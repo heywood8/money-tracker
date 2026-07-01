@@ -483,10 +483,14 @@ jest.mock('@react-native-community/datetimepicker', () => {
   };
 });
 
-// Mock react-native-chart-kit
+// Mock react-native-chart-kit (legacy root + modern v2 subpath)
 jest.mock('react-native-chart-kit', () => ({
   LineChart: () => 'LineChart',
   PieChart: () => 'PieChart',
+}));
+
+jest.mock('react-native-chart-kit/v2', () => ({
+  LineChart: () => 'LineChart',
 }));
 
 // Mock react-native-svg

@@ -14,8 +14,8 @@ jest.mock('../../app/contexts/DisplaySettingsContext', () => ({
   })),
 }));
 
-// Mock LineChart from react-native-chart-kit
-jest.mock('react-native-chart-kit', () => ({
+// Mock LineChart from the modern v2 charts subpath
+jest.mock('react-native-chart-kit/v2', () => ({
   LineChart: 'LineChart',
 }));
 
@@ -424,9 +424,9 @@ describe('BalanceHistoryCard', () => {
       );
 
       const lineChart = container.queryAll(n => n.type === 'LineChart')[0];
-      expect(lineChart.props.data.labels).toEqual(['1', '5', '10', '15', '20', '25', '28']);
-      // Should have 4 datasets: actual + plain avg + prevMonth + zero baseline (no forecast when not current month)
-      expect(lineChart.props.data.datasets).toHaveLength(4);
+      expect(lineChart.props.data.map(d => d.day)).toEqual(['1', '5', '10', '15', '20', '25', '28']);
+      // Should have 4 series: actual + plain avg + prevMonth + zero baseline (no forecast when not current month)
+      expect(lineChart.props.series).toHaveLength(4);
     });
 
     it('includes actual dataset with correct styling', async () => {
@@ -454,9 +454,9 @@ describe('BalanceHistoryCard', () => {
       );
 
       const lineChart = container.queryAll(n => n.type === 'LineChart')[0];
-      const actualDataset = lineChart.props.data.datasets[0];
-      expect(actualDataset.data).toEqual(mockBalanceHistoryData.actualForChart);
-      expect(actualDataset.strokeWidth).toBe(3);
+      const actualSeries = lineChart.props.series.find(s => s.yKey === 'actual');
+      expect(lineChart.props.data.map(d => d.actual)).toEqual(mockBalanceHistoryData.actualForChart);
+      expect(actualSeries.strokeWidth).toBe(3);
     });
 
     it('includes plain avg dataset as second dataset', async () => {
@@ -486,11 +486,11 @@ describe('BalanceHistoryCard', () => {
       );
 
       const lineChart = container.queryAll(n => n.type === 'LineChart')[0];
-      const plainAvgDataset = lineChart.props.data.datasets[1];
-      expect(plainAvgDataset.withDots).toBe(false);
-      expect(plainAvgDataset.strokeWidth).toBe(2);
+      const plainAvgSeries = lineChart.props.series.find(s => s.yKey === 'plainAvg');
+      expect(plainAvgSeries.dot).toBe(false);
+      expect(plainAvgSeries.strokeWidth).toBe(2);
       // Plain avg should be gray color
-      expect(plainAvgDataset.color()).toBe('rgba(128, 128, 128, 0.4)');
+      expect(plainAvgSeries.color).toBe('rgba(128, 128, 128, 0.4)');
     });
 
     it('combines actual and forecast data when isCurrentMonth with spendingPrediction', async () => {
@@ -534,8 +534,9 @@ describe('BalanceHistoryCard', () => {
       );
 
       const lineChart = container.queryAll(n => n.type === 'LineChart')[0];
-      // Should have 4 datasets: combined actual+forecast + plain avg + prevMonth + zero baseline
-      expect(lineChart.props.data.datasets).toHaveLength(4);
+      // 5 series: actual + forecast (split) + plain avg + prevMonth + zero baseline
+      expect(lineChart.props.series).toHaveLength(5);
+      expect(lineChart.props.series.find(s => s.yKey === 'forecast')).toBeTruthy();
 
       global.Date.mockRestore();
     });
@@ -567,10 +568,11 @@ describe('BalanceHistoryCard', () => {
       );
 
       const lineChart = container.queryAll(n => n.type === 'LineChart')[0];
-      // Should have 4 datasets: actual + plain avg + prevMonth + zero baseline (no forecast)
-      expect(lineChart.props.data.datasets).toHaveLength(4);
-      const prevMonthDataset = lineChart.props.data.datasets[2];
-      expect(prevMonthDataset.withDots).toBe(false);
+      // 4 series: actual + plain avg + prevMonth + zero baseline (no forecast)
+      expect(lineChart.props.series).toHaveLength(4);
+      const prevMonthSeries = lineChart.props.series.find(s => s.yKey === 'prevMonth');
+      expect(prevMonthSeries).toBeTruthy();
+      expect(prevMonthSeries.dot).toBe(false);
     });
 
     it('excludes prevMonth dataset when not available', async () => {
@@ -603,8 +605,9 @@ describe('BalanceHistoryCard', () => {
       );
 
       const lineChart = container.queryAll(n => n.type === 'LineChart')[0];
-      // Should have 3 datasets: actual + plain avg + zero baseline (no prevMonth)
-      expect(lineChart.props.data.datasets).toHaveLength(3);
+      // 3 series: actual + plain avg + zero baseline (no prevMonth)
+      expect(lineChart.props.series).toHaveLength(3);
+      expect(lineChart.props.series.find(s => s.yKey === 'prevMonth')).toBeFalsy();
     });
 
     it('excludes prevMonth dataset when all values are undefined', async () => {
@@ -637,8 +640,8 @@ describe('BalanceHistoryCard', () => {
       );
 
       const lineChart = container.queryAll(n => n.type === 'LineChart')[0];
-      // Should have 3 datasets: actual + plain avg + zero baseline (no prevMonth since all undefined)
-      expect(lineChart.props.data.datasets).toHaveLength(3);
+      // 3 series: actual + plain avg + zero baseline (no prevMonth since all undefined)
+      expect(lineChart.props.series).toHaveLength(3);
     });
   });
 
@@ -1217,7 +1220,7 @@ describe('BalanceHistoryCard', () => {
       );
 
       const lineChart = container.queryAll(n => n.type === 'LineChart')[0];
-      const actualDataset = lineChart.props.data.datasets[0];
+      const actualDataset = { data: lineChart.props.data.map(d => d.actual).filter(v => v !== null) };
       expect(actualDataset.data).toEqual([1000, 1200]); // undefined should be filtered
     });
 
@@ -1516,7 +1519,7 @@ describe('BalanceHistoryCard', () => {
       );
 
       const lineChart = container.queryAll(n => n.type === 'LineChart')[0];
-      const actualDataset = lineChart.props.data.datasets[0];
+      const actualDataset = { data: lineChart.props.data.map(d => d.actual).filter(v => v !== null) };
       expect(actualDataset.data).toEqual([500, 600, 700, 800, 750, 900, 1000]);
     });
 
@@ -1550,7 +1553,7 @@ describe('BalanceHistoryCard', () => {
       );
 
       const lineChart = container.queryAll(n => n.type === 'LineChart')[0];
-      const actualDataset = lineChart.props.data.datasets[0];
+      const actualDataset = { data: lineChart.props.data.map(d => d.actual).filter(v => v !== null) };
       expect(actualDataset.data).toEqual([500, 600, 700, 800, 750, 900, 1000]);
     });
 
@@ -1584,7 +1587,7 @@ describe('BalanceHistoryCard', () => {
       );
 
       const lineChart = container.queryAll(n => n.type === 'LineChart')[0];
-      const actualDataset = lineChart.props.data.datasets[0];
+      const actualDataset = { data: lineChart.props.data.map(d => d.actual).filter(v => v !== null) };
       expect(actualDataset.data).toEqual([500, 600, 700, 800, 750, 900, 1000]);
     });
 
@@ -1618,7 +1621,7 @@ describe('BalanceHistoryCard', () => {
       );
 
       const lineChart = container.queryAll(n => n.type === 'LineChart')[0];
-      const actualDataset = lineChart.props.data.datasets[0];
+      const actualDataset = { data: lineChart.props.data.map(d => d.actual).filter(v => v !== null) };
       // Labels are [1, 5, 10, 15, 20, 25, 31] — days 1, 5, 10 are <= 10
       expect(actualDataset.data).toEqual([500, 600, 700]);
     });
@@ -1653,7 +1656,7 @@ describe('BalanceHistoryCard', () => {
       );
 
       const lineChart = container.queryAll(n => n.type === 'LineChart')[0];
-      const actualDataset = lineChart.props.data.datasets[0];
+      const actualDataset = { data: lineChart.props.data.map(d => d.actual).filter(v => v !== null) };
       // Labels are [1, 5, 10, ...] — only day 1 is <= 3
       expect(actualDataset.data).toEqual([500]);
     });
@@ -1688,7 +1691,7 @@ describe('BalanceHistoryCard', () => {
       );
 
       const lineChart = container.queryAll(n => n.type === 'LineChart')[0];
-      const actualDataset = lineChart.props.data.datasets[0];
+      const actualDataset = { data: lineChart.props.data.map(d => d.actual).filter(v => v !== null) };
       // All labels [1, 5, 10, 15, 20, 25, 31] are <= 31
       expect(actualDataset.data).toEqual([500, 600, 700, 800, 750, 900, 1000]);
     });
@@ -1733,12 +1736,13 @@ describe('BalanceHistoryCard', () => {
       );
 
       const lineChart = container.queryAll(n => n.type === 'LineChart')[0];
-      const actualDataset = lineChart.props.data.datasets[0];
-      // Days 1, 5, 10, 15 are <= 16 (actual data), days 20, 25, 31 get forecast values
-      // Actual: [500, 600, 700, 800] + forecast for days 20, 25, 31
-      expect(actualDataset.data.length).toBeGreaterThan(4);
-      // First 4 values should be the actual data
-      expect(actualDataset.data.slice(0, 4)).toEqual([500, 600, 700, 800]);
+      // Forecast now lives in its own dashed series (days after today), not appended to actual
+      const forecastValues = lineChart.props.data.map(d => d.forecast).filter(v => v !== null);
+      expect(forecastValues.length).toBeGreaterThan(0);
+      expect(lineChart.props.series.find(s => s.yKey === 'forecast')).toBeTruthy();
+      // Actual series stops at today: days 1, 5, 10, 15 (<= 16)
+      const actualValues = lineChart.props.data.map(d => d.actual).filter(v => v !== null);
+      expect(actualValues).toEqual([500, 600, 700, 800]);
     });
   });
 
