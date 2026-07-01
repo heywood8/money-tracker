@@ -1,5 +1,12 @@
 # Changelog
 
+## [0.168.0](https://github.com/heywood8/money-tracker/compare/penny-v0.167.1...penny-v0.168.0) (2026-07-01)
+
+
+### Features
+
+* **operations:** parse DEBIT ACCOUNT notifications without learning category rules ([#1144](https://github.com/heywood8/money-tracker/issues/1144)) ([91d26f0](https://github.com/heywood8/money-tracker/commit/91d26f058c9d518aced609d362973169b0ea0bae))
+
 ## [0.167.1](https://github.com/heywood8/money-tracker/compare/penny-v0.167.0...penny-v0.167.1) (2026-06-30)
 
 
