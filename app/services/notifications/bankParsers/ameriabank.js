@@ -2,12 +2,18 @@
  * Bank notification parser for the Ameriabank app (`com.banqr.ameriabank`).
  *
  * Ameria posts each card event as a single pipe-delimited "ARCA transaction"
- * line. Four kinds are recognized today:
+ * line. Five kinds are recognized today:
  *
  *   PURCHASE                | 3,900.00 AMD  | 4083***7027, | NAREK MEHRABYAN, AM | 28.06.2026 10:15 | BALANCE: 133,719.97 AMD
  *   E-POS PURCHASE          | 129.99 EUR    | 4083***7027, | Nike ES, ES         | 29.06.2026 15:14 | BALANCE: 27,608.20 AMD
  *   C2C                     | 19,200.00 AMD | 4083***7027, | TO: N. DORVANYAN | AMERIABANK API GATE, AM | 28.06.2026 16:23 | BALANCE: 106,819.97 AMD
  *   PRE-PURCHASE COMPLETION | 2,800.00 AMD  | 4083***7027, | YANDEX.GO, AM | 30.06.2026 13:51 | BALANCE: 19,095.20 AMD
+ *   DEBIT ACCOUNT           | 7,500.00 AMD  | 4083***7027, | AMERIABANK API GATE, AM | 01.07.2026 12:02 | BALANCE: 104,320.20 AMD
+ *
+ * DEBIT ACCOUNT is a direct debit routed through the bank's API gateway (its
+ * merchant segment is the generic "AMERIABANK API GATE"). Like C2C, that generic
+ * counterparty covers many unrelated debits, so its category can never be inferred
+ * or learned — it is always reviewed manually (see KINDS_REQUIRING_CATEGORY).
  *
  * PRE-PURCHASE (the initial authorization hold) is intentionally ignored —
  * PRE-PURCHASE COMPLETION is the actual settled charge, so recording both
@@ -57,6 +63,11 @@ const KIND_TO_TYPE = {
   // amount may differ from the hold (e.g. a taxi fare calculated after the ride).
   // PRE-PURCHASE itself is intentionally omitted to avoid duplicate entries.
   'PRE-PURCHASE COMPLETION': 'expense',
+  // Direct debit routed through the bank's API gateway. An expense whose
+  // counterparty ("AMERIABANK API GATE") is generic across many unrelated
+  // debits, so — like C2C — its category cannot be inferred or learned. See
+  // KINDS_REQUIRING_CATEGORY below.
+  'DEBIT ACCOUNT': 'expense',
 };
 
 const KNOWN_KINDS = Object.keys(KIND_TO_TYPE);
@@ -65,10 +76,12 @@ const KNOWN_KINDS = Object.keys(KIND_TO_TYPE);
  * Kinds whose category must always be chosen by the user instead of being
  * inferred from learned merchant rules. A client-to-client transfer goes to the
  * same counterparty (a friend) for many different reasons, so any single learned
- * category would be wrong as often as right. These always land in the review
- * queue with the category left blank.
+ * category would be wrong as often as right. A DEBIT ACCOUNT is a direct debit
+ * whose merchant is the generic "AMERIABANK API GATE" gateway, which likewise
+ * spans many unrelated debits. These always land in the review queue with the
+ * category left blank, and no merchant rule is ever learned for them.
  */
-const KINDS_REQUIRING_CATEGORY = new Set(['C2C']);
+const KINDS_REQUIRING_CATEGORY = new Set(['C2C', 'DEBIT ACCOUNT']);
 
 /**
  * Whether a notification kind must always have its category chosen manually.
@@ -190,7 +203,7 @@ const toIsoDate = (day, month, year) => {
  *   country: string|null,     // ISO alpha-2, e.g. 'AM'
  *   date: string|null,        // 'YYYY-MM-DD'
  *   time: string|null,        // 'HH:MM'
- *   requiresCategory: boolean,// true when the category must be chosen manually (C2C)
+ *   requiresCategory: boolean,// true when the category must be chosen manually (C2C, DEBIT ACCOUNT)
  *   packageName: string|null, // source app, passed through for rule scoping
  *   raw: string,              // the original text, kept for auditing/debugging
  * }}
@@ -288,7 +301,8 @@ export const parse = (notification) => {
     country,
     date,
     time,
-    // C2C transfers must always be reviewed so the user picks the category.
+    // C2C transfers and DEBIT ACCOUNT debits must always be reviewed so the user
+    // picks the category (their counterparty is too generic to learn a rule from).
     requiresCategory: kindRequiresCategory(kind),
     packageName: notification.packageName || null,
     raw: text,
