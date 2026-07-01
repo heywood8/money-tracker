@@ -1,5 +1,12 @@
 # Changelog
 
+## [0.169.1](https://github.com/heywood8/money-tracker/compare/penny-v0.169.0...penny-v0.169.1) (2026-07-01)
+
+
+### Bug Fixes
+
+* **notifications:** round amounts when resolving from the review queue ([#1148](https://github.com/heywood8/money-tracker/issues/1148)) ([5107fb5](https://github.com/heywood8/money-tracker/commit/5107fb5e9daae8d284a7d72f2c7f3b2cd7f006b7))
+
 ## [0.169.0](https://github.com/heywood8/money-tracker/compare/penny-v0.168.0...penny-v0.169.0) (2026-07-01)
 
 
