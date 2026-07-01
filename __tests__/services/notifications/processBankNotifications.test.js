@@ -597,5 +597,20 @@ describe('processBankNotifications', () => {
       // ...but the friend -> category rule is never remembered.
       expect(NotificationRulesDB.upsertMerchantRule).not.toHaveBeenCalled();
     });
+
+    it('does not learn a merchant rule for a DEBIT ACCOUNT debit, even with a category', async () => {
+      PendingNotificationsDB.getPendingNotificationById.mockResolvedValue({
+        ...pending, kind: 'DEBIT ACCOUNT', merchant: 'AMERIABANK API GATE',
+      });
+      await pipeline.resolvePendingNotification('p1', { accountId: 7, categoryId: 'cat-fees' });
+
+      // The operation is still created and the card still learned...
+      expect(OperationsDB.createOperation).toHaveBeenCalledWith(
+        expect.objectContaining({ accountId: 7, categoryId: 'cat-fees' }),
+      );
+      expect(AccountsDB.setAccountCardMask).toHaveBeenCalledWith(7, '4083***7027');
+      // ...but the generic gateway -> category rule is never remembered.
+      expect(NotificationRulesDB.upsertMerchantRule).not.toHaveBeenCalled();
+    });
   });
 });

@@ -225,6 +225,52 @@ describe('parseBankNotification', () => {
     });
   });
 
+  describe('DEBIT ACCOUNT template (direct debit via API gateway)', () => {
+    // The Ameria "ARCA transaction" DEBIT ACCOUNT notification from the design.
+    const AMERIA_DEBIT_ACCOUNT = {
+      title: 'АРКА транзакции',
+      text: 'DEBIT ACCOUNT | 7,500.00 AMD | 4083***7027, | AMERIABANK API GATE, AM | 01.07.2026 12:02 | BALANCE: 104,320.20 AMD',
+      packageName: 'com.banqr.ameriabank',
+      postTime: 1782000900000,
+    };
+    let result;
+    beforeEach(() => {
+      result = parseBankNotification(AMERIA_DEBIT_ACCOUNT);
+    });
+
+    it('recognizes DEBIT ACCOUNT as a transaction', () => {
+      expect(result).not.toBeNull();
+    });
+
+    it('maps DEBIT ACCOUNT to an expense operation', () => {
+      expect(result.kind).toBe('DEBIT ACCOUNT');
+      expect(result.type).toBe('expense');
+    });
+
+    it('extracts amount, currency, card mask, merchant, country, date and time', () => {
+      expect(result.amount).toBe('7500.00');
+      expect(result.currency).toBe('AMD');
+      expect(result.cardMask).toBe('4083***7027');
+      expect(result.merchant).toBe('AMERIABANK API GATE');
+      expect(result.country).toBe('AM');
+      expect(result.date).toBe('2026-07-01');
+      expect(result.time).toBe('12:02');
+    });
+
+    it('flags that the category must be chosen manually (no learned binding)', () => {
+      expect(result.requiresCategory).toBe(true);
+    });
+
+    it('recognizes the DEBIT ACCOUNT keyword case-insensitively', () => {
+      const lower = parseBankNotification({
+        ...AMERIA_DEBIT_ACCOUNT,
+        text: AMERIA_DEBIT_ACCOUNT.text.replace('DEBIT ACCOUNT', 'debit account'),
+      });
+      expect(lower.kind).toBe('DEBIT ACCOUNT');
+      expect(lower.requiresCategory).toBe(true);
+    });
+  });
+
   describe('PRE-PURCHASE (authorization hold) is ignored to avoid duplicates', () => {
     it('returns null for a PRE-PURCHASE notification', () => {
       expect(
@@ -246,6 +292,11 @@ describe('parseBankNotification', () => {
     it('is true for C2C (any case)', () => {
       expect(kindRequiresCategory('C2C')).toBe(true);
       expect(kindRequiresCategory('c2c')).toBe(true);
+    });
+
+    it('is true for DEBIT ACCOUNT (any case)', () => {
+      expect(kindRequiresCategory('DEBIT ACCOUNT')).toBe(true);
+      expect(kindRequiresCategory('debit account')).toBe(true);
     });
 
     it('is false for PURCHASE and unknown/empty kinds', () => {
