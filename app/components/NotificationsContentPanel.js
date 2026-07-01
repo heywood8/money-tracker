@@ -1,6 +1,6 @@
 import React, { useRef, useEffect, useMemo } from 'react';
 import PropTypes from 'prop-types';
-import { View, StyleSheet, Animated, Easing, ScrollView, ActivityIndicator, RefreshControl } from 'react-native';
+import { View, StyleSheet, Animated, Easing, ScrollView, ActivityIndicator, RefreshControl, TouchableOpacity } from 'react-native';
 import { Text } from 'react-native-paper';
 import { Ionicons } from '@expo/vector-icons';
 import { useThemeColors } from '../contexts/ThemeColorsContext';
@@ -19,7 +19,7 @@ const formatPostTime = (postTime) => {
   return `${datePart} · ${timePart}`;
 };
 
-export function NotificationCard({ notification, colors, t }) {
+export function NotificationCard({ notification, colors, t, onReAdd, reAddState }) {
   const { title, text, packageName, postTime } = notification;
   const timeLabel = formatPostTime(postTime);
   // A notification that parses into a bank transaction is surfaced with an
@@ -67,6 +67,41 @@ export function NotificationCard({ notification, colors, t }) {
           {t('notification_no_text') || 'No text'}
         </Text>
       ) : null}
+      {/* Re-add lets the user turn an already-processed bank notification into an
+          operation again (e.g. after deleting the original or dismissing it). */}
+      {isBank && onReAdd ? (
+        <View style={styles.reAddRow}>
+          {reAddState === 'loading' ? (
+            <ActivityIndicator size="small" color={colors.primary} />
+          ) : reAddState === 'created' ? (
+            <View style={styles.reAddFeedback}>
+              <Ionicons name="checkmark-circle" size={15} color={colors.primary} />
+              <Text style={[styles.reAddFeedbackText, { color: colors.primary }]}>
+                {t('bank_notifications_readd_created') || 'Operation added'}
+              </Text>
+            </View>
+          ) : reAddState === 'pending' ? (
+            <View style={styles.reAddFeedback}>
+              <Ionicons name="list-outline" size={15} color={colors.mutedText} />
+              <Text style={[styles.reAddFeedbackText, { color: colors.mutedText }]}>
+                {t('bank_notifications_readd_queued') || 'Added to review queue'}
+              </Text>
+            </View>
+          ) : (
+            <TouchableOpacity
+              onPress={() => onReAdd(notification)}
+              style={[styles.reAddButton, { borderColor: colors.primary }]}
+              accessibilityRole="button"
+              accessibilityLabel={t('bank_notifications_readd') || 'Re-add operation'}
+            >
+              <Ionicons name="add-circle-outline" size={15} color={colors.primary} />
+              <Text style={[styles.reAddButtonText, { color: colors.primary }]}>
+                {t('bank_notifications_readd') || 'Re-add operation'}
+              </Text>
+            </TouchableOpacity>
+          )}
+        </View>
+      ) : null}
     </View>
   );
 }
@@ -80,6 +115,15 @@ NotificationCard.propTypes = {
   }).isRequired,
   colors: PropTypes.object.isRequired,
   t: PropTypes.func.isRequired,
+  // Optional: when provided, bank-parseable cards show a "Re-add operation" action.
+  onReAdd: PropTypes.func,
+  // Optional: 'loading' | 'created' | 'pending' feedback state for this card.
+  reAddState: PropTypes.oneOf(['loading', 'created', 'pending']),
+};
+
+NotificationCard.defaultProps = {
+  onReAdd: null,
+  reAddState: undefined,
 };
 
 export default function NotificationsContentPanel({ isLoading, notifications, onRefresh, bottomInset }) {
@@ -243,6 +287,33 @@ const styles = StyleSheet.create({
   },
   emptyIcon: {
     marginBottom: SPACING.xs,
+  },
+  reAddButton: {
+    alignItems: 'center',
+    borderRadius: BORDER_RADIUS.sm,
+    borderWidth: StyleSheet.hairlineWidth,
+    flexDirection: 'row',
+    gap: 4,
+    paddingHorizontal: SPACING.md,
+    paddingVertical: SPACING.xs,
+  },
+  reAddButtonText: {
+    fontSize: 13,
+    fontWeight: '600',
+  },
+  reAddFeedback: {
+    alignItems: 'center',
+    flexDirection: 'row',
+    gap: 4,
+    paddingVertical: SPACING.xs,
+  },
+  reAddFeedbackText: {
+    fontSize: 13,
+    fontWeight: '600',
+  },
+  reAddRow: {
+    alignItems: 'flex-start',
+    marginTop: SPACING.sm,
   },
   resultContainer: {
     flex: 1,

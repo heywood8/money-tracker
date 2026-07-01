@@ -20,7 +20,10 @@ jest.mock('../../app/contexts/ThemeColorsContext', () => ({
 }));
 jest.mock('../../app/contexts/AccountsDataContext', () => ({
   useAccountsData: () => ({
-    accounts: [{ id: 1, name: 'Checking', currency: 'AMD' }],
+    accounts: [
+      { id: 1, name: 'Checking', currency: 'AMD' },
+      { id: 2, name: 'Cash', currency: 'AMD' },
+    ],
   }),
 }));
 jest.mock('../../app/contexts/CategoriesContext', () => ({
@@ -73,6 +76,8 @@ describe('NotificationProcessingContentPanel', () => {
     pipeline.processBankNotifications.mockResolvedValue({ created: 0, pending: 1, skipped: 0 });
     pipeline.resolvePendingNotification.mockResolvedValue({ id: 1 });
     pipeline.dismissPendingNotification.mockResolvedValue();
+    pipeline.reAddNotification.mockResolvedValue({ created: 1, pending: 0, skipped: 0 });
+    pipeline.resolveAtmTargetAccount.mockResolvedValue(null);
     PendingNotificationsDB.getPendingNotifications.mockResolvedValue([PENDING]);
   });
 
@@ -207,5 +212,70 @@ describe('NotificationProcessingContentPanel', () => {
     // Must use the "hidden by filters" copy, not the "nothing recorded" copy.
     await waitFor(() => expect(getByText('notifications_all_filtered')).toBeTruthy());
     expect(queryByText('notifications_empty')).toBeNull();
+  });
+
+  describe('ATM cash transfer review', () => {
+    const ATM_PENDING = {
+      id: 'pt1', kind: 'ATM CASH', type: 'transfer', amount: '200000.00', currency: 'AMD',
+      cardMask: '4083***7027', merchant: 'ATM 401 REPUBLIC 67/1', date: '2026-07-01',
+      accountId: 1, categoryId: null, packageName: 'am.bank',
+    };
+
+    it('shows a target-account picker instead of a category grid for a transfer', async () => {
+      PendingNotificationsDB.getPendingNotifications.mockResolvedValue([ATM_PENDING]);
+      const { getByText, queryByTestId } = await render(<NotificationProcessingContentPanel />);
+      await waitFor(() => expect(getByText('ATM 401 REPUBLIC 67/1')).toBeTruthy());
+      // The "To account" field is present and the category grid is not.
+      expect(getByText('BANK_NOTIFICATIONS_TRANSFER_TO *')).toBeTruthy();
+      expect(queryByTestId('category-grid-c1')).toBeNull();
+    });
+
+    it('keeps Save disabled until a target account is bound/chosen', async () => {
+      // No cash account bound yet → target is unset → Save must be a no-op.
+      pipeline.resolveAtmTargetAccount.mockResolvedValue(null);
+      PendingNotificationsDB.getPendingNotifications.mockResolvedValue([ATM_PENDING]);
+      const { getByText } = await render(<NotificationProcessingContentPanel />);
+      await waitFor(() => expect(getByText('ATM 401 REPUBLIC 67/1')).toBeTruthy());
+
+      fireEvent.press(getByText('save'));
+      expect(pipeline.resolvePendingNotification).not.toHaveBeenCalled();
+    });
+
+    it('saves a transfer with the bound cash account pre-filled as the target', async () => {
+      // The bound cash account (id 2) pre-fills the target picker.
+      pipeline.resolveAtmTargetAccount.mockResolvedValue({ id: 2, currency: 'AMD' });
+      PendingNotificationsDB.getPendingNotifications.mockResolvedValue([ATM_PENDING]);
+      const { getByText } = await render(<NotificationProcessingContentPanel />);
+      await waitFor(() => expect(getByText('ATM 401 REPUBLIC 67/1')).toBeTruthy());
+
+      fireEvent.press(getByText('save'));
+      await waitFor(() =>
+        expect(pipeline.resolvePendingNotification).toHaveBeenCalledWith(
+          'pt1', expect.objectContaining({ accountId: 1, toAccountId: 2 }),
+        ),
+      );
+    });
+  });
+
+  describe('re-add operation', () => {
+    it('offers a re-add action on a bank-parseable recent notification', async () => {
+      const { getByText, getAllByText } = await render(<NotificationProcessingContentPanel />);
+      await waitFor(() => expect(getByText('New message')).toBeTruthy());
+      // Only the bank card (not the chat card) exposes the re-add action.
+      expect(getAllByText('bank_notifications_readd')).toHaveLength(1);
+    });
+
+    it('re-adds the operation and shows confirmation feedback', async () => {
+      const { getByText } = await render(<NotificationProcessingContentPanel />);
+      await waitFor(() => expect(getByText('bank_notifications_readd')).toBeTruthy());
+
+      fireEvent.press(getByText('bank_notifications_readd'));
+      await waitFor(() =>
+        expect(pipeline.reAddNotification).toHaveBeenCalledWith(
+          expect.objectContaining({ packageName: 'am.bank' }),
+        ),
+      );
+      await waitFor(() => expect(getByText('bank_notifications_readd_created')).toBeTruthy());
+    });
   });
 });

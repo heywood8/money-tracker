@@ -54,4 +54,19 @@ export const kindRequiresCategory = (kind, packageName) => {
   return BANK_PARSERS.some((candidate) => candidate.kindRequiresCategory(kind));
 };
 
+/**
+ * Whether a notification kind maps to a transfer between the user's own accounts
+ * (e.g. an ATM cash withdrawal). Scoped to the source app when known; otherwise
+ * true if any registered parser treats the kind that way.
+ *
+ * @param {string} kind
+ * @param {string} [packageName] - source app, for per-app scoping
+ * @returns {boolean}
+ */
+export const kindIsTransfer = (kind, packageName) => {
+  const parser = getParserForPackage(packageName);
+  if (parser) return parser.kindIsTransfer(kind);
+  return BANK_PARSERS.some((candidate) => candidate.kindIsTransfer(kind));
+};
+
 export default parseBankNotification;

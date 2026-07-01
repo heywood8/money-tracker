@@ -9,11 +9,18 @@
  *   C2C                     | 19,200.00 AMD | 4083***7027, | TO: N. DORVANYAN | AMERIABANK API GATE, AM | 28.06.2026 16:23 | BALANCE: 106,819.97 AMD
  *   PRE-PURCHASE COMPLETION | 2,800.00 AMD  | 4083***7027, | YANDEX.GO, AM | 30.06.2026 13:51 | BALANCE: 19,095.20 AMD
  *   DEBIT ACCOUNT           | 7,500.00 AMD  | 4083***7027, | AMERIABANK API GATE, AM | 01.07.2026 12:02 | BALANCE: 104,320.20 AMD
+ *   ATM CASH                | 200,000.00 AMD| 4083***7027, | ATM 401 REPUBLIC 67/1, AM | 01.07.2026 09:13 | BALANCE: 111,820.20 AMD
  *
  * DEBIT ACCOUNT is a direct debit routed through the bank's API gateway (its
  * merchant segment is the generic "AMERIABANK API GATE"). Like C2C, that generic
  * counterparty covers many unrelated debits, so its category can never be inferred
  * or learned — it is always reviewed manually (see KINDS_REQUIRING_CATEGORY).
+ *
+ * ATM CASH is a cash withdrawal: money leaves the card account and becomes
+ * physical cash. It is therefore a *transfer* (type 'transfer', see TRANSFER_KINDS)
+ * from the card account to a "cash" account rather than an expense. It has no
+ * category; instead it needs a target (cash) account, which the user binds the
+ * first time one is reviewed and which is remembered for future withdrawals.
  *
  * PRE-PURCHASE (the initial authorization hold) is intentionally ignored —
  * PRE-PURCHASE COMPLETION is the actual settled charge, so recording both
@@ -68,9 +75,30 @@ const KIND_TO_TYPE = {
   // debits, so — like C2C — its category cannot be inferred or learned. See
   // KINDS_REQUIRING_CATEGORY below.
   'DEBIT ACCOUNT': 'expense',
+  // Cash withdrawal at an ATM. The money doesn't leave the user's net worth —
+  // it moves from the card account into physical cash — so it is modelled as a
+  // transfer, not an expense. Its destination is a "cash" account the user binds
+  // once (see TRANSFER_KINDS).
+  'ATM CASH': 'transfer',
 };
 
 const KNOWN_KINDS = Object.keys(KIND_TO_TYPE);
+
+/**
+ * Kinds that move money between the user's own accounts (operation type
+ * 'transfer') rather than in or out of them. A transfer needs a *target* account
+ * instead of a category: an ATM withdrawal goes from the card account to a cash
+ * account. The target is bound on first review and reused thereafter.
+ */
+const TRANSFER_KINDS = new Set(['ATM CASH']);
+
+/**
+ * Whether a notification kind maps to a transfer between the user's own accounts.
+ * @param {string} kind
+ * @returns {boolean}
+ */
+export const kindIsTransfer = (kind) =>
+  TRANSFER_KINDS.has(String(kind || '').toUpperCase());
 
 /**
  * Kinds whose category must always be chosen by the user instead of being
@@ -204,6 +232,7 @@ const toIsoDate = (day, month, year) => {
  *   date: string|null,        // 'YYYY-MM-DD'
  *   time: string|null,        // 'HH:MM'
  *   requiresCategory: boolean,// true when the category must be chosen manually (C2C, DEBIT ACCOUNT)
+ *   isTransfer: boolean,      // true when the kind moves money between own accounts (ATM CASH)
  *   packageName: string|null, // source app, passed through for rule scoping
  *   raw: string,              // the original text, kept for auditing/debugging
  * }}
@@ -304,6 +333,9 @@ export const parse = (notification) => {
     // C2C transfers and DEBIT ACCOUNT debits must always be reviewed so the user
     // picks the category (their counterparty is too generic to learn a rule from).
     requiresCategory: kindRequiresCategory(kind),
+    // ATM CASH is a transfer between the user's own accounts (card -> cash), so it
+    // needs a target account rather than a category.
+    isTransfer: kindIsTransfer(kind),
     packageName: notification.packageName || null,
     raw: text,
   };
@@ -313,4 +345,5 @@ export default {
   packageNames: PACKAGE_NAMES,
   parse,
   kindRequiresCategory,
+  kindIsTransfer,
 };

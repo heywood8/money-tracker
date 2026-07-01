@@ -23,15 +23,18 @@ const PREF_KEYS = {
   BANK_NOTIFICATIONS_ENABLED: 'bank_notifications_enabled',
   BANK_NOTIFICATIONS_PROCESSED_SIGS: 'bank_notifications_processed_sigs',
   BANK_NOTIFICATIONS_PACKAGES: 'bank_notifications_packages',
+  BANK_NOTIFICATIONS_ATM_ACCOUNT: 'bank_notifications_atm_account',
 };
 jest.mock('../../../app/services/PreferencesDB', () => ({
   PREF_KEYS: {
     BANK_NOTIFICATIONS_ENABLED: 'bank_notifications_enabled',
     BANK_NOTIFICATIONS_PROCESSED_SIGS: 'bank_notifications_processed_sigs',
     BANK_NOTIFICATIONS_PACKAGES: 'bank_notifications_packages',
+    BANK_NOTIFICATIONS_ATM_ACCOUNT: 'bank_notifications_atm_account',
   },
   getPreference: jest.fn(),
   setPreference: jest.fn(),
+  getNumberPreference: jest.fn(),
   getJsonPreference: jest.fn(),
   setJsonPreference: jest.fn(),
 }));
@@ -71,6 +74,13 @@ const C2C = {
   packageName: PKG,
   postTime: 1782002580000,
 };
+// ATM cash withdrawal — booked as a transfer from the card account to a cash account.
+const ATM_CASH = {
+  title: 'АРКА транзакции',
+  text: 'ATM CASH | 200,000.00 AMD | 4083***7027, | ATM 401 REPUBLIC 67/1, AM | 01.07.2026 09:13 | BALANCE: 111,820.20 AMD',
+  packageName: PKG,
+  postTime: 1782003180000,
+};
 const NON_TRANSACTION = {
   title: 'Chat', text: 'Hi there', packageName: 'com.chat', postTime: 1782000800000,
 };
@@ -97,6 +107,10 @@ describe('processBankNotifications', () => {
     OperationsDB.createOperation.mockResolvedValue({ id: 1 });
     PendingNotificationsDB.addPendingNotification.mockResolvedValue({ id: 'p1' });
     AccountsDB.getAccountById.mockResolvedValue(null);
+    AccountsDB.setAccountCardMask.mockResolvedValue();
+    // No ATM "cash" target account bound by default.
+    PreferencesDB.getNumberPreference.mockResolvedValue(null);
+    PreferencesDB.setPreference.mockResolvedValue();
     Currency.fetchLiveExchangeRate.mockResolvedValue({ rate: null, source: 'none' });
   });
 
@@ -327,6 +341,58 @@ describe('processBankNotifications', () => {
           kind: 'C2C', merchant: 'N. DORVANYAN', accountId: 7, categoryId: null,
         }),
       );
+    });
+  });
+
+  describe('ATM CASH withdrawals (transfer)', () => {
+    it('auto-creates a transfer when the card + a bound cash account resolve and the source is trusted', async () => {
+      NotificationAccess.getRecentNotifications.mockResolvedValue([ATM_CASH]);
+      AccountsDB.getAccountByCardMask.mockResolvedValue({ id: 7, currency: 'AMD' });
+      PreferencesDB.getJsonPreference.mockImplementation((key) => prefs([], [PKG])(key));
+      // A cash account (id 9) is bound as the ATM transfer target.
+      PreferencesDB.getNumberPreference.mockResolvedValue(9);
+      AccountsDB.getAccountById.mockResolvedValue({ id: 9, currency: 'AMD' });
+
+      const summary = await pipeline.processBankNotifications();
+
+      expect(summary).toEqual({ created: 1, pending: 0, skipped: 0 });
+      expect(OperationsDB.createOperation).toHaveBeenCalledWith(
+        expect.objectContaining({
+          type: 'transfer', amount: '200000', accountId: 7, toAccountId: 9,
+          date: '2026-07-01', description: 'ATM 401 REPUBLIC 67/1',
+        }),
+      );
+    });
+
+    it('queues the transfer when no cash account is bound yet (first time)', async () => {
+      NotificationAccess.getRecentNotifications.mockResolvedValue([ATM_CASH]);
+      AccountsDB.getAccountByCardMask.mockResolvedValue({ id: 7, currency: 'AMD' });
+      PreferencesDB.getJsonPreference.mockImplementation((key) => prefs([], [PKG])(key));
+      PreferencesDB.getNumberPreference.mockResolvedValue(null); // no target bound
+
+      const summary = await pipeline.processBankNotifications();
+
+      expect(summary).toEqual({ created: 0, pending: 1, skipped: 0 });
+      expect(OperationsDB.createOperation).not.toHaveBeenCalled();
+      expect(PendingNotificationsDB.addPendingNotification).toHaveBeenCalledWith(
+        expect.objectContaining({
+          kind: 'ATM CASH', type: 'transfer', merchant: 'ATM 401 REPUBLIC 67/1',
+          accountId: 7, categoryId: null,
+        }),
+      );
+    });
+
+    it('queues the transfer when the source is not trusted even if a cash account is bound', async () => {
+      NotificationAccess.getRecentNotifications.mockResolvedValue([ATM_CASH]);
+      AccountsDB.getAccountByCardMask.mockResolvedValue({ id: 7, currency: 'AMD' });
+      PreferencesDB.getNumberPreference.mockResolvedValue(9);
+      AccountsDB.getAccountById.mockResolvedValue({ id: 9, currency: 'AMD' });
+      // allowlist empty -> not trusted
+
+      const summary = await pipeline.processBankNotifications();
+
+      expect(summary).toEqual({ created: 0, pending: 1, skipped: 0 });
+      expect(OperationsDB.createOperation).not.toHaveBeenCalled();
     });
   });
 
@@ -611,6 +677,121 @@ describe('processBankNotifications', () => {
       expect(AccountsDB.setAccountCardMask).toHaveBeenCalledWith(7, '4083***7027');
       // ...but the generic gateway -> category rule is never remembered.
       expect(NotificationRulesDB.upsertMerchantRule).not.toHaveBeenCalled();
+    });
+  });
+
+  describe('resolvePendingNotification — transfers (ATM cash)', () => {
+    const pendingTransfer = {
+      id: 'pt1', kind: 'ATM CASH', type: 'transfer', amount: '200000.00', currency: 'AMD',
+      cardMask: '4083***7027', merchant: 'ATM 401 REPUBLIC 67/1', date: '2026-07-01',
+      accountId: null, categoryId: null, packageName: PKG,
+      createdAt: '2026-07-01T09:13:00.000Z',
+    };
+
+    it('creates a transfer, learns the card, binds the cash account and trusts the source', async () => {
+      PendingNotificationsDB.getPendingNotificationById.mockResolvedValue(pendingTransfer);
+      AccountsDB.getAccountById.mockImplementation(async (id) =>
+        id === 7 ? { id: 7, currency: 'AMD' } : id === 9 ? { id: 9, currency: 'AMD' } : null);
+      PreferencesDB.getJsonPreference.mockImplementation((key) => prefs([], [])(key));
+
+      await pipeline.resolvePendingNotification('pt1', { accountId: 7, toAccountId: 9 });
+
+      expect(OperationsDB.createOperation).toHaveBeenCalledWith(
+        expect.objectContaining({
+          type: 'transfer', amount: '200000', accountId: 7, toAccountId: 9,
+          date: '2026-07-01', description: 'ATM 401 REPUBLIC 67/1',
+        }),
+      );
+      // Learns the card -> source-account binding.
+      expect(AccountsDB.setAccountCardMask).toHaveBeenCalledWith(7, '4083***7027');
+      // Binds the cash account for future auto-create ("first time" binding).
+      expect(PreferencesDB.setPreference).toHaveBeenCalledWith('bank_notifications_atm_account', '9');
+      // Trusts the source package for auto-create.
+      expect(PreferencesDB.setJsonPreference).toHaveBeenCalledWith(
+        'bank_notifications_packages', [PKG],
+      );
+      // No merchant -> category rule for a transfer.
+      expect(NotificationRulesDB.upsertMerchantRule).not.toHaveBeenCalled();
+      expect(PendingNotificationsDB.deletePendingNotification).toHaveBeenCalledWith('pt1');
+    });
+
+    it('throws when no target account is chosen', async () => {
+      PendingNotificationsDB.getPendingNotificationById.mockResolvedValue(pendingTransfer);
+      await expect(
+        pipeline.resolvePendingNotification('pt1', { accountId: 7 }),
+      ).rejects.toThrow(/target account/);
+      expect(OperationsDB.createOperation).not.toHaveBeenCalled();
+    });
+
+    it('throws when source and target are the same account', async () => {
+      PendingNotificationsDB.getPendingNotificationById.mockResolvedValue(pendingTransfer);
+      await expect(
+        pipeline.resolvePendingNotification('pt1', { accountId: 7, toAccountId: 7 }),
+      ).rejects.toThrow(/same source and target/);
+      expect(OperationsDB.createOperation).not.toHaveBeenCalled();
+    });
+
+    it('books a cross-currency transfer with a destination amount and rate', async () => {
+      PendingNotificationsDB.getPendingNotificationById.mockResolvedValue(pendingTransfer);
+      AccountsDB.getAccountById.mockImplementation(async (id) =>
+        id === 7 ? { id: 7, currency: 'AMD' } : id === 9 ? { id: 9, currency: 'USD' } : null);
+      Currency.fetchLiveExchangeRate.mockResolvedValue({ rate: '0.0026', source: 'offline' });
+
+      await pipeline.resolvePendingNotification('pt1', { accountId: 7, toAccountId: 9 });
+
+      expect(OperationsDB.createOperation).toHaveBeenCalledWith(
+        expect.objectContaining({
+          type: 'transfer', accountId: 7, toAccountId: 9,
+          amount: '200000', destinationAmount: '520.00',
+          exchangeRate: '0.0026', sourceCurrency: 'AMD', destinationCurrency: 'USD',
+        }),
+      );
+    });
+  });
+
+  describe('reAddNotification', () => {
+    it('re-creates the operation for a fully-resolved notification, bypassing the trust gate', async () => {
+      AccountsDB.getAccountByCardMask.mockResolvedValue({ id: 7, currency: 'AMD' });
+      NotificationRulesDB.getMerchantRule.mockResolvedValue({ categoryId: 'cat-food' });
+      // allowlist empty -> normally not trusted, but re-add is user-initiated.
+      PreferencesDB.getJsonPreference.mockImplementation((key) => prefs([], [])(key));
+
+      const summary = await pipeline.reAddNotification(PURCHASE);
+
+      expect(summary).toEqual({ created: 1, pending: 0, skipped: 0 });
+      expect(OperationsDB.createOperation).toHaveBeenCalledWith(
+        expect.objectContaining({ type: 'expense', accountId: 7, categoryId: 'cat-food' }),
+      );
+    });
+
+    it('queues for review when the notification cannot be fully resolved', async () => {
+      AccountsDB.getAccountByCardMask.mockResolvedValue(null);
+      AccountsDB.getAllAccounts.mockResolvedValue([]);
+
+      const summary = await pipeline.reAddNotification(PURCHASE);
+
+      expect(summary).toEqual({ created: 0, pending: 1, skipped: 0 });
+      expect(PendingNotificationsDB.addPendingNotification).toHaveBeenCalled();
+    });
+
+    it('re-adds an ATM cash withdrawal as a transfer when a cash account is bound', async () => {
+      AccountsDB.getAccountByCardMask.mockResolvedValue({ id: 7, currency: 'AMD' });
+      PreferencesDB.getNumberPreference.mockResolvedValue(9);
+      AccountsDB.getAccountById.mockResolvedValue({ id: 9, currency: 'AMD' });
+
+      const summary = await pipeline.reAddNotification(ATM_CASH);
+
+      expect(summary).toEqual({ created: 1, pending: 0, skipped: 0 });
+      expect(OperationsDB.createOperation).toHaveBeenCalledWith(
+        expect.objectContaining({ type: 'transfer', accountId: 7, toAccountId: 9 }),
+      );
+    });
+
+    it('is a no-op (skipped) for a non-bank notification', async () => {
+      const summary = await pipeline.reAddNotification(NON_TRANSACTION);
+      expect(summary).toEqual({ created: 0, pending: 0, skipped: 1 });
+      expect(OperationsDB.createOperation).not.toHaveBeenCalled();
+      expect(PendingNotificationsDB.addPendingNotification).not.toHaveBeenCalled();
     });
   });
 });

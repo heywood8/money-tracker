@@ -7,7 +7,8 @@
  * another bank is just another parser module registered here.
  *
  * A parser is an object: `{ packageNames: string[], parse(notification) =>
- * descriptor|null, kindRequiresCategory(kind) => boolean }`.
+ * descriptor|null, kindRequiresCategory(kind) => boolean,
+ * kindIsTransfer(kind) => boolean }`.
  */
 
 import ameriabank from './ameriabank';
