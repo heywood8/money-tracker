@@ -1,5 +1,12 @@
 # Changelog
 
+## [0.170.0](https://github.com/heywood8/money-tracker/compare/penny-v0.169.1...penny-v0.170.0) (2026-07-01)
+
+
+### Features
+
+* **graphs:** migrate balance-history chart to react-native-chart-kit v7 modern LineChart ([#1139](https://github.com/heywood8/money-tracker/issues/1139)) ([a1f6d35](https://github.com/heywood8/money-tracker/commit/a1f6d352d9b87af82dd3a8475dfb2aaa080d1f1b))
+
 ## [0.169.1](https://github.com/heywood8/money-tracker/compare/penny-v0.169.0...penny-v0.169.1) (2026-07-01)
 
 
