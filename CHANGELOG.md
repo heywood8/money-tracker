@@ -1,5 +1,12 @@
 # Changelog
 
+## [0.170.1](https://github.com/heywood8/money-tracker/compare/penny-v0.170.0...penny-v0.170.1) (2026-07-02)
+
+
+### Bug Fixes
+
+* resolve 24 functionality bugs across budgets, backup, dates, and multi-currency flows ([#1151](https://github.com/heywood8/money-tracker/issues/1151)) ([6dbc706](https://github.com/heywood8/money-tracker/commit/6dbc7063edd711680bfe7ff32a5f53d7160a1d0f))
+
 ## [0.170.0](https://github.com/heywood8/money-tracker/compare/penny-v0.169.1...penny-v0.170.0) (2026-07-01)
 
 
