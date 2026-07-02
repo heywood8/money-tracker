@@ -21,6 +21,7 @@ import ListCard from '../components/ListCard';
 import OperationsList from '../components/operations/OperationsList';
 import QuickAddForm from '../components/operations/QuickAddForm';
 import PickerModal from '../components/operations/PickerModal';
+import UndoSnackbar from '../components/operations/UndoSnackbar';
 import SearchOverlay from '../components/search/SearchOverlay';
 import SearchBar from '../components/search/SearchBar';
 import FilterChipStrip from '../components/search/FilterChipStrip';
@@ -74,6 +75,11 @@ const OperationsScreen = () => {
   // a ref so applying a label does not depend on the freshly-created operation
   // having already been re-loaded into `operations` (which is async).
   const pendingOpDescRef = useRef('');
+  // Undo bar for a just-added operation. `token` bumps on every add so the
+  // snackbar remounts (restarting its countdown/animation) when operations are
+  // added back-to-back within the 5-second window.
+  const [undoInfo, setUndoInfo] = useState(null); // null | { id, token }
+  const undoTokenRef = useRef(0);
   const [filterPanelHeight, setFilterPanelHeight] = useState(0);
   // Seeded with an estimate of the collapsed search-pill area so the list's top
   // inset is roughly right on first paint; the real value arrives via onLayout.
@@ -556,6 +562,12 @@ const OperationsScreen = () => {
 
       const createdOperation = await addOperation(operationData);
 
+      // Offer a brief window to undo the just-created operation.
+      if (createdOperation?.id) {
+        undoTokenRef.current += 1;
+        setUndoInfo({ id: createdOperation.id, token: undoTokenRef.current });
+      }
+
       // Save last accessed account
       if (quickAddValues.accountId) {
         setLastAccessedAccount(quickAddValues.accountId);
@@ -635,6 +647,23 @@ const OperationsScreen = () => {
   const handleDismissSuggestion = useCallback(() => {
     setPendingSuggestionId(null);
     setPendingSuggestions([]);
+  }, []);
+
+  // Undo a just-added operation: delete it and drop any label suggestions that
+  // targeted it (otherwise the suggestion row would point at a deleted op).
+  const handleUndoAdd = useCallback((operationId) => {
+    deleteOperation(operationId);
+    setPendingSuggestionId((prev) => {
+      if (prev === operationId) {
+        setPendingSuggestions([]);
+        return null;
+      }
+      return prev;
+    });
+  }, [deleteOperation]);
+
+  const handleUndoClosed = useCallback(() => {
+    setUndoInfo(null);
   }, []);
 
   // Keep the suggestion row in sync with the operation's current labels. When the
@@ -955,6 +984,20 @@ const OperationsScreen = () => {
         >
           <Icon name="chevron-up" size={24} color={colors.text} />
         </TouchableOpacity>
+      )}
+
+      {/* Undo bar for the most recently added operation (auto-hides after 5s) */}
+      {undoInfo && (
+        <UndoSnackbar
+          key={undoInfo.token}
+          operationId={undoInfo.id}
+          message={t('operation_added')}
+          actionLabel={t('undo')}
+          duration={5000}
+          colors={colors}
+          onUndo={handleUndoAdd}
+          onClosed={handleUndoClosed}
+        />
       )}
 
       <OperationModal

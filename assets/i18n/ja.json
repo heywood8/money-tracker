@@ -479,6 +479,7 @@
   "mark_as_executed": "実行済みにする",
   "marked_as_executed": "実行済みにしました",
   "undo": "元に戻す",
+  "operation_added": "取引を追加しました",
   "marked_as_pending": "未実行にしました",
   "loading_accounts": "アカウントを読み込み中...",
   "loading_categories": "カテゴリを読み込み中...",
