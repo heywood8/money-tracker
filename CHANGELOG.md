@@ -1,5 +1,12 @@
 # Changelog
 
+## [0.172.0](https://github.com/heywood8/money-tracker/compare/penny-v0.171.0...penny-v0.172.0) (2026-07-02)
+
+
+### Features
+
+* **planned:** add undo swipe action for executed operations ([#1155](https://github.com/heywood8/money-tracker/issues/1155)) ([eda93ac](https://github.com/heywood8/money-tracker/commit/eda93ac8d620d9830f4b99fce404ad3005c1819d))
+
 ## [0.171.0](https://github.com/heywood8/money-tracker/compare/penny-v0.170.1...penny-v0.171.0) (2026-07-02)
 
 
