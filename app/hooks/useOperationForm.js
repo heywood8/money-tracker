@@ -70,11 +70,12 @@ const useOperationForm = ({
     return category?.isShadow || false;
   }, [operation, categories]);
 
-  // Check if operation date is today (for shadow operations)
+  // Check if operation date is today (for shadow operations).
+  // Compare against the LOCAL date — operation dates are stored as local
+  // YYYY-MM-DD strings, so the UTC date would mismatch near midnight.
   const isOperationToday = useMemo(() => {
     if (!operation) return false;
-    const today = new Date().toISOString().split('T')[0];
-    return operation.date === today;
+    return operation.date === formatDate(new Date());
   }, [operation]);
 
   // Imported MoneyOK operations carry protected metadata labels (Account:/Category:/
@@ -112,6 +113,34 @@ const useOperationForm = ({
     if (!values.operationCurrency || !sourceAccount) return false;
     return values.operationCurrency !== sourceAccount.currency;
   }, [values.type, values.operationCurrency, sourceAccount]);
+
+  // Clear a stale exchange rate when the currency PAIR changes — e.g. the user
+  // switches a transfer's destination from a EUR account to an AMD account. The
+  // auto-populate effect below only fires when exchangeRate is empty, so without
+  // this reset the old pair's rate would silently be applied to the new pair
+  // (crediting the destination a wildly wrong amount).
+  const ratePairRef = useRef(null);
+  useEffect(() => {
+    if (!visible) {
+      ratePairRef.current = null;
+      return;
+    }
+    const forTransfer = isMultiCurrencyTransfer && sourceAccount && destinationAccount;
+    const forForeignOp = isForeignCurrencyOp && sourceAccount && values.operationCurrency;
+    if (!forTransfer && !forForeignOp) {
+      ratePairRef.current = null;
+      return;
+    }
+    const fromCurrency = forForeignOp ? values.operationCurrency : sourceAccount.currency;
+    const toCurrency = forForeignOp ? sourceAccount.currency : destinationAccount?.currency;
+    if (!fromCurrency || !toCurrency) return;
+    const pair = `${fromCurrency}:${toCurrency}`;
+    if (ratePairRef.current && ratePairRef.current !== pair && values.exchangeRate) {
+      setValues(v => ({ ...v, exchangeRate: '', destinationAmount: '' }));
+      setLastEditedField(null);
+    }
+    ratePairRef.current = pair;
+  }, [visible, isMultiCurrencyTransfer, isForeignCurrencyOp, sourceAccount, destinationAccount, values.operationCurrency, values.exchangeRate]);
 
   // Auto-populate exchange rate when a multicurrency pair is detected and no rate is set yet.
   // Handles both multicurrency transfers and foreign currency expense/income ops.
@@ -472,7 +501,13 @@ const useOperationForm = ({
     // Automatically evaluate any pending math operation before saving
     let finalAmount = values.amount;
     if (hasOperation(values.amount)) {
-      const evaluated = evaluateExpression(values.amount, Currency.getDecimalPlaces(sourceAccount?.currency));
+      // The calculator amount is entered in the operation currency when a foreign
+      // currency is selected — evaluate with THAT currency's decimal places, not
+      // the account's (e.g. a USD amount on a JPY account must keep its cents).
+      const amountCurrency = (isForeignCurrencyOp && values.operationCurrency)
+        ? values.operationCurrency
+        : sourceAccount?.currency;
+      const evaluated = evaluateExpression(values.amount, Currency.getDecimalPlaces(amountCurrency));
       if (evaluated !== null) {
         finalAmount = evaluated;
       }
@@ -508,7 +543,7 @@ const useOperationForm = ({
     }
 
     onClose();
-  }, [values, validateFields, prepareOperationData, isNew, addOperation, updateOperation, operation, onClose, validateOperation, showDialog, t]);
+  }, [values, validateFields, prepareOperationData, isNew, addOperation, updateOperation, operation, onClose, validateOperation, showDialog, t, isForeignCurrencyOp, sourceAccount]);
 
   // Close modal
   const handleClose = useCallback(() => {
@@ -547,9 +582,10 @@ const useOperationForm = ({
     return displayName || t('select_category');
   }, [categories, t]);
 
-  // Helper: Format date for display
+  // Helper: Format date for display. Bare YYYY-MM-DD parses as UTC midnight,
+  // which is the previous local day west of Greenwich — anchor to local time.
   const formatDateForDisplay = useCallback((isoDate) => {
-    const date = new Date(isoDate);
+    const date = new Date(isoDate.includes('T') ? isoDate : `${isoDate}T00:00:00`);
     return date.toLocaleDateString(undefined, {
       year: 'numeric',
       month: 'long',

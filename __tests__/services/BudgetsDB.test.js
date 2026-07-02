@@ -803,6 +803,43 @@ describe('BudgetsDB Service', () => {
           BudgetsDB.getCurrentPeriodDates('invalid');
         }).toThrow('Invalid period type: invalid');
       });
+
+      describe('Regression Tests', () => {
+        it('weekly period spans exactly 7 days when the week starts in the previous month', async () => {
+          // Thu Jul 2 2026: Monday of that week is Jun 29. The end must be
+          // Sun Jul 5 — the old code applied start's day-of-month (29+6=35)
+          // to a July-based date, producing Aug 4 (a ~5 week "week").
+          const referenceDate = new Date(2026, 6, 2);
+          const { start, end } = BudgetsDB.getCurrentPeriodDates('weekly', referenceDate);
+
+          expect(start.getFullYear()).toBe(2026);
+          expect(start.getMonth()).toBe(5); // June
+          expect(start.getDate()).toBe(29);
+          expect(end.getFullYear()).toBe(2026);
+          expect(end.getMonth()).toBe(6); // July
+          expect(end.getDate()).toBe(5);
+        });
+
+        it('monthly period ends in the same month when the reference day does not exist in the next month', async () => {
+          // Jan 31: setMonth(+1) on the 31st used to roll to Mar 3, then
+          // setDate(0) yielded Feb 28 — a two-month "monthly" period.
+          const referenceDate = new Date(2026, 0, 31);
+          const { start, end } = BudgetsDB.getCurrentPeriodDates('monthly', referenceDate);
+
+          expect(start.getMonth()).toBe(0); // January
+          expect(start.getDate()).toBe(1);
+          expect(end.getMonth()).toBe(0); // January
+          expect(end.getDate()).toBe(31);
+        });
+
+        it('monthly period is correct on the 31st of months preceding 30-day months', async () => {
+          const referenceDate = new Date(2026, 2, 31); // Mar 31
+          const { start, end } = BudgetsDB.getCurrentPeriodDates('monthly', referenceDate);
+
+          expect(end.getMonth()).toBe(2); // March
+          expect(end.getDate()).toBe(31);
+        });
+      });
     });
 
     describe('getNextPeriodDates', () => {

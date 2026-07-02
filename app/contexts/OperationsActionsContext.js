@@ -7,6 +7,7 @@ import { appEvents, EVENTS } from '../services/eventEmitter';
 import { useDialog } from './DialogContext';
 import { setJsonPreference, PREF_KEYS } from '../services/PreferencesDB';
 import { useOperationsData } from './OperationsDataContext';
+import { formatDate as formatLocalDate } from '../services/BalanceHistoryDB';
 
 /**
  * OperationsActionsContext provides stable action functions for operations.
@@ -221,7 +222,8 @@ export const OperationsActionsProvider = ({ children }) => {
         const currentFilters = activeFiltersRef.current;
         const isFiltered = _hasActiveFilters(currentFilters);
 
-        const todayStr = new Date().toISOString().split('T')[0];
+        // Local date — operation dates are stored as local YYYY-MM-DD strings
+        const todayStr = formatLocalDate(new Date());
         let nextOp;
         if (!_oldestLoadedDate) {
           nextOp = isFiltered
@@ -579,10 +581,11 @@ export const OperationsActionsProvider = ({ children }) => {
       const currentFilters = activeFiltersRef.current;
       const isFiltered = _hasActiveFilters(currentFilters);
 
-      // Calculate today's date in YYYY-MM-DD format
-      const today = new Date();
-      today.setHours(0, 0, 0, 0);
-      const todayStr = today.toISOString().split('T')[0];
+      // Calculate today's date in YYYY-MM-DD format using the LOCAL calendar day.
+      // toISOString would yield yesterday's date for UTC+ timezones, silently
+      // excluding today's operations from the loaded range (and hasNewerOperations
+      // is set false below, so they could never be paged back in).
+      const todayStr = formatLocalDate(new Date());
 
       // Load all operations from the selected date to today
       const operationsData = isFiltered

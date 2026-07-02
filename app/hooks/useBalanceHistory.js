@@ -69,19 +69,23 @@ const useBalanceHistory = (selectedAccount, selectedYear, selectedMonth) => {
       const prevHistory = await getBalanceHistory(selectedAccount, prevStartDateStr, prevEndDateStr);
       const prevMonthTotalExpenses = await getTotalExpenses(selectedAccount, prevStartDateStr, prevEndDateStr);
 
-      // Get current month's total expenses for the selected account (used for spending prediction)
-      const currentMonthTotalExpenses = await getTotalExpenses(selectedAccount, startDateStr, endDateStr);
+      // Get current day of month
+      const now = new Date();
+      const isCurrentMonth = selectedYear === now.getFullYear() && selectedMonth === now.getMonth();
+      const currentDay = isCurrentMonth ? now.getDate() : endDate.getDate();
+
+      // Get current month's total expenses for the selected account (used for
+      // spending prediction). For the current month, cap the window at today —
+      // the prediction divides by elapsed days, so future-dated operations
+      // (e.g. scheduled rent later this month) must not inflate the average.
+      const expenseEndStr = isCurrentMonth ? formatDate(now) : endDateStr;
+      const currentMonthTotalExpenses = await getTotalExpenses(selectedAccount, startDateStr, expenseEndStr);
 
       // Transform history data for chart
       const dataPoints = history.map(item => ({
         date: item.date,
         balance: parseFloat(item.balance),
       }));
-
-      // Get current day of month
-      const now = new Date();
-      const isCurrentMonth = selectedYear === now.getFullYear() && selectedMonth === now.getMonth();
-      const currentDay = isCurrentMonth ? now.getDate() : endDate.getDate();
 
       // Generate all days in month for x-axis
       const daysInMonth = endDate.getDate();

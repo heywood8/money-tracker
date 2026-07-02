@@ -98,7 +98,15 @@ const useExpenseData = (selectedYear, selectedMonth, selectedCurrency, selectedC
         const category = categoryMap.get(item.category_id);
         if (!category) return;
 
-        if (category.parentId === selectedCategory) {
+        // Spending recorded directly on the selected category itself must not be
+        // dropped — without its own bucket the drill-down total shrinks below the
+        // parent's slice in the "all" view.
+        if (category.id === selectedCategory) {
+          if (!aggregatedSpending[category.id]) {
+            aggregatedSpending[category.id] = { category, total: '0' };
+          }
+          aggregatedSpending[category.id].total = Currency.add(aggregatedSpending[category.id].total, item.total);
+        } else if (category.parentId === selectedCategory) {
           if (!aggregatedSpending[category.id]) {
             aggregatedSpending[category.id] = { category, total: '0' };
           }

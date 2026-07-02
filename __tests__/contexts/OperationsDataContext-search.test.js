@@ -551,6 +551,47 @@ describe('OperationsDataContext - Search API', () => {
           expect(result.current.data.operations).toHaveLength(5);
         });
       });
+
+      it('includes incoming transfers when filtering by the destination account (regression)', async () => {
+        // op-4 is a transfer acc-1 → acc-2. Filtering by acc-2 must show it —
+        // the SQL layer matches account_id OR to_account_id, and the in-memory
+        // filter used to drop incoming transfers silently.
+        const result = await setupWithOperations();
+
+        await waitFor(() => {
+          expect(result.current.data.operations).toHaveLength(5);
+        });
+
+        await act(async () => {
+          result.current.actions.updateSearchFilters({ accountIds: ['acc-2'] });
+        });
+
+        await waitFor(() => {
+          const filtered = result.current.data.operations;
+          expect(filtered.map(op => op.id).sort()).toEqual(['op-2', 'op-4', 'op-5']);
+        });
+      });
+    });
+
+    describe('destination account text search (regression)', () => {
+      it('finds transfers by the destination account name', async () => {
+        // "Bank Account" is acc-2's name; op-4 transfers INTO acc-2 and its
+        // description ("Transfer to bank") does not contain the full phrase.
+        const result = await setupWithOperations();
+
+        await waitFor(() => {
+          expect(result.current.data.operations).toHaveLength(5);
+        });
+
+        await act(async () => {
+          result.current.actions.updateSearchFilters({ text: 'Bank Account' });
+        });
+
+        await waitFor(() => {
+          const ids = result.current.data.operations.map(op => op.id);
+          expect(ids).toContain('op-4');
+        });
+      });
     });
 
     describe('category filtering', () => {

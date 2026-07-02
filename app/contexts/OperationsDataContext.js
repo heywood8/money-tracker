@@ -160,9 +160,14 @@ export const OperationsDataProvider = ({ children }) => {
           }
         }
 
-        // match account name
+        // match account name (source and transfer destination — SQL search matches
+        // both a.name and to_a.name, so the in-memory pass must agree)
         const accountName = accountNameById.get(op.accountId);
         if (accountName && normalizeSearchText(accountName).includes(searchLower)) {
+          return true;
+        }
+        const toAccountName = op.toAccountId ? accountNameById.get(op.toAccountId) : null;
+        if (toAccountName && normalizeSearchText(toAccountName).includes(searchLower)) {
           return true;
         }
 
@@ -190,9 +195,14 @@ export const OperationsDataProvider = ({ children }) => {
       result = result.filter(op => searchState.types.includes(op.type));
     }
 
-    // account filter
+    // account filter — a transfer belongs to both its source and destination
+    // account (the SQL filters match account_id OR to_account_id; incoming
+    // transfers must not disappear when filtering by the receiving account)
     if (searchState.accountIds.length > 0) {
-      result = result.filter(op => searchState.accountIds.includes(op.accountId));
+      result = result.filter(op =>
+        searchState.accountIds.includes(op.accountId) ||
+        (op.toAccountId != null && searchState.accountIds.includes(op.toAccountId)),
+      );
     }
 
     // category filter
