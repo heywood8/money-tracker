@@ -1,5 +1,12 @@
 # Changelog
 
+## [0.171.0](https://github.com/heywood8/money-tracker/compare/penny-v0.170.1...penny-v0.171.0) (2026-07-02)
+
+
+### Features
+
+* **planned:** add mark-as-executed action and fix swipe row transparency ([#1153](https://github.com/heywood8/money-tracker/issues/1153)) ([0b66049](https://github.com/heywood8/money-tracker/commit/0b66049daa573e3b952582a7b30fad3ff14d30ea))
+
 ## [0.170.1](https://github.com/heywood8/money-tracker/compare/penny-v0.170.0...penny-v0.170.1) (2026-07-02)
 
 
