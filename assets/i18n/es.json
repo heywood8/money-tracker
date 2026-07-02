@@ -478,6 +478,8 @@
   "execute": "Ejecutar",
   "mark_as_executed": "Marcar como ejecutada",
   "marked_as_executed": "Marcada como ejecutada",
+  "undo": "Deshacer",
+  "marked_as_pending": "Marcada como pendiente",
   "loading_accounts": "Cargando cuentas...",
   "loading_categories": "Cargando categorías...",
   "none": "Ninguno",

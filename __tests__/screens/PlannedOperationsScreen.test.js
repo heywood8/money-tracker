@@ -32,6 +32,7 @@ jest.mock('../../app/contexts/DialogContext', () => ({
 
 const mockExecute = jest.fn();
 const mockMarkExecuted = jest.fn();
+const mockUpdate = jest.fn();
 const mockDelete = jest.fn();
 const mockIsExecuted = jest.fn();
 
@@ -45,6 +46,7 @@ jest.mock('../../app/contexts/PlannedOperationsContext', () => ({
     loading: false,
     executePlannedOperation: mockExecute,
     markPlannedOperationExecuted: mockMarkExecuted,
+    updatePlannedOperation: mockUpdate,
     deletePlannedOperation: mockDelete,
     isExecutedThisMonth: mockIsExecuted,
   }),
@@ -192,6 +194,23 @@ describe('PlannedOperationsScreen', () => {
       mockIsExecuted.mockReturnValue(true);
       const { queryByTestId } = await renderScreen();
       expect(queryByTestId('mark-executed-action-r1')).toBeNull();
+    });
+  });
+
+  describe('Undo action', () => {
+    it('calls updatePlannedOperation with a cleared lastExecutedMonth when undo swipe action is pressed', async () => {
+      mockIsExecuted.mockImplementation((op) => op.id === 'r1');
+      const { getByTestId } = await renderScreen();
+      await fireEvent.press(getByTestId('undo-action-r1'));
+      await waitFor(() => {
+        expect(mockUpdate).toHaveBeenCalledWith('r1', { lastExecutedMonth: null });
+      });
+    });
+
+    it('does not render undo action for un-executed items', async () => {
+      mockIsExecuted.mockReturnValue(false);
+      const { queryByTestId } = await renderScreen();
+      expect(queryByTestId('undo-action-r1')).toBeNull();
     });
   });
 });

@@ -478,6 +478,8 @@
   "execute": "Esegui",
   "mark_as_executed": "Segna come eseguita",
   "marked_as_executed": "Segnata come eseguita",
+  "undo": "Annulla",
+  "marked_as_pending": "Segnata come in sospeso",
   "loading_accounts": "Caricamento conti...",
   "loading_categories": "Caricamento categorie...",
   "none": "Nessuno",

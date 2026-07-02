@@ -38,6 +38,7 @@ export default function PlannedOperationsScreen() {
     loading,
     executePlannedOperation,
     markPlannedOperationExecuted,
+    updatePlannedOperation,
     deletePlannedOperation,
     isExecutedThisMonth,
   } = usePlannedOperations();
@@ -227,6 +228,16 @@ export default function PlannedOperationsScreen() {
     }
   }, [markPlannedOperationExecuted, t]);
 
+  const handleUndoExecuted = useCallback(async (op) => {
+    try {
+      await updatePlannedOperation(op.id, { lastExecutedMonth: null });
+      setSnackbarMessage(t('marked_as_pending'));
+      setSnackbarVisible(true);
+    } catch (error) {
+      // Error handled by context
+    }
+  }, [updatePlannedOperation, t]);
+
   const handleLongPress = useCallback((op) => {
     showDialog(
       t('select_action'),
@@ -283,6 +294,19 @@ export default function PlannedOperationsScreen() {
       </Pressable>
     </View>
   ), [colors.primary, colors.income, handleExecute, handleMarkExecuted, t]);
+
+  const renderUndoAction = useCallback((item) => (
+    <Pressable
+      testID={`undo-action-${item.id}`}
+      style={[styles.swipeExecute, { backgroundColor: colors.mutedText }]}
+      onPress={() => handleUndoExecuted(item)}
+      accessibilityRole="button"
+      accessibilityLabel={t('undo')}
+    >
+      <Icon name="undo" size={20} color="white" />
+      <Text style={styles.swipeExecuteText}>{t('undo')}</Text>
+    </Pressable>
+  ), [colors.mutedText, handleUndoExecuted, t]);
 
   const renderSectionHeader = useCallback(({ section }) => {
     const label = section.key === 'recurring' ? `🔁 ${t('recurring')}` : `1️⃣ ${t('one_time')}`;
@@ -357,7 +381,16 @@ export default function PlannedOperationsScreen() {
           testID={`item-opacity-${item.id}`}
           style={styles.executedWrapper}
         >
-          {rowContent}
+          <Swipeable
+            renderRightActions={() => renderUndoAction(item)}
+            overshootRight={false}
+            friction={2}
+            rightThreshold={60}
+          >
+            <View style={[styles.swipeRowCover, { backgroundColor: colors.background }]}>
+              {rowContent}
+            </View>
+          </Swipeable>
         </View>
       );
     }
@@ -378,7 +411,7 @@ export default function PlannedOperationsScreen() {
       </Swipeable>
     );
   }, [colors, isExecutedThisMonth, getCategoryInfo, getAccountName, getAccountCurrency,
-    getCurrencySymbol, handleEdit, handleLongPress, renderRightActions]);
+    getCurrencySymbol, handleEdit, handleLongPress, renderRightActions, renderUndoAction]);
 
   const renderEmpty = useCallback(() => {
     if (loading) {
