@@ -1,5 +1,12 @@
 # Changelog
 
+## [0.173.0](https://github.com/heywood8/money-tracker/compare/penny-v0.172.0...penny-v0.173.0) (2026-07-02)
+
+
+### Features
+
+* **operations:** add undo option for just-added operations ([#1157](https://github.com/heywood8/money-tracker/issues/1157)) ([502bb5c](https://github.com/heywood8/money-tracker/commit/502bb5cfdf376e35c15d207a7a855dbd35ea0533))
+
 ## [0.172.0](https://github.com/heywood8/money-tracker/compare/penny-v0.171.0...penny-v0.172.0) (2026-07-02)
 
 
