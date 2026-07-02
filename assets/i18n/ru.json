@@ -479,6 +479,7 @@
   "mark_as_executed": "Отметить как выполненную",
   "marked_as_executed": "Отмечено как выполненное",
   "undo": "Отменить",
+  "operation_added": "Операция добавлена",
   "marked_as_pending": "Отмечено как ожидающее",
   "loading_accounts": "Загрузка счетов...",
   "loading_categories": "Загрузка категорий...",

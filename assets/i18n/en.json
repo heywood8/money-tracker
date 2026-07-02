@@ -479,6 +479,7 @@
   "mark_as_executed": "Mark as executed",
   "marked_as_executed": "Marked as executed",
   "undo": "Undo",
+  "operation_added": "Operation added",
   "marked_as_pending": "Marked as pending",
   "loading_accounts": "Loading accounts...",
   "loading_categories": "Loading categories...",
