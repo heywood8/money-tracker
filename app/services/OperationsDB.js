@@ -940,9 +940,13 @@ export const deleteOperation = async (id) => {
  */
 export const getTotalExpenses = async (accountId, startDate, endDate) => {
   try {
+    // Shadow-category ops are balance adjustments, not real spending — exclude
+    // them so these totals agree with the pie charts, which filter shadows out.
     const results = await queryAll(
-      `SELECT amount FROM operations
-       WHERE account_id = ? AND type = 'expense' AND date >= ? AND date <= ?`,
+      `SELECT o.amount FROM operations o
+       LEFT JOIN categories c ON o.category_id = c.id
+       WHERE o.account_id = ? AND o.type = 'expense' AND o.date >= ? AND o.date <= ?
+         AND (c.is_shadow IS NULL OR c.is_shadow = 0)`,
       [accountId, startDate, endDate],
     );
     if (!results || results.length === 0) return '0';
@@ -963,8 +967,10 @@ export const getTotalExpenses = async (accountId, startDate, endDate) => {
 export const getTotalIncome = async (accountId, startDate, endDate) => {
   try {
     const results = await queryAll(
-      `SELECT amount FROM operations
-       WHERE account_id = ? AND type = 'income' AND date >= ? AND date <= ?`,
+      `SELECT o.amount FROM operations o
+       LEFT JOIN categories c ON o.category_id = c.id
+       WHERE o.account_id = ? AND o.type = 'income' AND o.date >= ? AND o.date <= ?
+         AND (c.is_shadow IS NULL OR c.is_shadow = 0)`,
       [accountId, startDate, endDate],
     );
     if (!results || results.length === 0) return '0';

@@ -519,8 +519,11 @@ export const adjustAccountBalance = async (accountId, newBalance, description = 
       const currentBalanceStr = account.balance || '0';
       const targetBalanceStr = String(newBalance) || '0';
 
-      // Check if there's already an adjustment operation for today
-      const today = new Date().toISOString().split('T')[0];
+      // Check if there's already an adjustment operation for today.
+      // Use the LOCAL date — operations and balance history both use local
+      // YYYY-MM-DD strings, so the UTC date would file the adjustment under
+      // yesterday (and break same-day merging) between local and UTC midnight.
+      const today = BalanceHistoryDB.formatDate(new Date());
       const existingOperation = await db.getFirstAsync(
         `SELECT o.*, c.category_type FROM operations o
          JOIN categories c ON o.category_id = c.id

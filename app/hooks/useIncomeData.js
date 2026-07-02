@@ -83,7 +83,15 @@ const useIncomeData = (selectedYear, selectedMonth, selectedCurrency, selectedIn
         const category = categoryMap.get(item.category_id);
         if (!category) return;
 
-        if (category.parentId === selectedIncomeCategory) {
+        // Income recorded directly on the selected category itself must not be
+        // dropped — without its own bucket the drill-down total shrinks below the
+        // parent's slice in the "all" view.
+        if (category.id === selectedIncomeCategory) {
+          if (!aggregatedIncome[category.id]) {
+            aggregatedIncome[category.id] = { category, total: '0' };
+          }
+          aggregatedIncome[category.id].total = Currency.add(aggregatedIncome[category.id].total, item.total);
+        } else if (category.parentId === selectedIncomeCategory) {
           if (!aggregatedIncome[category.id]) {
             aggregatedIncome[category.id] = { category, total: '0' };
           }

@@ -258,6 +258,24 @@ const OperationsScreen = () => {
     }
   }, [pendingScroll, scrollToDateString, operationsLoading, groupedOperations]);
 
+  // Clear a stale exchange rate when the transfer's currency PAIR changes (e.g.
+  // destination switched from a EUR account to an AMD account). The auto-populate
+  // effect below only fires when exchangeRate is empty, so without this reset the
+  // old pair's rate would be applied to the new pair.
+  const ratePairRef = useRef(null);
+  useEffect(() => {
+    if (!isMultiCurrencyTransfer || !sourceAccount || !destinationAccount) {
+      ratePairRef.current = null;
+      return;
+    }
+    const pair = `${sourceAccount.currency}:${destinationAccount.currency}`;
+    if (ratePairRef.current && ratePairRef.current !== pair && quickAddValues.exchangeRate) {
+      setQuickAddValues(v => ({ ...v, exchangeRate: '', destinationAmount: '' }));
+      setLastEditedField(null);
+    }
+    ratePairRef.current = pair;
+  }, [isMultiCurrencyTransfer, sourceAccount, destinationAccount, quickAddValues.exchangeRate]);
+
   // Auto-populate exchange rate when multi-currency transfer accounts change (async with live rate)
   useEffect(() => {
     if (!isMultiCurrencyTransfer || !sourceAccount || !destinationAccount || quickAddValues.exchangeRate) {
@@ -318,9 +336,11 @@ const OperationsScreen = () => {
         }
       }
     }
-    // If user edited amount or rate, calculate destination amount
+    // If user edited amount or rate, calculate destination amount.
+    // Skip while the amount holds an unevaluated calculator expression ("10+5"):
+    // convertAmount would coerce it to 0 and persist destinationAmount "0.00".
     else if (lastEditedField === 'amount' || lastEditedField === 'exchangeRate') {
-      if (quickAddValues.amount && quickAddValues.exchangeRate) {
+      if (quickAddValues.amount && quickAddValues.exchangeRate && !hasOperation(quickAddValues.amount)) {
         const converted = Currency.convertAmount(
           quickAddValues.amount,
           sourceAccount.currency,
@@ -357,8 +377,10 @@ const OperationsScreen = () => {
   }, [t, showDialog, deleteOperation]);
 
   const handleDateSeparatorPress = useCallback((dateString) => {
-    // Parse the date and set it as the selected date
-    const date = new Date(dateString);
+    // Parse the date and set it as the selected date (T00:00:00 anchors the bare
+    // YYYY-MM-DD string to local midnight; bare strings parse as UTC and open the
+    // picker on the previous day west of Greenwich)
+    const date = new Date(`${dateString}T00:00:00`);
     setSelectedDate(date);
     setShowDatePicker(true);
   }, []);
@@ -447,8 +469,11 @@ const OperationsScreen = () => {
         }
       }
 
-      // Calculate destination amount if we have a rate but no destination amount
-      if (operationData.exchangeRate && !operationData.destinationAmount) {
+      // Calculate destination amount from the (already expression-evaluated) amount.
+      // Recompute unless the user explicitly typed the destination amount — the form
+      // state may hold a destination derived from a partial expression (e.g. "10+"
+      // coerced to "0.00"), which must not be trusted at save time.
+      if (operationData.exchangeRate && (!operationData.destinationAmount || lastEditedField !== 'destinationAmount')) {
         const converted = Currency.convertAmount(
           operationData.amount,
           effectiveSourceAccount.currency,
@@ -558,7 +583,7 @@ const OperationsScreen = () => {
       // Errors from addOperation are already shown via dialog.
       // Errors from getDistinctLabels are non-critical — suggestion row simply won't appear.
     }
-  }, [quickAddValues, validateOperation, addOperation, t, showDialog, accounts, resetForm]);
+  }, [quickAddValues, validateOperation, addOperation, t, showDialog, accounts, resetForm, lastEditedField]);
 
   // Handler for auto-add with category (from picker)
   const handleAutoAddWithCategory = useCallback(async (categoryId) => {
@@ -638,15 +663,19 @@ const OperationsScreen = () => {
     { key: 'transfer', label: t('transfer'), icon: 'swap-horizontal' },
   ], [t]);
 
-  // Callbacks for multi-currency fields
+  // Callbacks for multi-currency fields. Normalize a locale decimal comma to a
+  // dot — Android decimal-pad keyboards emit "," in many locales, and downstream
+  // Decimal parsing coerces comma strings to 0 (silently crediting nothing).
   const handleExchangeRateChange = useCallback((text) => {
-    setQuickAddValues(v => ({ ...v, exchangeRate: text }));
+    const normalized = text.replace(',', '.');
+    setQuickAddValues(v => ({ ...v, exchangeRate: normalized }));
     setLastEditedField('exchangeRate');
     setRateSource('manual');
   }, [setRateSource]);
 
   const handleDestinationAmountChange = useCallback((text) => {
-    setQuickAddValues(v => ({ ...v, destinationAmount: text }));
+    const normalized = text.replace(',', '.');
+    setQuickAddValues(v => ({ ...v, destinationAmount: normalized }));
     setLastEditedField('destinationAmount');
     setRateSource('manual');
   }, [setRateSource]);

@@ -161,9 +161,26 @@ const CategoriesScreen = ({ onBackStateChange }) => {
   }, [pickerSlideAnim]);
 
   const potentialParents = useMemo(() => {
+    // Exclude the edited category AND all of its descendants — picking a
+    // descendant as parent creates a cycle, which detaches the subtree from the
+    // root grid and hangs every descendant walk (getAllDescendants, category paths).
+    const excludedIds = new Set();
+    if (formEditingCategory?.id) {
+      excludedIds.add(formEditingCategory.id);
+      const queue = [formEditingCategory.id];
+      while (queue.length > 0) {
+        const parentId = queue.shift();
+        categories.forEach(c => {
+          if (c.parentId === parentId && !excludedIds.has(c.id)) {
+            excludedIds.add(c.id);
+            queue.push(c.id);
+          }
+        });
+      }
+    }
     return categories.filter(c => {
       const catType = c.category_type || c.categoryType;
-      return catType === formValues.category_type && c.id !== formEditingCategory?.id && !c.isShadow;
+      return catType === formValues.category_type && !excludedIds.has(c.id) && !c.isShadow;
     });
   }, [categories, formValues.category_type, formEditingCategory]);
 

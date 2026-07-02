@@ -277,8 +277,10 @@ const NetWorthCard = memo(({ accounts, operations, colors, t }) => {
   // Calculate this month's change (only for accounts with matching currency)
   const monthlyChange = useMemo(() => {
     const now = new Date();
-    const currentMonth = now.getMonth();
-    const currentYear = now.getFullYear();
+    // Compare the YYYY-MM prefix of the stored local date string directly.
+    // Parsing "YYYY-MM-DD" with new Date() yields UTC midnight, which shifts
+    // ops dated the 1st into the previous month in UTC-negative timezones.
+    const currentMonthPrefix = `${now.getFullYear()}-${String(now.getMonth() + 1).padStart(2, '0')}`;
 
     return operations.reduce((sum, op) => {
       // Only count operations from accounts with matching currency
@@ -286,8 +288,7 @@ const NetWorthCard = memo(({ accounts, operations, colors, t }) => {
         return sum;
       }
 
-      const opDate = new Date(op.date);
-      if (opDate.getMonth() === currentMonth && opDate.getFullYear() === currentYear) {
+      if (typeof op.date === 'string' && op.date.startsWith(currentMonthPrefix)) {
         const amount = parseFloat(op.amount || '0');
         if (op.type === 'income') {
           return sum + amount;

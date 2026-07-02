@@ -539,6 +539,38 @@ describe('useExpenseData', () => {
       expect(result.current.chartData[0].amount).toBe(150);
     });
 
+    it('should include spending recorded directly on the selected parent category (regression)', async () => {
+      // $50 logged directly on Food itself plus $30 on its child Groceries.
+      // Drilling into Food must show both (total 80, matching Food's slice in
+      // the "all" view) — direct-on-parent spending used to be dropped.
+      const deepCategories = [
+        { id: 'cat-1', name: 'Food', parentId: null, icon: 'food', categoryType: 'expense', isShadow: false },
+        { id: 'cat-2', name: 'Groceries', parentId: 'cat-1', icon: 'cart', categoryType: 'expense', isShadow: false },
+      ];
+      const mockSpending = [
+        { category_id: 'cat-1', total: '50' }, // directly on the selected parent
+        { category_id: 'cat-2', total: '30' }, // on the child
+      ];
+      OperationsDB.getSpendingByCategoryAndCurrency.mockResolvedValue(mockSpending);
+
+      const { result } = await renderHook(() =>
+        useExpenseData(mockYear, mockMonth, mockCurrency, 'cat-1', deepCategories, mockColors, mockT),
+      );
+
+      await act(async () => {
+        await result.current.loadExpenseData();
+      });
+
+      await waitFor(() => expect(result.current.loading).toBe(false));
+
+      expect(result.current.chartData).toHaveLength(2);
+      const foodItem = result.current.chartData.find(item => item.name === 'Food');
+      const groceriesItem = result.current.chartData.find(item => item.name === 'Groceries');
+      expect(foodItem.amount).toBe(50);
+      expect(groceriesItem.amount).toBe(30);
+      expect(result.current.totalExpenses).toBe(80);
+    });
+
     it('should skip item in subfolder view when no ancestor matches selected category', async () => {
       // 'Transport' is in a completely different tree from 'cat-1' (Food)
       const mockSpending = [

@@ -247,8 +247,13 @@ export default function OperationModal({ visible, onClose, operation, isNew, onD
   );
 
   // Determine if split button should be shown
-  // Only for editing expense/income (not transfers, not shadow operations, not new)
-  const canSplit = !isNew && !isShadowOperation && values.type !== 'transfer' && parseFloat(values.amount) > 0;
+  // Only for editing expense/income (not transfers, not shadow operations, not new).
+  // Foreign-currency ops are excluded: the form model holds swapped amount/rate
+  // fields (foreign amount in `amount`), and handleSplit persists form values
+  // verbatim — splitting one would write the foreign nominal as the account
+  // amount, corrupting the row and the account balance.
+  const canSplit = !isNew && !isShadowOperation && values.type !== 'transfer'
+    && !isForeignCurrencyOp && parseFloat(values.amount) > 0;
 
   // Handle split confirmation
   const handleSplitConfirm = useCallback(async (splitAmount, categoryId) => {
@@ -270,10 +275,12 @@ export default function OperationModal({ visible, onClose, operation, isNew, onD
     }
   }, [isShadowOperation, setValues, setLastEditedField]);
 
-  // Handler for exchange rate changes
+  // Handler for exchange rate changes. Decimal commas from locale decimal-pad
+  // keyboards are normalized to dots — Decimal parsing coerces comma strings to 0.
   const handleExchangeRateChange = useCallback((text) => {
     if (!isShadowOperation) {
-      setValues(v => ({ ...v, exchangeRate: text }));
+      const normalized = text.replace(',', '.');
+      setValues(v => ({ ...v, exchangeRate: normalized }));
       setLastEditedField('exchangeRate');
       setRateSource('manual');
     }
@@ -282,7 +289,8 @@ export default function OperationModal({ visible, onClose, operation, isNew, onD
   // Handler for destination amount changes
   const handleDestinationAmountChange = useCallback((text) => {
     if (!isShadowOperation) {
-      setValues(v => ({ ...v, destinationAmount: text }));
+      const normalized = text.replace(',', '.');
+      setValues(v => ({ ...v, destinationAmount: normalized }));
       setLastEditedField('destinationAmount');
       setRateSource('manual');
     }
@@ -361,8 +369,12 @@ export default function OperationModal({ visible, onClose, operation, isNew, onD
     setValues(v => ({ ...v, categoryId: category.id, amount: finalAmount }));
     closePicker();
 
-    // Only auto-add for new operations, not when editing
-    if (isNew) {
+    // Only auto-add for new operations, not when editing.
+    // Foreign-currency ops are excluded: this fast path stores the raw form
+    // amount without the convert/swap logic of prepareOperationData, which
+    // would record the foreign nominal (e.g. 30 TRY) as the account-currency
+    // amount. The user completes those with the Save button instead.
+    if (isNew && !isForeignCurrencyOp) {
       // Check if amount is valid and auto-save
       const hasValidAmount = finalAmount &&
         !isNaN(parseFloat(finalAmount)) &&
@@ -396,7 +408,7 @@ export default function OperationModal({ visible, onClose, operation, isNew, onD
         }
       }
     }
-  }, [values, setValues, closePicker, isNew, addOperation, onClose, hasOperation, evaluateExpression, attachLocation, location]);
+  }, [values, setValues, closePicker, isNew, isForeignCurrencyOp, addOperation, onClose, hasOperation, evaluateExpression, attachLocation, location]);
 
   // FlatList key extractor
   const keyExtractor = useCallback((item) => {
@@ -646,10 +658,12 @@ export default function OperationModal({ visible, onClose, operation, isNew, onD
         t={t}
       />
 
-      {/* Date Picker */}
+      {/* Date Picker — anchor the bare YYYY-MM-DD date to local midnight; parsing
+          it bare (UTC) pre-selects the previous day west of Greenwich, and
+          confirming would silently move the operation back one day */}
       {showDatePicker && (
         <DateTimePicker
-          value={new Date(values.date)}
+          value={new Date(values.date?.includes('T') ? values.date : `${values.date}T00:00:00`)}
           mode="date"
           display="default"
           onChange={handleDateChange}

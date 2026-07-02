@@ -1,6 +1,7 @@
 import { executeQuery, queryAll, queryFirst, executeTransaction } from './db';
 import * as CategoriesDB from './CategoriesDB';
 import * as Currency from './currency';
+import { formatDate as formatLocalDate } from './BalanceHistoryDB';
 
 /**
  * Map database field names to camelCase for application use
@@ -291,7 +292,9 @@ export const deleteBudget = async (id) => {
  */
 export const getActiveBudgets = async (date = new Date()) => {
   try {
-    const dateStr = date.toISOString().split('T')[0];
+    // Local date string — operation/budget dates are stored as local YYYY-MM-DD,
+    // so a UTC string (toISOString) would shift the boundary in non-UTC timezones.
+    const dateStr = formatLocalDate(date);
 
     const budgets = await queryAll(
       `SELECT * FROM budgets
@@ -316,7 +319,7 @@ export const getActiveBudgets = async (date = new Date()) => {
  */
 export const hasActiveBudget = async (categoryId, date = new Date()) => {
   try {
-    const dateStr = date.toISOString().split('T')[0];
+    const dateStr = formatLocalDate(date);
 
     const result = await queryFirst(
       `SELECT 1 FROM budgets
@@ -470,13 +473,21 @@ export const getCurrentPeriodDates = (periodType, referenceDate = new Date(), lo
     const dayOfWeek = start.getDay(); // 0=Sun … 6=Sat
     const diff = (dayOfWeek - firstDayJS + 7) % 7;
     start.setDate(start.getDate() - diff);
-    end.setDate(start.getDate() + 6);
+    // Derive the end from the adjusted start, not from the reference date:
+    // when the week starts in the previous month, applying start's day-of-month
+    // to end (still holding the reference month) lands a month ahead.
+    end.setTime(start.getTime());
+    end.setDate(end.getDate() + 6);
     break;
   }
 
   case 'monthly': {
     // Month starts on 1st and ends on last day
     start.setDate(1);
+    // Pin the day before shifting the month: setMonth on a day-of-month that
+    // doesn't exist in the target month (e.g. Jan 31 → "Feb 31") rolls over an
+    // extra month, making the period end in the month after next.
+    end.setDate(1);
     end.setMonth(end.getMonth() + 1);
     end.setDate(0); // Last day of month
     break;
@@ -613,8 +624,11 @@ export const calculateBudgetStatus = async (budgetId, referenceDate = new Date()
 
     // Calculate current period dates
     const { start, end } = getCurrentPeriodDates(budget.periodType, referenceDate);
-    const startDateStr = start.toISOString().split('T')[0];
-    const endDateStr = end.toISOString().split('T')[0];
+    // Format with the local calendar date: start/end are local-midnight Dates, and
+    // operation dates are local YYYY-MM-DD strings. toISOString (UTC) would move
+    // the period boundary by a day for any non-UTC timezone.
+    const startDateStr = formatLocalDate(start);
+    const endDateStr = formatLocalDate(end);
 
     // Calculate spending
     const spent = await calculateSpendingForBudget(

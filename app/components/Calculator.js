@@ -4,6 +4,7 @@ import { MaterialCommunityIcons as Icon } from '@expo/vector-icons';
 import PropTypes from 'prop-types';
 import { BORDER_RADIUS, SPACING, HEIGHTS } from '../styles/designTokens';
 import { hasOperation as checkHasOperation, evaluateExpression as evalExpr } from '../utils/calculatorUtils';
+import { getDecimalPlaces } from '../services/currency';
 
 /**
  * Calculator button component - Memoized for performance
@@ -213,8 +214,10 @@ export default function Calculator({ value, onValueChange, colors, placeholder =
       if (key === 'backspace') {
         newExpression = prevExpression.slice(0, -1);
       } else if (key === '=') {
-        // Evaluate the expression
-        const result = evalExpr(prevExpression);
+        // Evaluate with the active currency's decimal places so pressing '='
+        // yields the same amount the save path would compute (e.g. 3 decimals
+        // for BHD/KWD, 0 for JPY) instead of the default 2.
+        const result = evalExpr(prevExpression, getDecimalPlaces(currencyCode));
         if (result !== null) {
           newExpression = result;
         }
@@ -242,7 +245,7 @@ export default function Calculator({ value, onValueChange, colors, placeholder =
 
       return newExpression;
     });
-  }, [getLastNumber]);
+  }, [getLastNumber, currencyCode]);
 
   // Handle equals button press - Wrapped with useCallback
   const handleEqualsPress = useCallback(() => {

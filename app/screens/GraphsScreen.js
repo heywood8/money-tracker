@@ -323,6 +323,17 @@ const GraphsScreen = () => {
       });
     });
 
+    // The picker defaults to the current month, so it must always be present —
+    // early in a new month (no operations yet) the wheel would otherwise display
+    // one period while the charts query another.
+    const currentPeriodValue = `${now.getFullYear()}-${now.getMonth()}`;
+    if (!items.some(item => item.value === currentPeriodValue)) {
+      items.unshift({
+        label: `${t(monthKeys[now.getMonth()])} ${now.getFullYear()}`,
+        value: currentPeriodValue,
+      });
+    }
+
     return items;
   }, [availableYears, availableMonths, t, monthKeys]);
 
@@ -359,11 +370,12 @@ const GraphsScreen = () => {
     // Calculate days in the selected month
     const daysInMonth = new Date(selectedYear, selectedMonth + 1, 0).getDate();
 
-    // Calculate days elapsed (from 1st to today, excluding current day)
+    // Days elapsed includes today: the expense total feeding this prediction
+    // covers the 1st through today, so the denominator must span the same days
+    // (dividing by currentDay - 1 would inflate the average every day).
     const currentDay = now.getDate();
-    const daysElapsed = currentDay - 1;
+    const daysElapsed = currentDay;
 
-    // If it's the first day, we can't make a good prediction yet
     if (daysElapsed < 1) {
       return null;
     }

@@ -1155,6 +1155,114 @@ op-2,income,20,acc-1,cat-1`;
     });
   });
 
+  describe('Regression — soft-delete and adjustment metadata survive restore', () => {
+    const makeMockDbInstance = () => {
+      let insertCount = 0;
+      return {
+        runAsync: jest.fn().mockImplementation(() => {
+          insertCount++;
+          return Promise.resolve({ lastInsertRowId: insertCount });
+        }),
+        getAllAsync: jest.fn().mockResolvedValue([]),
+        getFirstAsync: jest.fn().mockResolvedValue({ 1: 1 }),
+      };
+    };
+
+    it('restores accounts with their deleted_at flag (soft-deleted accounts must not resurrect)', async () => {
+      const mockDbInstance = makeMockDbInstance();
+      mockDb.executeTransaction.mockImplementation(async (callback) => {
+        await callback(mockDbInstance);
+      });
+
+      const backup = {
+        version: 1,
+        timestamp: '2024-01-01T00:00:00.000Z',
+        platform: 'native',
+        data: {
+          accounts: [
+            { id: 1, name: 'Live', balance: '100', currency: 'USD', deleted_at: null },
+            { id: 2, name: 'Deleted', balance: '0', currency: 'USD', deleted_at: '2024-01-02T00:00:00.000Z' },
+          ],
+          categories: [],
+          operations: [],
+          app_metadata: [],
+        },
+      };
+
+      await BackupRestore.restoreBackup(backup);
+
+      const accountInserts = mockDbInstance.runAsync.mock.calls.filter(call =>
+        call[0].startsWith('INSERT INTO accounts'),
+      );
+      expect(accountInserts).toHaveLength(2);
+      accountInserts.forEach(call => expect(call[0]).toContain('deleted_at'));
+
+      const deletedInsert = accountInserts.find(call => call[1].includes('Deleted'));
+      expect(deletedInsert[1]).toContain('2024-01-02T00:00:00.000Z');
+    });
+
+    it('restores operations with their original_balance column', async () => {
+      const mockDbInstance = makeMockDbInstance();
+      mockDb.executeTransaction.mockImplementation(async (callback) => {
+        await callback(mockDbInstance);
+      });
+
+      const backup = {
+        version: 1,
+        timestamp: '2024-01-01T00:00:00.000Z',
+        platform: 'native',
+        data: {
+          accounts: [{ id: 1, name: 'Main', balance: '150', currency: 'USD' }],
+          categories: [],
+          operations: [
+            {
+              id: 10,
+              type: 'income',
+              amount: '50',
+              account_id: 1,
+              date: '2024-01-01',
+              original_balance: '100',
+            },
+          ],
+          app_metadata: [],
+        },
+      };
+
+      await BackupRestore.restoreBackup(backup);
+
+      const operationInserts = mockDbInstance.runAsync.mock.calls.filter(call =>
+        call[0].startsWith('INSERT INTO operations'),
+      );
+      expect(operationInserts).toHaveLength(1);
+      expect(operationInserts[0][0]).toContain('original_balance');
+      expect(operationInserts[0][1]).toContain('100');
+    });
+
+    it('aborts before touching data when a transfer references a missing destination account', async () => {
+      const mockDbInstance = makeMockDbInstance();
+      mockDb.executeTransaction.mockImplementation(async (callback) => {
+        await callback(mockDbInstance);
+      });
+
+      const backup = {
+        version: 1,
+        timestamp: '2024-01-01T00:00:00.000Z',
+        platform: 'native',
+        data: {
+          accounts: [{ id: 1, name: 'Main', balance: '100', currency: 'USD' }],
+          categories: [],
+          operations: [
+            { id: 10, type: 'transfer', amount: '50', account_id: 1, to_account_id: 99, date: '2024-01-01' },
+          ],
+          app_metadata: [],
+        },
+      };
+
+      await expect(BackupRestore.restoreBackup(backup)).rejects.toThrow(/account IDs not found/);
+      expect(mockDbInstance.runAsync).not.toHaveBeenCalled();
+    });
+  });
+
   describe('Edge Cases and Regression Tests', () => {
     it('handles large backup data sets', async () => {
       const largeAccounts = Array.from({ length: 1000 }, (_, i) => ({

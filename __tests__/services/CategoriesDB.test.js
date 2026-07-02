@@ -504,6 +504,39 @@ describe('CategoriesDB', () => {
       expect(params).toContain(null);
     });
 
+    it('allows re-parenting to an unrelated category', async () => {
+      mockDb.executeQuery.mockResolvedValue();
+      mockDb.queryAll.mockResolvedValue([]); // no descendants
+
+      await CategoriesDB.updateCategory('cat-1', { parentId: 'cat-9' });
+
+      const [query, params] = mockDb.executeQuery.mock.calls[0];
+      expect(query).toContain('parent_id = ?');
+      expect(params).toContain('cat-9');
+    });
+
+    it('rejects setting a category as its own parent (regression: parent cycle)', async () => {
+      await expect(
+        CategoriesDB.updateCategory('cat-1', { parentId: 'cat-1' }),
+      ).rejects.toThrow(/own parent/);
+      expect(mockDb.executeQuery).not.toHaveBeenCalled();
+    });
+
+    it('rejects re-parenting onto a descendant (regression: parent cycle)', async () => {
+      // cat-2 is a child of cat-1; moving cat-1 under cat-2 would create a cycle
+      mockDb.queryAll.mockImplementation((query, params) => {
+        if (params && params[0] === 'cat-1') {
+          return Promise.resolve([{ id: 'cat-2', name: 'Child', parent_id: 'cat-1' }]);
+        }
+        return Promise.resolve([]);
+      });
+
+      await expect(
+        CategoriesDB.updateCategory('cat-1', { parentId: 'cat-2' }),
+      ).rejects.toThrow(/subcategories/);
+      expect(mockDb.executeQuery).not.toHaveBeenCalled();
+    });
+
     it('always updates updated_at timestamp', async () => {
       mockDb.executeQuery.mockResolvedValue();
 

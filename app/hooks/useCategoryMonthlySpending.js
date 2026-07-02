@@ -16,8 +16,11 @@ const useCategoryMonthlySpending = (selectedCurrency, selectedCategoryId, catego
   const [monthlyData, setMonthlyData] = useState([]);
   const [loading, setLoading] = useState(false);
 
-  // Generate the last 12 months as YYYY-MM strings
-  const last12Months = useMemo(() => {
+  // Generate the last 12 months as YYYY-MM strings. Computed per call (not
+  // memoized at mount) so the window follows a month rollover during a
+  // long-lived session — the DB query recomputes its window from "now" too,
+  // and the two must agree or the newest month's spending maps to nothing.
+  const getLast12Months = () => {
     const months = [];
     const now = new Date();
     for (let i = 11; i >= 0; i--) {
@@ -30,7 +33,7 @@ const useCategoryMonthlySpending = (selectedCurrency, selectedCategoryId, catego
       });
     }
     return months;
-  }, []);
+  };
 
   // Load monthly spending data
   const loadData = useCallback(async () => {
@@ -62,7 +65,7 @@ const useCategoryMonthlySpending = (selectedCurrency, selectedCategoryId, catego
       // Build array of 12 months (fill 0 for missing months)
       // totals arrive as Decimal-safe strings from the DB layer; convert to float here
       // since chart components need numeric values for bar height arithmetic.
-      const fullYearData = last12Months.map(monthInfo => ({
+      const fullYearData = getLast12Months().map(monthInfo => ({
         yearMonth: monthInfo.yearMonth,
         year: monthInfo.year,
         month: monthInfo.month,
@@ -76,7 +79,7 @@ const useCategoryMonthlySpending = (selectedCurrency, selectedCategoryId, catego
     } finally {
       setLoading(false);
     }
-  }, [selectedCurrency, selectedCategoryId, last12Months]);
+  }, [selectedCurrency, selectedCategoryId]);
 
   // Calculate total yearly spending using Decimal-safe addition before the final float conversion
   const totalYearlySpending = useMemo(() => {

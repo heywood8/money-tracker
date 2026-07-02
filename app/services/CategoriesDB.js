@@ -266,6 +266,17 @@ export const updateCategory = async (id, updates) => {
       values.push(updates.category_type || updates.categoryType);
     }
     if (updates.parentId !== undefined) {
+      // Guard against parent cycles: re-parenting onto itself or one of its own
+      // descendants would detach the subtree and hang every descendant walk.
+      if (updates.parentId) {
+        if (updates.parentId === id) {
+          throw new Error('Cannot set a category as its own parent');
+        }
+        const descendants = await getAllDescendants(id);
+        if (descendants.some(d => d.id === updates.parentId)) {
+          throw new Error('Cannot move a category into one of its own subcategories');
+        }
+      }
       fields.push('parent_id = ?');
       values.push(updates.parentId || null);
     }
@@ -410,12 +421,17 @@ export const getAllDescendants = async (id) => {
   try {
     const descendants = [];
     const queue = [id];
+    // Track visited ids so a corrupted parent cycle in existing data degrades
+    // to a bounded walk instead of an infinite loop.
+    const visited = new Set([id]);
 
     while (queue.length > 0) {
       const currentId = queue.shift();
       const children = await getChildCategories(currentId);
 
       for (const child of children) {
+        if (visited.has(child.id)) continue;
+        visited.add(child.id);
         descendants.push(child);
         queue.push(child.id);
       }

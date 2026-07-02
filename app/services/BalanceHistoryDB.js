@@ -132,8 +132,9 @@ export const populateCurrentMonthHistory = async (providedDb = null) => {
 
     // Define the population logic
     const populateLogic = async (db) => {
-      // Get all accounts (use db parameter directly)
-      const accounts = await db.getAllAsync('SELECT * FROM accounts ORDER BY display_order ASC, created_at DESC');
+      // Get all live accounts (soft-deleted ones must not get new history rows —
+      // their operations were reassigned, so reconstructed balances are meaningless)
+      const accounts = await db.getAllAsync('SELECT * FROM accounts WHERE deleted_at IS NULL ORDER BY display_order ASC, created_at DESC');
 
       for (const account of accounts) {
         // Get account creation date

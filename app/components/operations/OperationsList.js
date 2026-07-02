@@ -73,9 +73,12 @@ const OperationsList = forwardRef(({
   onDismissSuggestion,
 }, ref) => {
 
-  // Format date label for the separator header
+  // Format date label for the separator header.
+  // Append T00:00:00 so the bare YYYY-MM-DD string parses as LOCAL midnight —
+  // bare date strings parse as UTC, which shifts the day west of Greenwich
+  // (today's section would read "Yesterday" in UTC-negative timezones).
   const formatDate = useCallback((dateString) => {
-    const date = new Date(dateString);
+    const date = new Date(`${dateString}T00:00:00`);
     const today = new Date();
     today.setHours(0, 0, 0, 0);
 

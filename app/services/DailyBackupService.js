@@ -34,10 +34,17 @@ const ensureBackupDir = async () => {
 };
 
 /**
- * Today's date as "YYYY-MM-DD".
+ * Today's date as "YYYY-MM-DD" in the user's local timezone — the "already
+ * backed up today" boundary must roll at local midnight, not UTC midnight
+ * (getISOWeekString below already uses local date components).
  * @returns {string}
  */
-export const getTodayDateString = () => new Date().toISOString().split('T')[0];
+export const getTodayDateString = () => {
+  const d = new Date();
+  const month = String(d.getMonth() + 1).padStart(2, '0');
+  const day = String(d.getDate()).padStart(2, '0');
+  return `${d.getFullYear()}-${month}-${day}`;
+};
 
 /**
  * Current ISO 8601 week identifier as "YYYY-WNN".
