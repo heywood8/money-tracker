@@ -478,6 +478,8 @@
   "execute": "执行",
   "mark_as_executed": "标记为已执行",
   "marked_as_executed": "已标记为已执行",
+  "undo": "撤销",
+  "marked_as_pending": "已标记为待处理",
   "loading_accounts": "正在加载账户...",
   "loading_categories": "正在加载分类...",
   "none": "无",

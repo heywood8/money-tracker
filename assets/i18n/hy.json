@@ -478,6 +478,8 @@
   "execute": "Կատարել",
   "mark_as_executed": "Նշել որպես կատարված",
   "marked_as_executed": "Նշված է որպես կատարված",
+  "undo": "Հետարկել",
+  "marked_as_pending": "Նշված է որպես սպասվող",
   "loading_accounts": "Հաշիվների բեռնում...",
   "loading_categories": "Կատեգորիաների բեռնում...",
   "none": "Չկա",

@@ -478,6 +478,8 @@
   "execute": "Ausführen",
   "mark_as_executed": "Als ausgeführt markieren",
   "marked_as_executed": "Als ausgeführt markiert",
+  "undo": "Rückgängig",
+  "marked_as_pending": "Als ausstehend markiert",
   "loading_accounts": "Konten werden geladen...",
   "loading_categories": "Kategorien werden geladen...",
   "none": "Keine",
