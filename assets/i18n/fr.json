@@ -476,6 +476,8 @@
   "drag_to_reorder": "Glisser pour réorganiser",
   "error_loading_accounts": "Échec du chargement des comptes",
   "execute": "Exécuter",
+  "mark_as_executed": "Marquer comme exécutée",
+  "marked_as_executed": "Marquée comme exécutée",
   "loading_accounts": "Chargement des comptes...",
   "loading_categories": "Chargement des catégories...",
   "none": "Aucun",

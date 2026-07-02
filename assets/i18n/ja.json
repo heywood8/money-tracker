@@ -476,6 +476,8 @@
   "drag_to_reorder": "ドラッグして並べ替え",
   "error_loading_accounts": "アカウントの読み込みに失敗しました",
   "execute": "実行",
+  "mark_as_executed": "実行済みにする",
+  "marked_as_executed": "実行済みにしました",
   "loading_accounts": "アカウントを読み込み中...",
   "loading_categories": "カテゴリを読み込み中...",
   "none": "なし",

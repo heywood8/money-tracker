@@ -476,6 +476,8 @@
   "drag_to_reorder": "드래그하여 순서 변경",
   "error_loading_accounts": "계정을 불러오지 못했습니다",
   "execute": "실행",
+  "mark_as_executed": "실행됨으로 표시",
+  "marked_as_executed": "실행됨으로 표시되었습니다",
   "loading_accounts": "계정 불러오는 중...",
   "loading_categories": "카테고리 불러오는 중...",
   "none": "없음",

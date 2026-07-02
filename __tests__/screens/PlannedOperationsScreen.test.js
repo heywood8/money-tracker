@@ -31,6 +31,7 @@ jest.mock('../../app/contexts/DialogContext', () => ({
 }));
 
 const mockExecute = jest.fn();
+const mockMarkExecuted = jest.fn();
 const mockDelete = jest.fn();
 const mockIsExecuted = jest.fn();
 
@@ -43,6 +44,7 @@ jest.mock('../../app/contexts/PlannedOperationsContext', () => ({
     ],
     loading: false,
     executePlannedOperation: mockExecute,
+    markPlannedOperationExecuted: mockMarkExecuted,
     deletePlannedOperation: mockDelete,
     isExecutedThisMonth: mockIsExecuted,
   }),
@@ -171,6 +173,25 @@ describe('PlannedOperationsScreen', () => {
       mockIsExecuted.mockReturnValue(true);
       const { queryByTestId } = await renderScreen();
       expect(queryByTestId('execute-action-r1')).toBeNull();
+    });
+  });
+
+  describe('Mark as executed action', () => {
+    it('calls markPlannedOperationExecuted when mark-executed swipe action is pressed', async () => {
+      mockIsExecuted.mockReturnValue(false);
+      const { getByTestId } = await renderScreen();
+      await fireEvent.press(getByTestId('mark-executed-action-r1'));
+      await waitFor(() => {
+        expect(mockMarkExecuted).toHaveBeenCalledWith(
+          expect.objectContaining({ id: 'r1' }),
+        );
+      });
+    });
+
+    it('does not render mark-executed action for executed items', async () => {
+      mockIsExecuted.mockReturnValue(true);
+      const { queryByTestId } = await renderScreen();
+      expect(queryByTestId('mark-executed-action-r1')).toBeNull();
     });
   });
 });

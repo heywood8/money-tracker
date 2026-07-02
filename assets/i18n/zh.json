@@ -476,6 +476,8 @@
   "drag_to_reorder": "拖动以重新排序",
   "error_loading_accounts": "加载账户失败",
   "execute": "执行",
+  "mark_as_executed": "标记为已执行",
+  "marked_as_executed": "已标记为已执行",
   "loading_accounts": "正在加载账户...",
   "loading_categories": "正在加载分类...",
   "none": "无",

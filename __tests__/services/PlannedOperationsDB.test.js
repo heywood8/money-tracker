@@ -375,4 +375,65 @@ describe('PlannedOperationsDB Service', () => {
       expect(markCalls).toHaveLength(0);
     });
   });
+
+  describe('markExecutedOnly (mark executed without creating an operation)', () => {
+    const recurringOp = {
+      id: 'plan-1',
+      isRecurring: true,
+    };
+
+    const oneTimeOp = {
+      id: 'plan-2',
+      isRecurring: false,
+    };
+
+    it('runs everything in a single transaction', async () => {
+      await PlannedOperationsDB.markExecutedOnly(recurringOp, '2026-05');
+
+      expect(executeTransaction).toHaveBeenCalledTimes(1);
+    });
+
+    it('does NOT create a real operation', async () => {
+      await PlannedOperationsDB.markExecutedOnly(recurringOp, '2026-05');
+
+      expect(createOperationInTx).not.toHaveBeenCalled();
+    });
+
+    it('updates last_executed_month for recurring planned operation', async () => {
+      await PlannedOperationsDB.markExecutedOnly(recurringOp, '2026-05');
+
+      expect(mockDb.runAsync).toHaveBeenCalledWith(
+        expect.stringContaining('UPDATE planned_operations SET last_executed_month'),
+        expect.arrayContaining(['2026-05', 'plan-1']),
+      );
+    });
+
+    it('does NOT delete a recurring planned operation', async () => {
+      await PlannedOperationsDB.markExecutedOnly(recurringOp, '2026-05');
+
+      const deleteCalls = mockDb.runAsync.mock.calls.filter(
+        ([sql]) => sql.includes('DELETE FROM planned_operations'),
+      );
+      expect(deleteCalls).toHaveLength(0);
+    });
+
+    it('deletes a one-time planned operation after marking executed', async () => {
+      await PlannedOperationsDB.markExecutedOnly(oneTimeOp, '2026-05');
+
+      expect(mockDb.runAsync).toHaveBeenCalledWith(
+        expect.stringContaining('DELETE FROM planned_operations WHERE id = ?'),
+        ['plan-2'],
+      );
+    });
+
+    it('propagates errors and rolls back (no partial state)', async () => {
+      executeTransaction.mockImplementation(async () => {
+        throw new Error('write failed');
+      });
+
+      await expect(
+        PlannedOperationsDB.markExecutedOnly(recurringOp, '2026-05'),
+      ).rejects.toThrow('write failed');
+    });
+  });
 });

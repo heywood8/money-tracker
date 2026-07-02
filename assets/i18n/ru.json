@@ -476,6 +476,8 @@
   "drag_to_reorder": "Перетащите для изменения порядка",
   "error_loading_accounts": "Не удалось загрузить счета",
   "execute": "Выполнить",
+  "mark_as_executed": "Отметить как выполненную",
+  "marked_as_executed": "Отмечено как выполненное",
   "loading_accounts": "Загрузка счетов...",
   "loading_categories": "Загрузка категорий...",
   "none": "Нет",

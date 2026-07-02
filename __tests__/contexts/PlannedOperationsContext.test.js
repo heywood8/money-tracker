@@ -59,6 +59,7 @@ describe('PlannedOperationsContext', () => {
     PlannedOperationsDB.updatePlannedOperation.mockResolvedValue(undefined);
     PlannedOperationsDB.deletePlannedOperation.mockResolvedValue(undefined);
     PlannedOperationsDB.markExecuted.mockResolvedValue(undefined);
+    PlannedOperationsDB.markExecutedOnly.mockResolvedValue(undefined);
     PlannedOperationsDB.executeAndMark.mockResolvedValue({ id: 100, type: 'expense' });
     PlannedOperationsDB.validatePlannedOperation.mockReturnValue(null);
   });
@@ -280,6 +281,79 @@ describe('PlannedOperationsContext', () => {
       });
 
       expect(PlannedOperationsDB.executeAndMark).toHaveBeenCalled();
+    });
+  });
+
+  describe('Mark Planned Operation Executed', () => {
+    it('calls markExecutedOnly and updates state for recurring without creating an operation', async () => {
+      const plannedOp = {
+        id: '1',
+        name: 'Rent',
+        type: 'expense',
+        amount: '500',
+        accountId: 1,
+        categoryId: 'cat1',
+        isRecurring: true,
+        lastExecutedMonth: null,
+      };
+      PlannedOperationsDB.getAllPlannedOperations.mockResolvedValue([plannedOp]);
+
+      const { result } = await renderHook(() => usePlannedOperations(), { wrapper });
+      await waitFor(() => expect(result.current.loading).toBe(false));
+
+      await act(async () => {
+        await result.current.markPlannedOperationExecuted(plannedOp);
+      });
+
+      expect(PlannedOperationsDB.markExecutedOnly).toHaveBeenCalledWith(
+        plannedOp,
+        expect.stringMatching(/^\d{4}-\d{2}$/),
+      );
+      expect(PlannedOperationsDB.executeAndMark).not.toHaveBeenCalled();
+
+      expect(result.current.plannedOperations).toHaveLength(1);
+      expect(result.current.plannedOperations[0].lastExecutedMonth).toMatch(/^\d{4}-\d{2}$/);
+    });
+
+    it('removes one-time planned operation from state after marking executed', async () => {
+      const plannedOp = {
+        id: '2',
+        name: 'One-time',
+        type: 'expense',
+        amount: '100',
+        accountId: 1,
+        categoryId: 'cat1',
+        isRecurring: false,
+        lastExecutedMonth: null,
+      };
+      PlannedOperationsDB.getAllPlannedOperations.mockResolvedValue([plannedOp]);
+
+      const { result } = await renderHook(() => usePlannedOperations(), { wrapper });
+      await waitFor(() => expect(result.current.loading).toBe(false));
+
+      await act(async () => {
+        await result.current.markPlannedOperationExecuted(plannedOp);
+      });
+
+      expect(result.current.plannedOperations).toHaveLength(0);
+    });
+
+    it('shows dialog and re-throws when markExecutedOnly fails', async () => {
+      const plannedOp = {
+        id: '1', name: 'Rent', type: 'expense', amount: '500',
+        accountId: 1, categoryId: 'cat1', isRecurring: true, lastExecutedMonth: null,
+      };
+      PlannedOperationsDB.getAllPlannedOperations.mockResolvedValue([plannedOp]);
+      PlannedOperationsDB.markExecutedOnly.mockRejectedValue(new Error('write failed'));
+
+      const { result } = await renderHook(() => usePlannedOperations(), { wrapper });
+      await waitFor(() => expect(result.current.loading).toBe(false));
+
+      await act(async () => {
+        await expect(result.current.markPlannedOperationExecuted(plannedOp)).rejects.toThrow('write failed');
+      });
+
+      expect(mockShowDialog).toHaveBeenCalled();
     });
   });
 
