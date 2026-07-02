@@ -476,6 +476,8 @@
   "drag_to_reorder": "Drag to reorder",
   "error_loading_accounts": "Failed to load accounts",
   "execute": "Execute",
+  "mark_as_executed": "Mark as executed",
+  "marked_as_executed": "Marked as executed",
   "loading_accounts": "Loading accounts...",
   "loading_categories": "Loading categories...",
   "none": "None",

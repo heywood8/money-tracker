@@ -37,6 +37,7 @@ export default function PlannedOperationsScreen() {
     plannedOperations,
     loading,
     executePlannedOperation,
+    markPlannedOperationExecuted,
     deletePlannedOperation,
     isExecutedThisMonth,
   } = usePlannedOperations();
@@ -216,6 +217,16 @@ export default function PlannedOperationsScreen() {
     }
   }, [executePlannedOperation, t]);
 
+  const handleMarkExecuted = useCallback(async (op) => {
+    try {
+      await markPlannedOperationExecuted(op);
+      setSnackbarMessage(t('marked_as_executed'));
+      setSnackbarVisible(true);
+    } catch (error) {
+      // Error handled by context
+    }
+  }, [markPlannedOperationExecuted, t]);
+
   const handleLongPress = useCallback((op) => {
     showDialog(
       t('select_action'),
@@ -249,17 +260,29 @@ export default function PlannedOperationsScreen() {
   }, [showDialog, t, handleEdit, deletePlannedOperation]);
 
   const renderRightActions = useCallback((item) => (
-    <Pressable
-      testID={`execute-action-${item.id}`}
-      style={[styles.swipeExecute, { backgroundColor: colors.primary }]}
-      onPress={() => handleExecute(item)}
-      accessibilityRole="button"
-      accessibilityLabel={t('execute')}
-    >
-      <Icon name="play" size={20} color="white" />
-      <Text style={styles.swipeExecuteText}>{t('execute')}</Text>
-    </Pressable>
-  ), [colors.primary, handleExecute, t]);
+    <View style={styles.swipeActionsContainer}>
+      <Pressable
+        testID={`execute-action-${item.id}`}
+        style={[styles.swipeExecute, { backgroundColor: colors.primary }]}
+        onPress={() => handleExecute(item)}
+        accessibilityRole="button"
+        accessibilityLabel={t('execute')}
+      >
+        <Icon name="play" size={20} color="white" />
+        <Text style={styles.swipeExecuteText}>{t('execute')}</Text>
+      </Pressable>
+      <Pressable
+        testID={`mark-executed-action-${item.id}`}
+        style={[styles.swipeExecute, { backgroundColor: colors.income }]}
+        onPress={() => handleMarkExecuted(item)}
+        accessibilityRole="button"
+        accessibilityLabel={t('mark_as_executed')}
+      >
+        <Icon name="check-bold" size={20} color="white" />
+        <Text style={styles.swipeExecuteText}>{t('done')}</Text>
+      </Pressable>
+    </View>
+  ), [colors.primary, colors.income, handleExecute, handleMarkExecuted, t]);
 
   const renderSectionHeader = useCallback(({ section }) => {
     const label = section.key === 'recurring' ? `🔁 ${t('recurring')}` : `1️⃣ ${t('one_time')}`;
@@ -346,7 +369,10 @@ export default function PlannedOperationsScreen() {
         friction={2}
         rightThreshold={60}
       >
-        <View testID={`item-opacity-${item.id}`}>
+        <View
+          testID={`item-opacity-${item.id}`}
+          style={[styles.swipeRowCover, { backgroundColor: colors.background }]}
+        >
           {rowContent}
         </View>
       </Swipeable>
@@ -535,6 +561,10 @@ const styles = StyleSheet.create({
     fontSize: FONT_SIZE.md,
     fontWeight: '700',
   },
+  swipeActionsContainer: {
+    flexDirection: 'row',
+    gap: SPACING.xs,
+  },
   swipeExecute: {
     alignItems: 'center',
     borderRadius: BORDER_RADIUS.md,
@@ -548,5 +578,8 @@ const styles = StyleSheet.create({
     fontSize: FONT_SIZE.xs,
     fontWeight: '600',
     marginTop: 2,
+  },
+  swipeRowCover: {
+    borderRadius: BORDER_RADIUS.md,
   },
 });

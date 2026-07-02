@@ -181,6 +181,32 @@ export const PlannedOperationsProvider = ({ children }) => {
   }, [showDialog, t]);
 
   /**
+   * Mark a planned operation as executed without creating a real operation
+   * (for cases where the user already added the operation manually).
+   */
+  const markPlannedOperationExecuted = useCallback(async (plannedOp) => {
+    try {
+      const currentMonth = getCurrentMonth();
+
+      await PlannedOperationsDB.markExecutedOnly(plannedOp, currentMonth);
+
+      if (plannedOp.isRecurring) {
+        setPlannedOperations(prev =>
+          prev.map(op => op.id === plannedOp.id
+            ? { ...op, lastExecutedMonth: currentMonth }
+            : op),
+        );
+      } else {
+        setPlannedOperations(prev => prev.filter(op => op.id !== plannedOp.id));
+      }
+    } catch (error) {
+      console.error('Failed to mark planned operation as executed:', error);
+      showDialog(t('error'), error.message, [{ text: t('ok') }]);
+      throw error;
+    }
+  }, [showDialog, t]);
+
+  /**
    * Check if a planned operation has been executed this month
    */
   const isExecutedThisMonth = useCallback((plannedOp) => {
@@ -195,6 +221,7 @@ export const PlannedOperationsProvider = ({ children }) => {
     updatePlannedOperation,
     deletePlannedOperation,
     executePlannedOperation,
+    markPlannedOperationExecuted,
     isExecutedThisMonth,
     reloadPlannedOperations,
   }), [
@@ -205,6 +232,7 @@ export const PlannedOperationsProvider = ({ children }) => {
     updatePlannedOperation,
     deletePlannedOperation,
     executePlannedOperation,
+    markPlannedOperationExecuted,
     isExecutedThisMonth,
     reloadPlannedOperations,
   ]);

@@ -263,6 +263,30 @@ export const markExecuted = async (id, monthStr) => {
 };
 
 /**
+ * Mark a planned operation as executed without creating a real operation
+ * (e.g. it was already added to operations manually). Runs the executed-flag
+ * update and the one-time delete in a single transaction, mirroring
+ * executeAndMark's atomicity guarantees.
+ */
+export const markExecutedOnly = async (plannedOp, currentMonth) => {
+  try {
+    await executeTransaction(async (db) => {
+      await db.runAsync(
+        'UPDATE planned_operations SET last_executed_month = ?, updated_at = ? WHERE id = ?',
+        [currentMonth, new Date().toISOString(), plannedOp.id],
+      );
+
+      if (!plannedOp.isRecurring) {
+        await db.runAsync('DELETE FROM planned_operations WHERE id = ?', [plannedOp.id]);
+      }
+    });
+  } catch (error) {
+    console.error('Failed to mark planned operation as executed:', error);
+    throw error;
+  }
+};
+
+/**
  * Atomically execute a planned operation in a single SQLite transaction:
  * inserts the real operation, adjusts account balances, marks the planned
  * operation as executed, and (for one-time plans) deletes it.

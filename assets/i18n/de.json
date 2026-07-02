@@ -476,6 +476,8 @@
   "drag_to_reorder": "Zum Neuordnen ziehen",
   "error_loading_accounts": "Konten konnten nicht geladen werden",
   "execute": "Ausführen",
+  "mark_as_executed": "Als ausgeführt markieren",
+  "marked_as_executed": "Als ausgeführt markiert",
   "loading_accounts": "Konten werden geladen...",
   "loading_categories": "Kategorien werden geladen...",
   "none": "Keine",
