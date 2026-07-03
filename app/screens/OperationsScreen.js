@@ -21,7 +21,6 @@ import ListCard from '../components/ListCard';
 import OperationsList from '../components/operations/OperationsList';
 import QuickAddForm from '../components/operations/QuickAddForm';
 import PickerModal from '../components/operations/PickerModal';
-import UndoSnackbar from '../components/operations/UndoSnackbar';
 import SearchOverlay from '../components/search/SearchOverlay';
 import SearchBar from '../components/search/SearchBar';
 import FilterChipStrip from '../components/search/FilterChipStrip';
@@ -947,6 +946,12 @@ const OperationsScreen = () => {
         pendingSuggestions={pendingSuggestions}
         onApplySuggestion={handleApplySuggestion}
         onDismissSuggestion={handleDismissSuggestion}
+        undoOperationId={undoInfo ? undoInfo.id : null}
+        undoToken={undoInfo ? undoInfo.token : 0}
+        undoMessage={t('operation_added')}
+        undoActionLabel={t('undo')}
+        onUndo={handleUndoAdd}
+        onUndoClosed={handleUndoClosed}
       />
 
       {/* Floating search area — overlays the list so its content scrolls behind
@@ -1015,20 +1020,6 @@ const OperationsScreen = () => {
         >
           <Icon name="chevron-up" size={24} color={colors.text} />
         </TouchableOpacity>
-      )}
-
-      {/* Undo bar for the most recently added operation (auto-hides after 5s) */}
-      {undoInfo && (
-        <UndoSnackbar
-          key={undoInfo.token}
-          operationId={undoInfo.id}
-          message={t('operation_added')}
-          actionLabel={t('undo')}
-          duration={5000}
-          colors={colors}
-          onUndo={handleUndoAdd}
-          onClosed={handleUndoClosed}
-        />
       )}
 
       <OperationModal

@@ -41,12 +41,17 @@ jest.mock('../../../app/components/operations/DateSeparator', () => {
 jest.mock('../../../app/components/operations/OperationListItem', () => {
   const React = require('react');
   /* eslint-disable react/prop-types */
-  return function MockOperationListItem({ operation, formatCurrency, getCategoryInfo, getAccountName }) {
+  return function MockOperationListItem({ operation, formatCurrency, getCategoryInfo, getAccountName, showUndo }) {
     // invoke utility callbacks so their coverage counters are hit
     if (formatCurrency) formatCurrency(operation.accountId, operation.amount);
     if (getCategoryInfo) getCategoryInfo(operation.categoryId);
     if (getAccountName) getAccountName(operation.accountId);
-    return React.createElement('View', { testID: `op-item-${operation.id}` });
+    return React.createElement(
+      'View',
+      { testID: `op-item-${operation.id}` },
+      // Marker child so tests can assert which operation gets the inline undo bar.
+      showUndo ? React.createElement('View', { testID: `op-undo-${operation.id}` }) : null,
+    );
   };
   /* eslint-enable react/prop-types */
 });
@@ -398,6 +403,30 @@ describe('OperationsList', () => {
       const section = toSection(group);
       const { sp } = await getSectionListProps({ groupedOperations: [group], categories: catsNoIcon });
       await render(sp.renderItem({ item: section.data[0], index: 0, section }));
+    });
+  });
+
+  describe('branch coverage — undoOperationId match', () => {
+    it('renders the inline undo bar only on the matching operation', async () => {
+      const group = makeGroup(TODAY, [
+        { id: 'op-undo', type: 'expense', amount: '10.00', accountId: 'acc-usd', categoryId: 'cat-1' },
+        { id: 'op-plain', type: 'income', amount: '20.00', accountId: 'acc-usd', categoryId: 'cat-1' },
+      ]);
+      const section = toSection(group);
+      const { sp } = await getSectionListProps({
+        groupedOperations: [group],
+        undoOperationId: 'op-undo',
+        undoToken: 3,
+        undoMessage: 'operation_added',
+        undoActionLabel: 'undo',
+        onUndo: jest.fn(),
+        onUndoClosed: jest.fn(),
+      });
+      const matched = await render(sp.renderItem({ item: section.data[0], index: 0, section }));
+      expect(matched.getByTestId('op-undo-op-undo')).toBeTruthy();
+
+      const plain = await render(sp.renderItem({ item: section.data[1], index: 1, section }));
+      expect(plain.queryByTestId('op-undo-op-plain')).toBeNull();
     });
   });
 
