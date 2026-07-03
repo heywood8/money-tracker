@@ -4,6 +4,7 @@
  */
 
 import React from 'react';
+import * as RN from 'react-native';
 import { render, fireEvent } from '@testing-library/react-native';
 import UpdateAvailableModal from '../../app/modals/UpdateAvailableModal';
 
@@ -57,6 +58,21 @@ describe('UpdateAvailableModal', () => {
         <UpdateAvailableModal {...baseProps} updateData={baseUpdateData} />,
       );
       expect(getByText('v2.0.0')).toBeTruthy();
+    });
+
+    it('gives the dialog a bounded absolute height so its content is not empty', async () => {
+      // Regression guard: paper's Modal wraps children in an auto-height Surface, so a
+      // percentage height never resolves and the shared panel's flex:1 ScrollView
+      // collapses to zero height — an empty dialog. The container must carry a concrete
+      // numeric height (windowHeight * 0.8 = 640 here).
+      const { getByTestId } = await render(
+        <UpdateAvailableModal {...baseProps} updateData={baseUpdateData} />,
+      );
+      const flat = RN.StyleSheet.flatten(getByTestId('update-modal-container').props.style);
+      // A concrete pixel height (not a percentage or undefined) is what keeps the shared
+      // panel's flex:1 ScrollView from collapsing; the exact value tracks the window height.
+      expect(typeof flat.height).toBe('number');
+      expect(flat.height).toBeGreaterThan(0);
     });
 
     it('renders dismiss button and calls onDismiss when pressed', async () => {
