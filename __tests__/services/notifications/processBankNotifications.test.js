@@ -34,6 +34,7 @@ jest.mock('../../../app/services/PreferencesDB', () => ({
   },
   getPreference: jest.fn(),
   setPreference: jest.fn(),
+  deletePreference: jest.fn(),
   getNumberPreference: jest.fn(),
   getJsonPreference: jest.fn(),
   setJsonPreference: jest.fn(),
@@ -393,6 +394,36 @@ describe('processBankNotifications', () => {
 
       expect(summary).toEqual({ created: 0, pending: 1, skipped: 0 });
       expect(OperationsDB.createOperation).not.toHaveBeenCalled();
+    });
+  });
+
+  describe('ATM target account binding helpers', () => {
+    it('resolves the bound cash account from the preference', async () => {
+      PreferencesDB.getNumberPreference.mockResolvedValue(9);
+      AccountsDB.getAccountById.mockResolvedValue({ id: 9, currency: 'AMD' });
+      const account = await pipeline.resolveAtmTargetAccount();
+      expect(account).toEqual({ id: 9, currency: 'AMD' });
+    });
+
+    it('returns null when no cash account is bound', async () => {
+      PreferencesDB.getNumberPreference.mockResolvedValue(null);
+      const account = await pipeline.resolveAtmTargetAccount();
+      expect(account).toBeNull();
+    });
+
+    it('persists the chosen cash account', async () => {
+      await pipeline.setAtmTargetAccount(9);
+      expect(PreferencesDB.setPreference).toHaveBeenCalledWith(
+        'bank_notifications_atm_account',
+        '9',
+      );
+    });
+
+    it('clears the bound cash account by deleting the preference', async () => {
+      await pipeline.clearAtmTargetAccount();
+      expect(PreferencesDB.deletePreference).toHaveBeenCalledWith(
+        'bank_notifications_atm_account',
+      );
     });
   });
 

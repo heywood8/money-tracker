@@ -35,6 +35,7 @@ import { getValidAccessToken, signIn as googleSignIn, exportToSheets, importFrom
 import UpdateContentPanel from '../components/UpdateContentPanel';
 import NotificationProcessingContentPanel from '../components/NotificationProcessingContentPanel';
 import NotificationFiltersContentPanel from '../components/NotificationFiltersContentPanel';
+import NotificationBindingsContentPanel from '../components/NotificationBindingsContentPanel';
 import AccountsScreen from './AccountsScreen';
 import CategoriesScreen from './CategoriesScreen';
 
@@ -941,9 +942,9 @@ export default function SettingsScreen({ setSubPanelActive }) {
       return t('check_updates') || 'Check for updates';
     }
     if (activeSubPanel === 'notificationProcessing') {
-      return notificationView === 'filters'
-        ? (t('notification_filters') || 'Filters')
-        : (t('notification_processing') || 'Notification processing');
+      if (notificationView === 'filters') return t('notification_filters') || 'Filters';
+      if (notificationView === 'bindings') return t('notification_bindings') || 'Bindings';
+      return t('notification_processing') || 'Notification processing';
     }
     if (activeSubPanel === 'reset') return t('reset_database') || 'Reset Database';
     return '';
@@ -1003,6 +1004,15 @@ export default function SettingsScreen({ setSubPanelActive }) {
           </TouchableOpacity>
         )}
       >
+        <Menu.Item
+          onPress={() => {
+            setNotificationMenuVisible(false);
+            setNotificationView('bindings');
+          }}
+          title={t('notification_bindings') || 'Bindings'}
+          leadingIcon="link-variant"
+          testID="notification-bindings-menu-item"
+        />
         <Menu.Item
           onPress={() => {
             setNotificationMenuVisible(false);
@@ -1499,6 +1509,8 @@ export default function SettingsScreen({ setSubPanelActive }) {
               <View style={styles.updatePanelWrapper}>
                 {notificationView === 'filters' ? (
                   <NotificationFiltersContentPanel bottomInset={scrollBottomInset} />
+                ) : notificationView === 'bindings' ? (
+                  <NotificationBindingsContentPanel bottomInset={scrollBottomInset} />
                 ) : (
                   <NotificationProcessingContentPanel bottomInset={scrollBottomInset} />
                 )}

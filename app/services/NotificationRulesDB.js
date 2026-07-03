@@ -230,3 +230,64 @@ export const deleteMerchantRule = async (id) => {
     throw error;
   }
 };
+
+/**
+ * Remove the learned category from a rule by id, leaving its label override
+ * intact. When the rule would then hold neither a category nor a label the whole
+ * row is deleted, so a "category binding" the user removes doesn't linger as an
+ * empty rule. Used by the bindings-management UI.
+ *
+ * @param {string} id
+ * @returns {Promise<void>}
+ */
+export const clearMerchantRuleCategory = async (id) => {
+  try {
+    const row = await queryFirst(
+      'SELECT * FROM notification_merchant_rules WHERE id = ?',
+      [id],
+    );
+    if (!row) return;
+    // No label left to keep the row alive — drop it entirely.
+    if (!row.label_override) {
+      await deleteMerchantRule(id);
+      return;
+    }
+    await executeQuery(
+      'UPDATE notification_merchant_rules SET category_id = NULL, updated_at = ? WHERE id = ?',
+      [new Date().toISOString(), id],
+    );
+  } catch (error) {
+    console.error('Failed to clear merchant rule category:', error);
+    throw error;
+  }
+};
+
+/**
+ * Remove the display-label override from a rule by id, leaving its learned
+ * category intact. When the rule would then hold neither a label nor a category
+ * the whole row is deleted. Used by the bindings-management UI.
+ *
+ * @param {string} id
+ * @returns {Promise<void>}
+ */
+export const clearMerchantRuleLabel = async (id) => {
+  try {
+    const row = await queryFirst(
+      'SELECT * FROM notification_merchant_rules WHERE id = ?',
+      [id],
+    );
+    if (!row) return;
+    // No category left to keep the row alive — drop it entirely.
+    if (row.category_id == null) {
+      await deleteMerchantRule(id);
+      return;
+    }
+    await executeQuery(
+      'UPDATE notification_merchant_rules SET label_override = NULL, updated_at = ? WHERE id = ?',
+      [new Date().toISOString(), id],
+    );
+  } catch (error) {
+    console.error('Failed to clear merchant rule label:', error);
+    throw error;
+  }
+};

@@ -237,6 +237,16 @@ export const setAtmTargetAccount = async (accountId) => {
 };
 
 /**
+ * Forget the bound ATM cash target account. The next ATM CASH notification will
+ * ask the user to pick a target again. Used by the bindings-management UI.
+ */
+export const clearAtmTargetAccount = async () => {
+  await PreferencesDB.deletePreference(
+    PreferencesDB.PREF_KEYS.BANK_NOTIFICATIONS_ATM_ACCOUNT,
+  );
+};
+
+/**
  * Packages whose notifications are trusted to auto-create operations. A package
  * is added the first time the user resolves one of its notifications from the
  * review queue, so an unknown/forged source can never silently book money — it
