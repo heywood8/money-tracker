@@ -65,6 +65,8 @@ const OperationsList = forwardRef(({
   onScroll,
   onScrollToIndexFailed,
   onContentSizeChange,
+  refreshing,
+  onRefresh,
   headerComponent,
   topInset,
   pendingSuggestionId,
@@ -415,6 +417,13 @@ const OperationsList = forwardRef(({
       }
       onScroll={onScroll}
       scrollEventThrottle={16}
+      // Swipe-down-to-update: re-runs the bank-notification ingestion and
+      // reloads the suggested-operations stack. VirtualizedList renders its own
+      // RefreshControl when onRefresh is set; progressViewOffset drops the
+      // spinner below the floating search pill that overlays the list top.
+      refreshing={onRefresh ? refreshing : undefined}
+      onRefresh={onRefresh || undefined}
+      progressViewOffset={onRefresh ? topInset : undefined}
       onEndReached={handleEndReached}
       onEndReachedThreshold={0.5}
       onScrollToIndexFailed={onScrollToIndexFailed}
@@ -446,6 +455,8 @@ OperationsList.propTypes = {
   onScroll: PropTypes.func,
   onScrollToIndexFailed: PropTypes.func,
   onContentSizeChange: PropTypes.func,
+  refreshing: PropTypes.bool,
+  onRefresh: PropTypes.func,
   headerComponent: PropTypes.element,
   topInset: PropTypes.number,
   pendingSuggestionId: PropTypes.oneOfType([PropTypes.string, PropTypes.number]),
@@ -467,6 +478,8 @@ OperationsList.defaultProps = {
   onScroll: () => {},
   onScrollToIndexFailed: () => {},
   onContentSizeChange: () => {},
+  refreshing: false,
+  onRefresh: null,
   headerComponent: null,
   topInset: 0,
   pendingSuggestionId: null,

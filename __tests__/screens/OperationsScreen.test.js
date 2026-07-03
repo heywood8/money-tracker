@@ -59,6 +59,7 @@ jest.mock('../../app/contexts/OperationsDataContext', () => ({
 jest.mock('../../app/contexts/OperationsActionsContext', () => ({
   useOperationsActions: jest.fn(() => ({
     loadMoreOperations: jest.fn(),
+    loadInitialOperations: jest.fn(() => Promise.resolve()),
     addOperation: jest.fn(),
     updateOperation: jest.fn(),
     deleteOperation: jest.fn(),
@@ -158,6 +159,19 @@ jest.mock('../../app/contexts/DisplaySettingsContext', () => ({
 jest.mock('../../app/hooks/useQuickAddLocation', () => jest.fn(() => ({
   getLocation: jest.fn(() => null),
   prime: jest.fn(),
+})));
+
+// Mock the notification-suggestions hook so the screen render stays deterministic
+// and fast — its real form hits the notification DB + ingestion pipeline on mount,
+// which is unnecessary async work for these screen-level tests.
+jest.mock('../../app/hooks/usePendingOperationSuggestions', () => jest.fn(() => ({
+  suggestions: [],
+  savingIds: {},
+  atmTargetAccountId: null,
+  reload: jest.fn(),
+  refresh: jest.fn(),
+  accept: jest.fn(),
+  dismiss: jest.fn(),
 })));
 
 jest.mock('../../app/hooks/useQuickAddForm', () => jest.fn(() => ({
