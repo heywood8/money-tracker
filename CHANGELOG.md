@@ -1,5 +1,12 @@
 # Changelog
 
+## [0.179.0](https://github.com/heywood8/money-tracker/compare/penny-v0.178.0...penny-v0.179.0) (2026-07-03)
+
+
+### Features
+
+* parse Tinkoff "Доступно" available-balance notification template ([#1172](https://github.com/heywood8/money-tracker/issues/1172)) ([32de879](https://github.com/heywood8/money-tracker/commit/32de879d792473627ca861bc6a05f13ac9ed3393))
+
 ## [0.178.0](https://github.com/heywood8/money-tracker/compare/penny-v0.177.0...penny-v0.178.0) (2026-07-03)
 
 
