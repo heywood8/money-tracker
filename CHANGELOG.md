@@ -1,5 +1,12 @@
 # Changelog
 
+## [0.174.0](https://github.com/heywood8/money-tracker/compare/penny-v0.173.0...penny-v0.174.0) (2026-07-03)
+
+
+### Features
+
+* auto-refresh notification processing panel with animated new cards ([#1159](https://github.com/heywood8/money-tracker/issues/1159)) ([01f2975](https://github.com/heywood8/money-tracker/commit/01f297538043132ea748563766345bef72df7ea0))
+
 ## [0.173.0](https://github.com/heywood8/money-tracker/compare/penny-v0.172.0...penny-v0.173.0) (2026-07-02)
 
 
