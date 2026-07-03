@@ -1,5 +1,12 @@
 # Changelog
 
+## [0.176.0](https://github.com/heywood8/money-tracker/compare/penny-v0.175.0...penny-v0.176.0) (2026-07-03)
+
+
+### Features
+
+* **notifications:** background bank-notification checks with tap-to-review alerts ([#1164](https://github.com/heywood8/money-tracker/issues/1164)) ([f3b789c](https://github.com/heywood8/money-tracker/commit/f3b789cde78f9444f19199427765c2ad24fad9f9))
+
 ## [0.175.0](https://github.com/heywood8/money-tracker/compare/penny-v0.174.0...penny-v0.175.0) (2026-07-03)
 
 
