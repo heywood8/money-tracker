@@ -1,5 +1,12 @@
 # Changelog
 
+## [0.179.1](https://github.com/heywood8/money-tracker/compare/penny-v0.179.0...penny-v0.179.1) (2026-07-03)
+
+
+### Bug Fixes
+
+* **notifications:** async "Adding…" state on review-queue save ([#1174](https://github.com/heywood8/money-tracker/issues/1174)) ([17465a5](https://github.com/heywood8/money-tracker/commit/17465a52262adc8dcb5b71d5bb826ca9ac3abe85))
+
 ## [0.179.0](https://github.com/heywood8/money-tracker/compare/penny-v0.178.0...penny-v0.179.0) (2026-07-03)
 
 
