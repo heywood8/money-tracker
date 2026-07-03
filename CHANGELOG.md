@@ -1,5 +1,12 @@
 # Changelog
 
+## [0.176.1](https://github.com/heywood8/money-tracker/compare/penny-v0.176.0...penny-v0.176.1) (2026-07-03)
+
+
+### Miscellaneous Chores
+
+* allow send_later MCP tool without prompts in cloud sessions ([#1167](https://github.com/heywood8/money-tracker/issues/1167)) ([3d5c339](https://github.com/heywood8/money-tracker/commit/3d5c339f7d8d5b8894dc574982880deb777c42b7))
+
 ## [0.176.0](https://github.com/heywood8/money-tracker/compare/penny-v0.175.0...penny-v0.176.0) (2026-07-03)
 
 
