@@ -30,6 +30,7 @@
   "bank_notifications_readd": "작업 다시 추가",
   "bank_notifications_readd_created": "작업이 추가됨",
   "bank_notifications_readd_queued": "검토 대기열에 추가됨",
+  "bank_notifications_adding": "작업 추가 중…",
   "bank_notifications_transfer_from": "출금 계좌",
   "bank_notifications_transfer_to": "입금 계좌",
   "bank_notifications_transfer_label_help": "이 이체의 선택적 라벨",

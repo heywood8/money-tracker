@@ -30,6 +30,7 @@
   "bank_notifications_readd": "Vorgang erneut hinzufügen",
   "bank_notifications_readd_created": "Vorgang hinzugefügt",
   "bank_notifications_readd_queued": "Zur Prüfliste hinzugefügt",
+  "bank_notifications_adding": "Vorgang wird hinzugefügt…",
   "bank_notifications_transfer_from": "Von Konto",
   "bank_notifications_transfer_to": "Auf Konto",
   "bank_notifications_transfer_label_help": "Optionale Bezeichnung für diese Überweisung",
