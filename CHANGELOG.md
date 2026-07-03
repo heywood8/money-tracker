@@ -1,5 +1,12 @@
 # Changelog
 
+## [0.180.0](https://github.com/heywood8/money-tracker/compare/penny-v0.179.2...penny-v0.180.0) (2026-07-03)
+
+
+### Features
+
+* **operations:** show suggested operations from notifications on the main page ([#1179](https://github.com/heywood8/money-tracker/issues/1179)) ([b50c083](https://github.com/heywood8/money-tracker/commit/b50c0836efaa7e755c8415a5f1b3e82820fe37e4))
+
 ## [0.179.2](https://github.com/heywood8/money-tracker/compare/penny-v0.179.1...penny-v0.179.2) (2026-07-03)
 
 
