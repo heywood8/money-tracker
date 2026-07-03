@@ -25,6 +25,7 @@ import * as PreferencesDB from '../PreferencesDB';
  */
 export const DEFAULT_FILTER_PACKAGES = [
   'com.banq.ameriabank',
+  'com.idamob.tinkoff.android',
   'com.android.systemui',
   'org.telegram.messenger',
 ];

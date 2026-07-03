@@ -81,6 +81,48 @@ category:
   `destinationAmount` in target currency, `exchangeRate` source→target); a missing
   rate routes to review instead of booking a wrong amount.
 
+### Tinkoff / T-Bank (`com.idamob.tinkoff.android`) — a second bank, a new format
+
+Tinkoff posts a different shape from Ameria's single pipe-delimited line: the
+**merchant is the notification title** and the short Russian body carries the
+kind, amount and account currency, followed by a balance line.
+
+```
+title: МегаФон
+text:  Платеж на 1 000 ₽, счет RUB
+       Баланс 39 000 ₽
+```
+
+| Template field    | Example        | Becomes                                  |
+| ----------------- | -------------- | ---------------------------------------- |
+| kind              | `Платеж`       | operation `type: 'expense'`              |
+| amount            | `1 000`        | `amount: '1000'` (space grouping stripped) |
+| account currency  | `счет RUB`     | `currency: 'RUB'` (account matching)     |
+| merchant (title)  | `МегаФон`      | bound to a **category**                  |
+| balance           | `Баланс 39 000 ₽` | **ignored**                           |
+
+The parser lives in `app/services/notifications/bankParsers/tinkoff.js` and is
+registered in `bankParsers/index.js`. Key differences from the Ameria parser,
+each driven by the format:
+
+- **Merchant comes from the title**, not the body.
+- **No card mask** in this format, so account resolution relies on the single
+  currency-matching account. The currency is read from the explicit ISO code in
+  `счет RUB` (an unambiguous account signal), falling back to the amount's ₽/$/€
+  symbol when absent.
+- **The balance line is stripped first** so `39 000 ₽` can never be read as the
+  transaction amount.
+- **Russian numerics**: space thousands grouping (regular / non-breaking / narrow)
+  and a comma decimal separator (`1 000,50`) are both normalized.
+- **No date/time in the body**, so the ingestion layer falls back to the
+  notification's post time.
+
+Recognized kinds map to `expense` (`Покупка`, `Платеж`, `Оплата`, `Списание`) or
+`income` (`Пополнение`, `Возврат`). Kinds needing their own layout or a target
+account (`Перевод`, `Снятие`) are not yet handled — an unrecognized kind returns
+`null` and the notification is skipped rather than mis-booked. Covered by
+`__tests__/services/notifications/tinkoffParser.test.js`.
+
 ### Live auto-refresh
 
 While the processing panel is open it re-runs the pipeline and reloads both the
