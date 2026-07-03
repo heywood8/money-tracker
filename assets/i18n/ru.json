@@ -30,6 +30,7 @@
   "bank_notifications_readd": "Добавить снова",
   "bank_notifications_readd_created": "Операция добавлена",
   "bank_notifications_readd_queued": "Добавлено в очередь проверки",
+  "bank_notifications_adding": "Добавление операции…",
   "bank_notifications_transfer_from": "Со счёта",
   "bank_notifications_transfer_to": "На счёт",
   "bank_notifications_transfer_label_help": "Необязательная метка для этого перевода",

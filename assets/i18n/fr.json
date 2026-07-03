@@ -30,6 +30,7 @@
   "bank_notifications_readd": "Rajouter l'opération",
   "bank_notifications_readd_created": "Opération ajoutée",
   "bank_notifications_readd_queued": "Ajouté à la file d'attente",
+  "bank_notifications_adding": "Ajout de l’opération…",
   "bank_notifications_transfer_from": "Du compte",
   "bank_notifications_transfer_to": "Vers le compte",
   "bank_notifications_transfer_label_help": "Libellé facultatif pour ce transfert",

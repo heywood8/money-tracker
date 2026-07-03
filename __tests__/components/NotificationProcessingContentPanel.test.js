@@ -333,4 +333,47 @@ describe('NotificationProcessingContentPanel', () => {
       await waitFor(() => expect(getByText('bank_notifications_readd_created')).toBeTruthy());
     });
   });
+
+  // Regression: enabling automatic geotagging made the save await an up-to-8s
+  // location fix. The card must collapse into an async "Adding…" state and drop
+  // its Save button so a slow fix can't be double-tapped into duplicate operations.
+  describe('async save (location capture)', () => {
+    it('collapses the card into an "Adding…" row and drops the Save button while saving', async () => {
+      // Hang the resolve so the card stays mid-save and we can observe the
+      // collapsed state (and the absence of a second Save affordance).
+      let finishSave;
+      pipeline.resolvePendingNotification.mockImplementation(
+        () => new Promise((resolve) => { finishSave = resolve; }),
+      );
+      PendingNotificationsDB.getPendingNotifications.mockResolvedValue([{ ...PENDING, accountId: 1 }]);
+      const { getByText, queryByText } = await render(<NotificationProcessingContentPanel />);
+      await waitFor(() => expect(getByText('NAREK MEHRABYAN')).toBeTruthy());
+
+      fireEvent.press(getByText('save'));
+
+      // The card collapses to the progress row; the merchant is still shown but the
+      // Save button (and the whole form) is gone, so it can't be tapped again.
+      await waitFor(() => expect(getByText('bank_notifications_adding')).toBeTruthy());
+      expect(getByText('NAREK MEHRABYAN')).toBeTruthy();
+      expect(queryByText('save')).toBeNull();
+      expect(pipeline.resolvePendingNotification).toHaveBeenCalledTimes(1);
+
+      // Let the hung save finish so no promise dangles past the test.
+      await act(async () => { finishSave({ id: 1 }); });
+    });
+
+    it('re-expands the card when the save fails so the user can retry', async () => {
+      pipeline.resolvePendingNotification.mockRejectedValueOnce(new Error('no exchange rate'));
+      PendingNotificationsDB.getPendingNotifications.mockResolvedValue([{ ...PENDING, accountId: 1 }]);
+      const { getByText, queryByText } = await render(<NotificationProcessingContentPanel />);
+      await waitFor(() => expect(getByText('NAREK MEHRABYAN')).toBeTruthy());
+
+      fireEvent.press(getByText('save'));
+
+      // After the rejection settles the form comes back (Save is pressable again)
+      // and the transient progress row is gone.
+      await waitFor(() => expect(getByText('save')).toBeTruthy());
+      expect(queryByText('bank_notifications_adding')).toBeNull();
+    });
+  });
 });

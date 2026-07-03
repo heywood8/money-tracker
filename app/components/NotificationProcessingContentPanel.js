@@ -1,6 +1,16 @@
 import React, { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import PropTypes from 'prop-types';
-import { View, StyleSheet, ScrollView, ActivityIndicator, RefreshControl, TouchableOpacity } from 'react-native';
+import {
+  View,
+  StyleSheet,
+  ScrollView,
+  ActivityIndicator,
+  RefreshControl,
+  TouchableOpacity,
+  LayoutAnimation,
+  Platform,
+  UIManager,
+} from 'react-native';
 import { Text } from 'react-native-paper';
 import { Ionicons } from '@expo/vector-icons';
 import { useThemeColors } from '../contexts/ThemeColorsContext';
@@ -36,6 +46,23 @@ import * as Currency from '../services/currency';
 // newly-arrived notifications surface on their own, without a manual pull.
 const AUTO_REFRESH_MS = 3000;
 
+// Enable LayoutAnimation on the classic Android renderer. It is a no-op on Fabric
+// (the New Architecture drives layout animations natively), and the guard keeps it
+// from throwing when the method is absent.
+if (Platform.OS === 'android' && UIManager.setLayoutAnimationEnabledExperimental) {
+  UIManager.setLayoutAnimationEnabledExperimental(true);
+}
+
+// A short ease used when a review card collapses into its "Adding…" state and when
+// the finished card leaves the queue, so a save reads as a smooth transition
+// instead of an abrupt jump. Kept snappy to match the app's other 200–260ms moves.
+const CARD_COLLAPSE_ANIMATION = {
+  duration: 220,
+  create: { type: LayoutAnimation.Types.easeOut, property: LayoutAnimation.Properties.opacity },
+  update: { type: LayoutAnimation.Types.easeInEaseOut },
+  delete: { type: LayoutAnimation.Types.easeIn, property: LayoutAnimation.Properties.opacity },
+};
+
 /**
  * "Notification processing" settings subpanel — the main view.
  *
@@ -69,6 +96,11 @@ export default function NotificationProcessingContentPanel({ bottomInset }) {
   const [choices, setChoices] = useState({});
   // Per-recent-card re-add feedback: key -> 'loading' | 'created' | 'pending'.
   const [reAddState, setReAddState] = useState({});
+  // Per-review-card save state: pending id -> true while its save is in flight.
+  // A card mid-save collapses into a compact "Adding…" row and drops its action
+  // buttons, so the up-to-8s best-effort location fix inside the save can't be
+  // double-tapped into duplicate operations (the reason this is async at all).
+  const [savingIds, setSavingIds] = useState({});
   // Mirror of `choices` so reloadPending can read the latest values without
   // taking `choices` as a dependency (which would re-create it on every keystroke).
   const choicesRef = useRef(choices);
@@ -213,6 +245,23 @@ export default function NotificationProcessingContentPanel({ bottomInset }) {
     setChoices((prev) => ({ ...prev, [id]: { ...prev[id], ...patch } }));
   }, []);
 
+  // Drop save flags for cards that have left the queue (saved or dismissed) so the
+  // map only ever tracks cards still on screen.
+  useEffect(() => {
+    setSavingIds((prev) => {
+      const keys = Object.keys(prev);
+      if (keys.length === 0) return prev;
+      const live = new Set(pending.map((p) => p.id));
+      let changed = false;
+      const next = {};
+      keys.forEach((id) => {
+        if (live.has(id)) next[id] = prev[id];
+        else changed = true;
+      });
+      return changed ? next : prev;
+    });
+  }, [pending]);
+
   const handleSave = useCallback(async (item) => {
     const choice = choices[item.id] || {};
     if (choice.accountId == null) return;
@@ -220,16 +269,43 @@ export default function NotificationProcessingContentPanel({ bottomInset }) {
     if (item.type === 'transfer' && (choice.toAccountId == null || choice.toAccountId === choice.accountId)) {
       return;
     }
-    await resolvePendingNotification(item.id, {
-      accountId: choice.accountId,
-      categoryId: choice.categoryId || null,
-      toAccountId: choice.toAccountId ?? null,
-      // Send the field verbatim (string, possibly blank) so resolve treats it as
-      // authoritative — a cleared field reverts to the raw shop name.
-      labelOverride: choice.labelOverride ?? '',
-    });
-    await reloadPending();
-  }, [choices, reloadPending]);
+    // Ignore repeat taps while this item's save is already running.
+    if (savingIds[item.id]) return;
+
+    // Collapse the card into an "Adding…" state right away so the save feels
+    // instant even while the best-effort location fix inside resolve resolves in
+    // the background (it can take up to 8s). Dropping the Save button from the
+    // tree, together with the guard above, stops a second tap from booking a
+    // duplicate operation during the capture.
+    LayoutAnimation.configureNext(CARD_COLLAPSE_ANIMATION);
+    setSavingIds((prev) => ({ ...prev, [item.id]: true }));
+
+    try {
+      await resolvePendingNotification(item.id, {
+        accountId: choice.accountId,
+        categoryId: choice.categoryId || null,
+        toAccountId: choice.toAccountId ?? null,
+        // Send the field verbatim (string, possibly blank) so resolve treats it as
+        // authoritative — a cleared field reverts to the raw shop name.
+        labelOverride: choice.labelOverride ?? '',
+      });
+      // The pending row is deleted now; reloading drops the collapsed card from
+      // the queue (the effect above prunes its stale saving flag).
+      LayoutAnimation.configureNext(CARD_COLLAPSE_ANIMATION);
+      await reloadPending();
+    } catch (error) {
+      // The save failed (e.g. no exchange rate for a cross-currency booking) —
+      // expand the card again so the user can retry or adjust their choices.
+      if (mountedRef.current) {
+        LayoutAnimation.configureNext(CARD_COLLAPSE_ANIMATION);
+        setSavingIds((prev) => {
+          const next = { ...prev };
+          delete next[item.id];
+          return next;
+        });
+      }
+    }
+  }, [choices, reloadPending, savingIds]);
 
   const handleDismiss = useCallback(async (item) => {
     await dismissPendingNotification(item.id);
@@ -317,6 +393,32 @@ export default function NotificationProcessingContentPanel({ bottomInset }) {
         </View>
       ) : (
         pending.map((item) => {
+          // Mid-save: the full form is collapsed into a compact progress row so
+          // the save reads as instant, and the (now-absent) Save button can't be
+          // tapped again while the location fix resolves.
+          if (savingIds[item.id]) {
+            return (
+              <View
+                key={item.id}
+                style={[styles.card, styles.savingCard, { backgroundColor: colors.surface, borderColor: colors.border }]}
+                accessibilityRole="progressbar"
+                accessibilityLabel={t('bank_notifications_adding') || 'Adding operation…'}
+              >
+                <ActivityIndicator size="small" color={colors.primary} />
+                <View style={styles.savingBody}>
+                  <Text style={[styles.savingMerchant, { color: colors.text }]} numberOfLines={1}>
+                    {item.merchant || item.kind}
+                  </Text>
+                  <Text style={[styles.savingStatus, { color: colors.mutedText }]} numberOfLines={1}>
+                    {t('bank_notifications_adding') || 'Adding operation…'}
+                  </Text>
+                </View>
+                <Text style={[styles.cardAmount, { color: colors.mutedText }]}>
+                  {item.amount} {item.currency}
+                </Text>
+              </View>
+            );
+          }
           const choice = choices[item.id] || {};
           // ATM withdrawals resolve to a target (cash) account instead of a
           // category — they are booked as a transfer between the user's accounts.
@@ -614,6 +716,22 @@ const styles = StyleSheet.create({
   pickerWrap: {
     borderRadius: BORDER_RADIUS.sm,
     borderWidth: StyleSheet.hairlineWidth,
+  },
+  savingBody: {
+    flex: 1,
+  },
+  savingCard: {
+    alignItems: 'center',
+    flexDirection: 'row',
+    gap: SPACING.md,
+  },
+  savingMerchant: {
+    fontSize: 15,
+    fontWeight: '700',
+  },
+  savingStatus: {
+    fontSize: 12,
+    marginTop: 2,
   },
   scroll: {
     flex: 1,
