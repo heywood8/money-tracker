@@ -20,6 +20,7 @@ import Calculator from '../components/Calculator';
 import ListCard from '../components/ListCard';
 import OperationsList from '../components/operations/OperationsList';
 import QuickAddForm from '../components/operations/QuickAddForm';
+import SuggestedOperationsStack from '../components/operations/SuggestedOperationsStack';
 import PickerModal from '../components/operations/PickerModal';
 import SearchOverlay from '../components/search/SearchOverlay';
 import SearchBar from '../components/search/SearchBar';
@@ -30,6 +31,8 @@ import useMultiCurrencyTransfer from '../hooks/useMultiCurrencyTransfer';
 import useOperationPicker from '../hooks/useOperationPicker';
 import useQuickAddForm from '../hooks/useQuickAddForm';
 import useQuickAddLocation from '../hooks/useQuickAddLocation';
+import usePendingOperationSuggestions from '../hooks/usePendingOperationSuggestions';
+import { appEvents, EVENTS } from '../services/eventEmitter';
 import { useSearch } from '../contexts/SearchContext';
 import { useDisplaySettings } from '../contexts/DisplaySettingsContext';
 
@@ -160,6 +163,36 @@ const OperationsScreen = () => {
     navigateIntoFolder,
     navigateBack,
   } = useOperationPicker(t);
+
+  // Suggested operations parsed from bank notifications (the same pending queue
+  // the settings review panel manages), surfaced as stacked cards above the
+  // quick-add form so common cases never require a trip to settings.
+  const {
+    suggestions: operationSuggestions,
+    savingIds: suggestionSavingIds,
+    atmTargetAccountId,
+    refresh: refreshSuggestions,
+    accept: acceptSuggestion,
+    dismiss: dismissSuggestion,
+  } = usePendingOperationSuggestions();
+
+  // Pull-to-refresh: re-run the notification ingestion pipeline and reload the
+  // suggestion stack. Operations booked by the run arrive via RELOAD_ALL.
+  const [pullRefreshing, setPullRefreshing] = useState(false);
+  const handlePullRefresh = useCallback(async () => {
+    setPullRefreshing(true);
+    try {
+      await refreshSuggestions();
+    } finally {
+      setPullRefreshing(false);
+    }
+  }, [refreshSuggestions]);
+
+  // "Review" on a card that can't be one-tap accepted (and the "+N more" row)
+  // jumps to Settings → Notification processing, which keeps the full list.
+  const handleReviewSuggestions = useCallback(() => {
+    appEvents.emit(EVENTS.OPEN_NOTIFICATION_PROCESSING);
+  }, []);
 
   const {
     sourceAccount,
@@ -827,6 +860,22 @@ const OperationsScreen = () => {
     <>
       <Animated.View style={animatedQuickAddClipStyle}>
         <Animated.View style={animatedQuickAddSlideStyle}>
+          {/* Suggested operations stack sits on top of the quick-add panel, so
+              with one suggestion the header reads as two stacked cards:
+              the suggestion and the quick-add form. Collapses with the form
+              when search opens (it lives inside the same clip). */}
+          <SuggestedOperationsStack
+            colors={colors}
+            t={t}
+            suggestions={operationSuggestions}
+            accounts={accounts}
+            categories={categories}
+            savingIds={suggestionSavingIds}
+            atmTargetAccountId={atmTargetAccountId}
+            onAccept={acceptSuggestion}
+            onDismiss={dismissSuggestion}
+            onReviewAll={handleReviewSuggestions}
+          />
           <QuickAddForm
             colors={colors}
             t={t}
@@ -858,7 +907,7 @@ const OperationsScreen = () => {
       </Animated.View>
       {filtersExpanded && filterPanelHeight > 0 && <View style={{ height: filterPanelHeight }} />}
     </>
-  ), [animatedQuickAddClipStyle, animatedQuickAddSlideStyle, colors, t, quickAddValues, visibleAccounts, filteredCategories, topCategoriesForType, getCategoryInfo, getAccountName, getAccountBalance, getCategoryName, openPicker, handleQuickAdd, handleAmountChange, handleExchangeRateChange, handleDestinationAmountChange, handleAutoAddWithCategory, topTransferAccountsForForm, handleAutoAddWithAccount, TYPES, rateSource, handleOperationCurrencyChange, foreignRateSource, foreignExchangeRate, filterPanelHeight, filtersExpanded, flashCategoryErrorCount]);
+  ), [animatedQuickAddClipStyle, animatedQuickAddSlideStyle, colors, t, quickAddValues, visibleAccounts, filteredCategories, topCategoriesForType, getCategoryInfo, getAccountName, getAccountBalance, getCategoryName, openPicker, handleQuickAdd, handleAmountChange, handleExchangeRateChange, handleDestinationAmountChange, handleAutoAddWithCategory, topTransferAccountsForForm, handleAutoAddWithAccount, TYPES, rateSource, handleOperationCurrencyChange, foreignRateSource, foreignExchangeRate, filterPanelHeight, filtersExpanded, flashCategoryErrorCount, operationSuggestions, accounts, categories, suggestionSavingIds, atmTargetAccountId, acceptSuggestion, dismissSuggestion, handleReviewSuggestions]);
 
   // Auto-scroll to top when filter panel closes, but only if the user is still
   // near the top (hasn't scrolled into past dates). The threshold is filterPanelHeight:
@@ -941,6 +990,8 @@ const OperationsScreen = () => {
         onScroll={handleScroll}
         onScrollToIndexFailed={handleScrollToIndexFailed}
         onContentSizeChange={handleContentSizeChange}
+        refreshing={pullRefreshing}
+        onRefresh={handlePullRefresh}
         headerComponent={quickAddFormComponent}
         pendingSuggestionId={pendingSuggestionId}
         pendingSuggestions={pendingSuggestions}
