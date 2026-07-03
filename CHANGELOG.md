@@ -1,5 +1,12 @@
 # Changelog
 
+## [0.175.0](https://github.com/heywood8/money-tracker/compare/penny-v0.174.0...penny-v0.175.0) (2026-07-03)
+
+
+### Features
+
+* **geo:** auto-save location for quick-add and notification operations ([#1162](https://github.com/heywood8/money-tracker/issues/1162)) ([c308a8a](https://github.com/heywood8/money-tracker/commit/c308a8a229b904e142af8b72e647bf6b153dbe18))
+
 ## [0.174.0](https://github.com/heywood8/money-tracker/compare/penny-v0.173.0...penny-v0.174.0) (2026-07-03)
 
 
