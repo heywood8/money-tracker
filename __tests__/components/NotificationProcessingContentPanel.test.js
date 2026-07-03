@@ -1,5 +1,5 @@
 import React from 'react';
-import { render, fireEvent, waitFor } from '@testing-library/react-native';
+import { render, fireEvent, waitFor, act } from '@testing-library/react-native';
 import NotificationProcessingContentPanel from '../../app/components/NotificationProcessingContentPanel';
 import * as pipeline from '../../app/services/notifications/processBankNotifications';
 import * as PendingNotificationsDB from '../../app/services/PendingNotificationsDB';
@@ -254,6 +254,61 @@ describe('NotificationProcessingContentPanel', () => {
           'pt1', expect.objectContaining({ accountId: 1, toAccountId: 2 }),
         ),
       );
+    });
+  });
+
+  describe('auto-refresh', () => {
+    // Grab the 3-second tick the panel arms after its initial load. Spying on
+    // setInterval and invoking the callback directly sidesteps the fragile
+    // fake-timer/async-pipeline interaction while still asserting the contract.
+    const getAutoRefreshTick = (spy) => {
+      const call = spy.mock.calls.find(([, ms]) => ms === 3000);
+      expect(call).toBeTruthy();
+      return call[0];
+    };
+
+    it('arms a 3-second interval that re-runs the pipeline and reloads the lists', async () => {
+      const setIntervalSpy = jest.spyOn(global, 'setInterval');
+      try {
+        const { getByText } = await render(<NotificationProcessingContentPanel />);
+        await waitFor(() => expect(getByText('NAREK MEHRABYAN')).toBeTruthy());
+
+        const tick = getAutoRefreshTick(setIntervalSpy);
+        const recentBefore = NotificationAccess.getRecentNotifications.mock.calls.length;
+        const processBefore = pipeline.processBankNotifications.mock.calls.length;
+        const pendingBefore = PendingNotificationsDB.getPendingNotifications.mock.calls.length;
+
+        await act(async () => { await tick(); });
+
+        expect(NotificationAccess.getRecentNotifications.mock.calls.length).toBe(recentBefore + 1);
+        expect(pipeline.processBankNotifications.mock.calls.length).toBe(processBefore + 1);
+        expect(PendingNotificationsDB.getPendingNotifications.mock.calls.length).toBe(pendingBefore + 1);
+      } finally {
+        setIntervalSpy.mockRestore();
+      }
+    });
+
+    it('surfaces a notification that only arrives on a later refresh', async () => {
+      const setIntervalSpy = jest.spyOn(global, 'setInterval');
+      try {
+        const { getByText, queryByText } = await render(<NotificationProcessingContentPanel />);
+        await waitFor(() => expect(getByText('New message')).toBeTruthy());
+        // Not present yet — it hasn't been captured at mount time.
+        expect(queryByText('Fresh purchase')).toBeNull();
+
+        // The next fetch (fired by the interval tick) adds a fresh notification.
+        NotificationAccess.getRecentNotifications.mockResolvedValue([
+          { title: 'Chat', text: 'Fresh purchase', packageName: 'com.chat', postTime: 1718000200000 },
+          BANK_RAW,
+          CHAT_RAW,
+        ]);
+        const tick = getAutoRefreshTick(setIntervalSpy);
+        await act(async () => { await tick(); });
+
+        expect(getByText('Fresh purchase')).toBeTruthy();
+      } finally {
+        setIntervalSpy.mockRestore();
+      }
     });
   });
 

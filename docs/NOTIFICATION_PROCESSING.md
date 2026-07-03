@@ -81,6 +81,17 @@ category:
   `destinationAmount` in target currency, `exchangeRate` source→target); a missing
   rate routes to review instead of booking a wrong amount.
 
+### Live auto-refresh
+
+While the processing panel is open it re-runs the pipeline and reloads both the
+review queue and the **Recent notifications** feed every 3 seconds
+(`NotificationProcessingContentPanel`), so notifications captured while the panel
+is visible surface on their own — no pull-to-refresh needed (that still works).
+The refresh is silent (no spinner) and guarded so a slow run can't overlap the
+next tick; pull-to-refresh keeps its own spinner. A newly-captured card fades and
+slides into the feed (content-stable keys mean only genuinely new cards animate;
+the initial batch appears at rest).
+
 ### Re-adding an already-processed notification
 
 Each already-processed notification stays visible in the **Recent notifications**

@@ -32,6 +32,10 @@ import { getLabelForMerchant } from '../services/NotificationRulesDB';
 import { getRecentNotifications } from '../services/NotificationAccess';
 import * as Currency from '../services/currency';
 
+// How often the panel silently re-runs the pipeline and reloads its lists so
+// newly-arrived notifications surface on their own, without a manual pull.
+const AUTO_REFRESH_MS = 3000;
+
 /**
  * "Notification processing" settings subpanel — the main view.
  *
@@ -73,6 +77,12 @@ export default function NotificationProcessingContentPanel({ bottomInset }) {
   // whenever the user toggles between the main and filters views.
   const mountedRef = useRef(true);
   useEffect(() => () => { mountedRef.current = false; }, []);
+  // Keys of recent-feed cards already shown. New keys (notifications captured
+  // after the panel opened) animate in; the initial batch is seeded silently so
+  // opening the panel doesn't fire a flurry of animations. `null` until seeded.
+  const seenRecentKeys = useRef(null);
+  // Guards the auto-refresh timer so a slow run can't overlap the next tick.
+  const autoRefreshingRef = useRef(false);
 
   const accountItems = accounts.map((a) => ({
     label: a.name,
@@ -174,6 +184,31 @@ export default function NotificationProcessingContentPanel({ bottomInset }) {
     }
   }, [reloadPending, reloadRecent]);
 
+  // Silent variant of handleRefresh for the auto-refresh timer: same work, but no
+  // RefreshControl spinner and guarded against overlapping runs.
+  const runSilentRefresh = useCallback(async () => {
+    if (autoRefreshingRef.current) return;
+    autoRefreshingRef.current = true;
+    try {
+      if (await isBankNotificationsEnabled()) {
+        await processBankNotifications();
+      }
+      if (mountedRef.current) await Promise.all([reloadPending(), reloadRecent()]);
+    } catch (error) {
+      // Non-fatal; keep the last good data until the next tick.
+    } finally {
+      autoRefreshingRef.current = false;
+    }
+  }, [reloadPending, reloadRecent]);
+
+  // Auto-refresh every AUTO_REFRESH_MS once the initial load has finished, so
+  // notifications arriving while the panel is open surface without a manual pull.
+  useEffect(() => {
+    if (loading) return undefined;
+    const intervalId = setInterval(runSilentRefresh, AUTO_REFRESH_MS);
+    return () => clearInterval(intervalId);
+  }, [loading, runSilentRefresh]);
+
   const setChoice = useCallback((id, patch) => {
     setChoices((prev) => ({ ...prev, [id]: { ...prev[id], ...patch } }));
   }, []);
@@ -227,6 +262,32 @@ export default function NotificationProcessingContentPanel({ bottomInset }) {
     () => filterNotificationsByApp(recent, hidden),
     [recent, hidden],
   );
+
+  // Give each card a content-stable key (not the array index) so a card keeps
+  // its identity across refreshes even as newer notifications are prepended —
+  // only genuinely new cards mount, so only they animate. A per-render counter
+  // disambiguates the rare notifications that share every field.
+  const keyedRecent = useMemo(() => {
+    const counts = {};
+    return visibleRecent.map((notification) => {
+      const base = `${notification.postTime || 0}|${notification.packageName || ''}|${notification.title || ''}|${notification.text || ''}`;
+      counts[base] = (counts[base] || 0) + 1;
+      const key = counts[base] > 1 ? `${base}#${counts[base]}` : base;
+      return { notification, key };
+    });
+  }, [visibleRecent]);
+
+  // Track which keys have been shown. Runs after render, so the render below sees
+  // the pre-update set and can flag brand-new cards. The first feed load seeds the
+  // set without animating anything.
+  const previouslySeen = seenRecentKeys.current;
+  useEffect(() => {
+    if (seenRecentKeys.current === null) {
+      seenRecentKeys.current = new Set(keyedRecent.map((k) => k.key));
+      return;
+    }
+    keyedRecent.forEach((k) => seenRecentKeys.current.add(k.key));
+  }, [keyedRecent]);
 
   if (loading) {
     return (
@@ -430,10 +491,11 @@ export default function NotificationProcessingContentPanel({ bottomInset }) {
           </Text>
         </View>
       ) : (
-        visibleRecent.map((notification, index) => {
-          // Notifications carry no stable id; post time + index keeps keys unique
-          // even when two arrive at the same millisecond.
-          const key = `${notification.postTime || 0}-${index}`;
+        keyedRecent.map(({ notification, key }) => {
+          // A card is "new" (and animates in) when its key wasn't shown before.
+          // Before the first seed (`null`) nothing is new, so the initial batch
+          // renders at rest.
+          const isNew = previouslySeen != null && !previouslySeen.has(key);
           return (
             <NotificationCard
               key={key}
@@ -442,6 +504,7 @@ export default function NotificationProcessingContentPanel({ bottomInset }) {
               t={t}
               onReAdd={(n) => handleReAdd(n, key)}
               reAddState={reAddState[key]}
+              animateIn={isNew}
             />
           );
         })
