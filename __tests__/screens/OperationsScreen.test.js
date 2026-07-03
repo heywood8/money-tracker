@@ -149,6 +149,17 @@ jest.mock('../../app/components/operations/PickerModal', () => {
 });
 /* eslint-enable react/prop-types */
 
+// Location wiring: default to the feature off / no fix so existing tests are
+// unaffected; the location-specific test overrides these.
+jest.mock('../../app/contexts/DisplaySettingsContext', () => ({
+  useDisplaySettings: jest.fn(() => ({ attachLocation: false })),
+}));
+
+jest.mock('../../app/hooks/useQuickAddLocation', () => jest.fn(() => ({
+  getLocation: jest.fn(() => null),
+  prime: jest.fn(),
+})));
+
 jest.mock('../../app/hooks/useQuickAddForm', () => jest.fn(() => ({
   quickAddValues: {
     type: 'expense',
@@ -1110,6 +1121,134 @@ describe('OperationsScreen', () => {
 
       expect(mockResetForm).toHaveBeenCalled();
       expect(mockClosePicker).toHaveBeenCalled();
+    });
+  });
+
+  describe('Quick-add location', () => {
+    const { act } = require('@testing-library/react-native');
+
+    it('attaches the primed location to a quick-added operation', async () => {
+      const OperationsScreen = require('../../app/screens/OperationsScreen').default;
+      const { useOperationsData } = require('../../app/contexts/OperationsDataContext');
+      const { useOperationsActions } = require('../../app/contexts/OperationsActionsContext');
+      const { useAccountsData } = require('../../app/contexts/AccountsDataContext');
+      const useQuickAddForm = require('../../app/hooks/useQuickAddForm');
+      const useQuickAddLocation = require('../../app/hooks/useQuickAddLocation');
+      const useOperationPicker = require('../../app/hooks/useOperationPicker');
+
+      useOperationPicker.mockReturnValue({
+        pickerState: { visible: true, type: 'category', data: [] },
+        categoryNavigation: { currentFolderId: null, breadcrumb: [] },
+        openPicker: jest.fn(),
+        closePicker: jest.fn(),
+        navigateIntoFolder: jest.fn(),
+        navigateBack: jest.fn(),
+      });
+
+      useQuickAddLocation.mockReturnValue({
+        getLocation: jest.fn(() => ({ latitude: '40.1', longitude: '44.2' })),
+        prime: jest.fn(),
+      });
+
+      const mockAddOperation = jest.fn(() => Promise.resolve({ id: 'new-op' }));
+      useQuickAddForm.mockReturnValue({
+        quickAddValues: { type: 'expense', amount: '100', accountId: 'acc-1', categoryId: 'cat-1' },
+        setQuickAddValues: jest.fn(),
+        getAccountName: jest.fn(() => 'Cash'),
+        getAccountBalance: jest.fn(() => '$1000.00'),
+        getCategoryInfo: jest.fn(() => ({ name: 'Food', icon: 'food' })),
+        getCategoryName: jest.fn(() => 'Food'),
+        filteredCategories: [],
+        resetForm: jest.fn(),
+      });
+
+      useAccountsData.mockReturnValue({
+        accounts: [{ id: 'acc-1', currency: 'USD' }],
+        visibleAccounts: [{ id: 'acc-1', currency: 'USD' }],
+        loading: false,
+      });
+      useOperationsData.mockReturnValue({
+        operations: [], loading: false, loadingMore: false, hasMoreOperations: false,
+      });
+      useOperationsActions.mockReturnValue({
+        deleteOperation: jest.fn(),
+        addOperation: mockAddOperation,
+        validateOperation: jest.fn(() => null),
+        loadMoreOperations: jest.fn(),
+        jumpToDate: jest.fn(),
+      });
+
+      const { getByTestId } = await render(<OperationsScreen />);
+      // handleQuickAdd is reached through the picker's auto-add shortcut (the
+      // quick-add form itself is a mocked list header and not rendered here).
+      await act(async () => {
+        await getByTestId('picker-modal').props.onAutoAddWithCategory('cat-1');
+      });
+
+      expect(mockAddOperation).toHaveBeenCalledWith(
+        expect.objectContaining({ latitude: '40.1', longitude: '44.2' }),
+      );
+    });
+
+    it('quick-adds without coordinates when no fix is available', async () => {
+      const OperationsScreen = require('../../app/screens/OperationsScreen').default;
+      const { useOperationsData } = require('../../app/contexts/OperationsDataContext');
+      const { useOperationsActions } = require('../../app/contexts/OperationsActionsContext');
+      const { useAccountsData } = require('../../app/contexts/AccountsDataContext');
+      const useQuickAddForm = require('../../app/hooks/useQuickAddForm');
+      const useQuickAddLocation = require('../../app/hooks/useQuickAddLocation');
+      const useOperationPicker = require('../../app/hooks/useOperationPicker');
+
+      useOperationPicker.mockReturnValue({
+        pickerState: { visible: true, type: 'category', data: [] },
+        categoryNavigation: { currentFolderId: null, breadcrumb: [] },
+        openPicker: jest.fn(),
+        closePicker: jest.fn(),
+        navigateIntoFolder: jest.fn(),
+        navigateBack: jest.fn(),
+      });
+
+      useQuickAddLocation.mockReturnValue({
+        getLocation: jest.fn(() => null),
+        prime: jest.fn(),
+      });
+
+      const mockAddOperation = jest.fn(() => Promise.resolve({ id: 'new-op' }));
+      useQuickAddForm.mockReturnValue({
+        quickAddValues: { type: 'expense', amount: '100', accountId: 'acc-1', categoryId: 'cat-1' },
+        setQuickAddValues: jest.fn(),
+        getAccountName: jest.fn(() => 'Cash'),
+        getAccountBalance: jest.fn(() => '$1000.00'),
+        getCategoryInfo: jest.fn(() => ({ name: 'Food', icon: 'food' })),
+        getCategoryName: jest.fn(() => 'Food'),
+        filteredCategories: [],
+        resetForm: jest.fn(),
+      });
+
+      useAccountsData.mockReturnValue({
+        accounts: [{ id: 'acc-1', currency: 'USD' }],
+        visibleAccounts: [{ id: 'acc-1', currency: 'USD' }],
+        loading: false,
+      });
+      useOperationsData.mockReturnValue({
+        operations: [], loading: false, loadingMore: false, hasMoreOperations: false,
+      });
+      useOperationsActions.mockReturnValue({
+        deleteOperation: jest.fn(),
+        addOperation: mockAddOperation,
+        validateOperation: jest.fn(() => null),
+        loadMoreOperations: jest.fn(),
+        jumpToDate: jest.fn(),
+      });
+
+      const { getByTestId } = await render(<OperationsScreen />);
+      await act(async () => {
+        await getByTestId('picker-modal').props.onAutoAddWithCategory('cat-1');
+      });
+
+      const arg = mockAddOperation.mock.calls[0][0];
+      expect(arg).not.toHaveProperty('latitude');
+      expect(arg).not.toHaveProperty('longitude');
     });
   });
 

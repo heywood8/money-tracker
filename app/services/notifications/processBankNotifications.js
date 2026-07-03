@@ -18,8 +18,28 @@ import * as NotificationRulesDB from '../NotificationRulesDB';
 import * as PendingNotificationsDB from '../PendingNotificationsDB';
 import { serializeLabels, sanitizeLabel } from '../../utils/labelUtils';
 import { appEvents, EVENTS } from '../eventEmitter';
+import { captureLocationIfEnabled, operationLocationFields } from '../operationLocation';
 import { parseBankNotification, kindRequiresCategory } from './parseBankNotification';
 import { resolveNotification } from './resolveNotification';
+
+/**
+ * A per-run location provider. Captures the device location at most once (lazily,
+ * only when an operation is actually created) and reuses it for every operation
+ * booked in the same run, so a batch of notifications shares one best-effort fix
+ * instead of hammering GPS. Returns { latitude, longitude } or null; the feature
+ * being off / permission missing / a failed fix all resolve to null so location
+ * capture never blocks booking a notification (issue #1091).
+ * @returns {() => Promise<{latitude: string, longitude: string}|null>}
+ */
+const makeLocationProvider = () => {
+  let cached; // undefined until the first attempt
+  return async () => {
+    if (cached === undefined) {
+      cached = await captureLocationIfEnabled();
+    }
+    return cached;
+  };
+};
 
 // Cap on remembered signatures. The native side only ever keeps a handful of
 // notifications, so this is comfortably large while bounding storage.
@@ -276,8 +296,10 @@ const isAllowedSource = (packageName, allowed) =>
  * @param {string} date - resolved ISO date (never null)
  * @param {string[]} allowedPackages - trusted-source allowlist
  * @param {{ created: number, pending: number }} summary
+ * @param {() => Promise<Object|null>} [getLocation] - best-effort location provider
+ *   for auto-created operations; omitted callers book without coordinates.
  */
-const bookExpenseOrQueue = async (descriptor, resolution, date, allowedPackages, summary) => {
+const bookExpenseOrQueue = async (descriptor, resolution, date, allowedPackages, summary, getLocation) => {
   // Everything an auto-create needs except the currency match. Auto-create only
   // for trusted sources; kinds that require a manual category (C2C transfers,
   // DEBIT ACCOUNT) always wait in the queue.
@@ -320,6 +342,7 @@ const bookExpenseOrQueue = async (descriptor, resolution, date, allowedPackages,
     // A learned label override (e.g. "ECOSENSE BYUZAND" -> "Ecosense") wins over
     // the raw merchant for the operation's label.
     const label = resolution.labelOverride || descriptor.merchant;
+    const location = getLocation ? await getLocation() : null;
     await OperationsDB.createOperation({
       type: descriptor.type,
       ...currencyFields,
@@ -327,6 +350,7 @@ const bookExpenseOrQueue = async (descriptor, resolution, date, allowedPackages,
       categoryId: resolution.categoryId,
       date,
       description: label ? serializeLabels([label]) : null,
+      ...operationLocationFields(location),
     });
     summary.created += 1;
   } else {
@@ -355,8 +379,10 @@ const bookExpenseOrQueue = async (descriptor, resolution, date, allowedPackages,
  * @param {string} date - resolved ISO date (never null)
  * @param {string[]} allowedPackages - trusted-source allowlist
  * @param {{ created: number, pending: number }} summary
+ * @param {() => Promise<Object|null>} [getLocation] - best-effort location provider
+ *   for auto-created transfers; omitted callers book without coordinates.
  */
-const bookTransferOrQueue = async (descriptor, resolution, date, allowedPackages, summary) => {
+const bookTransferOrQueue = async (descriptor, resolution, date, allowedPackages, summary, getLocation) => {
   const target = await resolveAtmTargetAccount();
   const eligibleForAutoCreate =
     resolution.matchedAccount &&
@@ -390,6 +416,7 @@ const bookTransferOrQueue = async (descriptor, resolution, date, allowedPackages
         ),
       };
     }
+    const location = getLocation ? await getLocation() : null;
     await OperationsDB.createOperation({
       type: 'transfer',
       ...transferFields,
@@ -397,6 +424,7 @@ const bookTransferOrQueue = async (descriptor, resolution, date, allowedPackages
       toAccountId: target.id,
       date,
       description: descriptor.merchant ? serializeLabels([descriptor.merchant]) : null,
+      ...operationLocationFields(location),
     });
     summary.created += 1;
   } else {
@@ -450,6 +478,9 @@ const runProcess = async () => {
   const allowedPackages = await getAllowedPackages();
   const newlySeen = [];
 
+  // One best-effort location fix, shared by every operation auto-created this run.
+  const getLocation = makeLocationProvider();
+
   // Oldest first so operations are created in chronological order.
   const ordered = [...notifications].sort(
     (a, b) => (a.postTime || 0) - (b.postTime || 0),
@@ -480,9 +511,9 @@ const runProcess = async () => {
       // accounts, so they resolve a *target* account (a bound "cash" account)
       // instead of a category. Everything else books as expense/income.
       if (descriptor.isTransfer) {
-        await bookTransferOrQueue(descriptor, resolution, date, allowedPackages, summary);
+        await bookTransferOrQueue(descriptor, resolution, date, allowedPackages, summary, getLocation);
       } else {
-        await bookExpenseOrQueue(descriptor, resolution, date, allowedPackages, summary);
+        await bookExpenseOrQueue(descriptor, resolution, date, allowedPackages, summary, getLocation);
       }
 
       seen.add(signature);
@@ -577,6 +608,9 @@ export const resolvePendingNotification = async (pendingId, choices = {}) => {
     };
   }
 
+  // Best-effort location for this user-driven save (attached only when enabled).
+  const location = await captureLocationIfEnabled();
+
   const operation = await OperationsDB.createOperation({
     type: pending.type,
     ...currencyFields,
@@ -585,6 +619,7 @@ export const resolvePendingNotification = async (pendingId, choices = {}) => {
     // operations.date is NOT NULL — fall back to the row's creation date / today.
     date: pending.date || (pending.createdAt ? pending.createdAt.slice(0, 10) : todayIso()),
     description: label ? serializeLabels([label]) : null,
+    ...operationLocationFields(location),
   });
 
   // Persist an override change only when the user actually changed it in the
@@ -708,6 +743,9 @@ const resolvePendingTransfer = async (pending, choices = {}) => {
   const typedLabel = sanitizeLabel(choices.labelOverride);
   const label = typedLabel || pending.merchant;
 
+  // Best-effort location for this user-driven save (attached only when enabled).
+  const location = await captureLocationIfEnabled();
+
   const operation = await OperationsDB.createOperation({
     type: 'transfer',
     ...transferFields,
@@ -716,6 +754,7 @@ const resolvePendingTransfer = async (pending, choices = {}) => {
     // operations.date is NOT NULL — fall back to the row's creation date / today.
     date: pending.date || (pending.createdAt ? pending.createdAt.slice(0, 10) : todayIso()),
     description: label ? serializeLabels([label]) : null,
+    ...operationLocationFields(location),
   });
 
   // Learn the card -> source-account binding (default on when a card is present).
@@ -778,11 +817,12 @@ export const reAddNotification = async (notification) => {
   // The user explicitly asked to re-add this, so treat its own source as trusted
   // for this booking regardless of the learn-on-trust allowlist.
   const trustedAllowlist = descriptor.packageName ? [descriptor.packageName] : [];
+  const getLocation = makeLocationProvider();
 
   if (descriptor.isTransfer) {
-    await bookTransferOrQueue(descriptor, resolution, date, trustedAllowlist, summary);
+    await bookTransferOrQueue(descriptor, resolution, date, trustedAllowlist, summary, getLocation);
   } else {
-    await bookExpenseOrQueue(descriptor, resolution, date, trustedAllowlist, summary);
+    await bookExpenseOrQueue(descriptor, resolution, date, trustedAllowlist, summary, getLocation);
   }
 
   if (summary.created > 0 || summary.pending > 0) {

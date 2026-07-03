@@ -40,6 +40,18 @@ jest.mock('../../../app/services/PreferencesDB', () => ({
 }));
 import * as PreferencesDB from '../../../app/services/PreferencesDB';
 
+// Location capture is preference-gated; mock it so we can drive "fix available"
+// vs "feature off / no fix" directly. operationLocationFields stays the real pure
+// function so the merge-into-createOperation behavior is exercised.
+jest.mock('../../../app/services/operationLocation', () => ({
+  captureLocationIfEnabled: jest.fn(),
+  operationLocationFields: (loc) =>
+    loc && loc.latitude != null && loc.longitude != null
+      ? { latitude: loc.latitude, longitude: loc.longitude }
+      : {},
+}));
+import * as OperationLocation from '../../../app/services/operationLocation';
+
 // Use the real currency math but stub the live-rate fetch so conversions are
 // deterministic and never hit the network.
 jest.mock('../../../app/services/currency', () => {
@@ -112,6 +124,8 @@ describe('processBankNotifications', () => {
     PreferencesDB.getNumberPreference.mockResolvedValue(null);
     PreferencesDB.setPreference.mockResolvedValue();
     Currency.fetchLiveExchangeRate.mockResolvedValue({ rate: null, source: 'none' });
+    // Location feature off by default — no coordinates attached.
+    OperationLocation.captureLocationIfEnabled.mockResolvedValue(null);
   });
 
   it('does nothing when disabled', async () => {
@@ -138,6 +152,83 @@ describe('processBankNotifications', () => {
       }),
     );
     expect(emitSpy).toHaveBeenCalledWith(EVENTS.RELOAD_ALL);
+  });
+
+  describe('location capture', () => {
+    it('attaches the captured location to an auto-created operation when enabled', async () => {
+      OperationLocation.captureLocationIfEnabled.mockResolvedValue({ latitude: '40.1', longitude: '44.2' });
+      NotificationAccess.getRecentNotifications.mockResolvedValue([PURCHASE]);
+      AccountsDB.getAccountByCardMask.mockResolvedValue({ id: 7, currency: 'AMD' });
+      NotificationRulesDB.getMerchantRule.mockResolvedValue({ categoryId: 'cat-food' });
+      PreferencesDB.getJsonPreference.mockImplementation((key) => prefs([], [PKG])(key));
+
+      await pipeline.processBankNotifications();
+
+      expect(OperationsDB.createOperation).toHaveBeenCalledWith(
+        expect.objectContaining({ latitude: '40.1', longitude: '44.2' }),
+      );
+    });
+
+    it('books an auto-created operation without coordinates when capture yields none', async () => {
+      OperationLocation.captureLocationIfEnabled.mockResolvedValue(null);
+      NotificationAccess.getRecentNotifications.mockResolvedValue([PURCHASE]);
+      AccountsDB.getAccountByCardMask.mockResolvedValue({ id: 7, currency: 'AMD' });
+      NotificationRulesDB.getMerchantRule.mockResolvedValue({ categoryId: 'cat-food' });
+      PreferencesDB.getJsonPreference.mockImplementation((key) => prefs([], [PKG])(key));
+
+      await pipeline.processBankNotifications();
+
+      const arg = OperationsDB.createOperation.mock.calls[0][0];
+      expect(arg).not.toHaveProperty('latitude');
+      expect(arg).not.toHaveProperty('longitude');
+    });
+
+    it('captures at most one fix per run even across multiple auto-created operations', async () => {
+      OperationLocation.captureLocationIfEnabled.mockResolvedValue({ latitude: '40.1', longitude: '44.2' });
+      const SECOND = { ...PURCHASE, text: PURCHASE.text.replace('NAREK MEHRABYAN', 'SECOND SHOP'), postTime: PURCHASE.postTime + 1000 };
+      NotificationAccess.getRecentNotifications.mockResolvedValue([PURCHASE, SECOND]);
+      AccountsDB.getAccountByCardMask.mockResolvedValue({ id: 7, currency: 'AMD' });
+      NotificationRulesDB.getMerchantRule.mockResolvedValue({ categoryId: 'cat-food' });
+      PreferencesDB.getJsonPreference.mockImplementation((key) => prefs([], [PKG])(key));
+
+      const summary = await pipeline.processBankNotifications();
+
+      expect(summary.created).toBe(2);
+      expect(OperationLocation.captureLocationIfEnabled).toHaveBeenCalledTimes(1);
+      expect(OperationsDB.createOperation).toHaveBeenNthCalledWith(1,
+        expect.objectContaining({ latitude: '40.1', longitude: '44.2' }));
+      expect(OperationsDB.createOperation).toHaveBeenNthCalledWith(2,
+        expect.objectContaining({ latitude: '40.1', longitude: '44.2' }));
+    });
+
+    it('does not capture a location when nothing is auto-created (all queued)', async () => {
+      // Untrusted source → the notification is queued, not booked, so no fix.
+      NotificationAccess.getRecentNotifications.mockResolvedValue([PURCHASE]);
+      AccountsDB.getAccountByCardMask.mockResolvedValue({ id: 7, currency: 'AMD' });
+      NotificationRulesDB.getMerchantRule.mockResolvedValue({ categoryId: 'cat-food' });
+      PreferencesDB.getJsonPreference.mockImplementation((key) => prefs([], [])(key));
+
+      const summary = await pipeline.processBankNotifications();
+
+      expect(summary).toEqual({ created: 0, pending: 1, skipped: 0 });
+      expect(OperationLocation.captureLocationIfEnabled).not.toHaveBeenCalled();
+    });
+
+    it('attaches the captured location when resolving a pending notification', async () => {
+      OperationLocation.captureLocationIfEnabled.mockResolvedValue({ latitude: '1.5', longitude: '2.5' });
+      PendingNotificationsDB.getPendingNotificationById.mockResolvedValue({
+        id: 'p1', type: 'expense', amount: '3900.00', currency: 'AMD',
+        cardMask: '4083***7027', merchant: 'NAREK MEHRABYAN', date: '2026-06-28',
+        accountId: null, categoryId: null, packageName: PKG,
+        createdAt: '2026-06-28T10:15:00.000Z',
+      });
+
+      await pipeline.resolvePendingNotification('p1', { accountId: 7, categoryId: 'cat-food' });
+
+      expect(OperationsDB.createOperation).toHaveBeenCalledWith(
+        expect.objectContaining({ latitude: '1.5', longitude: '2.5' }),
+      );
+    });
   });
 
   it('uses a learned label override as the operation label on auto-create', async () => {
