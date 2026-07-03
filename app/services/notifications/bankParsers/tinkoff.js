@@ -10,6 +10,15 @@
  *   text:  Платеж на 1 000 ₽, счет RUB
  *          Баланс 39 000 ₽
  *
+ * A second, newer template carries no merchant title and puts an *available*
+ * balance ("Доступно") on the same line as the transaction, separated by ". ":
+ *
+ *   text:  Пополнение на 242 787,85 ₽, счет RUB. Доступно 281 787,85 ₽
+ *
+ * Both the "Баланс" and "Доступно" balance segments are stripped before parsing
+ * (see step 1 in `parse`) so their amounts can never be read as the transaction
+ * amount.
+ *
  * Field mapping for that example:
  *
  *   | Field           | Example        | Becomes                              |
@@ -34,6 +43,9 @@
  *   symbol when no "счет" segment is present.
  * - **The balance line is stripped before anything else** so its amount
  *   ("39 000 ₽") can never be mistaken for the transaction amount ("1 000 ₽").
+ *   Both balance keywords are handled: "Баланс" (full balance, on its own line)
+ *   and "Доступно" (available balance, which may sit on the same line after the
+ *   transaction, separated by ". ").
  * - **Russian numerics.** Amounts group with spaces (regular / non-breaking /
  *   narrow / thin) and use a comma decimal separator ("1 000,50"), both handled
  *   by normalizeAmount below.
@@ -198,8 +210,12 @@ export const parse = (notification) => {
   if (!text) return null;
 
   // 1. Strip the balance line so its amount is never read as the transaction
-  //    amount. Everything from the "Баланс" keyword onward is dropped.
-  const balanceIdx = text.search(/Баланс/iu);
+  //    amount. Everything from the balance keyword onward is dropped. Two
+  //    keywords are used by Tinkoff: "Баланс" (full balance, usually on its own
+  //    line) and "Доступно" (available balance, which can trail the transaction
+  //    on the same line after ". "). The transaction amount always precedes the
+  //    balance, so cutting at the first balance keyword leaves it intact.
+  const balanceIdx = text.search(/Баланс|Доступно/iu);
   const primary = (balanceIdx >= 0 ? text.slice(0, balanceIdx) : text).trim();
   if (!primary) return null;
 
