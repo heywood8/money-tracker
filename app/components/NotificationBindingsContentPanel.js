@@ -235,7 +235,7 @@ export default function NotificationBindingsContentPanel({ bottomInset }) {
           <Ionicons name="link-outline" size={40} color={colors.mutedText} />
           <Text style={[styles.emptyText, { color: colors.mutedText }]}>
             {t('notification_bindings_empty')
-              || "No bindings yet. Penny learns them as you review notifications."}
+              || 'No bindings yet. Penny learns them as you review notifications.'}
           </Text>
         </View>
       )}
