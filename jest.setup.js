@@ -889,6 +889,40 @@ jest.mock('expo-location', () => ({
   ),
 }));
 
+// Mock expo-notifications. Local notifications only — defaults grant permission
+// and resolve happily. Individual tests override via
+// require('expo-notifications').<fn>.mockResolvedValueOnce(...).
+jest.mock('expo-notifications', () => ({
+  setNotificationHandler: jest.fn(),
+  setNotificationChannelAsync: jest.fn(() => Promise.resolve(null)),
+  getPermissionsAsync: jest.fn(() => Promise.resolve({ status: 'granted', granted: true })),
+  requestPermissionsAsync: jest.fn(() => Promise.resolve({ status: 'granted', granted: true })),
+  scheduleNotificationAsync: jest.fn(() => Promise.resolve('test-notification-id')),
+  addNotificationResponseReceivedListener: jest.fn(() => ({ remove: jest.fn() })),
+  getLastNotificationResponseAsync: jest.fn(() => Promise.resolve(null)),
+  AndroidImportance: {
+    MIN: 1, LOW: 2, DEFAULT: 3, HIGH: 4, MAX: 5, NONE: 0, UNSPECIFIED: -1000,
+  },
+}));
+
+// Mock expo-task-manager. defineTask is a no-op collector; registration lookups
+// default to "not registered".
+jest.mock('expo-task-manager', () => ({
+  defineTask: jest.fn(),
+  isTaskRegisteredAsync: jest.fn(() => Promise.resolve(false)),
+  unregisterTaskAsync: jest.fn(() => Promise.resolve()),
+}));
+
+// Mock expo-background-task. Status defaults to Available so registration paths
+// run in tests.
+jest.mock('expo-background-task', () => ({
+  registerTaskAsync: jest.fn(() => Promise.resolve()),
+  unregisterTaskAsync: jest.fn(() => Promise.resolve()),
+  getStatusAsync: jest.fn(() => Promise.resolve(2)),
+  BackgroundTaskStatus: { Restricted: 1, Available: 2 },
+  BackgroundTaskResult: { Success: 1, Failed: 2 },
+}));
+
 // Suppress console.error and console.warn during tests to reduce noise
 // This prevents expected errors from cluttering test output with red text
 const originalConsoleError = console.error;

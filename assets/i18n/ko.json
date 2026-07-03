@@ -496,5 +496,12 @@
   "none": "없음",
   "update_download_failed": "업데이트를 다운로드할 수 없습니다. 다시 시도해 주세요.",
   "labels": "라벨",
-  "add_label_placeholder": "라벨 추가…"
+  "add_label_placeholder": "라벨 추가…",
+  "bank_notifications_background_alerts": "백그라운드 알림",
+  "bank_notifications_background_alerts_hint": "백그라운드에서 확인하고 검토할 거래가 있으면 알려줍니다",
+  "bank_notifications_bg_notification_title": "검토할 거래",
+  "bank_notifications_bg_notification_body_one": "거래 1건이 추가를 기다리고 있습니다",
+  "bank_notifications_bg_notification_body_other": "거래 {count}건이 추가를 기다리고 있습니다",
+  "bank_notifications_channel_name": "은행 거래",
+  "bank_notifications_permission_denied": "백그라운드 알림을 받으려면 시스템 설정에서 알림을 켜세요"
 }

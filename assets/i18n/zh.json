@@ -496,5 +496,12 @@
   "none": "无",
   "update_download_failed": "无法下载更新。请重试。",
   "labels": "标签",
-  "add_label_placeholder": "添加标签…"
+  "add_label_placeholder": "添加标签…",
+  "bank_notifications_background_alerts": "后台提醒",
+  "bank_notifications_background_alerts_hint": "在后台检查，并在有待处理的交易时通知你",
+  "bank_notifications_bg_notification_title": "待处理的交易",
+  "bank_notifications_bg_notification_body_one": "1 笔交易等待添加",
+  "bank_notifications_bg_notification_body_other": "{count} 笔交易等待添加",
+  "bank_notifications_channel_name": "银行交易",
+  "bank_notifications_permission_denied": "在系统设置中开启通知以接收后台提醒"
 }

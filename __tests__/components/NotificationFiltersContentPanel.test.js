@@ -4,6 +4,7 @@ import NotificationFiltersContentPanel from '../../app/components/NotificationFi
 import * as pipeline from '../../app/services/notifications/processBankNotifications';
 import * as NotificationAccess from '../../app/services/NotificationAccess';
 import * as notificationFilters from '../../app/services/notifications/notificationFilters';
+import * as backgroundBankTask from '../../app/services/notifications/backgroundBankTask';
 
 jest.mock('../../app/contexts/LocalizationContext', () => ({
   useLocalization: () => ({ t: (key) => key }),
@@ -21,6 +22,7 @@ jest.mock('../../app/contexts/ThemeColorsContext', () => ({
 jest.mock('../../app/services/notifications/processBankNotifications');
 jest.mock('../../app/services/NotificationAccess');
 jest.mock('../../app/services/notifications/notificationFilters');
+jest.mock('../../app/services/notifications/backgroundBankTask');
 
 const KNOWN = ['com.android.systemui', 'com.banq.ameriabank', 'org.telegram.messenger'];
 
@@ -37,6 +39,29 @@ describe('NotificationFiltersContentPanel', () => {
     notificationFilters.getHiddenPackages.mockResolvedValue(['com.android.systemui']);
     notificationFilters.togglePackageVisibility.mockResolvedValue([]);
     notificationFilters.isPackageHidden.mockImplementation((pkg, hidden) => (hidden || []).includes(pkg));
+    backgroundBankTask.isBackgroundAlertsEnabled.mockResolvedValue(false);
+    backgroundBankTask.setBackgroundAlertsEnabled.mockResolvedValue();
+    backgroundBankTask.syncBackgroundBankTaskRegistrationAsync.mockResolvedValue(true);
+  });
+
+  it('renders the background-alerts toggle, disabled while processing is off', async () => {
+    pipeline.isBankNotificationsEnabled.mockResolvedValue(false);
+    const { getByTestId, getByText } = await render(<NotificationFiltersContentPanel />);
+    await waitFor(() =>
+      expect(getByTestId('bank-notifications-background-alerts-toggle')).toBeTruthy(),
+    );
+    expect(getByText('bank_notifications_background_alerts')).toBeTruthy();
+    // The switch is disabled until bank processing is enabled.
+    expect(getByTestId('bank-notifications-background-alerts-toggle').props.disabled).toBe(true);
+  });
+
+  it('enables the background-alerts toggle once processing is on', async () => {
+    pipeline.isBankNotificationsEnabled.mockResolvedValue(true);
+    backgroundBankTask.isBackgroundAlertsEnabled.mockResolvedValue(true);
+    const { getByTestId } = await render(<NotificationFiltersContentPanel />);
+    await waitFor(() =>
+      expect(getByTestId('bank-notifications-background-alerts-toggle').props.disabled).toBe(false),
+    );
   });
 
   it('shows the notification-access control and the bank toggle', async () => {

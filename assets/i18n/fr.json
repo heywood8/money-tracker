@@ -496,5 +496,12 @@
   "none": "Aucun",
   "update_download_failed": "Impossible de télécharger la mise à jour. Veuillez réessayer.",
   "labels": "Étiquettes",
-  "add_label_placeholder": "Ajouter une étiquette…"
+  "add_label_placeholder": "Ajouter une étiquette…",
+  "bank_notifications_background_alerts": "Alertes en arrière-plan",
+  "bank_notifications_background_alerts_hint": "Vérifier en arrière-plan et vous notifier lorsqu'il y a des transactions à examiner",
+  "bank_notifications_bg_notification_title": "Transactions à examiner",
+  "bank_notifications_bg_notification_body_one": "1 transaction en attente d'ajout",
+  "bank_notifications_bg_notification_body_other": "{count} transactions en attente d'ajout",
+  "bank_notifications_channel_name": "Opérations bancaires",
+  "bank_notifications_permission_denied": "Activez les notifications dans les paramètres système pour recevoir les alertes en arrière-plan"
 }

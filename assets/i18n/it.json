@@ -496,5 +496,12 @@
   "none": "Nessuno",
   "update_download_failed": "Impossibile scaricare l'aggiornamento. Riprova.",
   "labels": "Etichette",
-  "add_label_placeholder": "Aggiungi etichetta…"
+  "add_label_placeholder": "Aggiungi etichetta…",
+  "bank_notifications_background_alerts": "Avvisi in background",
+  "bank_notifications_background_alerts_hint": "Controlla in background e avvisa quando ci sono transazioni da esaminare",
+  "bank_notifications_bg_notification_title": "Transazioni da esaminare",
+  "bank_notifications_bg_notification_body_one": "1 transazione in attesa di essere aggiunta",
+  "bank_notifications_bg_notification_body_other": "{count} transazioni in attesa di essere aggiunte",
+  "bank_notifications_channel_name": "Operazioni bancarie",
+  "bank_notifications_permission_denied": "Abilita le notifiche nelle impostazioni di sistema per ricevere gli avvisi in background"
 }
