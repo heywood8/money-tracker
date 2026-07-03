@@ -496,5 +496,12 @@
   "none": "None",
   "update_download_failed": "Could not download the update. Please try again.",
   "labels": "Labels",
-  "add_label_placeholder": "Add a label…"
+  "add_label_placeholder": "Add a label…",
+  "bank_notifications_background_alerts": "Background alerts",
+  "bank_notifications_background_alerts_hint": "Check in the background and notify you when there are transactions to review",
+  "bank_notifications_bg_notification_title": "Transactions to review",
+  "bank_notifications_bg_notification_body_one": "1 transaction is waiting to be added",
+  "bank_notifications_bg_notification_body_other": "{count} transactions are waiting to be added",
+  "bank_notifications_channel_name": "Bank operations",
+  "bank_notifications_permission_denied": "Enable notifications in system settings to receive background alerts"
 }

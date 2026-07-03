@@ -496,5 +496,12 @@
   "none": "なし",
   "update_download_failed": "更新をダウンロードできませんでした。もう一度お試しください。",
   "labels": "ラベル",
-  "add_label_placeholder": "ラベルを追加…"
+  "add_label_placeholder": "ラベルを追加…",
+  "bank_notifications_background_alerts": "バックグラウンド通知",
+  "bank_notifications_background_alerts_hint": "バックグラウンドで確認し、確認が必要な取引があるときに通知します",
+  "bank_notifications_bg_notification_title": "確認が必要な取引",
+  "bank_notifications_bg_notification_body_one": "1 件の取引が追加待ちです",
+  "bank_notifications_bg_notification_body_other": "{count} 件の取引が追加待ちです",
+  "bank_notifications_channel_name": "銀行取引",
+  "bank_notifications_permission_denied": "バックグラウンド通知を受け取るには、システム設定で通知を有効にしてください"
 }

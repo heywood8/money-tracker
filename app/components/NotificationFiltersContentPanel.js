@@ -12,6 +12,12 @@ import {
   processBankNotifications,
 } from '../services/notifications/processBankNotifications';
 import {
+  isBackgroundAlertsEnabled,
+  setBackgroundAlertsEnabled,
+  syncBackgroundBankTaskRegistrationAsync,
+} from '../services/notifications/backgroundBankTask';
+import { requestNotificationsPermission } from '../services/notifications/localNotifications';
+import {
   isNotificationAccessEnabled,
   openNotificationAccessSettings,
   getRecentNotifications,
@@ -42,6 +48,10 @@ export default function NotificationFiltersContentPanel({ bottomInset }) {
   const [refreshing, setRefreshing] = useState(false);
   const [accessEnabled, setAccessEnabled] = useState(false);
   const [enabled, setEnabled] = useState(false);
+  const [backgroundAlerts, setBackgroundAlerts] = useState(false);
+  // Set when the user tried to enable background alerts but the OS notification
+  // permission was denied — surfaces an inline hint under the toggle.
+  const [permissionDenied, setPermissionDenied] = useState(false);
   const [known, setKnown] = useState([]);
   const [hidden, setHidden] = useState([]);
   // Guards the async setters below from firing after the panel unmounts (it is
@@ -51,13 +61,15 @@ export default function NotificationFiltersContentPanel({ bottomInset }) {
   useEffect(() => () => { mountedRef.current = false; }, []);
 
   const reload = useCallback(async () => {
-    const [access, isOn] = await Promise.all([
+    const [access, isOn, alertsOn] = await Promise.all([
       isNotificationAccessEnabled(),
       isBankNotificationsEnabled(),
+      isBackgroundAlertsEnabled(),
     ]);
     if (!mountedRef.current) return;
     setAccessEnabled(access);
     setEnabled(isOn);
+    setBackgroundAlerts(alertsOn);
     // Fold any apps in the current feed into the persisted known list so the
     // filter list stays complete even after they age out of the native window.
     const recent = await getRecentNotifications();
@@ -99,10 +111,43 @@ export default function NotificationFiltersContentPanel({ bottomInset }) {
         // Enabling should act immediately on whatever is already captured.
         await processBankNotifications();
       }
+      // Background alerts require processing to be on, so reconcile the OS task
+      // registration whenever this master toggle changes.
+      await syncBackgroundBankTaskRegistrationAsync();
     } catch (error) {
       // Persisting/processing failed — revert the optimistic switch so the UI
       // matches the still-unchanged stored state.
       if (mountedRef.current) setEnabled(!value);
+    }
+  }, []);
+
+  const handleToggleBackgroundAlerts = useCallback(async (value) => {
+    if (value) {
+      // Enabling requires the OS notification permission (Android 13+). Ask
+      // first; if it is denied, leave the toggle off and show a hint.
+      const granted = await requestNotificationsPermission();
+      if (!granted) {
+        if (mountedRef.current) setPermissionDenied(true);
+        return;
+      }
+      if (mountedRef.current) {
+        setPermissionDenied(false);
+        setBackgroundAlerts(true);
+      }
+      try {
+        await setBackgroundAlertsEnabled(true);
+        await syncBackgroundBankTaskRegistrationAsync();
+      } catch (error) {
+        if (mountedRef.current) setBackgroundAlerts(false);
+      }
+      return;
+    }
+    if (mountedRef.current) setBackgroundAlerts(false);
+    try {
+      await setBackgroundAlertsEnabled(false);
+      await syncBackgroundBankTaskRegistrationAsync();
+    } catch (error) {
+      if (mountedRef.current) setBackgroundAlerts(true);
     }
   }, []);
 
@@ -182,6 +227,38 @@ export default function NotificationFiltersContentPanel({ bottomInset }) {
           onValueChange={handleToggle}
           color={colors.primary}
           testID="bank-notifications-toggle"
+        />
+      </View>
+
+      {/* ── Background alerts ── */}
+      <View
+        style={[
+          styles.row,
+          { borderColor: colors.border, backgroundColor: colors.surface },
+          !enabled && styles.rowDisabled,
+        ]}
+      >
+        <View style={styles.rowText}>
+          <Text style={[styles.rowTitle, { color: colors.text }]}>
+            {t('bank_notifications_background_alerts') || 'Background alerts'}
+          </Text>
+          <Text style={[styles.rowHint, { color: colors.mutedText }]}>
+            {t('bank_notifications_background_alerts_hint') ||
+              'Check in the background and notify you when there are transactions to review'}
+          </Text>
+          {permissionDenied ? (
+            <Text style={[styles.rowHint, { color: colors.primary }]}>
+              {t('bank_notifications_permission_denied') ||
+                'Enable notifications in system settings to receive background alerts'}
+            </Text>
+          ) : null}
+        </View>
+        <Switch
+          value={backgroundAlerts}
+          onValueChange={handleToggleBackgroundAlerts}
+          disabled={!enabled}
+          color={colors.primary}
+          testID="bank-notifications-background-alerts-toggle"
         />
       </View>
 
@@ -289,6 +366,9 @@ const styles = StyleSheet.create({
     gap: SPACING.sm,
     marginTop: SPACING.md,
     padding: SPACING.md,
+  },
+  rowDisabled: {
+    opacity: 0.5,
   },
   rowHint: {
     fontSize: 12,

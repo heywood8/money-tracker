@@ -496,5 +496,12 @@
   "none": "Keine",
   "update_download_failed": "Update konnte nicht heruntergeladen werden. Bitte erneut versuchen.",
   "labels": "Labels",
-  "add_label_placeholder": "Label hinzufügen…"
+  "add_label_placeholder": "Label hinzufügen…",
+  "bank_notifications_background_alerts": "Hintergrundbenachrichtigungen",
+  "bank_notifications_background_alerts_hint": "Im Hintergrund prüfen und benachrichtigen, wenn Transaktionen zu prüfen sind",
+  "bank_notifications_bg_notification_title": "Zu prüfende Transaktionen",
+  "bank_notifications_bg_notification_body_one": "1 Transaktion wartet auf das Hinzufügen",
+  "bank_notifications_bg_notification_body_other": "{count} Transaktionen warten auf das Hinzufügen",
+  "bank_notifications_channel_name": "Bankvorgänge",
+  "bank_notifications_permission_denied": "Aktiviere Benachrichtigungen in den Systemeinstellungen, um Hintergrundbenachrichtigungen zu erhalten"
 }

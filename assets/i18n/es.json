@@ -496,5 +496,12 @@
   "none": "Ninguno",
   "update_download_failed": "No se pudo descargar la actualización. Inténtalo de nuevo.",
   "labels": "Etiquetas",
-  "add_label_placeholder": "Añadir etiqueta…"
+  "add_label_placeholder": "Añadir etiqueta…",
+  "bank_notifications_background_alerts": "Alertas en segundo plano",
+  "bank_notifications_background_alerts_hint": "Comprueba en segundo plano y avisa cuando haya transacciones para revisar",
+  "bank_notifications_bg_notification_title": "Transacciones para revisar",
+  "bank_notifications_bg_notification_body_one": "1 transacción esperando a ser añadida",
+  "bank_notifications_bg_notification_body_other": "{count} transacciones esperando a ser añadidas",
+  "bank_notifications_channel_name": "Operaciones bancarias",
+  "bank_notifications_permission_denied": "Activa las notificaciones en los ajustes del sistema para recibir alertas en segundo plano"
 }

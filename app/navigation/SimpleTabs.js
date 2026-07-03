@@ -27,6 +27,7 @@ import { useUpdateDownload } from '../contexts/UpdateDownloadContext';
 import { SwipeNavigationGestureProvider } from '../contexts/SwipeNavigationContext';
 import Header from '../components/Header';
 import SettingsScreen from '../screens/SettingsScreen';
+import { appEvents, EVENTS } from '../services/eventEmitter';
 
 const { width: SCREEN_WIDTH } = Dimensions.get('window');
 
@@ -351,6 +352,16 @@ export default function SimpleTabs() {
     screenAdjust0, screenAdjust1, screenAdjust2, screenAdjust3,
     screenOpacity0, screenOpacity1, screenOpacity2, screenOpacity3,
     clearTransitioningRef]);
+
+  // A tapped "transactions to review" notification routes here: jump to the
+  // Settings tab. SettingsScreen listens for the same event and opens the
+  // notification-processing subpanel, so the two land together.
+  React.useEffect(() => {
+    const unsubscribe = appEvents.on(EVENTS.OPEN_NOTIFICATION_PROCESSING, () => {
+      handleTabPress('Settings');
+    });
+    return unsubscribe;
+  }, [handleTabPress]);
 
   // Android hardware back button navigates to Operations from any other tab
   React.useEffect(() => {

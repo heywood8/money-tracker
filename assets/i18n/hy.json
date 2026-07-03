@@ -496,5 +496,12 @@
   "none": "Չկա",
   "update_download_failed": "Չհաջողվեց ներբեռնել թարմացումը։ Խնդրում ենք նորից փորձել։",
   "labels": "Պիտակներ",
-  "add_label_placeholder": "Ավելացնել պիտակ…"
+  "add_label_placeholder": "Ավելացնել պիտակ…",
+  "bank_notifications_background_alerts": "Ֆոնային ծանուցումներ",
+  "bank_notifications_background_alerts_hint": "Ստուգել ֆոնային ռեժիմում և ծանուցել, երբ կան մշակման ենթակա գործարքներ",
+  "bank_notifications_bg_notification_title": "Մշակման ենթակա գործարքներ",
+  "bank_notifications_bg_notification_body_one": "1 գործարք սպասում է ավելացման",
+  "bank_notifications_bg_notification_body_other": "{count} գործարք սպասում է ավելացման",
+  "bank_notifications_channel_name": "Բանկային գործառնություններ",
+  "bank_notifications_permission_denied": "Միացրեք ծանուցումները համակարգի կարգավորումներում՝ ֆոնային ծանուցումներ ստանալու համար"
 }

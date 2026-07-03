@@ -496,5 +496,12 @@
   "none": "Нет",
   "update_download_failed": "Не удалось загрузить обновление. Попробуйте ещё раз.",
   "labels": "Метки",
-  "add_label_placeholder": "Добавить метку…"
+  "add_label_placeholder": "Добавить метку…",
+  "bank_notifications_background_alerts": "Фоновые уведомления",
+  "bank_notifications_background_alerts_hint": "Проверять в фоне и уведомлять, когда появятся операции для обработки",
+  "bank_notifications_bg_notification_title": "Операции для обработки",
+  "bank_notifications_bg_notification_body_one": "1 операция ожидает добавления",
+  "bank_notifications_bg_notification_body_other": "{count} операций ожидают добавления",
+  "bank_notifications_channel_name": "Банковские операции",
+  "bank_notifications_permission_denied": "Включите уведомления в настройках системы, чтобы получать фоновые оповещения"
 }

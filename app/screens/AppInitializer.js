@@ -11,6 +11,8 @@ import { checkForAppUpdate } from '../services/AppUpdateService';
 import { getPreference, setPreference, PREF_KEYS } from '../services/PreferencesDB';
 import { useUpdateDownload } from '../contexts/UpdateDownloadContext';
 import { useSqliteFileImport } from '../hooks/useSqliteFileImport';
+import useNotificationResponseRouter from '../hooks/useNotificationResponseRouter';
+import { syncBackgroundBankTaskRegistrationAsync } from '../services/notifications/backgroundBankTask';
 import UpdateAvailableModal from '../modals/UpdateAvailableModal';
 
 const AUTO_CHECK_INTERVAL_MS = 24 * 60 * 60 * 1000;
@@ -32,6 +34,10 @@ const AppInitializer = () => {
   // Disabled during first launch so the import warning doesn't appear before
   // the user has finished initial language setup.
   useSqliteFileImport({ enabled: !isFirstLaunch });
+
+  // Deep-link a tapped "transactions to review" notification into the
+  // notification-processing screen (handles both cold-start and warm taps).
+  useNotificationResponseRouter();
 
   // Run once on every app open (after first launch is complete)
   useEffect(() => {
@@ -102,6 +108,16 @@ const AppInitializer = () => {
     });
 
     return () => subscription.remove();
+  }, [isFirstLaunch]);
+
+  // Keep the OS background-task registration in sync with the stored preferences
+  // on every app open, so it survives reinstalls/updates and reflects toggles
+  // made in a previous session.
+  useEffect(() => {
+    if (isFirstLaunch) return;
+    syncBackgroundBankTaskRegistrationAsync().catch((error) => {
+      console.warn('[AppInitializer] Background task sync failed:', error);
+    });
   }, [isFirstLaunch]);
 
   const handleUpdateDismiss = useCallback(async () => {

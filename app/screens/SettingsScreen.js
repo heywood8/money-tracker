@@ -27,6 +27,7 @@ import * as LegacyFileSystem from 'expo-file-system/legacy';
 import * as Sharing from 'expo-sharing';
 import { checkForAppUpdate, listDownloadedApks, installApk, verifyCachedApk } from '../services/AppUpdateService';
 import { getPreference, setPreference, PREF_KEYS } from '../services/PreferencesDB';
+import { appEvents, EVENTS } from '../services/eventEmitter';
 import { useDisplaySettings } from '../contexts/DisplaySettingsContext';
 import { useUpdateDownload } from '../contexts/UpdateDownloadContext';
 import { authenticateWithBiometrics, BiometricResult } from '../services/BiometricService';
@@ -356,6 +357,16 @@ export default function SettingsScreen({ setSubPanelActive }) {
   useEffect(() => {
     setSubPanelActive(activeSubPanel !== null);
   }, [activeSubPanel, setSubPanelActive]);
+
+  // A tapped "transactions to review" notification opens the notification-
+  // processing subpanel directly. SimpleTabs handles switching to the Settings
+  // tab on the same event; this screen is pre-mounted, so the listener is live.
+  useEffect(() => {
+    const unsubscribe = appEvents.on(EVENTS.OPEN_NOTIFICATION_PROCESSING, () => {
+      openSubPanel('notificationProcessing');
+    });
+    return unsubscribe;
+  }, [openSubPanel]);
 
   // Android hardware back: step one level up when possible (nested step / embedded
   // screen), otherwise close the panel — mirroring the swipe and the back arrow.

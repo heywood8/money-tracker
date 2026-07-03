@@ -17,6 +17,9 @@ export const PREF_KEYS = {
   BANK_NOTIFICATIONS_ENABLED: 'bank_notifications_enabled',
   BANK_NOTIFICATIONS_PROCESSED_SIGS: 'bank_notifications_processed_sigs',
   BANK_NOTIFICATIONS_PACKAGES: 'bank_notifications_packages',
+  // Opt-in: run the ingestion pipeline periodically in the background and post a
+  // system notification when new transactions land in the review queue.
+  BANK_NOTIFICATIONS_BACKGROUND_ALERTS: 'bank_notifications_background_alerts',
   // Target "cash" account for ATM-withdrawal transfers, bound the first time an
   // ATM CASH notification is reviewed and reused for subsequent withdrawals.
   BANK_NOTIFICATIONS_ATM_ACCOUNT: 'bank_notifications_atm_account',

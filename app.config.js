@@ -87,6 +87,11 @@ module.exports = {
       // "Notification access" special permission (read notifications in the
       // background). No notifications are read or processed.
       './plugins/withNotificationListener.js',
+      // Local notifications for the opt-in background "transactions to review"
+      // alert. Only local (scheduled) notifications are used — no push/FCM setup
+      // is required. The plugin also declares the POST_NOTIFICATIONS permission
+      // needed on Android 13+.
+      'expo-notifications',
     ],
     updates: {
       'url': 'https://u.expo.dev/89372eb2-93f5-475a-a630-9caa827d8406',
