@@ -1,5 +1,12 @@
 # Changelog
 
+## [0.177.0](https://github.com/heywood8/money-tracker/compare/penny-v0.176.1...penny-v0.177.0) (2026-07-03)
+
+
+### Features
+
+* **updates:** prompt for updates every minute and fix empty update dialog ([#1165](https://github.com/heywood8/money-tracker/issues/1165)) ([146677c](https://github.com/heywood8/money-tracker/commit/146677cbb19ddaf247f34403b1650cc66dac53ca))
+
 ## [0.176.1](https://github.com/heywood8/money-tracker/compare/penny-v0.176.0...penny-v0.176.1) (2026-07-03)
 
 
