@@ -207,4 +207,62 @@ describe('NotificationRulesDB', () => {
       );
     });
   });
+
+  describe('clearMerchantRuleCategory', () => {
+    it('does nothing when the rule is not found', async () => {
+      mockDb.queryFirst.mockResolvedValue(null);
+      await NotificationRulesDB.clearMerchantRuleCategory('missing');
+      expect(mockDb.executeQuery).not.toHaveBeenCalled();
+    });
+
+    it('deletes the whole row when it has no label to keep', async () => {
+      mockDb.queryFirst.mockResolvedValue({ id: 'r1', category_id: 'cat-1', label_override: null });
+      await NotificationRulesDB.clearMerchantRuleCategory('r1');
+      expect(mockDb.executeQuery).toHaveBeenCalledWith(
+        'DELETE FROM notification_merchant_rules WHERE id = ?',
+        ['r1'],
+      );
+    });
+
+    it('nulls only the category when a label override remains', async () => {
+      mockDb.queryFirst.mockResolvedValue({ id: 'r1', category_id: 'cat-1', label_override: 'Ecosense' });
+      await NotificationRulesDB.clearMerchantRuleCategory('r1');
+      const [sql, params] = mockDb.executeQuery.mock.calls[0];
+      expect(sql).toContain('SET category_id = NULL');
+      expect(params[params.length - 1]).toBe('r1');
+      expect(mockDb.executeQuery).not.toHaveBeenCalledWith(
+        'DELETE FROM notification_merchant_rules WHERE id = ?',
+        ['r1'],
+      );
+    });
+  });
+
+  describe('clearMerchantRuleLabel', () => {
+    it('does nothing when the rule is not found', async () => {
+      mockDb.queryFirst.mockResolvedValue(null);
+      await NotificationRulesDB.clearMerchantRuleLabel('missing');
+      expect(mockDb.executeQuery).not.toHaveBeenCalled();
+    });
+
+    it('deletes the whole row when it has no category to keep', async () => {
+      mockDb.queryFirst.mockResolvedValue({ id: 'r1', category_id: null, label_override: 'Ecosense' });
+      await NotificationRulesDB.clearMerchantRuleLabel('r1');
+      expect(mockDb.executeQuery).toHaveBeenCalledWith(
+        'DELETE FROM notification_merchant_rules WHERE id = ?',
+        ['r1'],
+      );
+    });
+
+    it('nulls only the label when a learned category remains', async () => {
+      mockDb.queryFirst.mockResolvedValue({ id: 'r1', category_id: 'cat-1', label_override: 'Ecosense' });
+      await NotificationRulesDB.clearMerchantRuleLabel('r1');
+      const [sql, params] = mockDb.executeQuery.mock.calls[0];
+      expect(sql).toContain('SET label_override = NULL');
+      expect(params[params.length - 1]).toBe('r1');
+      expect(mockDb.executeQuery).not.toHaveBeenCalledWith(
+        'DELETE FROM notification_merchant_rules WHERE id = ?',
+        ['r1'],
+      );
+    });
+  });
 });
