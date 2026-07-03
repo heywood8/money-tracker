@@ -1,4 +1,5 @@
 import { useState, useEffect, useCallback, useRef } from 'react';
+import { LayoutAnimation, Platform, UIManager } from 'react-native';
 import { getPendingNotifications } from '../services/PendingNotificationsDB';
 import {
   processBankNotifications,
@@ -7,6 +8,23 @@ import {
   resolveAtmTargetAccount,
 } from '../services/notifications/processBankNotifications';
 import { appEvents, EVENTS } from '../services/eventEmitter';
+
+// Enable LayoutAnimation on the classic Android renderer (a no-op on Fabric, where
+// the New Architecture drives layout animations natively). Guarded so it never
+// throws when the method is absent. Mirrors NotificationProcessingContentPanel.
+if (Platform.OS === 'android' && UIManager.setLayoutAnimationEnabledExperimental) {
+  UIManager.setLayoutAnimationEnabledExperimental(true);
+}
+
+// A short ease so a card leaving the stack (accepted/dismissed) reads as a smooth
+// collapse and the quick-add form below slides up, instead of an abrupt jump.
+// Matches the settings review panel's CARD_COLLAPSE_ANIMATION timing.
+const CARD_LEAVE_ANIMATION = {
+  duration: 220,
+  create: { type: LayoutAnimation.Types.easeOut, property: LayoutAnimation.Properties.opacity },
+  update: { type: LayoutAnimation.Types.easeInEaseOut },
+  delete: { type: LayoutAnimation.Types.easeIn, property: LayoutAnimation.Properties.opacity },
+};
 
 /**
  * Pending "suggested operations from notifications" for the main operations page.
@@ -105,6 +123,8 @@ export default function usePendingOperationSuggestions() {
       );
       // resolve emits RELOAD_ALL, but reload explicitly so the card leaves the
       // stack even if no listener chain is mounted (and to keep tests direct).
+      // Animate the removal so the card collapses and the form below slides up.
+      LayoutAnimation.configureNext(CARD_LEAVE_ANIMATION);
       await reload();
     } catch (error) {
       // The save failed (e.g. no exchange rate for a cross-currency booking) —
@@ -126,8 +146,13 @@ export default function usePendingOperationSuggestions() {
     try {
       await dismissPendingNotification(item.id);
     } catch (error) {
-      return; // Row still exists; leave the card in place.
+      // Row still exists; leave the card in place. Log so a persistent failure
+      // (rather than a silently unresponsive Dismiss) is diagnosable.
+      console.warn('[usePendingOperationSuggestions] Failed to dismiss suggestion:', error);
+      return;
     }
+    // Animate the removal so the card collapses and the form below slides up.
+    LayoutAnimation.configureNext(CARD_LEAVE_ANIMATION);
     await reload();
   }, [reload]);
 

@@ -1,4 +1,4 @@
-import React, { useRef, useEffect } from 'react';
+import React, { useRef, useEffect, memo } from 'react';
 import PropTypes from 'prop-types';
 import {
   View,
@@ -12,7 +12,7 @@ import {
 import { Ionicons } from '@expo/vector-icons';
 import { kindRequiresCategory } from '../../services/notifications/parseBankNotification';
 import { getCategoryDisplayName } from '../../utils/categoryUtils';
-import { SPACING, BORDER_RADIUS } from '../../styles/layout';
+import { SPACING, BORDER_RADIUS } from '../../styles/designTokens';
 
 // Cards shown inline on the main page; the rest collapse into a "+N more" row
 // that opens the full review queue in settings.
@@ -52,12 +52,13 @@ const formatSuggestionDate = (isoDate) => {
  * key is its stable pending id, so it mounts (and animates) exactly once, when
  * the suggestion first appears on the page.
  */
-function SuggestedOperationCard({
+const SuggestedOperationCard = memo(function SuggestedOperationCard({
   item,
   colors,
   t,
   accounts,
   categories,
+  atmTargetAccountId,
   saving,
   canAccept,
   onAccept,
@@ -113,16 +114,29 @@ function SuggestedOperationCard({
   }
 
   const account = accounts.find((a) => a.id === item.accountId);
-  const categoryName = item.categoryId
+  const isTransfer = item.type === 'transfer';
+  // ATM-withdrawal transfers land in a bound cash account. Show "source → target"
+  // so the user sees where the money goes before one-tap accepting a transfer
+  // (mirrors the "To account" field in the settings review panel).
+  const targetAccount = isTransfer
+    ? accounts.find((a) => a.id === atmTargetAccountId)
+    : null;
+  const categoryName = !isTransfer && item.categoryId
     ? getCategoryDisplayName(item.categoryId, categories, t)
     : null;
+  const accountLabel = isTransfer && account && targetAccount
+    ? `${account.name} → ${targetAccount.name}`
+    : (account ? account.name : null);
   const metaLabel = [
     formatSuggestionDate(item.date),
-    account ? account.name : null,
+    accountLabel,
     categoryName,
   ]
     .filter(Boolean)
     .join(' · ');
+  // A screen reader navigating by action hears each card's buttons identically
+  // ("Add"/"Dismiss") otherwise; naming the merchant + amount disambiguates them.
+  const itemContext = `${item.merchant || item.kind}, ${item.amount} ${item.currency}`;
 
   return (
     <Animated.View style={[styles.card, cardColorStyle, enterStyle]}>
@@ -150,7 +164,7 @@ function SuggestedOperationCard({
           onPress={() => onDismiss(item)}
           style={styles.actionButton}
           accessibilityRole="button"
-          accessibilityLabel={t('dismiss') || 'Dismiss'}
+          accessibilityLabel={`${t('dismiss') || 'Dismiss'}: ${itemContext}`}
         >
           <Text style={[styles.actionLabel, { color: colors.mutedText }]}>
             {t('dismiss') || 'Dismiss'}
@@ -161,7 +175,7 @@ function SuggestedOperationCard({
             onPress={() => onAccept(item)}
             style={[styles.actionButton, styles.actionButtonPrimary, { backgroundColor: colors.primary }]}
             accessibilityRole="button"
-            accessibilityLabel={t('add') || 'Add'}
+            accessibilityLabel={`${t('add') || 'Add'}: ${itemContext}`}
             accessibilityHint={t('suggested_add_hint') || 'Add this operation with the suggested account and category'}
           >
             <Text style={[styles.actionLabel, styles.actionLabelPrimary]}>
@@ -176,7 +190,7 @@ function SuggestedOperationCard({
             onPress={onReviewAll}
             style={[styles.actionButton, styles.actionButtonPrimary, styles.actionButtonOutlined, { borderColor: colors.primary }]}
             accessibilityRole="button"
-            accessibilityLabel={t('suggested_review') || 'Review'}
+            accessibilityLabel={`${t('suggested_review') || 'Review'}: ${itemContext}`}
             accessibilityHint={t('suggested_review_hint') || 'Open the review queue in settings'}
           >
             <Text style={[styles.actionLabel, { color: colors.primary }]}>
@@ -187,7 +201,7 @@ function SuggestedOperationCard({
       </View>
     </Animated.View>
   );
-}
+});
 
 SuggestedOperationCard.propTypes = {
   item: PropTypes.object.isRequired,
@@ -195,6 +209,7 @@ SuggestedOperationCard.propTypes = {
   t: PropTypes.func.isRequired,
   accounts: PropTypes.array.isRequired,
   categories: PropTypes.array.isRequired,
+  atmTargetAccountId: PropTypes.oneOfType([PropTypes.string, PropTypes.number]),
   saving: PropTypes.bool,
   canAccept: PropTypes.bool,
   onAccept: PropTypes.func.isRequired,
@@ -203,6 +218,7 @@ SuggestedOperationCard.propTypes = {
 };
 
 SuggestedOperationCard.defaultProps = {
+  atmTargetAccountId: null,
   saving: false,
   canAccept: false,
 };
@@ -214,7 +230,7 @@ SuggestedOperationCard.defaultProps = {
  * review queue that Settings → Notification processing manages; this surface
  * offers one-tap accept/dismiss and defers anything ambiguous to that panel.
  */
-export default function SuggestedOperationsStack({
+const SuggestedOperationsStack = memo(function SuggestedOperationsStack({
   colors,
   t,
   suggestions,
@@ -241,6 +257,7 @@ export default function SuggestedOperationsStack({
           t={t}
           accounts={accounts}
           categories={categories}
+          atmTargetAccountId={atmTargetAccountId}
           saving={!!savingIds[item.id]}
           canAccept={canAcceptSuggestion(item, atmTargetAccountId)}
           onAccept={onAccept}
@@ -264,7 +281,9 @@ export default function SuggestedOperationsStack({
       ) : null}
     </View>
   );
-}
+});
+
+SuggestedOperationsStack.displayName = 'SuggestedOperationsStack';
 
 SuggestedOperationsStack.propTypes = {
   colors: PropTypes.object.isRequired,
@@ -292,6 +311,7 @@ const styles = StyleSheet.create({
     alignItems: 'center',
     borderRadius: BORDER_RADIUS.sm,
     justifyContent: 'center',
+    minHeight: 44,
     paddingHorizontal: SPACING.lg,
     paddingVertical: SPACING.xs + 2,
   },
@@ -365,6 +385,7 @@ const styles = StyleSheet.create({
     gap: 4,
     justifyContent: 'center',
     marginBottom: SPACING.sm,
+    minHeight: 44,
     paddingVertical: SPACING.sm,
   },
   savingBody: {
@@ -383,3 +404,5 @@ const styles = StyleSheet.create({
     textTransform: 'uppercase',
   },
 });
+
+export default SuggestedOperationsStack;

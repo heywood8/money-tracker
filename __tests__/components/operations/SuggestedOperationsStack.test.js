@@ -132,6 +132,25 @@ describe('SuggestedOperationsStack', () => {
     expect(queryByText('dismiss')).toBeNull();
   });
 
+  it('shows the transfer destination (source → target) so money movement is visible', async () => {
+    const transfer = {
+      ...READY, id: 'p9', type: 'transfer', categoryId: null,
+      merchant: 'ATM YEREVAN', accountId: 1,
+    };
+    const props = makeProps({ suggestions: [transfer], atmTargetAccountId: 2 });
+    const { getByText } = await render(<SuggestedOperationsStack {...props} />);
+    // Checking (source, id 1) → Cash (bound target, id 2)
+    expect(getByText(/Checking → Cash/)).toBeTruthy();
+  });
+
+  it('gives each action a merchant-contextual accessibility label', async () => {
+    const props = makeProps();
+    const { getByLabelText } = await render(<SuggestedOperationsStack {...props} />);
+    // Labels carry the merchant + amount so a screen reader disambiguates cards.
+    expect(getByLabelText('add: SAS SUPERMARKET, 3900.00 AMD')).toBeTruthy();
+    expect(getByLabelText('dismiss: SAS SUPERMARKET, 3900.00 AMD')).toBeTruthy();
+  });
+
   it('caps visible cards and routes the overflow row to review-all', async () => {
     const many = Array.from({ length: 5 }, (_, i) => ({
       ...READY,
