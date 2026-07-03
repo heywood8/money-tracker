@@ -5,22 +5,21 @@ import { MaterialCommunityIcons as Icon } from '@expo/vector-icons';
 import {
   SPACING,
   FONT_SIZE,
-  BORDER_RADIUS,
   DURATION,
   ICON_SIZE,
-  ELEVATION,
-  Z_INDEX,
 } from '../../styles/designTokens';
 
 /**
  * UndoSnackbar
  *
- * A transient "just-added" bar that floats above the tab bar and offers a brief
- * window to undo the last created operation. A thin progress bar depletes over
- * `duration`, giving the user a clear visual cue for how much time remains.
+ * A transient "just-added" bar that renders inline within the operations list,
+ * directly beneath the operation it refers to (between that operation and the
+ * one before it), offering a brief window to undo the last created operation. A
+ * thin progress bar depletes over `duration`, giving the user a clear visual cue
+ * for how much time remains.
  *
  * Lifecycle is intentionally split so the exit animation always plays:
- *  - `onUndo(operationId)` performs the undo (called before the slide-out).
+ *  - `onUndo(operationId)` performs the undo (called before the fade-out).
  *  - `onClosed()` tells the parent to unmount, and fires only after the exit
  *    animation completes (whether dismissed by timeout or by the Undo tap).
  *
@@ -33,7 +32,6 @@ const UndoSnackbar = ({
   actionLabel,
   duration,
   colors,
-  bottomOffset,
   onUndo,
   onClosed,
 }) => {
@@ -58,7 +56,7 @@ const UndoSnackbar = ({
   }, [revealAnim, onClosed]);
 
   useEffect(() => {
-    // Entry: slide up + fade in.
+    // Entry: gentle slide up + fade in within the row's reserved slot.
     Animated.timing(revealAnim, {
       toValue: 1,
       duration: DURATION.normal,
@@ -81,63 +79,60 @@ const UndoSnackbar = ({
   }, []);
 
   const handleUndoPress = useCallback(() => {
-    // Perform the undo first (so it's immediate), then slide the bar away.
+    // Perform the undo first (so it's immediate), then fade the bar away.
     animateOut(() => onUndo(operationId));
   }, [animateOut, onUndo, operationId]);
 
+  // Subtle rise into place; the slot height is reserved immediately (transforms
+  // don't affect layout), so the row above never jumps.
   const translateY = revealAnim.interpolate({
     inputRange: [0, 1],
-    outputRange: [40, 0],
+    outputRange: [6, 0],
   });
 
   return (
-    <View
-      pointerEvents="box-none"
-      style={[styles.wrapper, { bottom: bottomOffset }]}
+    <Animated.View
+      style={[
+        styles.container,
+        {
+          backgroundColor: colors.altRow || colors.surface,
+          borderTopColor: colors.border,
+          opacity: revealAnim,
+          transform: [{ translateY }],
+        },
+      ]}
     >
-      <Animated.View
-        style={[
-          styles.card,
-          {
-            backgroundColor: colors.surface,
-            borderColor: colors.border,
-            opacity: revealAnim,
-            transform: [{ translateY }],
-          },
-        ]}
-      >
-        <View style={styles.content}>
-          <Icon
-            name="check-circle"
-            size={ICON_SIZE.md}
-            color={colors.primary}
-          />
-          <Text style={[styles.message, { color: colors.text }]} numberOfLines={1}>
-            {message}
+      <View style={styles.content}>
+        <Icon
+          name="check-circle"
+          size={ICON_SIZE.md}
+          color={colors.primary}
+        />
+        <Text style={[styles.message, { color: colors.text }]} numberOfLines={1}>
+          {message}
+        </Text>
+        <TouchableOpacity
+          onPress={handleUndoPress}
+          style={styles.actionButton}
+          accessibilityRole="button"
+          accessibilityLabel={actionLabel}
+          hitSlop={{ top: 8, bottom: 8, left: 8, right: 8 }}
+        >
+          <Icon name="undo-variant" size={ICON_SIZE.sm} color={colors.primary} />
+          <Text style={[styles.actionText, { color: colors.primary }]}>
+            {actionLabel}
           </Text>
-          <TouchableOpacity
-            onPress={handleUndoPress}
-            style={styles.actionButton}
-            accessibilityRole="button"
-            accessibilityLabel={actionLabel}
-            hitSlop={{ top: 8, bottom: 8, left: 8, right: 8 }}
-          >
-            <Icon name="undo-variant" size={ICON_SIZE.sm} color={colors.primary} />
-            <Text style={[styles.actionText, { color: colors.primary }]}>
-              {actionLabel}
-            </Text>
-          </TouchableOpacity>
-        </View>
-        <View style={[styles.progressTrack, { backgroundColor: colors.border }]}>
-          <Animated.View
-            style={[
-              styles.progressFill,
-              { backgroundColor: colors.primary, transform: [{ scaleX: progressAnim }] },
-            ]}
-          />
-        </View>
-      </Animated.View>
-    </View>
+        </TouchableOpacity>
+      </View>
+      <View style={[styles.progressTrack, { backgroundColor: colors.border }]}>
+        <Animated.View
+          style={[
+            styles.progressFill,
+            { backgroundColor: colors.primary, transform: [{ scaleX: progressAnim }] },
+          ]}
+        />
+      </View>
+    </Animated.View>
   );
 };
 
@@ -155,19 +150,17 @@ const styles = StyleSheet.create({
     letterSpacing: 0.5,
     textTransform: 'uppercase',
   },
-  card: {
-    borderRadius: BORDER_RADIUS.lg,
-    borderWidth: 1,
+  container: {
+    borderTopWidth: 1,
+    // Clip the depleting progress fill to the bar's bounds.
     overflow: 'hidden',
-    width: '92%',
-    ...ELEVATION.high,
   },
   content: {
     alignItems: 'center',
     flexDirection: 'row',
     gap: SPACING.sm,
     paddingHorizontal: SPACING.lg,
-    paddingVertical: SPACING.md,
+    paddingVertical: SPACING.sm,
   },
   message: {
     flex: 1,
@@ -184,13 +177,6 @@ const styles = StyleSheet.create({
     height: 3,
     width: '100%',
   },
-  wrapper: {
-    alignItems: 'center',
-    left: 0,
-    position: 'absolute',
-    right: 0,
-    zIndex: Z_INDEX.toast,
-  },
 });
 
 UndoSnackbar.propTypes = {
@@ -203,15 +189,14 @@ UndoSnackbar.propTypes = {
     border: PropTypes.string.isRequired,
     primary: PropTypes.string.isRequired,
     text: PropTypes.string.isRequired,
+    altRow: PropTypes.string,
   }).isRequired,
-  bottomOffset: PropTypes.number,
   onUndo: PropTypes.func.isRequired,
   onClosed: PropTypes.func.isRequired,
 };
 
 UndoSnackbar.defaultProps = {
   duration: 5000,
-  bottomOffset: 140,
 };
 
 export default memo(UndoSnackbar);

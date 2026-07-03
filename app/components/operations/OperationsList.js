@@ -71,6 +71,12 @@ const OperationsList = forwardRef(({
   pendingSuggestions,
   onApplySuggestion,
   onDismissSuggestion,
+  undoOperationId,
+  undoToken,
+  undoMessage,
+  undoActionLabel,
+  onUndo,
+  onUndoClosed,
 }, ref) => {
 
   // Format date label for the separator header.
@@ -330,10 +336,16 @@ const OperationsList = forwardRef(({
           suggestionChips={item.id === pendingSuggestionId ? pendingSuggestions : null}
           onApplySuggestion={onApplySuggestion}
           onDismissSuggestion={onDismissSuggestion}
+          showUndo={item.id === undoOperationId}
+          undoToken={undoToken}
+          undoMessage={undoMessage}
+          undoActionLabel={undoActionLabel}
+          onUndo={onUndo}
+          onUndoClosed={onUndoClosed}
         />
       </View>
     );
-  }, [colors, t, categories, getCategoryInfo, getAccountName, formatCurrency, onEditOperation, pendingSuggestionId, pendingSuggestions, onApplySuggestion, onDismissSuggestion]);
+  }, [colors, t, categories, getCategoryInfo, getAccountName, formatCurrency, onEditOperation, pendingSuggestionId, pendingSuggestions, onApplySuggestion, onDismissSuggestion, undoOperationId, undoToken, undoMessage, undoActionLabel, onUndo, onUndoClosed]);
 
   const keyExtractor = useCallback((item) => item.id, []);
 
@@ -366,7 +378,7 @@ const OperationsList = forwardRef(({
       renderSectionHeader={renderSectionHeader}
       renderSectionFooter={renderSectionFooter}
       keyExtractor={keyExtractor}
-      extraData={[accounts, categories, pendingSuggestionId]}
+      extraData={[accounts, categories, pendingSuggestionId, undoOperationId, undoToken]}
       getItemLayout={getItemLayout}
       ListHeaderComponent={
         (topInset > 0 || headerComponent)
@@ -440,6 +452,12 @@ OperationsList.propTypes = {
   pendingSuggestions: PropTypes.arrayOf(PropTypes.string),
   onApplySuggestion: PropTypes.func,
   onDismissSuggestion: PropTypes.func,
+  undoOperationId: PropTypes.oneOfType([PropTypes.string, PropTypes.number]),
+  undoToken: PropTypes.oneOfType([PropTypes.string, PropTypes.number]),
+  undoMessage: PropTypes.string,
+  undoActionLabel: PropTypes.string,
+  onUndo: PropTypes.func,
+  onUndoClosed: PropTypes.func,
 };
 
 OperationsList.defaultProps = {
@@ -455,6 +473,12 @@ OperationsList.defaultProps = {
   pendingSuggestions: [],
   onApplySuggestion: () => {},
   onDismissSuggestion: () => {},
+  undoOperationId: null,
+  undoToken: 0,
+  undoMessage: '',
+  undoActionLabel: '',
+  onUndo: () => {},
+  onUndoClosed: () => {},
 };
 
 const styles = StyleSheet.create({

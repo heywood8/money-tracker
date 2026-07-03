@@ -6,6 +6,7 @@ import PropTypes from 'prop-types';
 import { getCategoryNames } from '../../utils/categoryUtils';
 import { parseLabels, visibleListLabels, displayLabel } from '../../utils/labelUtils';
 import DescriptionSuggestionRow from './DescriptionSuggestionRow';
+import UndoSnackbar from './UndoSnackbar';
 import { SPACING, FONT_SIZE, FONT_WEIGHT, ICON_SIZE, HEIGHTS } from '../../styles/designTokens';
 import currencies from '../../../assets/currencies.json';
 
@@ -32,6 +33,13 @@ const OperationListItem = ({
   suggestionChips,
   onApplySuggestion,
   onDismissSuggestion,
+  showUndo,
+  undoToken,
+  undoMessage,
+  undoActionLabel,
+  undoDuration,
+  onUndo,
+  onUndoClosed,
 }) => {
   const isExpense = operation.type === 'expense';
   const isIncome = operation.type === 'income';
@@ -162,6 +170,21 @@ const OperationListItem = ({
         </View>
       </TouchableRipple>
 
+      {/* Inline "just added" undo bar — sits directly beneath the operation it
+          refers to, between it and the operation before it. */}
+      {showUndo && (
+        <UndoSnackbar
+          key={undoToken}
+          operationId={operation.id}
+          message={undoMessage}
+          actionLabel={undoActionLabel}
+          duration={undoDuration}
+          colors={colors}
+          onUndo={onUndo}
+          onClosed={onUndoClosed}
+        />
+      )}
+
       {suggestionChips && suggestionChips.length > 0 && (
         <DescriptionSuggestionRow
           chips={suggestionChips}
@@ -181,6 +204,7 @@ const OperationListItem = ({
 
 OperationListItem.propTypes = {
   operation: PropTypes.shape({
+    id: PropTypes.string.isRequired,
     type: PropTypes.string.isRequired,
     accountId: PropTypes.string.isRequired,
     categoryId: PropTypes.string,
@@ -205,6 +229,13 @@ OperationListItem.propTypes = {
   suggestionChips: PropTypes.arrayOf(PropTypes.string),
   onApplySuggestion: PropTypes.func,
   onDismissSuggestion: PropTypes.func,
+  showUndo: PropTypes.bool,
+  undoToken: PropTypes.oneOfType([PropTypes.string, PropTypes.number]),
+  undoMessage: PropTypes.string,
+  undoActionLabel: PropTypes.string,
+  undoDuration: PropTypes.number,
+  onUndo: PropTypes.func,
+  onUndoClosed: PropTypes.func,
 };
 
 OperationListItem.defaultProps = {
@@ -213,6 +244,13 @@ OperationListItem.defaultProps = {
   suggestionChips: null,
   onApplySuggestion: () => {},
   onDismissSuggestion: () => {},
+  showUndo: false,
+  undoToken: 0,
+  undoMessage: '',
+  undoActionLabel: '',
+  undoDuration: 5000,
+  onUndo: () => {},
+  onUndoClosed: () => {},
 };
 
 const styles = StyleSheet.create({

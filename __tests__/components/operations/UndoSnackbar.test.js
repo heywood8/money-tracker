@@ -5,6 +5,7 @@ import UndoSnackbar from '../../../app/components/operations/UndoSnackbar';
 
 const mockColors = {
   surface: '#1e1e1e',
+  altRow: '#242424',
   border: '#333',
   primary: '#4C9EFF',
   text: '#ffffff',
