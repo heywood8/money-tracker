@@ -6,9 +6,9 @@
  * notification to the parser registered for its source app and exposes the
  * per-app `kindRequiresCategory` helper.
  *
- * Today only Ameriabank (`com.banqr.ameriabank`) is supported. When a second
- * bank is added it becomes another parser module in `bankParsers/` — nothing
- * here changes.
+ * Ameriabank (`com.banqr.ameriabank`) and Tinkoff / T-Bank
+ * (`com.idamob.tinkoff.android`) are supported today. Adding another bank is just
+ * another parser module in `bankParsers/` — nothing here changes.
  */
 
 import { BANK_PARSERS, getParserForPackage } from './bankParsers';
