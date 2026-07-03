@@ -8,15 +8,14 @@ import { useThemeColors } from '../contexts/ThemeColorsContext';
 import { performDailyBackupIfNeeded } from '../services/DailyBackupService';
 import { useDialog } from '../contexts/DialogContext';
 import { checkForAppUpdate } from '../services/AppUpdateService';
-import { getPreference, setPreference, PREF_KEYS } from '../services/PreferencesDB';
 import { useUpdateDownload } from '../contexts/UpdateDownloadContext';
 import { useSqliteFileImport } from '../hooks/useSqliteFileImport';
 import useNotificationResponseRouter from '../hooks/useNotificationResponseRouter';
 import { syncBackgroundBankTaskRegistrationAsync } from '../services/notifications/backgroundBankTask';
 import UpdateAvailableModal from '../modals/UpdateAvailableModal';
 
-const AUTO_CHECK_INTERVAL_MS = 24 * 60 * 60 * 1000;
-const UPDATE_REMINDER_DELAY_DAYS = 3;
+// Poll for a newer release this often while the app is open and in the foreground.
+const UPDATE_CHECK_INTERVAL_MS = 60 * 1000;
 
 /**
  * AppInitializer handles first-time setup and app initialization
@@ -26,9 +25,27 @@ const AppInitializer = () => {
   const { isFirstLaunch, isLoading, setFirstLaunchComplete, t } = useLocalization();
   const { colors } = useThemeColors();
   const { showDialog } = useDialog();
-  const { startDownload } = useUpdateDownload();
+  const { startDownload, isDownloading } = useUpdateDownload();
   const [isInitializing, setIsInitializing] = useState(false);
   const [pendingUpdate, setPendingUpdate] = useState(null);
+
+  // Versions the user has already dealt with this session (dismissed or chose to install).
+  // Held in a ref, not persisted, so the suppression clears on app restart — exactly
+  // "don't prompt again for this version until the user restarts the app".
+  const dismissedVersionsRef = useRef(new Set());
+  // Latest-value mirrors read inside the long-lived interval callback, so its closure
+  // never acts on stale state.
+  const pendingUpdateRef = useRef(null);
+  const isDownloadingRef = useRef(false);
+  const isCheckingRef = useRef(false);
+
+  useEffect(() => {
+    pendingUpdateRef.current = pendingUpdate;
+  }, [pendingUpdate]);
+
+  useEffect(() => {
+    isDownloadingRef.current = isDownloading;
+  }, [isDownloading]);
 
   // Handle SQLite/backup files opened with the app (Android ACTION_VIEW).
   // Disabled during first launch so the import warning doesn't appear before
@@ -39,48 +56,75 @@ const AppInitializer = () => {
   // notification-processing screen (handles both cold-start and warm taps).
   useNotificationResponseRouter();
 
-  // Run once on every app open (after first launch is complete)
+  // Run the daily backup once on every app open (after first launch is complete).
   useEffect(() => {
     if (!isFirstLaunch) {
       performDailyBackupIfNeeded();
-
-      const runUpdateCheck = async () => {
-        try {
-          const now = Date.now();
-          const lastCheckIso = await getPreference(PREF_KEYS.UPDATE_LAST_CHECK_AT, null);
-          const lastCheckMs = lastCheckIso ? Date.parse(lastCheckIso) : NaN;
-
-          if (Number.isFinite(lastCheckMs) && now - lastCheckMs < AUTO_CHECK_INTERVAL_MS) {
-            return;
-          }
-
-          await setPreference(PREF_KEYS.UPDATE_LAST_CHECK_AT, new Date(now).toISOString());
-
-          const result = await checkForAppUpdate();
-          if (!result.success || !result.isUpdateAvailable) {
-            return;
-          }
-
-          const skipUntilIso = await getPreference(PREF_KEYS.UPDATE_SKIP_UNTIL, null);
-          const skipUntilMs = skipUntilIso ? Date.parse(skipUntilIso) : NaN;
-          if (Number.isFinite(skipUntilMs) && skipUntilMs > now) {
-            return;
-          }
-
-          setPendingUpdate({
-            latestVersion: result.latestVersion,
-            currentVersion: result.currentVersion,
-            downloadUrl: result.downloadUrl,
-            checksumUrl: result.checksumUrl || null,
-            releaseNotes: result.releaseNotes || null,
-          });
-        } catch (error) {
-          console.warn('[AppInitializer] Failed to auto-check updates:', error);
-        }
-      };
-
-      runUpdateCheck();
     }
+  }, [isFirstLaunch]);
+
+  // Poll for app updates every minute while the app is open, regardless of which screen
+  // the user is viewing. When a newer release is found we surface the update dialog. A
+  // version the user dismisses is silenced for the rest of the session (handleUpdateDismiss),
+  // while re-checks keep running so a still-newer release can prompt again.
+  useEffect(() => {
+    if (isFirstLaunch) {
+      return undefined;
+    }
+
+    let cancelled = false;
+
+    const runUpdateCheck = async () => {
+      // Never stack work or prompts: skip while a check is already running, a download is
+      // in progress, or the update dialog is already on screen.
+      if (isCheckingRef.current || isDownloadingRef.current || pendingUpdateRef.current) {
+        return;
+      }
+      isCheckingRef.current = true;
+      try {
+        const result = await checkForAppUpdate();
+        if (cancelled || !result.success || !result.isUpdateAvailable) {
+          return;
+        }
+        // The user already dealt with this version this session — stay quiet until restart.
+        if (dismissedVersionsRef.current.has(result.latestVersion)) {
+          return;
+        }
+        // Guard again: state may have changed while the network request was in flight.
+        if (pendingUpdateRef.current || isDownloadingRef.current) {
+          return;
+        }
+        setPendingUpdate({
+          latestVersion: result.latestVersion,
+          currentVersion: result.currentVersion,
+          downloadUrl: result.downloadUrl,
+          checksumUrl: result.checksumUrl || null,
+          releaseNotes: result.releaseNotes || null,
+        });
+      } catch (error) {
+        console.warn('[AppInitializer] Failed to auto-check updates:', error);
+      } finally {
+        isCheckingRef.current = false;
+      }
+    };
+
+    // Check immediately on open, then once a minute.
+    runUpdateCheck();
+    const intervalId = setInterval(runUpdateCheck, UPDATE_CHECK_INTERVAL_MS);
+
+    // Re-check the moment the app returns to the foreground, so a user coming back to an
+    // open screen sees a current result without waiting for the next interval tick.
+    const subscription = AppState.addEventListener('change', (nextState) => {
+      if (nextState === 'active') {
+        runUpdateCheck();
+      }
+    });
+
+    return () => {
+      cancelled = true;
+      clearInterval(intervalId);
+      subscription.remove();
+    };
   }, [isFirstLaunch]);
 
   // Process any bank notifications captured while the app was backgrounded.
@@ -120,20 +164,20 @@ const AppInitializer = () => {
     });
   }, [isFirstLaunch]);
 
-  const handleUpdateDismiss = useCallback(async () => {
-    if (pendingUpdate) {
-      const suppressUntil = new Date(
-        Date.now() + UPDATE_REMINDER_DELAY_DAYS * 24 * 60 * 60 * 1000,
-      ).toISOString();
-      await setPreference(PREF_KEYS.UPDATE_SKIP_UNTIL, suppressUntil);
-      await setPreference(PREF_KEYS.UPDATE_LAST_PROMPTED_VERSION, pendingUpdate.latestVersion);
+  const handleUpdateDismiss = useCallback(() => {
+    // Silence this version until the app restarts. dismissedVersionsRef is in-memory only,
+    // so relaunching the app clears it and the update can be suggested again.
+    if (pendingUpdate?.latestVersion) {
+      dismissedVersionsRef.current.add(pendingUpdate.latestVersion);
     }
     setPendingUpdate(null);
   }, [pendingUpdate]);
 
-  const handleUpdateNow = useCallback(async (downloadUrl) => {
-    if (pendingUpdate) {
-      await setPreference(PREF_KEYS.UPDATE_LAST_PROMPTED_VERSION, pendingUpdate.latestVersion);
+  const handleUpdateNow = useCallback((downloadUrl) => {
+    // Treat "update now" as resolving this version too, so we don't re-prompt for it this
+    // session (e.g. if the user backs out of the Android package installer).
+    if (pendingUpdate?.latestVersion) {
+      dismissedVersionsRef.current.add(pendingUpdate.latestVersion);
     }
     const checksumUrl = pendingUpdate?.checksumUrl || null;
     setPendingUpdate(null);
