@@ -1,5 +1,12 @@
 # Changelog
 
+## [0.178.0](https://github.com/heywood8/money-tracker/compare/penny-v0.177.0...penny-v0.178.0) (2026-07-03)
+
+
+### Features
+
+* **notifications:** add Tinkoff/T-Bank notification parser ([#1170](https://github.com/heywood8/money-tracker/issues/1170)) ([5798655](https://github.com/heywood8/money-tracker/commit/579865544afcfb7f2fa6c6b9453a587f1cb0e4a0))
+
 ## [0.177.0](https://github.com/heywood8/money-tracker/compare/penny-v0.176.1...penny-v0.177.0) (2026-07-03)
 
 
