@@ -1,52 +1,144 @@
-import React from 'react';
+import React, { useMemo } from 'react';
 import PropTypes from 'prop-types';
-import { View, StyleSheet, TouchableOpacity, useWindowDimensions } from 'react-native';
+import { View, StyleSheet, TouchableOpacity, ScrollView, useWindowDimensions } from 'react-native';
 import { Portal, Modal, Text, Divider } from 'react-native-paper';
 import { Ionicons } from '@expo/vector-icons';
 import { useThemeColors } from '../contexts/ThemeColorsContext';
 import { useLocalization } from '../contexts/LocalizationContext';
-import { HORIZONTAL_PADDING, SPACING, BORDER_RADIUS } from '../styles/layout';
-import UpdateContentPanel from '../components/UpdateContentPanel';
+import { SPACING, BORDER_RADIUS } from '../styles/layout';
+import { parseReleaseNotes, formatReleaseDateTime } from '../components/UpdateContentPanel';
+
+// Picks the release-note entry describing the version we're prompting the user to install.
+// Prefers the entry whose version matches the latest release; otherwise falls back to the
+// first (newest) entry so a mislabelled payload still surfaces some notes.
+const findLeadRelease = (releaseNotes, latestVersion) => {
+  if (!Array.isArray(releaseNotes) || releaseNotes.length === 0) return null;
+  return releaseNotes.find((r) => r.version === latestVersion) || releaseNotes[0];
+};
 
 export default function UpdateAvailableModal({ visible, onDismiss, onUpdate, updateData }) {
   const { colors } = useThemeColors();
   const { t } = useLocalization();
   const { height: windowHeight } = useWindowDimensions();
 
+  // The release notes can span several skipped versions; the notes region scrolls within a
+  // bounded height so a long changelog never grows the card past the actions. Everything else
+  // (header, meta, buttons) hugs its content, so a single short release yields a short card.
+  const notesMaxHeight = Math.round(windowHeight * 0.4);
+
+  const parsedReleases = useMemo(() => {
+    const list = Array.isArray(updateData?.releaseNotes) ? updateData.releaseNotes : [];
+    return list
+      .map((r) => ({ version: r.version, ...parseReleaseNotes(r.notes, r.version), publishedAt: r.publishedAt }))
+      .filter((r) => r.body);
+  }, [updateData]);
+
   if (!updateData) return null;
 
-  const updateResult = { type: 'available', ...updateData };
+  const { latestVersion, currentVersion, downloadUrl } = updateData;
+  const lead = findLeadRelease(updateData.releaseNotes, latestVersion);
+  const leadParsed = lead ? parseReleaseNotes(lead.notes, lead.version) : null;
+  const dateLabel = leadParsed ? formatReleaseDateTime(lead.publishedAt, leadParsed.date) : null;
+  const hasNotes = parsedReleases.length > 0;
+  const showVersionLabels = parsedReleases.length > 1;
 
-  // react-native-paper's Modal drops its children into an auto-height Surface, so a
-  // percentage height (or maxHeight) here never resolves — it stays "hug content". The
-  // shared UpdateContentPanel fills its parent with a flex:1 ScrollView, which then
-  // collapses to zero height, leaving the dialog empty. Pin an absolute height so the
-  // scroll region always has room and the update content is actually visible.
-  const containerHeight = Math.round(windowHeight * 0.8);
+  const metaText = dateLabel ? `v${latestVersion} · ${dateLabel}` : `v${latestVersion}`;
 
   return (
     <Portal>
-      <Modal visible={visible} onDismiss={onDismiss} dismissable>
+      <Modal
+        visible={visible}
+        onDismiss={onDismiss}
+        dismissable
+        contentContainerStyle={styles.modalWrapper}
+      >
         <View
           testID="update-modal-container"
-          style={[styles.modalContainer, { backgroundColor: colors.card, height: containerHeight }]}
+          style={[styles.card, { backgroundColor: colors.card, borderColor: colors.border }]}
         >
           <View style={styles.header}>
-            <TouchableOpacity onPress={onDismiss} style={styles.backButton}>
-              <Ionicons name="arrow-back" size={24} color={colors.text} />
+            <View style={[styles.iconBadge, { backgroundColor: `${colors.primary}22` }]}>
+              <Ionicons name="arrow-up-circle" size={24} color={colors.primary} />
+            </View>
+            <View style={styles.headerText}>
+              <Text style={[styles.title, { color: colors.text }]} numberOfLines={1}>
+                {t('update_available_title') || 'Update available'}
+              </Text>
+              <Text style={[styles.meta, { color: colors.mutedText }]} numberOfLines={1}>
+                {metaText}
+              </Text>
+            </View>
+            <TouchableOpacity
+              onPress={onDismiss}
+              style={styles.closeButton}
+              accessibilityRole="button"
+              accessibilityLabel={t('later') || 'Later'}
+              hitSlop={{ top: 8, bottom: 8, left: 8, right: 8 }}
+            >
+              <Ionicons name="close" size={22} color={colors.mutedText} />
             </TouchableOpacity>
-            <Text variant="titleLarge" style={[styles.headerTitle, { color: colors.text }]}>
-              {t('update_available_title') || 'Update available'}
-            </Text>
-            <View style={styles.backButton} />
           </View>
-          <Divider />
-          <UpdateContentPanel
-            isChecking={false}
-            updateResult={updateResult}
-            downloadedApks={[]}
-            onUpdate={onUpdate}
-          />
+
+          {currentVersion ? (
+            <Text style={[styles.fromVersion, { color: colors.mutedText }]}>
+              {(t('update_from_version') || 'installed: v{currentVersion}').replace('{currentVersion}', currentVersion)}
+            </Text>
+          ) : null}
+
+          <Divider style={styles.divider} />
+
+          {hasNotes ? (
+            <ScrollView
+              testID="update-notes-scroll"
+              style={[styles.notes, { maxHeight: notesMaxHeight }]}
+              contentContainerStyle={styles.notesContent}
+              showsVerticalScrollIndicator={false}
+            >
+              <Text style={[styles.notesLabel, { color: colors.mutedText }]}>
+                {t('whats_new') || "What's new"}
+              </Text>
+              {parsedReleases.map((release) => (
+                <View key={release.version} style={styles.releaseBlock}>
+                  {showVersionLabels ? (
+                    <Text style={[styles.releaseVersion, { color: colors.text }]}>
+                      v{release.version}
+                    </Text>
+                  ) : null}
+                  <Text style={[styles.releaseBody, { color: colors.text }]}>
+                    {release.body}
+                  </Text>
+                </View>
+              ))}
+            </ScrollView>
+          ) : (
+            <Text style={[styles.emptyNotes, { color: colors.mutedText }]}>
+              {(t('update_available_message') || 'A newer app version ({latestVersion}) is available. Download and install the APK from GitHub.').replace('{latestVersion}', `v${latestVersion}`)}
+            </Text>
+          )}
+
+          <View style={styles.actions}>
+            <TouchableOpacity
+              onPress={onDismiss}
+              style={[styles.button, styles.laterButton, { borderColor: colors.border }]}
+              accessibilityRole="button"
+              accessibilityLabel={t('later') || 'Later'}
+            >
+              <Text style={[styles.laterText, { color: colors.text }]}>
+                {t('later') || 'Later'}
+              </Text>
+            </TouchableOpacity>
+            <TouchableOpacity
+              onPress={() => onUpdate(downloadUrl)}
+              style={[styles.button, styles.updateButton, { backgroundColor: colors.primary }]}
+              accessibilityRole="button"
+              accessibilityLabel={`${t('update_now') || 'Update now'} v${latestVersion}`}
+            >
+              <Ionicons name="cloud-download-outline" size={18} color="#fff" />
+              <Text style={styles.updateText}>
+                {t('update_now') || 'Update now'}
+              </Text>
+            </TouchableOpacity>
+          </View>
         </View>
       </Modal>
     </Portal>
@@ -64,30 +156,125 @@ UpdateAvailableModal.propTypes = {
     releaseNotes: PropTypes.arrayOf(PropTypes.shape({
       version: PropTypes.string,
       notes: PropTypes.string,
+      publishedAt: PropTypes.string,
     })),
   }),
 };
 
 const styles = StyleSheet.create({
-  backButton: {
+  actions: {
+    flexDirection: 'row',
+    gap: SPACING.sm,
+    paddingHorizontal: SPACING.lg,
+    paddingTop: SPACING.md,
+  },
+  button: {
     alignItems: 'center',
-    height: 40,
+    borderRadius: BORDER_RADIUS.md,
+    flexDirection: 'row',
+    gap: SPACING.xs,
+    height: 46,
     justifyContent: 'center',
-    width: 40,
+  },
+  card: {
+    borderRadius: BORDER_RADIUS.lg,
+    borderWidth: StyleSheet.hairlineWidth,
+    overflow: 'hidden',
+    paddingBottom: SPACING.lg,
+    paddingTop: SPACING.md,
+  },
+  closeButton: {
+    alignItems: 'center',
+    height: 32,
+    justifyContent: 'center',
+    width: 32,
+  },
+  divider: {
+    marginTop: SPACING.md,
+  },
+  emptyNotes: {
+    fontSize: 14,
+    lineHeight: 20,
+    paddingHorizontal: SPACING.lg,
+    paddingTop: SPACING.md,
+  },
+  fromVersion: {
+    fontSize: 12.5,
+    paddingHorizontal: SPACING.lg,
+    paddingLeft: 68,
+    paddingTop: SPACING.xs,
   },
   header: {
     alignItems: 'center',
     flexDirection: 'row',
-    justifyContent: 'space-between',
-    paddingHorizontal: HORIZONTAL_PADDING,
-    paddingVertical: SPACING.lg,
+    gap: SPACING.md,
+    paddingHorizontal: SPACING.lg,
   },
-  headerTitle: {
+  headerText: {
+    flex: 1,
+    minWidth: 0,
+  },
+  iconBadge: {
+    alignItems: 'center',
+    borderRadius: BORDER_RADIUS.md,
+    height: 40,
+    justifyContent: 'center',
+    width: 40,
+  },
+  laterButton: {
+    borderWidth: StyleSheet.hairlineWidth,
+    flex: 0.55,
+  },
+  laterText: {
+    fontSize: 15,
     fontWeight: '600',
   },
-  modalContainer: {
-    borderRadius: BORDER_RADIUS.lg,
-    margin: SPACING.md,
-    overflow: 'hidden',
+  meta: {
+    fontSize: 12.5,
+    fontVariant: ['tabular-nums'],
+    marginTop: 1,
+  },
+  modalWrapper: {
+    marginHorizontal: SPACING.lg,
+  },
+  notes: {
+    marginTop: SPACING.sm,
+  },
+  notesContent: {
+    paddingBottom: SPACING.xs,
+    paddingHorizontal: SPACING.lg,
+    paddingTop: SPACING.sm,
+  },
+  notesLabel: {
+    fontSize: 11,
+    fontWeight: '700',
+    letterSpacing: 0.8,
+    marginBottom: SPACING.sm,
+    textTransform: 'uppercase',
+  },
+  releaseBlock: {
+    marginBottom: SPACING.sm,
+  },
+  releaseBody: {
+    fontSize: 13.5,
+    lineHeight: 20,
+  },
+  releaseVersion: {
+    fontSize: 13,
+    fontWeight: '700',
+    marginBottom: 2,
+  },
+  title: {
+    fontSize: 17,
+    fontWeight: '700',
+    letterSpacing: -0.1,
+  },
+  updateButton: {
+    flex: 1,
+  },
+  updateText: {
+    color: '#fff',
+    fontSize: 15,
+    fontWeight: '600',
   },
 });
