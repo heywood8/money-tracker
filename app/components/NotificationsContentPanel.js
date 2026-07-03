@@ -19,7 +19,7 @@ const formatPostTime = (postTime) => {
   return `${datePart} · ${timePart}`;
 };
 
-export function NotificationCard({ notification, colors, t, onReAdd, reAddState }) {
+export function NotificationCard({ notification, colors, t, onReAdd, reAddState, animateIn }) {
   const { title, text, packageName, postTime } = notification;
   const timeLabel = formatPostTime(postTime);
   // A notification that parses into a bank transaction is surfaced with an
@@ -29,8 +29,29 @@ export function NotificationCard({ notification, colors, t, onReAdd, reAddState 
   const cardColorStyle = isBank
     ? { backgroundColor: colors.selected, borderColor: colors.primary, borderLeftColor: colors.primary }
     : { backgroundColor: colors.surface, borderColor: colors.border, borderLeftColor: colors.border };
+  // Entry animation: a freshly-captured card fades and slides down into place.
+  // `animateIn` is read once at mount — the card only animates the first time it
+  // appears (its stable key keeps it mounted across auto-refreshes), so existing
+  // cards never re-animate. Non-animated callers get it at rest (value 1).
+  const enterAnim = useRef(new Animated.Value(animateIn ? 0 : 1)).current;
+  useEffect(() => {
+    if (!animateIn) return;
+    Animated.timing(enterAnim, {
+      toValue: 1,
+      duration: 320,
+      easing: Easing.out(Easing.cubic),
+      useNativeDriver: true,
+    }).start();
+    // Mount-only: capture the initial `animateIn`; later prop changes are ignored.
+  }, []);
+  const enterStyle = {
+    opacity: enterAnim,
+    transform: [
+      { translateY: enterAnim.interpolate({ inputRange: [0, 1], outputRange: [-12, 0] }) },
+    ],
+  };
   return (
-    <View style={[styles.card, isBank && styles.cardBank, cardColorStyle]}>
+    <Animated.View style={[styles.card, isBank && styles.cardBank, cardColorStyle, enterStyle]}>
       <View style={styles.cardHeader}>
         <View style={styles.cardHeaderLeft}>
           <Ionicons
@@ -102,7 +123,7 @@ export function NotificationCard({ notification, colors, t, onReAdd, reAddState 
           )}
         </View>
       ) : null}
-    </View>
+    </Animated.View>
   );
 }
 
@@ -119,11 +140,14 @@ NotificationCard.propTypes = {
   onReAdd: PropTypes.func,
   // Optional: 'loading' | 'created' | 'pending' feedback state for this card.
   reAddState: PropTypes.oneOf(['loading', 'created', 'pending']),
+  // Optional: when true, the card plays a fade + slide-in animation on mount.
+  animateIn: PropTypes.bool,
 };
 
 NotificationCard.defaultProps = {
   onReAdd: null,
   reAddState: undefined,
+  animateIn: false,
 };
 
 export default function NotificationsContentPanel({ isLoading, notifications, onRefresh, bottomInset }) {

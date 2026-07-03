@@ -1,6 +1,6 @@
 import React from 'react';
 import { render } from '@testing-library/react-native';
-import NotificationsContentPanel from '../../app/components/NotificationsContentPanel';
+import NotificationsContentPanel, { NotificationCard } from '../../app/components/NotificationsContentPanel';
 
 jest.mock('../../app/contexts/LocalizationContext', () => ({
   useLocalization: () => ({ t: (key) => key }),
@@ -93,5 +93,35 @@ describe('NotificationsContentPanel', () => {
       <NotificationsContentPanel {...baseProps} notifications={notifications} />,
     );
     expect(getByText('notification_no_text')).toBeTruthy();
+  });
+
+  describe('NotificationCard entry animation', () => {
+    const colors = {
+      surface: '#f5f5f5', primary: '#6200ee', selected: '#e8f0ff',
+      text: '#000', mutedText: '#888', border: '#ddd',
+    };
+    const t = (key) => key;
+
+    it('renders its content when animating in', async () => {
+      const notification = {
+        title: 'Bank', text: 'You spent $5', packageName: 'com.bank', postTime: 1718000000000,
+      };
+      const { getByText } = await render(
+        <NotificationCard notification={notification} colors={colors} t={t} animateIn />,
+      );
+      // The fade/slide-in wrapper must not swallow the card's content.
+      expect(getByText('Bank')).toBeTruthy();
+      expect(getByText('You spent $5')).toBeTruthy();
+    });
+
+    it('renders its content at rest when not animating', async () => {
+      const notification = {
+        title: 'Chat', text: 'New message', packageName: 'com.chat', postTime: 1718000100000,
+      };
+      const { getByText } = await render(
+        <NotificationCard notification={notification} colors={colors} t={t} />,
+      );
+      expect(getByText('New message')).toBeTruthy();
+    });
   });
 });
