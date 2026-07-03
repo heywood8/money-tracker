@@ -59,6 +59,7 @@ jest.mock('../../app/contexts/OperationsDataContext', () => ({
 jest.mock('../../app/contexts/OperationsActionsContext', () => ({
   useOperationsActions: jest.fn(() => ({
     loadMoreOperations: jest.fn(),
+    loadInitialOperations: jest.fn(() => Promise.resolve()),
     addOperation: jest.fn(),
     updateOperation: jest.fn(),
     deleteOperation: jest.fn(),

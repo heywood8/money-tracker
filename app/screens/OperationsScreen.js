@@ -61,6 +61,7 @@ const OperationsScreen = () => {
     jumpToDate,
     setSearchText,
     updateSearchFilters,
+    loadInitialOperations,
   } = useOperationsActions();
   const { accounts, visibleAccounts } = useAccountsData();
   const { categories } = useCategories();
@@ -176,17 +177,25 @@ const OperationsScreen = () => {
     dismiss: dismissSuggestion,
   } = usePendingOperationSuggestions();
 
-  // Pull-to-refresh: re-run the notification ingestion pipeline and reload the
-  // suggestion stack. Operations booked by the run arrive via RELOAD_ALL.
+  // Pull-to-refresh: reload the transactions the list shows AND re-run the
+  // notification ingestion pipeline + reload the suggestion stack. Reloading the
+  // operations is what a user pulling down on a transaction list expects; the
+  // ingestion run only reloads operations on its own when it books/queues
+  // something (via RELOAD_ALL), so the explicit reload covers the common
+  // "nothing new arrived" case. loadInitialOperations() with no args reloads
+  // under the current search/filter (via the actions' internal ref); showLoading
+  // is false so the native pull spinner isn't doubled by the list placeholder.
   const [pullRefreshing, setPullRefreshing] = useState(false);
+  const pullRefreshMountedRef = useRef(true);
+  useEffect(() => () => { pullRefreshMountedRef.current = false; }, []);
   const handlePullRefresh = useCallback(async () => {
     setPullRefreshing(true);
     try {
-      await refreshSuggestions();
+      await Promise.all([loadInitialOperations(undefined, false), refreshSuggestions()]);
     } finally {
-      setPullRefreshing(false);
+      if (pullRefreshMountedRef.current) setPullRefreshing(false);
     }
-  }, [refreshSuggestions]);
+  }, [loadInitialOperations, refreshSuggestions]);
 
   // "Review" on a card that can't be one-tap accepted (and the "+N more" row)
   // jumps to Settings → Notification processing, which keeps the full list.

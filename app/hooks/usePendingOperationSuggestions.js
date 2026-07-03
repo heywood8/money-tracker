@@ -121,10 +121,17 @@ export default function usePendingOperationSuggestions() {
         item.id,
         item.type === 'transfer' ? { toAccountId: atmTargetAccountId } : {},
       );
-      // resolve emits RELOAD_ALL, but reload explicitly so the card leaves the
-      // stack even if no listener chain is mounted (and to keep tests direct).
-      // Animate the removal so the card collapses and the form below slides up.
+      // The operation is booked and the pending row deleted. Drop the card from
+      // the stack optimistically: reload() below swallows its own errors, so a
+      // transient post-write read failure must not strand the card in the
+      // buttonless "Adding…" state (the saving flag is only pruned when the item
+      // actually leaves `suggestions`). Animate the collapse.
       LayoutAnimation.configureNext(CARD_LEAVE_ANIMATION);
+      if (mountedRef.current) {
+        setSuggestions((prev) => prev.filter((s) => s.id !== item.id));
+      }
+      // resolve emits RELOAD_ALL, but reload explicitly so the stack reconciles
+      // with the DB even if no listener chain is mounted (and to keep tests direct).
       await reload();
     } catch (error) {
       // The save failed (e.g. no exchange rate for a cross-currency booking) —

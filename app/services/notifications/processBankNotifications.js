@@ -843,11 +843,16 @@ export const reAddNotification = async (notification) => {
 
 /**
  * Dismiss a pending notification without creating an operation.
+ * Emits RELOAD_ALL so every live surface (the settings review queue and the
+ * operations-page suggestion stack) drops the card — mirroring the resolve path,
+ * which already emits it. Without this, dismissing from one surface leaves a
+ * stale card on the other until its next unrelated reload.
  * @param {string} pendingId
  * @returns {Promise<void>}
  */
 export const dismissPendingNotification = async (pendingId) => {
   await PendingNotificationsDB.deletePendingNotification(pendingId);
+  appEvents.emit(EVENTS.RELOAD_ALL);
 };
 
 export default processBankNotifications;

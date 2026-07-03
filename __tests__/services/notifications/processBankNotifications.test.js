@@ -979,4 +979,16 @@ describe('processBankNotifications', () => {
       expect(PendingNotificationsDB.addPendingNotification).not.toHaveBeenCalled();
     });
   });
+
+  describe('dismissPendingNotification', () => {
+    it('deletes the pending row and emits RELOAD_ALL so every live surface updates', async () => {
+      PendingNotificationsDB.deletePendingNotification.mockResolvedValue();
+      const emitSpy = jest.spyOn(appEvents, 'emit');
+
+      await pipeline.dismissPendingNotification('p1');
+
+      expect(PendingNotificationsDB.deletePendingNotification).toHaveBeenCalledWith('p1');
+      expect(emitSpy).toHaveBeenCalledWith(EVENTS.RELOAD_ALL);
+    });
+  });
 });

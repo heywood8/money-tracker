@@ -154,6 +154,21 @@ describe('usePendingOperationSuggestions', () => {
       expect(result.current.savingIds).toEqual({});
       expect(result.current.suggestions).toEqual([EXPENSE]);
     });
+
+    it('drops the card even if the post-accept reload fails (no stuck "Adding…" state)', async () => {
+      // resolve succeeds (operation booked, row deleted) but the follow-up reload
+      // throws transiently. The card must still leave the stack, not strand.
+      pipeline.resolvePendingNotification.mockResolvedValue({ id: 'op1' });
+      const { result } = await renderHook(() => usePendingOperationSuggestions());
+      await waitFor(() => expect(result.current.suggestions).toEqual([EXPENSE]));
+
+      PendingNotificationsDB.getPendingNotifications.mockRejectedValue(new Error('db busy'));
+      await act(async () => {
+        await result.current.accept(EXPENSE);
+      });
+      expect(result.current.suggestions).toEqual([]);
+      expect(result.current.savingIds).toEqual({});
+    });
   });
 
   describe('dismiss', () => {
