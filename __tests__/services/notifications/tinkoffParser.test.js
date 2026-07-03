@@ -147,6 +147,63 @@ describe('Tinkoff notification parser', () => {
     });
   });
 
+  describe('"Доступно" available-balance template (single line, no merchant)', () => {
+    // The newer T-Bank template: no merchant title, and the available balance
+    // ("Доступно") trails the transaction on the same line after ". ".
+    const TINKOFF_TOPUP = {
+      text: 'Пополнение на 242 787,85 ₽, счет RUB. Доступно 281 787,85 ₽',
+      packageName: 'com.idamob.tinkoff.android',
+      postTime: 1782000900000,
+    };
+
+    let result;
+    beforeEach(() => {
+      result = parseBankNotification(TINKOFF_TOPUP);
+    });
+
+    it('recognizes the notification and returns an object', () => {
+      expect(result).not.toBeNull();
+    });
+
+    it('maps Пополнение to an income operation', () => {
+      expect(result.kind).toBe('ПОПОЛНЕНИЕ');
+      expect(result.type).toBe('income');
+    });
+
+    it('extracts the transaction amount, stripping the space grouping', () => {
+      expect(result.amount).toBe('242787.85');
+    });
+
+    it('never reads the "Доступно" available-balance amount', () => {
+      expect(result.amount).not.toBe('281787.85');
+      const { raw, ...structured } = result;
+      expect(JSON.stringify(structured)).not.toContain('281787');
+    });
+
+    it('extracts the account currency from "счет RUB"', () => {
+      expect(result.currency).toBe('RUB');
+    });
+
+    it('has no merchant when the title is absent', () => {
+      expect(result.merchant).toBeNull();
+    });
+
+    it('keeps the full raw text for auditing', () => {
+      expect(result.raw).toBe(TINKOFF_TOPUP.text);
+    });
+
+    it('strips a "Доступно" balance even for an expense kind on one line', () => {
+      const expense = parseBankNotification({
+        title: 'Пятерочка',
+        text: 'Покупка на 549,90 ₽, счет RUB. Доступно 12 300,10 ₽',
+        packageName: 'com.idamob.tinkoff.android',
+      });
+      expect(expense.type).toBe('expense');
+      expect(expense.amount).toBe('549.90');
+      expect(expense.amount).not.toBe('12300.10');
+    });
+  });
+
   describe('kind keyword handling', () => {
     it('folds ё so Платёж is recognized as ПЛАТЕЖ', () => {
       const result = parseBankNotification({

@@ -101,6 +101,17 @@ text:  Платеж на 1 000 ₽, счет RUB
 | merchant (title)  | `МегаФон`      | bound to a **category**                  |
 | balance           | `Баланс 39 000 ₽` | **ignored**                           |
 
+A second, newer template carries no merchant title and puts an *available*
+balance (`Доступно`) on the same line as the transaction, separated by `. `:
+
+```
+text:  Пополнение на 242 787,85 ₽, счет RUB. Доступно 281 787,85 ₽
+```
+
+Here `Пополнение` maps to `income`, `amount` is `242787.85`, `currency` is `RUB`,
+and the `Доступно 281 787,85 ₽` balance segment is stripped and ignored just like
+`Баланс`.
+
 The parser lives in `app/services/notifications/bankParsers/tinkoff.js` and is
 registered in `bankParsers/index.js`. Key differences from the Ameria parser,
 each driven by the format:
@@ -111,7 +122,8 @@ each driven by the format:
   `счет RUB` (an unambiguous account signal), falling back to the amount's ₽/$/€
   symbol when absent.
 - **The balance line is stripped first** so `39 000 ₽` can never be read as the
-  transaction amount.
+  transaction amount. Both `Баланс` and `Доступно` are recognized as balance
+  keywords, whether on their own line or trailing the transaction after `. `.
 - **Russian numerics**: space thousands grouping (regular / non-breaking / narrow)
   and a comma decimal separator (`1 000,50`) are both normalized.
 - **No date/time in the body**, so the ingestion layer falls back to the
