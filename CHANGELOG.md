@@ -1,5 +1,12 @@
 # Changelog
 
+## [0.179.2](https://github.com/heywood8/money-tracker/compare/penny-v0.179.1...penny-v0.179.2) (2026-07-03)
+
+
+### Code Refactoring
+
+* **updates:** redesign update-available modal as a compact card ([#1177](https://github.com/heywood8/money-tracker/issues/1177)) ([318452f](https://github.com/heywood8/money-tracker/commit/318452f4b86a7944bb040e456c4a5536b32616c1))
+
 ## [0.179.1](https://github.com/heywood8/money-tracker/compare/penny-v0.179.0...penny-v0.179.1) (2026-07-03)
 
 
