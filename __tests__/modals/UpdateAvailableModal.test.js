@@ -1,6 +1,10 @@
 /**
  * Tests for UpdateAvailableModal component
- * Covers rendering branches: null updateData, with/without releaseNotes, single/multiple notes
+ *
+ * The modal is a compact, content-hugging card shown over any screen when a newer
+ * release is found. It reuses the release-note parsing from UpdateContentPanel but
+ * renders its own condensed layout (icon badge + title, meta line, bounded "What's
+ * new" scroll region, and a Later / Update now action row).
  */
 
 import React from 'react';
@@ -53,77 +57,84 @@ describe('UpdateAvailableModal', () => {
   });
 
   describe('Basic rendering', () => {
-    it('renders version numbers when updateData is provided', async () => {
+    it('renders the latest version in the meta line', async () => {
       const { getByText } = await render(
         <UpdateAvailableModal {...baseProps} updateData={baseUpdateData} />,
       );
       expect(getByText('v2.0.0')).toBeTruthy();
     });
 
-    it('gives the dialog a bounded absolute height so its content is not empty', async () => {
-      // Regression guard: paper's Modal wraps children in an auto-height Surface, so a
-      // percentage height never resolves and the shared panel's flex:1 ScrollView
-      // collapses to zero height — an empty dialog. The container must carry a concrete
-      // numeric height (windowHeight * 0.8 = 640 here).
+    it('hugs its content — the card carries no fixed height', async () => {
+      // Regression guard: the old modal pinned the shared full-screen panel to 80% of the
+      // window, stranding a single card in a large void. The redesigned card must size to
+      // its content, so the container must NOT declare a fixed numeric height.
       const { getByTestId } = await render(
         <UpdateAvailableModal {...baseProps} updateData={baseUpdateData} />,
       );
       const flat = RN.StyleSheet.flatten(getByTestId('update-modal-container').props.style);
-      // A concrete pixel height (not a percentage or undefined) is what keeps the shared
-      // panel's flex:1 ScrollView from collapsing; the exact value tracks the window height.
-      expect(typeof flat.height).toBe('number');
-      expect(flat.height).toBeGreaterThan(0);
+      expect(flat.height).toBeUndefined();
     });
 
-    it('renders dismiss button and calls onDismiss when pressed', async () => {
+    it('bounds the "what\'s new" scroll region so long changelogs never grow the card', async () => {
+      // Regression guard: the notes list can span several skipped versions. Only that region
+      // scrolls (bounded maxHeight); the header and actions stay put and always visible.
+      const updateData = {
+        ...baseUpdateData,
+        releaseNotes: [{ version: '2.0.0', notes: 'Some notes' }],
+      };
+      const { getByTestId } = await render(
+        <UpdateAvailableModal {...baseProps} updateData={updateData} />,
+      );
+      const flat = RN.StyleSheet.flatten(getByTestId('update-notes-scroll').props.style);
+      expect(typeof flat.maxHeight).toBe('number');
+      expect(flat.maxHeight).toBeGreaterThan(0);
+    });
+
+    it('dismisses when the close (×) icon is pressed', async () => {
       const onDismiss = jest.fn();
       const { getByText } = await render(
         <UpdateAvailableModal {...baseProps} onDismiss={onDismiss} updateData={baseUpdateData} />,
       );
-      // The back button wraps an Ionicons 'arrow-back' icon; press it to trigger onDismiss
-      await fireEvent.press(getByText('arrow-back'));
+      // Ionicons renders its `name` as text in tests; the close affordance is the 'close' glyph.
+      await fireEvent.press(getByText('close'));
       expect(onDismiss).toHaveBeenCalledTimes(1);
     });
 
-    it('calls onUpdate with downloadUrl, checksum and version when a release download button is pressed', async () => {
+    it('dismisses when the Later button is pressed', async () => {
+      const onDismiss = jest.fn();
+      const { getByText } = await render(
+        <UpdateAvailableModal {...baseProps} onDismiss={onDismiss} updateData={baseUpdateData} />,
+      );
+      await fireEvent.press(getByText('later'));
+      expect(onDismiss).toHaveBeenCalledTimes(1);
+    });
+
+    it('calls onUpdate with the download URL when "Update now" is pressed', async () => {
       const onUpdate = jest.fn();
       const { getByLabelText } = await render(
         <UpdateAvailableModal {...baseProps} onUpdate={onUpdate} updateData={baseUpdateData} />,
       );
-      // The newest version is synthesized into a card so its per-release download button is reachable.
-      await fireEvent.press(getByLabelText('Download version 2.0.0'));
-      expect(onUpdate).toHaveBeenCalledWith('https://example.com/app.apk', undefined, '2.0.0');
+      await fireEvent.press(getByLabelText('update_now v2.0.0'));
+      expect(onUpdate).toHaveBeenCalledWith('https://example.com/app.apk');
     });
   });
 
   describe('Without releaseNotes', () => {
-    it('shows install hint text when releaseNotes is null', async () => {
-      const { getByText } = await render(
+    it('shows the generic availability message when releaseNotes is null', async () => {
+      const { getByText, queryByText } = await render(
         <UpdateAvailableModal
           {...baseProps}
           updateData={{ ...baseUpdateData, releaseNotes: null }}
         />,
       );
-      // update_install_hint should be rendered as the fallback
-      expect(getByText('update_install_hint')).toBeTruthy();
-    });
-
-    it('does not show the update hint below the button when releaseNotes is null', async () => {
-      const { getAllByText } = await render(
-        <UpdateAvailableModal
-          {...baseProps}
-          updateData={{ ...baseUpdateData, releaseNotes: null }}
-        />,
-      );
-      // When no releaseNotes, the hint above the button is NOT rendered
-      // Only the hint text in the else branch is shown (once)
-      const hints = getAllByText('update_install_hint');
-      expect(hints).toHaveLength(1);
+      expect(getByText('update_available_message')).toBeTruthy();
+      // No "What's new" section when there is nothing to show.
+      expect(queryByText('whats_new')).toBeNull();
     });
   });
 
   describe('With releaseNotes', () => {
-    it('shows changelog section when releaseNotes is provided', async () => {
+    it('shows the "what\'s new" section when releaseNotes is provided', async () => {
       const updateData = {
         ...baseUpdateData,
         releaseNotes: [{ version: '2.0.0', notes: '**Bold feature** added' }],
@@ -145,20 +156,20 @@ describe('UpdateAvailableModal', () => {
       expect(getByText('Bold and italic text')).toBeTruthy();
     });
 
-    it('shows the release version label on each changelog entry', async () => {
+    it('renders a single release without a redundant in-list version label', async () => {
       const updateData = {
         ...baseUpdateData,
         releaseNotes: [{ version: '2.0.0', notes: 'Single release' }],
       };
-      const { getByText } = await render(
+      const { getByText, getAllByText } = await render(
         <UpdateAvailableModal {...baseProps} updateData={updateData} />,
       );
-      // The version now lives only on its release card (the single bottom header is gone).
-      expect(getByText('v2.0.0')).toBeTruthy();
+      // The version appears once (the meta line); a lone release doesn't repeat it in the body.
+      expect(getAllByText('v2.0.0')).toHaveLength(1);
       expect(getByText('Single release')).toBeTruthy();
     });
 
-    it('shows every release version when there are multiple release notes', async () => {
+    it('labels each release when there are multiple release notes', async () => {
       const updateData = {
         ...baseUpdateData,
         releaseNotes: [
@@ -166,39 +177,14 @@ describe('UpdateAvailableModal', () => {
           { version: '1.9.0', notes: 'Bug fix' },
         ],
       };
-      const { getByText } = await render(
+      const { getByText, getAllByText } = await render(
         <UpdateAvailableModal {...baseProps} updateData={updateData} />,
       );
-      // Each release is its own card with its own version label.
-      expect(getByText('v2.0.0')).toBeTruthy();
+      // Each release contributes its own version label; v2.0.0 also appears in the meta line.
+      expect(getAllByText('v2.0.0').length).toBeGreaterThanOrEqual(1);
       expect(getByText('v1.9.0')).toBeTruthy();
       expect(getByText('New feature')).toBeTruthy();
-    });
-
-    it('shows changelog section instead of install hint when releaseNotes is provided', async () => {
-      const updateData = {
-        ...baseUpdateData,
-        releaseNotes: [{ version: '2.0.0', notes: 'New stuff' }],
-      };
-      const { queryByText, getByText } = await render(
-        <UpdateAvailableModal {...baseProps} updateData={updateData} />,
-      );
-      // Changelog header shown, install hint not shown
-      expect(getByText('whats_new')).toBeTruthy();
-      expect(queryByText('update_install_hint')).toBeNull();
-    });
-  });
-
-  describe('Invisible state', () => {
-    it('renders without crashing when visible=false (updateData still provided)', async () => {
-      // When visible=false but updateData is provided, the modal renders (hidden by Portal)
-      await render(
-        <UpdateAvailableModal
-          {...baseProps}
-          visible={false}
-          updateData={baseUpdateData}
-        />,
-      );
+      expect(getByText('Bug fix')).toBeTruthy();
     });
   });
 
@@ -245,6 +231,18 @@ describe('UpdateAvailableModal', () => {
         <UpdateAvailableModal {...baseProps} updateData={updateData} />,
       );
       expect(getByText('link text')).toBeTruthy();
+    });
+  });
+
+  describe('Invisible state', () => {
+    it('renders without crashing when visible=false (updateData still provided)', async () => {
+      await render(
+        <UpdateAvailableModal
+          {...baseProps}
+          visible={false}
+          updateData={baseUpdateData}
+        />,
+      );
     });
   });
 });
