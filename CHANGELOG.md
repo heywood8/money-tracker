@@ -1,5 +1,13 @@
 # Changelog
 
+## [0.180.1](https://github.com/heywood8/money-tracker/compare/penny-v0.180.0...penny-v0.180.1) (2026-07-05)
+
+
+### Miscellaneous Chores
+
+* **deps:** bump @sentry/react-native from 8.16.0 to 8.17.1 ([#1182](https://github.com/heywood8/money-tracker/issues/1182)) ([7d3ef1e](https://github.com/heywood8/money-tracker/commit/7d3ef1ee0bf53ae21998ac9360c8137362e1fe63))
+* **deps:** bump marocchino/sticky-pull-request-comment from 3.0.4 to 3.0.5 ([#1181](https://github.com/heywood8/money-tracker/issues/1181)) ([d0c31eb](https://github.com/heywood8/money-tracker/commit/d0c31eb2c3cfcf577ba03dd4fe6899fb9bde4098))
+
 ## [0.180.0](https://github.com/heywood8/money-tracker/compare/penny-v0.179.2...penny-v0.180.0) (2026-07-03)
 
 
