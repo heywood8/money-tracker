@@ -1,5 +1,12 @@
 # Changelog
 
+## [0.181.0](https://github.com/heywood8/money-tracker/compare/penny-v0.180.1...penny-v0.181.0) (2026-07-05)
+
+
+### Features
+
+* **operations:** exclude a single operation from spending average ([#1184](https://github.com/heywood8/money-tracker/issues/1184)) ([bbf4187](https://github.com/heywood8/money-tracker/commit/bbf4187f9c123e127976c279d46340314d1facee))
+
 ## [0.180.1](https://github.com/heywood8/money-tracker/compare/penny-v0.180.0...penny-v0.180.1) (2026-07-05)
 
 
