@@ -207,6 +207,8 @@
   "balance_adjustments": "Մնացորդի ճշգրտումներ",
   "add_operation": "Ավելացնել գործարք",
   "edit_operation": "Խմբագրել գործարքը",
+  "exclude_from_average": "Բացառել ծախսերի միջինից",
+  "exclude_from_average_hint": "Այս գործարքը չհաշվել օրական միջինում և կանխատեսման մեջ",
   "amount": "Գումար",
   "description": "Նկարագրություն",
   "date": "Ամսաթիվ",

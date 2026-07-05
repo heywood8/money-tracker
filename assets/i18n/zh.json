@@ -207,6 +207,8 @@
   "balance_adjustments": "余额调整",
   "add_operation": "添加操作",
   "edit_operation": "编辑操作",
+  "exclude_from_average": "从支出平均值中排除",
+  "exclude_from_average_hint": "此操作不计入每日平均值和消耗预测",
   "amount": "金额",
   "description": "描述",
   "date": "日期",

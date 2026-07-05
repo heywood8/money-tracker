@@ -10,6 +10,7 @@ import {
   Dimensions,
 } from 'react-native';
 import DateTimePicker from '@react-native-community/datetimepicker';
+import { Switch } from 'react-native-paper';
 import { MaterialCommunityIcons as Icon } from '@expo/vector-icons';
 import { useThemeColors } from '../contexts/ThemeColorsContext';
 import { useLocalization } from '../contexts/LocalizationContext';
@@ -307,6 +308,13 @@ export default function OperationModal({ visible, onClose, operation, isNew, onD
   const handleDescriptionChange = useCallback((text) => {
     if (!isShadowOperation) {
       setValues(v => ({ ...v, description: text }));
+    }
+  }, [isShadowOperation, setValues]);
+
+  // Handler for the "exclude from spending average" toggle
+  const handleToggleExcludeFromAvg = useCallback((val) => {
+    if (!isShadowOperation) {
+      setValues(v => ({ ...v, excludeFromAvg: val }));
     }
   }, [isShadowOperation, setValues]);
 
@@ -643,6 +651,28 @@ export default function OperationModal({ visible, onClose, operation, isNew, onD
           />
         )}
 
+        {/* Exclude-from-average toggle. Only when editing an expense (the burndown
+            forecast / daily average is expense-based), never for shadow ops. */}
+        {!isNew && !isShadowOperation && values.type === 'expense' && (
+          <View style={styles.excludeAvgRow}>
+            <View style={styles.excludeAvgTextContainer}>
+              <Text style={[modalSharedStyles.fieldLabel, styles.excludeAvgLabel, { color: colors.mutedText }]}>
+                {(t('exclude_from_average') || 'Exclude from spending average').toUpperCase()}
+              </Text>
+              <Text style={[styles.excludeAvgHint, { color: colors.mutedText }]}>
+                {t('exclude_from_average_hint') || "Won't affect the daily average or burndown forecast"}
+              </Text>
+            </View>
+            <Switch
+              value={!!values.excludeFromAvg}
+              onValueChange={handleToggleExcludeFromAvg}
+              trackColor={{ false: colors.border, true: colors.primary + '66' }}
+              thumbColor={values.excludeFromAvg ? colors.primary : colors.mutedText}
+              testID="exclude-from-avg-switch"
+            />
+          </View>
+        )}
+
         {errors.general && <Text style={styles.error}>{errors.general}</Text>}
       </ModalShell>
 
@@ -768,6 +798,22 @@ const styles = StyleSheet.create({
     fontSize: 12,
     marginBottom: SPACING.sm,
   },
+  excludeAvgHint: {
+    fontSize: 12,
+  },
+  excludeAvgLabel: {
+    marginBottom: 2,
+  },
+  excludeAvgRow: {
+    alignItems: 'center',
+    flexDirection: 'row',
+    gap: SPACING.md,
+    justifyContent: 'space-between',
+    marginBottom: SPACING.md,
+  },
+  excludeAvgTextContainer: {
+    flex: 1,
+  },
   folderBadge: {
     position: 'absolute',
     right: 4,
@@ -872,6 +918,7 @@ OperationModal.propTypes = {
     destinationAmount: PropTypes.oneOfType([PropTypes.string, PropTypes.number]),
     latitude: PropTypes.oneOfType([PropTypes.string, PropTypes.number]),
     longitude: PropTypes.oneOfType([PropTypes.string, PropTypes.number]),
+    excludeFromAvg: PropTypes.oneOfType([PropTypes.bool, PropTypes.number]),
   }),
   isNew: PropTypes.bool,
   onDelete: PropTypes.func,

@@ -207,6 +207,8 @@
   "balance_adjustments": "残高調整",
   "add_operation": "取引を追加",
   "edit_operation": "取引を編集",
+  "exclude_from_average": "支出平均から除外",
+  "exclude_from_average_hint": "この取引を日次平均とバーンダウン予測に含めない",
   "amount": "金額",
   "description": "説明",
   "date": "日付",

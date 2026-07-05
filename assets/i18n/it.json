@@ -207,6 +207,8 @@
   "balance_adjustments": "Rettifiche saldo",
   "add_operation": "Aggiungi operazione",
   "edit_operation": "Modifica operazione",
+  "exclude_from_average": "Escludi dalla media di spesa",
+  "exclude_from_average_hint": "Non conteggiare questa operazione nella media giornaliera e nella previsione",
   "amount": "Importo",
   "description": "Descrizione",
   "date": "Data",
