@@ -207,6 +207,8 @@
   "balance_adjustments": "Корректировка баланса",
   "add_operation": "Добавить операцию",
   "edit_operation": "Редактировать операцию",
+  "exclude_from_average": "Исключить из средних расходов",
+  "exclude_from_average_hint": "Не учитывать эту операцию в среднем и прогнозе расходов",
   "amount": "Сумма",
   "description": "Описание",
   "date": "Дата",

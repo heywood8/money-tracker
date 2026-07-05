@@ -193,6 +193,48 @@ describe('OperationsDB Service', () => {
       expect(result.longitude).toBeNull();
     });
 
+    it('maps exclude_from_avg to an excludeFromAvg boolean on read', async () => {
+      queryFirst.mockResolvedValue({
+        id: 3,
+        type: 'expense',
+        amount: '100',
+        account_id: 'acc1',
+        category_id: 'cat1',
+        date: '2025-12-05',
+        created_at: '2025-12-05T10:00:00Z',
+        exclude_from_avg: 1,
+      });
+      const flagged = await OperationsDB.getOperationById(3);
+      expect(flagged.excludeFromAvg).toBe(true);
+
+      queryFirst.mockResolvedValue({
+        id: 4,
+        type: 'expense',
+        amount: '100',
+        account_id: 'acc1',
+        category_id: 'cat1',
+        date: '2025-12-05',
+        created_at: '2025-12-05T10:00:00Z',
+        exclude_from_avg: 0,
+      });
+      const notFlagged = await OperationsDB.getOperationById(4);
+      expect(notFlagged.excludeFromAvg).toBe(false);
+    });
+
+    it('maps a missing exclude_from_avg column to false (legacy rows)', async () => {
+      queryFirst.mockResolvedValue({
+        id: 5,
+        type: 'expense',
+        amount: '100',
+        account_id: 'acc1',
+        category_id: 'cat1',
+        date: '2025-12-05',
+        created_at: '2025-12-05T10:00:00Z',
+      });
+      const result = await OperationsDB.getOperationById(5);
+      expect(result.excludeFromAvg).toBe(false);
+    });
+
     it('persists latitude/longitude in the INSERT on create', async () => {
       mockDb.getFirstAsync.mockResolvedValue({ balance: '1000' });
 
@@ -255,6 +297,46 @@ describe('OperationsDB Service', () => {
       const params = insertCall[1];
       expect(params[params.length - 2]).toBe(0);
       expect(params[params.length - 1]).toBe(0);
+    });
+
+    it('persists exclude_from_avg = 1 in the INSERT when the operation is flagged', async () => {
+      mockDb.getFirstAsync.mockResolvedValue({ balance: '1000' });
+
+      await OperationsDB.createOperation({
+        type: 'expense',
+        amount: '100',
+        accountId: 'acc1',
+        categoryId: 'cat1',
+        date: '2025-12-05',
+        excludeFromAvg: true,
+      });
+
+      const insertCall = mockDb.runAsync.mock.calls.find(
+        (c) => typeof c[0] === 'string' && c[0].includes('INSERT INTO operations'),
+      );
+      expect(insertCall[0]).toContain('exclude_from_avg');
+      // Column list ends with exclude_from_avg, latitude, longitude → the flag is
+      // the third param from the end (latitude/longitude stay last).
+      const params = insertCall[1];
+      expect(params[params.length - 3]).toBe(1);
+    });
+
+    it('defaults exclude_from_avg to 0 when the flag is not supplied', async () => {
+      mockDb.getFirstAsync.mockResolvedValue({ balance: '1000' });
+
+      await OperationsDB.createOperation({
+        type: 'expense',
+        amount: '100',
+        accountId: 'acc1',
+        categoryId: 'cat1',
+        date: '2025-12-05',
+      });
+
+      const insertCall = mockDb.runAsync.mock.calls.find(
+        (c) => typeof c[0] === 'string' && c[0].includes('INSERT INTO operations'),
+      );
+      const params = insertCall[1];
+      expect(params[params.length - 3]).toBe(0);
     });
 
     it('updates latitude/longitude when provided', async () => {
@@ -508,6 +590,58 @@ describe('OperationsDB Service', () => {
 
       // Should recalculate balance: reverse old (-(-100) = +100) + apply new (-200) = -100 net
       expect(Currency.add).toHaveBeenCalled();
+    });
+
+    it('persists exclude_from_avg when the flag is toggled on', async () => {
+      const oldOperation = {
+        id: 1,
+        type: 'expense',
+        amount: '100',
+        account_id: 'acc1',
+        category_id: 'cat1',
+        date: '2025-12-05',
+        exclude_from_avg: 0,
+      };
+      const updatedOperation = { ...oldOperation, exclude_from_avg: 1 };
+
+      mockDb.getFirstAsync
+        .mockResolvedValueOnce(oldOperation)     // Get old operation
+        .mockResolvedValueOnce(updatedOperation) // Get updated operation
+        .mockResolvedValueOnce({ balance: '1000' }); // Get account balance
+
+      await OperationsDB.updateOperation(1, { excludeFromAvg: true });
+
+      const updateCall = mockDb.runAsync.mock.calls.find(
+        (c) => typeof c[0] === 'string' && c[0].includes('UPDATE operations SET'),
+      );
+      expect(updateCall[0]).toContain('exclude_from_avg = ?');
+      // Only the flag was changed, so params are [1 (flag), 1 (id for WHERE)].
+      expect(updateCall[1]).toEqual([1, 1]);
+    });
+
+    it('writes exclude_from_avg = 0 when the flag is toggled off', async () => {
+      const oldOperation = {
+        id: 1,
+        type: 'expense',
+        amount: '100',
+        account_id: 'acc1',
+        category_id: 'cat1',
+        date: '2025-12-05',
+        exclude_from_avg: 1,
+      };
+      const updatedOperation = { ...oldOperation, exclude_from_avg: 0 };
+
+      mockDb.getFirstAsync
+        .mockResolvedValueOnce(oldOperation)
+        .mockResolvedValueOnce(updatedOperation)
+        .mockResolvedValueOnce({ balance: '1000' });
+
+      await OperationsDB.updateOperation(1, { excludeFromAvg: false });
+
+      const updateCall = mockDb.runAsync.mock.calls.find(
+        (c) => typeof c[0] === 'string' && c[0].includes('UPDATE operations SET'),
+      );
+      expect(updateCall[1]).toEqual([0, 1]);
     });
 
     it('handles account change in update', async () => {
@@ -798,6 +932,18 @@ describe('OperationsDB Service', () => {
       const result = await OperationsDB.getTotalExpenses('acc1', '2025-12-01', '2025-12-31');
 
       expect(result).toBe('0');
+    });
+
+    it('excludes operations flagged exclude_from_avg from the total (average/forecast)', async () => {
+      queryAll.mockResolvedValue([{ amount: '100' }]);
+
+      await OperationsDB.getTotalExpenses('acc1', '2025-12-01', '2025-12-31');
+
+      // The total feeding the daily average / burndown forecast must filter out
+      // user-flagged one-off operations, while remaining scoped to real expenses.
+      const sql = queryAll.mock.calls[0][0];
+      expect(sql).toContain('exclude_from_avg');
+      expect(sql).toContain("type = 'expense'");
     });
 
     it('gets total income for account in date range', async () => {

@@ -207,6 +207,8 @@
   "balance_adjustments": "Saldo-Anpassungen",
   "add_operation": "Vorgang hinzufügen",
   "edit_operation": "Vorgang bearbeiten",
+  "exclude_from_average": "Vom Ausgabendurchschnitt ausschließen",
+  "exclude_from_average_hint": "Diesen Vorgang nicht in Tagesdurchschnitt und Prognose einbeziehen",
   "amount": "Betrag",
   "description": "Beschreibung",
   "date": "Datum",

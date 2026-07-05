@@ -92,6 +92,13 @@
       "when": 1766700000000,
       "tag": "0012_account_auto_txn_rounding",
       "breakpoints": true
+    },
+    {
+      "idx": 13,
+      "version": "6",
+      "when": 1766800000000,
+      "tag": "0013_operation_exclude_from_avg",
+      "breakpoints": true
     }
   ]
 }

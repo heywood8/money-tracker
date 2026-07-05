@@ -207,6 +207,8 @@
   "balance_adjustments": "Ajustes de saldo",
   "add_operation": "Añadir operación",
   "edit_operation": "Editar operación",
+  "exclude_from_average": "Excluir del promedio de gastos",
+  "exclude_from_average_hint": "No incluir esta operación en el promedio diario ni en la previsión",
   "amount": "Cantidad",
   "description": "Descripción",
   "date": "Fecha",

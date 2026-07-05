@@ -82,6 +82,12 @@ export const operations = sqliteTable('operations', {
   // and getLabelsNearLocation already scans like getDistinctLabels.
   latitude: text('latitude'),
   longitude: text('longitude'),
+  // When 1, this operation is left out of the daily spending average and the
+  // burndown forecast (getTotalExpenses) only. It still counts as a normal
+  // expense everywhere else — account balances, pie charts, category totals.
+  // 0 / null = counted (default). Lets a one-off large purchase not skew the
+  // forecast. Physically appended last by migration 0013 (after longitude).
+  excludeFromAvg: integer('exclude_from_avg').default(0),
 }, (table) => ({
   dateIdx: index('idx_operations_date').on(table.date),
   accountIdx: index('idx_operations_account').on(table.accountId),

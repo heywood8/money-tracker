@@ -52,6 +52,9 @@ const mapOperationFields = (dbOperation) => {
     destinationCurrency: dbOperation.destination_currency,
     latitude: dbOperation.latitude,
     longitude: dbOperation.longitude,
+    // Exposed as a boolean for the form/toggle. Stored as 0/1 (nullable) — the
+    // integer column coerces any legacy string value, so !! is safe here.
+    excludeFromAvg: !!dbOperation.exclude_from_avg,
   };
 };
 
@@ -496,19 +499,23 @@ export const createOperationInTx = async (db, operation) => {
     destination_amount: operation.destinationAmount || null,
     source_currency: operation.sourceCurrency || null,
     destination_currency: operation.destinationCurrency || null,
+    // 1 when the operation is excluded from the spending average / burndown
+    // forecast; 0 (counted) by default. Listed before latitude/longitude so those
+    // stay the last two columns/params.
+    exclude_from_avg: operation.excludeFromAvg ? 1 : 0,
     // ?? (not ||) so a valid 0.0 coordinate (equator / prime meridian) survives.
     latitude: operation.latitude ?? null,
     longitude: operation.longitude ?? null,
   };
 
   const result = await db.runAsync(
-    'INSERT INTO operations (type, amount, account_id, category_id, to_account_id, date, created_at, description, exchange_rate, destination_amount, source_currency, destination_currency, latitude, longitude) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)',
+    'INSERT INTO operations (type, amount, account_id, category_id, to_account_id, date, created_at, description, exchange_rate, destination_amount, source_currency, destination_currency, exclude_from_avg, latitude, longitude) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)',
     [
       operationData.type, operationData.amount, operationData.account_id,
       operationData.category_id, operationData.to_account_id, operationData.date,
       operationData.created_at, operationData.description, operationData.exchange_rate,
       operationData.destination_amount, operationData.source_currency, operationData.destination_currency,
-      operationData.latitude, operationData.longitude,
+      operationData.exclude_from_avg, operationData.latitude, operationData.longitude,
     ],
   );
 
@@ -644,6 +651,10 @@ export const updateOperation = async (id, updates) => {
       if (updates.longitude !== undefined) {
         fields.push('longitude = ?');
         values.push(updates.longitude ?? null);
+      }
+      if (updates.excludeFromAvg !== undefined) {
+        fields.push('exclude_from_avg = ?');
+        values.push(updates.excludeFromAvg ? 1 : 0);
       }
 
       if (fields.length === 0) {
@@ -799,6 +810,11 @@ export const splitOperation = async (id, updates, newOperationData) => {
         destination_amount: newOperationData.destinationAmount || null,
         source_currency: newOperationData.sourceCurrency || null,
         destination_currency: newOperationData.destinationCurrency || null,
+        // The split-off sibling is part of the same expense, so it inherits the
+        // parent's average-exclusion flag unless the caller overrides it.
+        exclude_from_avg: newOperationData.excludeFromAvg !== undefined
+          ? (newOperationData.excludeFromAvg ? 1 : 0)
+          : (oldOperation.exclude_from_avg ? 1 : 0),
         latitude: newOperationData.latitude !== undefined
           ? (newOperationData.latitude ?? null)
           : (oldOperation.latitude ?? null),
@@ -808,12 +824,12 @@ export const splitOperation = async (id, updates, newOperationData) => {
       };
 
       const result = await db.runAsync(
-        'INSERT INTO operations (type, amount, account_id, category_id, to_account_id, date, created_at, description, exchange_rate, destination_amount, source_currency, destination_currency, latitude, longitude) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)',
+        'INSERT INTO operations (type, amount, account_id, category_id, to_account_id, date, created_at, description, exchange_rate, destination_amount, source_currency, destination_currency, exclude_from_avg, latitude, longitude) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)',
         [
           newRow.type, newRow.amount, newRow.account_id, newRow.category_id,
           newRow.to_account_id, newRow.date, newRow.created_at, newRow.description,
           newRow.exchange_rate, newRow.destination_amount, newRow.source_currency, newRow.destination_currency,
-          newRow.latitude, newRow.longitude,
+          newRow.exclude_from_avg, newRow.latitude, newRow.longitude,
         ],
       );
 
@@ -942,11 +958,15 @@ export const getTotalExpenses = async (accountId, startDate, endDate) => {
   try {
     // Shadow-category ops are balance adjustments, not real spending — exclude
     // them so these totals agree with the pie charts, which filter shadows out.
+    // Operations flagged exclude_from_avg = 1 are user-marked one-offs kept out of
+    // the daily spending average / burndown forecast (this total is only consumed
+    // by the prediction, so excluding them here is exactly the intended scope).
     const results = await queryAll(
       `SELECT o.amount FROM operations o
        LEFT JOIN categories c ON o.category_id = c.id
        WHERE o.account_id = ? AND o.type = 'expense' AND o.date >= ? AND o.date <= ?
-         AND (c.is_shadow IS NULL OR c.is_shadow = 0)`,
+         AND (c.is_shadow IS NULL OR c.is_shadow = 0)
+         AND (o.exclude_from_avg IS NULL OR o.exclude_from_avg = 0)`,
       [accountId, startDate, endDate],
     );
     if (!results || results.length === 0) return '0';

@@ -207,6 +207,8 @@
   "balance_adjustments": "Balance Adjustments",
   "add_operation": "Add Operation",
   "edit_operation": "Edit Operation",
+  "exclude_from_average": "Exclude from spending average",
+  "exclude_from_average_hint": "Keep this operation out of the daily average and burndown forecast",
   "amount": "Amount",
   "description": "Description",
   "date": "Date",

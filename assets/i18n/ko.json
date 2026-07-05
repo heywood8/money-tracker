@@ -207,6 +207,8 @@
   "balance_adjustments": "잔액 조정",
   "add_operation": "거래 추가",
   "edit_operation": "거래 편집",
+  "exclude_from_average": "지출 평균에서 제외",
+  "exclude_from_average_hint": "이 거래를 일일 평균 및 번다운 예측에서 제외합니다",
   "amount": "금액",
   "description": "설명",
   "date": "날짜",

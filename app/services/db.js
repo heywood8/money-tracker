@@ -164,6 +164,11 @@ const isSchemaComplete = async (rawDb) => {
     // Check accounts has auto_txn_rounding column (migration 0012).
     if (!accountsCols.some(c => c.name === 'auto_txn_rounding')) return false;
 
+    // Check operations has exclude_from_avg column (migration 0013). Without this
+    // check, an install complete through 0012 would report "schema complete" and
+    // skip migrate(), so 0013 would never add the column for existing users.
+    if (!opsCols.some(c => c.name === 'exclude_from_avg')) return false;
+
     return true;
   } catch (error) {
     console.warn('[DB] isSchemaComplete check failed:', error.message);
@@ -417,6 +422,14 @@ const detectAppliedMigrations = async (rawDb) => {
     const accCols = await getColumns('accounts');
     if (accCols.some(c => c.name === 'auto_txn_rounding')) {
       applied.push(12);
+    }
+  }
+
+  // Migration 0013: Adds operations.exclude_from_avg column.
+  if (await tableExists('operations')) {
+    const opsCols = await getColumns('operations');
+    if (opsCols.some(c => c.name === 'exclude_from_avg')) {
+      applied.push(13);
     }
   }
 

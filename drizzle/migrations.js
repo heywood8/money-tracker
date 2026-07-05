@@ -14,6 +14,7 @@ import m0009 from './0009_add_operation_location.js';
 import m0010 from './0010_bank_notifications.js';
 import m0011 from './0011_merchant_label_override.js';
 import m0012 from './0012_account_auto_txn_rounding.js';
+import m0013 from './0013_operation_exclude_from_avg.js';
 
 export default {
   journal,
@@ -31,6 +32,7 @@ export default {
     m0010,
     m0011,
     m0012,
+    m0013,
   },
   postMigrationHandlers: {
     m0003: m0003PostMigration,
