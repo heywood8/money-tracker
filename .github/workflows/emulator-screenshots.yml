@@ -273,7 +273,7 @@ jobs:
 
             core.setOutput('message', lines.join('\n'));
 
-      - uses: marocchino/sticky-pull-request-comment@v3.0.4
+      - uses: marocchino/sticky-pull-request-comment@v3.0.5
         if: steps.resolve-pr.outputs.pr_number != '' && always()
         with:
           header: "App Screenshots"
