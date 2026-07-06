@@ -570,6 +570,9 @@ jest.mock('react-native-gesture-handler', () => {
       simultaneousWithExternalGesture: jest.fn().mockReturnThis(),
       requireExternalGestureToFail: jest.fn().mockReturnThis(),
     })),
+    Simultaneous: jest.fn((...gestures) => gestures[0]),
+    Race: jest.fn((...gestures) => gestures[0]),
+    Exclusive: jest.fn((...gestures) => gestures[0]),
   };
 
   return {

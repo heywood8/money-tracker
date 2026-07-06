@@ -32,6 +32,7 @@ import useOperationPicker from '../hooks/useOperationPicker';
 import useQuickAddForm from '../hooks/useQuickAddForm';
 import useQuickAddLocation from '../hooks/useQuickAddLocation';
 import usePendingOperationSuggestions from '../hooks/usePendingOperationSuggestions';
+import usePullToRevealSearch from '../hooks/usePullToRevealSearch';
 import { appEvents, EVENTS } from '../services/eventEmitter';
 import { useSearch } from '../contexts/SearchContext';
 import { useDisplaySettings } from '../contexts/DisplaySettingsContext';
@@ -97,6 +98,19 @@ const OperationsScreen = () => {
   const prevSearchModeRef = useRef(searchMode);
   const quickAddMaxHeight = useSharedValue(1000); // Large enough to not clip
   const quickAddTranslateY = useSharedValue(0);
+
+  // Pull-to-reveal search: the pill is hidden by default and pulled into view
+  // with a light downward swipe at the top of the list; a light swipe up hides
+  // it again — unless a search/filter is active, which pins it visible.
+  const searchPinned = searchMode !== 'closed' || hasActiveSearch;
+  const {
+    revealPanGesture,
+    pillAnimatedStyle,
+    pillShown,
+    setPeeked: setSearchPeeked,
+    setScrollY: setSearchScrollY,
+    setRevealHeight: setSearchRevealHeight,
+  } = usePullToRevealSearch({ pinned: searchPinned });
 
   // Animate when searchMode changes
   useEffect(() => {
@@ -938,8 +952,16 @@ const OperationsScreen = () => {
   // The user is returning to the normal view and should land on the QuickAdd form.
   // Deferred via requestAnimationFrame so the scroll runs after the close animation settles.
   useEffect(() => {
-    const wasOpen = prevSearchModeRef.current === 'open';
+    const prevMode = prevSearchModeRef.current;
+    const wasOpen = prevMode === 'open';
     prevSearchModeRef.current = searchMode;
+
+    // Fully dismissing search (any state → 'closed') returns the pill to hidden,
+    // so a pulled-open pill doesn't linger once the user closes search. A bare
+    // peek (closed → closed) is left alone; only a real transition resets it.
+    if (prevMode !== 'closed' && searchMode === 'closed') {
+      setSearchPeeked(false);
+    }
 
     if (wasOpen && searchMode !== 'open') {
       // Defer one animation frame so FlatList layout has settled after the
@@ -949,15 +971,18 @@ const OperationsScreen = () => {
         flatListRef.current?.scrollToOffset({ offset: 0, animated: false });
       });
     }
-  }, [searchMode]);
+  }, [searchMode, setSearchPeeked]);
 
   // Handle scroll event to show/hide scroll-to-top button
   const handleScroll = useCallback((event) => {
     const offsetY = event.nativeEvent.contentOffset.y;
     scrollOffsetRef.current = offsetY;
+    // Feed the offset to the pull-to-reveal gesture so it only engages when a
+    // pull begins at the very top of the list.
+    setSearchScrollY(offsetY);
     // Show button when scrolled down past the calculator (roughly 250px)
     setShowScrollToTop(offsetY > 250);
-  }, []);
+  }, [setSearchScrollY]);
 
   // Scroll to top handler
   const scrollToTop = useCallback(() => {
@@ -977,14 +1002,18 @@ const OperationsScreen = () => {
   }, []);
 
   const handleSearchBarAreaLayout = useCallback((event) => {
-    setSearchBarAreaHeight(event.nativeEvent.layout.height);
-  }, []);
+    const { height } = event.nativeEvent.layout;
+    setSearchBarAreaHeight(height);
+    // Report the pill height so the hidden state translates it exactly off-screen.
+    setSearchRevealHeight(height);
+  }, [setSearchRevealHeight]);
 
   return (
     <View style={[styles.container, { backgroundColor: colors.background }]}>
       <OperationsList
         ref={flatListRef}
-        topInset={searchBarAreaHeight}
+        topInset={pillShown ? searchBarAreaHeight : 0}
+        revealPanGesture={revealPanGesture}
         groupedOperations={groupedOperations}
         accounts={accounts}
         categories={categories}
@@ -1017,10 +1046,10 @@ const OperationsScreen = () => {
       {/* Floating search area — overlays the list so its content scrolls behind
           it instead of being clipped by an opaque band. The matching topInset on
           the list above keeps content from starting underneath the pill. */}
-      <View
-        style={styles.floatingSearchArea}
+      <Animated.View
+        style={[styles.floatingSearchArea, pillAnimatedStyle]}
         onLayout={handleSearchBarAreaLayout}
-        pointerEvents="box-none"
+        pointerEvents={pillShown ? 'box-none' : 'none'}
       >
         <SearchBar
           searchText={searchState?.text || ''}
@@ -1041,7 +1070,7 @@ const OperationsScreen = () => {
             t={t}
           />
         )}
-      </View>
+      </Animated.View>
 
       {/* Picker Modal for Account/Category selection */}
       <PickerModal
