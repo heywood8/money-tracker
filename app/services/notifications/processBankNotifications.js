@@ -341,9 +341,10 @@ const bookExpenseOrQueue = async (descriptor, resolution, date, allowedPackages,
     if (resolution.accountRounding) {
       currencyFields = {
         ...currencyFields,
-        amount: Currency.roundToNearest(
+        amount: Currency.roundToStep(
           currencyFields.amount,
           resolution.accountRounding,
+          resolution.accountRoundingMode,
           resolution.accountCurrency,
         ),
       };
@@ -419,9 +420,10 @@ const bookTransferOrQueue = async (descriptor, resolution, date, allowedPackages
     if (resolution.accountRounding && !transferFields.destinationAmount) {
       transferFields = {
         ...transferFields,
-        amount: Currency.roundToNearest(
+        amount: Currency.roundToStep(
           transferFields.amount,
           resolution.accountRounding,
+          resolution.accountRoundingMode,
           resolution.accountCurrency,
         ),
       };
@@ -611,10 +613,11 @@ export const resolvePendingNotification = async (pendingId, choices = {}) => {
   // `amount` is rounded; any preserved foreign `destinationAmount` keeps the
   // original charged value.
   const accountRounding = account ? account.autoTxnRounding : null;
+  const accountRoundingMode = account ? account.autoTxnRoundingMode : null;
   if (accountRounding) {
     currencyFields = {
       ...currencyFields,
-      amount: Currency.roundToNearest(currencyFields.amount, accountRounding, accountCurrency),
+      amount: Currency.roundToStep(currencyFields.amount, accountRounding, accountRoundingMode, accountCurrency),
     };
   }
 
@@ -740,10 +743,11 @@ const resolvePendingTransfer = async (pending, choices = {}) => {
   // rate-derived destinationAmount intact so both sides stay consistent. Mirrors
   // the auto-create transfer path.
   const accountRounding = sourceAccount ? sourceAccount.autoTxnRounding : null;
+  const accountRoundingMode = sourceAccount ? sourceAccount.autoTxnRoundingMode : null;
   if (accountRounding && !transferFields.destinationAmount) {
     transferFields = {
       ...transferFields,
-      amount: Currency.roundToNearest(transferFields.amount, accountRounding, sourceCurrency),
+      amount: Currency.roundToStep(transferFields.amount, accountRounding, accountRoundingMode, sourceCurrency),
     };
   }
 

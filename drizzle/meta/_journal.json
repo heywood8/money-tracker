@@ -99,6 +99,13 @@
       "when": 1766800000000,
       "tag": "0013_operation_exclude_from_avg",
       "breakpoints": true
+    },
+    {
+      "idx": 14,
+      "version": "6",
+      "when": 1766900000000,
+      "tag": "0014_account_rounding_mode",
+      "breakpoints": true
     }
   ]
 }

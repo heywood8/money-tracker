@@ -92,6 +92,9 @@ export const AccountsActionsProvider = ({ children }) => {
         if (updated.autoTxnRounding !== undefined && updated.autoTxnRounding !== currentAccount.autoTxnRounding) {
           nonBalanceUpdates.autoTxnRounding = updated.autoTxnRounding;
         }
+        if (updated.autoTxnRoundingMode !== undefined && updated.autoTxnRoundingMode !== currentAccount.autoTxnRoundingMode) {
+          nonBalanceUpdates.autoTxnRoundingMode = updated.autoTxnRoundingMode;
+        }
 
         if (Object.keys(nonBalanceUpdates).length > 0) {
           await AccountsDB.updateAccount(id, nonBalanceUpdates);
@@ -109,6 +112,7 @@ export const AccountsActionsProvider = ({ children }) => {
         if (updated.hidden !== undefined) updates.hidden = updated.hidden;
         if (updated.cardMask !== undefined) updates.cardMask = updated.cardMask;
         if (updated.autoTxnRounding !== undefined) updates.autoTxnRounding = updated.autoTxnRounding;
+        if (updated.autoTxnRoundingMode !== undefined) updates.autoTxnRoundingMode = updated.autoTxnRoundingMode;
 
         await AccountsDB.updateAccount(id, updates);
 
