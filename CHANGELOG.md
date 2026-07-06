@@ -1,5 +1,12 @@
 # Changelog
 
+## [0.182.0](https://github.com/heywood8/money-tracker/compare/penny-v0.181.0...penny-v0.182.0) (2026-07-06)
+
+
+### Features
+
+* **accounts:** choose rounding method for automatic transactions ([#1186](https://github.com/heywood8/money-tracker/issues/1186)) ([d9a1750](https://github.com/heywood8/money-tracker/commit/d9a1750d17628905a5fe6a89a2b0ab99ed2b2b42))
+
 ## [0.181.0](https://github.com/heywood8/money-tracker/compare/penny-v0.180.1...penny-v0.181.0) (2026-07-05)
 
 
