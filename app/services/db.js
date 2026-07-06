@@ -169,6 +169,11 @@ const isSchemaComplete = async (rawDb) => {
     // skip migrate(), so 0013 would never add the column for existing users.
     if (!opsCols.some(c => c.name === 'exclude_from_avg')) return false;
 
+    // Check accounts has auto_txn_rounding_mode column (migration 0014). Same
+    // reasoning as above: without this check, an install complete through 0013
+    // would skip migrate() and never gain the column.
+    if (!accountsCols.some(c => c.name === 'auto_txn_rounding_mode')) return false;
+
     return true;
   } catch (error) {
     console.warn('[DB] isSchemaComplete check failed:', error.message);
@@ -430,6 +435,14 @@ const detectAppliedMigrations = async (rawDb) => {
     const opsCols = await getColumns('operations');
     if (opsCols.some(c => c.name === 'exclude_from_avg')) {
       applied.push(13);
+    }
+  }
+
+  // Migration 0014: Adds accounts.auto_txn_rounding_mode column.
+  if (await tableExists('accounts')) {
+    const accCols = await getColumns('accounts');
+    if (accCols.some(c => c.name === 'auto_txn_rounding_mode')) {
+      applied.push(14);
     }
   }
 

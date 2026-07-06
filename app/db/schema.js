@@ -28,6 +28,11 @@ export const accounts = sqliteTable('accounts', {
   // (10, 100, or 1000). When set, an auto-created amount is rounded to the
   // nearest multiple (ties up). Nullable / 0 means no rounding.
   autoTxnRounding: integer('auto_txn_rounding'),
+  // How the rounding step above is applied: 'nearest' (round to the nearest
+  // multiple, ties up — the default), 'up' (always up to the next multiple), or
+  // 'down' (always down to the previous multiple). Nullable — NULL means
+  // 'nearest'. Only meaningful when autoTxnRounding is set.
+  autoTxnRoundingMode: text('auto_txn_rounding_mode'),
   createdAt: text('created_at').notNull(),
   updatedAt: text('updated_at').notNull(),
   deletedAt: text('deleted_at'),

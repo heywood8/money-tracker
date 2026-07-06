@@ -131,8 +131,10 @@ export const resolveNotification = async (descriptor) => {
   const labelOverride = labelFromRule(descriptor, rule);
   const accountId = account ? account.id : null;
   const accountCurrency = account ? account.currency : null;
-  // Rounding step for auto-created operations (null/0 = no rounding).
+  // Rounding step for auto-created operations (null/0 = no rounding) and the
+  // direction it is applied in ('nearest' | 'up' | 'down'; null = 'nearest').
   const accountRounding = account ? account.autoTxnRounding : null;
+  const accountRoundingMode = account ? account.autoTxnRoundingMode : null;
   const matchedAccount = accountId != null;
   const matchedCategory = categoryId != null;
   const currencyMatch =
@@ -141,6 +143,7 @@ export const resolveNotification = async (descriptor) => {
     accountId,
     accountCurrency,
     accountRounding,
+    accountRoundingMode,
     categoryId,
     labelOverride,
     matchedAccount,

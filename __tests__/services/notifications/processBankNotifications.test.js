@@ -264,6 +264,44 @@ describe('processBankNotifications', () => {
     );
   });
 
+  it("rounds the auto-created amount up when the account rounding mode is 'up'", async () => {
+    const ROUNDED = {
+      ...PURCHASE,
+      text: 'PURCHASE | 3,916.00 AMD | 4083***7027, | NAREK MEHRABYAN, AM | 28.06.2026 10:15 | BALANCE: 133,719.97 AMD',
+    };
+    NotificationAccess.getRecentNotifications.mockResolvedValue([ROUNDED]);
+    AccountsDB.getAccountByCardMask.mockResolvedValue({ id: 7, currency: 'AMD', autoTxnRounding: 100, autoTxnRoundingMode: 'up' });
+    NotificationRulesDB.getMerchantRule.mockResolvedValue({ categoryId: 'cat-food' });
+    PreferencesDB.getJsonPreference.mockImplementation((key) => prefs([], [PKG])(key));
+
+    await pipeline.processBankNotifications();
+
+    // 3916 AMD rounded up to the next 100 → 4000 (AMD has 0 decimals)
+    expect(OperationsDB.createOperation).toHaveBeenCalledWith(
+      expect.objectContaining({ amount: '4000' }),
+    );
+  });
+
+  it("rounds the auto-created amount down when the account rounding mode is 'down'", async () => {
+    // 3960 rounds up to 4000 in the default 'nearest' mode, so 'down' → 3900 is
+    // a distinct, direction-specific result.
+    const ROUNDED = {
+      ...PURCHASE,
+      text: 'PURCHASE | 3,960.00 AMD | 4083***7027, | NAREK MEHRABYAN, AM | 28.06.2026 10:15 | BALANCE: 133,719.97 AMD',
+    };
+    NotificationAccess.getRecentNotifications.mockResolvedValue([ROUNDED]);
+    AccountsDB.getAccountByCardMask.mockResolvedValue({ id: 7, currency: 'AMD', autoTxnRounding: 100, autoTxnRoundingMode: 'down' });
+    NotificationRulesDB.getMerchantRule.mockResolvedValue({ categoryId: 'cat-food' });
+    PreferencesDB.getJsonPreference.mockImplementation((key) => prefs([], [PKG])(key));
+
+    await pipeline.processBankNotifications();
+
+    // 3960 AMD rounded down to the previous 100 → 3900 (AMD has 0 decimals)
+    expect(OperationsDB.createOperation).toHaveBeenCalledWith(
+      expect.objectContaining({ amount: '3900' }),
+    );
+  });
+
   it('rounds the converted amount on a currency mismatch, leaving the foreign value intact', async () => {
     NotificationAccess.getRecentNotifications.mockResolvedValue([PURCHASE]); // 3,900 AMD
     AccountsDB.getAccountByCardMask.mockResolvedValue({ id: 7, currency: 'USD', autoTxnRounding: 10 });

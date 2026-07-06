@@ -573,6 +573,60 @@ describe('Currency Service', () => {
     });
   });
 
+  describe('roundToStep', () => {
+    it("mode 'nearest' matches roundToNearest (ties up)", () => {
+      expect(Currency.roundToStep('1216', 100, 'nearest')).toBe('1200.00');
+      expect(Currency.roundToStep('1260', 100, 'nearest')).toBe('1300.00');
+      expect(Currency.roundToStep('150', 100, 'nearest')).toBe('200.00');
+      expect(Currency.roundToStep('2500', 1000, 'nearest')).toBe('3000.00');
+    });
+
+    it("defaults to 'nearest' when no mode is given", () => {
+      expect(Currency.roundToStep('1216', 100)).toBe('1200.00');
+      expect(Currency.roundToStep('1260', 100)).toBe('1300.00');
+    });
+
+    it("mode 'up' always rounds up to the next multiple", () => {
+      expect(Currency.roundToStep('1201', 100, 'up')).toBe('1300.00');
+      expect(Currency.roundToStep('1216', 100, 'up')).toBe('1300.00');
+      expect(Currency.roundToStep('11', 10, 'up')).toBe('20.00');
+      expect(Currency.roundToStep('2001', 1000, 'up')).toBe('3000.00');
+    });
+
+    it("mode 'down' always rounds down to the previous multiple", () => {
+      expect(Currency.roundToStep('1299', 100, 'down')).toBe('1200.00');
+      expect(Currency.roundToStep('1260', 100, 'down')).toBe('1200.00');
+      expect(Currency.roundToStep('19', 10, 'down')).toBe('10.00');
+      expect(Currency.roundToStep('2999', 1000, 'down')).toBe('2000.00');
+    });
+
+    it('leaves an already-multiple amount unchanged in every mode', () => {
+      expect(Currency.roundToStep('1200', 100, 'nearest')).toBe('1200.00');
+      expect(Currency.roundToStep('1200', 100, 'up')).toBe('1200.00');
+      expect(Currency.roundToStep('1200', 100, 'down')).toBe('1200.00');
+    });
+
+    it('formats with the currency decimal places when provided', () => {
+      // AMD has 0 decimal places
+      expect(Currency.roundToStep('1201', 100, 'up', 'AMD')).toBe('1300');
+      expect(Currency.roundToStep('1299', 100, 'down', 'AMD')).toBe('1200');
+      // USD has 2 decimal places
+      expect(Currency.roundToStep('1201', 100, 'up', 'USD')).toBe('1300.00');
+    });
+
+    it("falls back to 'nearest' for an unrecognized/null mode", () => {
+      expect(Currency.roundToStep('1216', 100, 'sideways')).toBe('1200.00');
+      expect(Currency.roundToStep('1260', 100, null)).toBe('1300.00');
+      expect(Currency.roundToStep('150', 100, undefined)).toBe('200.00');
+    });
+
+    it('returns the amount unchanged for a falsy/invalid/non-positive step', () => {
+      expect(Currency.roundToStep('1216', 0, 'up')).toBe('1216.00');
+      expect(Currency.roundToStep('1216', null, 'down')).toBe('1216.00');
+      expect(Currency.roundToStep('1216', -100, 'up')).toBe('1216.00');
+    });
+  });
+
   describe('isReasonableRate', () => {
     it('returns true for reasonable rates within 50% of expected', async () => {
       // Expected USD->EUR rate is 0.92

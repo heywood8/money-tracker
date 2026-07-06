@@ -31,6 +31,16 @@ const ROUNDING_OPTIONS = [
   { label: '1000', value: 1000 },
 ];
 
+// How the rounding step above is applied. 'nearest' is the historical default
+// (round to the nearest multiple, ties up); 'up'/'down' always round the amount
+// up/down to a multiple. Labels are localized at render time. Only shown when a
+// rounding step is selected.
+const ROUNDING_MODE_OPTIONS = [
+  { value: 'nearest', labelKey: 'rounding_mode_nearest', fallback: 'Nearest' },
+  { value: 'up', labelKey: 'rounding_mode_up', fallback: 'Up' },
+  { value: 'down', labelKey: 'rounding_mode_down', fallback: 'Down' },
+];
+
 // Memoized currency picker modal component
 const CurrencyPickerModal = memo(({ visible, onClose, currencies, colors, t, onSelect }) => {
   const renderCurrencyItem = useCallback(({ item }) => {
@@ -640,6 +650,10 @@ export default function AccountsScreen({ onBackStateChange }) {
     setEditValues(v => ({ ...v, autoTxnRounding: value }));
   }, []);
 
+  const handleRoundingModeSelect = useCallback((value) => {
+    setEditValues(v => ({ ...v, autoTxnRoundingMode: value }));
+  }, []);
+
   const handleBalanceChange = useCallback((text) => {
     setEditValues(v => {
       const decimals = currencies[v.currency]?.decimal_digits ?? 2;
@@ -1049,8 +1063,41 @@ export default function AccountsScreen({ onBackStateChange }) {
               })}
             </View>
             <Text style={[styles.cardMaskHint, { color: colors.mutedText }]}>
-              {t('auto_txn_rounding_hint') || 'Round amounts from bank notifications to the nearest 10/100/1000'}
+              {t('auto_txn_rounding_hint') || 'Round amounts from bank notifications to 10/100/1000'}
             </Text>
+
+            {/* Rounding direction — only relevant once a step is chosen */}
+            {editValues.autoTxnRounding ? (
+              <>
+                <Text style={[modalSharedStyles.fieldLabel, { color: colors.mutedText }]}>
+                  {(t('auto_txn_rounding_mode') || 'Rounding method').toUpperCase()}
+                </Text>
+                <View style={[styles.roundingRow, { borderColor: colors.border, backgroundColor: colors.surface }]}>
+                  {ROUNDING_MODE_OPTIONS.map((opt) => {
+                    const selected = (editValues.autoTxnRoundingMode || 'nearest') === opt.value;
+                    return (
+                      <TouchableRipple
+                        key={opt.value}
+                        onPress={() => handleRoundingModeSelect(opt.value)}
+                        style={[
+                          styles.roundingOption,
+                          selected && { backgroundColor: colors.primary },
+                        ]}
+                      >
+                        <Text
+                          style={[
+                            styles.roundingOptionText,
+                            selected ? styles.roundingOptionTextSelected : { color: colors.text },
+                          ]}
+                        >
+                          {t(opt.labelKey) || opt.fallback}
+                        </Text>
+                      </TouchableRipple>
+                    );
+                  })}
+                </View>
+              </>
+            ) : null}
 
             {/* Settings group */}
             <View style={[styles.settingsGroup, { borderColor: colors.border, backgroundColor: colors.surface }]}>

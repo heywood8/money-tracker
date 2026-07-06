@@ -92,21 +92,34 @@ export const formatAmount = (amount, currencyOrDecimals = 2) => {
   return formatted;
 };
 
+// Maps a rounding-mode name to the decimal.js rounding constant applied when
+// dividing the amount by the step. Amounts are non-negative magnitudes here, so
+// ROUND_UP/ROUND_DOWN (away from / toward zero) behave as ceil/floor.
+const ROUNDING_MODE_MAP = {
+  nearest: Decimal.ROUND_HALF_UP, // nearest multiple, ties up
+  up: Decimal.ROUND_UP,           // always up to the next multiple
+  down: Decimal.ROUND_DOWN,       // always down to the previous multiple
+};
+
 /**
- * Round an amount to the nearest multiple of `step` (e.g. 10, 100, 1000).
+ * Round an amount to a multiple of `step` (e.g. 10, 100, 1000) using the given
+ * direction. Used to round the amount of operations created automatically from
+ * bank notifications, per the account's rounding setting.
  *
- * Half-way values are rounded up (away from zero): with step 100, 150 → 200 and
- * 1216 → 1200; with step 1000, 2500 → 3000. Used to round the amount of
- * operations created automatically from bank notifications, per the account's
- * rounding setting.
+ * With step 100:
+ *   mode 'nearest' — 150 → 200, 1216 → 1200 (ties up)
+ *   mode 'up'      — 1201 → 1300, 1200 → 1200
+ *   mode 'down'    — 1299 → 1200, 1200 → 1200
  *
  * @param {string|number} amount - Amount to round
  * @param {number|string} step - Rounding step. A falsy, non-finite, or
  *   non-positive step returns the amount unchanged (just formatted).
+ * @param {'nearest'|'up'|'down'} mode - Rounding direction. Anything unrecognized
+ *   (including null/undefined) falls back to 'nearest'.
  * @param {string} currencyCode - Currency code for formatting the result (optional)
  * @returns {string} Rounded amount as string
  */
-export const roundToNearest = (amount, step, currencyCode = null) => {
+export const roundToStep = (amount, step, mode = 'nearest', currencyCode = null) => {
   const decimal = toDecimal(amount);
   const stepDecimal = toDecimal(step);
 
@@ -114,10 +127,11 @@ export const roundToNearest = (amount, step, currencyCode = null) => {
     return currencyCode ? formatAmount(decimal, currencyCode) : decimal.toFixed(2);
   }
 
-  // Nearest multiple of step, ties rounded away from zero (half-up).
+  const roundingMode = ROUNDING_MODE_MAP[mode] ?? Decimal.ROUND_HALF_UP;
+
   const rounded = decimal
     .dividedBy(stepDecimal)
-    .toDecimalPlaces(0, Decimal.ROUND_HALF_UP)
+    .toDecimalPlaces(0, roundingMode)
     .times(stepDecimal);
 
   if (currencyCode) {
@@ -125,6 +139,18 @@ export const roundToNearest = (amount, step, currencyCode = null) => {
   }
   return rounded.toFixed(2);
 };
+
+/**
+ * Round an amount to the nearest multiple of `step`, ties up. Thin wrapper over
+ * {@link roundToStep} with mode 'nearest', kept for backward compatibility.
+ *
+ * @param {string|number} amount - Amount to round
+ * @param {number|string} step - Rounding step
+ * @param {string} currencyCode - Currency code for formatting the result (optional)
+ * @returns {string} Rounded amount as string
+ */
+export const roundToNearest = (amount, step, currencyCode = null) =>
+  roundToStep(amount, step, 'nearest', currencyCode);
 
 /**
  * Legacy toCents function - kept for backward compatibility
