@@ -1,6 +1,5 @@
 import React, { useMemo, useCallback, forwardRef, useRef, useImperativeHandle } from 'react';
 import { View, Text, StyleSheet, SectionList, ActivityIndicator } from 'react-native';
-import { GestureDetector, Gesture } from 'react-native-gesture-handler';
 import { MaterialCommunityIcons as Icon } from '@expo/vector-icons';
 import PropTypes from 'prop-types';
 import DateSeparator from './DateSeparator';
@@ -80,7 +79,6 @@ const OperationsList = forwardRef(({
   undoActionLabel,
   onUndo,
   onUndoClosed,
-  revealPanGesture,
 }, ref) => {
 
   // Format date label for the separator header.
@@ -373,18 +371,7 @@ const OperationsList = forwardRef(({
     },
   }), [sections]);
 
-  // Compose the (optional) pull-to-reveal Pan gesture with the list's own native
-  // scroll so both recognise together: the search pill reads the top pull while
-  // normal scrolling AND native pull-to-refresh keep working. Gesture.Native()
-  // attaches to the SectionList's underlying scroll view (the direct child of the
-  // GestureDetector below).
-  const scrollNativeGesture = useMemo(() => Gesture.Native(), []);
-  const composedGesture = useMemo(
-    () => (revealPanGesture ? Gesture.Simultaneous(revealPanGesture, scrollNativeGesture) : null),
-    [revealPanGesture, scrollNativeGesture],
-  );
-
-  const list = (
+  return (
     <SectionList
       ref={sectionListRef}
       contentInsetAdjustmentBehavior="automatic"
@@ -449,10 +436,6 @@ const OperationsList = forwardRef(({
       removeClippedSubviews={true}
     />
   );
-
-  return composedGesture
-    ? <GestureDetector gesture={composedGesture}>{list}</GestureDetector>
-    : list;
 });
 
 OperationsList.displayName = 'OperationsList';
@@ -486,7 +469,6 @@ OperationsList.propTypes = {
   undoActionLabel: PropTypes.string,
   onUndo: PropTypes.func,
   onUndoClosed: PropTypes.func,
-  revealPanGesture: PropTypes.object,
 };
 
 OperationsList.defaultProps = {
@@ -510,7 +492,6 @@ OperationsList.defaultProps = {
   undoActionLabel: '',
   onUndo: () => {},
   onUndoClosed: () => {},
-  revealPanGesture: null,
 };
 
 const styles = StyleSheet.create({
