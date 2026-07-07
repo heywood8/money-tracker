@@ -1,5 +1,12 @@
 # Changelog
 
+## [0.183.1](https://github.com/heywood8/money-tracker/compare/penny-v0.183.0...penny-v0.183.1) (2026-07-07)
+
+
+### Reverts
+
+* hide search pill until pulled down ([#1188](https://github.com/heywood8/money-tracker/issues/1188)) ([#1190](https://github.com/heywood8/money-tracker/issues/1190)) ([286c2ac](https://github.com/heywood8/money-tracker/commit/286c2ac958d9bd9a5da01a003a7d43f69a3b6768))
+
 ## [0.183.0](https://github.com/heywood8/money-tracker/compare/penny-v0.182.0...penny-v0.183.0) (2026-07-06)
 
 
