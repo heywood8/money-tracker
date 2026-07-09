@@ -1,5 +1,17 @@
 # Changelog
 
+## [0.184.0](https://github.com/heywood8/money-tracker/compare/penny-v0.183.1...penny-v0.184.0) (2026-07-09)
+
+
+### Features
+
+* **notifications:** swipe to deactivate an app and order enabled filters first ([#1192](https://github.com/heywood8/money-tracker/issues/1192)) ([f2d01a0](https://github.com/heywood8/money-tracker/commit/f2d01a0b3deb2b2198260a87ad1fd51ccf30d633))
+
+
+### Bug Fixes
+
+* **notifications:** keep learned category on unmatched-account pending items ([#1193](https://github.com/heywood8/money-tracker/issues/1193)) ([96767ba](https://github.com/heywood8/money-tracker/commit/96767bae05eb14f4e7101f523f49f721a0796b43))
+
 ## [0.183.1](https://github.com/heywood8/money-tracker/compare/penny-v0.183.0...penny-v0.183.1) (2026-07-07)
 
 
