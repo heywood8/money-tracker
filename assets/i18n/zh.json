@@ -76,6 +76,8 @@
   "notification_filter_apps": "应用",
   "notification_filter_apps_hint": "取消勾选某个应用，即可在列表中隐藏其通知",
   "notification_filter_apps_empty": "暂无应用。收到通知后将显示在此处。",
+  "notification_filter_hide": "隐藏",
+  "notification_filter_hide_app": "隐藏此应用的通知",
   "cancel": "取消",
   "save": "保存",
   "add": "添加",

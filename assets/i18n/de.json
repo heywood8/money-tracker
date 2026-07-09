@@ -76,6 +76,8 @@
   "notification_filter_apps": "Apps",
   "notification_filter_apps_hint": "Deaktivieren Sie eine App, um ihre Benachrichtigungen aus der Liste auszublenden",
   "notification_filter_apps_empty": "Noch keine Apps. Sie erscheinen hier, sobald Benachrichtigungen eintreffen.",
+  "notification_filter_hide": "Ausblenden",
+  "notification_filter_hide_app": "Benachrichtigungen dieser App ausblenden",
   "cancel": "Abbrechen",
   "save": "Speichern",
   "add": "Hinzufügen",

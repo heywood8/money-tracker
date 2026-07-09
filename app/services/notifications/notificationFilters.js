@@ -58,6 +58,35 @@ export const setHiddenPackages = async (list) => {
   );
 };
 
+// Serializes all hidden-set mutations so concurrent read-modify-writes can't
+// lose an update. Each mutation chains off the previous one, so a second hide
+// fired before the first has persisted still reads the first's result rather
+// than a stale snapshot (last-write-wins would otherwise drop one). The chain is
+// kept alive across failures (`.catch`) so one rejected write can't wedge it.
+let hiddenWriteChain = Promise.resolve();
+
+/**
+ * Run a hidden-set mutation under the serialized write chain. `apply(set)`
+ * mutates the passed Set in place and returns whether it actually changed
+ * anything (only then is the result persisted). The read of the current state
+ * happens inside the chained step, so it always sees the prior mutation's write.
+ * @param {(hidden: Set<string>) => boolean} apply
+ * @returns {Promise<string[]>} the updated hidden list
+ */
+const mutateHiddenSet = (apply) => {
+  const run = hiddenWriteChain.then(async () => {
+    const hidden = new Set(await getHiddenPackages());
+    const changed = apply(hidden);
+    const next = Array.from(hidden);
+    if (changed) await setHiddenPackages(next);
+    return next;
+  });
+  // Keep the chain healthy regardless of this step's outcome; the caller still
+  // sees the real result/rejection via `run`.
+  hiddenWriteChain = run.catch(() => {});
+  return run;
+};
+
 /**
  * Flip a single app's visibility based on the CURRENT persisted state rather
  * than a caller-supplied flag. Reading-then-flipping from the source of truth
@@ -66,18 +95,30 @@ export const setHiddenPackages = async (list) => {
  * @param {string} packageName
  * @returns {Promise<string[]>} the updated hidden list
  */
-export const togglePackageVisibility = async (packageName) => {
-  const hidden = new Set(await getHiddenPackages());
-  if (!packageName) return Array.from(hidden);
-  if (hidden.has(packageName)) {
-    hidden.delete(packageName); // was hidden → show it
-  } else {
-    hidden.add(packageName); // was visible → hide it
-  }
-  const next = Array.from(hidden);
-  await setHiddenPackages(next);
-  return next;
-};
+export const togglePackageVisibility = (packageName) =>
+  mutateHiddenSet((hidden) => {
+    if (!packageName) return false;
+    if (hidden.has(packageName)) {
+      hidden.delete(packageName); // was hidden → show it
+    } else {
+      hidden.add(packageName); // was visible → hide it
+    }
+    return true;
+  });
+
+/**
+ * Hide a single app from the feed. Unlike togglePackageVisibility this only ever
+ * adds (idempotent), so it is safe for the swipe-to-deactivate action on the
+ * processing page, where the swiped card is always for a currently-visible app.
+ * @param {string} packageName
+ * @returns {Promise<string[]>} the updated hidden list
+ */
+export const hidePackage = (packageName) =>
+  mutateHiddenSet((hidden) => {
+    if (!packageName || hidden.has(packageName)) return false;
+    hidden.add(packageName);
+    return true;
+  });
 
 /**
  * Every package Penny knows about for the filter list: the shipped defaults

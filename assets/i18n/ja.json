@@ -76,6 +76,8 @@
   "notification_filter_apps": "アプリ",
   "notification_filter_apps_hint": "アプリのチェックを外すと、その通知が一覧から非表示になります",
   "notification_filter_apps_empty": "アプリはまだありません。通知が届くとここに表示されます。",
+  "notification_filter_hide": "非表示",
+  "notification_filter_hide_app": "このアプリの通知を非表示にする",
   "cancel": "キャンセル",
   "save": "保存",
   "add": "追加",

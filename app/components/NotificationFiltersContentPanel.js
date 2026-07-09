@@ -1,4 +1,4 @@
-import React, { useCallback, useEffect, useRef, useState } from 'react';
+import React, { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import PropTypes from 'prop-types';
 import { View, StyleSheet, ScrollView, ActivityIndicator, RefreshControl, TouchableOpacity } from 'react-native';
 import { Text, Switch } from 'react-native-paper';
@@ -168,6 +168,20 @@ export default function NotificationFiltersContentPanel({ bottomInset }) {
     }
   }, []);
 
+  // Enabled (visible) apps first, then hidden ones — each group sorted
+  // alphabetically. Recomputed from the persisted lists so toggling a row moves
+  // it into the right group. `known` already arrives sorted, but re-sorting here
+  // keeps the two groups internally alphabetical regardless of input order.
+  const orderedApps = useMemo(() => {
+    const hiddenSet = new Set(hidden);
+    return [...known].sort((a, b) => {
+      const aHidden = hiddenSet.has(a);
+      const bHidden = hiddenSet.has(b);
+      if (aHidden !== bHidden) return aHidden ? 1 : -1;
+      return a.localeCompare(b);
+    });
+  }, [known, hidden]);
+
   if (loading) {
     return (
       <View style={styles.centered}>
@@ -280,7 +294,7 @@ export default function NotificationFiltersContentPanel({ bottomInset }) {
           </Text>
         </View>
       ) : (
-        known.map((pkg) => {
+        orderedApps.map((pkg) => {
           const checked = !isPackageHidden(pkg, hidden);
           return (
             <TouchableOpacity

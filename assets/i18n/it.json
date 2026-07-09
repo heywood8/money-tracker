@@ -76,6 +76,8 @@
   "notification_filter_apps": "App",
   "notification_filter_apps_hint": "Deseleziona un'app per nasconderne le notifiche dall'elenco",
   "notification_filter_apps_empty": "Ancora nessuna app. Appariranno qui man mano che arrivano le notifiche.",
+  "notification_filter_hide": "Nascondi",
+  "notification_filter_hide_app": "Nascondi le notifiche di questa app",
   "cancel": "Annulla",
   "save": "Salva",
   "add": "Aggiungi",

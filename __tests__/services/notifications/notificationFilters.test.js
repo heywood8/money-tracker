@@ -4,6 +4,7 @@ import {
   getHiddenPackages,
   setHiddenPackages,
   togglePackageVisibility,
+  hidePackage,
   getKnownPackages,
   registerSeenPackages,
   isPackageHidden,
@@ -91,6 +92,36 @@ describe('notificationFilters', () => {
     it('propagates a persistence failure to the caller', async () => {
       PreferencesDB.setJsonPreference.mockRejectedValueOnce(new Error('disk full'));
       await expect(togglePackageVisibility('com.chat')).rejects.toThrow('disk full');
+    });
+  });
+
+  describe('hidePackage', () => {
+    it('hides a visible app by adding it to the hidden set', async () => {
+      const next = await hidePackage('com.chat');
+      expect(next).toContain('com.chat');
+      expect(store.hidden).toContain('com.chat');
+    });
+
+    it('is idempotent for an already-hidden app and does not re-persist', async () => {
+      store.hidden = ['com.chat'];
+      const next = await hidePackage('com.chat');
+      expect(next).toEqual(['com.chat']);
+      expect(PreferencesDB.setJsonPreference).not.toHaveBeenCalled();
+    });
+
+    it('is a no-op for an empty package name and does not persist', async () => {
+      store.hidden = ['a'];
+      const next = await hidePackage('');
+      expect(next).toEqual(['a']);
+      expect(PreferencesDB.setJsonPreference).not.toHaveBeenCalled();
+    });
+
+    it('serializes concurrent hides so neither write is lost (race regression)', async () => {
+      // Fired together, the two read-modify-writes would race and drop one under a
+      // naive last-write-wins; the serialized chain must persist both.
+      await Promise.all([hidePackage('com.a'), hidePackage('com.b')]);
+      expect(store.hidden).toContain('com.a');
+      expect(store.hidden).toContain('com.b');
     });
   });
 
