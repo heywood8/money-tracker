@@ -369,10 +369,14 @@ const bookExpenseOrQueue = async (descriptor, resolution, date, allowedPackages,
       ...descriptor,
       date,
       accountId: resolution.accountId,
-      // Pre-fill the resolved category whenever we have an account to book
-      // against; a currency mismatch is no longer a blocker since it is resolved
-      // by conversion at save time.
-      categoryId: resolution.matchedAccount ? resolution.categoryId : null,
+      // Pre-fill the learned category whenever the merchant rule resolved one,
+      // regardless of whether the account matched. The category is derived from
+      // the merchant, not the account, so dropping it when the account is unknown
+      // (an as-yet-unbound card, or several non-hidden accounts sharing the
+      // notification's currency so the single-account fallback can't fire) throws
+      // away a binding the user already trained — forcing them to re-pick it on
+      // every notification even though it shows up in the bindings list.
+      categoryId: resolution.categoryId,
     });
     summary.pending += 1;
   }

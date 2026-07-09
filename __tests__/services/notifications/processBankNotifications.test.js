@@ -453,6 +453,45 @@ describe('processBankNotifications', () => {
     );
   });
 
+  // Regression: a learned merchant->category must still pre-fill the pending item
+  // even when the account cannot be resolved. Reproduces the real T-Bank case —
+  // the notification carries a card mask that isn't bound yet AND there are two
+  // non-hidden RUB accounts, so the single-account fallback can't fire. The
+  // category (merchant-derived) must not be dropped just because the account is
+  // unknown, otherwise a binding visible in the bindings list never gets applied.
+  it('pre-fills the learned category in the pending item even when the account does not resolve', async () => {
+    const TBANK_PURCHASE = {
+      title: 'PEREKRESTOK',
+      text: 'Покупка на 1304,89 ₽, кэшбэк 65 ₽, счет карты *4087 Доступно 148 000 ₽',
+      packageName: 'com.idamob.tinkoff.android',
+      postTime: 1782000900000,
+    };
+    NotificationAccess.getRecentNotifications.mockResolvedValue([TBANK_PURCHASE]);
+    // Card mask *4087 is not bound to any account.
+    AccountsDB.getAccountByCardMask.mockResolvedValue(null);
+    // Two non-hidden RUB accounts → the single-currency fallback finds >1 match
+    // and returns null, so no account resolves.
+    AccountsDB.getAllAccounts.mockResolvedValue([
+      { id: 23, currency: 'RUB', hidden: 0 },
+      { id: 24, currency: 'RUB', hidden: 0 },
+    ]);
+    // But the merchant already has a learned category.
+    NotificationRulesDB.getMerchantRule.mockResolvedValue({ categoryId: 'cat-transport' });
+
+    const summary = await pipeline.processBankNotifications();
+
+    expect(summary).toEqual({ created: 0, pending: 1, skipped: 0 });
+    expect(OperationsDB.createOperation).not.toHaveBeenCalled();
+    expect(PendingNotificationsDB.addPendingNotification).toHaveBeenCalledWith(
+      expect.objectContaining({
+        merchant: 'PEREKRESTOK',
+        cardMask: '*4087',
+        accountId: null,
+        categoryId: 'cat-transport',
+      }),
+    );
+  });
+
   describe('C2C transfers always require a manual category', () => {
     it('queues a C2C transfer even when the card resolves and the source is trusted', async () => {
       NotificationAccess.getRecentNotifications.mockResolvedValue([C2C]);
