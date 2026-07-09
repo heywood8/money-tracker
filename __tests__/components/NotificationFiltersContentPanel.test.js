@@ -91,6 +91,20 @@ describe('NotificationFiltersContentPanel', () => {
     expect(getByTestId('app-filter-org.telegram.messenger').props.accessibilityState.checked).toBe(true);
   });
 
+  it('lists enabled apps first, then hidden ones, each alphabetically', async () => {
+    // systemui is hidden; the other two are visible. Enabled group comes first
+    // (ameriabank before telegram), then the hidden systemui row.
+    const { getAllByTestId, getByTestId } = await render(<NotificationFiltersContentPanel />);
+    await waitFor(() => expect(getByTestId('app-filter-com.banq.ameriabank')).toBeTruthy());
+
+    const order = getAllByTestId(/^app-filter-/).map((node) => node.props.testID);
+    expect(order).toEqual([
+      'app-filter-com.banq.ameriabank',
+      'app-filter-org.telegram.messenger',
+      'app-filter-com.android.systemui',
+    ]);
+  });
+
   it('toggles a visible app off when its row is tapped', async () => {
     const { getByTestId } = await render(<NotificationFiltersContentPanel />);
     await waitFor(() => expect(getByTestId('app-filter-org.telegram.messenger')).toBeTruthy());

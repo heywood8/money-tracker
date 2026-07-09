@@ -76,6 +76,8 @@
   "notification_filter_apps": "Apps",
   "notification_filter_apps_hint": "Desmarque um app para ocultar suas notificações da lista",
   "notification_filter_apps_empty": "Ainda não há apps. Eles aparecerão aqui conforme as notificações chegarem.",
+  "notification_filter_hide": "Ocultar",
+  "notification_filter_hide_app": "Ocultar as notificações deste app",
   "cancel": "Cancelar",
   "save": "Salvar",
   "add": "Adicionar",

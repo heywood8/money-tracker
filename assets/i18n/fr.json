@@ -76,6 +76,8 @@
   "notification_filter_apps": "Applications",
   "notification_filter_apps_hint": "Décochez une application pour masquer ses notifications de la liste",
   "notification_filter_apps_empty": "Aucune application pour le moment. Elles apparaîtront ici au fur et à mesure des notifications.",
+  "notification_filter_hide": "Masquer",
+  "notification_filter_hide_app": "Masquer les notifications de cette application",
   "cancel": "Annuler",
   "save": "Enregistrer",
   "add": "Ajouter",

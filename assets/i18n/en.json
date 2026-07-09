@@ -76,6 +76,8 @@
   "notification_filter_apps": "Apps",
   "notification_filter_apps_hint": "Uncheck an app to hide its notifications from the feed",
   "notification_filter_apps_empty": "No apps yet. They'll appear here as notifications arrive.",
+  "notification_filter_hide": "Hide",
+  "notification_filter_hide_app": "Hide notifications from this app",
   "cancel": "Cancel",
   "save": "Save",
   "add": "Add",

@@ -7,10 +7,12 @@ import {
   ActivityIndicator,
   RefreshControl,
   TouchableOpacity,
+  Pressable,
   LayoutAnimation,
   Platform,
   UIManager,
 } from 'react-native';
+import { Swipeable } from 'react-native-gesture-handler';
 import { Text } from 'react-native-paper';
 import { Ionicons } from '@expo/vector-icons';
 import { useThemeColors } from '../contexts/ThemeColorsContext';
@@ -36,6 +38,7 @@ import {
   getHiddenPackages,
   registerSeenPackages,
   filterNotificationsByApp,
+  hidePackage,
 } from '../services/notifications/notificationFilters';
 import { getPendingNotifications } from '../services/PendingNotificationsDB';
 import { getLabelForMerchant } from '../services/NotificationRulesDB';
@@ -333,6 +336,36 @@ export default function NotificationProcessingContentPanel({ bottomInset }) {
     }
   }, [reloadPending]);
 
+  // Deactivate an app straight from the recent feed: swiping a card left reveals
+  // a "Hide" action that filters out every notification from that app. Hiding
+  // updates the local set immediately so the swiped card (and its siblings from
+  // the same app) drop out of the feed at once, without waiting for a refresh.
+  const handleDeactivateApp = useCallback(async (packageName) => {
+    if (!packageName) return;
+    try {
+      const next = await hidePackage(packageName);
+      if (mountedRef.current) setHidden(Array.isArray(next) ? next : []);
+    } catch (error) {
+      // Non-fatal; the next silent refresh reconciles the hidden set from storage.
+    }
+  }, []);
+
+  const renderDeactivateAction = useCallback((packageName) => (
+    <Pressable
+      testID={`deactivate-app-${packageName}`}
+      style={[styles.swipeDeactivate, { backgroundColor: colors.delete }]}
+      onPress={() => handleDeactivateApp(packageName)}
+      accessibilityRole="button"
+      accessibilityLabel={t('notification_filter_hide') || 'Hide'}
+      accessibilityHint={t('notification_filter_hide_app') || 'Hide notifications from this app'}
+    >
+      <Ionicons name="notifications-off" size={20} color="#ffffff" />
+      <Text style={styles.swipeDeactivateText} numberOfLines={1}>
+        {t('notification_filter_hide') || 'Hide'}
+      </Text>
+    </Pressable>
+  ), [colors.delete, handleDeactivateApp, t]);
+
   // The feed, with hidden apps filtered out.
   const visibleRecent = useMemo(
     () => filterNotificationsByApp(recent, hidden),
@@ -598,9 +631,8 @@ export default function NotificationProcessingContentPanel({ bottomInset }) {
           // Before the first seed (`null`) nothing is new, so the initial batch
           // renders at rest.
           const isNew = previouslySeen != null && !previouslySeen.has(key);
-          return (
+          const card = (
             <NotificationCard
-              key={key}
               notification={notification}
               colors={colors}
               t={t}
@@ -608,6 +640,23 @@ export default function NotificationProcessingContentPanel({ bottomInset }) {
               reAddState={reAddState[key]}
               animateIn={isNew}
             />
+          );
+          // Only offer swipe-to-hide when the source app is known — a card with no
+          // packageName can't be filtered by app, so it stays a plain card. A keyed
+          // Fragment carries the list key without adding an extra layout node.
+          if (!notification.packageName) {
+            return <React.Fragment key={key}>{card}</React.Fragment>;
+          }
+          return (
+            <Swipeable
+              key={key}
+              renderRightActions={() => renderDeactivateAction(notification.packageName)}
+              overshootRight={false}
+              friction={2}
+              rightThreshold={60}
+            >
+              {card}
+            </Swipeable>
           );
         })
       )}
@@ -752,5 +801,23 @@ const styles = StyleSheet.create({
   selectedCategoryText: {
     fontSize: 12,
     fontWeight: '600',
+  },
+  // Swipe-to-deactivate action revealed under a recent-notification card. The
+  // marginBottom matches the card's own marginBottom (SPACING.md) so the button's
+  // bottom edge lines up with the card's.
+  swipeDeactivate: {
+    alignItems: 'center',
+    borderRadius: BORDER_RADIUS.md,
+    justifyContent: 'center',
+    marginBottom: SPACING.md,
+    marginLeft: SPACING.xs,
+    paddingHorizontal: SPACING.md,
+    width: 72,
+  },
+  swipeDeactivateText: {
+    color: '#ffffff',
+    fontSize: 11,
+    fontWeight: '600',
+    marginTop: 2,
   },
 });

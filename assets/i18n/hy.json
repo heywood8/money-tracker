@@ -76,6 +76,8 @@
   "notification_filter_apps": "Հավելվածներ",
   "notification_filter_apps_hint": "Հանեք նշումը՝ հավելվածի ծանուցումները ցանկից թաքցնելու համար",
   "notification_filter_apps_empty": "Դեռ հավելվածներ չկան։ Դրանք կհայտնվեն այստեղ ծանուցումների ստացման հետ։",
+  "notification_filter_hide": "Թաքցնել",
+  "notification_filter_hide_app": "Թաքցնել այս հավելվածի ծանուցումները",
   "cancel": "Չեղարկել",
   "save": "Պահպանել",
   "add": "Ավելացնել",

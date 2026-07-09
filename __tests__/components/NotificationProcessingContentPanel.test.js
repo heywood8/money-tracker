@@ -44,6 +44,7 @@ jest.mock('../../app/services/notifications/notificationFilters', () => ({
   getHiddenPackages: jest.fn(),
   registerSeenPackages: jest.fn(),
   filterNotificationsByApp: jest.fn(),
+  hidePackage: jest.fn(),
 }));
 
 const PENDING = {
@@ -72,6 +73,7 @@ describe('NotificationProcessingContentPanel', () => {
     notificationFilters.getHiddenPackages.mockResolvedValue([]);
     notificationFilters.registerSeenPackages.mockResolvedValue([]);
     notificationFilters.filterNotificationsByApp.mockImplementation((items) => items);
+    notificationFilters.hidePackage.mockResolvedValue([]);
     pipeline.isBankNotificationsEnabled.mockResolvedValue(true);
     pipeline.processBankNotifications.mockResolvedValue({ created: 0, pending: 1, skipped: 0 });
     pipeline.resolvePendingNotification.mockResolvedValue({ id: 1 });
@@ -199,6 +201,39 @@ describe('NotificationProcessingContentPanel', () => {
     await waitFor(() => expect(getByText('NAREK MEHRABYAN')).toBeTruthy());
     // The chat notification's app is hidden, so its text must not appear.
     expect(queryByText('New message')).toBeNull();
+  });
+
+  it('deactivates an app from the recent feed via its swipe action and drops its cards', async () => {
+    // The Swipeable mock renders the right-actions inline, so the "Hide" button
+    // is present without performing an actual gesture.
+    notificationFilters.hidePackage.mockResolvedValue(['com.chat']);
+    // Filter for real so the optimistic setHidden actually removes the app's cards.
+    notificationFilters.filterNotificationsByApp.mockImplementation((items, hidden) =>
+      items.filter((n) => !(hidden || []).includes(n.packageName)),
+    );
+    const { getByTestId, getByText, queryByText } = await render(<NotificationProcessingContentPanel />);
+    await waitFor(() => expect(getByText('New message')).toBeTruthy());
+
+    fireEvent.press(getByTestId('deactivate-app-com.chat'));
+    await waitFor(() =>
+      expect(notificationFilters.hidePackage).toHaveBeenCalledWith('com.chat'),
+    );
+    // Core claim of the feature: the hidden app's card leaves the feed at once,
+    // driven by the optimistic setHidden(['com.chat']).
+    await waitFor(() => expect(queryByText('New message')).toBeNull());
+  });
+
+  it('renders a notification with no packageName as a plain, non-swipeable card', async () => {
+    // A packageName-less notification exercises the plain-card branch: it renders
+    // but exposes no swipe-to-hide affordance (there is no app to filter by).
+    const NO_PKG_RAW = { title: 'System', text: 'No package here', postTime: 1718000300000 };
+    NotificationAccess.getRecentNotifications.mockResolvedValue([NO_PKG_RAW, CHAT_RAW]);
+    const { getByText, queryByTestId } = await render(<NotificationProcessingContentPanel />);
+    await waitFor(() => expect(getByText('No package here')).toBeTruthy());
+
+    // The plain card has no deactivate button; the app-backed card still does.
+    expect(queryByTestId('deactivate-app-undefined')).toBeNull();
+    expect(queryByTestId('deactivate-app-com.chat')).toBeTruthy();
   });
 
   it('shows a distinct "all filtered" empty state when every recent item is hidden', async () => {
