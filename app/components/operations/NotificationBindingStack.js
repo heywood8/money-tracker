@@ -12,6 +12,17 @@ export const PEEK_OFFSET = 10;
 // Horizontal shrink per depth level — reads as the deck receding without a real
 // scale transform (which would shift the top edge and need translate compensation).
 const EDGE_INSET = 8;
+// Floor for the card frame when the measured quick-add panel is implausibly small
+// (a transient near-zero layout pass) — the form needs at least this to be usable.
+export const MIN_CARD_HEIGHT = 260;
+
+/**
+ * The card frame height for a measured quick-add panel height, floored so the
+ * cards stay usable if a transient layout pass reports a tiny value. Exported so
+ * the host can reserve a matching container minHeight and the cards never overhang
+ * their overlay (where Android would drop touches on the pinned actions).
+ */
+export const deckCardHeight = (quickAddHeight) => Math.max(quickAddHeight, MIN_CARD_HEIGHT);
 
 /**
  * Vertical headroom the deck needs above the quick-add panel so the cards
@@ -26,7 +37,13 @@ export const deckPeekAllowance = (count) =>
  * deck — the key is the stable pending id, so promotions (depth changes) don't
  * re-trigger the entrance.
  */
-const DeckSlot = memo(function DeckSlot({ style, pointerEvents, importantForAccessibility, testID, children }) {
+const DeckSlot = memo(function DeckSlot({
+  style = null,
+  pointerEvents = 'auto',
+  importantForAccessibility = 'auto',
+  testID = undefined,
+  children = null,
+}) {
   const enterAnim = useRef(new Animated.Value(0)).current;
   useEffect(() => {
     Animated.timing(enterAnim, {
@@ -63,14 +80,6 @@ DeckSlot.propTypes = {
   children: PropTypes.node,
 };
 
-DeckSlot.defaultProps = {
-  style: null,
-  pointerEvents: 'auto',
-  importantForAccessibility: 'auto',
-  testID: undefined,
-  children: null,
-};
-
 /**
  * FIFO deck of notification binding cards laid over the quick-add panel.
  *
@@ -82,14 +91,15 @@ DeckSlot.defaultProps = {
  * deckPeekAllowance() of top padding for the peeking edges.
  */
 const NotificationBindingStack = memo(function NotificationBindingStack({
-  suggestions,
-  choices,
-  savingIds,
+  suggestions = [],
+  choices = {},
+  savingIds = {},
+  saveErrors = {},
   quickAddHeight,
   colors,
   t,
-  accounts,
-  categories,
+  accounts = [],
+  categories = [],
   onChoiceChange,
   onSave,
   onDismiss,
@@ -99,6 +109,7 @@ const NotificationBindingStack = memo(function NotificationBindingStack({
   const visible = suggestions.slice(0, MAX_DECK);
   const overflowCount = suggestions.length - visible.length;
   const peekDepth = visible.length - 1;
+  const cardHeight = deckCardHeight(quickAddHeight);
 
   return (
     <View style={styles.overlay} pointerEvents="box-none">
@@ -128,7 +139,7 @@ const NotificationBindingStack = memo(function NotificationBindingStack({
                     backgroundColor: colors.surface,
                     borderColor: colors.border,
                     borderLeftColor: colors.primary,
-                    height: quickAddHeight,
+                    height: cardHeight,
                   },
                 ]}
                 pointerEvents="none"
@@ -146,7 +157,8 @@ const NotificationBindingStack = memo(function NotificationBindingStack({
                 accounts={accounts}
                 categories={categories}
                 saving={!!savingIds[item.id]}
-                height={quickAddHeight}
+                saveError={!!saveErrors[item.id]}
+                height={cardHeight}
                 onChoiceChange={(patch) => onChoiceChange(item.id, patch)}
                 onSave={() => onSave(item)}
                 onDismiss={() => onDismiss(item)}
@@ -176,6 +188,7 @@ NotificationBindingStack.propTypes = {
   suggestions: PropTypes.arrayOf(PropTypes.object),
   choices: PropTypes.object,
   savingIds: PropTypes.object,
+  saveErrors: PropTypes.object,
   quickAddHeight: PropTypes.number.isRequired,
   colors: PropTypes.object.isRequired,
   t: PropTypes.func.isRequired,
@@ -184,14 +197,6 @@ NotificationBindingStack.propTypes = {
   onChoiceChange: PropTypes.func.isRequired,
   onSave: PropTypes.func.isRequired,
   onDismiss: PropTypes.func.isRequired,
-};
-
-NotificationBindingStack.defaultProps = {
-  suggestions: [],
-  choices: {},
-  savingIds: {},
-  accounts: [],
-  categories: [],
 };
 
 const styles = StyleSheet.create({

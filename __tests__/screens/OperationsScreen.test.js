@@ -171,7 +171,7 @@ jest.mock('../../app/hooks/usePendingOperationSuggestions', () => ({
   default: jest.fn(() => ({
     suggestions: [],
     savingIds: {},
-    atmTargetAccountId: null,
+    saveErrors: {},
     choices: {},
     setChoice: jest.fn(),
     reload: jest.fn(),

@@ -34,8 +34,17 @@ const TRANSFER = {
 };
 
 // The full choices the hook seeds for EXPENSE/TRANSFER with no learned label.
-const EXPENSE_CHOICE = { accountId: 1, categoryId: 'c1', toAccountId: null, labelOverride: '' };
-const TRANSFER_CHOICE = { accountId: 1, categoryId: null, toAccountId: 2, labelOverride: '' };
+// labelDirty is false until the user actually types a custom name.
+const EXPENSE_CHOICE = {
+  accountId: 1, categoryId: 'c1', toAccountId: null, labelOverride: '', labelDirty: false,
+};
+const TRANSFER_CHOICE = {
+  accountId: 1, categoryId: null, toAccountId: 2, labelOverride: '', labelDirty: false,
+};
+// The resolve payload for an untouched card: the label is omitted (not authoritative)
+// so the resolver applies and preserves the learned merchant label at resolve time.
+const EXPENSE_RESOLVE = { accountId: 1, categoryId: 'c1', toAccountId: null };
+const TRANSFER_RESOLVE = { accountId: 1, categoryId: null, toAccountId: 2 };
 
 describe('canSaveSuggestion', () => {
   beforeEach(() => {
@@ -76,10 +85,9 @@ describe('usePendingOperationSuggestions', () => {
     kindRequiresCategory.mockReturnValue(false);
   });
 
-  it('loads pending suggestions and the bound ATM target on mount', async () => {
+  it('loads pending suggestions on mount', async () => {
     const { result } = await renderHook(() => usePendingOperationSuggestions());
     await waitFor(() => expect(result.current.suggestions).toEqual([EXPENSE]));
-    expect(result.current.atmTargetAccountId).toBe(2);
   });
 
   it('survives a failing load and keeps the last known state', async () => {
@@ -140,8 +148,40 @@ describe('usePendingOperationSuggestions', () => {
         appEvents.emit(EVENTS.RELOAD_ALL);
       });
       await waitFor(() => expect(result.current.choices.p1).toEqual({
-        ...EXPENSE_CHOICE, categoryId: 'c9', labelOverride: 'My shop',
+        ...EXPENSE_CHOICE, categoryId: 'c9', labelOverride: 'My shop', labelDirty: true,
       }));
+    });
+
+    it('keeps a user-cleared label cleared across reload (does not re-seed it)', async () => {
+      NotificationRulesDB.getLabelForMerchant.mockResolvedValue('Coffee Bros');
+      const { result } = await renderHook(() => usePendingOperationSuggestions());
+      await waitFor(() => expect(result.current.choices.p1?.labelOverride).toBe('Coffee Bros'));
+
+      // User deliberately clears the field to revert to the raw shop name.
+      await act(async () => {
+        result.current.setChoice('p1', { labelOverride: '' });
+      });
+      await act(async () => {
+        appEvents.emit(EVENTS.RELOAD_ALL);
+      });
+      // The learned label must NOT be refilled — the clear is authoritative.
+      await waitFor(() => expect(result.current.choices.p1).toEqual({
+        ...EXPENSE_CHOICE, labelOverride: '', labelDirty: true,
+      }));
+    });
+
+    it('backfills a transfer target with a newly-bound ATM account on reload', async () => {
+      PendingNotificationsDB.getPendingNotifications.mockResolvedValue([TRANSFER]);
+      pipeline.resolveAtmTargetAccount.mockResolvedValueOnce(null); // none bound yet
+      const { result } = await renderHook(() => usePendingOperationSuggestions());
+      await waitFor(() => expect(result.current.choices.p2?.toAccountId).toBeNull());
+
+      // A sibling ATM save binds the target; the next reload should pick it up.
+      pipeline.resolveAtmTargetAccount.mockResolvedValue({ id: 2, name: 'Cash', currency: 'AMD' });
+      await act(async () => {
+        appEvents.emit(EVENTS.RELOAD_ALL);
+      });
+      await waitFor(() => expect(result.current.choices.p2?.toAccountId).toBe(2));
     });
 
     it('patches a single field via setChoice', async () => {
@@ -193,7 +233,7 @@ describe('usePendingOperationSuggestions', () => {
   });
 
   describe('accept', () => {
-    it('resolves an expense with its full seeded bindings and drops it from the deck', async () => {
+    it('resolves an untouched expense WITHOUT a label override and drops it from the deck', async () => {
       const { result } = await renderHook(() => usePendingOperationSuggestions());
       await waitFor(() => expect(result.current.choices.p1).toEqual(EXPENSE_CHOICE));
 
@@ -201,9 +241,24 @@ describe('usePendingOperationSuggestions', () => {
       await act(async () => {
         await result.current.accept(EXPENSE);
       });
-      expect(pipeline.resolvePendingNotification).toHaveBeenCalledWith('p1', EXPENSE_CHOICE);
+      // labelOverride is omitted so the resolver keeps the learned merchant label.
+      expect(pipeline.resolvePendingNotification).toHaveBeenCalledWith('p1', EXPENSE_RESOLVE);
       expect(result.current.suggestions).toEqual([]);
       expect(result.current.savingIds).toEqual({});
+    });
+
+    it('does not send a label override even when a label was seeded from the learned name', async () => {
+      NotificationRulesDB.getLabelForMerchant.mockResolvedValue('Groceries');
+      const { result } = await renderHook(() => usePendingOperationSuggestions());
+      await waitFor(() => expect(result.current.choices.p1?.labelOverride).toBe('Groceries'));
+
+      PendingNotificationsDB.getPendingNotifications.mockResolvedValue([]);
+      await act(async () => {
+        await result.current.accept(EXPENSE);
+      });
+      // The seed is best-effort — never authoritative — so it must not be sent as
+      // an override (which would wipe the learned label on a failed seed lookup).
+      expect(pipeline.resolvePendingNotification).toHaveBeenCalledWith('p1', EXPENSE_RESOLVE);
     });
 
     it('passes the user-edited bindings (account, category, label) to resolve', async () => {
@@ -231,7 +286,7 @@ describe('usePendingOperationSuggestions', () => {
       await act(async () => {
         await result.current.accept(TRANSFER);
       });
-      expect(pipeline.resolvePendingNotification).toHaveBeenCalledWith('p2', TRANSFER_CHOICE);
+      expect(pipeline.resolvePendingNotification).toHaveBeenCalledWith('p2', TRANSFER_RESOLVE);
     });
 
     it('no-ops while the choice is invalid (missing account)', async () => {
@@ -270,7 +325,7 @@ describe('usePendingOperationSuggestions', () => {
       await waitFor(() => expect(result.current.suggestions).toEqual([]));
     });
 
-    it('restores the card when the save fails', async () => {
+    it('restores the card and flags an inline error when the save fails', async () => {
       pipeline.resolvePendingNotification.mockRejectedValue(new Error('no exchange rate'));
       const { result } = await renderHook(() => usePendingOperationSuggestions());
       await waitFor(() => expect(result.current.choices.p1).toEqual(EXPENSE_CHOICE));
@@ -280,8 +335,26 @@ describe('usePendingOperationSuggestions', () => {
       });
       expect(result.current.savingIds).toEqual({});
       expect(result.current.suggestions).toEqual([EXPENSE]);
+      // The failure is surfaced, not swallowed, so the card can show an error.
+      expect(result.current.saveErrors).toEqual({ p1: true });
       // Choices survive the failure so the user can retry or adjust.
       expect(result.current.choices.p1).toEqual(EXPENSE_CHOICE);
+    });
+
+    it('clears a card save-error when the user edits it', async () => {
+      pipeline.resolvePendingNotification.mockRejectedValue(new Error('no exchange rate'));
+      const { result } = await renderHook(() => usePendingOperationSuggestions());
+      await waitFor(() => expect(result.current.choices.p1).toEqual(EXPENSE_CHOICE));
+
+      await act(async () => {
+        await result.current.accept(EXPENSE);
+      });
+      await waitFor(() => expect(result.current.saveErrors).toEqual({ p1: true }));
+
+      await act(async () => {
+        result.current.setChoice('p1', { accountId: 3 });
+      });
+      expect(result.current.saveErrors).toEqual({});
     });
 
     it('drops the card even if the post-accept reload fails (no stuck "Adding…" state)', async () => {

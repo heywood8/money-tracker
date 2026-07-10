@@ -20,7 +20,7 @@ import Calculator from '../components/Calculator';
 import ListCard from '../components/ListCard';
 import OperationsList from '../components/operations/OperationsList';
 import QuickAddForm from '../components/operations/QuickAddForm';
-import NotificationBindingStack, { deckPeekAllowance } from '../components/operations/NotificationBindingStack';
+import NotificationBindingStack, { deckPeekAllowance, deckCardHeight } from '../components/operations/NotificationBindingStack';
 import PickerModal from '../components/operations/PickerModal';
 import SearchOverlay from '../components/search/SearchOverlay';
 import SearchBar from '../components/search/SearchBar';
@@ -170,6 +170,7 @@ const OperationsScreen = () => {
   const {
     suggestions: operationSuggestions,
     savingIds: suggestionSavingIds,
+    saveErrors: suggestionSaveErrors,
     choices: suggestionChoices,
     setChoice: setSuggestionChoice,
     refresh: refreshSuggestions,
@@ -875,9 +876,19 @@ const OperationsScreen = () => {
         <Animated.View style={animatedQuickAddSlideStyle}>
           {/* Deck container: the binding cards overlay the quick-add form
               (absolute, sized to the measured wrapper below), with top padding
-              for the peeking edges of the cards behind the front one. Collapses
-              with the form when search opens (same clip). */}
-          <View style={{ paddingTop: deckPeekAllowance(operationSuggestions.length) }}>
+              for the peeking edges of the cards behind the front one. The
+              minHeight reserves room for the floored card frame so a card never
+              overhangs this container (an overhang would drop touches on the
+              pinned actions on Android). Collapses with the form when search
+              opens (same clip). */}
+          <View
+            style={{
+              paddingTop: deckPeekAllowance(operationSuggestions.length),
+              minHeight: hasSuggestions && quickAddHeight > 0
+                ? deckPeekAllowance(operationSuggestions.length) + deckCardHeight(quickAddHeight)
+                : undefined,
+            }}
+          >
             <View
               onLayout={handleQuickAddLayout}
               importantForAccessibility={hasSuggestions ? 'no-hide-descendants' : 'auto'}
@@ -915,6 +926,7 @@ const OperationsScreen = () => {
                 suggestions={operationSuggestions}
                 choices={suggestionChoices}
                 savingIds={suggestionSavingIds}
+                saveErrors={suggestionSaveErrors}
                 quickAddHeight={quickAddHeight}
                 colors={colors}
                 t={t}
@@ -930,7 +942,7 @@ const OperationsScreen = () => {
       </Animated.View>
       {filtersExpanded && filterPanelHeight > 0 && <View style={{ height: filterPanelHeight }} />}
     </>
-  ), [animatedQuickAddClipStyle, animatedQuickAddSlideStyle, colors, t, quickAddValues, visibleAccounts, filteredCategories, topCategoriesForType, getCategoryInfo, getAccountName, getAccountBalance, getCategoryName, openPicker, handleQuickAdd, handleAmountChange, handleExchangeRateChange, handleDestinationAmountChange, handleAutoAddWithCategory, topTransferAccountsForForm, handleAutoAddWithAccount, TYPES, rateSource, handleOperationCurrencyChange, foreignRateSource, foreignExchangeRate, filterPanelHeight, filtersExpanded, flashCategoryErrorCount, operationSuggestions, hasSuggestions, quickAddHeight, handleQuickAddLayout, accounts, categories, suggestionSavingIds, suggestionChoices, setSuggestionChoice, acceptSuggestion, dismissSuggestion]);
+  ), [animatedQuickAddClipStyle, animatedQuickAddSlideStyle, colors, t, quickAddValues, visibleAccounts, filteredCategories, topCategoriesForType, getCategoryInfo, getAccountName, getAccountBalance, getCategoryName, openPicker, handleQuickAdd, handleAmountChange, handleExchangeRateChange, handleDestinationAmountChange, handleAutoAddWithCategory, topTransferAccountsForForm, handleAutoAddWithAccount, TYPES, rateSource, handleOperationCurrencyChange, foreignRateSource, foreignExchangeRate, filterPanelHeight, filtersExpanded, flashCategoryErrorCount, operationSuggestions, hasSuggestions, quickAddHeight, handleQuickAddLayout, accounts, categories, suggestionSavingIds, suggestionSaveErrors, suggestionChoices, setSuggestionChoice, acceptSuggestion, dismissSuggestion]);
 
   // Auto-scroll to top when filter panel closes, but only if the user is still
   // near the top (hasn't scrolled into past dates). The threshold is filterPanelHeight:

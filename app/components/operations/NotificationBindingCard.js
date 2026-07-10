@@ -18,9 +18,15 @@ import { getCategoryDisplayName } from '../../utils/categoryUtils';
 import * as Currency from '../../services/currency';
 import { SPACING, BORDER_RADIUS } from '../../styles/designTokens';
 
-// Safety net when the measured quick-add height is implausibly small (e.g. a
-// transient zero-ish layout pass) — the form needs at least this much to be usable.
-const MIN_CARD_HEIGHT = 260;
+// "Jun 28" for an ISO YYYY-MM-DD date, localized to the app's language. The
+// T00:00:00 anchors the bare string to local midnight (a bare date parses as UTC
+// and shifts a day west of Greenwich). Mirrors the deleted SuggestedOperationsStack.
+const formatSuggestionDate = (isoDate) => {
+  if (!isoDate) return null;
+  const parsed = new Date(`${isoDate}T00:00:00`);
+  if (Number.isNaN(parsed.getTime())) return isoDate;
+  return parsed.toLocaleDateString(undefined, { month: 'short', day: 'numeric' });
+};
 
 /**
  * Full inline binding panel for one pending bank notification — the front card
@@ -34,12 +40,13 @@ const MIN_CARD_HEIGHT = 260;
  */
 const NotificationBindingCard = ({
   item,
-  choice,
+  choice = {},
   colors,
   t,
   accounts,
   categories,
-  saving,
+  saving = false,
+  saveError = false,
   height,
   onChoiceChange,
   onSave,
@@ -72,7 +79,11 @@ const NotificationBindingCard = ({
     backgroundColor: colors.surface,
     borderColor: colors.border,
     borderLeftColor: colors.primary,
-    height: Math.max(height, MIN_CARD_HEIGHT),
+    // Pinned to the height the deck measured for the quick-add panel (already
+    // floored by the stack), so the card never overhangs its overlay container —
+    // an overhanging bottom would put the pinned actions outside the parent's
+    // bounds, where Android doesn't deliver touches.
+    height,
   };
 
   // A screen reader hears each card's identical buttons ("Dismiss"/"Save")
@@ -130,8 +141,8 @@ const NotificationBindingCard = ({
         <Text style={[styles.merchant, { color: colors.text }]} numberOfLines={1}>
           {item.merchant || item.kind}
         </Text>
-        <Text style={[styles.metaText, { color: colors.mutedText }]} numberOfLines={1}>
-          {[item.date, item.cardMask].filter(Boolean).join(' · ')}
+        <Text testID="binding-card-meta" style={[styles.metaText, { color: colors.mutedText }]} numberOfLines={1}>
+          {[formatSuggestionDate(item.date), item.cardMask].filter(Boolean).join(' · ')}
         </Text>
         {convertedPreview && (
           <Text style={[styles.conversionText, { color: colors.mutedText }]}>
@@ -216,7 +227,14 @@ const NotificationBindingCard = ({
         )}
       </ScrollView>
 
-      {/* Pinned outside the scroll body so Save is always reachable. */}
+      {/* Pinned outside the scroll body so Save (and any error) is always
+          reachable without scrolling the form. */}
+      {saveError ? (
+        <Text style={[styles.errorText, { color: colors.delete || '#c0392b' }]} numberOfLines={2}>
+          {t('bank_notifications_save_error')
+            || 'Couldn’t add this operation. Check the account and try again.'}
+        </Text>
+      ) : null}
       <View style={styles.actions}>
         <TouchableOpacity
           onPress={onDismiss}
@@ -257,15 +275,11 @@ NotificationBindingCard.propTypes = {
   accounts: PropTypes.array.isRequired,
   categories: PropTypes.array.isRequired,
   saving: PropTypes.bool,
+  saveError: PropTypes.bool,
   height: PropTypes.number.isRequired,
   onChoiceChange: PropTypes.func.isRequired,
   onSave: PropTypes.func.isRequired,
   onDismiss: PropTypes.func.isRequired,
-};
-
-NotificationBindingCard.defaultProps = {
-  choice: {},
-  saving: false,
 };
 
 const styles = StyleSheet.create({
@@ -333,6 +347,12 @@ const styles = StyleSheet.create({
     fontSize: 12,
     fontStyle: 'italic',
     marginTop: 2,
+  },
+  errorText: {
+    fontSize: 12,
+    fontWeight: '500',
+    paddingHorizontal: SPACING.md,
+    paddingTop: SPACING.xs,
   },
   fieldLabel: {
     fontSize: 11,

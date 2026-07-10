@@ -31,6 +31,7 @@
   "bank_notifications_readd_created": "Գործարքն ավելացվեց",
   "bank_notifications_readd_queued": "Ավելացվեց ստուգման հերթ",
   "bank_notifications_adding": "Գործարքի ավելացում…",
+  "bank_notifications_save_error": "Չհաջողվեց ավելացնել գործարքը։ Ստուգեք հաշիվը և նորից փորձեք։",
   "bank_notifications_transfer_from": "Հաշվից",
   "bank_notifications_transfer_to": "Հաշվին",
   "bank_notifications_transfer_label_help": "Կամընտիր պիտակ այս փոխանցման համար",

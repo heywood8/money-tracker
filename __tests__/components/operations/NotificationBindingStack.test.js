@@ -208,6 +208,19 @@ describe('NotificationBindingStack', () => {
     expect(queryByText('dismiss')).toBeNull();
   });
 
+  it('shows an inline error when the front card has a save error', async () => {
+    const { getByText } = await renderStack({ saveErrors: { p1: true } });
+    expect(getByText('bank_notifications_save_error')).toBeTruthy();
+  });
+
+  it('localizes the notification date instead of rendering the raw ISO string', async () => {
+    const { getByTestId } = await renderStack();
+    const meta = String(getByTestId('binding-card-meta').props.children);
+    // The raw machine date must not reach the UI; the localized form + card mask do.
+    expect(meta).not.toContain('2026-06-28');
+    expect(meta).toContain('4083***7027');
+  });
+
   it('caps the deck at MAX_DECK layers and sums the overflow in a "+N" badge', async () => {
     const { getAllByTestId, getByText } = await renderStack({
       suggestions: makeSuggestions(6),
