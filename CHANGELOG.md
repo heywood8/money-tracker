@@ -1,5 +1,12 @@
 # Changelog
 
+## [0.185.0](https://github.com/heywood8/money-tracker/compare/penny-v0.184.0...penny-v0.185.0) (2026-07-10)
+
+
+### Features
+
+* **notifications:** inline binding deck over the quick-add panel ([#1195](https://github.com/heywood8/money-tracker/issues/1195)) ([b4bb38d](https://github.com/heywood8/money-tracker/commit/b4bb38d0f7c8a1882af53ca13847737afb49d363))
+
 ## [0.184.0](https://github.com/heywood8/money-tracker/compare/penny-v0.183.1...penny-v0.184.0) (2026-07-09)
 
 
