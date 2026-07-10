@@ -31,6 +31,7 @@
   "bank_notifications_readd_created": "Operación añadida",
   "bank_notifications_readd_queued": "Añadido a la cola de revisión",
   "bank_notifications_adding": "Añadiendo operación…",
+  "bank_notifications_save_error": "No se pudo añadir la operación. Comprueba la cuenta e inténtalo de nuevo.",
   "bank_notifications_transfer_from": "Desde la cuenta",
   "bank_notifications_transfer_to": "A la cuenta",
   "bank_notifications_transfer_label_help": "Etiqueta opcional para esta transferencia",

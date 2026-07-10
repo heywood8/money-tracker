@@ -39,6 +39,7 @@
   "bank_notifications_readd_created": "Operation added",
   "bank_notifications_readd_queued": "Added to review queue",
   "bank_notifications_adding": "Adding operation…",
+  "bank_notifications_save_error": "Couldn’t add this operation. Check the account and try again.",
   "bank_notifications_transfer_from": "From account",
   "bank_notifications_transfer_to": "To account",
   "bank_notifications_transfer_label_help": "Optional label for this transfer",

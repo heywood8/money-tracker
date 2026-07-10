@@ -20,7 +20,7 @@ import Calculator from '../components/Calculator';
 import ListCard from '../components/ListCard';
 import OperationsList from '../components/operations/OperationsList';
 import QuickAddForm from '../components/operations/QuickAddForm';
-import SuggestedOperationsStack from '../components/operations/SuggestedOperationsStack';
+import NotificationBindingStack, { deckPeekAllowance, deckCardHeight } from '../components/operations/NotificationBindingStack';
 import PickerModal from '../components/operations/PickerModal';
 import SearchOverlay from '../components/search/SearchOverlay';
 import SearchBar from '../components/search/SearchBar';
@@ -32,7 +32,6 @@ import useOperationPicker from '../hooks/useOperationPicker';
 import useQuickAddForm from '../hooks/useQuickAddForm';
 import useQuickAddLocation from '../hooks/useQuickAddLocation';
 import usePendingOperationSuggestions from '../hooks/usePendingOperationSuggestions';
-import { appEvents, EVENTS } from '../services/eventEmitter';
 import { useSearch } from '../contexts/SearchContext';
 import { useDisplaySettings } from '../contexts/DisplaySettingsContext';
 
@@ -166,16 +165,27 @@ const OperationsScreen = () => {
   } = useOperationPicker(t);
 
   // Suggested operations parsed from bank notifications (the same pending queue
-  // the settings review panel manages), surfaced as stacked cards above the
-  // quick-add form so common cases never require a trip to settings.
+  // the settings review panel manages), surfaced as a deck of full binding
+  // cards laid over the quick-add form so nothing requires a trip to settings.
   const {
     suggestions: operationSuggestions,
     savingIds: suggestionSavingIds,
-    atmTargetAccountId,
+    saveErrors: suggestionSaveErrors,
+    choices: suggestionChoices,
+    setChoice: setSuggestionChoice,
     refresh: refreshSuggestions,
     accept: acceptSuggestion,
     dismiss: dismissSuggestion,
   } = usePendingOperationSuggestions();
+
+  // Measured height of the quick-add wrapper — the binding cards pin their frame
+  // to it so the deck reads as cards stacked over the form. Rounded, and only
+  // committed on a real change, so onLayout can't ping-pong re-renders.
+  const [quickAddHeight, setQuickAddHeight] = useState(0);
+  const handleQuickAddLayout = useCallback((event) => {
+    const measured = Math.round(event.nativeEvent.layout.height);
+    setQuickAddHeight((prev) => (prev === measured ? prev : measured));
+  }, []);
 
   // Pull-to-refresh: reload the transactions the list shows AND re-run the
   // notification ingestion pipeline + reload the suggestion stack. Reloading the
@@ -196,12 +206,6 @@ const OperationsScreen = () => {
       if (pullRefreshMountedRef.current) setPullRefreshing(false);
     }
   }, [loadInitialOperations, refreshSuggestions]);
-
-  // "Review" on a card that can't be one-tap accepted (and the "+N more" row)
-  // jumps to Settings → Notification processing, which keeps the full list.
-  const handleReviewSuggestions = useCallback(() => {
-    appEvents.emit(EVENTS.OPEN_NOTIFICATION_PROCESSING);
-  }, []);
 
   const {
     sourceAccount,
@@ -865,58 +869,80 @@ const OperationsScreen = () => {
     return () => sub.remove();
   }, [isSearchOpen, filtersExpanded, toggleFilters, handleCloseSearch]);
 
+  const hasSuggestions = operationSuggestions.length > 0;
   const quickAddFormComponent = useMemo(() => (
     <>
       <Animated.View style={animatedQuickAddClipStyle}>
         <Animated.View style={animatedQuickAddSlideStyle}>
-          {/* Suggested operations stack sits on top of the quick-add panel, so
-              with one suggestion the header reads as two stacked cards:
-              the suggestion and the quick-add form. Collapses with the form
-              when search opens (it lives inside the same clip). */}
-          <SuggestedOperationsStack
-            colors={colors}
-            t={t}
-            suggestions={operationSuggestions}
-            accounts={accounts}
-            categories={categories}
-            savingIds={suggestionSavingIds}
-            atmTargetAccountId={atmTargetAccountId}
-            onAccept={acceptSuggestion}
-            onDismiss={dismissSuggestion}
-            onReviewAll={handleReviewSuggestions}
-          />
-          <QuickAddForm
-            colors={colors}
-            t={t}
-            quickAddValues={quickAddValues}
-            setQuickAddValues={setQuickAddValues}
-            accounts={visibleAccounts}
-            filteredCategories={filteredCategories}
-            topCategoriesForType={topCategoriesForType}
-            getCategoryInfo={getCategoryInfo}
-            getAccountName={getAccountName}
-            getAccountBalance={getAccountBalance}
-            getCategoryName={getCategoryName}
-            openPicker={openPicker}
-            handleQuickAdd={handleQuickAdd}
-            handleAmountChange={handleAmountChange}
-            handleExchangeRateChange={handleExchangeRateChange}
-            handleDestinationAmountChange={handleDestinationAmountChange}
-            onAutoAddWithCategory={handleAutoAddWithCategory}
-            topTransferAccounts={topTransferAccountsForForm}
-            onAutoAddWithAccount={handleAutoAddWithAccount}
-            TYPES={TYPES}
-            rateSource={rateSource}
-            onOperationCurrencyChange={handleOperationCurrencyChange}
-            foreignRateSource={foreignRateSource}
-            foreignExchangeRate={foreignExchangeRate}
-            flashCategoryError={flashCategoryErrorCount}
-          />
+          {/* Deck container: the binding cards overlay the quick-add form
+              (absolute, sized to the measured wrapper below), with top padding
+              for the peeking edges of the cards behind the front one. The
+              minHeight reserves room for the floored card frame so a card never
+              overhangs this container (an overhang would drop touches on the
+              pinned actions on Android). Collapses with the form when search
+              opens (same clip). */}
+          <View
+            style={{
+              paddingTop: deckPeekAllowance(operationSuggestions.length),
+              minHeight: hasSuggestions && quickAddHeight > 0
+                ? deckPeekAllowance(operationSuggestions.length) + deckCardHeight(quickAddHeight)
+                : undefined,
+            }}
+          >
+            <View
+              onLayout={handleQuickAddLayout}
+              importantForAccessibility={hasSuggestions ? 'no-hide-descendants' : 'auto'}
+            >
+              <QuickAddForm
+                colors={colors}
+                t={t}
+                quickAddValues={quickAddValues}
+                setQuickAddValues={setQuickAddValues}
+                accounts={visibleAccounts}
+                filteredCategories={filteredCategories}
+                topCategoriesForType={topCategoriesForType}
+                getCategoryInfo={getCategoryInfo}
+                getAccountName={getAccountName}
+                getAccountBalance={getAccountBalance}
+                getCategoryName={getCategoryName}
+                openPicker={openPicker}
+                handleQuickAdd={handleQuickAdd}
+                handleAmountChange={handleAmountChange}
+                handleExchangeRateChange={handleExchangeRateChange}
+                handleDestinationAmountChange={handleDestinationAmountChange}
+                onAutoAddWithCategory={handleAutoAddWithCategory}
+                topTransferAccounts={topTransferAccountsForForm}
+                onAutoAddWithAccount={handleAutoAddWithAccount}
+                TYPES={TYPES}
+                rateSource={rateSource}
+                onOperationCurrencyChange={handleOperationCurrencyChange}
+                foreignRateSource={foreignRateSource}
+                foreignExchangeRate={foreignExchangeRate}
+                flashCategoryError={flashCategoryErrorCount}
+              />
+            </View>
+            {hasSuggestions && quickAddHeight > 0 && (
+              <NotificationBindingStack
+                suggestions={operationSuggestions}
+                choices={suggestionChoices}
+                savingIds={suggestionSavingIds}
+                saveErrors={suggestionSaveErrors}
+                quickAddHeight={quickAddHeight}
+                colors={colors}
+                t={t}
+                accounts={accounts}
+                categories={categories}
+                onChoiceChange={setSuggestionChoice}
+                onSave={acceptSuggestion}
+                onDismiss={dismissSuggestion}
+              />
+            )}
+          </View>
         </Animated.View>
       </Animated.View>
       {filtersExpanded && filterPanelHeight > 0 && <View style={{ height: filterPanelHeight }} />}
     </>
-  ), [animatedQuickAddClipStyle, animatedQuickAddSlideStyle, colors, t, quickAddValues, visibleAccounts, filteredCategories, topCategoriesForType, getCategoryInfo, getAccountName, getAccountBalance, getCategoryName, openPicker, handleQuickAdd, handleAmountChange, handleExchangeRateChange, handleDestinationAmountChange, handleAutoAddWithCategory, topTransferAccountsForForm, handleAutoAddWithAccount, TYPES, rateSource, handleOperationCurrencyChange, foreignRateSource, foreignExchangeRate, filterPanelHeight, filtersExpanded, flashCategoryErrorCount, operationSuggestions, accounts, categories, suggestionSavingIds, atmTargetAccountId, acceptSuggestion, dismissSuggestion, handleReviewSuggestions]);
+  ), [animatedQuickAddClipStyle, animatedQuickAddSlideStyle, colors, t, quickAddValues, visibleAccounts, filteredCategories, topCategoriesForType, getCategoryInfo, getAccountName, getAccountBalance, getCategoryName, openPicker, handleQuickAdd, handleAmountChange, handleExchangeRateChange, handleDestinationAmountChange, handleAutoAddWithCategory, topTransferAccountsForForm, handleAutoAddWithAccount, TYPES, rateSource, handleOperationCurrencyChange, foreignRateSource, foreignExchangeRate, filterPanelHeight, filtersExpanded, flashCategoryErrorCount, operationSuggestions, hasSuggestions, quickAddHeight, handleQuickAddLayout, accounts, categories, suggestionSavingIds, suggestionSaveErrors, suggestionChoices, setSuggestionChoice, acceptSuggestion, dismissSuggestion]);
 
   // Auto-scroll to top when filter panel closes, but only if the user is still
   // near the top (hasn't scrolled into past dates). The threshold is filterPanelHeight:

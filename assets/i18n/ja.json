@@ -31,6 +31,7 @@
   "bank_notifications_readd_created": "操作を追加しました",
   "bank_notifications_readd_queued": "確認キューに追加しました",
   "bank_notifications_adding": "操作を追加中…",
+  "bank_notifications_save_error": "この操作を追加できませんでした。口座を確認して、もう一度お試しください。",
   "bank_notifications_transfer_from": "出金口座",
   "bank_notifications_transfer_to": "入金口座",
   "bank_notifications_transfer_label_help": "この振替の任意のラベル",
