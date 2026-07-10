@@ -163,16 +163,24 @@ jest.mock('../../app/hooks/useQuickAddLocation', () => jest.fn(() => ({
 
 // Mock the notification-suggestions hook so the screen render stays deterministic
 // and fast — its real form hits the notification DB + ingestion pipeline on mount,
-// which is unnecessary async work for these screen-level tests.
-jest.mock('../../app/hooks/usePendingOperationSuggestions', () => jest.fn(() => ({
-  suggestions: [],
-  savingIds: {},
-  atmTargetAccountId: null,
-  reload: jest.fn(),
-  refresh: jest.fn(),
-  accept: jest.fn(),
-  dismiss: jest.fn(),
-})));
+// which is unnecessary async work for these screen-level tests. The module's
+// named canSaveSuggestion export is stubbed too: the binding cards imported by
+// the screen call it at render time.
+jest.mock('../../app/hooks/usePendingOperationSuggestions', () => ({
+  __esModule: true,
+  default: jest.fn(() => ({
+    suggestions: [],
+    savingIds: {},
+    atmTargetAccountId: null,
+    choices: {},
+    setChoice: jest.fn(),
+    reload: jest.fn(),
+    refresh: jest.fn(),
+    accept: jest.fn(),
+    dismiss: jest.fn(),
+  })),
+  canSaveSuggestion: jest.fn(() => false),
+}));
 
 jest.mock('../../app/hooks/useQuickAddForm', () => jest.fn(() => ({
   quickAddValues: {
