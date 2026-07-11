@@ -100,6 +100,18 @@ describe('UpdateAvailableModal', () => {
       expect(onDismiss).toHaveBeenCalledTimes(1);
     });
 
+    it('does NOT dismiss when the surrounding scrim is tapped', async () => {
+      // Regression guard: an available-update prompt must not be dismissible by a stray tap
+      // outside the card. Only the ×, "Later", or the hardware back button dismiss it, so the
+      // scrim is an inert View — pressing it fires no onDismiss.
+      const onDismiss = jest.fn();
+      const { getByTestId } = await render(
+        <UpdateAvailableModal {...baseProps} onDismiss={onDismiss} updateData={baseUpdateData} />,
+      );
+      await fireEvent.press(getByTestId('update-modal-scrim'));
+      expect(onDismiss).not.toHaveBeenCalled();
+    });
+
     it('dismisses when the Later button is pressed', async () => {
       const onDismiss = jest.fn();
       const { getByText } = await render(

@@ -1,6 +1,6 @@
 import React, { useMemo } from 'react';
 import PropTypes from 'prop-types';
-import { View, StyleSheet, TouchableOpacity, ScrollView, useWindowDimensions, Modal, Pressable } from 'react-native';
+import { View, StyleSheet, TouchableOpacity, ScrollView, useWindowDimensions, Modal } from 'react-native';
 import { Text, Divider } from 'react-native-paper';
 import { Ionicons } from '@expo/vector-icons';
 import { useThemeColors } from '../contexts/ThemeColorsContext';
@@ -48,9 +48,13 @@ export default function UpdateAvailableModal({ visible, onDismiss, onUpdate, upd
   // laid out via a Portal host that, under the New Architecture + Android edge-to-edge, fails
   // to span the full screen — the scrim covered only the content above the card, leaving an
   // undimmed band between the list and this panel. A core Modal owns a full-screen native
-  // window, so the scrim (a plain absolute-fill Pressable) reliably dims the entire screen
-  // and the card centres deterministically. `statusBarTranslucent`/`navigationBarTranslucent`
-  // let that window extend under both system bars so the dim is truly edge-to-edge.
+  // window, so the scrim (a plain absolute-fill View) reliably dims the entire screen and the
+  // card centres deterministically. `statusBarTranslucent`/`navigationBarTranslucent` let that
+  // window extend under both system bars so the dim is truly edge-to-edge.
+  //
+  // The scrim is a plain View (not a Pressable): tapping outside the card must NOT dismiss the
+  // prompt. Dismissal is deliberate only — the × icon, the "Later" button, or the hardware back
+  // button (onRequestClose) — so a stray tap can't silently bury an available update.
   return (
     <Modal
       visible={visible}
@@ -60,13 +64,11 @@ export default function UpdateAvailableModal({ visible, onDismiss, onUpdate, upd
       animationType="fade"
       onRequestClose={onDismiss}
     >
-      <Pressable
+      <View
         testID="update-modal-scrim"
         style={[styles.scrim, { backgroundColor: colors.modalBackground }]}
-        onPress={onDismiss}
       >
-        {/* Inner Pressable swallows taps on the card so they don't dismiss via the scrim. */}
-        <Pressable style={styles.cardWrapper} onPress={() => {}}>
+        <View style={styles.cardWrapper}>
           <View
             testID="update-modal-container"
             style={[styles.card, { backgroundColor: colors.card, borderColor: colors.border }]}
@@ -155,8 +157,8 @@ export default function UpdateAvailableModal({ visible, onDismiss, onUpdate, upd
               </TouchableOpacity>
             </View>
           </View>
-        </Pressable>
-      </Pressable>
+        </View>
+      </View>
     </Modal>
   );
 }
