@@ -1,7 +1,7 @@
 import React, { useMemo } from 'react';
 import PropTypes from 'prop-types';
-import { View, StyleSheet, TouchableOpacity, ScrollView, useWindowDimensions } from 'react-native';
-import { Portal, Modal, Text, Divider } from 'react-native-paper';
+import { View, StyleSheet, TouchableOpacity, ScrollView, useWindowDimensions, Modal, Pressable } from 'react-native';
+import { Text, Divider } from 'react-native-paper';
 import { Ionicons } from '@expo/vector-icons';
 import { useThemeColors } from '../contexts/ThemeColorsContext';
 import { useLocalization } from '../contexts/LocalizationContext';
@@ -44,104 +44,120 @@ export default function UpdateAvailableModal({ visible, onDismiss, onUpdate, upd
 
   const metaText = dateLabel ? `v${latestVersion} · ${dateLabel}` : `v${latestVersion}`;
 
+  // Rendered as a core React Native Modal (not Paper's Portal/Modal): Paper's backdrop is
+  // laid out via a Portal host that, under the New Architecture + Android edge-to-edge, fails
+  // to span the full screen — the scrim covered only the content above the card, leaving an
+  // undimmed band between the list and this panel. A core Modal owns a full-screen native
+  // window, so the scrim (a plain absolute-fill Pressable) reliably dims the entire screen
+  // and the card centres deterministically. `statusBarTranslucent`/`navigationBarTranslucent`
+  // let that window extend under both system bars so the dim is truly edge-to-edge.
   return (
-    <Portal>
-      <Modal
-        visible={visible}
-        onDismiss={onDismiss}
-        dismissable
-        contentContainerStyle={styles.modalWrapper}
+    <Modal
+      visible={visible}
+      transparent
+      statusBarTranslucent
+      navigationBarTranslucent
+      animationType="fade"
+      onRequestClose={onDismiss}
+    >
+      <Pressable
+        testID="update-modal-scrim"
+        style={[styles.scrim, { backgroundColor: colors.modalBackground }]}
+        onPress={onDismiss}
       >
-        <View
-          testID="update-modal-container"
-          style={[styles.card, { backgroundColor: colors.card, borderColor: colors.border }]}
-        >
-          <View style={styles.header}>
-            <View style={[styles.iconBadge, { backgroundColor: `${colors.primary}22` }]}>
-              <Ionicons name="arrow-up-circle" size={24} color={colors.primary} />
+        {/* Inner Pressable swallows taps on the card so they don't dismiss via the scrim. */}
+        <Pressable style={styles.cardWrapper} onPress={() => {}}>
+          <View
+            testID="update-modal-container"
+            style={[styles.card, { backgroundColor: colors.card, borderColor: colors.border }]}
+          >
+            <View style={styles.header}>
+              <View style={[styles.iconBadge, { backgroundColor: `${colors.primary}22` }]}>
+                <Ionicons name="arrow-up-circle" size={24} color={colors.primary} />
+              </View>
+              <View style={styles.headerText}>
+                <Text style={[styles.title, { color: colors.text }]} numberOfLines={1}>
+                  {t('update_available_title') || 'Update available'}
+                </Text>
+                <Text style={[styles.meta, { color: colors.mutedText }]} numberOfLines={1}>
+                  {metaText}
+                </Text>
+              </View>
+              <TouchableOpacity
+                onPress={onDismiss}
+                style={styles.closeButton}
+                accessibilityRole="button"
+                accessibilityLabel={t('later') || 'Later'}
+                hitSlop={{ top: 8, bottom: 8, left: 8, right: 8 }}
+              >
+                <Ionicons name="close" size={22} color={colors.mutedText} />
+              </TouchableOpacity>
             </View>
-            <View style={styles.headerText}>
-              <Text style={[styles.title, { color: colors.text }]} numberOfLines={1}>
-                {t('update_available_title') || 'Update available'}
-              </Text>
-              <Text style={[styles.meta, { color: colors.mutedText }]} numberOfLines={1}>
-                {metaText}
-              </Text>
-            </View>
-            <TouchableOpacity
-              onPress={onDismiss}
-              style={styles.closeButton}
-              accessibilityRole="button"
-              accessibilityLabel={t('later') || 'Later'}
-              hitSlop={{ top: 8, bottom: 8, left: 8, right: 8 }}
-            >
-              <Ionicons name="close" size={22} color={colors.mutedText} />
-            </TouchableOpacity>
-          </View>
 
-          {currentVersion ? (
-            <Text style={[styles.fromVersion, { color: colors.mutedText }]}>
-              {(t('update_from_version') || 'installed: v{currentVersion}').replace('{currentVersion}', currentVersion)}
-            </Text>
-          ) : null}
-
-          <Divider style={styles.divider} />
-
-          {hasNotes ? (
-            <ScrollView
-              testID="update-notes-scroll"
-              style={[styles.notes, { maxHeight: notesMaxHeight }]}
-              contentContainerStyle={styles.notesContent}
-              showsVerticalScrollIndicator={false}
-            >
-              <Text style={[styles.notesLabel, { color: colors.mutedText }]}>
-                {t('whats_new') || "What's new"}
+            {currentVersion ? (
+              <Text style={[styles.fromVersion, { color: colors.mutedText }]}>
+                {(t('update_from_version') || 'installed: v{currentVersion}').replace('{currentVersion}', currentVersion)}
               </Text>
-              {parsedReleases.map((release) => (
-                <View key={release.version} style={styles.releaseBlock}>
-                  {showVersionLabels ? (
-                    <Text style={[styles.releaseVersion, { color: colors.text }]}>
-                      v{release.version}
+            ) : null}
+
+            <Divider style={styles.divider} />
+
+            {hasNotes ? (
+              <ScrollView
+                testID="update-notes-scroll"
+                style={[styles.notes, { maxHeight: notesMaxHeight }]}
+                contentContainerStyle={styles.notesContent}
+                showsVerticalScrollIndicator={false}
+              >
+                <Text style={[styles.notesLabel, { color: colors.mutedText }]}>
+                  {t('whats_new') || "What's new"}
+                </Text>
+                {parsedReleases.map((release) => (
+                  <View key={release.version} style={styles.releaseBlock}>
+                    {showVersionLabels ? (
+                      <Text style={[styles.releaseVersion, { color: colors.text }]}>
+                        v{release.version}
+                      </Text>
+                    ) : null}
+                    <Text style={[styles.releaseBody, { color: colors.text }]}>
+                      {release.body}
                     </Text>
-                  ) : null}
-                  <Text style={[styles.releaseBody, { color: colors.text }]}>
-                    {release.body}
-                  </Text>
-                </View>
-              ))}
-            </ScrollView>
-          ) : (
-            <Text style={[styles.emptyNotes, { color: colors.mutedText }]}>
-              {(t('update_available_message') || 'A newer app version ({latestVersion}) is available. Download and install the APK from GitHub.').replace('{latestVersion}', `v${latestVersion}`)}
-            </Text>
-          )}
+                  </View>
+                ))}
+              </ScrollView>
+            ) : (
+              <Text style={[styles.emptyNotes, { color: colors.mutedText }]}>
+                {(t('update_available_message') || 'A newer app version ({latestVersion}) is available. Download and install the APK from GitHub.').replace('{latestVersion}', `v${latestVersion}`)}
+              </Text>
+            )}
 
-          <View style={styles.actions}>
-            <TouchableOpacity
-              onPress={onDismiss}
-              style={[styles.button, styles.laterButton, { borderColor: colors.border }]}
-              accessibilityRole="button"
-              accessibilityLabel={t('later') || 'Later'}
-            >
-              <Text style={[styles.laterText, { color: colors.text }]}>
-                {t('later') || 'Later'}
-              </Text>
-            </TouchableOpacity>
-            <TouchableOpacity
-              onPress={() => onUpdate(downloadUrl)}
-              style={[styles.button, styles.updateButton, { backgroundColor: colors.primary }]}
-              accessibilityRole="button"
-              accessibilityLabel={`${t('update_now') || 'Update now'} v${latestVersion}`}
-            >
-              <Ionicons name="cloud-download-outline" size={18} color="#fff" />
-              <Text style={styles.updateText}>
-                {t('update_now') || 'Update now'}
-              </Text>
-            </TouchableOpacity>
+            <View style={styles.actions}>
+              <TouchableOpacity
+                onPress={onDismiss}
+                style={[styles.button, styles.laterButton, { borderColor: colors.border }]}
+                accessibilityRole="button"
+                accessibilityLabel={t('later') || 'Later'}
+              >
+                <Text style={[styles.laterText, { color: colors.text }]}>
+                  {t('later') || 'Later'}
+                </Text>
+              </TouchableOpacity>
+              <TouchableOpacity
+                onPress={() => onUpdate(downloadUrl)}
+                style={[styles.button, styles.updateButton, { backgroundColor: colors.primary }]}
+                accessibilityRole="button"
+                accessibilityLabel={`${t('update_now') || 'Update now'} v${latestVersion}`}
+              >
+                <Ionicons name="cloud-download-outline" size={18} color="#fff" />
+                <Text style={styles.updateText}>
+                  {t('update_now') || 'Update now'}
+                </Text>
+              </TouchableOpacity>
+            </View>
           </View>
-        </View>
-      </Modal>
-    </Portal>
+        </Pressable>
+      </Pressable>
+    </Modal>
   );
 }
 
@@ -182,6 +198,12 @@ const styles = StyleSheet.create({
     overflow: 'hidden',
     paddingBottom: SPACING.lg,
     paddingTop: SPACING.md,
+    width: '100%',
+  },
+  cardWrapper: {
+    alignSelf: 'center',
+    maxWidth: 480,
+    width: '100%',
   },
   closeButton: {
     alignItems: 'center',
@@ -234,9 +256,6 @@ const styles = StyleSheet.create({
     fontVariant: ['tabular-nums'],
     marginTop: 1,
   },
-  modalWrapper: {
-    marginHorizontal: SPACING.lg,
-  },
   notes: {
     marginTop: SPACING.sm,
   },
@@ -263,6 +282,12 @@ const styles = StyleSheet.create({
     fontSize: 13,
     fontWeight: '700',
     marginBottom: 2,
+  },
+  scrim: {
+    alignItems: 'center',
+    flex: 1,
+    justifyContent: 'center',
+    paddingHorizontal: SPACING.lg,
   },
   title: {
     fontSize: 17,
