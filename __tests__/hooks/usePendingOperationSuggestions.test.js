@@ -9,6 +9,7 @@ import usePendingOperationSuggestions, { canSaveSuggestion } from '../../app/hoo
 import * as pipeline from '../../app/services/notifications/processBankNotifications';
 import * as PendingNotificationsDB from '../../app/services/PendingNotificationsDB';
 import * as NotificationRulesDB from '../../app/services/NotificationRulesDB';
+import * as AccountsDB from '../../app/services/AccountsDB';
 import { kindRequiresCategory } from '../../app/services/notifications/parseBankNotification';
 import { appEvents, EVENTS } from '../../app/services/eventEmitter';
 
@@ -16,6 +17,9 @@ jest.mock('../../app/services/notifications/processBankNotifications');
 jest.mock('../../app/services/PendingNotificationsDB');
 jest.mock('../../app/services/NotificationRulesDB', () => ({
   getLabelForMerchant: jest.fn(),
+}));
+jest.mock('../../app/services/AccountsDB', () => ({
+  getAccountByCardMask: jest.fn(),
 }));
 jest.mock('../../app/services/notifications/parseBankNotification', () => ({
   kindRequiresCategory: jest.fn(),
@@ -82,6 +86,7 @@ describe('usePendingOperationSuggestions', () => {
     pipeline.resolvePendingNotification.mockResolvedValue({ id: 'op1' });
     pipeline.dismissPendingNotification.mockResolvedValue();
     NotificationRulesDB.getLabelForMerchant.mockResolvedValue(null);
+    AccountsDB.getAccountByCardMask.mockResolvedValue(null);
     kindRequiresCategory.mockReturnValue(false);
   });
 
@@ -128,6 +133,50 @@ describe('usePendingOperationSuggestions', () => {
       PendingNotificationsDB.getPendingNotifications.mockResolvedValue([TRANSFER]);
       const { result } = await renderHook(() => usePendingOperationSuggestions());
       await waitFor(() => expect(result.current.choices).toEqual({ p2: TRANSFER_CHOICE }));
+    });
+
+    it('re-resolves the account for a card-bound item the pipeline left unresolved', async () => {
+      // The card was bound after this item was enqueued (or only became matchable
+      // once matching went last-4): the empty account must fill in from the card.
+      const UNRESOLVED = { ...EXPENSE, id: 'p9', accountId: null, cardMask: '*7027' };
+      PendingNotificationsDB.getPendingNotifications.mockResolvedValue([UNRESOLVED]);
+      AccountsDB.getAccountByCardMask.mockResolvedValue({ id: 9, name: 'T-bank' });
+
+      const { result } = await renderHook(() => usePendingOperationSuggestions());
+      await waitFor(() => expect(result.current.choices.p9?.accountId).toBe(9));
+      expect(AccountsDB.getAccountByCardMask).toHaveBeenCalledWith('*7027');
+    });
+
+    it('leaves the account null when the card resolves to nothing', async () => {
+      const UNRESOLVED = { ...EXPENSE, id: 'p9', accountId: null, cardMask: '*0000' };
+      PendingNotificationsDB.getPendingNotifications.mockResolvedValue([UNRESOLVED]);
+      AccountsDB.getAccountByCardMask.mockResolvedValue(null);
+
+      const { result } = await renderHook(() => usePendingOperationSuggestions());
+      await waitFor(() => expect(result.current.choices.p9).toBeTruthy());
+      expect(result.current.choices.p9.accountId).toBeNull();
+    });
+
+    it('does not look up a card for an item that already has an account', async () => {
+      // EXPENSE ships with accountId: 1, so the card lookup is skipped entirely.
+      const { result } = await renderHook(() => usePendingOperationSuggestions());
+      await waitFor(() => expect(result.current.choices.p1).toBeTruthy());
+      expect(AccountsDB.getAccountByCardMask).not.toHaveBeenCalled();
+    });
+
+    it('backfills a resolved account onto an existing unresolved choice on reload', async () => {
+      const UNRESOLVED = { ...EXPENSE, id: 'p9', accountId: null, cardMask: '*7027' };
+      PendingNotificationsDB.getPendingNotifications.mockResolvedValue([UNRESOLVED]);
+      AccountsDB.getAccountByCardMask.mockResolvedValueOnce(null); // not bound yet
+      const { result } = await renderHook(() => usePendingOperationSuggestions());
+      await waitFor(() => expect(result.current.choices.p9?.accountId).toBeNull());
+
+      // The card gets bound; the next reload should pick up the account.
+      AccountsDB.getAccountByCardMask.mockResolvedValue({ id: 9 });
+      await act(async () => {
+        appEvents.emit(EVENTS.RELOAD_ALL);
+      });
+      await waitFor(() => expect(result.current.choices.p9?.accountId).toBe(9));
     });
 
     it('seeds the label from the learned merchant override', async () => {

@@ -101,6 +101,120 @@ describe('AccountsDB', () => {
     });
   });
 
+  describe('getAccountByCardMask', () => {
+    it('returns null for an empty mask without querying', async () => {
+      const result = await AccountsDB.getAccountByCardMask('');
+      expect(result).toBeNull();
+      expect(db.getDrizzle).not.toHaveBeenCalled();
+    });
+
+    it('returns the exact-literal match via the fast path', async () => {
+      const account = { id: 1, name: 'T-bank', cardMask: '4083***5285', currency: 'RUB' };
+      mockDrizzle.limit.mockResolvedValue([account]);
+
+      const result = await AccountsDB.getAccountByCardMask('4083***5285');
+
+      expect(result).toEqual(account);
+      // The fast path answers, so no full-table fallback scan is needed.
+      expect(mockDrizzle.orderBy).not.toHaveBeenCalled();
+    });
+
+    it('falls back to a last-4 match when the literal differs', async () => {
+      // A notification carries "*5285" but the account stored the full mask.
+      mockDrizzle.limit.mockResolvedValue([]); // no exact literal match
+      mockDrizzle.orderBy.mockResolvedValue([
+        { id: 1, name: 'Cash', cardMask: null, currency: 'RUB' },
+        { id: 2, name: 'T-bank', cardMask: '4083***5285', currency: 'RUB' },
+      ]);
+
+      const result = await AccountsDB.getAccountByCardMask('*5285');
+
+      expect(result).toMatchObject({ id: 2, name: 'T-bank' });
+    });
+
+    it('returns the lowest-id account when two share a last-4', async () => {
+      mockDrizzle.limit.mockResolvedValue([]);
+      mockDrizzle.orderBy.mockResolvedValue([
+        { id: 5, name: 'B', cardMask: '9999***5285' },
+        { id: 3, name: 'A', cardMask: '•• 5285' },
+      ]);
+
+      const result = await AccountsDB.getAccountByCardMask('*5285');
+
+      expect(result).toMatchObject({ id: 3 });
+    });
+
+    it('returns null when no account matches by literal or last-4', async () => {
+      mockDrizzle.limit.mockResolvedValue([]);
+      mockDrizzle.orderBy.mockResolvedValue([
+        { id: 1, name: 'Cash', cardMask: '*1234' },
+      ]);
+
+      const result = await AccountsDB.getAccountByCardMask('*5285');
+
+      expect(result).toBeNull();
+    });
+  });
+
+  describe('setAccountCardMask', () => {
+    let mockTxDb;
+    beforeEach(() => {
+      mockTxDb = { runAsync: jest.fn().mockResolvedValue(undefined) };
+      jest.spyOn(db, 'executeTransaction').mockImplementation(async (cb) => cb(mockTxDb));
+    });
+
+    it('binds the mask and strips it from another account sharing the last-4', async () => {
+      // Account 2 already holds the same card under a different format; it must
+      // give it up so the card has a single owner.
+      mockDrizzle.orderBy.mockResolvedValue([
+        { id: 1, name: 'T-bank', cardMask: null },
+        { id: 2, name: 'Old', cardMask: '4083***5285' },
+      ]);
+
+      await AccountsDB.setAccountCardMask(1, '*5285');
+
+      // Clears the clashing account, then sets the target.
+      expect(mockTxDb.runAsync).toHaveBeenCalledTimes(2);
+      expect(mockTxDb.runAsync).toHaveBeenNthCalledWith(
+        1,
+        'UPDATE accounts SET card_mask = NULL, updated_at = ? WHERE id = ?',
+        [expect.any(String), 2],
+      );
+      expect(mockTxDb.runAsync).toHaveBeenNthCalledWith(
+        2,
+        'UPDATE accounts SET card_mask = ?, updated_at = ? WHERE id = ?',
+        ['*5285', expect.any(String), 1],
+      );
+    });
+
+    it('only writes the target account when no other holds the card', async () => {
+      mockDrizzle.orderBy.mockResolvedValue([
+        { id: 1, name: 'T-bank', cardMask: null },
+        { id: 2, name: 'Other', cardMask: '*1234' },
+      ]);
+
+      await AccountsDB.setAccountCardMask(1, '*5285');
+
+      expect(mockTxDb.runAsync).toHaveBeenCalledTimes(1);
+      expect(mockTxDb.runAsync).toHaveBeenCalledWith(
+        'UPDATE accounts SET card_mask = ?, updated_at = ? WHERE id = ?',
+        ['*5285', expect.any(String), 1],
+      );
+    });
+
+    it('clears the mask without scanning when passed a falsy value', async () => {
+      await AccountsDB.setAccountCardMask(1, null);
+
+      // No clash scan needed when clearing.
+      expect(mockDrizzle.orderBy).not.toHaveBeenCalled();
+      expect(mockTxDb.runAsync).toHaveBeenCalledTimes(1);
+      expect(mockTxDb.runAsync).toHaveBeenCalledWith(
+        'UPDATE accounts SET card_mask = ?, updated_at = ? WHERE id = ?',
+        [null, expect.any(String), 1],
+      );
+    });
+  });
+
   describe('createAccount', () => {
     it('creates a new account with all fields', async () => {
       const newAccount = {
