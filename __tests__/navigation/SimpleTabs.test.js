@@ -309,9 +309,19 @@ jest.mock('../../app/contexts/UpdateDownloadContext', () => ({
   }),
 }));
 
+// Controllable per-test so the optional Accounts tab can be exercised both ways.
+let mockShowAccountsTab = false;
+jest.mock('../../app/contexts/DisplaySettingsContext', () => ({
+  useDisplaySettings: () => ({
+    showAccountsTab: mockShowAccountsTab,
+    setShowAccountsTab: jest.fn(),
+  }),
+}));
+
 describe('SimpleTabs Component Rendering', () => {
   beforeEach(() => {
     jest.clearAllMocks();
+    mockShowAccountsTab = false;
   });
 
   it('mounts all four screens immediately (no lazy mount)', async () => {
@@ -336,6 +346,25 @@ describe('SimpleTabs Component Rendering', () => {
     expect(getByText('Graphs')).toBeTruthy();
     expect(getByText('Planned')).toBeTruthy();
     expect(getByText('settings')).toBeTruthy();
+  });
+
+  it('does not render the Accounts tab when showAccountsTab is off', async () => {
+    const { queryByTestId } = await render(<SimpleTabs />);
+
+    expect(queryByTestId('tab-accounts')).toBeNull();
+    expect(queryByTestId('accounts-screen')).toBeNull();
+  });
+
+  it('renders the Accounts tab and screen when showAccountsTab is on', async () => {
+    mockShowAccountsTab = true;
+
+    const { getByTestId } = await render(<SimpleTabs />);
+
+    expect(getByTestId('tab-accounts')).toBeTruthy();
+    expect(getByTestId('accounts-screen')).toBeTruthy();
+    // The rest of the tabs are still present alongside it.
+    expect(getByTestId('tab-Operations')).toBeTruthy();
+    expect(getByTestId('tab-Graphs')).toBeTruthy();
   });
 
   it('renders all four screens after visiting each tab', async () => {

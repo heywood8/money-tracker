@@ -12,6 +12,8 @@
   "theme_light": "Claro",
   "hide_balances": "Ocultar saldos",
   "hide_balances_hint": "Enmascarar saldos de cuentas por privacidad",
+  "show_accounts_in_menu": "Mostrar cuentas en el menú principal",
+  "show_accounts_in_menu_hint": "Añade una pestaña Cuentas a la navegación inferior",
   "attach_location": "Adjuntar ubicación a las operaciones",
   "attach_location_hint": "Sugerir etiquetas que usaste cerca",
   "getting_location": "Obteniendo ubicación…",

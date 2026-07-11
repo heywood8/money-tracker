@@ -69,6 +69,7 @@ describe('PreferencesDB', () => {
         'UPDATE_SKIP_UNTIL',
         'HIDE_BALANCES',
         'ATTACH_LOCATION',
+        'SHOW_ACCOUNTS_TAB',
         'GOOGLE_SHEETS_SPREADSHEET_ID',
         'DEFAULT_ACCOUNT_ID',
         'BANK_NOTIFICATIONS_ENABLED',

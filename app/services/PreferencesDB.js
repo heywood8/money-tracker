@@ -11,6 +11,8 @@ export const PREF_KEYS = {
   UPDATE_SKIP_UNTIL: 'update_skip_until',
   HIDE_BALANCES: 'hide_balances',
   ATTACH_LOCATION: 'attach_location',
+  // Global toggle: show a dedicated Accounts tab in the bottom navigation.
+  SHOW_ACCOUNTS_TAB: 'show_accounts_tab',
   GOOGLE_SHEETS_SPREADSHEET_ID: 'google_sheets_spreadsheet_id',
   DEFAULT_ACCOUNT_ID: 'default_account_id',
   // Bank-notification processing

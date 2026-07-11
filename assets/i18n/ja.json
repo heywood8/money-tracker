@@ -12,6 +12,8 @@
   "theme_light": "ライト",
   "hide_balances": "残高を隠す",
   "hide_balances_hint": "プライバシーのため口座残高を非表示にする",
+  "show_accounts_in_menu": "メインメニューに口座を表示",
+  "show_accounts_in_menu_hint": "下部ナビゲーションに「口座」タブを追加します",
   "attach_location": "操作に位置情報を添付",
   "attach_location_hint": "近くで使ったラベルを提案します",
   "getting_location": "位置情報を取得中…",

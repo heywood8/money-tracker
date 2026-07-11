@@ -24,6 +24,26 @@ export const getAllAccounts = async () => {
 };
 
 /**
+ * Legacy upgrade bridge: did the user pin any account to the old per-account
+ * "show in main menu" flag (schema column show_in_main_menu, shipped in 0.190.0)?
+ * Used once to seed the new global "show accounts in main menu" preference so
+ * users who relied on the Accounts tab keep it after upgrading. Defensive: any
+ * error (e.g. the column missing on an unexpected schema) resolves to false.
+ * @returns {Promise<boolean>}
+ */
+export const hasMainMenuPinnedAccount = async () => {
+  try {
+    const row = await queryFirst(
+      'SELECT 1 AS present FROM accounts WHERE show_in_main_menu = 1 AND deleted_at IS NULL LIMIT 1',
+    );
+    return !!row;
+  } catch (error) {
+    console.warn('Failed to check legacy main-menu pins:', error?.message);
+    return false;
+  }
+};
+
+/**
  * Get account by ID using Drizzle
  * @param {string} id
  * @returns {Promise<Object|null>}
@@ -69,7 +89,6 @@ export const createAccount = async (account) => {
       cardMask: account.card_mask ?? account.cardMask ?? null,
       autoTxnRounding: account.auto_txn_rounding ?? account.autoTxnRounding ?? null,
       autoTxnRoundingMode: account.auto_txn_rounding_mode ?? account.autoTxnRoundingMode ?? null,
-      showInMainMenu: (account.show_in_main_menu ?? account.showInMainMenu) ? 1 : 0,
       createdAt: now,
       updatedAt: now,
     };
@@ -242,10 +261,6 @@ export const updateAccount = async (id, updates) => {
     if (updates.auto_txn_rounding_mode !== undefined || updates.autoTxnRoundingMode !== undefined) {
       setClauses.push('auto_txn_rounding_mode = ?');
       params.push((updates.auto_txn_rounding_mode ?? updates.autoTxnRoundingMode) || null);
-    }
-    if (updates.show_in_main_menu !== undefined || updates.showInMainMenu !== undefined) {
-      setClauses.push('show_in_main_menu = ?');
-      params.push((updates.show_in_main_menu ?? updates.showInMainMenu) ? 1 : 0);
     }
 
     if (setClauses.length === 0) {

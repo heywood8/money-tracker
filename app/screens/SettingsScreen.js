@@ -129,7 +129,7 @@ export default function SettingsScreen({ setSubPanelActive }) {
   const { colors } = useThemeColors();
   const { colorScheme, setTheme } = useThemeConfig();
   const { t, language, setLanguage, availableLanguages } = useLocalization();
-  const { hideBalances, setHideBalances, attachLocation, setAttachLocation } = useDisplaySettings();
+  const { hideBalances, setHideBalances, attachLocation, setAttachLocation, showAccountsTab, setShowAccountsTab } = useDisplaySettings();
   const { showDialog } = useDialog();
   const { resetDatabase } = useAccountsActions();
   const { startImport, cancelImport, completeImport, getCancelToken } = useImportProgress();
@@ -207,6 +207,10 @@ export default function SettingsScreen({ setSubPanelActive }) {
       );
     }
   }, [hideBalances, setHideBalances, t, showDialog]);
+
+  const handleToggleShowAccountsTab = useCallback(() => {
+    setShowAccountsTab(!showAccountsTab);
+  }, [showAccountsTab, setShowAccountsTab]);
 
   const handleToggleAttachLocation = useCallback(async () => {
     // Turning OFF is non-destructive and needs no permission: just persist false.
@@ -1598,6 +1602,15 @@ export default function SettingsScreen({ setSubPanelActive }) {
             <Ionicons name="chevron-forward" size={20} color={colors.mutedText} />
           </View>
         </TouchableRipple>
+
+        <SettingToggleRow
+          icon="grid-outline"
+          label={t('show_accounts_in_menu') || 'Show accounts in main menu'}
+          hint={t('show_accounts_in_menu_hint') || 'Add an Accounts tab to the bottom navigation'}
+          value={showAccountsTab}
+          onToggle={handleToggleShowAccountsTab}
+          testID="settings-show-accounts-tab-row"
+        />
 
         <TouchableRipple onPress={() => openSubPanel('categories')} style={styles.settingsRow} testID="settings-categories-row">
           <View style={styles.settingsRowContent}>

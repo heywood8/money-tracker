@@ -33,9 +33,12 @@ export const accounts = sqliteTable('accounts', {
   // 'down' (always down to the previous multiple). Nullable — NULL means
   // 'nearest'. Only meaningful when autoTxnRounding is set.
   autoTxnRoundingMode: text('auto_txn_rounding_mode'),
-  // Whether this account is listed on the dedicated Accounts tab in the bottom
-  // navigation ("main menu"). 0/NULL = not shown (default), 1 = shown. Set from
-  // the account settings in the Settings tab.
+  // LEGACY (shipped in 0.190.0). Was a per-account "show on the Accounts tab"
+  // flag; that granularity was replaced by a single global "show accounts in
+  // main menu" preference. Kept append-only so already-migrated databases stay
+  // consistent, and read once on upgrade to seed the new global toggle (see
+  // AccountsDB.hasMainMenuPinnedAccount / DisplaySettingsContext). No longer
+  // written by the app.
   showInMainMenu: integer('show_in_main_menu').default(0),
   createdAt: text('created_at').notNull(),
   updatedAt: text('updated_at').notNull(),

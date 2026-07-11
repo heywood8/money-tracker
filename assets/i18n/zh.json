@@ -12,6 +12,8 @@
   "theme_light": "浅色",
   "hide_balances": "隐藏余额",
   "hide_balances_hint": "为隐私起见遮蔽账户余额",
+  "show_accounts_in_menu": "在主菜单中显示账户",
+  "show_accounts_in_menu_hint": "在底部导航栏添加“账户”标签",
   "attach_location": "为操作附加位置",
   "attach_location_hint": "建议你在附近用过的标签",
   "getting_location": "正在获取位置…",

@@ -6,14 +6,17 @@ import React from 'react';
 import { renderHook, act, waitFor } from '@testing-library/react-native';
 import { DisplaySettingsProvider, useDisplaySettings } from '../../app/contexts/DisplaySettingsContext';
 import * as PreferencesDB from '../../app/services/PreferencesDB';
+import * as AccountsDB from '../../app/services/AccountsDB';
 
 jest.mock('../../app/services/PreferencesDB');
+jest.mock('../../app/services/AccountsDB');
 
 describe('DisplaySettingsContext', () => {
   beforeEach(() => {
     jest.clearAllMocks();
     PreferencesDB.getPreference.mockResolvedValue('false');
     PreferencesDB.setPreference.mockResolvedValue(undefined);
+    AccountsDB.hasMainMenuPinnedAccount.mockResolvedValue(false);
   });
 
   const wrapper = ({ children }) => (
@@ -193,6 +196,114 @@ describe('DisplaySettingsContext', () => {
 
       expect(result.current.attachLocation).toBe(false);
       expect(PreferencesDB.setPreference).toHaveBeenCalledWith('attach_location', 'false');
+    });
+  });
+
+  describe('showAccountsTab', () => {
+    it('defaults showAccountsTab=false', async () => {
+      PreferencesDB.getPreference.mockResolvedValue('false');
+
+      const { result } = await renderHook(() => useDisplaySettings(), { wrapper });
+
+      await waitFor(() => {
+        expect(PreferencesDB.getPreference).toHaveBeenCalled();
+      });
+
+      expect(result.current.showAccountsTab).toBe(false);
+    });
+
+    it('reads stored showAccountsTab="true" on mount', async () => {
+      PreferencesDB.getPreference.mockImplementation((key) =>
+        Promise.resolve(key === 'show_accounts_tab' ? 'true' : 'false'),
+      );
+
+      const { result } = await renderHook(() => useDisplaySettings(), { wrapper });
+
+      await waitFor(() => {
+        expect(result.current.showAccountsTab).toBe(true);
+      });
+      // hideBalances stays independent.
+      expect(result.current.hideBalances).toBe(false);
+    });
+
+    it('setShowAccountsTab(true) persists "true"', async () => {
+      const { result } = await renderHook(() => useDisplaySettings(), { wrapper });
+
+      await waitFor(() => {
+        expect(PreferencesDB.getPreference).toHaveBeenCalled();
+      });
+
+      await act(async () => {
+        await result.current.setShowAccountsTab(true);
+      });
+
+      expect(result.current.showAccountsTab).toBe(true);
+      expect(PreferencesDB.setPreference).toHaveBeenCalledWith('show_accounts_tab', 'true');
+    });
+
+    it('setShowAccountsTab(false) persists "false"', async () => {
+      PreferencesDB.getPreference.mockImplementation((key) =>
+        Promise.resolve(key === 'show_accounts_tab' ? 'true' : 'false'),
+      );
+
+      const { result } = await renderHook(() => useDisplaySettings(), { wrapper });
+
+      await waitFor(() => {
+        expect(result.current.showAccountsTab).toBe(true);
+      });
+
+      await act(async () => {
+        await result.current.setShowAccountsTab(false);
+      });
+
+      expect(result.current.showAccountsTab).toBe(false);
+      expect(PreferencesDB.setPreference).toHaveBeenCalledWith('show_accounts_tab', 'false');
+    });
+
+    describe('legacy upgrade bridge', () => {
+      it('seeds showAccountsTab=true when no pref is stored but an account was pinned', async () => {
+        PreferencesDB.getPreference.mockImplementation((key) =>
+          Promise.resolve(key === 'show_accounts_tab' ? null : 'false'),
+        );
+        AccountsDB.hasMainMenuPinnedAccount.mockResolvedValue(true);
+
+        const { result } = await renderHook(() => useDisplaySettings(), { wrapper });
+
+        await waitFor(() => {
+          expect(result.current.showAccountsTab).toBe(true);
+        });
+        expect(AccountsDB.hasMainMenuPinnedAccount).toHaveBeenCalled();
+        // Resolved value is persisted so the bridge only runs once.
+        expect(PreferencesDB.setPreference).toHaveBeenCalledWith('show_accounts_tab', 'true');
+      });
+
+      it('seeds showAccountsTab=false when no pref is stored and no account was pinned', async () => {
+        PreferencesDB.getPreference.mockImplementation((key) =>
+          Promise.resolve(key === 'show_accounts_tab' ? null : 'false'),
+        );
+        AccountsDB.hasMainMenuPinnedAccount.mockResolvedValue(false);
+
+        const { result } = await renderHook(() => useDisplaySettings(), { wrapper });
+
+        await waitFor(() => {
+          expect(PreferencesDB.setPreference).toHaveBeenCalledWith('show_accounts_tab', 'false');
+        });
+        expect(result.current.showAccountsTab).toBe(false);
+      });
+
+      it('does not consult accounts when a pref is already stored', async () => {
+        PreferencesDB.getPreference.mockImplementation((key) =>
+          Promise.resolve(key === 'show_accounts_tab' ? 'false' : 'false'),
+        );
+
+        const { result } = await renderHook(() => useDisplaySettings(), { wrapper });
+
+        await waitFor(() => {
+          expect(PreferencesDB.getPreference).toHaveBeenCalled();
+        });
+        expect(result.current.showAccountsTab).toBe(false);
+        expect(AccountsDB.hasMainMenuPinnedAccount).not.toHaveBeenCalled();
+      });
     });
   });
 });
