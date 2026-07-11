@@ -962,7 +962,7 @@ const styles = StyleSheet.create({
     fontSize: 12,
   },
   accountRows: {
-    gap: SPACING.sm,
+    gap: SPACING.xs,
   },
   accountShortcutBalance: {
     fontSize: 10,
