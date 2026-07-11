@@ -1,5 +1,12 @@
 # Changelog
 
+## [0.187.0](https://github.com/heywood8/money-tracker/compare/penny-v0.186.0...penny-v0.187.0) (2026-07-11)
+
+
+### Features
+
+* **notifications:** bind multiple cards to one account ([#1199](https://github.com/heywood8/money-tracker/issues/1199)) ([5b3c715](https://github.com/heywood8/money-tracker/commit/5b3c7159069811a9ff30de68016df0bb2f683726))
+
 ## [0.186.0](https://github.com/heywood8/money-tracker/compare/penny-v0.185.0...penny-v0.186.0) (2026-07-11)
 
 
