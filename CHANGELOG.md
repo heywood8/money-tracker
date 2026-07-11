@@ -1,5 +1,12 @@
 # Changelog
 
+## [0.188.0](https://github.com/heywood8/money-tracker/compare/penny-v0.187.3...penny-v0.188.0) (2026-07-11)
+
+
+### Features
+
+* **graphs:** operations list for leaf categories in pie charts ([#1207](https://github.com/heywood8/money-tracker/issues/1207)) ([b9594ae](https://github.com/heywood8/money-tracker/commit/b9594ae90e0c7086181e766d721dbd3c36a323d4))
+
 ## [0.187.3](https://github.com/heywood8/money-tracker/compare/penny-v0.187.2...penny-v0.187.3) (2026-07-11)
 
 
