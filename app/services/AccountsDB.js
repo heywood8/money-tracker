@@ -69,6 +69,7 @@ export const createAccount = async (account) => {
       cardMask: account.card_mask ?? account.cardMask ?? null,
       autoTxnRounding: account.auto_txn_rounding ?? account.autoTxnRounding ?? null,
       autoTxnRoundingMode: account.auto_txn_rounding_mode ?? account.autoTxnRoundingMode ?? null,
+      showInMainMenu: (account.show_in_main_menu ?? account.showInMainMenu) ? 1 : 0,
       createdAt: now,
       updatedAt: now,
     };
@@ -241,6 +242,10 @@ export const updateAccount = async (id, updates) => {
     if (updates.auto_txn_rounding_mode !== undefined || updates.autoTxnRoundingMode !== undefined) {
       setClauses.push('auto_txn_rounding_mode = ?');
       params.push((updates.auto_txn_rounding_mode ?? updates.autoTxnRoundingMode) || null);
+    }
+    if (updates.show_in_main_menu !== undefined || updates.showInMainMenu !== undefined) {
+      setClauses.push('show_in_main_menu = ?');
+      params.push((updates.show_in_main_menu ?? updates.showInMainMenu) ? 1 : 0);
     }
 
     if (setClauses.length === 0) {

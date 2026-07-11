@@ -136,12 +136,19 @@ export const AccountsDataProvider = ({ children }) => {
     return showHiddenAccounts ? accounts : visibleAccounts;
   }, [accounts, visibleAccounts, showHiddenAccounts]);
 
+  // Accounts opted into the dedicated Accounts tab ("main menu"). Hidden
+  // accounts never surface here, matching the "hide from main list" semantics.
+  const mainMenuAccounts = useMemo(() => {
+    return accounts.filter(account => !account?.hidden && account?.showInMainMenu);
+  }, [accounts]);
+
   const value = useMemo(() => ({
     // Data
     accounts,
     visibleAccounts,
     hiddenAccounts,
     displayedAccounts,
+    mainMenuAccounts,
     showHiddenAccounts,
     loading,
     error,
@@ -150,7 +157,7 @@ export const AccountsDataProvider = ({ children }) => {
     _setLoading: setLoading,
     _setShowHiddenAccounts: setShowHiddenAccounts,
     _initializeDefaultAccounts: initializeDefaultAccounts,
-  }), [accounts, visibleAccounts, hiddenAccounts, displayedAccounts, showHiddenAccounts, loading, error, initializeDefaultAccounts]);
+  }), [accounts, visibleAccounts, hiddenAccounts, displayedAccounts, mainMenuAccounts, showHiddenAccounts, loading, error, initializeDefaultAccounts]);
 
   return (
     <AccountsDataContext.Provider value={value}>
