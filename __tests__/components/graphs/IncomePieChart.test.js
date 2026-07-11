@@ -74,4 +74,27 @@ describe('IncomePieChart', () => {
     const { queryAllByTestId } = await render(<IncomePieChart {...defaultProps} />);
     expect(queryAllByTestId('icon-dots-horizontal').length).toBe(0);
   });
+
+  describe('leaf category (operations list)', () => {
+    const operations = [
+      { id: '1', amount: '3000.00', date: '2024-01-15', description: 'Payday', type: 'income' },
+    ];
+
+    it('renders the operations list instead of the donut', async () => {
+      const { getByText, queryByTestId } = await render(
+        <IncomePieChart {...defaultProps} isLeafCategory={true} operations={operations} />,
+      );
+      expect(queryByTestId('donut-chart')).toBeNull();
+      expect(getByText('Payday')).toBeTruthy();
+      expect(getByText('$3000.00')).toBeTruthy();
+    });
+
+    it('shows the empty state when the leaf has no operations', async () => {
+      const { getByText, queryByTestId } = await render(
+        <IncomePieChart {...defaultProps} isLeafCategory={true} operations={[]} />,
+      );
+      expect(queryByTestId('donut-chart')).toBeNull();
+      expect(getByText('no_income_data')).toBeTruthy();
+    });
+  });
 });

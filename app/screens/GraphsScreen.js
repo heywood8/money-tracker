@@ -20,6 +20,7 @@ import IncomePieChart from '../components/graphs/IncomePieChart';
 import ExpensePieChart from '../components/graphs/ExpensePieChart';
 import useExpenseData from '../hooks/useExpenseData';
 import useIncomeData from '../hooks/useIncomeData';
+import useCategoryOperations from '../hooks/useCategoryOperations';
 import useBalanceHistory from '../hooks/useBalanceHistory';
 
 const CARD_HEADER_HEIGHT = 56;
@@ -28,7 +29,7 @@ const CARD_GAP = 8;
 
 const GraphsScreen = () => {
   const { colors } = useThemeColors();
-  const { t } = useLocalization();
+  const { t, language } = useLocalization();
   const { accounts } = useAccountsData();
 
   const { width: windowWidth } = useWindowDimensions();
@@ -419,6 +420,40 @@ const GraphsScreen = () => {
     return cat ? cat.name : null;
   }, [selectedIncomeCategory, categories]);
 
+  // A selected category with no sub-categories is a "leaf": the drill-down has
+  // bottomed out, so the pie chart shows its operations instead of a breakdown.
+  const expenseCategoryIsLeaf = useMemo(() => {
+    if (selectedCategory === 'all') return false;
+    return !categories.some(c => c.parentId === selectedCategory);
+  }, [selectedCategory, categories]);
+
+  const incomeCategoryIsLeaf = useMemo(() => {
+    if (selectedIncomeCategory === 'all') return false;
+    return !categories.some(c => c.parentId === selectedIncomeCategory);
+  }, [selectedIncomeCategory, categories]);
+
+  const {
+    operations: expenseOperations,
+    loadingOperations: loadingExpenseOperations,
+  } = useCategoryOperations(
+    selectedYear,
+    selectedMonth,
+    selectedCurrency,
+    expenseCategoryIsLeaf ? selectedCategory : null,
+    'expense',
+  );
+
+  const {
+    operations: incomeOperations,
+    loadingOperations: loadingIncomeOperations,
+  } = useCategoryOperations(
+    selectedYear,
+    selectedMonth,
+    selectedCurrency,
+    incomeCategoryIsLeaf ? selectedIncomeCategory : null,
+    'income',
+  );
+
   // Shared category parent lookup
   const getParentCategoryId = useCallback((categoryId) => {
     if (categoryId === 'all') return 'all';
@@ -606,11 +641,14 @@ const GraphsScreen = () => {
                     <IncomePieChart
                       colors={colors}
                       t={t}
+                      language={language}
                       loadingIncome={loadingIncome}
                       incomeChartData={incomeChartData}
                       selectedCurrency={selectedCurrency}
                       onLegendItemPress={handleIncomeLegendItemPress}
-                      selectedIncomeCategory={selectedIncomeCategory}
+                      isLeafCategory={incomeCategoryIsLeaf}
+                      operations={incomeOperations}
+                      loadingOperations={loadingIncomeOperations}
                     />
                   </Animated.View>
                 </ScrollView>
@@ -668,11 +706,14 @@ const GraphsScreen = () => {
                     <ExpensePieChart
                       colors={colors}
                       t={t}
+                      language={language}
                       loading={loading}
                       chartData={chartData}
                       selectedCurrency={selectedCurrency}
                       onLegendItemPress={handleExpenseLegendItemPress}
-                      selectedCategory={selectedCategory}
+                      isLeafCategory={expenseCategoryIsLeaf}
+                      operations={expenseOperations}
+                      loadingOperations={loadingExpenseOperations}
                     />
                   </Animated.View>
                 </ScrollView>

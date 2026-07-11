@@ -78,7 +78,7 @@ describe('CustomLegend', () => {
       const singleItem = [{ name: 'Single', amount: 100, color: '#000', categoryId: 'cat-1' }];
       const { getByText } = await render(<CustomLegend {...defaultProps} data={singleItem} />);
       expect(getByText('Single')).toBeTruthy();
-      expect(getByText('100.0%')).toBeTruthy();
+      expect(getByText('100%')).toBeTruthy();
     });
 
     it('renders color indicators for each item', async () => {
@@ -121,15 +121,15 @@ describe('CustomLegend', () => {
   describe('Percentage Calculations', () => {
     it('calculates correct percentages', async () => {
       const { getByText } = await render(<CustomLegend {...defaultProps} />);
-      // Total is 150, Food is 100 (66.7%), Transport is 50 (33.3%)
-      expect(getByText('66.7%')).toBeTruthy();
-      expect(getByText('33.3%')).toBeTruthy();
+      // Total is 150, Food is 100 (67%), Transport is 50 (33%)
+      expect(getByText('67%')).toBeTruthy();
+      expect(getByText('33%')).toBeTruthy();
     });
 
     it('shows 100% for single item', async () => {
       const singleItem = [{ name: 'Only', amount: 50, color: '#000', categoryId: 'cat-1' }];
       const { getByText } = await render(<CustomLegend {...defaultProps} data={singleItem} />);
-      expect(getByText('100.0%')).toBeTruthy();
+      expect(getByText('100%')).toBeTruthy();
     });
 
     it('handles zero total gracefully', async () => {
@@ -151,7 +151,7 @@ describe('CustomLegend', () => {
       ];
       const { getAllByText } = await render(<CustomLegend {...defaultProps} data={manyItems} />);
       // Each item should be 25% of 100 total
-      expect(getAllByText('25.0%').length).toBe(4);
+      expect(getAllByText('25%').length).toBe(4);
     });
   });
 
@@ -210,17 +210,20 @@ describe('CustomLegend', () => {
       expect(queryByTestId('icon-chevron-right')).toBeNull();
     });
 
-    it('does not show chevron for leaf categories (hasChildren is false)', async () => {
+    it('shows a list icon (not a chevron) for leaf categories (hasChildren is false)', async () => {
       const leafData = [
         { name: 'Leaf', amount: 100, color: '#000', categoryId: 'cat-leaf', hasChildren: false },
       ];
       const { queryByTestId } = await render(
         <CustomLegend {...defaultProps} data={leafData} isClickable={true} />,
       );
+      // A leaf drills into its operations list, not another chart — so it gets a
+      // list glyph rather than the parent's chevron.
       expect(queryByTestId('icon-chevron-right')).toBeNull();
+      expect(queryByTestId('icon-format-list-bulleted')).toBeTruthy();
     });
 
-    it('leaf category is not clickable even when isClickable is true', async () => {
+    it('leaf category is clickable to open its operations', async () => {
       const onItemPress = jest.fn();
       const leafData = [
         { name: 'Leaf', amount: 100, color: '#000', categoryId: 'cat-leaf', hasChildren: false },
@@ -229,7 +232,7 @@ describe('CustomLegend', () => {
         <CustomLegend {...defaultProps} data={leafData} isClickable={true} onItemPress={onItemPress} />,
       );
       await fireEvent.press(getByText('Leaf'));
-      expect(onItemPress).not.toHaveBeenCalled();
+      expect(onItemPress).toHaveBeenCalledWith('cat-leaf');
     });
 
     it('item without categoryId is not clickable even when isClickable is true', async () => {
@@ -321,8 +324,8 @@ describe('CustomLegend', () => {
 
     it('still shows the percentage', async () => {
       const { getByText } = await render(<CustomLegend {...defaultProps} />);
-      expect(getByText('66.7%')).toBeTruthy();
-      expect(getByText('33.3%')).toBeTruthy();
+      expect(getByText('67%')).toBeTruthy();
+      expect(getByText('33%')).toBeTruthy();
     });
   });
 
@@ -331,7 +334,7 @@ describe('CustomLegend', () => {
       const smallData = [{ name: 'Tiny', amount: 0.01, color: '#000', categoryId: 'cat-1' }];
       const { getByText } = await render(<CustomLegend {...defaultProps} data={smallData} />);
       expect(getByText('$0.01')).toBeTruthy();
-      expect(getByText('100.0%')).toBeTruthy();
+      expect(getByText('100%')).toBeTruthy();
     });
 
     it('handles very large amounts (millions)', async () => {
@@ -361,8 +364,8 @@ describe('CustomLegend', () => {
         { name: 'B', amount: 66.67, color: '#2', categoryId: 'b' },
       ];
       const { getByText } = await render(<CustomLegend {...defaultProps} data={decimalData} />);
-      expect(getByText('33.3%')).toBeTruthy();
-      expect(getByText('66.7%')).toBeTruthy();
+      expect(getByText('33%')).toBeTruthy();
+      expect(getByText('67%')).toBeTruthy();
     });
   });
 });

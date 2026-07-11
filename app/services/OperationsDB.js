@@ -1114,6 +1114,45 @@ export const getIncomeByCategoryAndCurrency = async (currency, startDate, endDat
 };
 
 /**
+ * Get the individual operations of a single category, filtered by account
+ * currency and date range. Used by the Graphs pie chart drill-down: once a leaf
+ * category is selected there are no sub-categories left to break down, so the
+ * chart shows the actual operations instead. Only the exact category_id is
+ * matched (a leaf has no descendants), so no hierarchy walk is needed.
+ * @param {string} categoryId
+ * @param {string} currency - Currency code (e.g., 'USD', 'AMD')
+ * @param {string} startDate - ISO date string (YYYY-MM-DD)
+ * @param {string} endDate - ISO date string (YYYY-MM-DD)
+ * @param {string} [type] - Optional operation type filter ('expense' | 'income')
+ * @returns {Promise<Array>}
+ */
+export const getOperationsByCategoryAndCurrency = async (categoryId, currency, startDate, endDate, type = null) => {
+  try {
+    let sql = `SELECT o.* FROM operations o
+       JOIN accounts a ON o.account_id = a.id
+       WHERE o.category_id = ?
+         AND a.currency = ?
+         AND o.date >= ?
+         AND o.date <= ?`;
+
+    const params = [categoryId, currency, startDate, endDate];
+
+    if (type) {
+      sql += ' AND o.type = ?';
+      params.push(type);
+    }
+
+    sql += ' ORDER BY o.date DESC, o.created_at DESC';
+
+    const results = await queryAll(sql, params);
+    return (results || []).map(mapOperationFields).filter(Boolean);
+  } catch (error) {
+    console.error('Failed to get operations by category and currency:', error);
+    throw error;
+  }
+};
+
+/**
  * Check if operation exists
  * @param {number} id
  * @returns {Promise<boolean>}

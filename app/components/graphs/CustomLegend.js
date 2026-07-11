@@ -29,15 +29,21 @@ const CustomLegend = ({ data, currency, colors, onItemPress, isClickable }) => {
   return (
     <View style={styles.legendContainer}>
       {data.map((item, index) => {
-        const percentage = total > 0 ? ((item.amount / total) * 100).toFixed(1) : 0;
-        const isExpandable = isClickable && item.categoryId && item.hasChildren;
-        const ItemWrapper = isExpandable ? TouchableOpacity : View;
-        const wrapperProps = isExpandable ? {
+        // Whole-number percentages — "100.0%" overflowed the fixed column, and a
+        // single decimal adds no real signal to a legend.
+        const percentage = total > 0 ? Math.round((item.amount / total) * 100) : 0;
+        // Every category row is pressable: a parent drills into its children,
+        // a leaf opens the list of that category's operations for the period.
+        const isPressable = isClickable && !!item.categoryId;
+        const ItemWrapper = isPressable ? TouchableOpacity : View;
+        const wrapperProps = isPressable ? {
           onPress: () => onItemPress(item.categoryId),
           activeOpacity: 0.7,
           accessibilityRole: 'button',
           accessibilityLabel: `View details for ${item.name}`,
-          accessibilityHint: 'Double tap to filter by this category',
+          accessibilityHint: item.hasChildren
+            ? 'Double tap to filter by this category'
+            : 'Double tap to view operations',
         } : {};
 
         return (
@@ -46,7 +52,7 @@ const CustomLegend = ({ data, currency, colors, onItemPress, isClickable }) => {
             style={[
               styles.legendItem,
               { borderBottomColor: colors.border },
-              isExpandable && styles.legendItemClickable,
+              isPressable && styles.legendItemClickable,
             ]}
             {...wrapperProps}
           >
@@ -56,9 +62,9 @@ const CustomLegend = ({ data, currency, colors, onItemPress, isClickable }) => {
               <Text style={[styles.legendName, { color: colors.text }]} numberOfLines={1}>
                 {item.name}
               </Text>
-              {isExpandable && (
+              {isPressable && (
                 <Icon
-                  name="chevron-right"
+                  name={item.hasChildren ? 'chevron-right' : 'format-list-bulleted'}
                   size={16}
                   color={colors.mutedText}
                   style={styles.legendChevron}
