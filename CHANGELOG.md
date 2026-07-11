@@ -1,5 +1,12 @@
 # Changelog
 
+## [0.187.1](https://github.com/heywood8/money-tracker/compare/penny-v0.187.0...penny-v0.187.1) (2026-07-11)
+
+
+### Bug Fixes
+
+* **notifications:** match quick-add chip height in the binding card category grid ([#1201](https://github.com/heywood8/money-tracker/issues/1201)) ([033da5a](https://github.com/heywood8/money-tracker/commit/033da5a4181cb9ce49918db1c23f0612bc76acca))
+
 ## [0.187.0](https://github.com/heywood8/money-tracker/compare/penny-v0.186.0...penny-v0.187.0) (2026-07-11)
 
 
