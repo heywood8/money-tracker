@@ -24,6 +24,7 @@ import GraphsScreen from '../screens/GraphsScreen';
 import PlannedOperationsScreen from '../screens/PlannedOperationsScreen';
 import { useThemeColors } from '../contexts/ThemeColorsContext';
 import { useLocalization } from '../contexts/LocalizationContext';
+import { useDisplaySettings } from '../contexts/DisplaySettingsContext';
 import { useUpdateDownload } from '../contexts/UpdateDownloadContext';
 import { SwipeNavigationGestureProvider } from '../contexts/SwipeNavigationContext';
 import Header from '../components/Header';
@@ -235,6 +236,7 @@ TabGradientBlocker.displayName = 'TabGradientBlocker';
 export default function SimpleTabs() {
   const { colors } = useThemeColors();
   const { t } = useLocalization();
+  const { showAccountsTab } = useDisplaySettings();
   const { isDownloading, downloadProgress, downloadPhase } = useUpdateDownload();
   const [active, setActive] = React.useState('Operations');
   const [subPanelActive, setSubPanelActive] = React.useState(false);
@@ -247,13 +249,18 @@ export default function SimpleTabs() {
   // reinstall the native gesture recognizer mid-animation and cause jitter).
   const isTransitioningShared = useSharedValue(false);
 
-  const TABS = useMemo(() => [
-    { key: 'Operations', label: t('operations') || 'Operations' },
-    { key: 'Accounts', label: t('accounts') || 'Accounts' },
-    { key: 'Graphs', label: t('graphs') || 'Graphs' },
-    { key: 'Planned', label: t('planned') || 'Planned' },
-    { key: 'Settings', label: t('settings') || 'Settings' },
-  ], [t]);
+  // The Accounts tab is optional — inserted right after Operations only when the
+  // "show accounts in main menu" preference is on.
+  const TABS = useMemo(() => {
+    const tabs = [{ key: 'Operations', label: t('operations') || 'Operations' }];
+    if (showAccountsTab) {
+      tabs.push({ key: 'Accounts', label: t('accounts') || 'Accounts' });
+    }
+    tabs.push({ key: 'Graphs', label: t('graphs') || 'Graphs' });
+    tabs.push({ key: 'Planned', label: t('planned') || 'Planned' });
+    tabs.push({ key: 'Settings', label: t('settings') || 'Settings' });
+    return tabs;
+  }, [t, showAccountsTab]);
 
   // ---- shared animation values ----
   const translateX = useSharedValue(0);
@@ -270,6 +277,8 @@ export default function SimpleTabs() {
   // strip exactly 1 screen width (same as adjacent), then snap strip to the
   // real resting position and zero the offset — both on the worklet thread so
   // there is no visible jump. All 4 screens stay pre-mounted; no overlay needed.
+  // Five sets of animation values are allocated up front (hooks can't be
+  // conditional); only the first TABS.length are used at any time.
   const screenAdjust0 = useSharedValue(0);
   const screenAdjust1 = useSharedValue(0);
   const screenAdjust2 = useSharedValue(0);
@@ -330,7 +339,7 @@ export default function SimpleTabs() {
 
       // Hide intermediate screens so they don't bleed through when the repositioned
       // target overlaps their strip position (all worklet-thread, no React render).
-      for (let i = 0; i < opacityValues.length; i++) {
+      for (let i = 0; i < TABS.length; i++) {
         if (i !== oldIndex && i !== newIndex) opacityValues[i].value = 0;
       }
 
@@ -359,6 +368,22 @@ export default function SimpleTabs() {
     screenAdjust0, screenAdjust1, screenAdjust2, screenAdjust3, screenAdjust4,
     screenOpacity0, screenOpacity1, screenOpacity2, screenOpacity3, screenOpacity4,
     clearTransitioningRef]);
+
+  // When the Accounts tab is toggled on/off the tab set changes size and indices
+  // shift, so snap the strip/pill to the current tab's new index. useLayoutEffect
+  // (not useEffect) runs before paint, so the strip is repositioned in the same
+  // commit the tab set changes — otherwise a wrong/blank screen flashes for one
+  // frame. If the active tab was removed, fall back to Operations.
+  React.useLayoutEffect(() => {
+    const idx = TABS.findIndex(tab => tab.key === active);
+    const safeIdx = idx === -1 ? 0 : idx;
+    if (idx === -1) setActive(TABS[0].key);
+    activeIndex.value = safeIdx;
+    pillPosition.value = safeIdx;
+    translateX.value = -safeIdx * SCREEN_WIDTH;
+    // Intentionally only re-run when the tab set is toggled — depending on
+    // `active` would re-snap the strip mid-animation on every tab switch.
+  }, [showAccountsTab]);
 
   // A tapped "transactions to review" notification routes here: jump to the
   // Settings tab. SettingsScreen listens for the same event and opens the
@@ -466,7 +491,9 @@ export default function SimpleTabs() {
   // stable element reference lets React skip reconciling them, which avoids a
   // frame drop / stutter as a switch animation settles.
   const operationsScreen = useMemo(() => <OperationsScreen />, []);
-  const accountsScreen = useMemo(() => <AccountsScreen mainMenuMode />, []);
+  // The Accounts tab reuses the same accounts screen as a full-screen duplicate
+  // (all accounts, no subpanel header). Mounted only when the tab is enabled.
+  const accountsScreen = useMemo(() => <AccountsScreen />, []);
   const graphsScreen = useMemo(() => <GraphsScreen />, []);
   const plannedScreen = useMemo(() => <PlannedOperationsScreen />, []);
   const settingsScreen = useMemo(
@@ -474,28 +501,34 @@ export default function SimpleTabs() {
     [setSubPanelActive],
   );
 
+  // Screens in strip order — matches TABS. Keyed by identity so instances are
+  // preserved (not remounted) when the optional Accounts tab shifts positions.
+  const orderedScreens = useMemo(() => {
+    const list = [{ key: 'Operations', el: operationsScreen }];
+    if (showAccountsTab) list.push({ key: 'Accounts', el: accountsScreen });
+    list.push({ key: 'Graphs', el: graphsScreen });
+    list.push({ key: 'Planned', el: plannedScreen });
+    list.push({ key: 'Settings', el: settingsScreen });
+    return list;
+  }, [showAccountsTab, operationsScreen, accountsScreen, graphsScreen, plannedScreen, settingsScreen]);
+
   const renderScreens = useCallback(() => {
+    const positionStyles = [
+      screenAdjustedStyle0, screenAdjustedStyle1, screenAdjustedStyle2,
+      screenAdjustedStyle3, screenAdjustedStyle4,
+    ];
     return (
       <>
-        <Animated.View style={[styles.screen, screenAdjustedStyle0]}>
-          {operationsScreen}
-        </Animated.View>
-        <Animated.View style={[styles.screen, screenAdjustedStyle1]}>
-          {accountsScreen}
-        </Animated.View>
-        <Animated.View style={[styles.screen, screenAdjustedStyle2]}>
-          {graphsScreen}
-        </Animated.View>
-        <Animated.View style={[styles.screen, screenAdjustedStyle3]}>
-          {plannedScreen}
-        </Animated.View>
-        <Animated.View style={[styles.screen, screenAdjustedStyle4]}>
-          {settingsScreen}
-        </Animated.View>
+        {orderedScreens.map((item, i) => (
+          <Animated.View key={item.key} style={[styles.screen, positionStyles[i]]}>
+            {item.el}
+          </Animated.View>
+        ))}
       </>
     );
-  }, [operationsScreen, accountsScreen, graphsScreen, plannedScreen, settingsScreen,
-    screenAdjustedStyle0, screenAdjustedStyle1, screenAdjustedStyle2, screenAdjustedStyle3, screenAdjustedStyle4]);
+  }, [orderedScreens,
+    screenAdjustedStyle0, screenAdjustedStyle1, screenAdjustedStyle2,
+    screenAdjustedStyle3, screenAdjustedStyle4]);
 
   const displayedTab = active;
 
@@ -504,7 +537,7 @@ export default function SimpleTabs() {
       <Header />
       <View style={styles.content}>
         <GestureDetector gesture={panGesture}>
-          <Animated.View style={[styles.screensContainer, animatedStyle]}>
+          <Animated.View style={[styles.screensContainer, { width: SCREEN_WIDTH * TABS.length }, animatedStyle]}>
             {/* Expose the swipe Pan gesture so nested horizontal scrollables
                 (e.g. label-suggestion chips) can take priority over screen
                 swipes via blocksExternalGesture. */}
@@ -526,6 +559,8 @@ export default function SimpleTabs() {
         >
           <View style={[
             styles.floatingBar,
+            // Widen the bar for the extra tab so labels don't get cramped.
+            TABS.length >= 5 && styles.floatingBarWide,
             {
               backgroundColor: withAlpha(colors.surface, 0.87),
               borderColor: withAlpha(colors.border, 0.5),
@@ -580,7 +615,7 @@ const styles = StyleSheet.create({
     overflow: 'hidden',
     paddingHorizontal: 15,
     position: 'relative',
-    width: '92%',
+    width: '70%',
     ...Platform.select({
       android: {
         elevation: 8,
@@ -597,6 +632,9 @@ const styles = StyleSheet.create({
     flex: 1,
     justifyContent: 'flex-end',
   },
+  floatingBarWide: {
+    width: '92%',
+  },
   floatingBarWrapper: {
     bottom: 0,
     left: 0,
@@ -610,7 +648,8 @@ const styles = StyleSheet.create({
   screensContainer: {
     flex: 1,
     flexDirection: 'row',
-    width: SCREEN_WIDTH * 5,
+    // Base width; overridden inline to SCREEN_WIDTH * TABS.length (4 or 5 tabs).
+    width: SCREEN_WIDTH * 4,
   },
   tab: {
     flex: 1,

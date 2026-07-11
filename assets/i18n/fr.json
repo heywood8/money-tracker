@@ -12,6 +12,8 @@
   "theme_light": "Clair",
   "hide_balances": "Masquer les soldes",
   "hide_balances_hint": "Masquer les soldes des comptes pour la confidentialité",
+  "show_accounts_in_menu": "Afficher les comptes dans le menu principal",
+  "show_accounts_in_menu_hint": "Ajoute un onglet Comptes à la barre de navigation inférieure",
   "attach_location": "Joindre la position aux opérations",
   "attach_location_hint": "Suggérer les étiquettes utilisées à proximité",
   "getting_location": "Obtention de la position…",

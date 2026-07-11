@@ -366,7 +366,7 @@ NetWorthCard.defaultProps = {
 };
 
 // Memoized account row component
-const AccountRow = memo(({ item, colors, onPress, t, drag, isActive, isDefault, hideDrag }) => {
+const AccountRow = memo(({ item, colors, onPress, t, drag, isActive, isDefault }) => {
   const { hideBalances } = useDisplaySettings();
   const decimals = currencies[item.currency]?.decimal_digits ?? 2;
   const balance = parseFloat(item.balance);
@@ -425,18 +425,16 @@ const AccountRow = memo(({ item, colors, onPress, t, drag, isActive, isDefault, 
           )}
         </View>
       </TouchableOpacity>
-      {!hideDrag && (
-        <TouchableOpacity
-          onLongPress={drag}
-          delayLongPress={0}
-          style={styles.dragHandle}
-          hitSlop={{ top: 10, bottom: 10, left: 10, right: 10 }}
-          accessibilityLabel={t('drag_to_reorder') || 'Drag to reorder'}
-          accessibilityRole="button"
-        >
-          <Icon name="drag-horizontal-variant" size={24} color={colors.mutedText} />
-        </TouchableOpacity>
-      )}
+      <TouchableOpacity
+        onLongPress={drag}
+        delayLongPress={0}
+        style={styles.dragHandle}
+        hitSlop={{ top: 10, bottom: 10, left: 10, right: 10 }}
+        accessibilityLabel={t('drag_to_reorder') || 'Drag to reorder'}
+        accessibilityRole="button"
+      >
+        <Icon name="drag-horizontal-variant" size={24} color={colors.mutedText} />
+      </TouchableOpacity>
     </View>
   );
 });
@@ -451,7 +449,6 @@ AccountRow.propTypes = {
   drag: PropTypes.func,
   isActive: PropTypes.bool,
   isDefault: PropTypes.bool,
-  hideDrag: PropTypes.bool,
 };
 
 AccountRow.defaultProps = {
@@ -461,10 +458,9 @@ AccountRow.defaultProps = {
   drag: () => {},
   isActive: false,
   isDefault: false,
-  hideDrag: false,
 };
 
-export default function AccountsScreen({ onBackStateChange, mainMenuMode = false }) {
+export default function AccountsScreen({ onBackStateChange }) {
 
   const [editingId, setEditingId] = useState(null);
   const [editValues, setEditValues] = useState({});
@@ -496,7 +492,7 @@ export default function AccountsScreen({ onBackStateChange, mainMenuMode = false
   const { colorScheme } = useThemeConfig();
   const { colors } = useThemeColors();
   const { paperInputTheme } = makeModalStyles(colors);
-  const { accounts, displayedAccounts, hiddenAccounts, mainMenuAccounts, showHiddenAccounts, loading, error } = useAccountsData();
+  const { accounts, displayedAccounts, hiddenAccounts, showHiddenAccounts, loading, error } = useAccountsData();
   const { toggleShowHiddenAccounts, addAccount, updateAccount, deleteAccount, reorderAccounts, validateAccount, getOperationCount } = useAccountsActions();
   const { operations } = useOperationsData();
   const { t } = useLocalization();
@@ -746,10 +742,6 @@ export default function AccountsScreen({ onBackStateChange, mainMenuMode = false
     setEditValues(prev => ({ ...prev, hidden: value ? 1 : 0 }));
   }, []);
 
-  const handleToggleShowInMainMenuSwitch = useCallback((value) => {
-    setEditValues(prev => ({ ...prev, showInMainMenu: value ? 1 : 0 }));
-  }, []);
-
   // Toggling the default on the account being edited persists immediately. Because
   // the preference holds a single id, turning it on here automatically supersedes
   // whichever account was the default before, untoggling it everywhere.
@@ -834,16 +826,13 @@ export default function AccountsScreen({ onBackStateChange, mainMenuMode = false
     }
   }, [accountToDelete, transferConfirmDestinationId, deleteAccount, editingId, t, closeFormPanel]);
 
-  // Enhance accounts with currency symbol for better performance. The Accounts
-  // tab ("main menu") shows only the opted-in subset; Settings shows the full
-  // displayed list.
-  const listAccounts = mainMenuMode ? mainMenuAccounts : displayedAccounts;
+  // Enhance accounts with currency symbol for better performance
   const enhancedAccounts = useMemo(() => {
-    return listAccounts.map(acc => ({
+    return displayedAccounts.map(acc => ({
       ...acc,
       currencySymbol: currencies[acc.currency]?.symbol || acc.currency,
     }));
-  }, [listAccounts, currencies]);
+  }, [displayedAccounts, currencies]);
 
   // Memoize transfer confirmation message
   const transferConfirmMessage = useMemo(() => {
@@ -863,9 +852,8 @@ export default function AccountsScreen({ onBackStateChange, mainMenuMode = false
       drag={drag}
       isActive={isActive}
       isDefault={item.id === defaultAccountId}
-      hideDrag={mainMenuMode}
     />
-  ), [colors, startEdit, t, defaultAccountId, mainMenuMode]);
+  ), [colors, startEdit, t, defaultAccountId]);
 
   const handleDragEnd = useCallback(({ data }) => {
     reorderAccounts(data);
@@ -921,28 +909,13 @@ export default function AccountsScreen({ onBackStateChange, mainMenuMode = false
         keyboardShouldPersistTaps="handled"
         style={{ backgroundColor: colors.background }}
       >
-        {/* Net Worth Summary Card — on the main-menu tab it reflects only the
-            pinned accounts so the total matches the list shown below. */}
-        <NetWorthCard accounts={mainMenuMode ? listAccounts : accounts} operations={operations} colors={colors} t={t} />
+        {/* Net Worth Summary Card */}
+        <NetWorthCard accounts={accounts} operations={operations} colors={colors} t={t} />
 
         {/* Accounts Grouped Card */}
         <View style={[styles.accountsCard, { backgroundColor: colors.surface, borderColor: colors.border }]}>
           {enhancedAccounts.length === 0 ? (
-            <EmptyState
-              icon="bank-outline"
-              message={mainMenuMode
-                ? (t('no_main_menu_accounts') || 'No accounts pinned to the main menu yet.')
-                : (t('no_accounts') || 'No accounts yet.')}
-            />
-          ) : mainMenuMode ? (
-            // Main-menu tab: static (non-draggable) list. Reordering here would
-            // silently reshuffle the global account order, so it's disabled.
-            enhancedAccounts.map((item, index) => (
-              <React.Fragment key={item.id}>
-                {index > 0 && renderItemSeparator()}
-                {renderItem({ item })}
-              </React.Fragment>
-            ))
+            <EmptyState icon="bank-outline" message={t('no_accounts') || 'No accounts yet.'} />
           ) : (
             <NestableDraggableFlatList
               data={enhancedAccounts}
@@ -956,7 +929,7 @@ export default function AccountsScreen({ onBackStateChange, mainMenuMode = false
         </View>
 
         {/* Show/hide hidden accounts */}
-        {!mainMenuMode && hiddenAccounts.length > 0 && (
+        {hiddenAccounts.length > 0 && (
           <Pressable
             onPress={toggleShowHiddenAccounts}
             android_ripple={{ color: 'rgba(0, 0, 0, .08)', borderless: false }}
@@ -978,16 +951,12 @@ export default function AccountsScreen({ onBackStateChange, mainMenuMode = false
         )}
       </NestableScrollContainer>
 
-      {/* Account creation lives in Settings — a new account isn't pinned by
-          default, so it wouldn't appear here anyway. */}
-      {!mainMenuMode && (
-        <AddFAB
-          testID="accounts-add-fab"
-          onPress={addAccountHandler}
-          accessibilityLabel={t('add_account') || 'Add Account'}
-          accessibilityHint={t('add_account_hint') || 'Opens form to create a new account'}
-        />
-      )}
+      <AddFAB
+        testID="accounts-add-fab"
+        onPress={addAccountHandler}
+        accessibilityLabel={t('add_account') || 'Add Account'}
+        accessibilityHint={t('add_account_hint') || 'Opens form to create a new account'}
+      />
 
       {/* Inline form panel — slides in from the right */}
       {editingId && (
@@ -1227,24 +1196,6 @@ export default function AccountsScreen({ onBackStateChange, mainMenuMode = false
                   />
                 </View>
               )}
-              {!mainMenuMode && (
-                <View style={[styles.settingItem, styles.settingItemBorder, { borderBottomColor: colors.border }]}>
-                  <View style={styles.settingItemText}>
-                    <Text style={[styles.settingTitle, { color: colors.text }]}>
-                      {t('show_in_main_menu') || 'Show in main menu'}
-                    </Text>
-                    <Text style={[styles.settingHint, { color: colors.mutedText }]}>
-                      {t('show_in_main_menu_hint') || 'List this account on the Accounts tab'}
-                    </Text>
-                  </View>
-                  <Switch
-                    testID="account-show-in-main-menu-switch"
-                    value={!!editValues.showInMainMenu}
-                    onValueChange={handleToggleShowInMainMenuSwitch}
-                    color={colors.primary}
-                  />
-                </View>
-              )}
               <View style={styles.settingItem}>
                 <View style={styles.settingItemText}>
                   <Text style={[styles.settingTitle, { color: colors.text }]}>
@@ -1363,7 +1314,6 @@ export default function AccountsScreen({ onBackStateChange, mainMenuMode = false
 
 AccountsScreen.propTypes = {
   onBackStateChange: PropTypes.func,
-  mainMenuMode: PropTypes.bool,
 };
 
 AccountsScreen.defaultProps = {};
