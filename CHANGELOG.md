@@ -1,5 +1,12 @@
 # Changelog
 
+## [0.190.0](https://github.com/heywood8/money-tracker/compare/penny-v0.189.0...penny-v0.190.0) (2026-07-11)
+
+
+### Features
+
+* **accounts:** dedicated Accounts tab pinned via 'show in main menu' toggle ([#1209](https://github.com/heywood8/money-tracker/issues/1209)) ([8285ef1](https://github.com/heywood8/money-tracker/commit/8285ef1b65b21c649151219299d8154563c33613))
+
 ## [0.189.0](https://github.com/heywood8/money-tracker/compare/penny-v0.188.0...penny-v0.189.0) (2026-07-11)
 
 
