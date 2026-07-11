@@ -19,6 +19,7 @@ import { useAccountsActions } from '../contexts/AccountsActionsContext';
 import { useOperationsData } from '../contexts/OperationsDataContext';
 import { useLocalization } from '../contexts/LocalizationContext';
 import { getDefaultAccountId, setDefaultAccountId } from '../services/PreferencesDB';
+import { parseCardMasks, serializeCardMasks, cardMaskLast4 } from '../utils/cardMask';
 import currencies from '../../assets/currencies.json';
 
 // Rounding steps offered for operations auto-created from bank notifications.
@@ -463,6 +464,9 @@ export default function AccountsScreen({ onBackStateChange }) {
 
   const [editingId, setEditingId] = useState(null);
   const [editValues, setEditValues] = useState({});
+  // Draft text for the "add a card" input; the committed masks live on
+  // editValues.cardMask as a delimiter-joined list.
+  const [newCardMask, setNewCardMask] = useState('');
   const [errors, setErrors] = useState({});
   // Pinned default account for QuickAdd. A single stored id (or null = "latest
   // used"), so making one account the default inherently clears any previous one.
@@ -512,6 +516,7 @@ export default function AccountsScreen({ onBackStateChange }) {
     currencySlideAnim.setValue(Dimensions.get('window').width);
     setEditingId(id);
     setEditValues(values);
+    setNewCardMask('');
     Animated.timing(formPanelAnim, {
       toValue: 1,
       duration: 260,
@@ -643,7 +648,31 @@ export default function AccountsScreen({ onBackStateChange }) {
   }, []);
 
   const handleCardMaskChange = useCallback((text) => {
-    setEditValues(v => ({ ...v, cardMask: text }));
+    setNewCardMask(text);
+  }, []);
+
+  // Commit the draft mask to the account's card list (skip blanks and duplicates).
+  const handleAddCardMask = useCallback(() => {
+    const mask = newCardMask.trim();
+    if (!mask) return;
+    setEditValues(v => {
+      const list = parseCardMasks(v.cardMask);
+      const last4 = cardMaskLast4(mask);
+      const exists = list.some(m => (last4 ? cardMaskLast4(m) === last4 : m === mask));
+      if (exists) return v;
+      return { ...v, cardMask: serializeCardMasks([...list, mask]) };
+    });
+    setNewCardMask('');
+  }, [newCardMask]);
+
+  const handleRemoveCardMask = useCallback((mask) => {
+    setEditValues(v => {
+      const last4 = cardMaskLast4(mask);
+      const kept = parseCardMasks(v.cardMask).filter(
+        m => (last4 ? cardMaskLast4(m) !== last4 : m !== mask),
+      );
+      return { ...v, cardMask: serializeCardMasks(kept) };
+    });
   }, []);
 
   const handleRoundingSelect = useCallback((value) => {
@@ -1016,20 +1045,51 @@ export default function AccountsScreen({ onBackStateChange }) {
             </TouchableRipple>
             {errors.currency && <Text variant="bodySmall" style={styles.error}>{errors.currency}</Text>}
 
-            {/* Card mask (for bank-notification matching) */}
+            {/* Card masks (for bank-notification matching) — an account can hold
+                several cards, so they are managed as a list. */}
             <Text style={[modalSharedStyles.fieldLabel, { color: colors.mutedText }]}>
               {(t('card_mask') || 'Card number').toUpperCase()}
             </Text>
-            <PaperTextInput
-              mode="outlined"
-              theme={paperInputTheme}
-              value={editValues.cardMask || ''}
-              onChangeText={handleCardMaskChange}
-              autoCapitalize="characters"
-              autoCorrect={false}
-              placeholder="4083***7027"
-              style={modalSharedStyles.textInput}
-            />
+            {parseCardMasks(editValues.cardMask).map((mask) => (
+              <View
+                key={mask}
+                style={[styles.cardMaskRow, { borderColor: colors.border, backgroundColor: colors.surface }]}
+              >
+                <Icon name="card-outline" size={16} color={colors.mutedText} />
+                <Text style={[styles.cardMaskValue, { color: colors.text }]} numberOfLines={1}>
+                  {mask}
+                </Text>
+                <TouchableRipple
+                  onPress={() => handleRemoveCardMask(mask)}
+                  accessibilityRole="button"
+                  accessibilityLabel={`${t('delete') || 'Delete'} ${mask}`}
+                  style={styles.cardMaskRemove}
+                >
+                  <Icon name="close" size={18} color={colors.mutedText} />
+                </TouchableRipple>
+              </View>
+            ))}
+            <View style={styles.cardMaskAddRow}>
+              <PaperTextInput
+                mode="outlined"
+                theme={paperInputTheme}
+                value={newCardMask}
+                onChangeText={handleCardMaskChange}
+                onSubmitEditing={handleAddCardMask}
+                autoCapitalize="characters"
+                autoCorrect={false}
+                placeholder="4083***7027"
+                style={[modalSharedStyles.textInput, styles.cardMaskInput]}
+              />
+              <Button
+                mode="contained-tonal"
+                onPress={handleAddCardMask}
+                disabled={!newCardMask.trim()}
+                style={styles.cardMaskAddBtn}
+              >
+                {t('add') || 'Add'}
+              </Button>
+            </View>
             <Text style={[styles.cardMaskHint, { color: colors.mutedText }]}>
               {t('card_mask_hint') || 'Used to match bank notifications to this account'}
             </Text>
@@ -1310,9 +1370,41 @@ const styles = StyleSheet.create({
     marginTop: SPACING.sm,
     overflow: 'hidden',
   },
+  cardMaskAddBtn: {
+    alignSelf: 'center',
+  },
+  cardMaskAddRow: {
+    alignItems: 'center',
+    flexDirection: 'row',
+    gap: SPACING.sm,
+  },
   cardMaskHint: {
     fontSize: 12,
     marginTop: 4,
+  },
+  cardMaskInput: {
+    flex: 1,
+  },
+  cardMaskRemove: {
+    alignItems: 'center',
+    borderRadius: BORDER_RADIUS.sm,
+    justifyContent: 'center',
+    minHeight: 32,
+    minWidth: 32,
+  },
+  cardMaskRow: {
+    alignItems: 'center',
+    borderRadius: BORDER_RADIUS.sm,
+    borderWidth: StyleSheet.hairlineWidth,
+    flexDirection: 'row',
+    gap: SPACING.sm,
+    marginBottom: SPACING.xs,
+    paddingHorizontal: SPACING.sm,
+    paddingVertical: SPACING.xs,
+  },
+  cardMaskValue: {
+    flex: 1,
+    fontSize: 14,
   },
   centeredBodyMedium: {
     marginBottom: SPACING.lg,

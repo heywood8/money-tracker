@@ -11,6 +11,7 @@ import { useCategories } from '../contexts/CategoriesContext';
 import SimplePicker from './SimplePicker';
 import FormInput from './FormInput';
 import { getCategoryDisplayName } from '../utils/categoryUtils';
+import { parseCardMasks } from '../utils/cardMask';
 import { HORIZONTAL_PADDING, SPACING, BORDER_RADIUS } from '../styles/layout';
 import {
   getAllMerchantRules,
@@ -48,7 +49,7 @@ export default function NotificationBindingsContentPanel({ bottomInset }) {
   const { colors } = useThemeColors();
   const { t } = useLocalization();
   const { accounts } = useAccountsData();
-  const { updateAccount, reloadAccounts } = useAccountsActions();
+  const { reloadAccounts } = useAccountsActions();
   const { categories } = useCategories();
 
   const [loading, setLoading] = useState(true);
@@ -117,23 +118,26 @@ export default function NotificationBindingsContentPanel({ bottomInset }) {
   }, [reload]);
 
   // ── Card bindings ──
+  // One row per bound card: an account can hold several, stored as a list.
   const cardBindings = useMemo(
-    () => accounts.filter((a) => a.cardMask),
+    () => accounts.flatMap((a) => parseCardMasks(a.cardMask).map((mask) => ({ account: a, mask }))),
     [accounts],
   );
 
-  const handleReassignCard = useCallback(async (account, newAccountId) => {
+  const handleReassignCard = useCallback(async (account, mask, newAccountId) => {
     if (newAccountId == null || newAccountId === account.id) return;
-    // setAccountCardMask re-points the mask and strips it from its old owner in
-    // one transaction, then the context reload refreshes both rows.
-    await AccountsDB.setAccountCardMask(newAccountId, account.cardMask);
+    // addAccountCardMask moves just this card: it strips it from the old owner and
+    // adds it to the new one in one transaction, leaving both accounts' other
+    // cards untouched. Reload refreshes both rows.
+    await AccountsDB.addAccountCardMask(newAccountId, mask);
     await reloadAccounts();
   }, [reloadAccounts]);
 
-  const handleRemoveCard = useCallback(async (account) => {
-    // Context action clears the field and reloads accounts for us.
-    await updateAccount(account.id, { cardMask: null }, false);
-  }, [updateAccount]);
+  const handleRemoveCard = useCallback(async (account, mask) => {
+    // Drop only this card; the account keeps its other bindings.
+    await AccountsDB.removeAccountCardMask(account.id, mask);
+    await reloadAccounts();
+  }, [reloadAccounts]);
 
   const handleChangeAtm = useCallback(async (newAccountId) => {
     if (newAccountId == null) return;
@@ -251,27 +255,27 @@ export default function NotificationBindingsContentPanel({ bottomInset }) {
               || 'Which account each card, and ATM cash, maps to'}
           </Text>
 
-          {cardBindings.map((account) => (
+          {cardBindings.map(({ account, mask }) => (
             <View
-              key={`card-${account.id}`}
+              key={`card-${account.id}-${mask}`}
               style={[styles.card, { backgroundColor: colors.surface, borderColor: colors.border }]}
             >
               <View style={styles.cardTitleRow}>
                 <View style={styles.cardTitleText}>
                   <Ionicons name="card-outline" size={16} color={colors.mutedText} />
                   <Text style={[styles.bindingKey, { color: colors.text }]} numberOfLines={1}>
-                    {account.cardMask}
+                    {mask}
                   </Text>
                 </View>
                 {renderRemoveButton(
-                  () => handleRemoveCard(account),
+                  () => handleRemoveCard(account, mask),
                   t('notification_bindings_remove') || 'Remove binding',
                 )}
               </View>
               <View style={[styles.pickerWrap, { borderColor: colors.border }]}>
                 <SimplePicker
                   value={account.id}
-                  onValueChange={(v) => handleReassignCard(account, v)}
+                  onValueChange={(v) => handleReassignCard(account, mask, v)}
                   items={accountItems}
                   colors={colors}
                   closeLabel={t('close') || 'Close'}

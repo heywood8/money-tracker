@@ -3,7 +3,7 @@ import * as Currency from './currency';
 import { eq, sql, desc, asc, isNull, and } from 'drizzle-orm';
 import { accounts } from '../db/schema';
 import * as BalanceHistoryDB from './BalanceHistoryDB';
-import { cardMaskLast4 } from '../utils/cardMask';
+import { cardMaskLast4, parseCardMasks, serializeCardMasks } from '../utils/cardMask';
 
 /**
  * Get all accounts using Drizzle
@@ -85,12 +85,12 @@ export const createAccount = async (account) => {
 /**
  * Find a non-deleted account bound to the given card mask.
  *
- * Matching is by the card's last four digits, not the raw literal: the mask a
- * bank notification carries ("*5285") and the one stored on the account (a
- * user-typed "4083***5285", or one learned from a differently-decorated earlier
- * notification) rarely agree character-for-character, and the last four digits
- * are the only stable identity a bank exposes. An exact literal match is tried
- * first as a fast, index-served path before the last-4 fallback scan.
+ * An account can hold several cards (its masks live as a delimiter-joined list in
+ * `card_mask`), so every account's list is scanned. Matching prefers an exact
+ * literal within a list (fast, precise) and falls back to the card's last four
+ * digits — the only stable identity a bank exposes — so a notification's short
+ * mask ("*5285") still resolves an account storing a full one ("4083***5285").
+ * Lowest id wins if two accounts ever claim the same card.
  *
  * @param {string} cardMask - e.g. "4083***7027" or "*7027"
  * @returns {Promise<Object|null>}
@@ -98,26 +98,22 @@ export const createAccount = async (account) => {
 export const getAccountByCardMask = async (cardMask) => {
   if (!cardMask) return null;
   try {
-    const db = await getDrizzle();
-    // Fast path: an exact literal match (index-friendly, and the common case
-    // once a mask was learned from this very notification format). Single-owner
-    // is enforced on write, so at most one row matches a literal.
-    const exact = await db.select()
-      .from(accounts)
-      .where(and(eq(accounts.cardMask, cardMask), isNull(accounts.deletedAt)))
-      .limit(1);
+    const all = await getAllAccounts();
+    const withMasks = (all || []).map((a) => ({ account: a, masks: parseCardMasks(a.cardMask) }));
+
+    const exact = withMasks
+      .filter((x) => x.masks.includes(cardMask))
+      .map((x) => x.account)
+      .sort((a, b) => a.id - b.id);
     if (exact[0]) return exact[0];
 
-    // Fallback: match by last four digits so a differently-formatted stored mask
-    // ("4083***5285") still resolves a notification's short mask ("*5285"). Sort
-    // by id so the result is deterministic if two accounts ever share a last-4.
     const last4 = cardMaskLast4(cardMask);
     if (!last4) return null;
-    const all = await getAllAccounts();
-    const matches = (all || [])
-      .filter((a) => cardMaskLast4(a.cardMask) === last4)
+    const byLast4 = withMasks
+      .filter((x) => x.masks.some((m) => cardMaskLast4(m) === last4))
+      .map((x) => x.account)
       .sort((a, b) => a.id - b.id);
-    return matches[0] || null;
+    return byLast4[0] || null;
   } catch (error) {
     console.error('Failed to get account by card mask:', error);
     throw error;
@@ -125,46 +121,89 @@ export const getAccountByCardMask = async (cardMask) => {
 };
 
 /**
- * Bind a card mask to an account (used by learn-on-first-sight), enforcing that
- * a given mask belongs to at most one account: any other account currently
- * holding the same mask has it cleared in the same transaction.
+ * The list of card masks bound to an account (empty when none).
+ * @param {number} accountId
+ * @returns {Promise<string[]>}
+ */
+export const getAccountCardMasks = async (accountId) => {
+  const account = await getAccountById(accountId);
+  return account ? parseCardMasks(account.cardMask) : [];
+};
+
+/**
+ * Add a card mask to an account (learn-on-first-sight / reassign), enforcing that
+ * a given physical card belongs to at most one account: any other account
+ * holding the same card (by last-4) gives it up in the same transaction. Adding
+ * a card the account already holds is a no-op (beyond the single-owner strip).
  *
  * @param {number} accountId
  * @param {string} cardMask
  * @returns {Promise<void>}
  */
-export const setAccountCardMask = async (accountId, cardMask) => {
-  const mask = cardMask || null;
+export const addAccountCardMask = async (accountId, cardMask) => {
+  const last4 = cardMaskLast4(cardMask);
+  if (!last4) return; // nothing usable to bind
   try {
-    // Any other account holding the same card must give it up so a card has a
-    // single owner. Comparison is by last-4 (not the raw literal) to match how
-    // getAccountByCardMask resolves — otherwise a "4083***5285" on one account
-    // and a learned "*5285" on another would both claim the same card.
-    let clashingIds = [];
-    if (mask) {
-      const last4 = cardMaskLast4(mask);
-      if (last4) {
-        const all = await getAllAccounts();
-        clashingIds = (all || [])
-          .filter((a) => a.id !== accountId && cardMaskLast4(a.cardMask) === last4)
-          .map((a) => a.id);
+    const all = await getAllAccounts();
+    const target = (all || []).find((a) => a.id === accountId);
+    if (!target) return;
+
+    // { id, value } writes: strip this card from other owners, add it to target.
+    const updates = [];
+    for (const other of all) {
+      if (other.id === accountId) continue;
+      const masks = parseCardMasks(other.cardMask);
+      const kept = masks.filter((m) => cardMaskLast4(m) !== last4);
+      if (kept.length !== masks.length) {
+        updates.push({ id: other.id, value: serializeCardMasks(kept) });
       }
     }
+    const targetMasks = parseCardMasks(target.cardMask);
+    if (!targetMasks.some((m) => cardMaskLast4(m) === last4)) {
+      updates.push({ id: accountId, value: serializeCardMasks([...targetMasks, cardMask]) });
+    }
+
+    if (updates.length === 0) return;
+
     await executeTransaction(async (db) => {
       const now = new Date().toISOString();
-      for (const id of clashingIds) {
+      for (const u of updates) {
         await db.runAsync(
-          'UPDATE accounts SET card_mask = NULL, updated_at = ? WHERE id = ?',
-          [now, id],
+          'UPDATE accounts SET card_mask = ?, updated_at = ? WHERE id = ?',
+          [u.value, now, u.id],
         );
       }
+    });
+  } catch (error) {
+    console.error('Failed to add account card mask:', error);
+    throw error;
+  }
+};
+
+/**
+ * Remove a single card mask from an account (by last-4), leaving its other cards
+ * intact. A no-op when the account doesn't hold that card.
+ *
+ * @param {number} accountId
+ * @param {string} cardMask
+ * @returns {Promise<void>}
+ */
+export const removeAccountCardMask = async (accountId, cardMask) => {
+  const last4 = cardMaskLast4(cardMask);
+  try {
+    const account = await getAccountById(accountId);
+    if (!account) return;
+    const masks = parseCardMasks(account.cardMask);
+    const kept = masks.filter((m) => (last4 ? cardMaskLast4(m) !== last4 : m !== cardMask));
+    if (kept.length === masks.length) return; // nothing removed
+    await executeTransaction(async (db) => {
       await db.runAsync(
         'UPDATE accounts SET card_mask = ?, updated_at = ? WHERE id = ?',
-        [mask, now, accountId],
+        [serializeCardMasks(kept), new Date().toISOString(), accountId],
       );
     });
   } catch (error) {
-    console.error('Failed to set account card mask:', error);
+    console.error('Failed to remove account card mask:', error);
     throw error;
   }
 };

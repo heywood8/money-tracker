@@ -1,4 +1,9 @@
-import { cardMaskLast4, cardMasksMatch } from '../../app/utils/cardMask';
+import {
+  cardMaskLast4,
+  cardMasksMatch,
+  parseCardMasks,
+  serializeCardMasks,
+} from '../../app/utils/cardMask';
 
 describe('cardMaskLast4', () => {
   it('extracts the trailing four digits regardless of decoration or BIN prefix', () => {
@@ -37,5 +42,47 @@ describe('cardMasksMatch', () => {
     expect(cardMasksMatch('*5285', null)).toBe(false);
     expect(cardMasksMatch(null, '*5285')).toBe(false);
     expect(cardMasksMatch('12', '12')).toBe(false);
+  });
+});
+
+describe('parseCardMasks', () => {
+  it('splits a delimiter-joined list, trimming blanks', () => {
+    expect(parseCardMasks('*5285|4083***1234')).toEqual(['*5285', '4083***1234']);
+    expect(parseCardMasks(' *5285 | *1234 ')).toEqual(['*5285', '*1234']);
+  });
+
+  it('treats a legacy single mask as a one-element list', () => {
+    expect(parseCardMasks('4083***7027')).toEqual(['4083***7027']);
+  });
+
+  it('returns an empty list for null/empty', () => {
+    expect(parseCardMasks(null)).toEqual([]);
+    expect(parseCardMasks('')).toEqual([]);
+    expect(parseCardMasks('||')).toEqual([]);
+  });
+});
+
+describe('serializeCardMasks', () => {
+  it('joins masks with the delimiter', () => {
+    expect(serializeCardMasks(['*5285', '4083***1234'])).toBe('*5285|4083***1234');
+  });
+
+  it('drops blanks and de-duplicates by last-4', () => {
+    expect(serializeCardMasks(['*5285', '  ', '4083***5285', '*1234'])).toBe('*5285|*1234');
+  });
+
+  it('strips any stray delimiter from a mask', () => {
+    expect(serializeCardMasks(['*5285|garbage'])).toBe('*5285garbage');
+  });
+
+  it('returns null for an empty result', () => {
+    expect(serializeCardMasks([])).toBeNull();
+    expect(serializeCardMasks(['', '   '])).toBeNull();
+    expect(serializeCardMasks(null)).toBeNull();
+  });
+
+  it('round-trips with parseCardMasks', () => {
+    const stored = serializeCardMasks(['*5285', '4083***1234']);
+    expect(parseCardMasks(stored)).toEqual(['*5285', '4083***1234']);
   });
 });

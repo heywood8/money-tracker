@@ -65,7 +65,8 @@ describe('NotificationBindingsContentPanel', () => {
     NotificationRulesDB.clearMerchantRuleLabel.mockResolvedValue();
     NotificationRulesDB.upsertMerchantRule.mockResolvedValue();
     NotificationRulesDB.upsertMerchantLabel.mockResolvedValue();
-    AccountsDB.setAccountCardMask.mockResolvedValue();
+    AccountsDB.addAccountCardMask.mockResolvedValue();
+    AccountsDB.removeAccountCardMask.mockResolvedValue();
     pipeline.resolveAtmTargetAccount.mockResolvedValue({ id: 2, name: 'Cash', currency: 'AMD' });
     pipeline.setAtmTargetAccount.mockResolvedValue();
     pipeline.clearAtmTargetAccount.mockResolvedValue();
@@ -88,12 +89,19 @@ describe('NotificationBindingsContentPanel', () => {
     await waitFor(() => expect(getByText('notification_bindings_empty')).toBeTruthy());
   });
 
-  it('removes a card binding by clearing the account card mask', async () => {
+  it('removes a card binding by dropping just that card from the account', async () => {
     const { getAllByLabelText, getByText } = await render(<NotificationBindingsContentPanel />);
     await waitFor(() => expect(getByText('4083***7027')).toBeTruthy());
     // First remove button belongs to the card binding (rendered first).
     fireEvent.press(getAllByLabelText('notification_bindings_remove')[0]);
-    await waitFor(() => expect(mockUpdateAccount).toHaveBeenCalledWith(1, { cardMask: null }, false));
+    await waitFor(() => expect(AccountsDB.removeAccountCardMask).toHaveBeenCalledWith(1, '4083***7027'));
+  });
+
+  it('lists each card of a multi-card account as its own binding row', async () => {
+    mockAccounts = [{ id: 1, name: 'Checking', currency: 'AMD', cardMask: '4083***7027|*1234' }, CASH_ACCOUNT];
+    const { getByText } = await render(<NotificationBindingsContentPanel />);
+    await waitFor(() => expect(getByText('4083***7027')).toBeTruthy());
+    expect(getByText('*1234')).toBeTruthy();
   });
 
   it('removes the ATM cash target binding', async () => {

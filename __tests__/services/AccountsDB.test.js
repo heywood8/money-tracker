@@ -108,20 +108,19 @@ describe('AccountsDB', () => {
       expect(db.getDrizzle).not.toHaveBeenCalled();
     });
 
-    it('returns the exact-literal match via the fast path', async () => {
-      const account = { id: 1, name: 'T-bank', cardMask: '4083***5285', currency: 'RUB' };
-      mockDrizzle.limit.mockResolvedValue([account]);
+    it('returns the exact-literal match', async () => {
+      mockDrizzle.orderBy.mockResolvedValue([
+        { id: 1, name: 'Cash', cardMask: null, currency: 'RUB' },
+        { id: 2, name: 'T-bank', cardMask: '4083***5285', currency: 'RUB' },
+      ]);
 
       const result = await AccountsDB.getAccountByCardMask('4083***5285');
 
-      expect(result).toEqual(account);
-      // The fast path answers, so no full-table fallback scan is needed.
-      expect(mockDrizzle.orderBy).not.toHaveBeenCalled();
+      expect(result).toMatchObject({ id: 2, name: 'T-bank' });
     });
 
     it('falls back to a last-4 match when the literal differs', async () => {
       // A notification carries "*5285" but the account stored the full mask.
-      mockDrizzle.limit.mockResolvedValue([]); // no exact literal match
       mockDrizzle.orderBy.mockResolvedValue([
         { id: 1, name: 'Cash', cardMask: null, currency: 'RUB' },
         { id: 2, name: 'T-bank', cardMask: '4083***5285', currency: 'RUB' },
@@ -132,8 +131,16 @@ describe('AccountsDB', () => {
       expect(result).toMatchObject({ id: 2, name: 'T-bank' });
     });
 
+    it('matches any card in an account holding several', async () => {
+      mockDrizzle.orderBy.mockResolvedValue([
+        { id: 1, name: 'T-bank', cardMask: '*5285|4083***1234', currency: 'RUB' },
+      ]);
+
+      expect(await AccountsDB.getAccountByCardMask('*1234')).toMatchObject({ id: 1 });
+      expect(await AccountsDB.getAccountByCardMask('*5285')).toMatchObject({ id: 1 });
+    });
+
     it('returns the lowest-id account when two share a last-4', async () => {
-      mockDrizzle.limit.mockResolvedValue([]);
       mockDrizzle.orderBy.mockResolvedValue([
         { id: 5, name: 'B', cardMask: '9999***5285' },
         { id: 3, name: 'A', cardMask: '•• 5285' },
@@ -145,7 +152,6 @@ describe('AccountsDB', () => {
     });
 
     it('returns null when no account matches by literal or last-4', async () => {
-      mockDrizzle.limit.mockResolvedValue([]);
       mockDrizzle.orderBy.mockResolvedValue([
         { id: 1, name: 'Cash', cardMask: '*1234' },
       ]);
@@ -156,62 +162,100 @@ describe('AccountsDB', () => {
     });
   });
 
-  describe('setAccountCardMask', () => {
+  describe('getAccountCardMasks', () => {
+    it('parses the account card_mask list', async () => {
+      mockDrizzle.limit.mockResolvedValue([{ id: 1, cardMask: '*5285|4083***1234' }]);
+      expect(await AccountsDB.getAccountCardMasks(1)).toEqual(['*5285', '4083***1234']);
+    });
+
+    it('returns an empty list when the account has no cards', async () => {
+      mockDrizzle.limit.mockResolvedValue([{ id: 1, cardMask: null }]);
+      expect(await AccountsDB.getAccountCardMasks(1)).toEqual([]);
+    });
+  });
+
+  describe('addAccountCardMask', () => {
     let mockTxDb;
     beforeEach(() => {
       mockTxDb = { runAsync: jest.fn().mockResolvedValue(undefined) };
       jest.spyOn(db, 'executeTransaction').mockImplementation(async (cb) => cb(mockTxDb));
     });
 
-    it('binds the mask and strips it from another account sharing the last-4', async () => {
-      // Account 2 already holds the same card under a different format; it must
-      // give it up so the card has a single owner.
+    it('appends to the target keeping its existing cards, and strips it from another owner', async () => {
+      // Target already holds one card; account 2 holds the incoming card under a
+      // different format and must give it up (single owner).
       mockDrizzle.orderBy.mockResolvedValue([
-        { id: 1, name: 'T-bank', cardMask: null },
-        { id: 2, name: 'Old', cardMask: '4083***5285' },
+        { id: 1, name: 'T-bank', cardMask: '*1111' },
+        { id: 2, name: 'Old', cardMask: '4083***5285|*2222' },
       ]);
 
-      await AccountsDB.setAccountCardMask(1, '*5285');
+      await AccountsDB.addAccountCardMask(1, '*5285');
 
-      // Clears the clashing account, then sets the target.
       expect(mockTxDb.runAsync).toHaveBeenCalledTimes(2);
-      expect(mockTxDb.runAsync).toHaveBeenNthCalledWith(
-        1,
-        'UPDATE accounts SET card_mask = NULL, updated_at = ? WHERE id = ?',
-        [expect.any(String), 2],
-      );
-      expect(mockTxDb.runAsync).toHaveBeenNthCalledWith(
-        2,
-        'UPDATE accounts SET card_mask = ?, updated_at = ? WHERE id = ?',
-        ['*5285', expect.any(String), 1],
-      );
-    });
-
-    it('only writes the target account when no other holds the card', async () => {
-      mockDrizzle.orderBy.mockResolvedValue([
-        { id: 1, name: 'T-bank', cardMask: null },
-        { id: 2, name: 'Other', cardMask: '*1234' },
-      ]);
-
-      await AccountsDB.setAccountCardMask(1, '*5285');
-
-      expect(mockTxDb.runAsync).toHaveBeenCalledTimes(1);
+      // Old owner keeps its other card, loses 5285.
       expect(mockTxDb.runAsync).toHaveBeenCalledWith(
         'UPDATE accounts SET card_mask = ?, updated_at = ? WHERE id = ?',
-        ['*5285', expect.any(String), 1],
+        ['*2222', expect.any(String), 2],
+      );
+      // Target gains the new card alongside its existing one.
+      expect(mockTxDb.runAsync).toHaveBeenCalledWith(
+        'UPDATE accounts SET card_mask = ?, updated_at = ? WHERE id = ?',
+        ['*1111|*5285', expect.any(String), 1],
       );
     });
 
-    it('clears the mask without scanning when passed a falsy value', async () => {
-      await AccountsDB.setAccountCardMask(1, null);
+    it('is a no-op when the target already holds the card and no other does', async () => {
+      mockDrizzle.orderBy.mockResolvedValue([
+        { id: 1, name: 'T-bank', cardMask: '4083***5285' },
+      ]);
 
-      // No clash scan needed when clearing.
-      expect(mockDrizzle.orderBy).not.toHaveBeenCalled();
-      expect(mockTxDb.runAsync).toHaveBeenCalledTimes(1);
+      await AccountsDB.addAccountCardMask(1, '*5285');
+
+      expect(db.executeTransaction).not.toHaveBeenCalled();
+    });
+
+    it('ignores a mask without four digits', async () => {
+      await AccountsDB.addAccountCardMask(1, '**');
+      expect(db.getDrizzle).not.toHaveBeenCalled();
+      expect(db.executeTransaction).not.toHaveBeenCalled();
+    });
+  });
+
+  describe('removeAccountCardMask', () => {
+    let mockTxDb;
+    beforeEach(() => {
+      mockTxDb = { runAsync: jest.fn().mockResolvedValue(undefined) };
+      jest.spyOn(db, 'executeTransaction').mockImplementation(async (cb) => cb(mockTxDb));
+    });
+
+    it('removes just the named card and keeps the rest', async () => {
+      mockDrizzle.limit.mockResolvedValue([{ id: 1, cardMask: '*5285|4083***1234' }]);
+
+      await AccountsDB.removeAccountCardMask(1, '*5285');
+
+      expect(mockTxDb.runAsync).toHaveBeenCalledWith(
+        'UPDATE accounts SET card_mask = ?, updated_at = ? WHERE id = ?',
+        ['4083***1234', expect.any(String), 1],
+      );
+    });
+
+    it('clears the column when removing the last card', async () => {
+      mockDrizzle.limit.mockResolvedValue([{ id: 1, cardMask: '*5285' }]);
+
+      await AccountsDB.removeAccountCardMask(1, '4083***5285'); // different format, same last-4
+
       expect(mockTxDb.runAsync).toHaveBeenCalledWith(
         'UPDATE accounts SET card_mask = ?, updated_at = ? WHERE id = ?',
         [null, expect.any(String), 1],
       );
+    });
+
+    it('is a no-op when the account does not hold the card', async () => {
+      mockDrizzle.limit.mockResolvedValue([{ id: 1, cardMask: '*1234' }]);
+
+      await AccountsDB.removeAccountCardMask(1, '*5285');
+
+      expect(db.executeTransaction).not.toHaveBeenCalled();
     });
   });
 

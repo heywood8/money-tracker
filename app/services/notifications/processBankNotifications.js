@@ -659,7 +659,7 @@ export const resolvePendingNotification = async (pendingId, choices = {}) => {
   // Learn the card -> account binding (default on when a card mask is present).
   if (choices.learnCardMask !== false && pending.cardMask && accountId != null) {
     try {
-      await AccountsDB.setAccountCardMask(accountId, pending.cardMask);
+      await AccountsDB.addAccountCardMask(accountId, pending.cardMask);
     } catch (error) {
       console.error('[resolvePendingNotification] Failed to learn card mask:', error);
     }
@@ -778,7 +778,7 @@ const resolvePendingTransfer = async (pending, choices = {}) => {
   // Learn the card -> source-account binding (default on when a card is present).
   if (choices.learnCardMask !== false && pending.cardMask && accountId != null) {
     try {
-      await AccountsDB.setAccountCardMask(accountId, pending.cardMask);
+      await AccountsDB.addAccountCardMask(accountId, pending.cardMask);
     } catch (error) {
       console.error('[resolvePendingNotification] Failed to learn card mask:', error);
     }

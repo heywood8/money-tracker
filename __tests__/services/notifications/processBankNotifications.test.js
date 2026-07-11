@@ -120,7 +120,7 @@ describe('processBankNotifications', () => {
     OperationsDB.createOperation.mockResolvedValue({ id: 1 });
     PendingNotificationsDB.addPendingNotification.mockResolvedValue({ id: 'p1' });
     AccountsDB.getAccountById.mockResolvedValue(null);
-    AccountsDB.setAccountCardMask.mockResolvedValue();
+    AccountsDB.addAccountCardMask.mockResolvedValue();
     // No ATM "cash" target account bound by default.
     PreferencesDB.getNumberPreference.mockResolvedValue(null);
     PreferencesDB.setPreference.mockResolvedValue();
@@ -677,7 +677,7 @@ describe('processBankNotifications', () => {
       expect(OperationsDB.createOperation).toHaveBeenCalledWith(
         expect.objectContaining({ accountId: 7, categoryId: 'cat-food', amount: '3900.00', date: '2026-06-28' }),
       );
-      expect(AccountsDB.setAccountCardMask).toHaveBeenCalledWith(7, '4083***7027');
+      expect(AccountsDB.addAccountCardMask).toHaveBeenCalledWith(7, '4083***7027');
       expect(NotificationRulesDB.upsertMerchantRule).toHaveBeenCalledWith('NAREK MEHRABYAN', 'cat-food', PKG);
       expect(PreferencesDB.setJsonPreference).toHaveBeenCalledWith(
         'bank_notifications_packages', [PKG],
@@ -788,7 +788,7 @@ describe('processBankNotifications', () => {
         accountId: 7, categoryId: 'cat-food',
         learnCardMask: false, learnMerchant: false, learnSource: false,
       });
-      expect(AccountsDB.setAccountCardMask).not.toHaveBeenCalled();
+      expect(AccountsDB.addAccountCardMask).not.toHaveBeenCalled();
       expect(NotificationRulesDB.upsertMerchantRule).not.toHaveBeenCalled();
     });
 
@@ -891,7 +891,7 @@ describe('processBankNotifications', () => {
       expect(OperationsDB.createOperation).toHaveBeenCalledWith(
         expect.objectContaining({ accountId: 7, categoryId: 'cat-loan' }),
       );
-      expect(AccountsDB.setAccountCardMask).toHaveBeenCalledWith(7, '4083***7027');
+      expect(AccountsDB.addAccountCardMask).toHaveBeenCalledWith(7, '4083***7027');
       // ...but the friend -> category rule is never remembered.
       expect(NotificationRulesDB.upsertMerchantRule).not.toHaveBeenCalled();
     });
@@ -906,7 +906,7 @@ describe('processBankNotifications', () => {
       expect(OperationsDB.createOperation).toHaveBeenCalledWith(
         expect.objectContaining({ accountId: 7, categoryId: 'cat-fees' }),
       );
-      expect(AccountsDB.setAccountCardMask).toHaveBeenCalledWith(7, '4083***7027');
+      expect(AccountsDB.addAccountCardMask).toHaveBeenCalledWith(7, '4083***7027');
       // ...but the generic gateway -> category rule is never remembered.
       expect(NotificationRulesDB.upsertMerchantRule).not.toHaveBeenCalled();
     });
@@ -935,7 +935,7 @@ describe('processBankNotifications', () => {
         }),
       );
       // Learns the card -> source-account binding.
-      expect(AccountsDB.setAccountCardMask).toHaveBeenCalledWith(7, '4083***7027');
+      expect(AccountsDB.addAccountCardMask).toHaveBeenCalledWith(7, '4083***7027');
       // Binds the cash account for future auto-create ("first time" binding).
       expect(PreferencesDB.setPreference).toHaveBeenCalledWith('bank_notifications_atm_account', '9');
       // Trusts the source package for auto-create.
