@@ -12,6 +12,7 @@ import { Ionicons } from '@expo/vector-icons';
 import SimplePicker from '../SimplePicker';
 import FormInput from '../FormInput';
 import CategoryGridSelector from '../CategoryGridSelector';
+import useTopCategoryIds from '../../hooks/useTopCategoryIds';
 import { kindRequiresCategory } from '../../services/notifications/parseBankNotification';
 import { canSaveSuggestion } from '../../hooks/usePendingOperationSuggestions';
 import { getCategoryDisplayName } from '../../utils/categoryUtils';
@@ -55,6 +56,9 @@ const NotificationBindingCard = ({
   const isTransfer = item.type === 'transfer';
   const categoryRequired = !isTransfer && kindRequiresCategory(item.kind, item.packageName);
   const canSave = canSaveSuggestion(item, choice);
+  // Most-frequent categories drive the QuickAdd-style shortcut grid below, so the
+  // card's category picker matches the quick-add form it sits over.
+  const topCategoryIds = useTopCategoryIds();
 
   const accountItems = useMemo(
     () => accounts.map((a) => ({ label: a.name, subLabel: a.currency, value: a.id })),
@@ -222,6 +226,7 @@ const NotificationBindingCard = ({
               onSelect={(categoryId) => onChoiceChange({ categoryId })}
               colors={colors}
               t={t}
+              topCategoryIds={topCategoryIds}
             />
           </>
         )}

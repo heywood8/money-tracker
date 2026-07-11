@@ -3,6 +3,7 @@ import * as Currency from './currency';
 import { eq, sql, desc, asc, isNull, and } from 'drizzle-orm';
 import { accounts } from '../db/schema';
 import * as BalanceHistoryDB from './BalanceHistoryDB';
+import { cardMaskLast4 } from '../utils/cardMask';
 
 /**
  * Get all accounts using Drizzle
@@ -83,21 +84,40 @@ export const createAccount = async (account) => {
 
 /**
  * Find a non-deleted account bound to the given card mask.
- * @param {string} cardMask - e.g. "4083***7027"
+ *
+ * Matching is by the card's last four digits, not the raw literal: the mask a
+ * bank notification carries ("*5285") and the one stored on the account (a
+ * user-typed "4083***5285", or one learned from a differently-decorated earlier
+ * notification) rarely agree character-for-character, and the last four digits
+ * are the only stable identity a bank exposes. An exact literal match is tried
+ * first as a fast, index-served path before the last-4 fallback scan.
+ *
+ * @param {string} cardMask - e.g. "4083***7027" or "*7027"
  * @returns {Promise<Object|null>}
  */
 export const getAccountByCardMask = async (cardMask) => {
   if (!cardMask) return null;
   try {
     const db = await getDrizzle();
-    // ORDER BY id keeps the result deterministic if two accounts ever share a
-    // mask (single-ownership is enforced on write, but data can predate that).
-    const results = await db.select()
+    // Fast path: an exact literal match (index-friendly, and the common case
+    // once a mask was learned from this very notification format). Single-owner
+    // is enforced on write, so at most one row matches a literal.
+    const exact = await db.select()
       .from(accounts)
       .where(and(eq(accounts.cardMask, cardMask), isNull(accounts.deletedAt)))
-      .orderBy(asc(accounts.id))
       .limit(1);
-    return results[0] || null;
+    if (exact[0]) return exact[0];
+
+    // Fallback: match by last four digits so a differently-formatted stored mask
+    // ("4083***5285") still resolves a notification's short mask ("*5285"). Sort
+    // by id so the result is deterministic if two accounts ever share a last-4.
+    const last4 = cardMaskLast4(cardMask);
+    if (!last4) return null;
+    const all = await getAllAccounts();
+    const matches = (all || [])
+      .filter((a) => cardMaskLast4(a.cardMask) === last4)
+      .sort((a, b) => a.id - b.id);
+    return matches[0] || null;
   } catch (error) {
     console.error('Failed to get account by card mask:', error);
     throw error;
@@ -116,13 +136,26 @@ export const getAccountByCardMask = async (cardMask) => {
 export const setAccountCardMask = async (accountId, cardMask) => {
   const mask = cardMask || null;
   try {
+    // Any other account holding the same card must give it up so a card has a
+    // single owner. Comparison is by last-4 (not the raw literal) to match how
+    // getAccountByCardMask resolves — otherwise a "4083***5285" on one account
+    // and a learned "*5285" on another would both claim the same card.
+    let clashingIds = [];
+    if (mask) {
+      const last4 = cardMaskLast4(mask);
+      if (last4) {
+        const all = await getAllAccounts();
+        clashingIds = (all || [])
+          .filter((a) => a.id !== accountId && cardMaskLast4(a.cardMask) === last4)
+          .map((a) => a.id);
+      }
+    }
     await executeTransaction(async (db) => {
       const now = new Date().toISOString();
-      if (mask) {
-        // Strip the mask from any other account so it has a single owner.
+      for (const id of clashingIds) {
         await db.runAsync(
-          'UPDATE accounts SET card_mask = NULL, updated_at = ? WHERE card_mask = ? AND id != ?',
-          [now, mask, accountId],
+          'UPDATE accounts SET card_mask = NULL, updated_at = ? WHERE id = ?',
+          [now, id],
         );
       }
       await db.runAsync(

@@ -20,6 +20,13 @@ jest.mock('../../../app/services/notifications/parseBankNotification', () => ({
 jest.mock('../../../app/services/currency', () => ({
   convertAmount: jest.fn(() => '10.00'),
 }));
+// The card's category grid pulls top categories from history; stub it so the
+// deck renders deterministically without touching the DB. An empty list keeps
+// the grid in its filler-only state (every category shown as a shortcut).
+jest.mock('../../../app/hooks/useTopCategoryIds', () => ({
+  __esModule: true,
+  default: jest.fn(() => []),
+}));
 
 const COLORS = {
   background: '#fff', surface: '#f5f5f5', primary: '#6200ee',

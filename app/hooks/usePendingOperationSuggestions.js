@@ -9,6 +9,7 @@ import {
 } from '../services/notifications/processBankNotifications';
 import { kindRequiresCategory } from '../services/notifications/parseBankNotification';
 import { getLabelForMerchant } from '../services/NotificationRulesDB';
+import { getAccountByCardMask } from '../services/AccountsDB';
 import { appEvents, EVENTS } from '../services/eventEmitter';
 
 // Enable LayoutAnimation on the classic Android renderer (a no-op on Fabric, where
@@ -110,6 +111,18 @@ export default function usePendingOperationSuggestions() {
             .catch(() => existing?.labelOverride ?? '');
         }),
       );
+      // Re-resolve the account for any item the pipeline enqueued without one but
+      // that carries a card mask: the card→account binding may have been created
+      // (or made matchable) after the item was queued, so a card the user has
+      // since bound resolves now instead of leaving the account field blank.
+      const resolvedAccountIds = await Promise.all(
+        list.map((item) => {
+          if (item.accountId != null || !item.cardMask) return Promise.resolve(item.accountId ?? null);
+          return getAccountByCardMask(item.cardMask)
+            .then((account) => (account ? account.id : null))
+            .catch(() => null);
+        }),
+      );
       if (!mountedRef.current) return;
       setSuggestions(list);
       // Seed choices with any suggested account/category, the bound ATM target
@@ -118,10 +131,11 @@ export default function usePendingOperationSuggestions() {
         const next = { ...prev };
         list.forEach((item, i) => {
           const learned = overrides[i] ?? '';
+          const resolvedAccountId = resolvedAccountIds[i];
           const existing = next[item.id];
           if (!existing) {
             next[item.id] = {
-              accountId: item.accountId ?? null,
+              accountId: item.accountId ?? resolvedAccountId ?? null,
               categoryId: item.categoryId ?? null,
               toAccountId: item.type === 'transfer' ? atmId : null,
               labelOverride: learned,
@@ -135,6 +149,12 @@ export default function usePendingOperationSuggestions() {
           // (e.g. by saving a sibling ATM card) unblocks Save without a re-pick.
           if (item.type === 'transfer' && existing.toAccountId == null && atmId != null) {
             updated = { ...updated, toAccountId: atmId };
+          }
+          // Backfill an unresolved account with one now matched from the card mask
+          // (a binding created after this card first appeared), mirroring the ATM
+          // target backfill. Never overrides an account already chosen/suggested.
+          if (existing.accountId == null && resolvedAccountId != null) {
+            updated = { ...updated, accountId: resolvedAccountId };
           }
           // Refresh a non-edited label with the latest learned name (e.g. a
           // sibling just renamed this shop); never touch a field being edited.

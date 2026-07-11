@@ -4,17 +4,31 @@ import { View, Text, Pressable, StyleSheet } from 'react-native';
 import { MaterialCommunityIcons as Icon } from '@expo/vector-icons';
 import { SPACING, BORDER_RADIUS, FONT_SIZE } from '../styles/designTokens';
 
-const COLUMNS = 3;
+// Legacy (flat all-root) grid width vs. the quick-add-style suggestions grid,
+// which lays chips four-across to match the QuickAdd form.
+const LEGACY_COLUMNS = 3;
+const SUGGEST_COLUMNS = 4;
+// Shortcut counts shown in suggestions mode, mirroring the QuickAdd form: 7
+// alongside the "All categories" entry (8 slots over two rows of four), or a
+// full 8 shortcuts when there are few enough categories to skip the entry.
+const TOP_WITH_ALL = 7;
+const TOP_WITHOUT_ALL = 8;
 
 /**
  * Inline hierarchical category grid.
  *
- * The same chip-grid browser the QuickAdd panel uses, lifted into a standalone
- * component so other surfaces (e.g. the notification review queue) can pick a
- * category without a flat dropdown. Categories at the current folder level are
- * laid out as a grid of icon chips: folders drill in (a Back chip pops out),
- * leaf entries select. The selected leaf is highlighted, and the folder the
- * user drills through supplies the parent context a flat list never showed.
+ * Two layouts, selected by whether `topCategoryIds` is supplied:
+ *
+ * - **Legacy (no `topCategoryIds`)**: a flat grid of the current folder level's
+ *   categories (folders drill in, a Back chip pops out), three chips across.
+ *   Used by the Settings → Notification processing review queue.
+ *
+ * - **Suggestions (`topCategoryIds` given)**: mirrors the QuickAdd category
+ *   picker — an "All categories" entry plus the most-frequent leaf shortcuts,
+ *   four across. Tapping "All categories" reveals the parent hierarchy in the
+ *   same grid (a Back chip returns to the shortcuts); folders drill in, leaves
+ *   select. Used by the notification binding card over the quick-add panel, so
+ *   its category picker reads identically to the one right beneath it.
  *
  * @param {Array}    categories        All categories (folders + entries).
  * @param {string}   categoryType      'expense' | 'income' — restricts the grid.
@@ -22,6 +36,8 @@ const COLUMNS = 3;
  * @param {Function} onSelect          Called with the tapped leaf category id.
  * @param {Object}   colors            Theme colours.
  * @param {Function} t                 Translation function.
+ * @param {string[]} [topCategoryIds]  Most-frequent-first category ids; presence
+ *   switches the grid into the QuickAdd-style suggestions layout.
  */
 export default function CategoryGridSelector({
   categories,
@@ -30,9 +46,16 @@ export default function CategoryGridSelector({
   onSelect,
   colors,
   t,
+  topCategoryIds,
 }) {
+  const suggestMode = Array.isArray(topCategoryIds);
+  const columns = suggestMode ? SUGGEST_COLUMNS : LEGACY_COLUMNS;
+
   // Folders drilled into: [{ id, name }]. Empty array = root level.
   const [breadcrumb, setBreadcrumb] = useState([]);
+  // In suggestions mode the grid opens on the shortcuts; "All categories" flips
+  // it to the hierarchy browser. In legacy mode the hierarchy is always shown.
+  const [browsing, setBrowsing] = useState(!suggestMode);
   const currentFolderId = breadcrumb.length ? breadcrumb[breadcrumb.length - 1].id : null;
 
   // Non-shadow categories (folders + entries) of the requested type.
@@ -47,37 +70,109 @@ export default function CategoryGridSelector({
     [typed, currentFolderId],
   );
 
+  // Leaf entries of this type, used for the suggestions shortcuts and to decide
+  // whether an "All categories" entry is warranted (mirrors QuickAdd's >8 rule).
+  const typedLeaves = useMemo(() => typed.filter((c) => c.type !== 'folder'), [typed]);
+  const showAllButton = typedLeaves.length > 8;
+
+  // The frequency-ordered leaf shortcuts, filled from remaining leaves by natural
+  // order when history is short — the same shape as QuickAdd's topCategoriesForType.
+  const topCategories = useMemo(() => {
+    if (!suggestMode) return [];
+    const wanted = showAllButton ? TOP_WITH_ALL : TOP_WITHOUT_ALL;
+    const byId = new Map(typedLeaves.map((c) => [c.id, c]));
+    const fromHistory = (topCategoryIds || [])
+      .map((id) => byId.get(id))
+      .filter(Boolean)
+      .slice(0, wanted);
+    const historyIds = new Set(fromHistory.map((c) => c.id));
+    const fillers = typedLeaves.filter((c) => !historyIds.has(c.id)).slice(0, wanted - fromHistory.length);
+    return [...fromHistory, ...fillers];
+  }, [suggestMode, showAllButton, typedLeaves, topCategoryIds]);
+
   const enterFolder = useCallback((folder) => {
     const name = folder.nameKey ? t(folder.nameKey) : folder.name;
     setBreadcrumb((prev) => [...prev, { id: folder.id, name }]);
   }, [t]);
 
+  // Back: pop a folder level; at root in suggestions mode, return to the shortcuts.
   const goBack = useCallback(() => {
-    setBreadcrumb((prev) => prev.slice(0, -1));
+    setBreadcrumb((prev) => {
+      if (prev.length === 0) {
+        if (suggestMode) setBrowsing(false);
+        return prev;
+      }
+      return prev.slice(0, -1);
+    });
+  }, [suggestMode]);
+
+  // Open the hierarchy browser (suggestions mode only) at the root level.
+  const openBrowse = useCallback(() => {
+    setBreadcrumb([]);
+    setBrowsing(true);
   }, []);
 
-  // Build the slot list: a Back chip (only inside a folder) followed by the
-  // level's categories, then pad the final row with invisible spacers so chips
-  // keep an even width regardless of how many fill the last row.
-  const rows = useMemo(() => {
-    const slots = [];
-    if (breadcrumb.length > 0) slots.push({ kind: 'back' });
-    levelItems.forEach((item) => slots.push({ kind: 'item', item }));
-
-    const chunked = [];
-    for (let i = 0; i < slots.length; i += COLUMNS) chunked.push(slots.slice(i, i + COLUMNS));
-    if (chunked.length) {
-      const last = chunked[chunked.length - 1];
-      while (last.length < COLUMNS) last.push({ kind: 'spacer', id: `spacer-${last.length}` });
+  // Select a leaf; in suggestions mode also collapse the browser back to the
+  // shortcuts so the next open starts clean.
+  const selectLeaf = useCallback((id) => {
+    onSelect(id);
+    if (suggestMode) {
+      setBrowsing(false);
+      setBreadcrumb([]);
     }
-    return chunked;
-  }, [breadcrumb.length, levelItems]);
+  }, [onSelect, suggestMode]);
 
   const chipBackground = colors.inputBackground || colors.surface;
+
+  // Build the slot list for the current view, then chunk into rows and pad the
+  // final row with invisible spacers so chips keep an even width.
+  const rows = useMemo(() => {
+    const slots = [];
+    if (suggestMode && !browsing) {
+      if (showAllButton) slots.push({ kind: 'all' });
+      topCategories.forEach((item) => slots.push({ kind: 'item', item }));
+    } else {
+      // Hierarchy browser (legacy always, or suggestions after "All categories").
+      // Suggestions mode shows a Back chip at every level (root Back returns to
+      // the shortcuts); legacy only inside a folder.
+      if (breadcrumb.length > 0 || suggestMode) slots.push({ kind: 'back' });
+      levelItems.forEach((item) => slots.push({ kind: 'item', item }));
+    }
+
+    const chunked = [];
+    for (let i = 0; i < slots.length; i += columns) chunked.push(slots.slice(i, i + columns));
+    if (chunked.length) {
+      const last = chunked[chunked.length - 1];
+      while (last.length < columns) last.push({ kind: 'spacer', id: `spacer-${last.length}` });
+    }
+    return chunked;
+  }, [suggestMode, browsing, showAllButton, topCategories, breadcrumb.length, levelItems, columns]);
 
   const renderSlot = (slot, key) => {
     if (slot.kind === 'spacer') {
       return <View key={key} style={[styles.chip, styles.invisible]} />;
+    }
+
+    if (slot.kind === 'all') {
+      return (
+        <Pressable
+          key={key}
+          testID="category-grid-all"
+          onPress={openBrowse}
+          accessibilityRole="button"
+          accessibilityLabel={t('all_categories') || 'All categories'}
+          style={({ pressed }) => [
+            styles.chip,
+            { backgroundColor: chipBackground, borderColor: colors.border },
+            pressed && { backgroundColor: colors.selected },
+          ]}
+        >
+          <Icon name="menu" size={18} color={colors.text} />
+          <Text style={[styles.chipText, { color: colors.text }]} numberOfLines={2}>
+            {t('all_categories') || 'All categories'}
+          </Text>
+        </Pressable>
+      );
     }
 
     if (slot.kind === 'back') {
@@ -112,7 +207,7 @@ export default function CategoryGridSelector({
       <Pressable
         key={key}
         testID={`category-grid-${item.id}`}
-        onPress={() => (isFolder ? enterFolder(item) : onSelect(item.id))}
+        onPress={() => (isFolder ? enterFolder(item) : selectLeaf(item.id))}
         accessibilityRole="button"
         accessibilityState={{ selected: isSelected }}
         style={({ pressed }) => [
@@ -146,12 +241,12 @@ export default function CategoryGridSelector({
       ) : (
         rows.map((row, ri) => (
           <View key={`row-${ri}`} style={styles.row}>
-            {row.map((slot, ci) => {
+            {row.map((slot) => {
               const key = slot.kind === 'item'
                 ? `item-${slot.item.id}`
                 : slot.kind === 'spacer'
                   ? slot.id
-                  : `back-${ri}`;
+                  : `${slot.kind}-${ri}`;
               return renderSlot(slot, key);
             })}
           </View>
@@ -177,10 +272,12 @@ CategoryGridSelector.propTypes = {
   onSelect: PropTypes.func.isRequired,
   colors: PropTypes.object.isRequired,
   t: PropTypes.func.isRequired,
+  topCategoryIds: PropTypes.arrayOf(PropTypes.string),
 };
 
 CategoryGridSelector.defaultProps = {
   selectedCategoryId: null,
+  topCategoryIds: null,
 };
 
 const styles = StyleSheet.create({
