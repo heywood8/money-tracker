@@ -31,6 +31,7 @@ jest.mock('../../../app/services/PreferencesDB', () => ({
     BANK_NOTIFICATIONS_PROCESSED_SIGS: 'bank_notifications_processed_sigs',
     BANK_NOTIFICATIONS_PACKAGES: 'bank_notifications_packages',
     BANK_NOTIFICATIONS_ATM_ACCOUNT: 'bank_notifications_atm_account',
+    BANK_NOTIFICATIONS_ACCOUNT_BINDINGS: 'bank_notifications_account_bindings',
   },
   getPreference: jest.fn(),
   setPreference: jest.fn(),
@@ -790,6 +791,49 @@ describe('processBankNotifications', () => {
       });
       expect(AccountsDB.addAccountCardMask).not.toHaveBeenCalled();
       expect(NotificationRulesDB.upsertMerchantRule).not.toHaveBeenCalled();
+    });
+
+    // A card-less notification (T-Bank SBP "счет RUB") carries no card mask, so
+    // the manual pick is remembered as an (app + currency) -> account binding
+    // instead of a card mask.
+    const cardlessPending = {
+      ...pending, cardMask: null, currency: 'RUB', merchant: 'РЖД',
+      packageName: 'com.idamob.tinkoff.android',
+    };
+
+    it('learns the (app+currency) account binding for a card-less notification', async () => {
+      PendingNotificationsDB.getPendingNotificationById.mockResolvedValue(cardlessPending);
+      AccountsDB.getAccountById.mockResolvedValue({ id: 7, currency: 'RUB' });
+      await pipeline.resolvePendingNotification('p1', { accountId: 7, categoryId: 'cat-food' });
+      expect(PreferencesDB.setJsonPreference).toHaveBeenCalledWith(
+        'bank_notifications_account_bindings',
+        { 'com.idamob.tinkoff.android|RUB': 7 },
+      );
+      // No card to learn for a card-less notification.
+      expect(AccountsDB.addAccountCardMask).not.toHaveBeenCalled();
+    });
+
+    it('does not learn an account binding when opted out', async () => {
+      PendingNotificationsDB.getPendingNotificationById.mockResolvedValue(cardlessPending);
+      AccountsDB.getAccountById.mockResolvedValue({ id: 7, currency: 'RUB' });
+      await pipeline.resolvePendingNotification('p1', {
+        accountId: 7, categoryId: 'cat-food', learnAccountBinding: false,
+      });
+      expect(PreferencesDB.setJsonPreference).not.toHaveBeenCalledWith(
+        'bank_notifications_account_bindings', expect.anything(),
+      );
+    });
+
+    it('does not learn an account binding when the chosen account currency differs', async () => {
+      // Booking a RUB SBP charge against a USD account converts the amount, but the
+      // RUB->account key would mis-book future RUB notifications, so nothing is learned.
+      PendingNotificationsDB.getPendingNotificationById.mockResolvedValue(cardlessPending);
+      AccountsDB.getAccountById.mockResolvedValue({ id: 7, currency: 'USD' });
+      Currency.fetchLiveExchangeRate.mockResolvedValue({ rate: '0.011', source: 'offline' });
+      await pipeline.resolvePendingNotification('p1', { accountId: 7, categoryId: 'cat-food' });
+      expect(PreferencesDB.setJsonPreference).not.toHaveBeenCalledWith(
+        'bank_notifications_account_bindings', expect.anything(),
+      );
     });
 
     it('returns null for an unknown pending id', async () => {

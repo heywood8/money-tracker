@@ -5,9 +5,13 @@
 import * as resolver from '../../../app/services/notifications/resolveNotification';
 import * as AccountsDB from '../../../app/services/AccountsDB';
 import * as NotificationRulesDB from '../../../app/services/NotificationRulesDB';
+import { resolveAccountBinding } from '../../../app/services/notifications/accountBindings';
 
 jest.mock('../../../app/services/AccountsDB');
 jest.mock('../../../app/services/NotificationRulesDB');
+jest.mock('../../../app/services/notifications/accountBindings', () => ({
+  resolveAccountBinding: jest.fn(),
+}));
 
 const descriptor = {
   type: 'expense',
@@ -23,11 +27,22 @@ describe('resolveNotification', () => {
     jest.clearAllMocks();
     AccountsDB.getAccountByCardMask.mockResolvedValue(null);
     AccountsDB.getAllAccounts.mockResolvedValue([]);
+    resolveAccountBinding.mockResolvedValue(null);
     // resolveNotification (and the resolveCategoryId/resolveLabelOverride
     // helpers) now read the merchant rule once via getMerchantRule and derive
     // category + label override from it.
     NotificationRulesDB.getMerchantRule.mockResolvedValue(null);
   });
+
+  // A card-less descriptor (no mask) — e.g. a T-Bank SBP payment ("счет RUB").
+  const cardless = {
+    type: 'expense',
+    amount: '2118',
+    currency: 'RUB',
+    cardMask: null,
+    merchant: 'РЖД',
+    packageName: 'com.idamob.tinkoff.android',
+  };
 
   describe('resolveAccountId', () => {
     it('resolves via card-mask binding first', async () => {
@@ -62,6 +77,41 @@ describe('resolveNotification', () => {
 
     it('returns null when nothing matches', async () => {
       expect(await resolver.resolveAccountId(descriptor)).toBeNull();
+    });
+
+    it('resolves a card-less notification via the (app+currency) binding', async () => {
+      resolveAccountBinding.mockResolvedValue({ id: 5, currency: 'RUB' });
+      expect(await resolver.resolveAccountId(cardless)).toBe(5);
+      expect(resolveAccountBinding).toHaveBeenCalledWith('com.idamob.tinkoff.android', 'RUB');
+      // The binding wins outright — the currency heuristic is never consulted.
+      expect(AccountsDB.getAllAccounts).not.toHaveBeenCalled();
+    });
+
+    it('the binding wins over an ambiguous currency fallback', async () => {
+      resolveAccountBinding.mockResolvedValue({ id: 5, currency: 'RUB' });
+      AccountsDB.getAllAccounts.mockResolvedValue([
+        { id: 5, currency: 'RUB', hidden: 0 },
+        { id: 6, currency: 'RUB', hidden: 0 },
+      ]);
+      expect(await resolver.resolveAccountId(cardless)).toBe(5);
+    });
+
+    it('falls through to the currency heuristic when no binding exists', async () => {
+      resolveAccountBinding.mockResolvedValue(null);
+      AccountsDB.getAllAccounts.mockResolvedValue([{ id: 8, currency: 'RUB', hidden: 0 }]);
+      expect(await resolver.resolveAccountId(cardless)).toBe(8);
+    });
+
+    it('is card-less-only: a card notification never consults the binding', async () => {
+      resolveAccountBinding.mockResolvedValue({ id: 5 });
+      // descriptor carries a cardMask; getAccountByCardMask returns null (unbound)
+      // so it should fall to the currency heuristic, NOT the account binding.
+      AccountsDB.getAllAccounts.mockResolvedValue([
+        { id: 1, currency: 'AMD', hidden: 0 },
+        { id: 2, currency: 'AMD', hidden: 0 },
+      ]);
+      expect(await resolver.resolveAccountId(descriptor)).toBeNull();
+      expect(resolveAccountBinding).not.toHaveBeenCalled();
     });
   });
 

@@ -10,6 +10,7 @@ import {
 import { kindRequiresCategory } from '../services/notifications/parseBankNotification';
 import { getLabelForMerchant } from '../services/NotificationRulesDB';
 import { getAccountByCardMask } from '../services/AccountsDB';
+import { resolveAccountBinding } from '../services/notifications/accountBindings';
 import { appEvents, EVENTS } from '../services/eventEmitter';
 
 // Enable LayoutAnimation on the classic Android renderer (a no-op on Fabric, where
@@ -111,14 +112,21 @@ export default function usePendingOperationSuggestions() {
             .catch(() => existing?.labelOverride ?? '');
         }),
       );
-      // Re-resolve the account for any item the pipeline enqueued without one but
-      // that carries a card mask: the card→account binding may have been created
-      // (or made matchable) after the item was queued, so a card the user has
-      // since bound resolves now instead of leaving the account field blank.
+      // Re-resolve the account for any item the pipeline enqueued without one: a
+      // binding created (or made matchable) after the item was queued should
+      // backfill its account instead of leaving the field blank. A card item
+      // re-resolves via its card mask; a card-less item (SBP / account-level, no
+      // mask) re-resolves via the learned (source app + currency) binding — so
+      // binding one sibling unblocks the rest of the queued batch.
       const resolvedAccountIds = await Promise.all(
         list.map((item) => {
-          if (item.accountId != null || !item.cardMask) return Promise.resolve(item.accountId ?? null);
-          return getAccountByCardMask(item.cardMask)
+          if (item.accountId != null) return Promise.resolve(item.accountId);
+          if (item.cardMask) {
+            return getAccountByCardMask(item.cardMask)
+              .then((account) => (account ? account.id : null))
+              .catch(() => null);
+          }
+          return resolveAccountBinding(item.packageName, item.currency)
             .then((account) => (account ? account.id : null))
             .catch(() => null);
         }),
