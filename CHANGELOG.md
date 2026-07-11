@@ -1,5 +1,12 @@
 # Changelog
 
+## [0.189.0](https://github.com/heywood8/money-tracker/compare/penny-v0.188.0...penny-v0.189.0) (2026-07-11)
+
+
+### Features
+
+* **notifications:** bind card-less (SBP) notifications to an account ([#1210](https://github.com/heywood8/money-tracker/issues/1210)) ([7b52f53](https://github.com/heywood8/money-tracker/commit/7b52f53c1741297341811b0c18c3f8da3ba7d0e1))
+
 ## [0.188.0](https://github.com/heywood8/money-tracker/compare/penny-v0.187.3...penny-v0.188.0) (2026-07-11)
 
 
