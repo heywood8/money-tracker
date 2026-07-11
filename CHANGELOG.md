@@ -1,5 +1,12 @@
 # Changelog
 
+## [0.186.0](https://github.com/heywood8/money-tracker/compare/penny-v0.185.0...penny-v0.186.0) (2026-07-11)
+
+
+### Features
+
+* **notifications:** quick-add category grid on the binding card + resolve accounts by card mask on reload ([#1197](https://github.com/heywood8/money-tracker/issues/1197)) ([520cc9c](https://github.com/heywood8/money-tracker/commit/520cc9c0a4a1d1cdad00a1d350e8d1e54320181c))
+
 ## [0.185.0](https://github.com/heywood8/money-tracker/compare/penny-v0.184.0...penny-v0.185.0) (2026-07-10)
 
 
