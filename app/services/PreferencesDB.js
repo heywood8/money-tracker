@@ -23,6 +23,10 @@ export const PREF_KEYS = {
   // Target "cash" account for ATM-withdrawal transfers, bound the first time an
   // ATM CASH notification is reviewed and reused for subsequent withdrawals.
   BANK_NOTIFICATIONS_ATM_ACCOUNT: 'bank_notifications_atm_account',
+  // Learned (source app + currency) -> account bindings for notifications that
+  // carry no card number (e.g. T-Bank SBP payments say "счет RUB", not "*4087").
+  // A JSON object keyed by "<packageName>|<CURRENCY>" with an account id value.
+  BANK_NOTIFICATIONS_ACCOUNT_BINDINGS: 'bank_notifications_account_bindings',
   // Notification feed app filters (which apps' notifications are shown)
   NOTIFICATION_FILTER_KNOWN: 'notification_filter_known_packages',
   NOTIFICATION_FILTER_HIDDEN: 'notification_filter_hidden_packages',

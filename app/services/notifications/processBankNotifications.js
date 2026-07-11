@@ -21,6 +21,7 @@ import { appEvents, EVENTS } from '../eventEmitter';
 import { captureLocationIfEnabled, operationLocationFields } from '../operationLocation';
 import { parseBankNotification, kindRequiresCategory } from './parseBankNotification';
 import { resolveNotification } from './resolveNotification';
+import { learnAccountBinding } from './accountBindings';
 
 /**
  * A per-run location provider. Captures the device location at most once (lazily,
@@ -662,6 +663,27 @@ export const resolvePendingNotification = async (pendingId, choices = {}) => {
       await AccountsDB.addAccountCardMask(accountId, pending.cardMask);
     } catch (error) {
       console.error('[resolvePendingNotification] Failed to learn card mask:', error);
+    }
+  }
+
+  // Learn the (source app + currency) -> account binding for a card-less
+  // notification (SBP / account-level messages carry no card number), so future
+  // card-less notifications from this bank in this currency resolve without a
+  // manual pick. Only when the chosen account's currency matches the notification
+  // currency — otherwise the currency key would point at a mismatched account and
+  // mis-book later notifications.
+  if (
+    choices.learnAccountBinding !== false &&
+    !pending.cardMask &&
+    pending.packageName &&
+    pending.currency &&
+    accountId != null &&
+    accountCurrency === pending.currency
+  ) {
+    try {
+      await learnAccountBinding(pending.packageName, pending.currency, accountId);
+    } catch (error) {
+      console.error('[resolvePendingNotification] Failed to learn account binding:', error);
     }
   }
 

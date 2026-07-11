@@ -9,16 +9,23 @@
 
 import * as AccountsDB from '../AccountsDB';
 import * as NotificationRulesDB from '../NotificationRulesDB';
+import { resolveAccountBinding } from './accountBindings';
 
 /**
  * Resolve the account for a descriptor.
  *
  * 1. Exact card-mask binding wins.
- * 2. Otherwise, if exactly one non-hidden account matches the notification's
+ * 2. For a card-less notification (no mask — e.g. an SBP payment that names only
+ *    "счет RUB"), a learned (source app + currency) binding wins next. This is
+ *    scoped to card-less notifications on purpose: a real card notification for
+ *    an unbound card must still reach the queue so its card is learned, rather
+ *    than being captured by an account-wide default.
+ * 3. Otherwise, if exactly one non-hidden account matches the notification's
  *    currency, use it (a safe single-account fallback).
- * 3. Otherwise null — the user must choose.
+ * 4. Otherwise null — the user must choose.
  *
- * @param {Object} descriptor - parsed notification (needs cardMask, currency)
+ * @param {Object} descriptor - parsed notification (needs cardMask, currency,
+ *   packageName)
  * @returns {Promise<Object|null>} the account row, or null
  */
 export const resolveAccount = async (descriptor) => {
@@ -27,6 +34,9 @@ export const resolveAccount = async (descriptor) => {
   if (descriptor.cardMask) {
     const account = await AccountsDB.getAccountByCardMask(descriptor.cardMask);
     if (account) return account;
+  } else {
+    const bound = await resolveAccountBinding(descriptor.packageName, descriptor.currency);
+    if (bound) return bound;
   }
 
   if (descriptor.currency) {
