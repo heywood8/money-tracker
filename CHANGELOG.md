@@ -1,5 +1,12 @@
 # Changelog
 
+## [0.190.3](https://github.com/heywood8/money-tracker/compare/penny-v0.190.2...penny-v0.190.3) (2026-07-11)
+
+
+### Bug Fixes
+
+* **updates:** don't dismiss update prompt on outside tap ([#1214](https://github.com/heywood8/money-tracker/issues/1214)) ([7880441](https://github.com/heywood8/money-tracker/commit/78804413d1e302951e61b7b13ea15801dc267f64))
+
 ## [0.190.2](https://github.com/heywood8/money-tracker/compare/penny-v0.190.1...penny-v0.190.2) (2026-07-11)
 
 
