@@ -1,5 +1,12 @@
 # Changelog
 
+## [0.187.2](https://github.com/heywood8/money-tracker/compare/penny-v0.187.1...penny-v0.187.2) (2026-07-11)
+
+
+### Bug Fixes
+
+* **updates:** full-screen scrim for the update-available modal ([#1203](https://github.com/heywood8/money-tracker/issues/1203)) ([c3c37c2](https://github.com/heywood8/money-tracker/commit/c3c37c20c091202b8b064dd1cb2ec4c7a7510a22))
+
 ## [0.187.1](https://github.com/heywood8/money-tracker/compare/penny-v0.187.0...penny-v0.187.1) (2026-07-11)
 
 
