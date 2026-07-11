@@ -74,4 +74,35 @@ describe('ExpensePieChart', () => {
     const { queryAllByTestId } = await render(<ExpensePieChart {...defaultProps} />);
     expect(queryAllByTestId('icon-dots-horizontal').length).toBe(0);
   });
+
+  describe('leaf category (operations list)', () => {
+    const operations = [
+      { id: '1', amount: '12.50', date: '2024-01-15', description: 'Coffee', type: 'expense' },
+    ];
+
+    it('renders the operations list instead of the donut', async () => {
+      const { getByText, queryByTestId } = await render(
+        <ExpensePieChart {...defaultProps} isLeafCategory={true} operations={operations} />,
+      );
+      expect(queryByTestId('donut-chart')).toBeNull();
+      expect(getByText('Coffee')).toBeTruthy();
+      expect(getByText('$12.50')).toBeTruthy();
+    });
+
+    it('shows the empty state when the leaf has no operations', async () => {
+      const { getByText, queryByTestId } = await render(
+        <ExpensePieChart {...defaultProps} isLeafCategory={true} operations={[]} />,
+      );
+      expect(queryByTestId('donut-chart')).toBeNull();
+      expect(getByText('no_expense_data')).toBeTruthy();
+    });
+
+    it('shows a spinner while the leaf operations load', async () => {
+      const { getByTestId, queryByTestId } = await render(
+        <ExpensePieChart {...defaultProps} isLeafCategory={true} loadingOperations={true} operations={[]} />,
+      );
+      expect(queryByTestId('donut-chart')).toBeNull();
+      expect(getByTestId('category-operations-loading')).toBeTruthy();
+    });
+  });
 });

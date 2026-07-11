@@ -3,16 +3,35 @@ import { View, Text, StyleSheet, ActivityIndicator } from 'react-native';
 import PropTypes from 'prop-types';
 import DonutChart from './DonutChart';
 import CustomLegend from './CustomLegend';
+import CategoryOperationsList from './CategoryOperationsList';
 
 const IncomePieChart = ({
   colors,
   t,
+  language,
   loadingIncome,
   incomeChartData,
   selectedCurrency,
   onLegendItemPress,
-  selectedIncomeCategory,
+  isLeafCategory,
+  operations,
+  loadingOperations,
 }) => {
+  // A leaf category has no sub-categories left to break down — show its actual
+  // operations for the period instead of a pointless single-slice donut.
+  if (isLeafCategory) {
+    return (
+      <CategoryOperationsList
+        operations={operations}
+        loading={loadingOperations}
+        currency={selectedCurrency}
+        colors={colors}
+        language={language}
+        emptyText={t('no_income_data')}
+      />
+    );
+  }
+
   if (loadingIncome) {
     return (
       <View style={styles.loadingContainer}>
@@ -41,7 +60,7 @@ const IncomePieChart = ({
           currency={selectedCurrency}
           colors={colors}
           onItemPress={onLegendItemPress}
-          isClickable={selectedIncomeCategory === 'all'}
+          isClickable
         />
       </View>
     </View>
@@ -51,11 +70,21 @@ const IncomePieChart = ({
 IncomePieChart.propTypes = {
   colors: PropTypes.object.isRequired,
   t: PropTypes.func.isRequired,
+  language: PropTypes.string,
   loadingIncome: PropTypes.bool.isRequired,
   incomeChartData: PropTypes.array.isRequired,
   selectedCurrency: PropTypes.string.isRequired,
   onLegendItemPress: PropTypes.func.isRequired,
-  selectedIncomeCategory: PropTypes.string.isRequired,
+  isLeafCategory: PropTypes.bool,
+  operations: PropTypes.array,
+  loadingOperations: PropTypes.bool,
+};
+
+IncomePieChart.defaultProps = {
+  language: undefined,
+  isLeafCategory: false,
+  operations: [],
+  loadingOperations: false,
 };
 
 const styles = StyleSheet.create({
