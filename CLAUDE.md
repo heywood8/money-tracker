@@ -384,6 +384,10 @@ npm test  # Must show all tests passing (0 failed)
 
 If tests fail, DO NOT push. Fix the failures first.
 
+### Code Review Before a Pull Request
+
+**After implementing a feature and passing tests, run a code review of the change before opening the pull request.** Invoke the `/code-review` skill on the working diff (default effort, or `high`/`max` for larger or riskier changes), address the findings it surfaces (fix them, or consciously decide they're not worth acting on), then open the PR. This is a required step in the feature workflow: implement → tests green → `/code-review` → PR. Do not skip it for non-trivial feature work.
+
 **Testing Patterns:**
 
 1. **Context Testing** (see `__tests__/contexts/ThemeContext.test.js`):
