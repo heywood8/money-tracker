@@ -1,5 +1,12 @@
 # Changelog
 
+## [0.190.1](https://github.com/heywood8/money-tracker/compare/penny-v0.190.0...penny-v0.190.1) (2026-07-11)
+
+
+### Documentation
+
+* **claude:** require /code-review after a feature, before the PR ([#1213](https://github.com/heywood8/money-tracker/issues/1213)) ([16af751](https://github.com/heywood8/money-tracker/commit/16af75180e16d65c5acac981d776293d88537ff0))
+
 ## [0.190.0](https://github.com/heywood8/money-tracker/compare/penny-v0.189.0...penny-v0.190.0) (2026-07-11)
 
 
