@@ -1,5 +1,12 @@
 # Changelog
 
+## [0.190.2](https://github.com/heywood8/money-tracker/compare/penny-v0.190.1...penny-v0.190.2) (2026-07-11)
+
+
+### Continuous Integration
+
+* auto-retry failed workflow runs once for transient failures ([#1216](https://github.com/heywood8/money-tracker/issues/1216)) ([443b3d6](https://github.com/heywood8/money-tracker/commit/443b3d603dcbe5713120f3041faa226fdf94851a))
+
 ## [0.190.1](https://github.com/heywood8/money-tracker/compare/penny-v0.190.0...penny-v0.190.1) (2026-07-11)
 
 
