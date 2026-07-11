@@ -1,5 +1,12 @@
 # Changelog
 
+## [0.191.0](https://github.com/heywood8/money-tracker/compare/penny-v0.190.3...penny-v0.191.0) (2026-07-11)
+
+
+### Features
+
+* **accounts:** global toggle to show an Accounts tab in the bottom menu ([#1219](https://github.com/heywood8/money-tracker/issues/1219)) ([24fa56b](https://github.com/heywood8/money-tracker/commit/24fa56b589fda605f42a175dc742f996dd170c69))
+
 ## [0.190.3](https://github.com/heywood8/money-tracker/compare/penny-v0.190.2...penny-v0.190.3) (2026-07-11)
 
 
