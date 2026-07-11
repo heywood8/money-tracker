@@ -174,6 +174,11 @@ const isSchemaComplete = async (rawDb) => {
     // would skip migrate() and never gain the column.
     if (!accountsCols.some(c => c.name === 'auto_txn_rounding_mode')) return false;
 
+    // Check accounts has show_in_main_menu column (migration 0015). Same
+    // reasoning: an install complete through 0014 would otherwise skip migrate()
+    // and never gain the column.
+    if (!accountsCols.some(c => c.name === 'show_in_main_menu')) return false;
+
     return true;
   } catch (error) {
     console.warn('[DB] isSchemaComplete check failed:', error.message);
@@ -443,6 +448,14 @@ const detectAppliedMigrations = async (rawDb) => {
     const accCols = await getColumns('accounts');
     if (accCols.some(c => c.name === 'auto_txn_rounding_mode')) {
       applied.push(14);
+    }
+  }
+
+  // Migration 0015: Adds accounts.show_in_main_menu column.
+  if (await tableExists('accounts')) {
+    const accCols = await getColumns('accounts');
+    if (accCols.some(c => c.name === 'show_in_main_menu')) {
+      applied.push(15);
     }
   }
 

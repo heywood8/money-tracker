@@ -16,6 +16,7 @@ import m0011 from './0011_merchant_label_override.js';
 import m0012 from './0012_account_auto_txn_rounding.js';
 import m0013 from './0013_operation_exclude_from_avg.js';
 import m0014 from './0014_account_rounding_mode.js';
+import m0015 from './0015_account_show_in_main_menu.js';
 
 export default {
   journal,
@@ -35,6 +36,7 @@ export default {
     m0012,
     m0013,
     m0014,
+    m0015,
   },
   postMigrationHandlers: {
     m0003: m0003PostMigration,

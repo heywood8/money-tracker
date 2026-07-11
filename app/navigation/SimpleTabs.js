@@ -19,6 +19,7 @@ const SCREEN_TIMING = { duration: 300, easing: Easing.out(Easing.cubic) };
 const PILL_TIMING = { duration: 200, easing: Easing.out(Easing.quad) };
 import { MaterialCommunityIcons } from '@expo/vector-icons';
 import OperationsScreen from '../screens/OperationsScreen';
+import AccountsScreen from '../screens/AccountsScreen';
 import GraphsScreen from '../screens/GraphsScreen';
 import PlannedOperationsScreen from '../screens/PlannedOperationsScreen';
 import { useThemeColors } from '../contexts/ThemeColorsContext';
@@ -39,6 +40,7 @@ const withAlpha = (hex, alpha) => {
 
 const TAB_ICONS = {
   Operations: 'swap-horizontal',
+  Accounts: 'wallet-outline',
   Graphs: 'chart-line',
   Planned: 'calendar-clock',
   Settings: 'cog-outline',
@@ -247,6 +249,7 @@ export default function SimpleTabs() {
 
   const TABS = useMemo(() => [
     { key: 'Operations', label: t('operations') || 'Operations' },
+    { key: 'Accounts', label: t('accounts') || 'Accounts' },
     { key: 'Graphs', label: t('graphs') || 'Graphs' },
     { key: 'Planned', label: t('planned') || 'Planned' },
     { key: 'Settings', label: t('settings') || 'Settings' },
@@ -271,17 +274,20 @@ export default function SimpleTabs() {
   const screenAdjust1 = useSharedValue(0);
   const screenAdjust2 = useSharedValue(0);
   const screenAdjust3 = useSharedValue(0);
+  const screenAdjust4 = useSharedValue(0);
   // Opacity per screen — intermediates are zeroed during non-adjacent transitions
   // so they don't bleed through when the target overlaps their strip position.
   const screenOpacity0 = useSharedValue(1);
   const screenOpacity1 = useSharedValue(1);
   const screenOpacity2 = useSharedValue(1);
   const screenOpacity3 = useSharedValue(1);
+  const screenOpacity4 = useSharedValue(1);
 
   const screenAdjustedStyle0 = useAnimatedStyle(() => ({ opacity: screenOpacity0.value, transform: [{ translateX: screenAdjust0.value }] }));
   const screenAdjustedStyle1 = useAnimatedStyle(() => ({ opacity: screenOpacity1.value, transform: [{ translateX: screenAdjust1.value }] }));
   const screenAdjustedStyle2 = useAnimatedStyle(() => ({ opacity: screenOpacity2.value, transform: [{ translateX: screenAdjust2.value }] }));
   const screenAdjustedStyle3 = useAnimatedStyle(() => ({ opacity: screenOpacity3.value, transform: [{ translateX: screenAdjust3.value }] }));
+  const screenAdjustedStyle4 = useAnimatedStyle(() => ({ opacity: screenOpacity4.value, transform: [{ translateX: screenAdjust4.value }] }));
 
   // Called on JS thread when a non-adjacent transition finishes.
   const clearTransitioningRef = useCallback(() => {
@@ -315,8 +321,8 @@ export default function SimpleTabs() {
       const direction = newIndex > oldIndex ? 1 : -1;
       // How far to shift the target so it appears one screen width past the source.
       const adjacentOffset = (oldIndex + direction - newIndex) * SCREEN_WIDTH;
-      const adjSharedValues = [screenAdjust0, screenAdjust1, screenAdjust2, screenAdjust3];
-      const opacityValues = [screenOpacity0, screenOpacity1, screenOpacity2, screenOpacity3];
+      const adjSharedValues = [screenAdjust0, screenAdjust1, screenAdjust2, screenAdjust3, screenAdjust4];
+      const opacityValues = [screenOpacity0, screenOpacity1, screenOpacity2, screenOpacity3, screenOpacity4];
       const targetAdjust = adjSharedValues[newIndex];
 
       isTransitioningShared.value = true;
@@ -324,7 +330,7 @@ export default function SimpleTabs() {
 
       // Hide intermediate screens so they don't bleed through when the repositioned
       // target overlaps their strip position (all worklet-thread, no React render).
-      for (let i = 0; i < 4; i++) {
+      for (let i = 0; i < opacityValues.length; i++) {
         if (i !== oldIndex && i !== newIndex) opacityValues[i].value = 0;
       }
 
@@ -339,6 +345,7 @@ export default function SimpleTabs() {
         opacityValues[1].value = 1;
         opacityValues[2].value = 1;
         opacityValues[3].value = 1;
+        opacityValues[4].value = 1;
         isTransitioningShared.value = false;
         runOnJS(clearTransitioningRef)();
       });
@@ -349,8 +356,8 @@ export default function SimpleTabs() {
     // destination content is on-screen and slides in together with the strip.
     setActive(tabKey);
   }, [TABS, active, activeIndex, translateX, pillPosition, isTransitioningShared,
-    screenAdjust0, screenAdjust1, screenAdjust2, screenAdjust3,
-    screenOpacity0, screenOpacity1, screenOpacity2, screenOpacity3,
+    screenAdjust0, screenAdjust1, screenAdjust2, screenAdjust3, screenAdjust4,
+    screenOpacity0, screenOpacity1, screenOpacity2, screenOpacity3, screenOpacity4,
     clearTransitioningRef]);
 
   // A tapped "transactions to review" notification routes here: jump to the
@@ -459,6 +466,7 @@ export default function SimpleTabs() {
   // stable element reference lets React skip reconciling them, which avoids a
   // frame drop / stutter as a switch animation settles.
   const operationsScreen = useMemo(() => <OperationsScreen />, []);
+  const accountsScreen = useMemo(() => <AccountsScreen mainMenuMode />, []);
   const graphsScreen = useMemo(() => <GraphsScreen />, []);
   const plannedScreen = useMemo(() => <PlannedOperationsScreen />, []);
   const settingsScreen = useMemo(
@@ -473,18 +481,21 @@ export default function SimpleTabs() {
           {operationsScreen}
         </Animated.View>
         <Animated.View style={[styles.screen, screenAdjustedStyle1]}>
-          {graphsScreen}
+          {accountsScreen}
         </Animated.View>
         <Animated.View style={[styles.screen, screenAdjustedStyle2]}>
-          {plannedScreen}
+          {graphsScreen}
         </Animated.View>
         <Animated.View style={[styles.screen, screenAdjustedStyle3]}>
+          {plannedScreen}
+        </Animated.View>
+        <Animated.View style={[styles.screen, screenAdjustedStyle4]}>
           {settingsScreen}
         </Animated.View>
       </>
     );
-  }, [operationsScreen, graphsScreen, plannedScreen, settingsScreen,
-    screenAdjustedStyle0, screenAdjustedStyle1, screenAdjustedStyle2, screenAdjustedStyle3]);
+  }, [operationsScreen, accountsScreen, graphsScreen, plannedScreen, settingsScreen,
+    screenAdjustedStyle0, screenAdjustedStyle1, screenAdjustedStyle2, screenAdjustedStyle3, screenAdjustedStyle4]);
 
   const displayedTab = active;
 
@@ -569,7 +580,7 @@ const styles = StyleSheet.create({
     overflow: 'hidden',
     paddingHorizontal: 15,
     position: 'relative',
-    width: '70%',
+    width: '92%',
     ...Platform.select({
       android: {
         elevation: 8,
@@ -599,7 +610,7 @@ const styles = StyleSheet.create({
   screensContainer: {
     flex: 1,
     flexDirection: 'row',
-    width: SCREEN_WIDTH * 4,
+    width: SCREEN_WIDTH * 5,
   },
   tab: {
     flex: 1,

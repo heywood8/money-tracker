@@ -33,6 +33,10 @@ export const accounts = sqliteTable('accounts', {
   // 'down' (always down to the previous multiple). Nullable — NULL means
   // 'nearest'. Only meaningful when autoTxnRounding is set.
   autoTxnRoundingMode: text('auto_txn_rounding_mode'),
+  // Whether this account is listed on the dedicated Accounts tab in the bottom
+  // navigation ("main menu"). 0/NULL = not shown (default), 1 = shown. Set from
+  // the account settings in the Settings tab.
+  showInMainMenu: integer('show_in_main_menu').default(0),
   createdAt: text('created_at').notNull(),
   updatedAt: text('updated_at').notNull(),
   deletedAt: text('deleted_at'),
