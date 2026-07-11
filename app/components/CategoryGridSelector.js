@@ -148,9 +148,15 @@ export default function CategoryGridSelector({
     return chunked;
   }, [suggestMode, browsing, showAllButton, topCategories, breadcrumb.length, levelItems, columns]);
 
+  // In suggestions mode the grid sits over the quick-add panel, so its chips
+  // adopt the compact proportions the quick-add category shortcuts use — shorter,
+  // smaller text and icons — to occupy the same vertical space.
+  const affixIconSize = suggestMode ? 16 : 18; // "All categories" / Back
+  const itemIconSize = suggestMode ? 18 : 20;
+
   const renderSlot = (slot, key) => {
     if (slot.kind === 'spacer') {
-      return <View key={key} style={[styles.chip, styles.invisible]} />;
+      return <View key={key} style={[styles.chip, suggestMode && styles.chipCompact, styles.invisible]} />;
     }
 
     if (slot.kind === 'all') {
@@ -163,12 +169,13 @@ export default function CategoryGridSelector({
           accessibilityLabel={t('all_categories') || 'All categories'}
           style={({ pressed }) => [
             styles.chip,
+            suggestMode && styles.chipCompact,
             { backgroundColor: chipBackground, borderColor: colors.border },
             pressed && { backgroundColor: colors.selected },
           ]}
         >
-          <Icon name="menu" size={18} color={colors.text} />
-          <Text style={[styles.chipText, { color: colors.text }]} numberOfLines={2}>
+          <Icon name="menu" size={affixIconSize} color={colors.text} />
+          <Text style={[styles.chipText, suggestMode && styles.chipTextCompact, { color: colors.text }]} numberOfLines={2}>
             {t('all_categories') || 'All categories'}
           </Text>
         </Pressable>
@@ -185,12 +192,13 @@ export default function CategoryGridSelector({
           accessibilityLabel={t('back') || 'Back'}
           style={({ pressed }) => [
             styles.chip,
+            suggestMode && styles.chipCompact,
             { backgroundColor: chipBackground, borderColor: colors.border },
             pressed && { backgroundColor: colors.selected },
           ]}
         >
-          <Icon name="arrow-left" size={18} color={colors.text} />
-          <Text style={[styles.chipText, { color: colors.text }]} numberOfLines={1}>
+          <Icon name="arrow-left" size={affixIconSize} color={colors.text} />
+          <Text style={[styles.chipText, suggestMode && styles.chipTextCompact, { color: colors.text }]} numberOfLines={1}>
             {t('back') || 'Back'}
           </Text>
         </Pressable>
@@ -212,6 +220,7 @@ export default function CategoryGridSelector({
         accessibilityState={{ selected: isSelected }}
         style={({ pressed }) => [
           styles.chip,
+          suggestMode && styles.chipCompact,
           {
             backgroundColor: isSelected ? colors.primary : chipBackground,
             borderColor: isSelected ? colors.primary : colors.border,
@@ -219,8 +228,8 @@ export default function CategoryGridSelector({
           pressed && !isSelected && { backgroundColor: colors.selected },
         ]}
       >
-        <Icon name={item.icon || (isFolder ? 'folder' : 'tag')} size={20} color={textColor} />
-        <Text style={[styles.chipText, { color: textColor }]} numberOfLines={2}>
+        <Icon name={item.icon || (isFolder ? 'folder' : 'tag')} size={itemIconSize} color={textColor} />
+        <Text style={[styles.chipText, suggestMode && styles.chipTextCompact, { color: textColor }]} numberOfLines={2}>
           {name}
         </Text>
         {isFolder && (
@@ -293,11 +302,21 @@ const styles = StyleSheet.create({
     paddingVertical: SPACING.sm,
     position: 'relative',
   },
+  // Matches the quick-add category shortcut proportions so the grid reads at the
+  // same height when laid over the quick-add panel.
+  chipCompact: {
+    gap: 0,
+    minHeight: 48,
+    paddingVertical: SPACING.xs,
+  },
   chipText: {
     fontSize: FONT_SIZE.sm,
     fontWeight: '500',
     marginTop: 2,
     textAlign: 'center',
+  },
+  chipTextCompact: {
+    fontSize: FONT_SIZE.xs,
   },
   empty: {
     fontSize: FONT_SIZE.md,
