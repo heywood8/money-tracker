@@ -1,5 +1,12 @@
 # Changelog
 
+## [0.187.3](https://github.com/heywood8/money-tracker/compare/penny-v0.187.2...penny-v0.187.3) (2026-07-11)
+
+
+### Bug Fixes
+
+* **operations:** match transfer account row gap to category rows ([#1205](https://github.com/heywood8/money-tracker/issues/1205)) ([cc52741](https://github.com/heywood8/money-tracker/commit/cc527411dcc95fa7d9876257017995337007eed5))
+
 ## [0.187.2](https://github.com/heywood8/money-tracker/compare/penny-v0.187.1...penny-v0.187.2) (2026-07-11)
 
 
