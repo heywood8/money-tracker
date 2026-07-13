@@ -1,5 +1,12 @@
 # Changelog
 
+## [0.193.1](https://github.com/heywood8/money-tracker/compare/penny-v0.193.0...penny-v0.193.1) (2026-07-13)
+
+
+### Bug Fixes
+
+* **settings:** reset to main list when app is backgrounded on a subpanel ([#1229](https://github.com/heywood8/money-tracker/issues/1229)) ([edfdf38](https://github.com/heywood8/money-tracker/commit/edfdf3883562220b0130b886e71174a747a94caf))
+
 ## [0.193.0](https://github.com/heywood8/money-tracker/compare/penny-v0.192.1...penny-v0.193.0) (2026-07-13)
 
 
