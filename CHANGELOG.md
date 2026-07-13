@@ -1,5 +1,12 @@
 # Changelog
 
+## [0.193.0](https://github.com/heywood8/money-tracker/compare/penny-v0.192.1...penny-v0.193.0) (2026-07-13)
+
+
+### Features
+
+* **planned:** показывать предстоящие суммы как X / Y с K/M ([#1227](https://github.com/heywood8/money-tracker/issues/1227)) ([3476547](https://github.com/heywood8/money-tracker/commit/3476547d3cc43a7166676b4fb68014618dfa8baa))
+
 ## [0.192.1](https://github.com/heywood8/money-tracker/compare/penny-v0.192.0...penny-v0.192.1) (2026-07-13)
 
 
