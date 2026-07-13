@@ -65,6 +65,8 @@ export default function PlannedOperationsScreen() {
     const oneTime = [];
     let pendingOut = 0;
     let pendingIn = 0;
+    let totalOut = 0;
+    let totalIn = 0;
     let doneCount = 0;
     for (const op of plannedOperations) {
       if (op.isRecurring) {
@@ -72,22 +74,35 @@ export default function PlannedOperationsScreen() {
       } else {
         oneTime.push(op);
       }
+      const amount = parseFloat(op.amount || '0');
+      const isOut = op.type === 'expense' || op.type === 'transfer';
+      const isIn = op.type === 'income';
+      if (isOut) {
+        totalOut += amount;
+      } else if (isIn) {
+        totalIn += amount;
+      }
       if (isExecutedThisMonth(op)) {
         doneCount++;
-      } else {
-        const amount = parseFloat(op.amount || '0');
-        if (op.type === 'expense' || op.type === 'transfer') {
-          pendingOut += amount;
-        } else if (op.type === 'income') {
-          pendingIn += amount;
-        }
+      } else if (isOut) {
+        pendingOut += amount;
+      } else if (isIn) {
+        pendingIn += amount;
       }
     }
     const total = plannedOperations.length;
     return {
       recurringOps: sortByExecution(recurring),
       oneTimeOps: sortByExecution(oneTime),
-      summary: { pendingOut, pendingIn, doneCount, total, progressFraction: total > 0 ? doneCount / total : 0 },
+      summary: {
+        pendingOut,
+        pendingIn,
+        totalOut,
+        totalIn,
+        doneCount,
+        total,
+        progressFraction: total > 0 ? doneCount / total : 0,
+      },
     };
   }, [plannedOperations, isExecutedThisMonth, sortByExecution]);
 
@@ -116,8 +131,10 @@ export default function PlannedOperationsScreen() {
           <Text
             testID="summary-pending-out"
             style={[styles.summaryValue, { color: colors.expense }]}
+            numberOfLines={1}
+            adjustsFontSizeToFit
           >
-            {formatSummaryAmount(summary.pendingOut)}
+            {`${formatSummaryAmount(summary.pendingOut)} / ${formatSummaryAmount(summary.totalOut)}`}
           </Text>
           <Text style={[styles.summaryLabel, { color: colors.mutedText }]}>
             {t('pending_out')}
@@ -128,6 +145,8 @@ export default function PlannedOperationsScreen() {
           <Text
             testID="summary-done-count"
             style={[styles.summaryValue, { color: colors.text }]}
+            numberOfLines={1}
+            adjustsFontSizeToFit
           >
             {`${summary.doneCount} / ${summary.total}`}
           </Text>
@@ -140,8 +159,10 @@ export default function PlannedOperationsScreen() {
           <Text
             testID="summary-pending-in"
             style={[styles.summaryValue, { color: colors.income }]}
+            numberOfLines={1}
+            adjustsFontSizeToFit
           >
-            {formatSummaryAmount(summary.pendingIn)}
+            {`${formatSummaryAmount(summary.pendingIn)} / ${formatSummaryAmount(summary.totalIn)}`}
           </Text>
           <Text style={[styles.summaryLabel, { color: colors.mutedText }]}>
             {t('pending_in')}
