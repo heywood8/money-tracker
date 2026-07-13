@@ -1,6 +1,6 @@
 import React, { useEffect, useState, useCallback, useRef, useMemo } from 'react';
 import PropTypes from 'prop-types';
-import { View, StyleSheet, TouchableOpacity, ScrollView, FlatList, Linking, ActivityIndicator, BackHandler } from 'react-native';
+import { View, StyleSheet, TouchableOpacity, ScrollView, FlatList, Linking, ActivityIndicator, BackHandler, AppState } from 'react-native';
 import * as Clipboard from 'expo-clipboard';
 import { HORIZONTAL_PADDING, SPACING, BORDER_RADIUS } from '../styles/layout';
 import { Text, Divider, TouchableRipple, Menu } from 'react-native-paper';
@@ -383,6 +383,25 @@ export default function SettingsScreen({ setSubPanelActive }) {
     });
     return () => subscription.remove();
   }, [activeSubPanel, isBackDisabled, navigateBack]);
+
+  // When the app is backgrounded while a subpanel is open, reset back to the main
+  // settings list so returning to the app lands on the settings root rather than
+  // mid-flow. Skipped while a long async step (Sheets export/import) is running so
+  // it isn't yanked out from under an in-flight operation.
+  const closeSubPanelRef = useRef(closeSubPanel);
+  closeSubPanelRef.current = closeSubPanel;
+  const isBackDisabledRef = useRef(isBackDisabled);
+  isBackDisabledRef.current = isBackDisabled;
+  const activeSubPanelRef = useRef(activeSubPanel);
+  activeSubPanelRef.current = activeSubPanel;
+  useEffect(() => {
+    const subscription = AppState.addEventListener('change', (nextState) => {
+      if (nextState !== 'background') return;
+      if (!activeSubPanelRef.current || isBackDisabledRef.current) return;
+      closeSubPanelRef.current();
+    });
+    return () => subscription.remove();
+  }, []);
 
   const handleLanguageSelect = useCallback((lng) => {
     setLanguage(lng);
