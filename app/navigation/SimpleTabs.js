@@ -249,15 +249,15 @@ export default function SimpleTabs() {
   // reinstall the native gesture recognizer mid-animation and cause jitter).
   const isTransitioningShared = useSharedValue(false);
 
-  // The Accounts tab is optional — inserted right after Operations only when the
-  // "show accounts in main menu" preference is on.
+  // The Accounts tab is optional — inserted just before Settings (second to last)
+  // only when the "show accounts in main menu" preference is on.
   const TABS = useMemo(() => {
     const tabs = [{ key: 'Operations', label: t('operations') || 'Operations' }];
+    tabs.push({ key: 'Graphs', label: t('graphs') || 'Graphs' });
+    tabs.push({ key: 'Planned', label: t('planned') || 'Planned' });
     if (showAccountsTab) {
       tabs.push({ key: 'Accounts', label: t('accounts') || 'Accounts' });
     }
-    tabs.push({ key: 'Graphs', label: t('graphs') || 'Graphs' });
-    tabs.push({ key: 'Planned', label: t('planned') || 'Planned' });
     tabs.push({ key: 'Settings', label: t('settings') || 'Settings' });
     return tabs;
   }, [t, showAccountsTab]);
@@ -505,9 +505,9 @@ export default function SimpleTabs() {
   // preserved (not remounted) when the optional Accounts tab shifts positions.
   const orderedScreens = useMemo(() => {
     const list = [{ key: 'Operations', el: operationsScreen }];
-    if (showAccountsTab) list.push({ key: 'Accounts', el: accountsScreen });
     list.push({ key: 'Graphs', el: graphsScreen });
     list.push({ key: 'Planned', el: plannedScreen });
+    if (showAccountsTab) list.push({ key: 'Accounts', el: accountsScreen });
     list.push({ key: 'Settings', el: settingsScreen });
     return list;
   }, [showAccountsTab, operationsScreen, accountsScreen, graphsScreen, plannedScreen, settingsScreen]);
