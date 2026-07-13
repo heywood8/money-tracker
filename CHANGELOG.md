@@ -1,5 +1,12 @@
 # Changelog
 
+## [0.192.0](https://github.com/heywood8/money-tracker/compare/penny-v0.191.1...penny-v0.192.0) (2026-07-13)
+
+
+### Features
+
+* **accounts:** move Accounts tab to second-to-last position before Settings ([#1223](https://github.com/heywood8/money-tracker/issues/1223)) ([83400a0](https://github.com/heywood8/money-tracker/commit/83400a0bf46609a09ab24fd16f171f5d65d50ab5))
+
 ## [0.191.1](https://github.com/heywood8/money-tracker/compare/penny-v0.191.0...penny-v0.191.1) (2026-07-13)
 
 
