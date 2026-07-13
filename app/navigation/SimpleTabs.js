@@ -633,7 +633,7 @@ const styles = StyleSheet.create({
     justifyContent: 'flex-end',
   },
   floatingBarWide: {
-    width: '92%',
+    width: '84%',
   },
   floatingBarWrapper: {
     bottom: 0,
