@@ -1048,15 +1048,111 @@ export const getIncomeByCategory = async (startDate, endDate) => {
 };
 
 /**
+ * Fetch one exchange rate per distinct source currency into `targetCurrency`,
+ * in parallel. The offline rate is tried first (synchronous, no network) so a
+ * known currency pair never stalls the caller; only a currency absent from the
+ * offline table triggers a live fetch (see {@link Currency.fetchLiveExchangeRate}).
+ * A currency with neither an offline nor a live rate maps to a null rate and its
+ * amounts are dropped by callers.
+ * @param {Iterable<string>} currencies - source currency codes
+ * @param {string} targetCurrency
+ * @returns {Promise<Map<string, string|null>>} source currency → rate string or null
+ */
+const fetchRatesToTarget = async (currencies, targetCurrency) => {
+  const distinct = [...new Set([...currencies].filter(c => c && c !== targetCurrency))];
+  const rateByCurrency = new Map();
+  await Promise.all(distinct.map(async (from) => {
+    // Offline first — instant, avoids the multi-second live-fetch timeout on the
+    // graph-load path for currencies the bundled table already covers.
+    const offline = Currency.getExchangeRate(from, targetCurrency);
+    if (offline) {
+      rateByCurrency.set(from, offline);
+      return;
+    }
+    const { rate } = await Currency.fetchLiveExchangeRate(from, targetCurrency);
+    rateByCurrency.set(from, rate);
+  }));
+  return rateByCurrency;
+};
+
+/**
+ * Convert a raw amount to `targetCurrency` using a rate map from
+ * {@link fetchRatesToTarget}. Same-currency amounts pass through unchanged.
+ * @returns {string|null} converted amount, or null when the source currency has
+ *   no rate (or conversion failed) so the caller should skip the row.
+ */
+const convertWithRateMap = (rawAmount, fromCurrency, targetCurrency, rateByCurrency) => {
+  if (fromCurrency === targetCurrency) return rawAmount;
+  const rate = rateByCurrency.get(fromCurrency);
+  if (!rate) return null; // no rate available, cannot express in target
+  return Currency.convertAmount(rawAmount, fromCurrency, targetCurrency, rate);
+};
+
+/**
+ * Merge per-(category, currency) subtotals into per-category totals expressed in
+ * the target currency. Each subtotal recorded in a different currency is
+ * converted at the current exchange rate (offline first, live fallback);
+ * subtotals whose currency has no known rate are dropped.
+ * @param {Array<{category_id: string, currency: string, total: number}>} rows
+ * @param {string} targetCurrency
+ * @returns {Promise<Array<{category_id: string, total: string}>>} sorted by total DESC
+ */
+const mergeConvertedByCategory = async (rows, targetCurrency) => {
+  const rateByCurrency = await fetchRatesToTarget(rows.map(r => r.currency), targetCurrency);
+
+  const totals = new Map();
+  for (const row of rows) {
+    const converted = convertWithRateMap(String(row.total ?? '0'), row.currency, targetCurrency, rateByCurrency);
+    if (converted === null) continue;
+    totals.set(row.category_id, Currency.add(totals.get(row.category_id) || '0', converted));
+  }
+  return Array.from(totals.entries())
+    .map(([category_id, total]) => ({ category_id, total }))
+    .sort((a, b) => Currency.compare(b.total, a.total));
+};
+
+/**
+ * Given a set of source currencies, return those that cannot be converted to
+ * `targetCurrency` at all (no offline and no live rate). Used by the Graphs
+ * screen to warn that some operations are excluded from converted totals.
+ * @param {Iterable<string>} fromCurrencies
+ * @param {string} targetCurrency
+ * @returns {Promise<string[]>} currency codes with no available rate
+ */
+export const getUnconvertibleCurrencies = async (fromCurrencies, targetCurrency) => {
+  const rateByCurrency = await fetchRatesToTarget(fromCurrencies, targetCurrency);
+  return [...rateByCurrency.entries()].filter(([, rate]) => !rate).map(([currency]) => currency);
+};
+
+/**
  * Get spending by category filtered by currency and date range
  * @param {string} currency - Currency code (e.g., 'USD', 'AMD')
  * @param {string} startDate - ISO date string
  * @param {string} endDate - ISO date string
  * @param {string} [accountId] - Optional account ID to filter by specific account
+ * @param {boolean} [convertAll=false] - When true, include operations from every
+ *   currency and convert their amounts to `currency` at the current exchange rate
+ *   instead of restricting to accounts in `currency`. Ignored when `accountId` is
+ *   set (a single account has a single currency).
  * @returns {Promise<Array>}
  */
-export const getSpendingByCategoryAndCurrency = async (currency, startDate, endDate, accountId = null) => {
+export const getSpendingByCategoryAndCurrency = async (currency, startDate, endDate, accountId = null, convertAll = false) => {
   try {
+    if (convertAll && !accountId) {
+      const rows = await queryAll(
+        `SELECT o.category_id, a.currency as currency, SUM(CAST(o.amount AS REAL)) as total
+         FROM operations o
+         JOIN accounts a ON o.account_id = a.id
+         WHERE o.type = 'expense'
+           AND o.date >= ?
+           AND o.date <= ?
+           AND o.category_id IS NOT NULL
+         GROUP BY o.category_id, a.currency`,
+        [startDate, endDate],
+      );
+      return await mergeConvertedByCategory(rows || [], currency);
+    }
+
     let sql = `SELECT o.category_id, SUM(CAST(o.amount AS REAL)) as total
        FROM operations o
        JOIN accounts a ON o.account_id = a.id
@@ -1089,10 +1185,27 @@ export const getSpendingByCategoryAndCurrency = async (currency, startDate, endD
  * @param {string} currency - Currency code (e.g., 'USD', 'AMD')
  * @param {string} startDate - ISO date string
  * @param {string} endDate - ISO date string
+ * @param {boolean} [convertAll=false] - When true, include income from every
+ *   currency and convert amounts to `currency` at the current exchange rate.
  * @returns {Promise<Array>}
  */
-export const getIncomeByCategoryAndCurrency = async (currency, startDate, endDate) => {
+export const getIncomeByCategoryAndCurrency = async (currency, startDate, endDate, convertAll = false) => {
   try {
+    if (convertAll) {
+      const rows = await queryAll(
+        `SELECT o.category_id, a.currency as currency, SUM(CAST(o.amount AS REAL)) as total
+         FROM operations o
+         JOIN accounts a ON o.account_id = a.id
+         WHERE o.type = 'income'
+           AND o.date >= ?
+           AND o.date <= ?
+           AND o.category_id IS NOT NULL
+         GROUP BY o.category_id, a.currency`,
+        [startDate, endDate],
+      );
+      return await mergeConvertedByCategory(rows || [], currency);
+    }
+
     const results = await queryAll(
       `SELECT o.category_id, SUM(CAST(o.amount AS REAL)) as total
        FROM operations o
@@ -1855,9 +1968,12 @@ export const getMonthlySpendingByCategories = async (currency, year, categoryIds
  * Get spending by categories for the last 12 months (rolling)
  * @param {string} currency - Currency code
  * @param {Array<string>} categoryIds - Category IDs to include
+ * @param {boolean} [convertAll=false] - When true, include operations from every
+ *   currency and convert amounts to `currency` at the current exchange rate.
+ *   Past months are converted at today's rate too (a single "current rate" view).
  * @returns {Promise<Array<{yearMonth: string, total: string}>>} Array of {yearMonth: 'YYYY-MM', total as Decimal-safe string}
  */
-export const getLast12MonthsSpendingByCategories = async (currency, categoryIds) => {
+export const getLast12MonthsSpendingByCategories = async (currency, categoryIds, convertAll = false) => {
   try {
     if (!categoryIds || categoryIds.length === 0) {
       return [];
@@ -1871,25 +1987,44 @@ export const getLast12MonthsSpendingByCategories = async (currency, categoryIds)
     const startDateStr = `${startDate.getFullYear()}-${String(startDate.getMonth() + 1).padStart(2, '0')}-01`;
     const endDateStr = `${now.getFullYear()}-${String(now.getMonth() + 1).padStart(2, '0')}-31`;
 
+    // When converting, keep the account currency per row so each amount can be
+    // converted to the target currency before being summed into its month.
+    const currencyFilter = convertAll ? '' : 'AND a.currency = ?';
+    const params = convertAll
+      ? [startDateStr, endDateStr, ...categoryIds]
+      : [currency, startDateStr, endDateStr, ...categoryIds];
+
     const results = await queryAll(
       `SELECT
          strftime('%Y-%m', o.date) as year_month,
-         o.amount
+         o.amount,
+         a.currency as currency
        FROM operations o
        JOIN accounts a ON o.account_id = a.id
        WHERE o.type = 'expense'
-         AND a.currency = ?
+         ${currencyFilter}
          AND o.date >= ?
          AND o.date <= ?
          AND o.category_id IN (${placeholders})
        ORDER BY year_month ASC`,
-      [currency, startDateStr, endDateStr, ...categoryIds],
+      params,
     );
+
+    // Prefetch a rate per distinct source currency (offline first, live fallback).
+    const rateByCurrency = convertAll
+      ? await fetchRatesToTarget((results || []).map(r => r.currency), currency)
+      : new Map();
 
     const monthTotals = new Map();
     for (const row of results || []) {
+      let amount = String(row.amount || '0');
+      if (convertAll) {
+        const converted = convertWithRateMap(amount, row.currency, currency, rateByCurrency);
+        if (converted === null) continue; // no rate available, cannot express in target
+        amount = converted;
+      }
       const prev = monthTotals.get(row.year_month) || '0';
-      monthTotals.set(row.year_month, Currency.add(prev, String(row.amount || '0')));
+      monthTotals.set(row.year_month, Currency.add(prev, amount));
     }
 
     return Array.from(monthTotals.entries())
