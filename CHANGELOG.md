@@ -1,5 +1,12 @@
 # Changelog
 
+## [0.193.5](https://github.com/heywood8/money-tracker/compare/penny-v0.193.4...penny-v0.193.5) (2026-07-14)
+
+
+### Bug Fixes
+
+* **operations:** show label suggestions above the undo bar, not under it ([#1237](https://github.com/heywood8/money-tracker/issues/1237)) ([4a38cc7](https://github.com/heywood8/money-tracker/commit/4a38cc7a553772a873b05dbbb0afe24265d67842))
+
 ## [0.193.4](https://github.com/heywood8/money-tracker/compare/penny-v0.193.3...penny-v0.193.4) (2026-07-14)
 
 
