@@ -1,5 +1,12 @@
 # Changelog
 
+## [0.193.4](https://github.com/heywood8/money-tracker/compare/penny-v0.193.3...penny-v0.193.4) (2026-07-14)
+
+
+### Bug Fixes
+
+* **operations:** stop toggling removeClippedSubviews, crashes Fabric ([#1235](https://github.com/heywood8/money-tracker/issues/1235)) ([00b0bf2](https://github.com/heywood8/money-tracker/commit/00b0bf2f11774b3a0fcd850fbddcee684f0e51dc))
+
 ## [0.193.3](https://github.com/heywood8/money-tracker/compare/penny-v0.193.2...penny-v0.193.3) (2026-07-14)
 
 
