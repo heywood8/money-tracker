@@ -1,5 +1,12 @@
 # Changelog
 
+## [0.193.3](https://github.com/heywood8/money-tracker/compare/penny-v0.193.2...penny-v0.193.3) (2026-07-14)
+
+
+### Miscellaneous Chores
+
+* **gitignore:** ignore node_modules symlinks, not just the directory ([#1233](https://github.com/heywood8/money-tracker/issues/1233)) ([49041f7](https://github.com/heywood8/money-tracker/commit/49041f7f06c4cba7475c97d78d7ec6923403432f))
+
 ## [0.193.2](https://github.com/heywood8/money-tracker/compare/penny-v0.193.1...penny-v0.193.2) (2026-07-14)
 
 
