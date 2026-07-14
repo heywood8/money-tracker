@@ -1,5 +1,12 @@
 # Changelog
 
+## [0.194.0](https://github.com/heywood8/money-tracker/compare/penny-v0.193.5...penny-v0.194.0) (2026-07-14)
+
+
+### Features
+
+* add multi-currency category spending reports ([208a013](https://github.com/heywood8/money-tracker/commit/208a01387ee0b9db871ce799346e4f3673811f6f))
+
 ## [0.193.5](https://github.com/heywood8/money-tracker/compare/penny-v0.193.4...penny-v0.193.5) (2026-07-14)
 
 
