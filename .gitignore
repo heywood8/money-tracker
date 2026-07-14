@@ -4,7 +4,10 @@
 .worktrees/
 .claude/worktrees/
 # React Native
-node_modules/
+# No trailing slash: also matches the node_modules SYMLINK used in git
+# worktrees (a trailing slash matches directories only, which let the
+# symlink get staged by `git add -A` — bit PR #1214).
+node_modules
 npm-debug.log*
 yarn-debug.log*
 yarn-error.log*
