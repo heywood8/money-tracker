@@ -407,8 +407,11 @@ describe('OperationsList', () => {
   });
 
   describe('branch coverage — undoOperationId match', () => {
-    it('disables subview clipping while the undo bar is inline', async () => {
-      // Rationale lives on the removeClippedSubviews prop in OperationsList.js.
+    it('never toggles subview clipping based on undo state', async () => {
+      // Regression (PENNY-16): toggling removeClippedSubviews at runtime on a
+      // mounted Fabric list desyncs the JS/native view lists and crashes with
+      // "IllegalStateException: addViewAt: failed to insert view ... at index
+      // N". Clipping must stay a constant regardless of undo/suggestion state.
       const group = makeGroup(TODAY, [
         { id: 'op-undo', type: 'expense', amount: '10.00', accountId: 'acc-usd', categoryId: 'cat-1' },
       ]);
@@ -417,7 +420,7 @@ describe('OperationsList', () => {
         undoOperationId: 'op-undo',
         undoToken: 1,
       });
-      expect(withUndo.sp.removeClippedSubviews).toBe(false);
+      expect(withUndo.sp.removeClippedSubviews).toBe(true);
 
       const withoutUndo = await getSectionListProps({
         groupedOperations: [group],
