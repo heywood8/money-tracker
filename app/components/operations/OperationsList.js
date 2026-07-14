@@ -433,11 +433,15 @@ const OperationsList = forwardRef(({
       maxToRenderPerBatch={5}
       initialNumToRender={10}
       updateCellsBatchingPeriod={50}
-      // Android clipping can drop a subview that is inserted into an
-      // already-mounted cell — exactly how the inline undo bar appears. Disable
-      // clipping for the few seconds the bar is up; normal scrolling perf
-      // returns once it closes.
-      removeClippedSubviews={undoOperationId == null}
+      // NEVER toggle this at runtime. On Fabric (New Architecture, enabled for
+      // this app) flipping removeClippedSubviews on a mounted list desyncs the
+      // JS-side view list from SurfaceMountingManager's native one, crashing
+      // with "IllegalStateException: addViewAt: failed to insert view ... at
+      // index N" (IndexOutOfBoundsException) — see PENNY-16, caused by an
+      // earlier attempt to gate this on undoOperationId. The inline undo bar's
+      // visibility is guaranteed by UndoSnackbar mounting fully opaque instead
+      // (see its docblock), not by clipping tricks.
+      removeClippedSubviews={true}
     />
   );
 });

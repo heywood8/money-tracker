@@ -741,8 +741,9 @@ const OperationsScreen = () => {
   // Fallback cleanup: the snackbar's onClosed is the normal path, but it never
   // fires when the snackbar unmounts without animating out (its cell scrolled
   // beyond the render window, a filter excluding the row) or when the exit
-  // animation drops its completion callback. Undo state pins the list's
-  // removeClippedSubviews off, so it must not outlive its window.
+  // animation drops its completion callback. Without this, a leaked undoInfo
+  // would keep offering an undo action for an operation whose window has long
+  // since passed.
   useEffect(() => {
     if (!undoInfo) return undefined;
     const timer = setTimeout(() => setUndoInfo(null), UNDO_DURATION_MS + 1500);
