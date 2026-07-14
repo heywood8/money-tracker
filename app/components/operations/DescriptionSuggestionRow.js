@@ -7,7 +7,11 @@ import { useSwipeNavigationGesture } from '../../contexts/SwipeNavigationContext
 import { displayLabel } from '../../utils/labelUtils';
 
 const DescriptionSuggestionRow = ({ chips, colors, onApply, onDismiss }) => {
-  const fadeAnim = useRef(new Animated.Value(0)).current;
+  // Entry polish only (rise into place). Like UndoSnackbar, this row is
+  // inserted into an already-mounted virtualized list cell, where a
+  // native-driver animation can fail to attach — so visibility must never
+  // depend on an animation running. The row mounts fully opaque.
+  const entryAnim = useRef(new Animated.Value(0)).current;
 
   // Give horizontal scrolling over the chips priority over the screen-swipe
   // gesture: the native scroll blocks the external Pan until it fails, so a
@@ -19,16 +23,21 @@ const DescriptionSuggestionRow = ({ chips, colors, onApply, onDismiss }) => {
   }, [swipeGesture]);
 
   useEffect(() => {
-    Animated.timing(fadeAnim, {
+    Animated.timing(entryAnim, {
       toValue: 1,
       duration: DURATION.fast,
       useNativeDriver: true,
     }).start();
   }, []);
 
+  const translateY = entryAnim.interpolate({
+    inputRange: [0, 1],
+    outputRange: [6, 0],
+  });
+
   return (
     <Animated.View
-      style={[styles.container, { opacity: fadeAnim }]}
+      style={[styles.container, { transform: [{ translateY }] }]}
     >
       <View style={styles.row}>
         <View style={styles.xSlot}>

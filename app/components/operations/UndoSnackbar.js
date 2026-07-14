@@ -25,7 +25,18 @@ import {
  *
  * Mount this conditionally with a changing `key` (e.g. an incrementing token)
  * so each new operation restarts the entry animation and countdown cleanly.
+ *
+ * Visibility must NEVER depend on an animation successfully running: the bar is
+ * inserted into an already-mounted virtualized list cell, where a native-driver
+ * animation can fail to attach on its first frame. The container therefore
+ * mounts fully opaque; animations only add polish (entry rise) or remove the
+ * bar on the way out (exit fade), so their failure modes are benign.
  */
+// Shared with OperationsScreen's fallback cleanup: the parent must be able to
+// clear its undo state even when this component never gets to call onClosed
+// (cell unmounted by virtualization, exit animation never completing).
+export const UNDO_DURATION_MS = 5000;
+
 const UndoSnackbar = ({
   operationId,
   message,
@@ -35,8 +46,10 @@ const UndoSnackbar = ({
   onUndo,
   onClosed,
 }) => {
-  // 0 = hidden (slid down + transparent), 1 = fully shown
-  const revealAnim = useRef(new Animated.Value(0)).current;
+  // Entry polish only: 0 = rested 6px low, 1 = risen into place.
+  const entryAnim = useRef(new Animated.Value(0)).current;
+  // Exit fade: starts fully opaque so the bar is visible from its first frame.
+  const exitAnim = useRef(new Animated.Value(1)).current;
   // 1 = full countdown bar, 0 = depleted
   const progressAnim = useRef(new Animated.Value(1)).current;
   // Guards against a double dismiss (e.g. timeout firing right as Undo is tapped)
@@ -46,18 +59,20 @@ const UndoSnackbar = ({
     if (closingRef.current) return;
     closingRef.current = true;
     if (beforeClosed) beforeClosed();
-    Animated.timing(revealAnim, {
+    Animated.timing(exitAnim, {
       toValue: 0,
       duration: DURATION.fast,
       useNativeDriver: true,
     }).start(() => {
-      onClosed();
+      // The id lets the parent ignore a stale close from a previous bar that
+      // finishes fading after a newer operation's bar has already replaced it.
+      onClosed(operationId);
     });
-  }, [revealAnim, onClosed]);
+  }, [exitAnim, onClosed, operationId]);
 
   useEffect(() => {
-    // Entry: gentle slide up + fade in within the row's reserved slot.
-    Animated.timing(revealAnim, {
+    // Entry: gentle rise into the row's reserved slot.
+    Animated.timing(entryAnim, {
       toValue: 1,
       duration: DURATION.normal,
       useNativeDriver: true,
@@ -85,19 +100,20 @@ const UndoSnackbar = ({
 
   // Subtle rise into place; the slot height is reserved immediately (transforms
   // don't affect layout), so the row above never jumps.
-  const translateY = revealAnim.interpolate({
+  const translateY = entryAnim.interpolate({
     inputRange: [0, 1],
     outputRange: [6, 0],
   });
 
   return (
     <Animated.View
+      testID="undo-snackbar"
       style={[
         styles.container,
         {
           backgroundColor: colors.altRow || colors.surface,
           borderTopColor: colors.border,
-          opacity: revealAnim,
+          opacity: exitAnim,
           transform: [{ translateY }],
         },
       ]}
@@ -196,7 +212,7 @@ UndoSnackbar.propTypes = {
 };
 
 UndoSnackbar.defaultProps = {
-  duration: 5000,
+  duration: UNDO_DURATION_MS,
 };
 
 export default memo(UndoSnackbar);

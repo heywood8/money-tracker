@@ -407,6 +407,24 @@ describe('OperationsList', () => {
   });
 
   describe('branch coverage — undoOperationId match', () => {
+    it('disables subview clipping while the undo bar is inline', async () => {
+      // Rationale lives on the removeClippedSubviews prop in OperationsList.js.
+      const group = makeGroup(TODAY, [
+        { id: 'op-undo', type: 'expense', amount: '10.00', accountId: 'acc-usd', categoryId: 'cat-1' },
+      ]);
+      const withUndo = await getSectionListProps({
+        groupedOperations: [group],
+        undoOperationId: 'op-undo',
+        undoToken: 1,
+      });
+      expect(withUndo.sp.removeClippedSubviews).toBe(false);
+
+      const withoutUndo = await getSectionListProps({
+        groupedOperations: [group],
+      });
+      expect(withoutUndo.sp.removeClippedSubviews).toBe(true);
+    });
+
     it('renders the inline undo bar only on the matching operation', async () => {
       const group = makeGroup(TODAY, [
         { id: 'op-undo', type: 'expense', amount: '10.00', accountId: 'acc-usd', categoryId: 'cat-1' },
