@@ -170,8 +170,19 @@ const OperationListItem = ({
         </View>
       </TouchableRipple>
 
-      {/* Inline "just added" undo bar — sits directly beneath the operation it
-          refers to, between it and the operation before it. */}
+      {/* Label suggestions render directly beneath the operation; the undo bar
+          sits below them. When a just-added operation shows both, the labels
+          are the primary action and the undo/cancel bar reads as the secondary
+          affordance underneath — its top border separates the two cleanly. */}
+      {suggestionChips && suggestionChips.length > 0 && (
+        <DescriptionSuggestionRow
+          chips={suggestionChips}
+          colors={colors}
+          onApply={onApplySuggestion}
+          onDismiss={onDismissSuggestion}
+        />
+      )}
+
       {showUndo && (
         <UndoSnackbar
           key={undoToken}
@@ -182,15 +193,6 @@ const OperationListItem = ({
           colors={colors}
           onUndo={onUndo}
           onClosed={onUndoClosed}
-        />
-      )}
-
-      {suggestionChips && suggestionChips.length > 0 && (
-        <DescriptionSuggestionRow
-          chips={suggestionChips}
-          colors={colors}
-          onApply={onApplySuggestion}
-          onDismiss={onDismissSuggestion}
         />
       )}
 
