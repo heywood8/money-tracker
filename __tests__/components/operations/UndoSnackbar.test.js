@@ -1,5 +1,5 @@
 import React from 'react';
-import { Animated } from 'react-native';
+import { Animated, StyleSheet } from 'react-native';
 import { render, fireEvent, waitFor } from '@testing-library/react-native';
 import UndoSnackbar from '../../../app/components/operations/UndoSnackbar';
 
@@ -44,6 +44,17 @@ describe('UndoSnackbar', () => {
     expect(getByText('Undo')).toBeTruthy();
   });
 
+  it('is fully opaque on mount even when animations never run', async () => {
+    // Regression: the entry fade used to start the container at opacity 0 and
+    // rely on a native-driver animation to reveal it. Inside an already-mounted
+    // virtualized list cell that animation can fail to attach, leaving the bar
+    // permanently invisible. Animated.timing is mocked to a no-op here, so this
+    // asserts visibility without any animation running.
+    const { getByTestId } = await render(<UndoSnackbar {...baseProps} />);
+    const style = StyleSheet.flatten(getByTestId('undo-snackbar').props.style);
+    expect(style.opacity).toBe(1);
+  });
+
   it('calls onUndo with the operation id when Undo is pressed', async () => {
     const onUndo = jest.fn();
     const { getByLabelText } = await render(
@@ -61,6 +72,8 @@ describe('UndoSnackbar', () => {
     );
     await fireEvent.press(getByLabelText('Undo'));
     expect(onClosed).toHaveBeenCalledTimes(1);
+    // The id lets the parent ignore a stale close from a previous bar.
+    expect(onClosed).toHaveBeenCalledWith('op-123');
   });
 
   it('does not undo twice when Undo is pressed repeatedly', async () => {

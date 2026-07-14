@@ -433,7 +433,11 @@ const OperationsList = forwardRef(({
       maxToRenderPerBatch={5}
       initialNumToRender={10}
       updateCellsBatchingPeriod={50}
-      removeClippedSubviews={true}
+      // Android clipping can drop a subview that is inserted into an
+      // already-mounted cell — exactly how the inline undo bar appears. Disable
+      // clipping for the few seconds the bar is up; normal scrolling perf
+      // returns once it closes.
+      removeClippedSubviews={undoOperationId == null}
     />
   );
 });

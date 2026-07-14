@@ -22,6 +22,7 @@ import OperationsList from '../components/operations/OperationsList';
 import QuickAddForm from '../components/operations/QuickAddForm';
 import NotificationBindingStack, { deckPeekAllowance, deckCardHeight } from '../components/operations/NotificationBindingStack';
 import PickerModal from '../components/operations/PickerModal';
+import { UNDO_DURATION_MS } from '../components/operations/UndoSnackbar';
 import SearchOverlay from '../components/search/SearchOverlay';
 import SearchBar from '../components/search/SearchBar';
 import FilterChipStrip from '../components/search/FilterChipStrip';
@@ -731,9 +732,22 @@ const OperationsScreen = () => {
     });
   }, [deleteOperation]);
 
-  const handleUndoClosed = useCallback(() => {
-    setUndoInfo(null);
+  // `operationId` guards against a stale close: a previous bar finishing its
+  // exit fade must not clear the undo state of a newer operation's bar.
+  const handleUndoClosed = useCallback((operationId) => {
+    setUndoInfo(prev => (prev && operationId != null && prev.id !== operationId) ? prev : null);
   }, []);
+
+  // Fallback cleanup: the snackbar's onClosed is the normal path, but it never
+  // fires when the snackbar unmounts without animating out (its cell scrolled
+  // beyond the render window, a filter excluding the row) or when the exit
+  // animation drops its completion callback. Undo state pins the list's
+  // removeClippedSubviews off, so it must not outlive its window.
+  useEffect(() => {
+    if (!undoInfo) return undefined;
+    const timer = setTimeout(() => setUndoInfo(null), UNDO_DURATION_MS + 1500);
+    return () => clearTimeout(timer);
+  }, [undoInfo]);
 
   // Keep the suggestion row in sync with the operation's current labels. When the
   // op is (re)loaded, refresh the ref and drop any suggestions already applied —
