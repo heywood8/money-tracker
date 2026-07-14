@@ -1,5 +1,12 @@
 # Changelog
 
+## [0.193.2](https://github.com/heywood8/money-tracker/compare/penny-v0.193.1...penny-v0.193.2) (2026-07-14)
+
+
+### Bug Fixes
+
+* **operations:** make the inline undo bar reliably visible on device ([#1231](https://github.com/heywood8/money-tracker/issues/1231)) ([1ffddb9](https://github.com/heywood8/money-tracker/commit/1ffddb9318ab40fb6a72af125ae2a60a31030998))
+
 ## [0.193.1](https://github.com/heywood8/money-tracker/compare/penny-v0.193.0...penny-v0.193.1) (2026-07-13)
 
 
