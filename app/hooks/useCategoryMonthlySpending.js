@@ -12,7 +12,7 @@ import { appEvents, EVENTS } from '../services/eventEmitter';
  * @param {string|null} selectedCategoryId - Category ID to show spending for
  * @param {Array} categories - Array of all categories
  */
-const useCategoryMonthlySpending = (selectedCurrency, selectedCategoryId, categories) => {
+const useCategoryMonthlySpending = (selectedCurrency, selectedCategoryId, categories, convertAllCurrencies = false) => {
   const [monthlyData, setMonthlyData] = useState([]);
   const [loading, setLoading] = useState(false);
 
@@ -54,6 +54,7 @@ const useCategoryMonthlySpending = (selectedCurrency, selectedCategoryId, catego
       const spending = await getLast12MonthsSpendingByCategories(
         selectedCurrency,
         categoryIds,
+        convertAllCurrencies,
       );
 
       // Create a map of yearMonth to total for easy lookup
@@ -79,7 +80,7 @@ const useCategoryMonthlySpending = (selectedCurrency, selectedCategoryId, catego
     } finally {
       setLoading(false);
     }
-  }, [selectedCurrency, selectedCategoryId]);
+  }, [selectedCurrency, selectedCategoryId, convertAllCurrencies]);
 
   // Calculate total yearly spending using Decimal-safe addition before the final float conversion
   const totalYearlySpending = useMemo(() => {

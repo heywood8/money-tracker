@@ -406,6 +406,8 @@
   "balance_history_details": "残高履歴の詳細",
   "actions": "アクション",
   "category_spending_trend": "支出トレンド",
+  "graphs_convert_currencies": "他の通貨を換算",
+  "graphs_currencies_not_converted": "一部の通貨は換算されていません",
   "yearly_total": "年間合計",
   "last_12_months_total": "過去12ヶ月",
   "no_spending_data": "このカテゴリーの支出データがありません",

@@ -406,6 +406,8 @@
   "balance_history_details": "Détails de l'historique du solde",
   "actions": "Actions",
   "category_spending_trend": "Tendance des dépenses",
+  "graphs_convert_currencies": "Convertir les autres devises",
+  "graphs_currencies_not_converted": "Certaines devises non converties",
   "yearly_total": "Total annuel",
   "last_12_months_total": "12 derniers mois",
   "no_spending_data": "Aucune donnée de dépenses pour cette catégorie",

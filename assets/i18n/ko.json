@@ -406,6 +406,8 @@
   "balance_history_details": "잔액 내역 상세",
   "actions": "작업",
   "category_spending_trend": "지출 추세",
+  "graphs_convert_currencies": "다른 통화 환산",
+  "graphs_currencies_not_converted": "일부 통화는 환산되지 않음",
   "yearly_total": "연간 합계",
   "last_12_months_total": "최근 12개월",
   "no_spending_data": "이 카테고리의 지출 데이터가 없습니다",

@@ -386,6 +386,7 @@ describe('CategorySpendingCard', () => {
         'EUR',
         'cat-transport',
         defaultCategories,
+        false,
       );
     });
 
@@ -401,6 +402,7 @@ describe('CategorySpendingCard', () => {
         'USD',
         'cat-food', // Falls back to first parent expense category
         defaultCategories,
+        false,
       );
     });
 
@@ -412,11 +414,13 @@ describe('CategorySpendingCard', () => {
         'USD',
         'cat-food',
         defaultCategories,
+        false,
       );
       expect(useCategoryMonthlySpending).toHaveBeenCalledWith(
         'USD',
         null, // No vs category selected
         defaultCategories,
+        false,
       );
     });
   });
@@ -521,6 +525,7 @@ describe('CategorySpendingCard', () => {
         'USD',
         'cat-transport',
         defaultCategories,
+        false,
       );
     });
 
