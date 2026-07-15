@@ -13,7 +13,6 @@ import SimplePicker from '../SimplePicker';
 import FormInput from '../FormInput';
 import CategoryGridSelector from '../CategoryGridSelector';
 import useTopCategoryIds from '../../hooks/useTopCategoryIds';
-import { kindRequiresCategory } from '../../services/notifications/parseBankNotification';
 import { canSaveSuggestion } from '../../hooks/usePendingOperationSuggestions';
 import { getCategoryDisplayName } from '../../utils/categoryUtils';
 import * as Currency from '../../services/currency';
@@ -54,7 +53,6 @@ const NotificationBindingCard = ({
   onDismiss,
 }) => {
   const isTransfer = item.type === 'transfer';
-  const categoryRequired = !isTransfer && kindRequiresCategory(item.kind, item.packageName);
   const canSave = canSaveSuggestion(item, choice);
   // Most-frequent categories drive the QuickAdd-style shortcut grid below, so the
   // card's category picker matches the quick-add form it sits over.
@@ -134,48 +132,55 @@ const NotificationBindingCard = ({
         <View style={styles.cardHeader}>
           <View style={styles.cardHeaderLeft}>
             <Ionicons name="card" size={15} color={colors.primary} />
-            <Text style={[styles.sourceLabel, { color: colors.mutedText }]} numberOfLines={1}>
+            <Text
+              style={[styles.sourceLabel, { color: colors.mutedText }]}
+              numberOfLines={1}
+            >
               {t('suggested_from_notification') || 'From notification'}
+              {/* Date + card mask ride on the same line but in normal case — the
+                  sourceLabel's textTransform:'uppercase' would otherwise shout the
+                  localized date (e.g. "15 ИЮЛ."). A nested Text resets the case. */}
+              <Text testID="binding-card-meta" style={styles.sourceMeta}>
+                {[formatSuggestionDate(item.date), item.cardMask]
+                  .filter(Boolean)
+                  .map((part) => ` · ${part}`)
+                  .join('')}
+              </Text>
             </Text>
           </View>
-          <Text style={[styles.amount, { color: colors.text }]}>
-            {item.amount} {item.currency}
-          </Text>
+          <View style={styles.amountColumn}>
+            <Text style={[styles.amount, { color: colors.text }]}>
+              {item.amount} {item.currency}
+            </Text>
+            {convertedPreview && (
+              <Text style={[styles.conversionText, { color: colors.mutedText }]}>
+                ≈ {convertedPreview} {chosenAccount.currency}
+              </Text>
+            )}
+          </View>
         </View>
         <Text style={[styles.merchant, { color: colors.text }]} numberOfLines={1}>
           {item.merchant || item.kind}
         </Text>
-        <Text testID="binding-card-meta" style={[styles.metaText, { color: colors.mutedText }]} numberOfLines={1}>
-          {[formatSuggestionDate(item.date), item.cardMask].filter(Boolean).join(' · ')}
-        </Text>
-        {convertedPreview && (
-          <Text style={[styles.conversionText, { color: colors.mutedText }]}>
-            ≈ {convertedPreview} {chosenAccount.currency}
-          </Text>
-        )}
 
-        <Text style={[styles.fieldLabel, { color: colors.mutedText }]}>
-          {(t('bank_notifications_custom_label') || 'Custom name').toUpperCase()}
-        </Text>
         <FormInput
           value={choice.labelOverride ?? ''}
           onChangeText={(v) => onChoiceChange({ labelOverride: v })}
           placeholder={item.merchant || ''}
+          style={styles.nameInput}
         />
-        <Text style={[styles.helpText, { color: colors.mutedText }]}>
-          {isTransfer
-            ? (t('bank_notifications_transfer_label_help')
-              || 'Optional label for this transfer')
-            : (t('bank_notifications_custom_label_help')
-              || 'Used as the label for this and future transactions from this shop')}
-        </Text>
 
-        <Text style={[styles.fieldLabel, { color: colors.mutedText }]}>
-          {(isTransfer
+        {isTransfer && (
+          <Text style={[styles.fieldLabel, { color: colors.mutedText }]}>
+            {(t('bank_notifications_transfer_from') || 'From account').toUpperCase()}
+          </Text>
+        )}
+        <View
+          style={[styles.pickerWrap, styles.accountPicker, { borderColor: colors.border }]}
+          accessibilityLabel={isTransfer
             ? (t('bank_notifications_transfer_from') || 'From account')
-            : (t('account') || 'Account')).toUpperCase()}
-        </Text>
-        <View style={[styles.pickerWrap, { borderColor: colors.border }]}>
+            : (t('account') || 'Account')}
+        >
           <SimplePicker
             value={choice.accountId}
             onValueChange={(v) => onChoiceChange({ accountId: v })}
@@ -205,20 +210,14 @@ const NotificationBindingCard = ({
           </>
         ) : (
           <>
-            <View style={styles.categoryLabelRow}>
-              <Text style={[styles.fieldLabel, { color: colors.mutedText }]}>
-                {(t('category') || 'Category').toUpperCase()}
-                {categoryRequired ? ' *' : ''}
-              </Text>
-              {choice.categoryId ? (
-                <View style={styles.selectedCategoryRow}>
-                  <Ionicons name="pricetag" size={12} color={colors.primary} />
-                  <Text style={[styles.selectedCategoryText, { color: colors.text }]} numberOfLines={1}>
-                    {getCategoryDisplayName(choice.categoryId, categories, t)}
-                  </Text>
-                </View>
-              ) : null}
-            </View>
+            {choice.categoryId ? (
+              <View style={styles.selectedCategoryRow}>
+                <Ionicons name="pricetag" size={12} color={colors.primary} />
+                <Text style={[styles.selectedCategoryText, { color: colors.text }]} numberOfLines={1}>
+                  {getCategoryDisplayName(choice.categoryId, categories, t)}
+                </Text>
+              </View>
+            ) : null}
             <CategoryGridSelector
               categories={categories}
               categoryType={item.type}
@@ -288,6 +287,9 @@ NotificationBindingCard.propTypes = {
 };
 
 const styles = StyleSheet.create({
+  accountPicker: {
+    marginTop: SPACING.xs,
+  },
   actionButton: {
     alignItems: 'center',
     borderRadius: BORDER_RADIUS.sm,
@@ -318,6 +320,9 @@ const styles = StyleSheet.create({
     fontSize: 15,
     fontWeight: '700',
   },
+  amountColumn: {
+    alignItems: 'flex-end',
+  },
   body: {
     flex: 1,
     paddingHorizontal: SPACING.md,
@@ -342,12 +347,6 @@ const styles = StyleSheet.create({
     gap: SPACING.xs,
     marginRight: SPACING.sm,
   },
-  categoryLabelRow: {
-    alignItems: 'center',
-    flexDirection: 'row',
-    gap: SPACING.sm,
-    justifyContent: 'space-between',
-  },
   conversionText: {
     fontSize: 12,
     fontStyle: 'italic',
@@ -366,11 +365,6 @@ const styles = StyleSheet.create({
     marginBottom: 4,
     marginTop: SPACING.sm,
   },
-  helpText: {
-    fontSize: 11,
-    lineHeight: 15,
-    marginTop: 4,
-  },
   merchant: {
     fontSize: 15,
     fontWeight: '700',
@@ -378,6 +372,9 @@ const styles = StyleSheet.create({
   metaText: {
     fontSize: 12,
     marginTop: 2,
+  },
+  nameInput: {
+    marginTop: SPACING.sm,
   },
   pickerWrap: {
     borderRadius: BORDER_RADIUS.sm,
@@ -398,6 +395,8 @@ const styles = StyleSheet.create({
     flexDirection: 'row',
     flexShrink: 1,
     gap: 4,
+    marginBottom: SPACING.xs,
+    marginTop: SPACING.sm,
   },
   selectedCategoryText: {
     fontSize: 12,
@@ -409,6 +408,11 @@ const styles = StyleSheet.create({
     fontWeight: '600',
     letterSpacing: 0.4,
     textTransform: 'uppercase',
+  },
+  sourceMeta: {
+    fontWeight: '400',
+    letterSpacing: 0,
+    textTransform: 'none',
   },
 });
 

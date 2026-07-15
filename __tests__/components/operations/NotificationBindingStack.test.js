@@ -133,11 +133,16 @@ describe('NotificationBindingStack', () => {
   });
 
   it('renders the full expense binding form: label input, account picker, category grid', async () => {
+    // Field captions (custom-name, ACCOUNT, CATEGORY) were dropped to reclaim
+    // vertical space for three rows of the category grid — the inputs stay, their
+    // captions don't. The label input is anchored by its merchant placeholder and
+    // the account picker by its selected account label.
     const { getByText, getByPlaceholderText, getByTestId, queryByText } = await renderStack();
-    expect(getByText('BANK_NOTIFICATIONS_CUSTOM_LABEL')).toBeTruthy();
     expect(getByPlaceholderText('SAS SUPERMARKET')).toBeTruthy();
-    expect(getByText('ACCOUNT')).toBeTruthy();
+    expect(getByText('Checking')).toBeTruthy();
     expect(getByTestId('category-grid-c1')).toBeTruthy();
+    expect(queryByText('BANK_NOTIFICATIONS_CUSTOM_LABEL')).toBeNull();
+    expect(queryByText('ACCOUNT')).toBeNull();
     expect(queryByText('BANK_NOTIFICATIONS_TRANSFER_TO *')).toBeNull();
   });
 
