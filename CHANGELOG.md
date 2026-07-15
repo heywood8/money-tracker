@@ -1,5 +1,12 @@
 # Changelog
 
+## [0.195.0](https://github.com/heywood8/money-tracker/compare/penny-v0.194.0...penny-v0.195.0) (2026-07-15)
+
+
+### Features
+
+* **notifications:** compact binding card layout for 3 category rows ([#1241](https://github.com/heywood8/money-tracker/issues/1241)) ([8d93798](https://github.com/heywood8/money-tracker/commit/8d9379801eca01ce0de84e845754a30d14e012e0))
+
 ## [0.194.0](https://github.com/heywood8/money-tracker/compare/penny-v0.193.5...penny-v0.194.0) (2026-07-14)
 
 
