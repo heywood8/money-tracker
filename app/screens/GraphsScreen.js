@@ -280,15 +280,19 @@ const GraphsScreen = () => {
   // When converting, detect account currencies that cannot be expressed in the
   // selected currency (no offline and no live rate) so the UI can flag that some
   // operations are excluded rather than silently dropping them.
+  // Functional guards keep the empty state referentially stable: setting a fresh
+  // `[]` on every run would re-render, and since `currencies` gets a new identity
+  // whenever `accounts` does, that render would re-fire this effect — an infinite
+  // loop. Returning `prev` when already empty lets React bail out.
   useEffect(() => {
     if (!convertAllCurrencies || !selectedCurrency) {
-      setUnconvertedCurrencies([]);
+      setUnconvertedCurrencies(prev => (prev.length === 0 ? prev : []));
       return;
     }
     let cancelled = false;
     getUnconvertibleCurrencies(currencies, selectedCurrency)
       .then(list => { if (!cancelled) setUnconvertedCurrencies(list); })
-      .catch(() => { if (!cancelled) setUnconvertedCurrencies([]); });
+      .catch(() => { if (!cancelled) setUnconvertedCurrencies(prev => (prev.length === 0 ? prev : [])); });
     return () => { cancelled = true; };
   }, [convertAllCurrencies, selectedCurrency, currencies]);
 
