@@ -1,5 +1,12 @@
 # Changelog
 
+## [0.198.0](https://github.com/heywood8/money-tracker/compare/penny-v0.197.5...penny-v0.198.0) (2026-07-16)
+
+
+### Features
+
+* **operations:** non-blocking add of notification suggestions ([#1259](https://github.com/heywood8/money-tracker/issues/1259)) ([87a9b9a](https://github.com/heywood8/money-tracker/commit/87a9b9a38dc34034ff0c07150b9b4e7aed4e6049))
+
 ## [0.197.5](https://github.com/heywood8/money-tracker/compare/penny-v0.197.4...penny-v0.197.5) (2026-07-16)
 
 
