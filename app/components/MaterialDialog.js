@@ -17,7 +17,7 @@ import ModalBlurOverlay from './ModalBlurOverlay';
  * @param {function} onDismiss - Called when dialog is dismissed
  */
 export default function MaterialDialog({
-  visible,
+  visible = false,
   title,
   message,
   buttons = [],
@@ -120,14 +120,6 @@ MaterialDialog.propTypes = {
     }),
   ),
   onDismiss: PropTypes.func,
-};
-
-MaterialDialog.defaultProps = {
-  visible: false,
-  title: undefined,
-  message: undefined,
-  buttons: [],
-  onDismiss: undefined,
 };
 
 const styles = StyleSheet.create({

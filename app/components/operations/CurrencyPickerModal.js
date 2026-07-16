@@ -13,7 +13,7 @@ const alphabeticalList = Object.entries(currencies).map(([code, data]) => ({
   symbol: data.symbol,
 })).sort((a, b) => a.name.localeCompare(b.name));
 
-const CurrencyPickerModal = memo(({ visible, onClose, onSelect, selectedCurrency, colors, t }) => {
+const CurrencyPickerModal = memo(({ visible, onClose, onSelect, selectedCurrency = '', colors, t }) => {
   const [query, setQuery] = useState('');
   const [popularCodes, setPopularCodes] = useState([]);
 
@@ -129,10 +129,6 @@ CurrencyPickerModal.propTypes = {
   selectedCurrency: PropTypes.string,
   colors: PropTypes.object.isRequired,
   t: PropTypes.func.isRequired,
-};
-
-CurrencyPickerModal.defaultProps = {
-  selectedCurrency: '',
 };
 
 const styles = StyleSheet.create({

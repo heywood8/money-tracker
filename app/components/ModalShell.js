@@ -39,17 +39,17 @@ export default function ModalShell({
   visible,
   onDismiss,
   title,
-  subtitle,
-  onSave,
+  subtitle = null,
+  onSave = null,
   onCancel,
-  saveLabel,
-  cancelLabel,
-  onDelete,
-  deleteLabel,
-  deleteDisabled,
-  extraActions,
-  scrollRef,
-  showBlurOverlay,
+  saveLabel = null,
+  cancelLabel = null,
+  onDelete = null,
+  deleteLabel = null,
+  deleteDisabled = false,
+  extraActions = null,
+  scrollRef = null,
+  showBlurOverlay = false,
   children,
 }) {
   const { colors } = useThemeColors();
@@ -298,19 +298,6 @@ ModalShell.propTypes = {
   scrollRef: PropTypes.object,
   showBlurOverlay: PropTypes.bool,
   children: PropTypes.node.isRequired,
-};
-
-ModalShell.defaultProps = {
-  subtitle: null,
-  onSave: null,
-  saveLabel: null,
-  cancelLabel: null,
-  onDelete: null,
-  deleteLabel: null,
-  deleteDisabled: false,
-  extraActions: null,
-  scrollRef: null,
-  showBlurOverlay: false,
 };
 
 const styles = StyleSheet.create({

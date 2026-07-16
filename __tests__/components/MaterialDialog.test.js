@@ -439,8 +439,13 @@ describe('MaterialDialog', () => {
 
   describe('Default Props', () => {
     it('uses default visible value', async () => {
-      // Default visible is false
-      expect(MaterialDialog.defaultProps.visible).toBe(false);
+      // Default visible is false, so the dialog renders nothing when omitted
+      const { queryByTestId } = await render(
+        <MaterialDialog title="Hidden" />,
+        { wrapper },
+      );
+
+      expect(queryByTestId('material-dialog-overlay')).toBeNull();
     });
 
     it('uses default buttons array', async () => {

@@ -83,7 +83,7 @@ const CARD_COLLAPSE_ANIMATION = {
  *
  * The panel owns all of its async state so the host screen only has to mount it.
  */
-export default function NotificationProcessingContentPanel({ bottomInset }) {
+export default function NotificationProcessingContentPanel({ bottomInset = 0 }) {
   const { colors } = useThemeColors();
   const { t } = useLocalization();
   const { accounts } = useAccountsData();
@@ -666,10 +666,6 @@ export default function NotificationProcessingContentPanel({ bottomInset }) {
 
 NotificationProcessingContentPanel.propTypes = {
   bottomInset: PropTypes.number,
-};
-
-NotificationProcessingContentPanel.defaultProps = {
-  bottomInset: 0,
 };
 
 const styles = StyleSheet.create({

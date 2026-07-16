@@ -10,7 +10,7 @@ import { getDecimalPlaces } from '../services/currency';
  * Calculator button component - Memoized for performance
  * Executes on press down and repeats during long holds
  */
-const CalcButton = memo(({ value, onPress, style, textStyle, icon, colors }) => {
+const CalcButton = memo(({ value = '', onPress = () => {}, style = null, textStyle = null, icon = null, colors = {} }) => {
   const timeoutRef = useRef(null);
   const intervalRef = useRef(null);
   const isPressedRef = useRef(false);
@@ -153,15 +153,6 @@ CalcButton.propTypes = {
   colors: PropTypes.object,
 };
 
-CalcButton.defaultProps = {
-  value: '',
-  onPress: () => {},
-  style: null,
-  textStyle: null,
-  icon: null,
-  colors: {},
-};
-
 /**
  * Calculator component for amount input
  * Features:
@@ -172,7 +163,7 @@ CalcButton.defaultProps = {
  * - Shows "=" button when expression contains operations
  * - Evaluates expression and replaces with result
  */
-export default function Calculator({ value, onValueChange, colors, placeholder = '0', onAdd, containerBackground = null, compact = false, currencyCode, onCurrencyPress }) {
+export default function Calculator({ value = '', onValueChange = () => {}, colors, placeholder = '0', onAdd = null, containerBackground = null, compact = false, currencyCode, onCurrencyPress }) {
   const [expression, setExpression] = useState(value || '');
   const syncedFromPropRef = useRef(false);
 
@@ -487,14 +478,6 @@ Calculator.propTypes = {
   compact: PropTypes.bool,
   currencyCode: PropTypes.string,
   onCurrencyPress: PropTypes.func,
-};
-
-Calculator.defaultProps = {
-  value: '',
-  onValueChange: () => {},
-  placeholder: '0',
-  onAdd: null,
-  containerBackground: null,
 };
 
 const styles = StyleSheet.create({

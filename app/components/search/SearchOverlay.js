@@ -13,7 +13,7 @@ import { useSearch } from '../../contexts/SearchContext';
 
 const SCREEN_HEIGHT = Dimensions.get('window').height;
 
-const SearchOverlay = ({ colors, t, visible, onHeightChange, topOffset }) => {
+const SearchOverlay = ({ colors, t, visible, onHeightChange = null, topOffset = 0 }) => {
   const { searchState = { text: '', types: [], accountIds: [], categoryIds: [], dateRange: { startDate: null, endDate: null }, amountRange: { min: null, max: null } } } = useOperationsData();
   const { filtersExpanded } = useSearch();
   const { updateSearchFilters } = useOperationsActions();
@@ -77,11 +77,6 @@ SearchOverlay.propTypes = {
   t: PropTypes.func.isRequired,
   visible: PropTypes.bool.isRequired,
   topOffset: PropTypes.number,
-};
-
-SearchOverlay.defaultProps = {
-  onHeightChange: null,
-  topOffset: 0,
 };
 
 const styles = StyleSheet.create({

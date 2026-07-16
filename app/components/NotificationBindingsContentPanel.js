@@ -45,7 +45,7 @@ import {
  * preference; category and name bindings share the notification_merchant_rules
  * table (one row may carry both). Each row can be re-pointed or removed.
  */
-export default function NotificationBindingsContentPanel({ bottomInset }) {
+export default function NotificationBindingsContentPanel({ bottomInset = 0 }) {
   const { colors } = useThemeColors();
   const { t } = useLocalization();
   const { accounts } = useAccountsData();
@@ -420,10 +420,6 @@ export default function NotificationBindingsContentPanel({ bottomInset }) {
 
 NotificationBindingsContentPanel.propTypes = {
   bottomInset: PropTypes.number,
-};
-
-NotificationBindingsContentPanel.defaultProps = {
-  bottomInset: 0,
 };
 
 const styles = StyleSheet.create({

@@ -42,6 +42,13 @@ const SECTION_FOOTER_HEIGHT = BORDER_RADIUS.md + SPACING.xs;
 // DateSeparator, plus the cardTop cap (BORDER_RADIUS.md).
 const SECTION_HEADER_HEIGHT_FALLBACK = SPACING.sm + 17 + SPACING.xs + BORDER_RADIUS.md;
 
+// Hoisted so an omitted prop keeps a stable identity across renders. Inline
+// `[]` / `() => {}` defaults would allocate anew on every render and, since
+// several of these feed the renderItem useCallback deps, would churn its
+// identity and defeat the list's row memoization.
+const NOOP = () => {};
+const NO_SUGGESTIONS = [];
+
 /**
  * OperationsList Component
  *
@@ -56,23 +63,23 @@ const OperationsList = forwardRef(({
   categories,
   colors,
   t,
-  initialLoading,
-  loadingMore,
-  hasMoreOperations,
+  initialLoading = false,
+  loadingMore = false,
+  hasMoreOperations = false,
   onLoadMore,
   onEditOperation,
   onDateSeparatorPress,
-  onScroll,
-  onScrollToIndexFailed,
-  onContentSizeChange,
-  refreshing,
-  onRefresh,
-  headerComponent,
-  topInset,
-  pendingSuggestionId,
-  pendingSuggestions,
-  onApplySuggestion,
-  onDismissSuggestion,
+  onScroll = NOOP,
+  onScrollToIndexFailed = NOOP,
+  onContentSizeChange = NOOP,
+  refreshing = false,
+  onRefresh = null,
+  headerComponent = null,
+  topInset = 0,
+  pendingSuggestionId = null,
+  pendingSuggestions = NO_SUGGESTIONS,
+  onApplySuggestion = NOOP,
+  onDismissSuggestion = NOOP,
 }, ref) => {
 
   // Format date label for the separator header.
@@ -459,23 +466,6 @@ OperationsList.propTypes = {
   pendingSuggestions: PropTypes.arrayOf(PropTypes.string),
   onApplySuggestion: PropTypes.func,
   onDismissSuggestion: PropTypes.func,
-};
-
-OperationsList.defaultProps = {
-  initialLoading: false,
-  loadingMore: false,
-  hasMoreOperations: false,
-  onScroll: () => {},
-  onScrollToIndexFailed: () => {},
-  onContentSizeChange: () => {},
-  refreshing: false,
-  onRefresh: null,
-  headerComponent: null,
-  topInset: 0,
-  pendingSuggestionId: null,
-  pendingSuggestions: [],
-  onApplySuggestion: () => {},
-  onDismissSuggestion: () => {},
 };
 
 const styles = StyleSheet.create({

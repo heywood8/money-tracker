@@ -12,7 +12,7 @@ const ExpandableFilters = ({
   accounts,
   colors,
   t,
-  isExpanded,
+  isExpanded = true,
 }) => {
   const [showStartDatePicker, setShowStartDatePicker] = useState(false);
   const [showEndDatePicker, setShowEndDatePicker] = useState(false);
@@ -304,10 +304,6 @@ ExpandableFilters.propTypes = {
   }).isRequired,
   t: PropTypes.func.isRequired,
   isExpanded: PropTypes.bool,
-};
-
-ExpandableFilters.defaultProps = {
-  isExpanded: true,
 };
 
 const styles = StyleSheet.create({

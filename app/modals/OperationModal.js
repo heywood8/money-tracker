@@ -106,7 +106,9 @@ const buildLocationOverrides = (attachLocation, location) => {
   return null;
 };
 
-export default function OperationModal({ visible, onClose, operation, isNew, onDelete }) {
+export default function OperationModal({
+  visible = false, onClose = () => {}, operation = null, isNew = false, onDelete = null,
+}) {
   const { colors } = useThemeColors();
   const { t } = useLocalization();
   const { showDialog } = useDialog();
@@ -924,10 +926,3 @@ OperationModal.propTypes = {
   onDelete: PropTypes.func,
 };
 
-OperationModal.defaultProps = {
-  visible: false,
-  onClose: () => {},
-  operation: null,
-  isNew: false,
-  onDelete: null,
-};

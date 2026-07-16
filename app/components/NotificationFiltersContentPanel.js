@@ -40,7 +40,7 @@ import {
  *      checkbox. Apps are shown by default; unchecking one hides its
  *      notifications from the feed on the main processing page.
  */
-export default function NotificationFiltersContentPanel({ bottomInset }) {
+export default function NotificationFiltersContentPanel({ bottomInset = 0 }) {
   const { colors } = useThemeColors();
   const { t } = useLocalization();
 
@@ -324,10 +324,6 @@ export default function NotificationFiltersContentPanel({ bottomInset }) {
 
 NotificationFiltersContentPanel.propTypes = {
   bottomInset: PropTypes.number,
-};
-
-NotificationFiltersContentPanel.defaultProps = {
-  bottomInset: 0,
 };
 
 const styles = StyleSheet.create({

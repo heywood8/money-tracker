@@ -29,7 +29,9 @@ import currencies from '../../assets/currencies.json';
 import ModalBlurOverlay from '../components/ModalBlurOverlay';
 import ModalHeader from '../components/ModalHeader';
 
-export default function BudgetModal({ visible, onClose, budget, categoryId, categoryName, isNew }) {
+export default function BudgetModal({
+  visible = false, onClose = () => {}, budget = null, categoryId = '', categoryName = '', isNew = true,
+}) {
   const { colors } = useThemeColors();
   const { t } = useLocalization();
   const { showDialog } = useDialog();
@@ -678,15 +680,6 @@ BudgetModal.propTypes = {
   categoryId: PropTypes.string,
   categoryName: PropTypes.string,
   isNew: PropTypes.bool,
-};
-
-BudgetModal.defaultProps = {
-  visible: false,
-  onClose: () => {},
-  budget: null,
-  categoryId: '',
-  categoryName: '',
-  isNew: true,
 };
 
 const styles = StyleSheet.create({

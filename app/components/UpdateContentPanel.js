@@ -370,7 +370,7 @@ const unmatchedApksFor = (downloadedApks, releases) => {
   return downloadedApks.filter((apk) => !apk.version || !shown.has(apk.version));
 };
 
-export default function UpdateContentPanel({ isChecking, updateResult, downloadedApks, onUpdate, onInstallApk, onRefresh, bottomInset }) {
+export default function UpdateContentPanel({ isChecking = false, updateResult = null, downloadedApks = [], onUpdate = () => {}, onInstallApk = () => {}, onRefresh = null, bottomInset = 0 }) {
   const { colors } = useThemeColors();
   const { t } = useLocalization();
   const contentAnim = useRef(new Animated.Value(0)).current;
@@ -683,16 +683,6 @@ UpdateContentPanel.propTypes = {
   onInstallApk: PropTypes.func,
   onRefresh: PropTypes.func,
   bottomInset: PropTypes.number,
-};
-
-UpdateContentPanel.defaultProps = {
-  isChecking: false,
-  updateResult: null,
-  downloadedApks: [],
-  onUpdate: () => {},
-  onInstallApk: () => {},
-  onRefresh: null,
-  bottomInset: 0,
 };
 
 const styles = StyleSheet.create({

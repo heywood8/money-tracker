@@ -26,12 +26,12 @@ const OperationListItem = ({
   getCategoryInfo,
   getAccountName,
   formatCurrency,
-  isLast,
+  isLast = false,
   onPress,
   testID,
-  suggestionChips,
-  onApplySuggestion,
-  onDismissSuggestion,
+  suggestionChips = null,
+  onApplySuggestion = () => {},
+  onDismissSuggestion = () => {},
 }) => {
   const isExpense = operation.type === 'expense';
   const isIncome = operation.type === 'income';
@@ -209,14 +209,6 @@ OperationListItem.propTypes = {
   suggestionChips: PropTypes.arrayOf(PropTypes.string),
   onApplySuggestion: PropTypes.func,
   onDismissSuggestion: PropTypes.func,
-};
-
-OperationListItem.defaultProps = {
-  isLast: false,
-  testID: undefined,
-  suggestionChips: null,
-  onApplySuggestion: () => {},
-  onDismissSuggestion: () => {},
 };
 
 const styles = StyleSheet.create({
