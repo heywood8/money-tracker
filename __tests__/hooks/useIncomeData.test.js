@@ -108,6 +108,7 @@ describe('useIncomeData', () => {
         mockCurrency,
         '2024-01-01',
         '2024-01-31',
+        false,
       );
       expect(result.current.incomeChartData.length).toBeGreaterThan(0);
     });
@@ -135,6 +136,7 @@ describe('useIncomeData', () => {
         mockCurrency,
         '2024-01-01',
         '2024-12-31',
+        false,
       );
     });
 
@@ -484,10 +486,11 @@ describe('useIncomeData', () => {
         mockCurrency,
         expect.any(String),
         expect.any(String),
+        false,
       );
       expect(OperationsDB.getIncomeByCategoryAndCurrency).toHaveBeenCalledTimes(1);
       const callArgs = OperationsDB.getIncomeByCategoryAndCurrency.mock.calls[0];
-      expect(callArgs).toHaveLength(3);
+      expect(callArgs).toHaveLength(4);
     });
 
     it('should roll up grandchild to immediate child when viewing subfolder', async () => {

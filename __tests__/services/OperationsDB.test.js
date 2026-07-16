@@ -997,6 +997,132 @@ describe('OperationsDB Service', () => {
       );
     });
 
+    describe('Cross-currency conversion (convertAll)', () => {
+      // Deterministic conversion: each foreign currency has a fixed rate to USD.
+      // A currency missing from the table (XYZ) yields a null rate → its rows are dropped.
+      const RATES = { USD: 1, AMD: 0.0025, EUR: 1.1 };
+      beforeEach(() => {
+        // Default: no offline rate, so conversion defers to the live fetch mock.
+        // Individual tests override getExchangeRate to exercise the offline-first path.
+        Currency.getExchangeRate.mockReturnValue(null);
+        Currency.fetchLiveExchangeRate.mockImplementation(async (from) => ({
+          rate: RATES[from] !== undefined ? String(RATES[from]) : null,
+          source: 'live',
+        }));
+        // Real convertAmount formats to the target currency's decimals; mirror that
+        // here so float noise (e.g. 50 * 1.1) doesn't leak into the assertions.
+        Currency.convertAmount.mockImplementation((amount, _from, _to, rate) =>
+          rate ? (parseFloat(amount) * parseFloat(rate)).toFixed(2) : null,
+        );
+        Currency.compare.mockImplementation((a, b) => {
+          const da = parseFloat(a);
+          const db = parseFloat(b);
+          return da < db ? -1 : da > db ? 1 : 0;
+        });
+      });
+
+      it('spending: drops the currency filter and groups by category + currency', async () => {
+        queryAll.mockResolvedValue([]);
+        await OperationsDB.getSpendingByCategoryAndCurrency('USD', '2025-12-01', '2025-12-31', null, true);
+
+        const [sql, params] = queryAll.mock.calls[0];
+        expect(sql).not.toContain('a.currency = ?');
+        expect(sql).toContain('GROUP BY o.category_id, a.currency');
+        expect(params).toEqual(['2025-12-01', '2025-12-31']);
+      });
+
+      it('spending: converts foreign subtotals to the target currency and merges by category', async () => {
+        queryAll.mockResolvedValue([
+          { category_id: 'cat1', currency: 'USD', total: 100 },
+          { category_id: 'cat1', currency: 'AMD', total: 4000 }, // 4000 * 0.0025 = 10
+          { category_id: 'cat2', currency: 'EUR', total: 50 },   // 50 * 1.1 = 55
+        ]);
+
+        const result = await OperationsDB.getSpendingByCategoryAndCurrency('USD', '2025-12-01', '2025-12-31', null, true);
+
+        // cat1: 100 (passthrough) + 10 = 110; cat2: 55. Sorted by total DESC.
+        expect(result).toEqual([
+          { category_id: 'cat1', total: '110' },
+          { category_id: 'cat2', total: '55' },
+        ]);
+      });
+
+      it('spending: drops subtotals whose currency has no rate to the target', async () => {
+        queryAll.mockResolvedValue([
+          { category_id: 'cat1', currency: 'USD', total: 100 },
+          { category_id: 'cat2', currency: 'XYZ', total: 999 }, // no rate → dropped
+        ]);
+
+        const result = await OperationsDB.getSpendingByCategoryAndCurrency('USD', '2025-12-01', '2025-12-31', null, true);
+
+        expect(result).toEqual([{ category_id: 'cat1', total: '100' }]);
+      });
+
+      it('spending: keeps the currency filter when an account is specified even if convertAll is set', async () => {
+        queryAll.mockResolvedValue([]);
+        await OperationsDB.getSpendingByCategoryAndCurrency('USD', '2025-12-01', '2025-12-31', 'acc1', true);
+
+        const [sql, params] = queryAll.mock.calls[0];
+        expect(sql).toContain('a.currency = ?');
+        expect(params).toEqual(['USD', '2025-12-01', '2025-12-31', 'acc1']);
+      });
+
+      it('income: converts foreign subtotals and drops the currency filter', async () => {
+        queryAll.mockResolvedValue([
+          { category_id: 'cat1', currency: 'EUR', total: 50 }, // 55
+          { category_id: 'cat1', currency: 'USD', total: 20 },
+        ]);
+
+        const result = await OperationsDB.getIncomeByCategoryAndCurrency('USD', '2025-12-01', '2025-12-31', true);
+
+        const [sql, params] = queryAll.mock.calls[0];
+        expect(sql).not.toContain('a.currency = ?');
+        expect(sql).toContain('GROUP BY o.category_id, a.currency');
+        expect(params).toEqual(['2025-12-01', '2025-12-31']);
+        expect(result).toEqual([{ category_id: 'cat1', total: '75' }]);
+      });
+
+      it('trend: converts each month total at the current rate and drops the currency filter', async () => {
+        queryAll.mockResolvedValue([
+          { year_month: '2025-11', amount: 100, currency: 'USD' },
+          { year_month: '2025-11', amount: 4000, currency: 'AMD' }, // 10
+          { year_month: '2025-12', amount: 50, currency: 'EUR' },   // 55
+        ]);
+
+        const result = await OperationsDB.getLast12MonthsSpendingByCategories('USD', ['cat1'], true);
+
+        const sql = queryAll.mock.calls[0][0];
+        expect(sql).not.toContain('a.currency = ?');
+        expect(result).toEqual([
+          { yearMonth: '2025-11', total: '110' },
+          { yearMonth: '2025-12', total: '55' },
+        ]);
+      });
+
+      it('spending: uses the offline rate first and skips the live fetch when available', async () => {
+        Currency.getExchangeRate.mockImplementation((from) =>
+          RATES[from] !== undefined ? String(RATES[from]) : null,
+        );
+        queryAll.mockResolvedValue([
+          { category_id: 'cat1', currency: 'AMD', total: 4000 }, // 4000 * 0.0025 = 10
+        ]);
+
+        const result = await OperationsDB.getSpendingByCategoryAndCurrency('USD', '2025-12-01', '2025-12-31', null, true);
+
+        expect(result).toEqual([{ category_id: 'cat1', total: '10' }]);
+        expect(Currency.fetchLiveExchangeRate).not.toHaveBeenCalled();
+      });
+
+      it('getUnconvertibleCurrencies returns currencies with no offline or live rate', async () => {
+        // EUR has an offline rate; XYZ has neither offline nor live; USD is the target.
+        Currency.getExchangeRate.mockImplementation((from) => (from === 'EUR' ? '1.1' : null));
+
+        const result = await OperationsDB.getUnconvertibleCurrencies(['USD', 'EUR', 'AMD', 'XYZ'], 'USD');
+
+        expect(result).toEqual(['XYZ']); // AMD resolves via the live mock, EUR offline, USD is target
+      });
+    });
+
     it('gets top categories from last 3 months', async () => {
       const mockResults = [
         { category_id: 'cat1', count: 15 },

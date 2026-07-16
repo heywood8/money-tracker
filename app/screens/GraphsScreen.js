@@ -1,5 +1,5 @@
 import React, { useState, useEffect, useLayoutEffect, useCallback, useMemo, useRef } from 'react';
-import { View, Text, StyleSheet, ScrollView, useWindowDimensions } from 'react-native';
+import { View, Text, StyleSheet, ScrollView, TouchableOpacity, useWindowDimensions } from 'react-native';
 import Animated, { useSharedValue, useAnimatedStyle, withTiming, interpolate, runOnJS, Easing, SlideInLeft, SlideInRight, SlideOutLeft, SlideOutRight } from 'react-native-reanimated';
 import { MaterialCommunityIcons as Icon } from '@expo/vector-icons';
 import WheelPicker from '@quidone/react-native-wheel-picker';
@@ -7,7 +7,7 @@ import { useThemeColors } from '../contexts/ThemeColorsContext';
 import { useLocalization } from '../contexts/LocalizationContext';
 import { useAccountsData } from '../contexts/AccountsDataContext';
 import { TOP_CONTENT_SPACING } from '../styles/layout';
-import { getAvailableMonths } from '../services/OperationsDB';
+import { getAvailableMonths, getUnconvertibleCurrencies } from '../services/OperationsDB';
 import { getAllCategories } from '../services/CategoriesDB';
 import { appEvents, EVENTS } from '../services/eventEmitter';
 import { formatAmount } from '../services/currency';
@@ -41,6 +41,13 @@ const GraphsScreen = () => {
   // Combined period state: "YYYY-MM" for specific month or "YYYY-full" for full year
   const [selectedPeriod, setSelectedPeriod] = useState(`${now.getFullYear()}-${now.getMonth()}`);
   const [selectedCurrency, setSelectedCurrency] = useState('');
+  // When on, operations in other currencies are converted to selectedCurrency at
+  // the current rate and folded into the expense/income pie charts and the
+  // spending trend, instead of showing only same-currency operations.
+  const [convertAllCurrencies, setConvertAllCurrencies] = useState(false);
+  // Account currencies that have no rate (offline or live) to selectedCurrency —
+  // their operations are silently excluded from converted totals, so warn.
+  const [unconvertedCurrencies, setUnconvertedCurrencies] = useState([]);
   const [selectedCategory, setSelectedCategory] = useState('all');
   const [selectedIncomeCategory, setSelectedIncomeCategory] = useState('all');
   const [categories, setCategories] = useState([]);
@@ -94,14 +101,14 @@ const GraphsScreen = () => {
     loading,
     loadExpenseData,
     totalExpenses,
-  } = useExpenseData(selectedYear, selectedMonth, selectedCurrency, selectedCategory, categories, colors, t);
+  } = useExpenseData(selectedYear, selectedMonth, selectedCurrency, selectedCategory, categories, colors, t, convertAllCurrencies);
 
   const {
     incomeChartData,
     loadingIncome,
     loadIncomeData,
     totalIncome,
-  } = useIncomeData(selectedYear, selectedMonth, selectedCurrency, selectedIncomeCategory, categories, colors, t);
+  } = useIncomeData(selectedYear, selectedMonth, selectedCurrency, selectedIncomeCategory, categories, colors, t, convertAllCurrencies);
 
   const {
     balanceHistoryData,
@@ -269,6 +276,21 @@ const GraphsScreen = () => {
     [...new Set(accounts.map(acc => acc.currency))],
   [accounts],
   );
+
+  // When converting, detect account currencies that cannot be expressed in the
+  // selected currency (no offline and no live rate) so the UI can flag that some
+  // operations are excluded rather than silently dropping them.
+  useEffect(() => {
+    if (!convertAllCurrencies || !selectedCurrency) {
+      setUnconvertedCurrencies([]);
+      return;
+    }
+    let cancelled = false;
+    getUnconvertibleCurrencies(currencies, selectedCurrency)
+      .then(list => { if (!cancelled) setUnconvertedCurrencies(list); })
+      .catch(() => { if (!cancelled) setUnconvertedCurrencies([]); });
+    return () => { cancelled = true; };
+  }, [convertAllCurrencies, selectedCurrency, currencies]);
 
   // Prepare picker items
   const currencyItems = useMemo(() =>
@@ -591,6 +613,16 @@ const GraphsScreen = () => {
     <View style={[styles.container, { backgroundColor: colors.background }]}>
       <ScrollView style={styles.scrollView} contentContainerStyle={styles.scrollContent}>
         <View style={styles.content}>
+          {/* Warn when some account currencies can't be converted to the selected one */}
+          {convertAllCurrencies && unconvertedCurrencies.length > 0 && (
+            <View style={[styles.convertWarning, { backgroundColor: colors.altRow, borderColor: colors.border }]}>
+              <Icon name="alert-outline" size={16} color={colors.mutedText} />
+              <Text style={[styles.convertWarningText, { color: colors.mutedText }]}>
+                {`${t('graphs_currencies_not_converted')}: ${unconvertedCurrencies.join(', ')}`}
+              </Text>
+            </View>
+          )}
+
           {/* Summary Cards Row — always-mounted, width/height driven by Animated */}
           <View style={styles.summaryCardsRow}>
             {/* Income card */}
@@ -756,9 +788,35 @@ const GraphsScreen = () => {
             selectedCategory={selectedCategoryForTrend}
             onCategoryChange={setSelectedCategoryForTrend}
             categories={categories}
+            convertAllCurrencies={convertAllCurrencies}
           />
         </View>
       </ScrollView>
+
+      {/* Convert-other-currencies toggle — only useful with more than one currency */}
+      {currencyItems.length > 1 && (
+        <TouchableOpacity
+          style={[
+            styles.fabWheel,
+            styles.fabToggle,
+            {
+              backgroundColor: convertAllCurrencies ? colors.primary : colors.surface + 'DE',
+              borderColor: convertAllCurrencies ? colors.primary : colors.border + '80',
+            },
+          ]}
+          onPress={() => setConvertAllCurrencies(v => !v)}
+          activeOpacity={0.7}
+          accessibilityRole="switch"
+          accessibilityState={{ checked: convertAllCurrencies }}
+          accessibilityLabel={t('graphs_convert_currencies')}
+        >
+          <Icon
+            name="cash-sync"
+            size={24}
+            color={convertAllCurrencies ? colors.surface : colors.mutedText}
+          />
+        </TouchableOpacity>
+      )}
 
       {/* Floating currency wheel FAB */}
       {currencyItems.length > 0 && (
@@ -824,6 +882,29 @@ const styles = StyleSheet.create({
   content: {
     padding: TOP_CONTENT_SPACING,
     paddingTop: TOP_CONTENT_SPACING + 4,
+  },
+  convertWarning: {
+    alignItems: 'center',
+    borderRadius: 12,
+    borderWidth: 1,
+    flexDirection: 'row',
+    gap: 8,
+    marginBottom: 12,
+    paddingHorizontal: 12,
+    paddingVertical: 8,
+  },
+  convertWarningText: {
+    flex: 1,
+    fontSize: 12,
+  },
+  fabToggle: {
+    alignItems: 'center',
+    borderRadius: 22,
+    bottom: 136,
+    height: 44,
+    justifyContent: 'center',
+    right: 238,
+    width: 44,
   },
   fabWheel: {
     borderRadius: 16,

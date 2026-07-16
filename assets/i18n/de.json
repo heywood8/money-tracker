@@ -402,6 +402,8 @@
   "balance_history_details": "Saldohistorie Details",
   "actions": "Aktionen",
   "category_spending_trend": "Ausgabentrend",
+  "graphs_convert_currencies": "Andere Währungen umrechnen",
+  "graphs_currencies_not_converted": "Einige Währungen nicht umgerechnet",
   "yearly_total": "Jahresgesamt",
   "last_12_months_total": "Letzte 12 Monate",
   "no_spending_data": "Keine Ausgabedaten fur diese Kategorie",

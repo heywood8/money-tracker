@@ -15,7 +15,7 @@ const CHART_COLORS = [
  * DB is queried once per period/currency change. Category switches
  * re-aggregate the cached raw data synchronously (no DB hit).
  */
-const useIncomeData = (selectedYear, selectedMonth, selectedCurrency, selectedIncomeCategory, categories, colors, t) => {
+const useIncomeData = (selectedYear, selectedMonth, selectedCurrency, selectedIncomeCategory, categories, colors, t, convertAllCurrencies = false) => {
   const [rawIncome, setRawIncome] = useState(null);
   const [loadingIncome, setLoadingIncome] = useState(false);
 
@@ -38,6 +38,7 @@ const useIncomeData = (selectedYear, selectedMonth, selectedCurrency, selectedIn
         selectedCurrency,
         formatDate(startDate),
         formatDate(endDate),
+        convertAllCurrencies,
       );
 
       setRawIncome(income);
@@ -46,7 +47,7 @@ const useIncomeData = (selectedYear, selectedMonth, selectedCurrency, selectedIn
     } finally {
       setLoadingIncome(false);
     }
-  }, [selectedYear, selectedMonth, selectedCurrency]);
+  }, [selectedYear, selectedMonth, selectedCurrency, convertAllCurrencies]);
 
   // Aggregate cached raw income for the current category — no DB hit
   const incomeChartData = useMemo(() => {

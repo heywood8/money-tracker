@@ -402,6 +402,8 @@
   "balance_history_details": "余额历史详情",
   "actions": "操作",
   "category_spending_trend": "支出趋势",
+  "graphs_convert_currencies": "换算其他货币",
+  "graphs_currencies_not_converted": "部分货币未换算",
   "yearly_total": "年度总计",
   "last_12_months_total": "过去12个月",
   "no_spending_data": "此类别没有支出数据",

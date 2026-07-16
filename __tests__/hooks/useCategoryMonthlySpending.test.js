@@ -129,6 +129,7 @@ describe('useCategoryMonthlySpending', () => {
       expect(OperationsDB.getLast12MonthsSpendingByCategories).toHaveBeenCalledWith(
         mockCurrency,
         [mockCategoryId, 'cat-groceries', 'cat-restaurants'],
+        false,
       );
     });
 
@@ -144,6 +145,7 @@ describe('useCategoryMonthlySpending', () => {
         expect(OperationsDB.getLast12MonthsSpendingByCategories).toHaveBeenCalledWith(
           'EUR',
           [mockCategoryId],
+          false,
         );
       });
     });
@@ -308,6 +310,7 @@ describe('useCategoryMonthlySpending', () => {
         expect(OperationsDB.getLast12MonthsSpendingByCategories).toHaveBeenCalledWith(
           'USD',
           [mockCategoryId],
+          false,
         );
       });
 
@@ -321,6 +324,7 @@ describe('useCategoryMonthlySpending', () => {
         expect(OperationsDB.getLast12MonthsSpendingByCategories).toHaveBeenCalledWith(
           'EUR',
           [mockCategoryId],
+          false,
         );
       });
     });
@@ -338,6 +342,7 @@ describe('useCategoryMonthlySpending', () => {
         expect(OperationsDB.getLast12MonthsSpendingByCategories).toHaveBeenCalledWith(
           mockCurrency,
           ['cat-food'],
+          false,
         );
       });
 
@@ -351,6 +356,7 @@ describe('useCategoryMonthlySpending', () => {
         expect(OperationsDB.getLast12MonthsSpendingByCategories).toHaveBeenCalledWith(
           mockCurrency,
           ['cat-transport'],
+          false,
         );
       });
     });

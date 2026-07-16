@@ -102,7 +102,12 @@ jobs:
 
       - name: Run tests
         id: test
-        run: bun run test -- --coverage 2>&1 | tee test-output.txt
+        # The full suite under --coverage peaks past a Jest worker's default heap
+        # on the heaviest suites ("Jest worker ran out of memory"). Run a single
+        # worker with a larger heap so the peak fits within the runner's RAM.
+        env:
+          NODE_OPTIONS: --max-old-space-size=6144
+        run: bun run test -- --coverage --maxWorkers=1 2>&1 | tee test-output.txt
         continue-on-error: true
 
       - name: Post test results

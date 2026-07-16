@@ -110,6 +110,8 @@ describe('useExpenseData', () => {
         mockCurrency,
         '2024-01-01',
         '2024-01-31',
+        null,
+        false,
       );
       expect(result.current.chartData.length).toBeGreaterThan(0);
     });
@@ -137,6 +139,8 @@ describe('useExpenseData', () => {
         mockCurrency,
         '2024-01-01',
         '2024-12-31',
+        null,
+        false,
       );
     });
 
@@ -475,10 +479,12 @@ describe('useExpenseData', () => {
         mockCurrency,
         expect.any(String),
         expect.any(String),
+        null,
+        false,
       );
       expect(OperationsDB.getSpendingByCategoryAndCurrency).toHaveBeenCalledTimes(1);
       const callArgs = OperationsDB.getSpendingByCategoryAndCurrency.mock.calls[0];
-      expect(callArgs).toHaveLength(3);
+      expect(callArgs).toHaveLength(5);
     });
 
     it('should include expenses from multiple accounts in the same currency', async () => {

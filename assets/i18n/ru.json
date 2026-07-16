@@ -406,6 +406,8 @@
   "balance_history_details": "Детали истории баланса",
   "actions": "Действия",
   "category_spending_trend": "Тренд расходов",
+  "graphs_convert_currencies": "Пересчитывать другие валюты",
+  "graphs_currencies_not_converted": "Не пересчитаны валюты",
   "yearly_total": "Итого за год",
   "last_12_months_total": "За последние 12 месяцев",
   "no_spending_data": "Нет данных о расходах в этой категории",

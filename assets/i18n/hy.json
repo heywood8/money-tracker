@@ -401,6 +401,8 @@
   "balance_history_details": "Մնացորդի պատմության մանրամասներ",
   "actions": "Գործողություններ",
   "category_spending_trend": "Ծախսերի միտում",
+  "graphs_convert_currencies": "Փոխարկել այլ արժույթները",
+  "graphs_currencies_not_converted": "Որոշ արժույթներ չեն փոխարկվել",
   "yearly_total": "Տարեկան ընդամենը",
   "last_12_months_total": "Վերջին 12 ամիս",
   "no_spending_data": "Ծախսերի տվյալներ չկան այս կատեգորիայի համար",

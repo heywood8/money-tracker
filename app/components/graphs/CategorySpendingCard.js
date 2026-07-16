@@ -348,6 +348,7 @@ const CategorySpendingCard = ({
   selectedCategory,
   onCategoryChange,
   categories,
+  convertAllCurrencies = false,
 }) => {
   // null = closed, 'primary' = picking primary, 'vs' = picking vs category
   const [pickerMode, setPickerMode] = useState(null);
@@ -436,8 +437,8 @@ const CategorySpendingCard = ({
     setShowStackedBar(false);
   }, []);
 
-  const { monthlyData, loading } = useCategoryMonthlySpending(selectedCurrency, effectiveCategory, categories);
-  const { monthlyData: vsMonthlyData, loading: vsLoading } = useCategoryMonthlySpending(selectedCurrency, effectiveVsCategory, categories);
+  const { monthlyData, loading } = useCategoryMonthlySpending(selectedCurrency, effectiveCategory, categories, convertAllCurrencies);
+  const { monthlyData: vsMonthlyData, loading: vsLoading } = useCategoryMonthlySpending(selectedCurrency, effectiveVsCategory, categories, convertAllCurrencies);
 
   const { hideBalances } = useDisplaySettings();
 
@@ -703,6 +704,7 @@ CategorySpendingCard.propTypes = {
   selectedCategory: PropTypes.string,
   onCategoryChange: PropTypes.func.isRequired,
   categories: PropTypes.array.isRequired,
+  convertAllCurrencies: PropTypes.bool,
 };
 
 const styles = StyleSheet.create({

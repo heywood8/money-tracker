@@ -406,6 +406,8 @@
   "balance_history_details": "Balance History Details",
   "actions": "Actions",
   "category_spending_trend": "Spending Trend",
+  "graphs_convert_currencies": "Convert other currencies",
+  "graphs_currencies_not_converted": "Some currencies not converted",
   "yearly_total": "Yearly Total",
   "last_12_months_total": "Last 12 Months",
   "no_spending_data": "No spending data for this category",
