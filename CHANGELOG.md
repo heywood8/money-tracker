@@ -1,5 +1,12 @@
 # Changelog
 
+## [0.196.1](https://github.com/heywood8/money-tracker/compare/penny-v0.196.0...penny-v0.196.1) (2026-07-16)
+
+
+### Bug Fixes
+
+* **graphs:** устранить OOM jest-воркера из-за бесконечного ре-рендера в эффекте валют ([#1245](https://github.com/heywood8/money-tracker/issues/1245)) ([2f2c45d](https://github.com/heywood8/money-tracker/commit/2f2c45dc2b69b41dfc626bfa709e9cec96f7cfde))
+
 ## [0.196.0](https://github.com/heywood8/money-tracker/compare/penny-v0.195.0...penny-v0.196.0) (2026-07-16)
 
 
