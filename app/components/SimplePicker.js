@@ -5,11 +5,20 @@ import { MaterialCommunityIcons as Icon } from '@expo/vector-icons';
 import { HORIZONTAL_PADDING } from '../styles/layout';
 import ModalBlurOverlay from './ModalBlurOverlay';
 
+// Module-level so the default `colors` prop keeps a stable identity across
+// renders (an inline object literal would break the safeColors useMemo).
+const DEFAULT_COLORS = {
+  text: '#000',
+  surface: '#fff',
+  border: '#e0e0e0',
+  selected: '#f5f5f5',
+};
+
 /**
  * SimplePicker - A picker component for Android
  * Uses native HTML select on web, custom modal picker on Android
  */
-const SimplePicker = ({ value, onValueChange, items, style, textStyle, colors, leftIcon, leftText, closeLabel }) => {
+const SimplePicker = ({ value, onValueChange, items = [], style, textStyle, colors = DEFAULT_COLORS, leftIcon, leftText, closeLabel = 'Close' }) => {
   const [modalVisible, setModalVisible] = useState(false);
 
   // Defensive check for undefined items with warning
@@ -252,17 +261,6 @@ SimplePicker.propTypes = {
   leftIcon: PropTypes.string,
   leftText: PropTypes.string,
   closeLabel: PropTypes.string,
-};
-
-SimplePicker.defaultProps = {
-  items: [],
-  closeLabel: 'Close',
-  colors: {
-    text: '#000',
-    surface: '#fff',
-    border: '#e0e0e0',
-    selected: '#f5f5f5',
-  },
 };
 
 export default SimplePicker;

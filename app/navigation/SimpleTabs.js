@@ -132,7 +132,7 @@ UpdateProgressIcon.propTypes = {
 };
 
 // Memoized tab button with icon + label, pill active state
-const TabButton = memo(({ tab, isActive, colors, onPress, isUpdating, updatePhase, updateProgress }) => {
+const TabButton = memo(({ tab, isActive = false, colors, onPress = () => {}, isUpdating = false, updatePhase = null, updateProgress = null }) => {
   const handlePress = useCallback(() => {
     onPress(tab.key);
   }, [onPress, tab.key]);
@@ -196,14 +196,6 @@ TabButton.propTypes = {
   isUpdating: PropTypes.bool,
   updatePhase: PropTypes.string,
   updateProgress: PropTypes.number,
-};
-
-TabButton.defaultProps = {
-  isActive: false,
-  onPress: () => {},
-  isUpdating: false,
-  updatePhase: null,
-  updateProgress: null,
 };
 
 // Pre-computed gradient steps: transparent → very dark black overlay

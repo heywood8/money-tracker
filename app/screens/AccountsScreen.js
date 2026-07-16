@@ -22,6 +22,10 @@ import { getDefaultAccountId, setDefaultAccountId } from '../services/Preference
 import { parseCardMasks, serializeCardMasks, cardMaskLast4 } from '../utils/cardMask';
 import currencies from '../../assets/currencies.json';
 
+// Alias for use as a prop default: a `currencies = currencies` destructuring
+// default would shadow the import and throw (TDZ), so default to this instead.
+const DEFAULT_CURRENCIES = currencies;
+
 // Rounding steps offered for operations auto-created from bank notifications.
 // `null` means no rounding (the default). Labels are static; the "Off" option is
 // localized at render time.
@@ -43,7 +47,7 @@ const ROUNDING_MODE_OPTIONS = [
 ];
 
 // Memoized currency picker modal component
-const CurrencyPickerModal = memo(({ visible, onClose, currencies, colors, t, onSelect }) => {
+const CurrencyPickerModal = memo(({ visible = false, onClose = () => {}, currencies = DEFAULT_CURRENCIES, colors = {}, t = (k) => k, onSelect = () => {} }) => {
   const renderCurrencyItem = useCallback(({ item }) => {
     const [code, cur] = item;
 
@@ -90,17 +94,8 @@ CurrencyPickerModal.propTypes = {
   onSelect: PropTypes.func,
 };
 
-CurrencyPickerModal.defaultProps = {
-  visible: false,
-  onClose: () => {},
-  currencies,
-  colors: {},
-  t: (k) => k,
-  onSelect: () => {},
-};
-
 // Memoized transfer account picker modal component
-const TransferAccountPickerModal = memo(({ visible, onClose, accounts, accountToDelete, accountCurrency, operationCount, colors, t, onSelect, currencies }) => {
+const TransferAccountPickerModal = memo(({ visible = false, onClose = () => {}, accounts = [], accountToDelete = null, accountCurrency = null, operationCount = 0, colors = {}, t = (k) => k, onSelect = () => {}, currencies = DEFAULT_CURRENCIES }) => {
   const { hideBalances } = useDisplaySettings();
   const availableAccounts = useMemo(() => {
     return accounts.filter(a => a.id !== accountToDelete && a.currency === accountCurrency);
@@ -176,21 +171,8 @@ TransferAccountPickerModal.propTypes = {
   currencies: PropTypes.object,
 };
 
-TransferAccountPickerModal.defaultProps = {
-  visible: false,
-  onClose: () => {},
-  accounts: [],
-  accountToDelete: null,
-  accountCurrency: null,
-  operationCount: 0,
-  colors: {},
-  t: (k) => k,
-  onSelect: () => {},
-  currencies,
-};
-
 // Memoized confirmation dialog component
-const ConfirmationDialog = memo(({ visible, onClose, title, message, cancelText, confirmText, onConfirm, colors, confirmColor }) => {
+const ConfirmationDialog = memo(({ visible = false, onClose = () => {}, title = '', message = '', cancelText = null, confirmText = 'OK', onConfirm = () => {}, colors = {}, confirmColor = null }) => {
   return (
     <Portal>
       <Modal
@@ -243,20 +225,8 @@ ConfirmationDialog.propTypes = {
   confirmColor: PropTypes.string,
 };
 
-ConfirmationDialog.defaultProps = {
-  visible: false,
-  onClose: () => {},
-  title: '',
-  message: '',
-  cancelText: null,
-  confirmText: 'OK',
-  onConfirm: () => {},
-  colors: {},
-  confirmColor: null,
-};
-
 // Net worth summary card
-const NetWorthCard = memo(({ accounts, operations, colors, t }) => {
+const NetWorthCard = memo(({ accounts = [], operations = [], colors = {}, t = (k) => k }) => {
   const { hideBalances } = useDisplaySettings();
 
   // Determine display currency from first account (or default to USD)
@@ -358,15 +328,8 @@ NetWorthCard.propTypes = {
   t: PropTypes.func,
 };
 
-NetWorthCard.defaultProps = {
-  accounts: [],
-  operations: [],
-  colors: {},
-  t: (k) => k,
-};
-
 // Memoized account row component
-const AccountRow = memo(({ item, colors, onPress, t, drag, isActive, isDefault }) => {
+const AccountRow = memo(({ item, colors = {}, onPress = () => {}, t = (k) => k, drag = () => {}, isActive = false, isDefault = false }) => {
   const { hideBalances } = useDisplaySettings();
   const decimals = currencies[item.currency]?.decimal_digits ?? 2;
   const balance = parseFloat(item.balance);
@@ -449,15 +412,6 @@ AccountRow.propTypes = {
   drag: PropTypes.func,
   isActive: PropTypes.bool,
   isDefault: PropTypes.bool,
-};
-
-AccountRow.defaultProps = {
-  colors: {},
-  onPress: () => {},
-  t: (k) => k,
-  drag: () => {},
-  isActive: false,
-  isDefault: false,
 };
 
 export default function AccountsScreen({ onBackStateChange }) {
@@ -1315,8 +1269,6 @@ export default function AccountsScreen({ onBackStateChange }) {
 AccountsScreen.propTypes = {
   onBackStateChange: PropTypes.func,
 };
-
-AccountsScreen.defaultProps = {};
 
 const styles = StyleSheet.create({
   accountBalance: {

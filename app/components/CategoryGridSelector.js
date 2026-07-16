@@ -42,11 +42,11 @@ const TOP_WITHOUT_ALL = 8;
 export default function CategoryGridSelector({
   categories,
   categoryType,
-  selectedCategoryId,
+  selectedCategoryId = null,
   onSelect,
   colors,
   t,
-  topCategoryIds,
+  topCategoryIds = null,
 }) {
   const suggestMode = Array.isArray(topCategoryIds);
   const columns = suggestMode ? SUGGEST_COLUMNS : LEGACY_COLUMNS;
@@ -282,11 +282,6 @@ CategoryGridSelector.propTypes = {
   colors: PropTypes.object.isRequired,
   t: PropTypes.func.isRequired,
   topCategoryIds: PropTypes.arrayOf(PropTypes.string),
-};
-
-CategoryGridSelector.defaultProps = {
-  selectedCategoryId: null,
-  topCategoryIds: null,
 };
 
 const styles = StyleSheet.create({

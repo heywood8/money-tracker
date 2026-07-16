@@ -2,7 +2,7 @@ import { View, StyleSheet } from 'react-native';
 import PropTypes from 'prop-types';
 import { useThemeColors } from '../contexts/ThemeColorsContext';
 
-export default function Header({ rightContent }) {
+export default function Header({ rightContent = null }) {
   const { colors } = useThemeColors();
 
   if (!rightContent) return null;
@@ -21,10 +21,6 @@ export default function Header({ rightContent }) {
 
 Header.propTypes = {
   rightContent: PropTypes.node,
-};
-
-Header.defaultProps = {
-  rightContent: null,
 };
 
 const styles = StyleSheet.create({

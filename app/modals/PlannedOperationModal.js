@@ -32,7 +32,9 @@ const TYPE_OPTIONS = [
   { key: 'transfer', icon: 'swap-horizontal', colorKey: 'transfer' },
 ];
 
-export default function PlannedOperationModal({ visible, onClose, plannedOperation, isNew }) {
+export default function PlannedOperationModal({
+  visible = false, onClose, plannedOperation = null, isNew = true,
+}) {
   const { colors } = useThemeColors();
   const { paperInputTheme } = makeModalStyles(colors);
   const { t } = useLocalization();
@@ -457,12 +459,6 @@ PlannedOperationModal.propTypes = {
   onClose: PropTypes.func.isRequired,
   plannedOperation: PropTypes.object,
   isNew: PropTypes.bool,
-};
-
-PlannedOperationModal.defaultProps = {
-  visible: false,
-  plannedOperation: null,
-  isNew: true,
 };
 
 const styles = StyleSheet.create({

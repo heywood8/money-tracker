@@ -2,7 +2,7 @@ import React from 'react';
 import { View, Text, StyleSheet } from 'react-native';
 import PropTypes from 'prop-types';
 
-const FilterBadge = ({ count, colors }) => {
+const FilterBadge = ({ count = 0, colors }) => {
   if (!count || count === 0) {
     return null;
   }
@@ -22,10 +22,6 @@ FilterBadge.propTypes = {
   colors: PropTypes.shape({
     primary: PropTypes.string.isRequired,
   }).isRequired,
-};
-
-FilterBadge.defaultProps = {
-  count: 0,
 };
 
 const styles = StyleSheet.create({

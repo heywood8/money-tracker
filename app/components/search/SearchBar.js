@@ -27,11 +27,11 @@ const SearchBar = ({
   onSearchTextChange,
   onToggleFilters,
   onClose,
-  filterCount,
+  filterCount = 0,
   colors,
   t,
-  collapsed,
-  onCollapsedPress,
+  collapsed = false,
+  onCollapsedPress = undefined,
 }) => {
   const [localText, setLocalText] = useState(searchText);
   // Track the last value we sent to the parent so we can distinguish
@@ -237,12 +237,6 @@ SearchBar.propTypes = {
   t: PropTypes.func.isRequired,
   collapsed: PropTypes.bool,
   onCollapsedPress: PropTypes.func,
-};
-
-SearchBar.defaultProps = {
-  filterCount: 0,
-  collapsed: false,
-  onCollapsedPress: undefined,
 };
 
 const styles = StyleSheet.create({

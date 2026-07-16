@@ -13,9 +13,9 @@ const ExpensePieChart = ({
   chartData,
   selectedCurrency,
   onLegendItemPress,
-  isLeafCategory,
-  operations,
-  loadingOperations,
+  isLeafCategory = false,
+  operations = [],
+  loadingOperations = false,
 }) => {
   // A leaf category has no sub-categories left to break down — show its actual
   // operations for the period instead of a pointless single-slice donut.
@@ -78,13 +78,6 @@ ExpensePieChart.propTypes = {
   isLeafCategory: PropTypes.bool,
   operations: PropTypes.array,
   loadingOperations: PropTypes.bool,
-};
-
-ExpensePieChart.defaultProps = {
-  language: undefined,
-  isLeafCategory: false,
-  operations: [],
-  loadingOperations: false,
 };
 
 const styles = StyleSheet.create({

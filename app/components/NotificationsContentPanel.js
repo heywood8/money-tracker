@@ -19,7 +19,7 @@ const formatPostTime = (postTime) => {
   return `${datePart} · ${timePart}`;
 };
 
-export function NotificationCard({ notification, colors, t, onReAdd, reAddState, animateIn }) {
+export function NotificationCard({ notification, colors, t, onReAdd = null, reAddState = undefined, animateIn = false }) {
   const { title, text, packageName, postTime } = notification;
   const timeLabel = formatPostTime(postTime);
   // A notification that parses into a bank transaction is surfaced with an
@@ -144,13 +144,7 @@ NotificationCard.propTypes = {
   animateIn: PropTypes.bool,
 };
 
-NotificationCard.defaultProps = {
-  onReAdd: null,
-  reAddState: undefined,
-  animateIn: false,
-};
-
-export default function NotificationsContentPanel({ isLoading, notifications, onRefresh, bottomInset }) {
+export default function NotificationsContentPanel({ isLoading = false, notifications = [], onRefresh = null, bottomInset = 0 }) {
   const { colors } = useThemeColors();
   const { t } = useLocalization();
   const contentAnim = useRef(new Animated.Value(0)).current;
@@ -228,13 +222,6 @@ NotificationsContentPanel.propTypes = {
   ),
   onRefresh: PropTypes.func,
   bottomInset: PropTypes.number,
-};
-
-NotificationsContentPanel.defaultProps = {
-  isLoading: false,
-  notifications: [],
-  onRefresh: null,
-  bottomInset: 0,
 };
 
 const styles = StyleSheet.create({

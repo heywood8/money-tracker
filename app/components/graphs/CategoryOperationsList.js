@@ -34,7 +34,7 @@ const formatOpDate = (dateStr, language) => {
  * Views (no inner ScrollView) so the parent chart ScrollView measures and
  * animates its height.
  */
-const CategoryOperationsList = ({ operations, loading, currency, colors, language, emptyText }) => {
+const CategoryOperationsList = ({ operations = [], loading = false, currency, colors, language, emptyText = '' }) => {
   const { hideBalances } = useDisplaySettings();
 
   if (loading) {
@@ -112,13 +112,6 @@ CategoryOperationsList.propTypes = {
   colors: PropTypes.object.isRequired,
   language: PropTypes.string,
   emptyText: PropTypes.string,
-};
-
-CategoryOperationsList.defaultProps = {
-  operations: [],
-  loading: false,
-  language: undefined,
-  emptyText: '',
 };
 
 const styles = StyleSheet.create({

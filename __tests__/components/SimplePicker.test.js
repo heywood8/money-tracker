@@ -75,11 +75,27 @@ describe('SimplePicker', () => {
     });
 
     it('handles undefined items gracefully', async () => {
+      // undefined is filled in by the default parameter, so no warning is needed
       const { root } = await render(
         <SimplePicker
           value="opt1"
           onValueChange={jest.fn()}
           items={undefined}
+          colors={mockColors}
+        />,
+      );
+
+      expect(root).toBeTruthy();
+      expect(console.warn).not.toHaveBeenCalled();
+    });
+
+    it('handles null items gracefully', async () => {
+      // null bypasses the default parameter, so the defensive fallback catches it
+      const { root } = await render(
+        <SimplePicker
+          value="opt1"
+          onValueChange={jest.fn()}
+          items={null}
           colors={mockColors}
         />,
       );
@@ -438,11 +454,26 @@ describe('SimplePicker', () => {
 
   describe('Default Props', () => {
     it('uses default colors when not provided', async () => {
+      // The default parameter supplies colors, so the defensive fallback never trips
       const { root } = await render(
         <SimplePicker
           value="opt1"
           onValueChange={jest.fn()}
           items={mockItems}
+        />,
+      );
+
+      expect(root).toBeTruthy();
+      expect(console.warn).not.toHaveBeenCalled();
+    });
+
+    it('falls back to safe colors when colors is explicitly invalid', async () => {
+      const { root } = await render(
+        <SimplePicker
+          value="opt1"
+          onValueChange={jest.fn()}
+          items={mockItems}
+          colors={null}
         />,
       );
 
@@ -460,7 +491,7 @@ describe('SimplePicker', () => {
       );
 
       expect(root).toBeTruthy();
-      expect(console.warn).toHaveBeenCalledWith('SimplePicker: items prop is undefined or null. Using empty array.');
+      expect(console.warn).not.toHaveBeenCalled();
     });
   });
 
