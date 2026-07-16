@@ -1,5 +1,12 @@
 # Changelog
 
+## [0.197.1](https://github.com/heywood8/money-tracker/compare/penny-v0.197.0...penny-v0.197.1) (2026-07-16)
+
+
+### Bug Fixes
+
+* **operations:** stop the undo bar flashing for a split second ([#1249](https://github.com/heywood8/money-tracker/issues/1249)) ([8d78935](https://github.com/heywood8/money-tracker/commit/8d78935835977e6145adee16206be80e2133ca6e))
+
 ## [0.197.0](https://github.com/heywood8/money-tracker/compare/penny-v0.196.1...penny-v0.197.0) (2026-07-16)
 
 
