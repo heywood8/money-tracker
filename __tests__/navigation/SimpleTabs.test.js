@@ -115,13 +115,15 @@ jest.mock('react-native-safe-area-context', () => {
   const { View } = require('react-native');
   const PropTypes = require('prop-types');
 
-  function SafeAreaView({ children, style }) {
-    return React.createElement(View, { style }, children);
+  // Forwards every prop but `edges` (inset-only) to a real View, so testID and
+  // pointerEvents stay assertable the way the real SafeAreaView renders them.
+  function SafeAreaView({ children, edges: _edges, ...props }) {
+    return React.createElement(View, props, children);
   }
 
   SafeAreaView.propTypes = {
     children: PropTypes.node,
-    style: PropTypes.any,
+    edges: PropTypes.array,
   };
 
   function SafeAreaProvider({ children }) { return children; }
@@ -400,6 +402,37 @@ describe('SimpleTabs Component Rendering', () => {
   it('renders header component', async () => {
     const { getByTestId } = await render(<SimpleTabs />);
     expect(getByTestId('mock-header')).toBeTruthy();
+  });
+
+  describe('Tab bar touch blocking', () => {
+    // Regression: the gradient used to be a plain touch-absorbing View spanning
+    // TAB_OVERLAY_HEIGHT (130px), far taller than the bar itself. That killed
+    // taps on anything anchored just above the bar — most visibly the undo
+    // snackbar, pinned at insets.bottom + HEIGHTS.tabBar. Blocking must come
+    // from the bar wrapper (bar height + margin + inset), never the gradient.
+    it('lets touches pass through the gradient above the bar', async () => {
+      const { getByTestId } = await render(<SimpleTabs />);
+
+      expect(getByTestId('tab-gradient').props.pointerEvents).toBe('none');
+    });
+
+    it('absorbs taps in the empty space around the pill via the bar wrapper', async () => {
+      const { getByTestId } = await render(<SimpleTabs />);
+
+      // Default pointerEvents ('auto'): the wrapper itself is a touch target,
+      // while the tab buttons nested inside it still receive their own taps.
+      // 'box-none' here would let taps beside the pill fall through to content.
+      expect(getByTestId('tab-bar-wrapper').props.pointerEvents).toBeUndefined();
+      expect(getByTestId('tab-Operations')).toBeTruthy();
+    });
+
+    it('keeps the tab buttons tappable through the blocking wrapper', async () => {
+      const { getByTestId } = await render(<SimpleTabs />);
+
+      await act(async () => { fireEvent(getByTestId('tab-Graphs'), 'pressIn'); });
+
+      await waitFor(() => expect(getByTestId('graphs-screen')).toBeTruthy());
+    });
   });
 
   it('renders a Settings tab button', async () => {

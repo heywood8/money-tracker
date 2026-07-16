@@ -217,13 +217,14 @@ const gradientStepColors = Array.from({ length: GRADIENT_STEPS }, (_, i) => {
   return `rgba(0, 0, 0, ${opacity})`;
 });
 
-// Covers the tab bar region, blocks accidental touches falling through
-// to the list content below, and shows a darkening gradient as a visual cue.
-// Rendered before floatingBarWrapper so tab buttons (higher z-order) remain clickable.
-const TabGradientBlocker = memo(() => {
+// Darkening gradient behind the tab bar region. Purely visual: it must not
+// swallow touches, because it extends well above the bar and would make
+// elements anchored just above the bar (undo bar, FABs) untappable. Touch
+// blocking around the pill lives on floatingBarWrapper instead.
+const TabGradient = memo(() => {
   const stepHeight = TAB_OVERLAY_HEIGHT / GRADIENT_STEPS;
   return (
-    <View style={styles.tabGradientOverlay}>
+    <View style={styles.tabGradientOverlay} pointerEvents="none" testID="tab-gradient">
       {gradientStepColors.map((color, i) => (
         <View key={i} style={{ height: stepHeight, backgroundColor: color }} />
       ))}
@@ -231,7 +232,7 @@ const TabGradientBlocker = memo(() => {
   );
 });
 
-TabGradientBlocker.displayName = 'TabGradientBlocker';
+TabGradient.displayName = 'TabGradient';
 
 export default function SimpleTabs() {
   const { colors } = useThemeColors();
@@ -547,46 +548,44 @@ export default function SimpleTabs() {
           </Animated.View>
         </GestureDetector>
       </View>
-      {/* Gradient touch blocker — rendered before floatingBarWrapper so the
-          tab buttons (higher z-order, box-none wrapper) remain clickable while
-          the empty space around the pill catches accidental taps */}
-      <TabGradientBlocker />
-      {/* Floating bar overlays content so screen shows through behind it */}
-      <SafeAreaView edges={['bottom']} style={styles.floatingBarWrapper} pointerEvents="box-none">
-        <View
-          pointerEvents="box-none"
-          style={styles.floatingBarPositioner}
-        >
-          <View style={[
-            styles.floatingBar,
-            // Widen the bar for the extra tab so labels don't get cramped.
-            TABS.length >= 5 && styles.floatingBarWide,
-            {
-              backgroundColor: withAlpha(colors.surface, 0.87),
-              borderColor: withAlpha(colors.border, 0.5),
-            },
-          ]}>
-            <Animated.View
-              style={[
-                styles.activePill,
-                { backgroundColor: colors.primary + '1A' },
-                pillAnimatedStyle,
-              ]}
-            />
-            <View style={styles.tabsRow} onLayout={handleTabBarLayout}>
-              {TABS.map(tab => (
-                <TabButton
-                  key={tab.key}
-                  tab={tab}
-                  isActive={displayedTab === tab.key}
-                  colors={colors}
-                  onPress={handleTabPress}
-                  isUpdating={tab.key === 'Settings' && isDownloading}
-                  updatePhase={downloadPhase}
-                  updateProgress={downloadProgress}
-                />
-              ))}
-            </View>
+      {/* Visual gradient only — rendered before floatingBarWrapper so the tab
+          buttons stay on top */}
+      <TabGradient />
+      {/* Floating bar overlays content so screen shows through behind it.
+          The wrapper is exactly as tall as the bar plus its bottom margin and
+          safe-area inset, and it uses the default pointerEvents so the empty
+          space beside and below the pill absorbs accidental taps — without
+          reaching any higher than the bar itself. */}
+      <SafeAreaView edges={['bottom']} style={styles.floatingBarWrapper} testID="tab-bar-wrapper">
+        <View style={[
+          styles.floatingBar,
+          // Widen the bar for the extra tab so labels don't get cramped.
+          TABS.length >= 5 && styles.floatingBarWide,
+          {
+            backgroundColor: withAlpha(colors.surface, 0.87),
+            borderColor: withAlpha(colors.border, 0.5),
+          },
+        ]}>
+          <Animated.View
+            style={[
+              styles.activePill,
+              { backgroundColor: colors.primary + '1A' },
+              pillAnimatedStyle,
+            ]}
+          />
+          <View style={styles.tabsRow} onLayout={handleTabBarLayout}>
+            {TABS.map(tab => (
+              <TabButton
+                key={tab.key}
+                tab={tab}
+                isActive={displayedTab === tab.key}
+                colors={colors}
+                onPress={handleTabPress}
+                isUpdating={tab.key === 'Settings' && isDownloading}
+                updatePhase={downloadPhase}
+                updateProgress={downloadProgress}
+              />
+            ))}
           </View>
         </View>
       </SafeAreaView>
@@ -628,15 +627,16 @@ const styles = StyleSheet.create({
       },
     }),
   },
-  floatingBarPositioner: {
-    flex: 1,
-    justifyContent: 'flex-end',
-  },
   floatingBarWide: {
     width: '84%',
   },
   floatingBarWrapper: {
     bottom: 0,
+    // Carries the same elevation the gradient overlay uses, so the empty space
+    // beside the pill keeps absorbing taps even above an elevated subpanel
+    // (e.g. the Settings sub-screens). No backgroundColor, so this only affects
+    // z-ordering on Android and casts no shadow.
+    elevation: 8,
     left: 0,
     position: 'absolute',
     right: 0,
