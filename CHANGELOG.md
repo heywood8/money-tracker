@@ -1,5 +1,12 @@
 # Changelog
 
+## [0.196.0](https://github.com/heywood8/money-tracker/compare/penny-v0.195.0...penny-v0.196.0) (2026-07-16)
+
+
+### Features
+
+* **graphs:** переключатель пересчёта операций в других валютах ([#1243](https://github.com/heywood8/money-tracker/issues/1243)) ([86b3082](https://github.com/heywood8/money-tracker/commit/86b30823f6a5e484591913b3ae49df89de2a85f6))
+
 ## [0.195.0](https://github.com/heywood8/money-tracker/compare/penny-v0.194.0...penny-v0.195.0) (2026-07-15)
 
 
