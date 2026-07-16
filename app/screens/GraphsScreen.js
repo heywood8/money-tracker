@@ -897,6 +897,15 @@ const styles = StyleSheet.create({
     flex: 1,
     fontSize: 12,
   },
+  fabToggle: {
+    alignItems: 'center',
+    borderRadius: 22,
+    bottom: 136,
+    height: 44,
+    justifyContent: 'center',
+    right: 238,
+    width: 44,
+  },
   fabWheel: {
     borderRadius: 16,
     borderWidth: 1,
@@ -908,15 +917,6 @@ const styles = StyleSheet.create({
     shadowOffset: { width: 0, height: 4 },
     shadowOpacity: 0.3,
     shadowRadius: 8,
-  },
-  fabToggle: {
-    alignItems: 'center',
-    borderRadius: 22,
-    bottom: 136,
-    height: 44,
-    justifyContent: 'center',
-    right: 238,
-    width: 44,
   },
   fabWheelLeft: {
     borderRadius: 40,

@@ -1,5 +1,9 @@
 module.exports = {
   preset: 'jest-expo',
+  // Recycle a worker once its heap grows past this after a test file. The full
+  // suite under `--coverage` accumulates enough per-file state to crash a worker
+  // ("Jest worker ran out of memory"); restarting idle workers keeps CI stable.
+  workerIdleMemoryLimit: '512MB',
   setupFilesAfterEnv: [
     '<rootDir>/jest.setup.js',
   ],
