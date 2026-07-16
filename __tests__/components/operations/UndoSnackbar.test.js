@@ -1,7 +1,7 @@
 import React from 'react';
 import { Animated, StyleSheet } from 'react-native';
 import { render, fireEvent, waitFor } from '@testing-library/react-native';
-import UndoSnackbar from '../../../app/components/operations/UndoSnackbar';
+import UndoSnackbar, { UNDO_DURATION_MS } from '../../../app/components/operations/UndoSnackbar';
 
 const mockColors = {
   surface: '#1e1e1e',
@@ -107,6 +107,39 @@ describe('UndoSnackbar', () => {
     // Well within the 10s window — the dismiss timer has not fired.
     await flush(50);
     expect(onClosed).not.toHaveBeenCalled();
+  });
+
+  describe('Regression Tests', () => {
+    // The bar's real caller (OperationsScreen) does NOT pass `duration`, but every
+    // test above did — which hid the bug through two attempted fixes. React 19
+    // removed defaultProps for function components, so the omitted prop arrived as
+    // undefined: setTimeout(fn, undefined) fired on the next tick and the bar
+    // vanished in a couple of frames. These tests mount it exactly as the screen
+    // does — no `duration` — so the default can never silently break again.
+    const propsWithoutDuration = () => {
+      const { duration, ...rest } = baseProps;
+      return rest;
+    };
+
+    it('falls back to the 5s window when the parent omits duration', async () => {
+      const onClosed = jest.fn();
+      await render(<UndoSnackbar {...propsWithoutDuration()} onClosed={onClosed} />);
+
+      // Far past the couple of frames the broken default collapsed to, and far
+      // short of the real 5s window.
+      await flush(150);
+      expect(onClosed).not.toHaveBeenCalled();
+    });
+
+    it('runs the countdown animation over the full default duration', async () => {
+      await render(<UndoSnackbar {...propsWithoutDuration()} />);
+
+      // The depleting progress bar must span the same window as the dismiss timer,
+      // not Animated's own 500ms fallback for an undefined duration.
+      const durations = Animated.timing.mock.calls.map(([, config]) => config.duration);
+      expect(durations).toContain(UNDO_DURATION_MS);
+      expect(durations).not.toContain(undefined);
+    });
   });
 
   it('clears its auto-dismiss timer on unmount', async () => {

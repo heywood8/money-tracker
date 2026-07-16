@@ -41,7 +41,11 @@ const UndoSnackbar = ({
   operationId,
   message,
   actionLabel,
-  duration,
+  // Must be an ES6 default, not defaultProps: React 19 removed defaultProps for
+  // function components, so an omitted `duration` would arrive as undefined and
+  // collapse the visible window to a couple of frames (setTimeout(fn, undefined)
+  // fires on the next tick; Animated.timing falls back to its own 500ms).
+  duration = UNDO_DURATION_MS,
   colors,
   onUndo,
   onClosed,
@@ -215,10 +219,6 @@ UndoSnackbar.propTypes = {
   }).isRequired,
   onUndo: PropTypes.func.isRequired,
   onClosed: PropTypes.func.isRequired,
-};
-
-UndoSnackbar.defaultProps = {
-  duration: UNDO_DURATION_MS,
 };
 
 export default memo(UndoSnackbar);
