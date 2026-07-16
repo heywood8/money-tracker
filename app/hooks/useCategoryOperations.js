@@ -14,8 +14,10 @@ import { appEvents, EVENTS } from '../services/eventEmitter';
  * @param {string} selectedCurrency
  * @param {string|null} categoryId - leaf category id, or null when inactive
  * @param {string} [type] - 'expense' | 'income'
+ * @param {boolean} [convertAllCurrencies] - include foreign-currency operations,
+ *   converted to selectedCurrency (each op carries accountCurrency + convertedAmount)
  */
-const useCategoryOperations = (selectedYear, selectedMonth, selectedCurrency, categoryId, type) => {
+const useCategoryOperations = (selectedYear, selectedMonth, selectedCurrency, categoryId, type, convertAllCurrencies = false) => {
   const [operations, setOperations] = useState([]);
   const [loadingOperations, setLoadingOperations] = useState(false);
 
@@ -43,6 +45,7 @@ const useCategoryOperations = (selectedYear, selectedMonth, selectedCurrency, ca
         formatDate(startDate),
         formatDate(endDate),
         type,
+        convertAllCurrencies,
       );
 
       setOperations(ops);
@@ -52,7 +55,7 @@ const useCategoryOperations = (selectedYear, selectedMonth, selectedCurrency, ca
     } finally {
       setLoadingOperations(false);
     }
-  }, [selectedYear, selectedMonth, selectedCurrency, categoryId, type]);
+  }, [selectedYear, selectedMonth, selectedCurrency, categoryId, type, convertAllCurrencies]);
 
   useEffect(() => {
     loadOperations();

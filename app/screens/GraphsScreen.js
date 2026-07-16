@@ -467,6 +467,7 @@ const GraphsScreen = () => {
     selectedCurrency,
     expenseCategoryIsLeaf ? selectedCategory : null,
     'expense',
+    convertAllCurrencies,
   );
 
   const {
@@ -478,6 +479,7 @@ const GraphsScreen = () => {
     selectedCurrency,
     incomeCategoryIsLeaf ? selectedIncomeCategory : null,
     'income',
+    convertAllCurrencies,
   );
 
   // Shared category parent lookup

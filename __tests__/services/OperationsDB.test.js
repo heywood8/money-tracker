@@ -1121,6 +1121,37 @@ describe('OperationsDB Service', () => {
 
         expect(result).toEqual(['XYZ']); // AMD resolves via the live mock, EUR offline, USD is target
       });
+
+      it('category operations: converts foreign ops, tags account currency, drops unrateable', async () => {
+        queryAll.mockResolvedValue([
+          { id: '1', type: 'expense', amount: '100', category_id: 'cat1', date: '2025-12-05', account_currency: 'USD' },
+          { id: '2', type: 'expense', amount: '4000', category_id: 'cat1', date: '2025-12-06', account_currency: 'AMD' }, // 4000 * 0.0025 = 10.00
+          { id: '3', type: 'expense', amount: '999', category_id: 'cat1', date: '2025-12-07', account_currency: 'XYZ' }, // no rate → dropped
+        ]);
+
+        const result = await OperationsDB.getOperationsByCategoryAndCurrency('cat1', 'USD', '2025-12-01', '2025-12-31', 'expense', true);
+
+        const sql = queryAll.mock.calls[0][0];
+        expect(sql).not.toContain('a.currency = ?');
+        expect(sql).toContain('a.currency as account_currency');
+        expect(result).toHaveLength(2);
+        expect(result[0]).toMatchObject({ id: '1', amount: '100', accountCurrency: 'USD', convertedAmount: null });
+        expect(result[1]).toMatchObject({ id: '2', amount: '4000', accountCurrency: 'AMD', convertedAmount: '10.00' });
+      });
+
+      it('category operations: keeps the currency filter and plain shape when convertAll is off', async () => {
+        queryAll.mockResolvedValue([
+          { id: '1', type: 'expense', amount: '100', category_id: 'cat1', date: '2025-12-05', account_currency: 'USD' },
+        ]);
+
+        const result = await OperationsDB.getOperationsByCategoryAndCurrency('cat1', 'USD', '2025-12-01', '2025-12-31', 'expense', false);
+
+        const [sql, params] = queryAll.mock.calls[0];
+        expect(sql).toContain('a.currency = ?');
+        expect(params).toContain('USD');
+        expect(result[0].convertedAmount).toBeUndefined();
+        expect(result[0].accountCurrency).toBeUndefined();
+      });
     });
 
     it('gets top categories from last 3 months', async () => {
