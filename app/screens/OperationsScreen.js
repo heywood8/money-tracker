@@ -57,6 +57,9 @@ const OperationsScreen = () => {
   const {
     deleteOperation,
     addOperation,
+    addOptimisticOperation,
+    removeOptimisticOperation,
+    replaceOptimisticOperation,
     updateOperation,
     validateOperation,
     loadMoreOperations,
@@ -167,19 +170,55 @@ const OperationsScreen = () => {
     navigateBack,
   } = useOperationPicker(t);
 
+  // Insert a placeholder row for a just-accepted notification suggestion so the
+  // binding card can leave the deck immediately while its write runs in the
+  // background. The amount is an offline-rate estimate in the account currency;
+  // the persisted row (arriving via RELOAD_ALL) replaces it with the exact value.
+  const insertOptimisticSuggestion = useCallback((item, choice) => {
+    const account = accounts.find((a) => a.id === choice.accountId);
+    const accountCurrency = account?.currency;
+    let amount = item.amount;
+    if (account && item.currency && accountCurrency && accountCurrency !== item.currency) {
+      const converted = Currency.convertAmount(item.amount, item.currency, accountCurrency);
+      if (converted) amount = converted;
+    }
+    amount = Currency.formatAmount(amount, accountCurrency ?? 2);
+    const trimmedLabel = typeof choice.labelOverride === 'string' ? choice.labelOverride.trim() : '';
+    const label = trimmedLabel || item.merchant || '';
+    const isTransfer = item.type === 'transfer';
+    const opId = `_pending_notif_${item.id}`;
+    addOptimisticOperation({
+      id: opId,
+      type: item.type,
+      accountId: choice.accountId,
+      toAccountId: isTransfer ? (choice.toAccountId ?? null) : null,
+      categoryId: isTransfer ? null : (choice.categoryId ?? null),
+      amount: String(amount),
+      date: item.date || (item.createdAt ? item.createdAt.slice(0, 10) : toDateString(new Date())),
+      description: label ? serializeLabels([label]) : null,
+    });
+    return opId;
+  }, [accounts, addOptimisticOperation]);
+
   // Suggested operations parsed from bank notifications (the same pending queue
   // the settings review panel manages), surfaced as a deck of full binding
   // cards laid over the quick-add form so nothing requires a trip to settings.
+  // Accepting is non-blocking: the card leaves the deck at once (revealing the
+  // next suggestion or the quick-add form) and the operation lands in the list
+  // with an in-flight spinner via the optimistic add/remove pair.
   const {
     suggestions: operationSuggestions,
-    savingIds: suggestionSavingIds,
     saveErrors: suggestionSaveErrors,
     choices: suggestionChoices,
     setChoice: setSuggestionChoice,
     refresh: refreshSuggestions,
     accept: acceptSuggestion,
     dismiss: dismissSuggestion,
-  } = usePendingOperationSuggestions();
+  } = usePendingOperationSuggestions({
+    onOptimisticAdd: insertOptimisticSuggestion,
+    onOptimisticSettle: replaceOptimisticOperation,
+    onOptimisticRemove: removeOptimisticOperation,
+  });
 
   // Measured height of the quick-add wrapper — the binding cards pin their frame
   // to it so the deck reads as cards stacked over the form. Rounded, and only
@@ -940,7 +979,6 @@ const OperationsScreen = () => {
               <NotificationBindingStack
                 suggestions={operationSuggestions}
                 choices={suggestionChoices}
-                savingIds={suggestionSavingIds}
                 saveErrors={suggestionSaveErrors}
                 quickAddHeight={quickAddHeight}
                 colors={colors}
@@ -957,7 +995,7 @@ const OperationsScreen = () => {
       </Animated.View>
       {filtersExpanded && filterPanelHeight > 0 && <View style={{ height: filterPanelHeight }} />}
     </>
-  ), [animatedQuickAddClipStyle, animatedQuickAddSlideStyle, colors, t, quickAddValues, visibleAccounts, filteredCategories, topCategoriesForType, getCategoryInfo, getAccountName, getAccountBalance, getCategoryName, openPicker, handleQuickAdd, handleAmountChange, handleExchangeRateChange, handleDestinationAmountChange, handleAutoAddWithCategory, topTransferAccountsForForm, handleAutoAddWithAccount, TYPES, rateSource, handleOperationCurrencyChange, foreignRateSource, foreignExchangeRate, filterPanelHeight, filtersExpanded, flashCategoryErrorCount, operationSuggestions, hasSuggestions, quickAddHeight, handleQuickAddLayout, accounts, categories, suggestionSavingIds, suggestionSaveErrors, suggestionChoices, setSuggestionChoice, acceptSuggestion, dismissSuggestion]);
+  ), [animatedQuickAddClipStyle, animatedQuickAddSlideStyle, colors, t, quickAddValues, visibleAccounts, filteredCategories, topCategoriesForType, getCategoryInfo, getAccountName, getAccountBalance, getCategoryName, openPicker, handleQuickAdd, handleAmountChange, handleExchangeRateChange, handleDestinationAmountChange, handleAutoAddWithCategory, topTransferAccountsForForm, handleAutoAddWithAccount, TYPES, rateSource, handleOperationCurrencyChange, foreignRateSource, foreignExchangeRate, filterPanelHeight, filtersExpanded, flashCategoryErrorCount, operationSuggestions, hasSuggestions, quickAddHeight, handleQuickAddLayout, accounts, categories, suggestionSaveErrors, suggestionChoices, setSuggestionChoice, acceptSuggestion, dismissSuggestion]);
 
   // Auto-scroll to top when filter panel closes, but only if the user is still
   // near the top (hasn't scrolled into past dates). The threshold is filterPanelHeight:

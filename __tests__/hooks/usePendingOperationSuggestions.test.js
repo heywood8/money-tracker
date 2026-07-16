@@ -293,7 +293,7 @@ describe('usePendingOperationSuggestions', () => {
       // labelOverride is omitted so the resolver keeps the learned merchant label.
       expect(pipeline.resolvePendingNotification).toHaveBeenCalledWith('p1', EXPENSE_RESOLVE);
       expect(result.current.suggestions).toEqual([]);
-      expect(result.current.savingIds).toEqual({});
+      expect(result.current.committingIds).toEqual({});
     });
 
     it('does not send a label override even when a label was seeded from the learned name', async () => {
@@ -365,7 +365,7 @@ describe('usePendingOperationSuggestions', () => {
         result.current.accept(EXPENSE);
       });
       expect(pipeline.resolvePendingNotification).toHaveBeenCalledTimes(1);
-      await waitFor(() => expect(result.current.savingIds).toEqual({ p1: true }));
+      await waitFor(() => expect(result.current.committingIds).toEqual({ p1: true }));
 
       PendingNotificationsDB.getPendingNotifications.mockResolvedValue([]);
       await act(async () => {
@@ -382,7 +382,7 @@ describe('usePendingOperationSuggestions', () => {
       await act(async () => {
         await result.current.accept(EXPENSE);
       });
-      expect(result.current.savingIds).toEqual({});
+      expect(result.current.committingIds).toEqual({});
       expect(result.current.suggestions).toEqual([EXPENSE]);
       // The failure is surfaced, not swallowed, so the card can show an error.
       expect(result.current.saveErrors).toEqual({ p1: true });
@@ -418,7 +418,70 @@ describe('usePendingOperationSuggestions', () => {
         await result.current.accept(EXPENSE);
       });
       expect(result.current.suggestions).toEqual([]);
-      expect(result.current.savingIds).toEqual({});
+      expect(result.current.committingIds).toEqual({});
+    });
+  });
+
+  describe('non-blocking optimistic insert', () => {
+    it('inserts a placeholder row and hides the card the instant the save starts', async () => {
+      let resolveSave;
+      pipeline.resolvePendingNotification.mockImplementation(
+        () => new Promise((resolve) => { resolveSave = resolve; }),
+      );
+      const onOptimisticAdd = jest.fn(() => '_temp_1');
+      const onOptimisticSettle = jest.fn();
+      const onOptimisticRemove = jest.fn();
+      const { result } = await renderHook(() =>
+        usePendingOperationSuggestions({ onOptimisticAdd, onOptimisticSettle, onOptimisticRemove }));
+      await waitFor(() => expect(result.current.choices.p1).toEqual(EXPENSE_CHOICE));
+
+      await act(async () => { result.current.accept(EXPENSE); });
+      // The row is handed to the list, and the card leaves the deck without waiting
+      // on the write.
+      expect(onOptimisticAdd).toHaveBeenCalledWith(EXPENSE, EXPENSE_CHOICE);
+      await waitFor(() => expect(result.current.committingIds).toEqual({ p1: true }));
+      expect(result.current.suggestions).toEqual([]);
+
+      PendingNotificationsDB.getPendingNotifications.mockResolvedValue([]);
+      await act(async () => { resolveSave({ id: 'op1' }); });
+      await waitFor(() => expect(result.current.suggestions).toEqual([]));
+      // On success the placeholder is swapped for the persisted row, never rolled back.
+      expect(onOptimisticSettle).toHaveBeenCalledWith('_temp_1', { id: 'op1' });
+      expect(onOptimisticRemove).not.toHaveBeenCalled();
+    });
+
+    it('rolls back the placeholder row and restores the card when the save fails', async () => {
+      pipeline.resolvePendingNotification.mockRejectedValue(new Error('no exchange rate'));
+      const onOptimisticAdd = jest.fn(() => '_temp_1');
+      const onOptimisticSettle = jest.fn();
+      const onOptimisticRemove = jest.fn();
+      const { result } = await renderHook(() =>
+        usePendingOperationSuggestions({ onOptimisticAdd, onOptimisticSettle, onOptimisticRemove }));
+      await waitFor(() => expect(result.current.choices.p1).toEqual(EXPENSE_CHOICE));
+
+      await act(async () => { await result.current.accept(EXPENSE); });
+      expect(onOptimisticRemove).toHaveBeenCalledWith('_temp_1');
+      expect(onOptimisticSettle).not.toHaveBeenCalled();
+      expect(result.current.suggestions).toEqual([EXPENSE]);
+      expect(result.current.saveErrors).toEqual({ p1: true });
+      expect(result.current.committingIds).toEqual({});
+    });
+
+    it('rolls back the placeholder when the pending row had already vanished', async () => {
+      // resolve returns null when the row is gone (e.g. resolved elsewhere); nothing
+      // was booked, so the placeholder must be removed, not settled.
+      pipeline.resolvePendingNotification.mockResolvedValue(null);
+      const onOptimisticAdd = jest.fn(() => '_temp_1');
+      const onOptimisticSettle = jest.fn();
+      const onOptimisticRemove = jest.fn();
+      const { result } = await renderHook(() =>
+        usePendingOperationSuggestions({ onOptimisticAdd, onOptimisticSettle, onOptimisticRemove }));
+      await waitFor(() => expect(result.current.choices.p1).toEqual(EXPENSE_CHOICE));
+
+      PendingNotificationsDB.getPendingNotifications.mockResolvedValue([]);
+      await act(async () => { await result.current.accept(EXPENSE); });
+      expect(onOptimisticRemove).toHaveBeenCalledWith('_temp_1');
+      expect(onOptimisticSettle).not.toHaveBeenCalled();
     });
   });
 

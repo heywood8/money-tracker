@@ -65,7 +65,6 @@ const makeSuggestions = (count) =>
 const defaultProps = {
   suggestions: [EXPENSE],
   choices: { p1: { accountId: 1, categoryId: 'c1', toAccountId: null, labelOverride: '' } },
-  savingIds: {},
   quickAddHeight: 320,
   colors: COLORS,
   t,
@@ -211,13 +210,6 @@ describe('NotificationBindingStack', () => {
     const { getByText } = await renderStack({ onDismiss });
     fireEvent.press(getByText('dismiss'));
     expect(onDismiss).toHaveBeenCalledWith(EXPENSE);
-  });
-
-  it('collapses a saving card into the progress row without action buttons', async () => {
-    const { getByTestId, queryByText } = await renderStack({ savingIds: { p1: true } });
-    expect(getByTestId('notification-binding-card-saving')).toBeTruthy();
-    expect(queryByText('save')).toBeNull();
-    expect(queryByText('dismiss')).toBeNull();
   });
 
   it('shows an inline error when the front card has a save error', async () => {

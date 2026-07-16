@@ -480,4 +480,31 @@ describe('OperationListItem', () => {
       expect(getByText('Weekly shop')).toBeTruthy();
     });
   });
+
+  describe('Pending (in-flight) operation', () => {
+    it('does not open the editor while the write is still in flight', async () => {
+      const onPress = jest.fn();
+      const { getByTestId } = await render(
+        <OperationListItem
+          {...baseProps}
+          testID="pending-row"
+          operation={{ ...baseOperation, _pending: true }}
+          onPress={onPress}
+        />,
+      );
+      await fireEvent.press(getByTestId('pending-row'));
+      // A placeholder row carries a temp id with no DB row behind it; tapping it
+      // must not open an editor.
+      expect(onPress).not.toHaveBeenCalled();
+    });
+
+    it('opens the editor once the operation is settled (not pending)', async () => {
+      const onPress = jest.fn();
+      const { getByTestId } = await render(
+        <OperationListItem {...baseProps} testID="settled-row" onPress={onPress} />,
+      );
+      await fireEvent.press(getByTestId('settled-row'));
+      expect(onPress).toHaveBeenCalledTimes(1);
+    });
+  });
 });

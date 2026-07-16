@@ -6,7 +6,6 @@ import {
   StyleSheet,
   ScrollView,
   TouchableOpacity,
-  ActivityIndicator,
 } from 'react-native';
 import { Ionicons } from '@expo/vector-icons';
 import SimplePicker from '../SimplePicker';
@@ -45,7 +44,6 @@ const NotificationBindingCard = ({
   t,
   accounts,
   categories,
-  saving = false,
   saveError = false,
   height,
   onChoiceChange,
@@ -91,35 +89,6 @@ const NotificationBindingCard = ({
   // A screen reader hears each card's identical buttons ("Dismiss"/"Save")
   // otherwise; naming the merchant + amount disambiguates them.
   const itemContext = `${item.merchant || item.kind}, ${item.amount} ${item.currency}`;
-
-  // Mid-save: swap the body for a compact progress row, keeping the deck frame
-  // (its geometry is pinned to the quick-add panel) and dropping the action
-  // buttons so the up-to-8s save can't be double-tapped into duplicates.
-  if (saving) {
-    return (
-      <View
-        testID="notification-binding-card-saving"
-        style={[styles.card, frameStyle]}
-        accessibilityRole="progressbar"
-        accessibilityLabel={t('bank_notifications_adding') || 'Adding operation…'}
-      >
-        <View style={styles.savingRow}>
-          <ActivityIndicator size="small" color={colors.primary} />
-          <View style={styles.savingBody}>
-            <Text style={[styles.merchant, { color: colors.text }]} numberOfLines={1}>
-              {item.merchant || item.kind}
-            </Text>
-            <Text style={[styles.metaText, { color: colors.mutedText }]} numberOfLines={1}>
-              {t('bank_notifications_adding') || 'Adding operation…'}
-            </Text>
-          </View>
-          <Text style={[styles.amount, { color: colors.mutedText }]}>
-            {item.amount} {item.currency}
-          </Text>
-        </View>
-      </View>
-    );
-  }
 
   return (
     <View testID="notification-binding-card" style={[styles.card, frameStyle]}>
@@ -278,7 +247,6 @@ NotificationBindingCard.propTypes = {
   t: PropTypes.func.isRequired,
   accounts: PropTypes.array.isRequired,
   categories: PropTypes.array.isRequired,
-  saving: PropTypes.bool,
   saveError: PropTypes.bool,
   height: PropTypes.number.isRequired,
   onChoiceChange: PropTypes.func.isRequired,
@@ -369,26 +337,12 @@ const styles = StyleSheet.create({
     fontSize: 15,
     fontWeight: '700',
   },
-  metaText: {
-    fontSize: 12,
-    marginTop: 2,
-  },
   nameInput: {
     marginTop: SPACING.sm,
   },
   pickerWrap: {
     borderRadius: BORDER_RADIUS.sm,
     borderWidth: StyleSheet.hairlineWidth,
-  },
-  savingBody: {
-    flex: 1,
-  },
-  savingRow: {
-    alignItems: 'center',
-    flex: 1,
-    flexDirection: 'row',
-    gap: SPACING.md,
-    paddingHorizontal: SPACING.md,
   },
   selectedCategoryRow: {
     alignItems: 'center',
