@@ -1,5 +1,12 @@
 # Changelog
 
+## [0.197.3](https://github.com/heywood8/money-tracker/compare/penny-v0.197.2...penny-v0.197.3) (2026-07-16)
+
+
+### Bug Fixes
+
+* **operations:** keep the undo bar on screen for its full 5s window ([#1253](https://github.com/heywood8/money-tracker/issues/1253)) ([d557306](https://github.com/heywood8/money-tracker/commit/d5573066de12dcc5da8dccf5ab16ed64ae1288ac))
+
 ## [0.197.2](https://github.com/heywood8/money-tracker/compare/penny-v0.197.1...penny-v0.197.2) (2026-07-16)
 
 
