@@ -1237,18 +1237,28 @@ export const getIncomeByCategoryAndCurrency = async (currency, startDate, endDat
  * @param {string} startDate - ISO date string (YYYY-MM-DD)
  * @param {string} endDate - ISO date string (YYYY-MM-DD)
  * @param {string} [type] - Optional operation type filter ('expense' | 'income')
+ * @param {boolean} [convertAll=false] - When true, include operations from every
+ *   currency (not just `currency`). Each returned operation carries its
+ *   `accountCurrency` and, for foreign operations, a `convertedAmount` in
+ *   `currency` (offline rate first, live fallback). Operations whose currency has
+ *   no available rate are dropped, matching the converted pie/trend totals.
  * @returns {Promise<Array>}
  */
-export const getOperationsByCategoryAndCurrency = async (categoryId, currency, startDate, endDate, type = null) => {
+export const getOperationsByCategoryAndCurrency = async (categoryId, currency, startDate, endDate, type = null, convertAll = false) => {
   try {
-    let sql = `SELECT o.* FROM operations o
+    let sql = `SELECT o.*, a.currency as account_currency FROM operations o
        JOIN accounts a ON o.account_id = a.id
        WHERE o.category_id = ?
-         AND a.currency = ?
          AND o.date >= ?
          AND o.date <= ?`;
 
-    const params = [categoryId, currency, startDate, endDate];
+    const params = [categoryId, startDate, endDate];
+
+    // Restrict to the selected currency unless converting everything.
+    if (!convertAll) {
+      sql += ' AND a.currency = ?';
+      params.push(currency);
+    }
 
     if (type) {
       sql += ' AND o.type = ?';
@@ -1258,7 +1268,32 @@ export const getOperationsByCategoryAndCurrency = async (categoryId, currency, s
     sql += ' ORDER BY o.date DESC, o.created_at DESC';
 
     const results = await queryAll(sql, params);
-    return (results || []).map(mapOperationFields).filter(Boolean);
+    const rows = results || [];
+
+    if (!convertAll) {
+      return rows.map(mapOperationFields).filter(Boolean);
+    }
+
+    // Attach the account currency and, for foreign operations, the converted
+    // amount in the target currency. Drop operations with no available rate so
+    // the list stays consistent with the converted pie total.
+    const rateByCurrency = await fetchRatesToTarget(rows.map(r => r.account_currency), currency);
+    const operations = [];
+    for (const row of rows) {
+      const op = mapOperationFields(row);
+      if (!op) continue;
+      const accountCurrency = row.account_currency;
+      if (accountCurrency === currency) {
+        operations.push({ ...op, accountCurrency, convertedAmount: null });
+        continue;
+      }
+      const rate = rateByCurrency.get(accountCurrency);
+      if (!rate) continue; // no rate available, cannot express in target
+      const convertedAmount = Currency.convertAmount(String(op.amount ?? '0'), accountCurrency, currency, rate);
+      if (convertedAmount === null) continue;
+      operations.push({ ...op, accountCurrency, convertedAmount });
+    }
+    return operations;
   } catch (error) {
     console.error('Failed to get operations by category and currency:', error);
     throw error;

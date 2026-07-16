@@ -43,8 +43,9 @@ const GraphsScreen = () => {
   const [selectedCurrency, setSelectedCurrency] = useState('');
   // When on, operations in other currencies are converted to selectedCurrency at
   // the current rate and folded into the expense/income pie charts and the
-  // spending trend, instead of showing only same-currency operations.
-  const [convertAllCurrencies, setConvertAllCurrencies] = useState(false);
+  // spending trend, instead of showing only same-currency operations. On by
+  // default so multi-currency totals are complete out of the box.
+  const [convertAllCurrencies, setConvertAllCurrencies] = useState(true);
   // Account currencies that have no rate (offline or live) to selectedCurrency —
   // their operations are silently excluded from converted totals, so warn.
   const [unconvertedCurrencies, setUnconvertedCurrencies] = useState([]);
@@ -467,6 +468,7 @@ const GraphsScreen = () => {
     selectedCurrency,
     expenseCategoryIsLeaf ? selectedCategory : null,
     'expense',
+    convertAllCurrencies,
   );
 
   const {
@@ -478,6 +480,7 @@ const GraphsScreen = () => {
     selectedCurrency,
     incomeCategoryIsLeaf ? selectedIncomeCategory : null,
     'income',
+    convertAllCurrencies,
   );
 
   // Shared category parent lookup
@@ -816,7 +819,7 @@ const GraphsScreen = () => {
         >
           <Icon
             name="cash-sync"
-            size={24}
+            size={30}
             color={convertAllCurrencies ? colors.surface : colors.mutedText}
           />
         </TouchableOpacity>
@@ -902,13 +905,14 @@ const styles = StyleSheet.create({
     fontSize: 12,
   },
   fabToggle: {
+    // Match the wheel FABs: same bottom baseline (from fabWheel) and the picker's
+    // rendered height (itemHeight 28 × visibleItemCount 3 = 84), rounded like them.
     alignItems: 'center',
-    borderRadius: 22,
-    bottom: 136,
-    height: 44,
+    borderRadius: 40,
+    height: 84,
     justifyContent: 'center',
-    right: 238,
-    width: 44,
+    right: 240,
+    width: 72,
   },
   fabWheel: {
     borderRadius: 16,
