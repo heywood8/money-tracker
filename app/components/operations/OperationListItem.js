@@ -6,7 +6,6 @@ import PropTypes from 'prop-types';
 import { getCategoryNames } from '../../utils/categoryUtils';
 import { parseLabels, visibleListLabels, displayLabel } from '../../utils/labelUtils';
 import DescriptionSuggestionRow from './DescriptionSuggestionRow';
-import UndoSnackbar from './UndoSnackbar';
 import { SPACING, FONT_SIZE, FONT_WEIGHT, ICON_SIZE, HEIGHTS } from '../../styles/designTokens';
 import currencies from '../../../assets/currencies.json';
 
@@ -33,13 +32,6 @@ const OperationListItem = ({
   suggestionChips,
   onApplySuggestion,
   onDismissSuggestion,
-  showUndo,
-  undoToken,
-  undoMessage,
-  undoActionLabel,
-  undoDuration,
-  onUndo,
-  onUndoClosed,
 }) => {
   const isExpense = operation.type === 'expense';
   const isIncome = operation.type === 'income';
@@ -170,29 +162,15 @@ const OperationListItem = ({
         </View>
       </TouchableRipple>
 
-      {/* Label suggestions render directly beneath the operation; the undo bar
-          sits below them. When a just-added operation shows both, the labels
-          are the primary action and the undo/cancel bar reads as the secondary
-          affordance underneath — its top border separates the two cleanly. */}
+      {/* Label suggestions render directly beneath the just-added operation. The
+          undo affordance is no longer inline here — it floats above the tab bar
+          (see OperationsScreen), out of the virtualized list. */}
       {suggestionChips && suggestionChips.length > 0 && (
         <DescriptionSuggestionRow
           chips={suggestionChips}
           colors={colors}
           onApply={onApplySuggestion}
           onDismiss={onDismissSuggestion}
-        />
-      )}
-
-      {showUndo && (
-        <UndoSnackbar
-          key={undoToken}
-          operationId={operation.id}
-          message={undoMessage}
-          actionLabel={undoActionLabel}
-          duration={undoDuration}
-          colors={colors}
-          onUndo={onUndo}
-          onClosed={onUndoClosed}
         />
       )}
 
@@ -231,13 +209,6 @@ OperationListItem.propTypes = {
   suggestionChips: PropTypes.arrayOf(PropTypes.string),
   onApplySuggestion: PropTypes.func,
   onDismissSuggestion: PropTypes.func,
-  showUndo: PropTypes.bool,
-  undoToken: PropTypes.oneOfType([PropTypes.string, PropTypes.number]),
-  undoMessage: PropTypes.string,
-  undoActionLabel: PropTypes.string,
-  undoDuration: PropTypes.number,
-  onUndo: PropTypes.func,
-  onUndoClosed: PropTypes.func,
 };
 
 OperationListItem.defaultProps = {
@@ -246,13 +217,6 @@ OperationListItem.defaultProps = {
   suggestionChips: null,
   onApplySuggestion: () => {},
   onDismissSuggestion: () => {},
-  showUndo: false,
-  undoToken: 0,
-  undoMessage: '',
-  undoActionLabel: '',
-  undoDuration: 5000,
-  onUndo: () => {},
-  onUndoClosed: () => {},
 };
 
 const styles = StyleSheet.create({

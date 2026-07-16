@@ -53,6 +53,7 @@ jest.mock('../../app/services/OperationsDB', () => ({
   getSpendingByCategoryAndCurrency: jest.fn(() => Promise.resolve([])),
   getIncomeByCategoryAndCurrency: jest.fn(() => Promise.resolve([])),
   getAvailableMonths: jest.fn(() => Promise.resolve([])),
+  getUnconvertibleCurrencies: jest.fn(() => Promise.resolve([])),
 }));
 
 jest.mock('../../app/services/CategoriesDB', () => ({

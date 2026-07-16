@@ -43,8 +43,9 @@ const GraphsScreen = () => {
   const [selectedCurrency, setSelectedCurrency] = useState('');
   // When on, operations in other currencies are converted to selectedCurrency at
   // the current rate and folded into the expense/income pie charts and the
-  // spending trend, instead of showing only same-currency operations.
-  const [convertAllCurrencies, setConvertAllCurrencies] = useState(false);
+  // spending trend, instead of showing only same-currency operations. On by
+  // default so multi-currency totals are complete out of the box.
+  const [convertAllCurrencies, setConvertAllCurrencies] = useState(true);
   // Account currencies that have no rate (offline or live) to selectedCurrency —
   // their operations are silently excluded from converted totals, so warn.
   const [unconvertedCurrencies, setUnconvertedCurrencies] = useState([]);
@@ -471,6 +472,7 @@ const GraphsScreen = () => {
     selectedCurrency,
     expenseCategoryIsLeaf ? selectedCategory : null,
     'expense',
+    convertAllCurrencies,
   );
 
   const {
@@ -482,6 +484,7 @@ const GraphsScreen = () => {
     selectedCurrency,
     incomeCategoryIsLeaf ? selectedIncomeCategory : null,
     'income',
+    convertAllCurrencies,
   );
 
   // Shared category parent lookup
@@ -947,6 +950,8 @@ const styles = StyleSheet.create({
     fontSize: 12,
   },
   fabToggle: {
+    // A compact badge tucked into the currency wheel's bottom-right corner —
+    // rendered after the wheel with higher elevation/zIndex so it sits on top.
     alignItems: 'center',
     borderRadius: 16,
     borderWidth: 1,

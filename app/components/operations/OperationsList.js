@@ -73,12 +73,6 @@ const OperationsList = forwardRef(({
   pendingSuggestions,
   onApplySuggestion,
   onDismissSuggestion,
-  undoOperationId,
-  undoToken,
-  undoMessage,
-  undoActionLabel,
-  onUndo,
-  onUndoClosed,
 }, ref) => {
 
   // Format date label for the separator header.
@@ -338,16 +332,10 @@ const OperationsList = forwardRef(({
           suggestionChips={item.id === pendingSuggestionId ? pendingSuggestions : null}
           onApplySuggestion={onApplySuggestion}
           onDismissSuggestion={onDismissSuggestion}
-          showUndo={item.id === undoOperationId}
-          undoToken={undoToken}
-          undoMessage={undoMessage}
-          undoActionLabel={undoActionLabel}
-          onUndo={onUndo}
-          onUndoClosed={onUndoClosed}
         />
       </View>
     );
-  }, [colors, t, categories, getCategoryInfo, getAccountName, formatCurrency, onEditOperation, pendingSuggestionId, pendingSuggestions, onApplySuggestion, onDismissSuggestion, undoOperationId, undoToken, undoMessage, undoActionLabel, onUndo, onUndoClosed]);
+  }, [colors, t, categories, getCategoryInfo, getAccountName, formatCurrency, onEditOperation, pendingSuggestionId, pendingSuggestions, onApplySuggestion, onDismissSuggestion]);
 
   const keyExtractor = useCallback((item) => item.id, []);
 
@@ -380,7 +368,7 @@ const OperationsList = forwardRef(({
       renderSectionHeader={renderSectionHeader}
       renderSectionFooter={renderSectionFooter}
       keyExtractor={keyExtractor}
-      extraData={[accounts, categories, pendingSuggestionId, undoOperationId, undoToken]}
+      extraData={[accounts, categories, pendingSuggestionId]}
       getItemLayout={getItemLayout}
       ListHeaderComponent={
         (topInset > 0 || headerComponent)
@@ -438,9 +426,9 @@ const OperationsList = forwardRef(({
       // JS-side view list from SurfaceMountingManager's native one, crashing
       // with "IllegalStateException: addViewAt: failed to insert view ... at
       // index N" (IndexOutOfBoundsException) — see PENNY-16, caused by an
-      // earlier attempt to gate this on undoOperationId. The inline undo bar's
-      // visibility is guaranteed by UndoSnackbar mounting fully opaque instead
-      // (see its docblock), not by clipping tricks.
+      // earlier attempt to gate this on the (now removed) inline undo bar. The
+      // undo affordance now floats outside the list (OperationsScreen), so it is
+      // immune to this clipping entirely.
       removeClippedSubviews={true}
     />
   );
@@ -471,12 +459,6 @@ OperationsList.propTypes = {
   pendingSuggestions: PropTypes.arrayOf(PropTypes.string),
   onApplySuggestion: PropTypes.func,
   onDismissSuggestion: PropTypes.func,
-  undoOperationId: PropTypes.oneOfType([PropTypes.string, PropTypes.number]),
-  undoToken: PropTypes.oneOfType([PropTypes.string, PropTypes.number]),
-  undoMessage: PropTypes.string,
-  undoActionLabel: PropTypes.string,
-  onUndo: PropTypes.func,
-  onUndoClosed: PropTypes.func,
 };
 
 OperationsList.defaultProps = {
@@ -494,12 +476,6 @@ OperationsList.defaultProps = {
   pendingSuggestions: [],
   onApplySuggestion: () => {},
   onDismissSuggestion: () => {},
-  undoOperationId: null,
-  undoToken: 0,
-  undoMessage: '',
-  undoActionLabel: '',
-  onUndo: () => {},
-  onUndoClosed: () => {},
 };
 
 const styles = StyleSheet.create({

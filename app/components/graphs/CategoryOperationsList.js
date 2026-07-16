@@ -78,9 +78,17 @@ const CategoryOperationsList = ({ operations, loading, currency, colors, languag
                 </Text>
               ) : null}
             </View>
-            <Text style={[styles.amount, { color: colors.text }]} numberOfLines={1}>
-              {hideBalances ? '••••' : formatOpAmount(op.amount, currency)}
-            </Text>
+            <View style={styles.amountCol}>
+              <Text style={[styles.amount, { color: colors.text }]} numberOfLines={1}>
+                {hideBalances ? '••••' : formatOpAmount(op.convertedAmount != null ? op.convertedAmount : op.amount, currency)}
+              </Text>
+              {/* For a converted foreign operation, show the original amount too */}
+              {!hideBalances && op.convertedAmount != null && op.accountCurrency && op.accountCurrency !== currency ? (
+                <Text style={[styles.amountOriginal, { color: colors.mutedText }]} numberOfLines={1}>
+                  {formatOpAmount(op.amount, op.accountCurrency)}
+                </Text>
+              ) : null}
+            </View>
           </View>
         );
       })}
@@ -95,6 +103,8 @@ CategoryOperationsList.propTypes = {
       amount: PropTypes.oneOfType([PropTypes.string, PropTypes.number]),
       date: PropTypes.string,
       description: PropTypes.string,
+      accountCurrency: PropTypes.string,
+      convertedAmount: PropTypes.oneOfType([PropTypes.string, PropTypes.number]),
     }),
   ),
   loading: PropTypes.bool,
@@ -115,7 +125,14 @@ const styles = StyleSheet.create({
   amount: {
     fontSize: 13,
     fontWeight: '600',
+  },
+  amountCol: {
+    alignItems: 'flex-end',
     marginLeft: 10,
+  },
+  amountOriginal: {
+    fontSize: 11,
+    marginTop: 2,
   },
   centerBox: {
     alignItems: 'center',

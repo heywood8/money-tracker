@@ -10,6 +10,7 @@ jest.mock('../../../app/contexts/DisplaySettingsContext', () => ({
 jest.mock('../../../assets/currencies.json', () => ({
   USD: { decimal_digits: 2, symbol: '$' },
   JPY: { decimal_digits: 0, symbol: '¥' },
+  AMD: { decimal_digits: 0, symbol: '֏' },
 }));
 
 const colors = { text: '#000000', mutedText: '#888888', border: '#dddddd', primary: '#0000ff' };
@@ -42,6 +43,24 @@ describe('CategoryOperationsList', () => {
     expect(getByText('Coffee')).toBeTruthy();
     expect(getByText('March 5')).toBeTruthy();
     expect(getByText('$12.50')).toBeTruthy();
+  });
+
+  it('shows the converted amount in the target currency and the original beside it', async () => {
+    const ops = [{ id: '1', amount: '4000', date: '2024-03-05', description: 'Rent', accountCurrency: 'AMD', convertedAmount: '10.00' }];
+    const { getByText } = await render(
+      <CategoryOperationsList operations={ops} currency="USD" colors={colors} language="en" />,
+    );
+    expect(getByText('$10.00')).toBeTruthy();   // converted, selected currency
+    expect(getByText('֏4000')).toBeTruthy();    // original, account currency (AMD: 0 decimals)
+  });
+
+  it('does not show a separate original for a same-currency (convertedAmount null) op', async () => {
+    const ops = [{ id: '1', amount: '12.50', date: '2024-03-05', description: 'Coffee', accountCurrency: 'USD', convertedAmount: null }];
+    const { getByText, queryAllByText } = await render(
+      <CategoryOperationsList operations={ops} currency="USD" colors={colors} language="en" />,
+    );
+    expect(getByText('$12.50')).toBeTruthy();
+    expect(queryAllByText('$12.50')).toHaveLength(1); // not duplicated as an "original"
   });
 
   it('formats the date in the genitive month form for Russian', async () => {
