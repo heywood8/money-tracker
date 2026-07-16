@@ -1,5 +1,12 @@
 # Changelog
 
+## [0.197.4](https://github.com/heywood8/money-tracker/compare/penny-v0.197.3...penny-v0.197.4) (2026-07-16)
+
+
+### Bug Fixes
+
+* **navigation:** block taps only beside and below the tab bar ([#1255](https://github.com/heywood8/money-tracker/issues/1255)) ([13a1b74](https://github.com/heywood8/money-tracker/commit/13a1b74722e93b8ee1374160bc2ba68f112144f7))
+
 ## [0.197.3](https://github.com/heywood8/money-tracker/compare/penny-v0.197.2...penny-v0.197.3) (2026-07-16)
 
 
