@@ -93,7 +93,6 @@ DeckSlot.propTypes = {
 const NotificationBindingStack = memo(function NotificationBindingStack({
   suggestions = [],
   choices = {},
-  savingIds = {},
   saveErrors = {},
   quickAddHeight,
   colors,
@@ -156,7 +155,6 @@ const NotificationBindingStack = memo(function NotificationBindingStack({
                 t={t}
                 accounts={accounts}
                 categories={categories}
-                saving={!!savingIds[item.id]}
                 saveError={!!saveErrors[item.id]}
                 height={cardHeight}
                 onChoiceChange={(patch) => onChoiceChange(item.id, patch)}
@@ -187,7 +185,6 @@ NotificationBindingStack.displayName = 'NotificationBindingStack';
 NotificationBindingStack.propTypes = {
   suggestions: PropTypes.arrayOf(PropTypes.object),
   choices: PropTypes.object,
-  savingIds: PropTypes.object,
   saveErrors: PropTypes.object,
   quickAddHeight: PropTypes.number.isRequired,
   colors: PropTypes.object.isRequired,

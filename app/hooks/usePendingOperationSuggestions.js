@@ -1,4 +1,4 @@
-import { useState, useEffect, useCallback, useRef } from 'react';
+import { useState, useEffect, useCallback, useMemo, useRef } from 'react';
 import { LayoutAnimation, Platform, UIManager } from 'react-native';
 import { getPendingNotifications } from '../services/PendingNotificationsDB';
 import {
@@ -63,12 +63,26 @@ export const canSaveSuggestion = (item, choice = {}) => {
  * There is intentionally no polling here — the pipeline already runs on app
  * open/foreground (AppInitializer) and on the pull-to-refresh gesture (refresh),
  * so the main page stays cheap while idle.
+ *
+ * Saving is non-blocking: on accept the card leaves the deck at once (revealing
+ * the next suggestion, or the quick-add form) while the booking runs in the
+ * background. The host injects `onOptimisticAdd(item, choice) => placeholderId`,
+ * `onOptimisticSettle(placeholderId, operation)`, and
+ * `onOptimisticRemove(placeholderId)` so the just-accepted operation appears in
+ * the list immediately (carrying its own in-flight spinner), is swapped for the
+ * persisted row once the write lands, or is rolled back on failure. All default
+ * to no-ops, so the hook stays usable — and testable — standalone.
  */
-export default function usePendingOperationSuggestions() {
+export default function usePendingOperationSuggestions({
+  onOptimisticAdd = null,
+  onOptimisticSettle = null,
+  onOptimisticRemove = null,
+} = {}) {
   const [suggestions, setSuggestions] = useState([]);
-  // Per-item accept-in-flight flags, so the card can collapse into an
-  // "Adding operation…" row and repeat taps can't book duplicates.
-  const [savingIds, setSavingIds] = useState({});
+  // Per-item "commit in flight" flags. The accepted card is hidden from the deck
+  // (its operation now lives in the list) while its background write runs, and
+  // repeat taps can't book duplicates. Kept until the item leaves the queue.
+  const [committingIds, setCommittingIds] = useState({});
   // Per-item save-failure flags (e.g. no exchange rate for a cross-currency
   // booking), so the card can show an inline error instead of failing silently.
   const [saveErrors, setSaveErrors] = useState({});
@@ -82,8 +96,11 @@ export default function usePendingOperationSuggestions() {
   const choicesRef = useRef(choices);
   useEffect(() => { choicesRef.current = choices; }, [choices]);
   // Synchronous mirror of the in-flight set — state updates are async, so the
-  // double-tap guard must not rely on `savingIds` alone.
+  // double-tap guard must not rely on `committingIds` alone.
   const savingRef = useRef(new Set());
+  // pending id -> placeholder operation id, so a failed background write can roll
+  // back the exact optimistic row it inserted.
+  const optimisticIdsRef = useRef(new Map());
   // Guards async setters from firing after unmount.
   const mountedRef = useRef(true);
   useEffect(() => () => { mountedRef.current = false; }, []);
@@ -221,10 +238,18 @@ export default function usePendingOperationSuggestions() {
       });
       return changed ? next : prev;
     };
-    setSavingIds(prune);
+    setCommittingIds(prune);
     setChoices(prune);
     setSaveErrors(prune);
   }, [suggestions]);
+
+  // The deck shows only suggestions that aren't mid-commit: an accepted card is
+  // hidden the instant its background write starts, so the next suggestion (or the
+  // quick-add form, when the queue empties) surfaces without waiting on the write.
+  const visibleSuggestions = useMemo(
+    () => suggestions.filter((s) => !committingIds[s.id]),
+    [suggestions, committingIds],
+  );
 
   /**
    * Pull-to-refresh entry point: re-run the ingestion pipeline (a no-op when the
@@ -251,14 +276,32 @@ export default function usePendingOperationSuggestions() {
     if (!canSaveSuggestion(item, choice)) return;
     if (savingRef.current.has(item.id)) return;
     savingRef.current.add(item.id);
-    setSavingIds((prev) => ({ ...prev, [item.id]: true }));
-    // Clear any stale error from a prior failed attempt on this card.
+
+    // Optimistically drop the operation into the list so the user can act on the
+    // next suggestion immediately; its row shows an in-flight spinner until the
+    // background write lands. Track the placeholder id so a failure can roll back
+    // the exact row it inserted.
+    let optimisticId = null;
+    if (onOptimisticAdd) {
+      try {
+        optimisticId = onOptimisticAdd(item, choice);
+      } catch (error) {
+        optimisticId = null;
+      }
+    }
+    if (optimisticId != null) optimisticIdsRef.current.set(item.id, optimisticId);
+
+    // Hide the card from the deck (it now lives in the list) and clear any stale
+    // error, revealing the next suggestion — or the quick-add form — beneath it.
+    LayoutAnimation.configureNext(CARD_LEAVE_ANIMATION);
+    setCommittingIds((prev) => ({ ...prev, [item.id]: true }));
     setSaveErrors((prev) => {
       if (!prev[item.id]) return prev;
       const next = { ...prev };
       delete next[item.id];
       return next;
     });
+
     try {
       const resolveChoices = {
         accountId: choice.accountId,
@@ -272,13 +315,20 @@ export default function usePendingOperationSuggestions() {
       if (choice.labelDirty) {
         resolveChoices.labelOverride = choice.labelOverride ?? '';
       }
-      await resolvePendingNotification(item.id, resolveChoices);
-      // The operation is booked and the pending row deleted. Drop the card from
-      // the stack optimistically: reload() below swallows its own errors, so a
-      // transient post-write read failure must not strand the card in the
-      // buttonless "Adding…" state (the saving flag is only pruned when the item
-      // actually leaves `suggestions`). Animate the collapse.
-      LayoutAnimation.configureNext(CARD_LEAVE_ANIMATION);
+      const created = await resolvePendingNotification(item.id, resolveChoices);
+      // Booked: swap the placeholder for the persisted row deterministically, so a
+      // silently-failing RELOAD_ALL reload can't strand a permanent spinner (and
+      // the exact booked amount replaces the offline estimate at once). Roll back
+      // instead if nothing was created (the pending row had already vanished).
+      const placeholderId = optimisticIdsRef.current.get(item.id);
+      optimisticIdsRef.current.delete(item.id);
+      if (placeholderId != null) {
+        if (created && onOptimisticSettle) onOptimisticSettle(placeholderId, created);
+        else if (!created && onOptimisticRemove) onOptimisticRemove(placeholderId);
+      }
+      // Drop the item from the queue so the card is gone even if the reload below
+      // (which swallows its own errors) can't reach the DB; pruning then clears
+      // its committing flag and choices.
       if (mountedRef.current) {
         setSuggestions((prev) => prev.filter((s) => s.id !== item.id));
       }
@@ -287,10 +337,21 @@ export default function usePendingOperationSuggestions() {
       await reload();
     } catch (error) {
       // The save failed (e.g. no exchange rate for a cross-currency booking) —
-      // restore the card and surface an inline error so the user can adjust their
-      // choices and retry instead of tapping Save into a silent void.
+      // roll back the placeholder row, un-hide the card, and surface an inline
+      // error so the user can adjust their choices and retry instead of losing the
+      // suggestion into a silent void.
+      const placeholderId = optimisticIdsRef.current.get(item.id);
+      optimisticIdsRef.current.delete(item.id);
+      if (placeholderId != null && onOptimisticRemove) {
+        try {
+          onOptimisticRemove(placeholderId);
+        } catch (removeError) {
+          // Best-effort rollback — a stuck placeholder is preferable to a throw here.
+        }
+      }
       if (mountedRef.current) {
-        setSavingIds((prev) => {
+        LayoutAnimation.configureNext(CARD_LEAVE_ANIMATION);
+        setCommittingIds((prev) => {
           const next = { ...prev };
           delete next[item.id];
           return next;
@@ -300,7 +361,7 @@ export default function usePendingOperationSuggestions() {
     } finally {
       savingRef.current.delete(item.id);
     }
-  }, [reload]);
+  }, [reload, onOptimisticAdd, onOptimisticSettle, onOptimisticRemove]);
 
   /** Dismiss a suggestion without creating an operation. */
   const dismiss = useCallback(async (item) => {
@@ -318,8 +379,8 @@ export default function usePendingOperationSuggestions() {
   }, [reload]);
 
   return {
-    suggestions,
-    savingIds,
+    suggestions: visibleSuggestions,
+    committingIds,
     saveErrors,
     choices,
     setChoice,

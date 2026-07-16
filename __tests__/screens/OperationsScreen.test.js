@@ -170,7 +170,7 @@ jest.mock('../../app/hooks/usePendingOperationSuggestions', () => ({
   __esModule: true,
   default: jest.fn(() => ({
     suggestions: [],
-    savingIds: {},
+    committingIds: {},
     saveErrors: {},
     choices: {},
     setChoice: jest.fn(),

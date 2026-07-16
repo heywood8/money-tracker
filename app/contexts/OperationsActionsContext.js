@@ -433,6 +433,42 @@ export const OperationsActionsProvider = ({ children }) => {
     }
   }, [reloadAccounts, showDialog, loadInitialOperations, _setSaveError, _setOperations]);
 
+  // Insert a placeholder operation into the list immediately, before its DB write
+  // completes. Used by the notification-suggestion flow so the binding card can
+  // advance to the next suggestion without waiting on the (up-to-several-second)
+  // write: the row carries `_pending` so it renders an in-flight spinner. A
+  // RELOAD_ALL — emitted by the resolver when the write lands — wholesale-replaces
+  // the list, swapping this placeholder for the persisted row and dropping the
+  // spinner. No-ops if a row with the same id is already present.
+  const addOptimisticOperation = useCallback((operation) => {
+    _setOperations(prev => (
+      prev.some(op => op.id === operation.id)
+        ? prev
+        : [{ ...operation, _pending: true }, ...prev]
+    ));
+  }, [_setOperations]);
+
+  // Roll back a placeholder operation whose background write failed, so a booking
+  // that never persisted doesn't linger in the list.
+  const removeOptimisticOperation = useCallback((id) => {
+    _setOperations(prev => prev.filter(op => op.id !== id));
+  }, [_setOperations]);
+
+  // Replace a placeholder with the persisted row the write returned, in place.
+  // Deterministic cleanup for the optimistic path: it doesn't depend on the
+  // RELOAD_ALL reload landing (which silently no-ops if its read fails, otherwise
+  // stranding a permanent spinner). A no-op if the placeholder is already gone —
+  // e.g. a RELOAD_ALL reload beat us to it.
+  const replaceOptimisticOperation = useCallback((tempId, operation) => {
+    _setOperations(prev => {
+      const idx = prev.findIndex(op => op.id === tempId);
+      if (idx === -1) return prev;
+      const next = [...prev];
+      next[idx] = operation;
+      return next;
+    });
+  }, [_setOperations]);
+
   const splitOperation = useCallback(async (id, updates, newOperationData) => {
     try {
       await OperationsDB.splitOperation(id, updates, newOperationData);
@@ -689,6 +725,9 @@ export const OperationsActionsProvider = ({ children }) => {
 
   const value = useMemo(() => ({
     addOperation,
+    addOptimisticOperation,
+    removeOptimisticOperation,
+    replaceOptimisticOperation,
     splitOperation,
     updateOperation,
     deleteOperation,
@@ -710,6 +749,9 @@ export const OperationsActionsProvider = ({ children }) => {
     clearAllSearch: _clearAllSearch,
   }), [
     addOperation,
+    addOptimisticOperation,
+    removeOptimisticOperation,
+    replaceOptimisticOperation,
     splitOperation,
     updateOperation,
     deleteOperation,

@@ -1,5 +1,5 @@
 import React, { memo, useMemo } from 'react';
-import { View, Text, StyleSheet } from 'react-native';
+import { View, Text, StyleSheet, ActivityIndicator } from 'react-native';
 import { TouchableRipple } from 'react-native-paper';
 import { MaterialCommunityIcons as Icon } from '@expo/vector-icons';
 import PropTypes from 'prop-types';
@@ -36,6 +36,11 @@ const OperationListItem = ({
   const isExpense = operation.type === 'expense';
   const isIncome = operation.type === 'income';
   const isTransfer = operation.type === 'transfer';
+
+  // A placeholder row for an operation whose write (from a notification
+  // suggestion) is still in flight: it shows a spinner in the icon slot, dims,
+  // and can't be opened for editing until the persisted row replaces it.
+  const isPending = !!operation._pending;
 
   const isMultiCurrencyTransfer = isTransfer && operation.exchangeRate && operation.destinationAmount;
 
@@ -103,16 +108,22 @@ const OperationListItem = ({
     <>
       <TouchableRipple
         testID={testID}
-        onPress={onPress}
+        onPress={isPending ? undefined : onPress}
+        disabled={isPending}
         rippleColor="rgba(0, 0, 0, .08)"
         accessibilityRole="button"
         accessibilityLabel={accessibilityLabel}
         accessibilityHint={t('edit_operation_hint')}
+        accessibilityState={{ disabled: isPending, busy: isPending }}
       >
-        <View style={styles.row}>
-          {/* Icon */}
+        <View style={[styles.row, isPending && styles.rowPending]}>
+          {/* Icon — a spinner while the operation is still being written. */}
           <View style={styles.iconContainer}>
-            <Icon name={categoryInfo.icon} size={ICON_SIZE.md} color={amountColor} />
+            {isPending ? (
+              <ActivityIndicator size="small" color={amountColor} />
+            ) : (
+              <Icon name={categoryInfo.icon} size={ICON_SIZE.md} color={amountColor} />
+            )}
           </View>
 
           {/* Text */}
@@ -196,6 +207,7 @@ OperationListItem.propTypes = {
     sourceCurrency: PropTypes.string,
     destinationCurrency: PropTypes.string,
     description: PropTypes.string,
+    _pending: PropTypes.bool,
   }).isRequired,
   colors: PropTypes.object.isRequired,
   t: PropTypes.func.isRequired,
@@ -254,6 +266,9 @@ const styles = StyleSheet.create({
     minHeight: HEIGHTS.listItem,
     paddingHorizontal: SPACING.lg,
     paddingVertical: SPACING.xs,
+  },
+  rowPending: {
+    opacity: 0.6,
   },
   separator: {
     height: 1,
