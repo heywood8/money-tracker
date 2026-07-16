@@ -49,6 +49,10 @@ const GraphsScreen = () => {
   // Account currencies that have no rate (offline or live) to selectedCurrency —
   // their operations are silently excluded from converted totals, so warn.
   const [unconvertedCurrencies, setUnconvertedCurrencies] = useState([]);
+  // Long-press hint bubble explaining the convert-currencies corner toggle.
+  const [hintVisible, setHintVisible] = useState(false);
+  const hintOpacity = useSharedValue(0);
+  const hintTimerRef = useRef(null);
   const [selectedCategory, setSelectedCategory] = useState('all');
   const [selectedIncomeCategory, setSelectedIncomeCategory] = useState('all');
   const [categories, setCategories] = useState([]);
@@ -543,6 +547,30 @@ const GraphsScreen = () => {
   const handleToggleIncome = useCallback(() => toggleCard('income'), [toggleCard]);
   const handleToggleExpense = useCallback(() => toggleCard('expense'), [toggleCard]);
 
+  // Convert-toggle hint bubble: fade in on long-press, auto-dismiss after a beat.
+  const hideToggleHint = useCallback(() => {
+    if (hintTimerRef.current) {
+      clearTimeout(hintTimerRef.current);
+      hintTimerRef.current = null;
+    }
+    hintOpacity.value = withTiming(0, { duration: 180 }, (finished) => {
+      if (finished) runOnJS(setHintVisible)(false);
+    });
+  }, [hintOpacity]);
+
+  const showToggleHint = useCallback(() => {
+    if (hintTimerRef.current) clearTimeout(hintTimerRef.current);
+    setHintVisible(true);
+    hintOpacity.value = withTiming(1, { duration: 160 });
+    hintTimerRef.current = setTimeout(hideToggleHint, 2600);
+  }, [hintOpacity, hideToggleHint]);
+
+  useEffect(() => () => {
+    if (hintTimerRef.current) clearTimeout(hintTimerRef.current);
+  }, []);
+
+  const hintAnimStyle = useAnimatedStyle(() => ({ opacity: hintOpacity.value }));
+
 
   // Reset expansion and update dimension shared values on orientation change
   useEffect(() => {
@@ -800,31 +828,6 @@ const GraphsScreen = () => {
         </View>
       </ScrollView>
 
-      {/* Convert-other-currencies toggle — only useful with more than one currency */}
-      {currencyItems.length > 1 && (
-        <TouchableOpacity
-          style={[
-            styles.fabWheel,
-            styles.fabToggle,
-            {
-              backgroundColor: convertAllCurrencies ? colors.primary : colors.surface + 'DE',
-              borderColor: convertAllCurrencies ? colors.primary : colors.border + '80',
-            },
-          ]}
-          onPress={() => setConvertAllCurrencies(v => !v)}
-          activeOpacity={0.7}
-          accessibilityRole="switch"
-          accessibilityState={{ checked: convertAllCurrencies }}
-          accessibilityLabel={t('graphs_convert_currencies')}
-        >
-          <Icon
-            name="cash-sync"
-            size={30}
-            color={convertAllCurrencies ? colors.surface : colors.mutedText}
-          />
-        </TouchableOpacity>
-      )}
-
       {/* Floating currency wheel FAB */}
       {currencyItems.length > 0 && (
         <View style={[styles.fabWheel, styles.fabWheelLeft, { backgroundColor: colors.surface + 'DE', borderColor: colors.border + '80' }]}>
@@ -842,6 +845,36 @@ const GraphsScreen = () => {
         </View>
       )}
 
+      {/* Convert-other-currencies toggle — a badge tucked into the currency
+          wheel's bottom-right corner. Only useful with more than one currency. */}
+      {currencyItems.length > 1 && (
+        <TouchableOpacity
+          style={[
+            styles.fabToggle,
+            {
+              backgroundColor: convertAllCurrencies ? colors.primary : colors.surface,
+              borderColor: convertAllCurrencies ? colors.primary : colors.border,
+            },
+          ]}
+          onPress={() => {
+            hideToggleHint();
+            setConvertAllCurrencies(v => !v);
+          }}
+          onLongPress={showToggleHint}
+          delayLongPress={280}
+          activeOpacity={0.7}
+          accessibilityRole="switch"
+          accessibilityState={{ checked: convertAllCurrencies }}
+          accessibilityLabel={t('graphs_convert_currencies')}
+        >
+          <Icon
+            name="cash-sync"
+            size={18}
+            color={convertAllCurrencies ? colors.surface : colors.mutedText}
+          />
+        </TouchableOpacity>
+      )}
+
       {/* Floating period wheel FAB */}
       {periodItems.length > 0 && (
         <View style={[styles.fabWheel, styles.fabWheelRight, { backgroundColor: colors.surface + 'DE', borderColor: colors.border + '80' }]}>
@@ -857,6 +890,18 @@ const GraphsScreen = () => {
             keyExtractor={(item, index) => `period-${index}`}
           />
         </View>
+      )}
+
+      {/* Long-press hint for the convert-currencies toggle */}
+      {hintVisible && (
+        <Animated.View
+          pointerEvents="none"
+          style={[styles.toggleHint, hintAnimStyle, { backgroundColor: colors.text }]}
+        >
+          <Text style={[styles.toggleHintText, { color: colors.background }]} numberOfLines={2}>
+            {t('graphs_convert_currencies')}
+          </Text>
+        </Animated.View>
       )}
 
     </View>
@@ -905,14 +950,23 @@ const styles = StyleSheet.create({
     fontSize: 12,
   },
   fabToggle: {
-    // Match the wheel FABs: same bottom baseline (from fabWheel) and the picker's
-    // rendered height (itemHeight 28 × visibleItemCount 3 = 84), rounded like them.
+    // A compact badge tucked into the currency wheel's bottom-right corner —
+    // rendered after the wheel with higher elevation/zIndex so it sits on top.
     alignItems: 'center',
-    borderRadius: 40,
-    height: 84,
+    borderRadius: 16,
+    borderWidth: 1,
+    bottom: 104,
+    elevation: 12,
+    height: 32,
     justifyContent: 'center',
-    right: 240,
-    width: 72,
+    position: 'absolute',
+    right: 146,
+    shadowColor: '#000',
+    shadowOffset: { width: 0, height: 2 },
+    shadowOpacity: 0.35,
+    shadowRadius: 4,
+    width: 32,
+    zIndex: 2,
   },
   fabWheel: {
     borderRadius: 16,
@@ -950,6 +1004,25 @@ const styles = StyleSheet.create({
   summaryCardsRow: {
     flexDirection: 'row',
     marginBottom: 16,
+  },
+  toggleHint: {
+    borderRadius: 10,
+    bottom: 210,
+    elevation: 14,
+    maxWidth: 240,
+    paddingHorizontal: 12,
+    paddingVertical: 8,
+    position: 'absolute',
+    right: 16,
+    shadowColor: '#000',
+    shadowOffset: { width: 0, height: 2 },
+    shadowOpacity: 0.35,
+    shadowRadius: 6,
+    zIndex: 3,
+  },
+  toggleHintText: {
+    fontSize: 13,
+    fontWeight: '500',
   },
   wheelItemText: {
     fontSize: 14,
