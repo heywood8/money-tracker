@@ -10,27 +10,6 @@ import React from 'react';
 import { render, fireEvent } from '@testing-library/react-native';
 import OperationListItem from '../../../app/components/operations/OperationListItem';
 
-// Mock the inline undo bar: its own animation/timer lifecycle is covered in
-// UndoSnackbar.test.js. Here we only need to verify the wiring — that it is
-// rendered for the right operation and forwards the undo action.
-jest.mock('../../../app/components/operations/UndoSnackbar', () => {
-  const React = require('react');
-  const { Text } = require('react-native');
-  /* eslint-disable react/prop-types */
-  return function MockUndoSnackbar({ operationId, message, actionLabel, onUndo }) {
-    return React.createElement(
-      Text,
-      {
-        testID: `undo-bar-${operationId}`,
-        accessibilityLabel: actionLabel,
-        onPress: () => onUndo(operationId),
-      },
-      message,
-    );
-  };
-  /* eslint-enable react/prop-types */
-});
-
 const mockColors = {
   text: '#fff',
   mutedText: '#888',
@@ -100,44 +79,6 @@ describe('OperationListItem', () => {
       expect(getByLabelText('dismiss suggestion')).toBeTruthy();
       expect(getByText('Monthly pass')).toBeTruthy();
       expect(getByText('Bus fare')).toBeTruthy();
-    });
-  });
-
-  describe('Undo Bar Rendering', () => {
-    it('does not render the undo bar when showUndo is false', async () => {
-      const { queryByTestId } = await render(<OperationListItem {...baseProps} />);
-      expect(queryByTestId('undo-bar-1')).toBeNull();
-    });
-
-    it('renders the undo bar beneath the operation when showUndo is true', async () => {
-      const { getByTestId, getByText } = await render(
-        <OperationListItem
-          {...baseProps}
-          showUndo
-          undoMessage="operation_added"
-          undoActionLabel="undo"
-          onUndo={jest.fn()}
-          onUndoClosed={jest.fn()}
-        />,
-      );
-      expect(getByTestId('undo-bar-1')).toBeTruthy();
-      expect(getByText('operation_added')).toBeTruthy();
-    });
-
-    it('calls onUndo with the operation id when the undo action is triggered', async () => {
-      const onUndo = jest.fn();
-      const { getByTestId } = await render(
-        <OperationListItem
-          {...baseProps}
-          showUndo
-          undoMessage="operation_added"
-          undoActionLabel="undo"
-          onUndo={onUndo}
-          onUndoClosed={jest.fn()}
-        />,
-      );
-      await fireEvent.press(getByTestId('undo-bar-1'));
-      expect(onUndo).toHaveBeenCalledWith('1');
     });
   });
 

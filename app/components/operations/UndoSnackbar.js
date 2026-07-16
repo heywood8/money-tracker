@@ -7,34 +7,34 @@ import {
   FONT_SIZE,
   DURATION,
   ICON_SIZE,
+  BORDER_RADIUS,
 } from '../../styles/designTokens';
 
 /**
  * UndoSnackbar
  *
- * A transient "just-added" bar that renders inline within the operations list,
- * directly beneath the operation it refers to (between that operation and the
- * one before it), offering a brief window to undo the last created operation. A
- * thin progress bar depletes over `duration`, giving the user a clear visual cue
- * for how much time remains.
+ * A transient "just-added" snackbar. It is rendered by OperationsScreen as a
+ * floating overlay pinned just above the tab bar — deliberately OUTSIDE the
+ * operations SectionList. Rendering it inline inside a virtualized list cell
+ * used to fight `getItemLayout` + `removeClippedSubviews`: the cell's reported
+ * height never accounted for the bar, so the clipping pass would slice it off a
+ * few frames after mount (see PENNY-16 for the crash the inline approach also
+ * caused). As a floating sibling of the list it is immune to virtualization.
+ *
+ * A thin progress bar depletes over `duration`, giving the user a clear visual
+ * cue for how much time remains.
  *
  * Lifecycle is intentionally split so the exit animation always plays:
  *  - `onUndo(operationId)` performs the undo (called before the fade-out).
- *  - `onClosed()` tells the parent to unmount, and fires only after the exit
- *    animation completes (whether dismissed by timeout or by the Undo tap).
+ *  - `onClosed(operationId)` tells the parent to unmount, and fires only after
+ *    the exit animation completes (whether dismissed by timeout or Undo tap).
  *
  * Mount this conditionally with a changing `key` (e.g. an incrementing token)
  * so each new operation restarts the entry animation and countdown cleanly.
- *
- * Visibility must NEVER depend on an animation successfully running: the bar is
- * inserted into an already-mounted virtualized list cell, where a native-driver
- * animation can fail to attach on its first frame. The container therefore
- * mounts fully opaque; animations only add polish (entry rise) or remove the
- * bar on the way out (exit fade), so their failure modes are benign.
  */
-// Shared with OperationsScreen's fallback cleanup: the parent must be able to
-// clear its undo state even when this component never gets to call onClosed
-// (cell unmounted by virtualization, exit animation never completing).
+// Shared with OperationsScreen's fallback cleanup: a belt-and-suspenders timer
+// that clears the parent's undo state even if this component's exit animation
+// never completes its callback.
 export const UNDO_DURATION_MS = 5000;
 
 const UndoSnackbar = ({
@@ -112,7 +112,7 @@ const UndoSnackbar = ({
         styles.container,
         {
           backgroundColor: colors.altRow || colors.surface,
-          borderTopColor: colors.border,
+          borderColor: colors.border,
           opacity: exitAnim,
           transform: [{ translateY }],
         },
@@ -167,9 +167,15 @@ const styles = StyleSheet.create({
     textTransform: 'uppercase',
   },
   container: {
-    borderTopWidth: 1,
-    // Clip the depleting progress fill to the bar's bounds.
+    borderRadius: BORDER_RADIUS.lg,
+    borderWidth: StyleSheet.hairlineWidth,
+    elevation: 6,
+    // Clip the depleting progress fill to the rounded bounds.
     overflow: 'hidden',
+    shadowColor: '#000',
+    shadowOffset: { width: 0, height: 3 },
+    shadowOpacity: 0.25,
+    shadowRadius: 6,
   },
   content: {
     alignItems: 'center',

@@ -3,6 +3,7 @@ import { View, StyleSheet, FlatList, TouchableOpacity, TextInput, Pressable, Mod
 import Animated, { useSharedValue, useAnimatedStyle, withTiming, Easing } from 'react-native-reanimated';
 import { MaterialCommunityIcons as Icon } from '@expo/vector-icons';
 import DateTimePicker from '@react-native-community/datetimepicker';
+import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { useThemeColors } from '../contexts/ThemeColorsContext';
 import { TOP_CONTENT_SPACING, HORIZONTAL_PADDING, SPACING, BORDER_RADIUS, HEIGHTS } from '../styles/layout';
 import { useLocalization } from '../contexts/LocalizationContext';
@@ -22,7 +23,7 @@ import OperationsList from '../components/operations/OperationsList';
 import QuickAddForm from '../components/operations/QuickAddForm';
 import NotificationBindingStack, { deckPeekAllowance, deckCardHeight } from '../components/operations/NotificationBindingStack';
 import PickerModal from '../components/operations/PickerModal';
-import { UNDO_DURATION_MS } from '../components/operations/UndoSnackbar';
+import UndoSnackbar, { UNDO_DURATION_MS } from '../components/operations/UndoSnackbar';
 import SearchOverlay from '../components/search/SearchOverlay';
 import SearchBar from '../components/search/SearchBar';
 import FilterChipStrip from '../components/search/FilterChipStrip';
@@ -40,6 +41,7 @@ import { useDisplaySettings } from '../contexts/DisplaySettingsContext';
 
 const OperationsScreen = () => {
   const { colors } = useThemeColors();
+  const insets = useSafeAreaInsets();
 
   const { t } = useLocalization();
   const { showDialog } = useDialog();
@@ -738,12 +740,10 @@ const OperationsScreen = () => {
     setUndoInfo(prev => (prev && operationId != null && prev.id !== operationId) ? prev : null);
   }, []);
 
-  // Fallback cleanup: the snackbar's onClosed is the normal path, but it never
-  // fires when the snackbar unmounts without animating out (its cell scrolled
-  // beyond the render window, a filter excluding the row) or when the exit
-  // animation drops its completion callback. Without this, a leaked undoInfo
-  // would keep offering an undo action for an operation whose window has long
-  // since passed.
+  // Fallback cleanup: the snackbar's onClosed is the normal path, but it won't
+  // fire if the exit animation drops its completion callback. Without this, a
+  // leaked undoInfo would keep offering an undo action for an operation whose
+  // window has long since passed.
   useEffect(() => {
     if (!undoInfo) return undefined;
     const timer = setTimeout(() => setUndoInfo(null), UNDO_DURATION_MS + 1500);
@@ -1047,13 +1047,28 @@ const OperationsScreen = () => {
         pendingSuggestions={pendingSuggestions}
         onApplySuggestion={handleApplySuggestion}
         onDismissSuggestion={handleDismissSuggestion}
-        undoOperationId={undoInfo ? undoInfo.id : null}
-        undoToken={undoInfo ? undoInfo.token : 0}
-        undoMessage={t('operation_added')}
-        undoActionLabel={t('undo')}
-        onUndo={handleUndoAdd}
-        onUndoClosed={handleUndoClosed}
       />
+
+      {/* Floating undo snackbar — pinned above the tab bar, OUTSIDE the list, so
+          virtualization / removeClippedSubviews can't clip it (see UndoSnackbar
+          docblock and PENNY-16). The token key restarts its countdown whenever a
+          newer operation replaces the one being offered for undo. */}
+      {undoInfo && (
+        <View
+          style={[styles.floatingUndoArea, { bottom: insets.bottom + HEIGHTS.tabBar }]}
+          pointerEvents="box-none"
+        >
+          <UndoSnackbar
+            key={undoInfo.token}
+            operationId={undoInfo.id}
+            message={t('operation_added')}
+            actionLabel={t('undo')}
+            colors={colors}
+            onUndo={handleUndoAdd}
+            onClosed={handleUndoClosed}
+          />
+        </View>
+      )}
 
       {/* Floating search area — overlays the list so its content scrolls behind
           it instead of being clipped by an opaque band. The matching topInset on
@@ -1163,6 +1178,14 @@ const styles = StyleSheet.create({
     right: 0,
     top: 0,
     zIndex: 100,
+  },
+  floatingUndoArea: {
+    // `bottom` is applied inline (safe-area inset + tab bar height) so the
+    // snackbar floats just above the floating tab bar instead of behind it.
+    left: SPACING.lg,
+    position: 'absolute',
+    right: SPACING.lg,
+    zIndex: 90,
   },
   scrollToTopButton: {
     alignItems: 'center',
