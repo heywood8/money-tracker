@@ -1,5 +1,12 @@
 # Changelog
 
+## [0.197.2](https://github.com/heywood8/money-tracker/compare/penny-v0.197.1...penny-v0.197.2) (2026-07-16)
+
+
+### Bug Fixes
+
+* **graphs:** тумблер пересчёта валют бейджем в углу колеса + подсказка ([#1251](https://github.com/heywood8/money-tracker/issues/1251)) ([c0d7e88](https://github.com/heywood8/money-tracker/commit/c0d7e88161cff4e6de3ba8f5cea71b50c5fa0c09))
+
 ## [0.197.1](https://github.com/heywood8/money-tracker/compare/penny-v0.197.0...penny-v0.197.1) (2026-07-16)
 
 
