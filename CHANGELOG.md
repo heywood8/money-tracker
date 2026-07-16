@@ -1,5 +1,12 @@
 # Changelog
 
+## [0.197.5](https://github.com/heywood8/money-tracker/compare/penny-v0.197.4...penny-v0.197.5) (2026-07-16)
+
+
+### Code Refactoring
+
+* replace defaultProps with ES default parameters ([#1257](https://github.com/heywood8/money-tracker/issues/1257)) ([760a1ca](https://github.com/heywood8/money-tracker/commit/760a1cade48c175144313fd154505baec4c9547c))
+
 ## [0.197.4](https://github.com/heywood8/money-tracker/compare/penny-v0.197.3...penny-v0.197.4) (2026-07-16)
 
 
