@@ -10,6 +10,7 @@ jest.mock('../../../app/contexts/DisplaySettingsContext', () => ({
 jest.mock('../../../assets/currencies.json', () => ({
   USD: { decimal_digits: 2, symbol: '$' },
   JPY: { decimal_digits: 0, symbol: '¥' },
+  AMD: { decimal_digits: 0, symbol: '֏' },
 }));
 
 const colors = { text: '#000000', mutedText: '#888888', border: '#dddddd', primary: '#0000ff' };
