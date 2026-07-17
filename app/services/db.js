@@ -179,6 +179,13 @@ const isSchemaComplete = async (rawDb) => {
     // and never gain the column.
     if (!accountsCols.some(c => c.name === 'show_in_main_menu')) return false;
 
+    // Check notification_merchant_rules has last_matched_at column (migration 0016).
+    // Same reasoning: an install complete through 0015 would otherwise report
+    // "schema complete" and skip migrate(), so 0016 would never add the column —
+    // and getAllMerchantRules (which ORDER BYs COALESCE(last_matched_at, ...))
+    // would throw, wiping the category and name bindings from the UI.
+    if (!merchantRuleCols.some(c => c.name === 'last_matched_at')) return false;
+
     return true;
   } catch (error) {
     console.warn('[DB] isSchemaComplete check failed:', error.message);
@@ -456,6 +463,14 @@ const detectAppliedMigrations = async (rawDb) => {
     const accCols = await getColumns('accounts');
     if (accCols.some(c => c.name === 'show_in_main_menu')) {
       applied.push(15);
+    }
+  }
+
+  // Migration 0016: Adds notification_merchant_rules.last_matched_at column.
+  if (await tableExists('notification_merchant_rules')) {
+    const ruleCols = await getColumns('notification_merchant_rules');
+    if (ruleCols.some(c => c.name === 'last_matched_at')) {
+      applied.push(16);
     }
   }
 
