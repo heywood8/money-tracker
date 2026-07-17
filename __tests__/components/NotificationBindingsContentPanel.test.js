@@ -90,11 +90,21 @@ describe('NotificationBindingsContentPanel', () => {
   });
 
   it('removes a card binding by dropping just that card from the account', async () => {
-    const { getAllByLabelText, getByText } = await render(<NotificationBindingsContentPanel />);
+    const { getAllByLabelText, getByLabelText, getByText } = await render(<NotificationBindingsContentPanel />);
     await waitFor(() => expect(getByText('4083***7027')).toBeTruthy());
-    // First remove button belongs to the card binding (rendered first).
+    // Removal is two-tap: arm the first row (the card), then confirm.
     fireEvent.press(getAllByLabelText('notification_bindings_remove')[0]);
+    const confirm = await waitFor(() => getByLabelText('delete'));
+    fireEvent.press(confirm);
     await waitFor(() => expect(AccountsDB.removeAccountCardMask).toHaveBeenCalledWith(1, '4083***7027'));
+  });
+
+  it('does not remove a binding when the delete confirmation is cancelled', async () => {
+    const { getAllByLabelText, getByLabelText, getByText } = await render(<NotificationBindingsContentPanel />);
+    await waitFor(() => expect(getByText('4083***7027')).toBeTruthy());
+    fireEvent.press(getAllByLabelText('notification_bindings_remove')[0]); // arm
+    fireEvent.press(await waitFor(() => getByLabelText('cancel'))); // back out
+    expect(AccountsDB.removeAccountCardMask).not.toHaveBeenCalled();
   });
 
   it('lists each card of a multi-card account as its own binding row', async () => {
@@ -105,10 +115,11 @@ describe('NotificationBindingsContentPanel', () => {
   });
 
   it('removes the ATM cash target binding', async () => {
-    const { getAllByLabelText, getByText } = await render(<NotificationBindingsContentPanel />);
+    const { getAllByLabelText, getByLabelText, getByText } = await render(<NotificationBindingsContentPanel />);
     await waitFor(() => expect(getByText('notification_bindings_atm')).toBeTruthy());
     // The ATM row is the second binding in the card section (after the card row).
-    fireEvent.press(getAllByLabelText('notification_bindings_remove')[1]);
+    fireEvent.press(getAllByLabelText('notification_bindings_remove')[1]); // arm ATM
+    fireEvent.press(await waitFor(() => getByLabelText('delete'))); // confirm
     await waitFor(() => expect(pipeline.clearAtmTargetAccount).toHaveBeenCalled());
   });
 
@@ -117,9 +128,10 @@ describe('NotificationBindingsContentPanel', () => {
     NotificationRulesDB.getAllMerchantRules.mockResolvedValue([CATEGORY_RULE]);
     pipeline.resolveAtmTargetAccount.mockResolvedValue(null);
 
-    const { getAllByLabelText, getByText } = await render(<NotificationBindingsContentPanel />);
+    const { getAllByLabelText, getByLabelText, getByText } = await render(<NotificationBindingsContentPanel />);
     await waitFor(() => expect(getByText('COFFEE HOUSE')).toBeTruthy());
     fireEvent.press(getAllByLabelText('notification_bindings_remove')[0]);
+    fireEvent.press(await waitFor(() => getByLabelText('delete')));
     await waitFor(() => expect(NotificationRulesDB.clearMerchantRuleCategory).toHaveBeenCalledWith('r1'));
   });
 
@@ -128,9 +140,32 @@ describe('NotificationBindingsContentPanel', () => {
     NotificationRulesDB.getAllMerchantRules.mockResolvedValue([LABEL_RULE]);
     pipeline.resolveAtmTargetAccount.mockResolvedValue(null);
 
-    const { getAllByLabelText, getByText } = await render(<NotificationBindingsContentPanel />);
+    const { getAllByLabelText, getByLabelText, getByText } = await render(<NotificationBindingsContentPanel />);
     await waitFor(() => expect(getByText('GROCERY')).toBeTruthy());
     fireEvent.press(getAllByLabelText('notification_bindings_remove')[0]);
+    fireEvent.press(await waitFor(() => getByLabelText('delete')));
     await waitFor(() => expect(NotificationRulesDB.clearMerchantRuleLabel).toHaveBeenCalledWith('r2'));
+  });
+
+  it('binds a card by hand from the add-card editor', async () => {
+    NotificationRulesDB.getAllMerchantRules.mockResolvedValue([]);
+    pipeline.resolveAtmTargetAccount.mockResolvedValue(null);
+    const { getByLabelText, getByPlaceholderText } = await render(<NotificationBindingsContentPanel />);
+    await waitFor(() => expect(getByLabelText('notification_bindings_add_card')).toBeTruthy());
+    fireEvent.press(getByLabelText('notification_bindings_add_card'));
+    // Account picker defaults to the first account (id 1); type the last 4 digits.
+    const last4 = await waitFor(() => getByPlaceholderText('notification_bindings_card_last4'));
+    fireEvent.changeText(last4, '9999');
+    fireEvent.press(await waitFor(() => getByLabelText('save')));
+    await waitFor(() => expect(AccountsDB.addAccountCardMask).toHaveBeenCalledWith(1, '9999'));
+  });
+
+  it('filters every section by the search query', async () => {
+    const { getByPlaceholderText, getByText, queryByText } = await render(<NotificationBindingsContentPanel />);
+    await waitFor(() => expect(getByText('COFFEE HOUSE')).toBeTruthy());
+    fireEvent.changeText(getByPlaceholderText('search'), 'grocery');
+    await waitFor(() => expect(queryByText('COFFEE HOUSE')).toBeNull());
+    expect(getByText('GROCERY')).toBeTruthy();
+    expect(queryByText('4083***7027')).toBeNull();
   });
 });

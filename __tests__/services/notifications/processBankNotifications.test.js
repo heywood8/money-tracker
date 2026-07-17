@@ -686,6 +686,12 @@ describe('processBankNotifications', () => {
       expect(PendingNotificationsDB.deletePendingNotification).toHaveBeenCalledWith('p1');
     });
 
+    it('bumps the merchant rule match so its binding floats to the top', async () => {
+      PendingNotificationsDB.getPendingNotificationById.mockResolvedValue(pending);
+      await pipeline.resolvePendingNotification('p1', { accountId: 7, categoryId: 'cat-food' });
+      expect(NotificationRulesDB.touchMerchantRuleMatch).toHaveBeenCalledWith('NAREK MEHRABYAN', PKG);
+    });
+
     it('converts the amount to the chosen account currency when they differ', async () => {
       PendingNotificationsDB.getPendingNotificationById.mockResolvedValue({
         ...pending, amount: '129.99', currency: 'EUR', merchant: 'Nike ES',

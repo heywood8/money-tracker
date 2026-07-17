@@ -365,6 +365,17 @@ const bookExpenseOrQueue = async (descriptor, resolution, date, allowedPackages,
       ...operationLocationFields(location),
     });
     summary.created += 1;
+
+    // Float the merchant's binding to the top of the bindings list on this
+    // auto-create (no-op when no rule exists). Best-effort: a failed bookkeeping
+    // update must not abort the run and re-book this notification next pass.
+    if (descriptor.merchant) {
+      try {
+        await NotificationRulesDB.touchMerchantRuleMatch(descriptor.merchant, descriptor.packageName);
+      } catch (error) {
+        console.error('[bookExpenseOrQueue] Failed to bump merchant rule match:', error);
+      }
+    }
   } else {
     await PendingNotificationsDB.addPendingNotification({
       ...descriptor,
@@ -713,6 +724,17 @@ export const resolvePendingNotification = async (pendingId, choices = {}) => {
       await learnSourcePackage(pending.packageName);
     } catch (error) {
       console.error('[resolvePendingNotification] Failed to learn source package:', error);
+    }
+  }
+
+  // Float the merchant's binding to the top of the bindings list on this
+  // approval (no-op when no rule exists). Runs after the learn calls above so a
+  // rule just learned this approval is stamped too. Best-effort.
+  if (pending.merchant) {
+    try {
+      await NotificationRulesDB.touchMerchantRuleMatch(pending.merchant, pending.packageName);
+    } catch (error) {
+      console.error('[resolvePendingNotification] Failed to bump merchant rule match:', error);
     }
   }
 
