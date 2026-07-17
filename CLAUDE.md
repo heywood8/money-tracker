@@ -2,6 +2,10 @@
 
 This file provides guidance to Claude Code (claude.ai/code) when working with code in this repository.
 
+## Language Conventions for Git
+
+**Write all git commit messages and pull request descriptions in English only.** Never use Russian (or any other language) in commit messages or PR titles/descriptions, regardless of the language used in conversation.
+
 ## Project Overview
 
 Penny is a React Native mobile app built with Expo for tracking personal finances. The app targets Android, with features for managing accounts, operations, categories, planned operations, budgets, and viewing graphs. It includes internationalization (11 languages: English, Italian, Russian, Spanish, French, Chinese, German, Armenian, Japanese, Korean, Portuguese) and theme support (light/dark/system). Supports backup/restore (JSON, CSV, SQLite) and Google Sheets export via native Google Sign-In.
