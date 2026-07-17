@@ -1,5 +1,12 @@
 # Changelog
 
+## [0.199.0](https://github.com/heywood8/money-tracker/compare/penny-v0.198.0...penny-v0.199.0) (2026-07-17)
+
+
+### Features
+
+* **bindings:** переработка экрана привязок + всплытие по последнему совпадению ([#1261](https://github.com/heywood8/money-tracker/issues/1261)) ([53d7df1](https://github.com/heywood8/money-tracker/commit/53d7df126dedb1a651d8537143e15fb69bc7ec42))
+
 ## [0.198.0](https://github.com/heywood8/money-tracker/compare/penny-v0.197.5...penny-v0.198.0) (2026-07-16)
 
 
