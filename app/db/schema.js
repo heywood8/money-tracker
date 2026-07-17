@@ -174,6 +174,13 @@ export const notificationMerchantRules = sqliteTable('notification_merchant_rule
   packageName: text('package_name'),
   categoryId: text('category_id').references(() => categories.id, { onDelete: 'cascade' }),
   labelOverride: text('label_override'),
+  // ISO timestamp of the most recent notification this rule actually resolved
+  // (auto-created or approved from the queue). Unlike updatedAt (which only
+  // moves when the rule is edited), this bumps every time the merchant is seen
+  // again, so the bindings UI can float a freshly-matched rule to the top.
+  // Nullable — NULL until the first post-0016 match; ordering falls back to
+  // updatedAt for such rows.
+  lastMatchedAt: text('last_matched_at'),
   createdAt: text('created_at').notNull(),
   updatedAt: text('updated_at').notNull(),
 }, (table) => ({

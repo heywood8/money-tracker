@@ -265,4 +265,57 @@ describe('NotificationRulesDB', () => {
       );
     });
   });
+
+  describe('getAllMerchantRules', () => {
+    it('orders by last-matched (falling back to updated_at) so recent hits float up', async () => {
+      mockDb.queryAll.mockResolvedValue([]);
+      await NotificationRulesDB.getAllMerchantRules();
+      const [sql] = mockDb.queryAll.mock.calls[0];
+      expect(sql).toContain('ORDER BY COALESCE(last_matched_at, updated_at) DESC');
+    });
+
+    it('maps last_matched_at onto the returned rule (null when absent)', async () => {
+      mockDb.queryAll.mockResolvedValue([
+        { id: 'r1', merchant: 'SHOP', category_id: 'c1', last_matched_at: '2026-07-17T10:00:00.000Z' },
+        { id: 'r2', merchant: 'OTHER', category_id: 'c2' },
+      ]);
+      const rules = await NotificationRulesDB.getAllMerchantRules();
+      expect(rules[0].lastMatchedAt).toBe('2026-07-17T10:00:00.000Z');
+      expect(rules[1].lastMatchedAt).toBeNull();
+    });
+  });
+
+  describe('touchMerchantRuleMatch', () => {
+    it('does nothing when the merchant key is empty', async () => {
+      await NotificationRulesDB.touchMerchantRuleMatch('');
+      expect(mockDb.queryAll).not.toHaveBeenCalled();
+      expect(mockDb.executeQuery).not.toHaveBeenCalled();
+    });
+
+    it('is a no-op when no rule exists for the merchant', async () => {
+      mockDb.queryAll.mockResolvedValue([]);
+      await NotificationRulesDB.touchMerchantRuleMatch('SHOP', 'am.bank');
+      expect(mockDb.executeQuery).not.toHaveBeenCalled();
+    });
+
+    it('stamps last_matched_at on the resolved rule row', async () => {
+      mockDb.queryAll.mockResolvedValue([
+        { id: 'r1', merchant: 'SHOP', package_name: null, category_id: 'c1' },
+      ]);
+      await NotificationRulesDB.touchMerchantRuleMatch('shop');
+      const [sql, params] = mockDb.executeQuery.mock.calls[0];
+      expect(sql).toContain('SET last_matched_at = ?');
+      expect(params[params.length - 1]).toBe('r1');
+    });
+
+    it('stamps the package-scoped row when one matches', async () => {
+      mockDb.queryAll.mockResolvedValue([
+        { id: 'r1', merchant: 'SHOP', package_name: null, category_id: 'c1' },
+        { id: 'r2', merchant: 'SHOP', package_name: 'am.bank', category_id: 'c2' },
+      ]);
+      await NotificationRulesDB.touchMerchantRuleMatch('shop', 'am.bank');
+      const [, params] = mockDb.executeQuery.mock.calls[0];
+      expect(params[params.length - 1]).toBe('r2');
+    });
+  });
 });

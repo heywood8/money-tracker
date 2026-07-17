@@ -27,6 +27,7 @@ const mapRuleFields = (row) => {
     packageName: row.package_name,
     categoryId: row.category_id,
     labelOverride: row.label_override ?? null,
+    lastMatchedAt: row.last_matched_at ?? null,
     createdAt: row.created_at,
     updatedAt: row.updated_at,
   };
@@ -202,17 +203,52 @@ export const upsertMerchantLabel = async (merchant, labelOverride, packageName =
 };
 
 /**
- * All merchant rules, newest first (for the rules-management UI).
+ * All merchant rules, most-recently-matched first (for the rules-management UI).
+ *
+ * Orders by COALESCE(last_matched_at, updated_at) DESC so a rule whose merchant
+ * was just seen again (auto-created or approved) floats above older ones even
+ * though its category/label were unchanged. Rules never matched since the 0016
+ * migration have a NULL last_matched_at and fall back to their updated_at.
+ *
  * @returns {Promise<Array>}
  */
 export const getAllMerchantRules = async () => {
   try {
     const rows = await queryAll(
-      'SELECT * FROM notification_merchant_rules ORDER BY updated_at DESC',
+      'SELECT * FROM notification_merchant_rules ORDER BY COALESCE(last_matched_at, updated_at) DESC',
     );
     return (rows || []).map(mapRuleFields);
   } catch (error) {
     console.error('Failed to get merchant rules:', error);
+    throw error;
+  }
+};
+
+/**
+ * Stamp a merchant rule as matched right now (bumps last_matched_at), so the
+ * bindings UI floats it to the top of its list. Resolves the same way reads do —
+ * a package-scoped rule wins, with an unscoped rule as the fallback — so the row
+ * that actually resolved the notification is the one stamped. A no-op when no
+ * rule exists for the merchant (nothing learned yet). Best-effort: booking a
+ * notification must never fail because this bookkeeping update did, so callers
+ * swallow errors.
+ *
+ * @param {string} merchant
+ * @param {string|null} packageName
+ * @returns {Promise<void>}
+ */
+export const touchMerchantRuleMatch = async (merchant, packageName = null) => {
+  const key = normalizeMerchant(merchant);
+  if (!key) return;
+  try {
+    const rule = await getMerchantRule(merchant, packageName);
+    if (!rule) return;
+    await executeQuery(
+      'UPDATE notification_merchant_rules SET last_matched_at = ? WHERE id = ?',
+      [new Date().toISOString(), rule.id],
+    );
+  } catch (error) {
+    console.error('Failed to touch merchant rule match:', error);
     throw error;
   }
 };
