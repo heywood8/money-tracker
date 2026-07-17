@@ -1,5 +1,12 @@
 # Changelog
 
+## [0.199.1](https://github.com/heywood8/money-tracker/compare/penny-v0.199.0...penny-v0.199.1) (2026-07-17)
+
+
+### Bug Fixes
+
+* **db:** применить миграцию 0016 для установок, полных до 0015 ([#1263](https://github.com/heywood8/money-tracker/issues/1263)) ([a86786d](https://github.com/heywood8/money-tracker/commit/a86786d2728fab345b20c50eba4f762c47fb56ef))
+
 ## [0.199.0](https://github.com/heywood8/money-tracker/compare/penny-v0.198.0...penny-v0.199.0) (2026-07-17)
 
 
