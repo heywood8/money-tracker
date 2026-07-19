@@ -721,7 +721,7 @@ describe('OperationFormFields', () => {
     });
   });
 
-  describe('Category Error Flash Animation', () => {
+  describe('Field Error Flash Animation', () => {
     const mockTopCategories = [
       { id: 'cat1', name: 'Food', icon: 'food', type: 'entry', categoryType: 'expense' },
       { id: 'cat2', name: 'Transport', icon: 'car', type: 'entry', categoryType: 'expense' },
@@ -731,7 +731,7 @@ describe('OperationFormFields', () => {
       return { name: cat?.name || 'Unknown', icon: cat?.icon || 'tag', parentName: null };
     };
 
-    it('renders category chips without error when flashCategoryError is 0', async () => {
+    it('renders without error when flashError is null', async () => {
       const props = {
         ...defaultProps,
         topCategoriesForType: mockTopCategories,
@@ -741,28 +741,55 @@ describe('OperationFormFields', () => {
       await render(<OperationFormFields {...props} />);
     });
 
-    it('triggers flash animation branch when flashCategoryError is non-zero', async () => {
+    it('triggers flash branch for a category omission', async () => {
       const props = {
         ...defaultProps,
         topCategoriesForType: mockTopCategories,
         getCategoryInfo,
         values: { ...defaultProps.values, categoryId: '' },
-        flashCategoryError: 1,
+        flashError: { field: 'category', token: 1 },
       };
       await render(<OperationFormFields {...props} />);
     });
 
-    it('re-triggers animation when flashCategoryError increments again', async () => {
+    it('triggers flash branch for a missing source account', async () => {
+      const props = {
+        ...defaultProps,
+        values: { ...defaultProps.values, accountId: '' },
+        flashError: { field: 'account', token: 1 },
+      };
+      await render(<OperationFormFields {...props} />);
+    });
+
+    it('triggers flash branch for a zero amount', async () => {
+      const props = {
+        ...defaultProps,
+        values: { ...defaultProps.values, amount: '' },
+        flashError: { field: 'amount', token: 1 },
+      };
+      await render(<OperationFormFields {...props} />);
+    });
+
+    it('triggers flash branch for a missing transfer target account', async () => {
+      const props = {
+        ...defaultProps,
+        values: { ...defaultProps.values, type: 'transfer', toAccountId: '' },
+        flashError: { field: 'toAccount', token: 1 },
+      };
+      await render(<OperationFormFields {...props} />);
+    });
+
+    it('re-triggers animation when the token changes for the same field', async () => {
       const props = {
         ...defaultProps,
         topCategoriesForType: mockTopCategories,
         getCategoryInfo,
         values: { ...defaultProps.values, categoryId: '' },
-        flashCategoryError: 0,
+        flashError: null,
       };
       const { rerender } = await render(<OperationFormFields {...props} />);
-      expect(() => rerender(<OperationFormFields {...props} flashCategoryError={1} />)).not.toThrow();
-      expect(() => rerender(<OperationFormFields {...props} flashCategoryError={2} />)).not.toThrow();
+      expect(() => rerender(<OperationFormFields {...props} flashError={{ field: 'category', token: 1 }} />)).not.toThrow();
+      expect(() => rerender(<OperationFormFields {...props} flashError={{ field: 'category', token: 2 }} />)).not.toThrow();
     });
   });
 });

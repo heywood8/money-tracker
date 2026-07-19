@@ -42,7 +42,7 @@ const QuickAddForm = memo(({
   onOperationCurrencyChange,
   foreignRateSource,
   foreignExchangeRate,
-  flashCategoryError,
+  flashError,
 }) => {
   const containerThemed = React.useMemo(() => ({
     backgroundColor: colors.background,
@@ -88,7 +88,7 @@ const QuickAddForm = memo(({
           onOperationCurrencyChange={onOperationCurrencyChange}
           foreignRateSource={foreignRateSource}
           foreignExchangeRate={foreignExchangeRate}
-          flashCategoryError={flashCategoryError}
+          flashError={flashError}
         />
       </View>
     </View>
@@ -122,7 +122,10 @@ QuickAddForm.propTypes = {
   onOperationCurrencyChange: PropTypes.func,
   foreignRateSource: PropTypes.oneOf(['loading', 'live', 'offline']),
   foreignExchangeRate: PropTypes.string,
-  flashCategoryError: PropTypes.number,
+  flashError: PropTypes.shape({
+    field: PropTypes.oneOf(['category', 'account', 'toAccount', 'amount']),
+    token: PropTypes.number,
+  }),
 };
 
 const styles = StyleSheet.create({
