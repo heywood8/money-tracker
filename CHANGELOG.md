@@ -1,5 +1,12 @@
 # Changelog
 
+## [0.200.1](https://github.com/heywood8/money-tracker/compare/penny-v0.200.0...penny-v0.200.1) (2026-07-19)
+
+
+### Documentation
+
+* add quality-of-life backlog from code-level UX audit ([#1270](https://github.com/heywood8/money-tracker/issues/1270)) ([6ae6cbb](https://github.com/heywood8/money-tracker/commit/6ae6cbbf2c31fdfcb13141ccf70bfd815d5ffd8c))
+
 ## [0.200.0](https://github.com/heywood8/money-tracker/compare/penny-v0.199.1...penny-v0.200.0) (2026-07-19)
 
 
