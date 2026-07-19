@@ -212,6 +212,11 @@ export const pendingNotifications = sqliteTable('pending_notifications', {
   categoryId: text('category_id').references(() => categories.id, { onDelete: 'set null' }),
   packageName: text('package_name'),
   raw: text('raw'),
+  // Location captured at ingestion time (near the shop), reused when the item is
+  // resolved so a notification reviewed later isn't stamped with the wrong place.
+  // Both nullable — only populated when the attach-location opt-in was on.
+  latitude: text('latitude'),
+  longitude: text('longitude'),
   createdAt: text('created_at').notNull(),
 }, (table) => ({
   createdIdx: index('idx_pending_notifications_created').on(table.createdAt),

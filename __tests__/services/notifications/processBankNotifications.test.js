@@ -47,6 +47,7 @@ import * as PreferencesDB from '../../../app/services/PreferencesDB';
 // function so the merge-into-createOperation behavior is exercised.
 jest.mock('../../../app/services/operationLocation', () => ({
   captureLocationIfEnabled: jest.fn(),
+  isAttachLocationEnabled: jest.fn(),
   operationLocationFields: (loc) =>
     loc && loc.latitude != null && loc.longitude != null
       ? { latitude: loc.latitude, longitude: loc.longitude }
@@ -128,6 +129,9 @@ describe('processBankNotifications', () => {
     Currency.fetchLiveExchangeRate.mockResolvedValue({ rate: null, source: 'none' });
     // Location feature off by default — no coordinates attached.
     OperationLocation.captureLocationIfEnabled.mockResolvedValue(null);
+    // Opt-in on by default so the resolve path can reuse a stored fix; the tests
+    // that exercise the off case override this explicitly.
+    OperationLocation.isAttachLocationEnabled.mockResolvedValue(true);
   });
 
   it('does nothing when disabled', async () => {
@@ -203,8 +207,11 @@ describe('processBankNotifications', () => {
         expect.objectContaining({ latitude: '40.1', longitude: '44.2' }));
     });
 
-    it('does not capture a location when nothing is auto-created (all queued)', async () => {
-      // Untrusted source → the notification is queued, not booked, so no fix.
+    it('stores the ingestion-time location on a queued notification', async () => {
+      // Untrusted source → the notification is queued, not booked. The location is
+      // still captured now (near the shop) and stored on the pending row so it is
+      // reused when the user resolves it later.
+      OperationLocation.captureLocationIfEnabled.mockResolvedValue({ latitude: '40.1', longitude: '44.2' });
       NotificationAccess.getRecentNotifications.mockResolvedValue([PURCHASE]);
       AccountsDB.getAccountByCardMask.mockResolvedValue({ id: 7, currency: 'AMD' });
       NotificationRulesDB.getMerchantRule.mockResolvedValue({ categoryId: 'cat-food' });
@@ -213,15 +220,73 @@ describe('processBankNotifications', () => {
       const summary = await pipeline.processBankNotifications();
 
       expect(summary).toEqual({ created: 0, pending: 1, skipped: 0 });
-      expect(OperationLocation.captureLocationIfEnabled).not.toHaveBeenCalled();
+      expect(OperationsDB.createOperation).not.toHaveBeenCalled();
+      expect(PendingNotificationsDB.addPendingNotification).toHaveBeenCalledWith(
+        expect.objectContaining({ latitude: '40.1', longitude: '44.2' }),
+      );
     });
 
-    it('attaches the captured location when resolving a pending notification', async () => {
+    it('queues a notification without coordinates when the feature is off', async () => {
+      OperationLocation.captureLocationIfEnabled.mockResolvedValue(null);
+      NotificationAccess.getRecentNotifications.mockResolvedValue([PURCHASE]);
+      AccountsDB.getAccountByCardMask.mockResolvedValue({ id: 7, currency: 'AMD' });
+      NotificationRulesDB.getMerchantRule.mockResolvedValue({ categoryId: 'cat-food' });
+      PreferencesDB.getJsonPreference.mockImplementation((key) => prefs([], [])(key));
+
+      await pipeline.processBankNotifications();
+
+      const arg = PendingNotificationsDB.addPendingNotification.mock.calls[0][0];
+      expect(arg).not.toHaveProperty('latitude');
+      expect(arg).not.toHaveProperty('longitude');
+    });
+
+    it('reuses the stored ingestion location when resolving a pending notification', async () => {
+      // The live capture would return the (wrong) current location; the stored fix
+      // from ingestion must win so a purchase reviewed at home keeps the shop's place.
+      OperationLocation.captureLocationIfEnabled.mockResolvedValue({ latitude: '55.7', longitude: '37.6' });
+      PendingNotificationsDB.getPendingNotificationById.mockResolvedValue({
+        id: 'p1', type: 'expense', amount: '3900.00', currency: 'AMD',
+        cardMask: '4083***7027', merchant: 'NAREK MEHRABYAN', date: '2026-06-28',
+        accountId: null, categoryId: null, packageName: PKG,
+        latitude: '40.1', longitude: '44.2',
+        createdAt: '2026-06-28T10:15:00.000Z',
+      });
+
+      await pipeline.resolvePendingNotification('p1', { accountId: 7, categoryId: 'cat-food' });
+
+      expect(OperationLocation.captureLocationIfEnabled).not.toHaveBeenCalled();
+      expect(OperationsDB.createOperation).toHaveBeenCalledWith(
+        expect.objectContaining({ latitude: '40.1', longitude: '44.2' }),
+      );
+    });
+
+    it('does not attach a stored location when the feature has since been turned off', async () => {
+      // Coords were captured at the shop while opted in, but the user has since
+      // opted out. Resolving creates a NEW operation, which the toggle governs, so
+      // nothing is attached — not even the stored fix.
+      OperationLocation.isAttachLocationEnabled.mockResolvedValue(false);
+      PendingNotificationsDB.getPendingNotificationById.mockResolvedValue({
+        id: 'p1', type: 'expense', amount: '3900.00', currency: 'AMD',
+        cardMask: '4083***7027', merchant: 'NAREK MEHRABYAN', date: '2026-06-28',
+        accountId: null, categoryId: null, packageName: PKG,
+        latitude: '40.1', longitude: '44.2',
+        createdAt: '2026-06-28T10:15:00.000Z',
+      });
+
+      await pipeline.resolvePendingNotification('p1', { accountId: 7, categoryId: 'cat-food' });
+
+      const arg = OperationsDB.createOperation.mock.calls[0][0];
+      expect(arg).not.toHaveProperty('latitude');
+      expect(arg).not.toHaveProperty('longitude');
+    });
+
+    it('falls back to a live capture when a pending notification carries no stored location', async () => {
       OperationLocation.captureLocationIfEnabled.mockResolvedValue({ latitude: '1.5', longitude: '2.5' });
       PendingNotificationsDB.getPendingNotificationById.mockResolvedValue({
         id: 'p1', type: 'expense', amount: '3900.00', currency: 'AMD',
         cardMask: '4083***7027', merchant: 'NAREK MEHRABYAN', date: '2026-06-28',
         accountId: null, categoryId: null, packageName: PKG,
+        latitude: null, longitude: null,
         createdAt: '2026-06-28T10:15:00.000Z',
       });
 
