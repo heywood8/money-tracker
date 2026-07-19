@@ -186,6 +186,14 @@ const isSchemaComplete = async (rawDb) => {
     // would throw, wiping the category and name bindings from the UI.
     if (!merchantRuleCols.some(c => c.name === 'last_matched_at')) return false;
 
+    // Check pending_notifications has BOTH latitude and longitude (migration 0017).
+    // Both are checked for the same reason as operations' 0009 columns: a
+    // half-applied 0017 (latitude only) must not be mistaken for complete. Without
+    // this check, an install complete through 0016 would skip migrate() and never
+    // gain the columns.
+    const pendingCols = await rawDb.getAllAsync('PRAGMA table_info(pending_notifications)');
+    if (!pendingCols.some(c => c.name === 'latitude') || !pendingCols.some(c => c.name === 'longitude')) return false;
+
     return true;
   } catch (error) {
     console.warn('[DB] isSchemaComplete check failed:', error.message);
@@ -471,6 +479,16 @@ const detectAppliedMigrations = async (rawDb) => {
     const ruleCols = await getColumns('notification_merchant_rules');
     if (ruleCols.some(c => c.name === 'last_matched_at')) {
       applied.push(16);
+    }
+  }
+
+  // Migration 0017: Adds latitude/longitude columns to pending_notifications.
+  // Require BOTH columns — a half-applied 0017 (latitude only) must re-run so the
+  // missing longitude column is added.
+  if (await tableExists('pending_notifications')) {
+    const pnCols = await getColumns('pending_notifications');
+    if (pnCols.some(c => c.name === 'latitude') && pnCols.some(c => c.name === 'longitude')) {
+      applied.push(17);
     }
   }
 

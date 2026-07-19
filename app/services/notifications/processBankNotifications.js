@@ -18,7 +18,7 @@ import * as NotificationRulesDB from '../NotificationRulesDB';
 import * as PendingNotificationsDB from '../PendingNotificationsDB';
 import { serializeLabels, sanitizeLabel } from '../../utils/labelUtils';
 import { appEvents, EVENTS } from '../eventEmitter';
-import { captureLocationIfEnabled, operationLocationFields } from '../operationLocation';
+import { captureLocationIfEnabled, isAttachLocationEnabled, operationLocationFields } from '../operationLocation';
 import { parseBankNotification, kindRequiresCategory } from './parseBankNotification';
 import { resolveNotification } from './resolveNotification';
 import { learnAccountBinding } from './accountBindings';
@@ -40,6 +40,27 @@ const makeLocationProvider = () => {
     }
     return cached;
   };
+};
+
+/**
+ * Location to stamp on an operation booked from a pending notification. Prefers
+ * the fix captured when the notification was ingested (near the shop) so resolving
+ * the item later — e.g. after coming home — doesn't record the current (wrong)
+ * place. Falls back to a live capture for rows that carry no stored fix (queued
+ * before this feature, or ingested with the toggle off).
+ *
+ * Gated on the current opt-in either way: resolving a pending row creates a NEW
+ * operation, and the toggle governs new operations, so a user who has since opted
+ * out gets no location — not even the stored one.
+ * @param {{ latitude?: *, longitude?: * }} pending
+ * @returns {Promise<{ latitude: string, longitude: string }|null>}
+ */
+const resolvePendingLocation = async (pending) => {
+  if (pending && pending.latitude != null && pending.longitude != null) {
+    if (!(await isAttachLocationEnabled())) return null;
+    return { latitude: pending.latitude, longitude: pending.longitude };
+  }
+  return captureLocationIfEnabled();
 };
 
 // Cap on remembered signatures. The native side only ever keeps a handful of
@@ -377,6 +398,10 @@ const bookExpenseOrQueue = async (descriptor, resolution, date, allowedPackages,
       }
     }
   } else {
+    // Capture the location NOW (at ingestion, near the shop) and store it on the
+    // pending row, so resolving the item later — e.g. after coming home — stamps
+    // the operation with where the purchase happened, not the current location.
+    const location = getLocation ? await getLocation() : null;
     await PendingNotificationsDB.addPendingNotification({
       ...descriptor,
       date,
@@ -389,6 +414,7 @@ const bookExpenseOrQueue = async (descriptor, resolution, date, allowedPackages,
       // away a binding the user already trained — forcing them to re-pick it on
       // every notification even though it shows up in the bindings list.
       categoryId: resolution.categoryId,
+      ...operationLocationFields(location),
     });
     summary.pending += 1;
   }
@@ -456,12 +482,16 @@ const bookTransferOrQueue = async (descriptor, resolution, date, allowedPackages
     });
     summary.created += 1;
   } else {
+    // Capture the location NOW (at ingestion, near the ATM) and store it on the
+    // pending row, mirroring the expense/income queue path.
+    const location = getLocation ? await getLocation() : null;
     await PendingNotificationsDB.addPendingNotification({
       ...descriptor,
       date,
       accountId: resolution.accountId,
       // Transfers carry no category; the target account is chosen at review time.
       categoryId: null,
+      ...operationLocationFields(location),
     });
     summary.pending += 1;
   }
@@ -637,8 +667,9 @@ export const resolvePendingNotification = async (pendingId, choices = {}) => {
     };
   }
 
-  // Best-effort location for this user-driven save (attached only when enabled).
-  const location = await captureLocationIfEnabled();
+  // Prefer the fix captured at ingestion (near the shop); fall back to a live,
+  // opt-in-gated capture only when the pending row carries no stored coordinates.
+  const location = await resolvePendingLocation(pending);
 
   const operation = await OperationsDB.createOperation({
     type: pending.type,
@@ -805,8 +836,9 @@ const resolvePendingTransfer = async (pending, choices = {}) => {
   const typedLabel = sanitizeLabel(choices.labelOverride);
   const label = typedLabel || pending.merchant;
 
-  // Best-effort location for this user-driven save (attached only when enabled).
-  const location = await captureLocationIfEnabled();
+  // Prefer the fix captured at ingestion (near the ATM); fall back to a live,
+  // opt-in-gated capture only when the pending row carries no stored coordinates.
+  const location = await resolvePendingLocation(pending);
 
   const operation = await OperationsDB.createOperation({
     type: 'transfer',
