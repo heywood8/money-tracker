@@ -241,6 +241,8 @@
   "income_label": "Einnahme",
   "transfer_label": "Überweisung",
   "edit_operation_hint": "Doppeltippen, um diesen Vorgang zu bearbeiten",
+  "operation_row_hint": "Doppeltippen zum Bearbeiten, lange drücken für weitere Aktionen",
+  "repeat": "Wiederholen",
   "delete_operation_accessibility": "Vorgang löschen",
   "delete_hint": "Doppeltippen zum Löschen. Sie werden um Bestätigung gebeten.",
   "select_date": "Datum auswählen",

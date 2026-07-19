@@ -241,6 +241,8 @@
   "income_label": "Income",
   "transfer_label": "Transfer",
   "edit_operation_hint": "Double tap to edit this operation",
+  "operation_row_hint": "Double tap to edit, long press for more actions",
+  "repeat": "Repeat",
   "delete_operation_accessibility": "Delete operation",
   "delete_hint": "Double tap to delete. You will be asked to confirm.",
   "select_date": "Select Date",

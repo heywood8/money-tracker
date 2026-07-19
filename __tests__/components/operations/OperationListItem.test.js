@@ -278,8 +278,26 @@ describe('OperationListItem', () => {
         <OperationListItem {...baseProps} />,
       );
       expect(
-        getByA11yHint('edit_operation_hint'),
+        getByA11yHint('operation_row_hint'),
       ).toBeTruthy();
+    });
+  });
+
+  describe('Long press', () => {
+    it('calls onLongPress when the row is long pressed', async () => {
+      const onLongPress = jest.fn();
+      const { getByTestId } = await render(
+        <OperationListItem {...baseProps} testID="op-row" onLongPress={onLongPress} />,
+      );
+      fireEvent(getByTestId('op-row'), 'longPress');
+      expect(onLongPress).toHaveBeenCalledTimes(1);
+    });
+
+    it('does not throw when onLongPress is omitted', async () => {
+      const { getByTestId } = await render(
+        <OperationListItem {...baseProps} testID="op-row" />,
+      );
+      expect(() => fireEvent(getByTestId('op-row'), 'longPress')).not.toThrow();
     });
   });
 

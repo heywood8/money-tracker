@@ -241,6 +241,8 @@
   "income_label": "Ingreso",
   "transfer_label": "Transferencia",
   "edit_operation_hint": "Doble toque para editar esta operación",
+  "operation_row_hint": "Doble toque para editar, mantén pulsado para más acciones",
+  "repeat": "Repetir",
   "delete_operation_accessibility": "Eliminar operación",
   "delete_hint": "Doble toque para eliminar. Se le pedirá confirmación.",
   "select_date": "Seleccionar fecha",

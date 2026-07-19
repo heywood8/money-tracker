@@ -68,6 +68,7 @@ const OperationsList = forwardRef(({
   hasMoreOperations = false,
   onLoadMore,
   onEditOperation,
+  onLongPressOperation = NOOP,
   onDateSeparatorPress,
   onScroll = NOOP,
   onScrollToIndexFailed = NOOP,
@@ -336,13 +337,14 @@ const OperationsList = forwardRef(({
           formatCurrency={formatCurrency}
           isLast={isLast}
           onPress={() => onEditOperation(item)}
+          onLongPress={() => onLongPressOperation(item)}
           suggestionChips={item.id === pendingSuggestionId ? pendingSuggestions : null}
           onApplySuggestion={onApplySuggestion}
           onDismissSuggestion={onDismissSuggestion}
         />
       </View>
     );
-  }, [colors, t, categories, getCategoryInfo, getAccountName, formatCurrency, onEditOperation, pendingSuggestionId, pendingSuggestions, onApplySuggestion, onDismissSuggestion]);
+  }, [colors, t, categories, getCategoryInfo, getAccountName, formatCurrency, onEditOperation, onLongPressOperation, pendingSuggestionId, pendingSuggestions, onApplySuggestion, onDismissSuggestion]);
 
   const keyExtractor = useCallback((item) => item.id, []);
 
@@ -454,6 +456,7 @@ OperationsList.propTypes = {
   hasMoreOperations: PropTypes.bool,
   onLoadMore: PropTypes.func.isRequired,
   onEditOperation: PropTypes.func.isRequired,
+  onLongPressOperation: PropTypes.func,
   onDateSeparatorPress: PropTypes.func.isRequired,
   onScroll: PropTypes.func,
   onScrollToIndexFailed: PropTypes.func,

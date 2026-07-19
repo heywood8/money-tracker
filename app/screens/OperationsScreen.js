@@ -482,6 +482,66 @@ const OperationsScreen = () => {
     );
   }, [t, showDialog, deleteOperation]);
 
+  // Duplicate an existing operation onto today — a one-tap "log this again" for
+  // recurring daily entries. All money-bearing fields (amount, accounts,
+  // exchange-rate metadata, exclude-from-average flag) are copied verbatim; only
+  // the date is re-stamped to today and location is dropped (a repeat happens
+  // here-and-now, so stale coordinates would be misleading). Reuses the same undo
+  // affordance as a normal quick-add.
+  const handleRepeatOperation = useCallback(async (operation) => {
+    const duplicate = {
+      type: operation.type,
+      amount: operation.amount,
+      accountId: operation.accountId,
+      categoryId: operation.categoryId,
+      toAccountId: operation.toAccountId,
+      date: toDateString(new Date()),
+      description: operation.description,
+      exchangeRate: operation.exchangeRate,
+      destinationAmount: operation.destinationAmount,
+      sourceCurrency: operation.sourceCurrency,
+      destinationCurrency: operation.destinationCurrency,
+      excludeFromAvg: operation.excludeFromAvg,
+    };
+
+    try {
+      const createdOperation = await addOperation(duplicate);
+      if (createdOperation?.id) {
+        undoTokenRef.current += 1;
+        setUndoInfo({ id: createdOperation.id, token: undoTokenRef.current });
+      }
+    } catch (error) {
+      // addOperation already surfaces failures via dialog.
+    }
+  }, [addOperation]);
+
+  // Long-press on a row opens a quick-action menu, mirroring the planned-ops
+  // convention (showDialog). Edit repeats the tap behaviour; Repeat and Delete are
+  // the shortcuts QoL-7 adds so deleting/duplicating no longer costs a trip through
+  // the full edit modal.
+  const handleLongPressOperation = useCallback((operation) => {
+    const isTransfer = operation.type === 'transfer';
+    const category = categories.find(cat => cat.id === operation.categoryId);
+    const label = isTransfer
+      ? t('transfer')
+      : (category ? (category.nameKey ? t(category.nameKey) : category.name) : '');
+
+    showDialog(
+      t('select_action'),
+      label,
+      [
+        { text: t('edit'), onPress: () => handleEditOperation(operation) },
+        { text: t('repeat'), onPress: () => handleRepeatOperation(operation) },
+        {
+          text: t('delete'),
+          style: 'destructive',
+          onPress: () => handleDeleteOperation(operation),
+        },
+        { text: t('cancel'), style: 'cancel' },
+      ],
+    );
+  }, [showDialog, t, categories, handleEditOperation, handleRepeatOperation, handleDeleteOperation]);
+
   const handleDateSeparatorPress = useCallback((dateString) => {
     // Parse the date and set it as the selected date (T00:00:00 anchors the bare
     // YYYY-MM-DD string to local midnight; bare strings parse as UTC and open the
@@ -1074,6 +1134,7 @@ const OperationsScreen = () => {
         hasMoreOperations={hasMoreOperations}
         onLoadMore={loadMoreOperations}
         onEditOperation={handleEditOperation}
+        onLongPressOperation={handleLongPressOperation}
         onDateSeparatorPress={handleDateSeparatorPress}
         onScroll={handleScroll}
         onScrollToIndexFailed={handleScrollToIndexFailed}

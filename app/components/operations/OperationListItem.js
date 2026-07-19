@@ -28,6 +28,7 @@ const OperationListItem = ({
   formatCurrency,
   isLast = false,
   onPress,
+  onLongPress = () => {},
   testID,
   suggestionChips = null,
   onApplySuggestion = () => {},
@@ -109,11 +110,12 @@ const OperationListItem = ({
       <TouchableRipple
         testID={testID}
         onPress={isPending ? undefined : onPress}
+        onLongPress={isPending ? undefined : onLongPress}
         disabled={isPending}
         rippleColor="rgba(0, 0, 0, .08)"
         accessibilityRole="button"
         accessibilityLabel={accessibilityLabel}
-        accessibilityHint={t('edit_operation_hint')}
+        accessibilityHint={t('operation_row_hint')}
         accessibilityState={{ disabled: isPending, busy: isPending }}
       >
         <View style={[styles.row, isPending && styles.rowPending]}>
@@ -217,6 +219,7 @@ OperationListItem.propTypes = {
   formatCurrency: PropTypes.func.isRequired,
   isLast: PropTypes.bool,
   onPress: PropTypes.func.isRequired,
+  onLongPress: PropTypes.func,
   testID: PropTypes.string,
   suggestionChips: PropTypes.arrayOf(PropTypes.string),
   onApplySuggestion: PropTypes.func,
