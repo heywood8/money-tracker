@@ -12,10 +12,16 @@ import { useUpdateDownload } from '../contexts/UpdateDownloadContext';
 import { useSqliteFileImport } from '../hooks/useSqliteFileImport';
 import useNotificationResponseRouter from '../hooks/useNotificationResponseRouter';
 import { syncBackgroundBankTaskRegistrationAsync } from '../services/notifications/backgroundBankTask';
+import { useAppBlur } from '../contexts/AppBlurContext';
+import { getPreference, setPreference, PREF_KEYS } from '../services/PreferencesDB';
 import UpdateAvailableModal from '../modals/UpdateAvailableModal';
 
 // Poll for a newer release this often while the app is open and in the foreground.
 const UPDATE_CHECK_INTERVAL_MS = 60 * 1000;
+
+// How long "Later" silences a specific version across app restarts. A newer version
+// bypasses the snooze; the same version stays quiet until this window elapses.
+const UPDATE_SNOOZE_MS = 24 * 60 * 60 * 1000;
 
 /**
  * AppInitializer handles first-time setup and app initialization
@@ -26,18 +32,29 @@ const AppInitializer = () => {
   const { colors } = useThemeColors();
   const { showDialog } = useDialog();
   const { startDownload, isDownloading } = useUpdateDownload();
+  const { blurCount } = useAppBlur();
   const [isInitializing, setIsInitializing] = useState(false);
   const [pendingUpdate, setPendingUpdate] = useState(null);
 
   // Versions the user has already dealt with this session (dismissed or chose to install).
-  // Held in a ref, not persisted, so the suppression clears on app restart — exactly
-  // "don't prompt again for this version until the user restarts the app".
+  // Held in a ref for the session; "Later" additionally persists a time-boxed snooze
+  // (persistedSnoozeRef) so the same version stays quiet across app restarts.
   const dismissedVersionsRef = useRef(new Set());
+  // Persisted "remind me later" state loaded on mount: { version, skipUntil (ISO) }.
+  // A prompt is suppressed while the latest version matches and now < skipUntil.
+  const persistedSnoozeRef = useRef({ version: null, skipUntil: null });
+  // Resolves once the persisted snooze has been read. runUpdateCheck awaits this before
+  // deciding to prompt, so the very first (cold-start) check can't re-nag a deferred version
+  // by racing ahead of the DB read.
+  const snoozeLoadedRef = useRef(null);
   // Latest-value mirrors read inside the long-lived interval callback, so its closure
   // never acts on stale state.
   const pendingUpdateRef = useRef(null);
   const isDownloadingRef = useRef(false);
   const isCheckingRef = useRef(false);
+  // Whether any blur-backed modal (operation editor, pickers, dialogs) is open. The update
+  // prompt must not pop over an in-progress task, so we hold off while this is set.
+  const blurCountRef = useRef(0);
 
   useEffect(() => {
     pendingUpdateRef.current = pendingUpdate;
@@ -46,6 +63,30 @@ const AppInitializer = () => {
   useEffect(() => {
     isDownloadingRef.current = isDownloading;
   }, [isDownloading]);
+
+  useEffect(() => {
+    blurCountRef.current = blurCount;
+  }, [blurCount]);
+
+  // Load the persisted "Later" snooze once so a restart within the snooze window doesn't
+  // re-nag for a version the user already deferred.
+  useEffect(() => {
+    let cancelled = false;
+    snoozeLoadedRef.current = (async () => {
+      try {
+        const [version, skipUntil] = await Promise.all([
+          getPreference(PREF_KEYS.UPDATE_LAST_PROMPTED_VERSION),
+          getPreference(PREF_KEYS.UPDATE_SKIP_UNTIL),
+        ]);
+        if (!cancelled) {
+          persistedSnoozeRef.current = { version: version || null, skipUntil: skipUntil || null };
+        }
+      } catch (error) {
+        console.warn('[AppInitializer] Failed to load update snooze:', error);
+      }
+    })();
+    return () => { cancelled = true; };
+  }, []);
 
   // Handle SQLite/backup files opened with the app (Android ACTION_VIEW).
   // Disabled during first launch so the import warning doesn't appear before
@@ -75,9 +116,10 @@ const AppInitializer = () => {
     let cancelled = false;
 
     const runUpdateCheck = async () => {
-      // Never stack work or prompts: skip while a check is already running, a download is
-      // in progress, or the update dialog is already on screen.
-      if (isCheckingRef.current || isDownloadingRef.current || pendingUpdateRef.current) {
+      // Never stack work or prompts, and never pop over an open task: skip while a check is
+      // already running, a download is in progress, the update dialog is already on screen,
+      // or a blur-backed modal (operation editor, picker, dialog) is open.
+      if (isCheckingRef.current || isDownloadingRef.current || pendingUpdateRef.current || blurCountRef.current > 0) {
         return;
       }
       isCheckingRef.current = true;
@@ -90,8 +132,21 @@ const AppInitializer = () => {
         if (dismissedVersionsRef.current.has(result.latestVersion)) {
           return;
         }
+        // Make sure the persisted snooze has been read before deciding — otherwise the first
+        // cold-start check could race ahead of the DB read and re-nag a deferred version.
+        if (snoozeLoadedRef.current) {
+          await snoozeLoadedRef.current;
+          if (cancelled) return;
+        }
+        // Respect a persisted "Later": same version still inside its snooze window stays quiet
+        // even across restarts. A newer version has a different value and prompts as usual.
+        const snooze = persistedSnoozeRef.current;
+        if (snooze.version === result.latestVersion && snooze.skipUntil
+          && new Date().toISOString() < snooze.skipUntil) {
+          return;
+        }
         // Guard again: state may have changed while the network request was in flight.
-        if (pendingUpdateRef.current || isDownloadingRef.current) {
+        if (pendingUpdateRef.current || isDownloadingRef.current || blurCountRef.current > 0) {
           return;
         }
         setPendingUpdate({
@@ -165,10 +220,17 @@ const AppInitializer = () => {
   }, [isFirstLaunch]);
 
   const handleUpdateDismiss = useCallback(() => {
-    // Silence this version until the app restarts. dismissedVersionsRef is in-memory only,
-    // so relaunching the app clears it and the update can be suggested again.
-    if (pendingUpdate?.latestVersion) {
-      dismissedVersionsRef.current.add(pendingUpdate.latestVersion);
+    // "Later" silences this version for the session and, persisted, across restarts for
+    // UPDATE_SNOOZE_MS. A newer release still prompts because it carries a different version.
+    const version = pendingUpdate?.latestVersion;
+    if (version) {
+      dismissedVersionsRef.current.add(version);
+      const skipUntil = new Date(Date.now() + UPDATE_SNOOZE_MS).toISOString();
+      persistedSnoozeRef.current = { version, skipUntil };
+      setPreference(PREF_KEYS.UPDATE_LAST_PROMPTED_VERSION, version).catch((error) => {
+        console.warn('[AppInitializer] Failed to persist update snooze:', error);
+      });
+      setPreference(PREF_KEYS.UPDATE_SKIP_UNTIL, skipUntil).catch(() => {});
     }
     setPendingUpdate(null);
   }, [pendingUpdate]);
