@@ -62,9 +62,10 @@ Findings from a code-level UX audit. Each item is small-scope (no major rework) 
 **Fix**: placeholder text for year-view balance card, top-level `EmptyState` when no visible accounts, init `loading: true`.
 
 ### QoL-12. QuickAdd validation feedback is inconsistent
-**Status**: Not Started
+**Status**: ✅ Completed
 **Problem**: a missing category gets a lightweight non-blocking red flash, but a missing account / zero amount / same-account transfer pops a blocking dialog needing an extra OK tap (`OperationsScreen.js:618-626`).
 **Fix**: extend the flash/inline treatment to the other one-field omissions.
+**Implementation**: `handleQuickAdd` now maps each single-field validation failure to the offending field via `getQuickAddFlashField` and flashes it red inline instead of opening a dialog. The category-only `flashCategoryError` prop was generalized to `flashError={{ field, token }}`, threaded through `QuickAddForm` → `OperationFormFields`, which flashes the source-account picker, target-account picker/chips, category chips, or the `Calculator` amount display (new `flashError` bool → red display border). The blocking dialog remains only for non-field errors (missing type/date). Same behaviour is unchanged in `OperationModal` (no `flashError` passed).
 
 ### QoL-13. Settings polish (small items)
 **Status**: Not Started
