@@ -7,10 +7,9 @@ This document contains potential features for the Penny app. Use the architect a
 
 Findings from a code-level UX audit. Each item is small-scope (no major rework) and user-visible. Items marked **[verified]** were confirmed against the code by hand; the rest carry file:line evidence from the audit agents.
 
-### QoL-1. Wire the Budgets feature into the UI ⭐ biggest win
-**Status**: Not Started · **[verified]**
-**Problem**: Budgets are fully implemented and tested (`BudgetModal.js`, `BudgetProgressBar.js`, `BudgetsContext` + DB + validation + rollover), and `BudgetsProvider` is mounted in `App.js:85` — but nothing imports `BudgetModal`/`BudgetProgressBar` and no screen calls the budget actions. The feature is unreachable by any tap sequence.
-**Fix**: add entry points — e.g. a "Set budget" action on category long-press / edit form in `CategoriesScreen`, and render `BudgetProgressBar` in `CategorySpendingCard` or the categories grid. Also: `BudgetModal.js:540` has a hardcoded untranslated string — run through `t()` when wiring up.
+### QoL-1. Budgets — dormant by design, do NOT wire up
+**Status**: ❄️ Won't do (intentional)
+**Note**: budgets are fully implemented in code (`BudgetModal.js`, `BudgetProgressBar.js`, contexts, DB, tests) but the UI entry points were deliberately removed by the owner — the feature is dormant on purpose, not an oversight. Don't propose re-surfacing it. If it ever comes back: `BudgetModal.js:540` has a hardcoded untranslated string to fix.
 
 ### QoL-2. Split operation parses decimal comma wrong (bug)
 **Status**: Not Started · **[verified]**
@@ -88,10 +87,9 @@ Findings from a code-level UX audit. Each item is small-scope (no major rework) 
 ## High Priority Features
 
 ### 1. Budget Tracking
-**Status**: ⚠️ Code complete, NOT reachable from UI — see QoL-1
+**Status**: ❄️ Dormant by design — code complete, UI entry points intentionally removed (see QoL-1)
 **Description**: Allow users to set monthly budgets per category and track spending against those budgets.
 **User Value**: Helps users control spending and achieve financial goals.
-**Note (2026-07-19 audit)**: modal, progress bar, contexts, DB layer and tests all exist and `BudgetsProvider` is mounted, but no screen exposes any entry point. The remaining work is UI wiring only.
 
 ### 2. Data Export/Import
 **Status**: ✅ Completed
