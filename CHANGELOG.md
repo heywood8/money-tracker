@@ -1,5 +1,12 @@
 # Changelog
 
+## [0.200.0](https://github.com/heywood8/money-tracker/compare/penny-v0.199.1...penny-v0.200.0) (2026-07-19)
+
+
+### Features
+
+* **notifications:** persist ingestion location on pending notifications ([#1268](https://github.com/heywood8/money-tracker/issues/1268)) ([82f9d1d](https://github.com/heywood8/money-tracker/commit/82f9d1d12b69df2d293afe891737dc6c37afc653))
+
 ## [0.199.1](https://github.com/heywood8/money-tracker/compare/penny-v0.199.0...penny-v0.199.1) (2026-07-17)
 
 
