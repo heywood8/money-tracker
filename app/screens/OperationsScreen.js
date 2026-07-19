@@ -16,6 +16,7 @@ import { setLastAccessedAccount } from '../services/LastAccount';
 import { formatDate as toDateString } from '../services/BalanceHistoryDB';
 import { getDistinctLabels } from '../services/OperationsDB';
 import { parseLabels, serializeLabels, addLabel, hasLabel } from '../utils/labelUtils';
+import { buildRepeatedOperation } from '../utils/operationUtils';
 import OperationModal from '../modals/OperationModal';
 import Calculator from '../components/Calculator';
 import ListCard from '../components/ListCard';
@@ -489,20 +490,7 @@ const OperationsScreen = () => {
   // here-and-now, so stale coordinates would be misleading). Reuses the same undo
   // affordance as a normal quick-add.
   const handleRepeatOperation = useCallback(async (operation) => {
-    const duplicate = {
-      type: operation.type,
-      amount: operation.amount,
-      accountId: operation.accountId,
-      categoryId: operation.categoryId,
-      toAccountId: operation.toAccountId,
-      date: toDateString(new Date()),
-      description: operation.description,
-      exchangeRate: operation.exchangeRate,
-      destinationAmount: operation.destinationAmount,
-      sourceCurrency: operation.sourceCurrency,
-      destinationCurrency: operation.destinationCurrency,
-      excludeFromAvg: operation.excludeFromAvg,
-    };
+    const duplicate = buildRepeatedOperation(operation, toDateString(new Date()));
 
     try {
       const createdOperation = await addOperation(duplicate);

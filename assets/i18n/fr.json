@@ -240,7 +240,6 @@
   "expense_label": "Dépense",
   "income_label": "Revenu",
   "transfer_label": "Virement",
-  "edit_operation_hint": "Appuyez deux fois pour modifier cette opération",
   "operation_row_hint": "Appuyez deux fois pour modifier, appui long pour plus d'actions",
   "repeat": "Répéter",
   "delete_operation_accessibility": "Supprimer l'opération",

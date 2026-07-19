@@ -240,7 +240,6 @@
   "expense_label": "支出",
   "income_label": "収入",
   "transfer_label": "振替",
-  "edit_operation_hint": "ダブルタップしてこの取引を編集",
   "operation_row_hint": "ダブルタップで編集、長押しでその他の操作",
   "repeat": "繰り返す",
   "delete_operation_accessibility": "取引を削除",

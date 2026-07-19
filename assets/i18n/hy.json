@@ -240,7 +240,6 @@
   "expense_label": "Ծախս",
   "income_label": "Եկամուտ",
   "transfer_label": "Փոխանցում",
-  "edit_operation_hint": "Կրկնակի սեղմեք՝ խմբագրելու այս գործարքը",
   "operation_row_hint": "Կրկնակի սեղմեք՝ խմբագրելու, երկար սեղմեք՝ այլ գործողությունների համար",
   "repeat": "Կրկնել",
   "delete_operation_accessibility": "Ջնջել գործարքը",
