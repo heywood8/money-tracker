@@ -4,15 +4,23 @@
  */
 
 import React from 'react';
-import { render } from '@testing-library/react-native';
+import { render, fireEvent, waitFor } from '@testing-library/react-native';
 import PropTypes from 'prop-types';
 
 // Mock all dependencies
 jest.mock('react-native-paper', () => {
   const React = require('react');
-  const { View, Text, TouchableOpacity, ActivityIndicator } = require('react-native');
+  const { View, Text, TouchableOpacity, ActivityIndicator, TextInput: RNTextInput } = require('react-native');
   const PropTypes = require('prop-types');
-  
+
+  const TextInput = ({ value, onChangeText, placeholder, ...props }) =>
+    React.createElement(RNTextInput, { value, onChangeText, placeholder, ...props });
+  TextInput.propTypes = {
+    value: PropTypes.string,
+    onChangeText: PropTypes.func,
+    placeholder: PropTypes.string,
+  };
+
   const FAB = ({ onPress, icon, label, ...props }) => React.createElement(TouchableOpacity, { onPress, testID: 'fab', ...props });
   FAB.propTypes = {
     onPress: PropTypes.func,
@@ -37,6 +45,7 @@ jest.mock('react-native-paper', () => {
 
   return {
     Text: Text,
+    TextInput,
     FAB,
     ActivityIndicator: ActivityIndicator,
     Card,
@@ -365,6 +374,63 @@ describe('CategoriesScreen', () => {
       });
 
       await render(<CategoriesScreen />);
+    });
+  });
+
+  describe('QoL-5: new category inherits the browsed folder', () => {
+    const buildContext = (addCategory) => {
+      const folder = { id: 'f1', name: 'Salary', type: 'folder', icon: 'folder', category_type: 'income' };
+      const child = { id: 'c1', name: 'Bonus', type: 'entry', parentId: 'f1', category_type: 'income' };
+      return {
+        categories: [folder, child],
+        loading: false,
+        getChildren: jest.fn((id) => (id === 'f1' ? [child] : [])),
+        addCategory,
+        updateCategory: jest.fn(),
+        deleteCategory: jest.fn(),
+        validateCategory: jest.fn(() => null),
+      };
+    };
+
+    it('defaults parentId and category_type to the open folder', async () => {
+      const CategoriesScreen = require('../../app/screens/CategoriesScreen').default;
+      const { useCategories } = require('../../app/contexts/CategoriesContext');
+      const addCategory = jest.fn();
+      useCategories.mockReturnValue(buildContext(addCategory));
+
+      const { getByLabelText, getByTestId, getByText } = await render(<CategoriesScreen />);
+
+      // Navigate into the "Salary" folder (income) — wait for the child grid to
+      // settle before opening the add form (state flush is deferred by an effect).
+      fireEvent.press(getByLabelText('Salary category'));
+      await waitFor(() => getByText('Bonus'));
+
+      fireEvent.press(getByTestId('categories-add-fab'));
+      await waitFor(() => getByText('save'));
+      fireEvent.press(getByText('save'));
+
+      expect(addCategory).toHaveBeenCalledWith(
+        expect.objectContaining({ parentId: 'f1', category_type: 'income' }),
+      );
+    });
+
+    it('keeps root default (parentId null) when not inside a folder', async () => {
+      const CategoriesScreen = require('../../app/screens/CategoriesScreen').default;
+      const { useCategories } = require('../../app/contexts/CategoriesContext');
+      const addCategory = jest.fn();
+      useCategories.mockReturnValue(buildContext(addCategory));
+
+      const { getByTestId, getByText } = await render(<CategoriesScreen />);
+
+      // Add from the root grid — no folder open.
+      fireEvent.press(getByTestId('categories-add-fab'));
+
+      await waitFor(() => getByText('save'));
+      fireEvent.press(getByText('save'));
+
+      expect(addCategory).toHaveBeenCalledWith(
+        expect.objectContaining({ parentId: null, category_type: 'expense' }),
+      );
     });
   });
 

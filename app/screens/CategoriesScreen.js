@@ -82,7 +82,20 @@ const CategoriesScreen = ({ onBackStateChange }) => {
       setFormIsNew(false);
       setFormEditingCategory(category);
     } else {
-      setFormValues(DEFAULT_FORM_VALUES);
+      // Creating a new category while browsing inside a folder: default the
+      // parent to the open folder instead of the root, and inherit its
+      // category_type so the parent picker (filtered by category_type) stays
+      // consistent with the pre-filled parent.
+      const parentFolder = gridParentId
+        ? categories.find(c => c.id === gridParentId)
+        : null;
+      setFormValues({
+        ...DEFAULT_FORM_VALUES,
+        parentId: gridParentId,
+        category_type: parentFolder
+          ? (parentFolder.category_type || parentFolder.categoryType || DEFAULT_FORM_VALUES.category_type)
+          : DEFAULT_FORM_VALUES.category_type,
+      });
       setFormIsNew(true);
       setFormEditingCategory(null);
     }
@@ -92,7 +105,7 @@ const CategoriesScreen = ({ onBackStateChange }) => {
       Animated.timing(listAnim, { toValue: 1, duration: 200, easing: Easing.in(Easing.quad), useNativeDriver: true }),
       Animated.timing(formAnim, { toValue: 1, duration: 260, easing: Easing.out(Easing.cubic), useNativeDriver: true }),
     ]).start();
-  }, [listAnim, formAnim]);
+  }, [listAnim, formAnim, gridParentId, categories]);
 
   const closeForm = useCallback(() => {
     Keyboard.dismiss();
