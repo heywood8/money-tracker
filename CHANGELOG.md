@@ -1,5 +1,12 @@
 # Changelog
 
+## [0.204.0](https://github.com/heywood8/money-tracker/compare/penny-v0.203.0...penny-v0.204.0) (2026-07-20)
+
+
+### Features
+
+* **operations:** lift row + icon action bar on long-press ([#1281](https://github.com/heywood8/money-tracker/issues/1281)) ([e8f027e](https://github.com/heywood8/money-tracker/commit/e8f027ee67fbb8d74677a041a19fc91efb07093e))
+
 ## [0.203.0](https://github.com/heywood8/money-tracker/compare/penny-v0.202.0...penny-v0.203.0) (2026-07-20)
 
 
