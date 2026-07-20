@@ -12,6 +12,7 @@ import { getAllCategories } from '../services/CategoriesDB';
 import { appEvents, EVENTS } from '../services/eventEmitter';
 import { formatAmount } from '../services/currency';
 import currenciesJson from '../../assets/currencies.json';
+import EmptyState from '../components/EmptyState';
 import BalanceHistoryCard from '../components/graphs/BalanceHistoryCard';
 import CategorySpendingCard from '../components/graphs/CategorySpendingCard';
 import ExpenseSummaryCard from '../components/graphs/ExpenseSummaryCard';
@@ -788,31 +789,42 @@ const GraphsScreen = () => {
             </Animated.View>
           </View>
 
-          {/* Balance History Card */}
-          {selectedMonth !== null && selectedAccount && (
-            <BalanceHistoryCard
-              colors={colors}
-              t={t}
-              selectedAccount={selectedAccount}
-              onAccountChange={setSelectedAccount}
-              accountItems={accountItems}
-              loadingBalanceHistory={loadingBalanceHistory}
-              balanceHistoryData={balanceHistoryData}
-              selectedYear={selectedYear}
-              selectedMonth={selectedMonth}
-              accounts={accounts}
-              spendingPrediction={spendingPrediction}
-              isCurrentMonth={isCurrentMonth}
-              closeLabel={t('close')}
-              onShowCalendar={handleShowCalendar}
-              balanceHistoryTableData={balanceHistoryTableData}
-              editingBalanceValue={editingBalanceValue}
-              onEditingBalanceValueChange={setEditingBalanceValue}
-              onEditBalance={handleEditBalance}
-              onCancelEdit={handleCancelEdit}
-              onSaveBalance={handleSaveBalance}
-              onDeleteBalance={handleDeleteBalance}
-            />
+          {/* Balance History Card — shown for a specific month. When no account is
+              available, render an explicit empty state instead of silently dropping
+              the card, so the user sees an explanation rather than a blank gap
+              (QoL-11). Full-year selection intentionally omits this monthly card. */}
+          {selectedMonth !== null && (
+            selectedAccount ? (
+              <BalanceHistoryCard
+                colors={colors}
+                t={t}
+                selectedAccount={selectedAccount}
+                onAccountChange={setSelectedAccount}
+                accountItems={accountItems}
+                loadingBalanceHistory={loadingBalanceHistory}
+                balanceHistoryData={balanceHistoryData}
+                selectedYear={selectedYear}
+                selectedMonth={selectedMonth}
+                accounts={accounts}
+                spendingPrediction={spendingPrediction}
+                isCurrentMonth={isCurrentMonth}
+                closeLabel={t('close')}
+                onShowCalendar={handleShowCalendar}
+                balanceHistoryTableData={balanceHistoryTableData}
+                editingBalanceValue={editingBalanceValue}
+                onEditingBalanceValueChange={setEditingBalanceValue}
+                onEditBalance={handleEditBalance}
+                onCancelEdit={handleCancelEdit}
+                onSaveBalance={handleSaveBalance}
+                onDeleteBalance={handleDeleteBalance}
+              />
+            ) : (
+              <EmptyState
+                icon="chart-line-variant"
+                message={t('no_balance_history')}
+                testID="balance-history-empty"
+              />
+            )
           )}
 
           {/* Category Spending Trend Card - Last 12 Months */}

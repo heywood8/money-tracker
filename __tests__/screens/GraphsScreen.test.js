@@ -791,4 +791,32 @@ describe('GraphsScreen', () => {
       expect(getByTestId('expense-summary-card')).toBeTruthy();
     });
   });
+
+  describe('Balance History Empty State (QoL-11)', () => {
+    it('renders an empty state instead of silently hiding the balance card when no account is available', async () => {
+      const GraphsScreen = require('../../app/screens/GraphsScreen').default;
+      const { useAccountsData } = require('../../app/contexts/AccountsDataContext');
+
+      // No accounts → selectedAccount stays null while a specific month is selected
+      // by default. The balance region must explain the absence rather than vanish.
+      useAccountsData.mockReturnValue({ accounts: [] });
+
+      const { getByTestId } = await render(<GraphsScreen />);
+
+      expect(getByTestId('balance-history-empty')).toBeTruthy();
+    });
+
+    it('renders the balance card (not the empty state) when an account is available', async () => {
+      const GraphsScreen = require('../../app/screens/GraphsScreen').default;
+      const { useAccountsData } = require('../../app/contexts/AccountsDataContext');
+
+      useAccountsData.mockReturnValue({
+        accounts: [{ id: 'acc-1', name: 'Cash', currency: 'USD', balance: '100.00', displayOrder: 0 }],
+      });
+
+      const { queryByTestId } = await render(<GraphsScreen />);
+
+      expect(queryByTestId('balance-history-empty')).toBeNull();
+    });
+  });
 });

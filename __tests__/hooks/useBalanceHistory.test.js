@@ -39,16 +39,30 @@ describe('useBalanceHistory', () => {
   });
 
   describe('Initialization', () => {
-    it('should initialize with default state', async () => {
+    it('should initialize in the loading state', async () => {
       const { result } = await renderHook(() => useBalanceHistory(mockAccountId, mockYear, mockMonth));
 
       expect(result.current.balanceHistoryData).toEqual({ labels: [] });
-      // loading starts false — the mount spinner was removed in #933 to avoid
-      // a loading flash on the Graphs screen; load() flips it true on demand.
-      expect(result.current.loadingBalanceHistory).toBe(false);
+      // loading starts true so the Graphs screen shows a spinner on first render
+      // instead of a "no data" flash before loadBalanceHistory() runs (QoL-11).
+      // The early-return in loadBalanceHistory() resets this to false when no
+      // account/month is selected, so "nothing selected" stays a valid empty state.
+      expect(result.current.loadingBalanceHistory).toBe(true);
       expect(result.current.balanceHistoryTableData).toEqual([]);
       expect(result.current.editingBalanceRow).toBeNull();
       expect(result.current.editingBalanceValue).toBe('');
+    });
+
+    it('resets loading to false via early-return when no account is selected', async () => {
+      // Guard against an "eternal spinner": with loading initialized to true, the
+      // early-return path must flip it back to false so the empty state shows.
+      const { result } = await renderHook(() => useBalanceHistory(null, mockYear, mockMonth));
+
+      await act(async () => {
+        await result.current.loadBalanceHistory();
+      });
+
+      expect(result.current.loadingBalanceHistory).toBe(false);
     });
   });
 
