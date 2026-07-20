@@ -21,6 +21,7 @@ import OperationModal from '../modals/OperationModal';
 import Calculator from '../components/Calculator';
 import ListCard from '../components/ListCard';
 import OperationsList from '../components/operations/OperationsList';
+import OperationActionMenu from '../components/operations/OperationActionMenu';
 import QuickAddForm from '../components/operations/QuickAddForm';
 import NotificationBindingStack, { deckPeekAllowance, deckCardHeight } from '../components/operations/NotificationBindingStack';
 import PickerModal from '../components/operations/PickerModal';
@@ -107,6 +108,8 @@ const OperationsScreen = () => {
   // added back-to-back within the 5-second window.
   const [undoInfo, setUndoInfo] = useState(null); // null | { id, token }
   const undoTokenRef = useRef(0);
+  // Long-press quick-action menu on a row: null | { operation, layout, row }
+  const [actionMenu, setActionMenu] = useState(null);
   const [filterPanelHeight, setFilterPanelHeight] = useState(0);
   // Seeded with an estimate of the collapsed search-pill area so the list's top
   // inset is roughly right on first paint; the real value arrives via onLayout.
@@ -522,32 +525,36 @@ const OperationsScreen = () => {
     }
   }, [addOperation]);
 
-  // Long-press on a row opens a quick-action menu, mirroring the planned-ops
-  // convention (showDialog). Edit repeats the tap behaviour; Repeat and Delete are
-  // the shortcuts QoL-7 adds so deleting/duplicating no longer costs a trip through
-  // the full edit modal.
-  const handleLongPressOperation = useCallback((operation) => {
-    const isTransfer = operation.type === 'transfer';
-    const category = categories.find(cat => cat.id === operation.categoryId);
-    const label = isTransfer
-      ? t('transfer')
-      : (category ? (category.nameKey ? t(category.nameKey) : category.name) : '');
+  // Long-press on a row lifts it above a blurred backdrop and floats an icon
+  // action bar over it (OperationActionMenu). Edit repeats the tap behaviour;
+  // Repeat and Delete are the QoL-7 shortcuts. OperationsList hands us the
+  // measured row layout plus a static clone to lift.
+  const handleLongPressOperation = useCallback((menu) => {
+    setActionMenu(menu);
+  }, []);
 
-    showDialog(
-      t('select_action'),
-      label,
-      [
-        { text: t('edit'), onPress: () => handleEditOperation(operation) },
-        { text: t('repeat'), onPress: () => handleRepeatOperation(operation) },
-        {
-          text: t('delete'),
-          style: 'destructive',
-          onPress: () => handleDeleteOperation(operation),
-        },
-        { text: t('cancel'), style: 'cancel' },
-      ],
-    );
-  }, [showDialog, t, categories, handleEditOperation, handleRepeatOperation, handleDeleteOperation]);
+  const closeActionMenu = useCallback(() => setActionMenu(null), []);
+
+  // Read the current menu from state (fresh via deps) and run the side effect
+  // outside setState — a state updater must stay pure (StrictMode double-invokes
+  // it, which would fire the action twice).
+  const handleMenuEdit = useCallback(() => {
+    const op = actionMenu?.operation;
+    setActionMenu(null);
+    if (op) handleEditOperation(op);
+  }, [actionMenu, handleEditOperation]);
+
+  const handleMenuRepeat = useCallback(() => {
+    const op = actionMenu?.operation;
+    setActionMenu(null);
+    if (op) handleRepeatOperation(op);
+  }, [actionMenu, handleRepeatOperation]);
+
+  const handleMenuDelete = useCallback(() => {
+    const op = actionMenu?.operation;
+    setActionMenu(null);
+    if (op) handleDeleteOperation(op);
+  }, [actionMenu, handleDeleteOperation]);
 
   const handleDateSeparatorPress = useCallback((dateString) => {
     // Parse the date and set it as the selected date (T00:00:00 anchors the bare
@@ -1228,6 +1235,17 @@ const OperationsScreen = () => {
         onSelectCategory={handleSelectCategory}
         onAutoAddWithCategory={handleAutoAddWithCategory}
         onAutoAddWithAccount={handleAutoAddWithAccount}
+      />
+
+      {/* Long-press quick-action menu for a single operation row */}
+      <OperationActionMenu
+        menu={actionMenu}
+        colors={colors}
+        t={t}
+        onClose={closeActionMenu}
+        onEdit={handleMenuEdit}
+        onRepeat={handleMenuRepeat}
+        onDelete={handleMenuDelete}
       />
 
       {/* Scroll to Top Button - only show when scrolled down */}

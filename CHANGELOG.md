@@ -1,5 +1,26 @@
 # Changelog
 
+## [0.204.2](https://github.com/heywood8/money-tracker/compare/penny-v0.204.1...penny-v0.204.2) (2026-07-20)
+
+
+### Documentation
+
+* sync QoL backlog statuses after audit follow-ups ([#1283](https://github.com/heywood8/money-tracker/issues/1283)) ([4023ec0](https://github.com/heywood8/money-tracker/commit/4023ec0b87123fa87ca09eed27f775bf99273774))
+
+## [0.204.1](https://github.com/heywood8/money-tracker/compare/penny-v0.204.0...penny-v0.204.1) (2026-07-20)
+
+
+### Code Refactoring
+
+* extract flash error color to constant in Calculator ([#1286](https://github.com/heywood8/money-tracker/issues/1286)) ([cc6f5e2](https://github.com/heywood8/money-tracker/commit/cc6f5e2ad7e8226fc0bbb42ba2feeb0d8254653a))
+
+## [0.204.0](https://github.com/heywood8/money-tracker/compare/penny-v0.203.0...penny-v0.204.0) (2026-07-20)
+
+
+### Features
+
+* **operations:** lift row + icon action bar on long-press ([#1281](https://github.com/heywood8/money-tracker/issues/1281)) ([e8f027e](https://github.com/heywood8/money-tracker/commit/e8f027ee67fbb8d74677a041a19fc91efb07093e))
+
 ## [0.203.0](https://github.com/heywood8/money-tracker/compare/penny-v0.202.0...penny-v0.203.0) (2026-07-20)
 
 
