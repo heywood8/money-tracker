@@ -1,10 +1,11 @@
-import React, { useEffect, useState } from 'react';
+import React, { useEffect, useMemo, useState } from 'react';
 import { View, Text, ScrollView, TouchableOpacity, TextInput, StyleSheet } from 'react-native';
 import { MaterialCommunityIcons as Icon } from '@expo/vector-icons';
 import DateTimePicker from '@react-native-community/datetimepicker';
 import PropTypes from 'prop-types';
 import { HORIZONTAL_PADDING } from '../../styles/layout';
 import { formatDate } from '../../services/BalanceHistoryDB';
+import currencies from '../../../assets/currencies.json';
 
 const ExpandableFilters = ({
   filters,
@@ -44,6 +45,17 @@ const ExpandableFilters = ({
     }
   }, [filters.amountRange?.max]);
 
+  // Currency hint for the amount inputs: shown only when every account shares one
+  // currency (the common case). Mixed currencies make a single symbol misleading, so
+  // we show none rather than guess.
+  const currencySymbol = useMemo(() => {
+    if (!accounts || accounts.length === 0) return null;
+    const first = accounts[0]?.currency;
+    if (!first || !accounts.every(a => a.currency === first)) return null;
+    const meta = currencies[first];
+    return meta?.symbol_native || meta?.symbol || first;
+  }, [accounts]);
+
   if (!isExpanded) {
     return null;
   }
@@ -54,6 +66,16 @@ const ExpandableFilters = ({
     const value = parseFloat(str.replace(',', '.'));
     if (isNaN(value) || value < 0) return null;
     return value;
+  };
+
+  // Push the parsed min/max into the shared filter state. Wired to both onBlur and
+  // onSubmitEditing so the range applies whether the user taps "done" or moves focus
+  // away — previously it only committed on blur (QoL-13).
+  const commitMinAmount = () => {
+    onFilterChange({ amountRange: { ...filters.amountRange, min: parseAmount(localMinAmount) } });
+  };
+  const commitMaxAmount = () => {
+    onFilterChange({ amountRange: { ...filters.amountRange, max: parseAmount(localMaxAmount) } });
   };
 
   const toggleType = (type) => {
@@ -186,29 +208,39 @@ const ExpandableFilters = ({
             {t('amount_range')}
           </Text>
           <View style={styles.amountRangeContainer}>
-            <TextInput
-              style={[styles.amountInput, { backgroundColor: colors.inputBackground, borderColor: colors.inputBorder, color: colors.text }]}
-              value={localMinAmount}
-              onChangeText={setLocalMinAmount}
-              onBlur={() => {
-                onFilterChange({ amountRange: { ...filters.amountRange, min: parseAmount(localMinAmount) } });
-              }}
-              placeholder={t('min_amount')}
-              placeholderTextColor={colors.mutedText}
-              keyboardType="numeric"
-            />
+            <View style={[styles.amountInputWrap, { backgroundColor: colors.inputBackground, borderColor: colors.inputBorder }]}>
+              {currencySymbol && (
+                <Text style={[styles.amountCurrencyHint, { color: colors.mutedText }]}>{currencySymbol}</Text>
+              )}
+              <TextInput
+                style={[styles.amountInputField, { color: colors.text }]}
+                value={localMinAmount}
+                onChangeText={setLocalMinAmount}
+                onBlur={commitMinAmount}
+                onSubmitEditing={commitMinAmount}
+                returnKeyType="done"
+                placeholder={t('min_amount')}
+                placeholderTextColor={colors.mutedText}
+                keyboardType="numeric"
+              />
+            </View>
             <Text style={[styles.amountRangeSeparator, { color: colors.mutedText }]}>-</Text>
-            <TextInput
-              style={[styles.amountInput, { backgroundColor: colors.inputBackground, borderColor: colors.inputBorder, color: colors.text }]}
-              value={localMaxAmount}
-              onChangeText={setLocalMaxAmount}
-              onBlur={() => {
-                onFilterChange({ amountRange: { ...filters.amountRange, max: parseAmount(localMaxAmount) } });
-              }}
-              placeholder={t('max_amount')}
-              placeholderTextColor={colors.mutedText}
-              keyboardType="numeric"
-            />
+            <View style={[styles.amountInputWrap, { backgroundColor: colors.inputBackground, borderColor: colors.inputBorder }]}>
+              {currencySymbol && (
+                <Text style={[styles.amountCurrencyHint, { color: colors.mutedText }]}>{currencySymbol}</Text>
+              )}
+              <TextInput
+                style={[styles.amountInputField, { color: colors.text }]}
+                value={localMaxAmount}
+                onChangeText={setLocalMaxAmount}
+                onBlur={commitMaxAmount}
+                onSubmitEditing={commitMaxAmount}
+                returnKeyType="done"
+                placeholder={t('max_amount')}
+                placeholderTextColor={colors.mutedText}
+                keyboardType="numeric"
+              />
+            </View>
           </View>
         </View>
 
@@ -292,6 +324,7 @@ ExpandableFilters.propTypes = {
   accounts: PropTypes.arrayOf(PropTypes.shape({
     id: PropTypes.string,
     name: PropTypes.string,
+    currency: PropTypes.string,
   })).isRequired,
   colors: PropTypes.shape({
     background: PropTypes.string,
@@ -307,13 +340,23 @@ ExpandableFilters.propTypes = {
 };
 
 const styles = StyleSheet.create({
-  amountInput: {
+  amountCurrencyHint: {
+    fontSize: 14,
+    fontWeight: '600',
+    marginRight: 6,
+  },
+  amountInputField: {
+    flex: 1,
+    fontSize: 14,
+    paddingVertical: 9,
+  },
+  amountInputWrap: {
+    alignItems: 'center',
     borderRadius: 8,
     borderWidth: 1,
     flex: 1,
-    fontSize: 14,
+    flexDirection: 'row',
     paddingHorizontal: 12,
-    paddingVertical: 9,
   },
   amountRangeContainer: {
     alignItems: 'center',

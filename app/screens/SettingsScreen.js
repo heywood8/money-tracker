@@ -1,6 +1,9 @@
 import React, { useEffect, useState, useCallback, useRef, useMemo } from 'react';
 import PropTypes from 'prop-types';
-import { View, StyleSheet, TouchableOpacity, ScrollView, FlatList, Linking, ActivityIndicator, BackHandler, AppState } from 'react-native';
+// ToastAndroid is intentional: this is an Android-only app, so the platform-split lint rule
+// doesn't apply here.
+// eslint-disable-next-line react-native/split-platform-components
+import { View, StyleSheet, TouchableOpacity, ScrollView, FlatList, Linking, ActivityIndicator, BackHandler, AppState, ToastAndroid } from 'react-native';
 import * as Clipboard from 'expo-clipboard';
 import { HORIZONTAL_PADDING, SPACING, BORDER_RADIUS } from '../styles/layout';
 import { Text, Divider, TouchableRipple, Menu } from 'react-native-paper';
@@ -158,6 +161,9 @@ export default function SettingsScreen({ setSubPanelActive }) {
   const [sheetsError, setSheetsError] = useState(null);
   const [sheetsImportSteps, setSheetsImportSteps] = useState(SHEETS_IMPORT_STEPS.map(s => ({ ...s, status: 'pending' })));
   const [sheetsImportError, setSheetsImportError] = useState(null);
+  // Reset runs synchronously-invisible otherwise; this drives the inline spinner
+  // that keeps the confirm subpanel open while the wipe is in flight (QoL-13).
+  const [resetInProgress, setResetInProgress] = useState(false);
   const [updateResult, setUpdateResult] = useState(null);
   const [isCheckingUpdate, setIsCheckingUpdate] = useState(false);
   const [downloadedApks, setDownloadedApks] = useState([]);
@@ -286,8 +292,11 @@ export default function SettingsScreen({ setSubPanelActive }) {
     if (activeSubPanel === 'import' && importStep === 'sheets-progress') {
       return sheetsImportSteps.some(s => s.status === 'in_progress');
     }
+    if (activeSubPanel === 'reset') {
+      return resetInProgress;
+    }
     return false;
-  }, [activeSubPanel, exportStep, importStep, sheetsSteps, sheetsImportSteps]);
+  }, [activeSubPanel, exportStep, importStep, sheetsSteps, sheetsImportSteps, resetInProgress]);
 
   // Embedded screens (Accounts/Categories) report whether they can navigate back
   // one level internally (edit form open, subcategory drill, picker, …) so a swipe
@@ -522,14 +531,22 @@ export default function SettingsScreen({ setSubPanelActive }) {
   }, [exportStep, sheetsSteps, dismissPanel]);
 
   const confirmResetDatabase = useCallback(async () => {
-    closeSubPanel();
+    // Keep the confirm subpanel open with an inline spinner while the wipe runs, then
+    // close and toast on success — previously the panel closed immediately and the reset
+    // happened invisibly, leaving the user with no feedback (QoL-13).
+    if (resetInProgress) return;
+    setResetInProgress(true);
     try {
       await resetDatabase();
+      setResetInProgress(false);
+      closeSubPanel();
+      ToastAndroid.show(t('database_reset_done') || 'Database reset', ToastAndroid.SHORT);
     } catch (error) {
+      setResetInProgress(false);
       console.error('[Settings] Database reset failed:', error);
       showDialog(t('error') || 'Error', error.message || 'Database reset failed', [{ text: 'OK' }]);
     }
-  }, [closeSubPanel, resetDatabase, showDialog, t]);
+  }, [resetInProgress, closeSubPanel, resetDatabase, showDialog, t]);
 
   const confirmImportBackup = useCallback(async () => {
     if (importPickInProgress.current) return;
@@ -646,6 +663,15 @@ export default function SettingsScreen({ setSubPanelActive }) {
       }
     }
   }, [t, closeSubPanel, startImport, completeImport, cancelImport, getCancelToken, showDialog]);
+
+  // When Sheets import dead-ends on "no spreadsheet configured", this CTA sends the user
+  // straight to the export subpanel to set one up. The subpanel is already slid in, so we
+  // just swap its content instead of re-opening (QoL-13).
+  const handleSetupSheetsExport = useCallback(() => {
+    setSheetsImportError(null);
+    setExportStep('list');
+    setActiveSubPanel('export');
+  }, []);
 
   const handleImportLocalBackupSelect = useCallback((item) => {
     setImportSelectedBackup(item);
@@ -1316,8 +1342,19 @@ export default function SettingsScreen({ setSubPanelActive }) {
                 <Text style={[styles.confirmText, { color: colors.text }]}>
                   {t('reset_database_confirm') || 'Are you sure you want to reset the database? This will delete all data and create default accounts.'}
                 </Text>
-                <TouchableRipple onPress={confirmResetDatabase} style={styles.confirmButtonDestructive}>
-                  <Text style={styles.confirmButtonText}>{t('reset') || 'Reset'}</Text>
+                <TouchableRipple
+                  onPress={confirmResetDatabase}
+                  disabled={resetInProgress}
+                  style={[styles.confirmButtonDestructive, resetInProgress && styles.confirmButtonBusy]}
+                >
+                  {resetInProgress ? (
+                    <View style={styles.confirmButtonBusyRow}>
+                      <ActivityIndicator size="small" color="#fff" />
+                      <Text style={styles.confirmButtonText}>{t('resetting_database') || 'Resetting…'}</Text>
+                    </View>
+                  ) : (
+                    <Text style={styles.confirmButtonText}>{t('reset') || 'Reset'}</Text>
+                  )}
                 </TouchableRipple>
               </View>
             )}
@@ -1379,9 +1416,23 @@ export default function SettingsScreen({ setSubPanelActive }) {
                   </View>
                 </TouchableRipple>
                 {sheetsImportError && importStep === 'source' && (
-                  <Text testID="settings-import-no-spreadsheet" style={styles.sheetsImportErrorInline}>
-                    {sheetsImportError}
-                  </Text>
+                  <View style={styles.sheetsSetupCta}>
+                    <Text testID="settings-import-no-spreadsheet" style={styles.sheetsImportErrorInline}>
+                      {sheetsImportError}
+                    </Text>
+                    <TouchableRipple
+                      testID="settings-import-setup-export"
+                      onPress={handleSetupSheetsExport}
+                      style={[styles.sheetsSetupCtaButton, { borderColor: colors.primary }]}
+                    >
+                      <View style={styles.sheetsSetupCtaRow}>
+                        <Ionicons name="cloud-upload-outline" size={18} color={colors.primary} />
+                        <Text style={[styles.sheetsSetupCtaText, { color: colors.primary }]}>
+                          {t('google_sheets_setup_export_now') || 'Export now to set up'}
+                        </Text>
+                      </View>
+                    </TouchableRipple>
+                  </View>
                 )}
               </ScrollView>
             )}
@@ -1814,6 +1865,15 @@ const styles = StyleSheet.create({
   clearLogsText: {
     color: '#e53935',
   },
+  confirmButtonBusy: {
+    opacity: 0.85,
+  },
+  confirmButtonBusyRow: {
+    alignItems: 'center',
+    flexDirection: 'row',
+    gap: SPACING.sm,
+    justifyContent: 'center',
+  },
   confirmButtonDestructive: {
     backgroundColor: '#c44',
     borderRadius: BORDER_RADIUS.md,
@@ -2037,6 +2097,26 @@ const styles = StyleSheet.create({
   },
   sheetsProgressStepLabelError: {
     color: '#c44',
+  },
+  sheetsSetupCta: {
+    marginTop: SPACING.sm,
+  },
+  sheetsSetupCtaButton: {
+    alignSelf: 'flex-start',
+    borderRadius: BORDER_RADIUS.md,
+    borderWidth: 1,
+    marginHorizontal: 16,
+    paddingHorizontal: SPACING.lg,
+    paddingVertical: SPACING.sm,
+  },
+  sheetsSetupCtaRow: {
+    alignItems: 'center',
+    flexDirection: 'row',
+    gap: SPACING.sm,
+  },
+  sheetsSetupCtaText: {
+    fontSize: 14,
+    fontWeight: '600',
   },
   subPanelBody: {
     flex: 1,
