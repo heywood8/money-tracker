@@ -1,5 +1,12 @@
 # Changelog
 
+## [0.200.2](https://github.com/heywood8/money-tracker/compare/penny-v0.200.1...penny-v0.200.2) (2026-07-20)
+
+
+### Miscellaneous Chores
+
+* **deps:** bump @sentry/react-native from 8.18.0 to 8.19.0 ([#1267](https://github.com/heywood8/money-tracker/issues/1267)) ([2d4852c](https://github.com/heywood8/money-tracker/commit/2d4852cda32f3559094a2dcf64d47f224dadad2a))
+
 ## [0.200.1](https://github.com/heywood8/money-tracker/compare/penny-v0.200.0...penny-v0.200.1) (2026-07-19)
 
 
