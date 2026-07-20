@@ -1,4 +1,4 @@
-import React, { memo, useMemo } from 'react';
+import React, { memo, useMemo, useRef, useCallback } from 'react';
 import { View, Text, StyleSheet, ActivityIndicator } from 'react-native';
 import { TouchableRipple } from 'react-native-paper';
 import { MaterialCommunityIcons as Icon } from '@expo/vector-icons';
@@ -34,6 +34,19 @@ const OperationListItem = ({
   onApplySuggestion = () => {},
   onDismissSuggestion = () => {},
 }) => {
+  // Measure the row in window coordinates on long-press so the caller can float
+  // an action menu / lifted clone exactly over it (see OperationActionMenu).
+  const rowRef = useRef(null);
+  const handleLongPress = useCallback(() => {
+    const node = rowRef.current;
+    if (!node || typeof node.measureInWindow !== 'function') {
+      onLongPress(operation, null);
+      return;
+    }
+    node.measureInWindow((x, y, width, height) => {
+      onLongPress(operation, { x, y, width, height });
+    });
+  }, [onLongPress, operation]);
   const isExpense = operation.type === 'expense';
   const isIncome = operation.type === 'income';
   const isTransfer = operation.type === 'transfer';
@@ -110,7 +123,7 @@ const OperationListItem = ({
       <TouchableRipple
         testID={testID}
         onPress={isPending ? undefined : onPress}
-        onLongPress={isPending ? undefined : onLongPress}
+        onLongPress={isPending ? undefined : handleLongPress}
         disabled={isPending}
         rippleColor="rgba(0, 0, 0, .08)"
         accessibilityRole="button"
@@ -118,7 +131,7 @@ const OperationListItem = ({
         accessibilityHint={t('operation_row_hint')}
         accessibilityState={{ disabled: isPending, busy: isPending }}
       >
-        <View style={[styles.row, isPending && styles.rowPending]}>
+        <View ref={rowRef} style={[styles.row, isPending && styles.rowPending]}>
           {/* Icon — a spinner while the operation is still being written. */}
           <View style={styles.iconContainer}>
             {isPending ? (
