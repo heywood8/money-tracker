@@ -1,5 +1,12 @@
 # Changelog
 
+## [0.204.1](https://github.com/heywood8/money-tracker/compare/penny-v0.204.0...penny-v0.204.1) (2026-07-20)
+
+
+### Code Refactoring
+
+* extract flash error color to constant in Calculator ([#1286](https://github.com/heywood8/money-tracker/issues/1286)) ([cc6f5e2](https://github.com/heywood8/money-tracker/commit/cc6f5e2ad7e8226fc0bbb42ba2feeb0d8254653a))
+
 ## [0.204.0](https://github.com/heywood8/money-tracker/compare/penny-v0.203.0...penny-v0.204.0) (2026-07-20)
 
 
