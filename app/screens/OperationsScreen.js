@@ -44,7 +44,7 @@ import { useDisplaySettings } from '../contexts/DisplaySettingsContext';
 // missing-category case already had (instead of a blocking OK dialog). The
 // order mirrors validateOperation; returns null for anything not tied to a
 // single visible field (e.g. missing type/date), which falls back to a dialog.
-const getQuickAddFlashField = (op) => {
+export const getQuickAddFlashField = (op) => {
   if (!op.amount || isNaN(parseFloat(op.amount)) || parseFloat(op.amount) <= 0) return 'amount';
   if (!op.accountId) return 'account';
   if (op.type === 'transfer') {
