@@ -1,4 +1,4 @@
-import React, { useState, useCallback, useMemo } from 'react';
+import React, { useState, useCallback, useMemo, useRef } from 'react';
 import PropTypes from 'prop-types';
 import {
   View,
@@ -9,11 +9,16 @@ import {
   StyleSheet,
   FlatList,
   KeyboardAvoidingView,
+  Animated,
+  Easing,
+  Dimensions,
 } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { MaterialCommunityIcons as Icon } from '@expo/vector-icons';
 import { SPACING, BORDER_RADIUS, HEIGHTS, FONT_SIZE } from '../../styles/designTokens';
 import ModalBlurOverlay from '../ModalBlurOverlay';
+
+const SCREEN_WIDTH = Dimensions.get('window').width;
 
 /**
  * SplitOperationModal Component
@@ -42,6 +47,9 @@ export default function SplitOperationModal({
   const [showCategoryPicker, setShowCategoryPicker] = useState(false);
   const [error, setError] = useState('');
 
+  // Category picker slides in as an in-modal subpanel (QoL-15): 0=hidden, 1=shown.
+  const pickerAnim = useRef(new Animated.Value(0)).current;
+
   // Reset state when modal opens
   React.useEffect(() => {
     if (visible) {
@@ -49,8 +57,9 @@ export default function SplitOperationModal({
       setSelectedCategoryId('');
       setError('');
       setShowCategoryPicker(false);
+      pickerAnim.setValue(0);
     }
-  }, [visible]);
+  }, [visible, pickerAnim]);
 
   // Filter categories by operation type (expense or income) and exclude folders/shadow
   const filteredCategories = useMemo(() => {
@@ -95,12 +104,34 @@ export default function SplitOperationModal({
     setError('');
   }, []);
 
+  // Open the category picker subpanel over the split form (QoL-15). Entry uses
+  // Easing.out(Easing.cubic) per the modal subpanel convention.
+  const openCategoryPicker = useCallback(() => {
+    setShowCategoryPicker(true);
+    Animated.timing(pickerAnim, {
+      toValue: 1,
+      duration: 260,
+      easing: Easing.out(Easing.cubic),
+      useNativeDriver: true,
+    }).start();
+  }, [pickerAnim]);
+
+  // Reverse the slide, then unmount the subpanel once it settles.
+  const closeCategoryPicker = useCallback(() => {
+    Animated.timing(pickerAnim, {
+      toValue: 0,
+      duration: 180,
+      easing: Easing.in(Easing.quad),
+      useNativeDriver: true,
+    }).start(() => setShowCategoryPicker(false));
+  }, [pickerAnim]);
+
   // Handle category selection
   const handleCategorySelect = useCallback((categoryId) => {
     setSelectedCategoryId(categoryId);
-    setShowCategoryPicker(false);
     setError('');
-  }, []);
+    closeCategoryPicker();
+  }, [closeCategoryPicker]);
 
   // Handle confirm
   const handleConfirm = useCallback(() => {
@@ -145,6 +176,12 @@ export default function SplitOperationModal({
 
   // Key extractor for FlatList
   const keyExtractor = useCallback((item) => item.id, []);
+
+  // Subpanel slides in from the right; the overlay opacity fades it in.
+  const pickerTranslateX = pickerAnim.interpolate({
+    inputRange: [0, 1],
+    outputRange: [SCREEN_WIDTH, 0],
+  });
 
   return (
     <>
@@ -200,7 +237,7 @@ export default function SplitOperationModal({
                     styles.pickerButton,
                     { backgroundColor: colors.inputBackground, borderColor: colors.inputBorder },
                   ]}
-                  onPress={() => setShowCategoryPicker(true)}
+                  onPress={openCategoryPicker}
                   testID="category-picker-button"
                 >
                   <Text style={[styles.pickerButtonText, { color: selectedCategoryId ? colors.text : colors.mutedText }]}>
@@ -237,45 +274,49 @@ export default function SplitOperationModal({
                 </View>
               </Pressable>
             </Pressable>
+
+            {/* Category picker as an in-modal subpanel instead of a nested Modal
+                (QoL-15): it slides in over the split form within the same Modal. */}
+            {showCategoryPicker && (
+              <Animated.View style={[styles.pickerSubPanelOverlay, { opacity: pickerAnim }]}>
+                <Pressable
+                  style={styles.pickerSubPanelBackdrop}
+                  onPress={closeCategoryPicker}
+                  testID="category-picker-backdrop"
+                />
+                <Animated.View
+                  style={[
+                    styles.pickerModalContent,
+                    styles.pickerSubPanel,
+                    { backgroundColor: colors.card, transform: [{ translateX: pickerTranslateX }] },
+                  ]}
+                >
+                  <Text style={[styles.pickerTitle, { color: colors.text }]}>
+                    {t('select_category')}
+                  </Text>
+                  <FlatList
+                    data={filteredCategories}
+                    keyExtractor={keyExtractor}
+                    renderItem={renderCategoryItem}
+                    ListEmptyComponent={
+                      <Text style={[styles.emptyText, { color: colors.mutedText }]}>
+                        {t('no_categories')}
+                      </Text>
+                    }
+                  />
+                  <Pressable
+                    style={styles.closeButton}
+                    onPress={closeCategoryPicker}
+                  >
+                    <Text style={[styles.closeButtonText, { color: colors.primary }]}>
+                      {t('close')}
+                    </Text>
+                  </Pressable>
+                </Animated.View>
+              </Animated.View>
+            )}
           </KeyboardAvoidingView>
         </SafeAreaView>
-      </Modal>
-
-      {/* Category Picker Modal */}
-      <Modal
-        visible={showCategoryPicker && visible}
-        animationType="slide"
-        transparent={true}
-        onRequestClose={() => setShowCategoryPicker(false)}
-      >
-        <Pressable style={styles.modalOverlay} onPress={() => setShowCategoryPicker(false)}>
-          <Pressable
-            style={[styles.pickerModalContent, { backgroundColor: colors.card }]}
-            onPress={handleStopPropagation}
-          >
-            <Text style={[styles.pickerTitle, { color: colors.text }]}>
-              {t('select_category')}
-            </Text>
-            <FlatList
-              data={filteredCategories}
-              keyExtractor={keyExtractor}
-              renderItem={renderCategoryItem}
-              ListEmptyComponent={
-                <Text style={[styles.emptyText, { color: colors.mutedText }]}>
-                  {t('no_categories')}
-                </Text>
-              }
-            />
-            <Pressable
-              style={styles.closeButton}
-              onPress={() => setShowCategoryPicker(false)}
-            >
-              <Text style={[styles.closeButtonText, { color: colors.primary }]}>
-                {t('close')}
-              </Text>
-            </Pressable>
-          </Pressable>
-        </Pressable>
       </Modal>
     </>
   );
@@ -396,6 +437,29 @@ const styles = StyleSheet.create({
     maxHeight: '70%',
     padding: SPACING.md,
     width: '90%',
+  },
+  pickerSubPanel: {
+    elevation: 6,
+    shadowColor: '#000',
+    shadowOffset: { width: 0, height: 2 },
+    shadowOpacity: 0.25,
+    shadowRadius: 6,
+  },
+  pickerSubPanelBackdrop: {
+    bottom: 0,
+    left: 0,
+    position: 'absolute',
+    right: 0,
+    top: 0,
+  },
+  pickerSubPanelOverlay: {
+    alignItems: 'center',
+    bottom: 0,
+    justifyContent: 'center',
+    left: 0,
+    position: 'absolute',
+    right: 0,
+    top: 0,
   },
   pickerTitle: {
     fontSize: FONT_SIZE.lg,

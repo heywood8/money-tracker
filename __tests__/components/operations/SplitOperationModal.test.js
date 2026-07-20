@@ -224,8 +224,25 @@ describe('SplitOperationModal', () => {
 
       await waitFor(() => {
         // Category list should no longer be visible in the picker
-        // Note: The category picker is a separate modal that closes
+        // Note: the category picker is an in-modal subpanel that slides out
       });
+    });
+  });
+
+  describe('Category picker subpanel (QoL-15)', () => {
+    it('renders the picker inline over the form (backdrop present), not as a nested modal', async () => {
+      const { getByTestId, queryByTestId, getByText } = await render(
+        <SplitOperationModal {...defaultProps} />,
+      );
+
+      // Closed initially — the subpanel is not mounted.
+      expect(queryByTestId('category-picker-backdrop')).toBeNull();
+
+      await fireEvent.press(getByTestId('category-picker-button'));
+
+      // Opening mounts the in-modal subpanel (its backdrop) rather than a second Modal.
+      expect(getByTestId('category-picker-backdrop')).toBeTruthy();
+      expect(getByText('Food')).toBeTruthy();
     });
   });
 
