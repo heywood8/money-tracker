@@ -85,9 +85,13 @@ export default function SplitOperationModal({
     return null;
   }, [originalAmount, t]);
 
-  // Handle amount change
+  // Handle amount change. Normalize a locale decimal comma to a dot — Android
+  // decimal-pad keyboards emit "," in many locales, and downstream currency
+  // parsing coerces comma strings to garbage (parseFloat("1,5") === 1, and
+  // Decimal treats the comma string as 0), silently corrupting the split amount.
   const handleAmountChange = useCallback((text) => {
-    setSplitAmount(text);
+    const normalized = text.replace(',', '.');
+    setSplitAmount(normalized);
     setError('');
   }, []);
 
