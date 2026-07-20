@@ -1,5 +1,12 @@
 # Changelog
 
+## [0.204.4](https://github.com/heywood8/money-tracker/compare/penny-v0.204.3...penny-v0.204.4) (2026-07-20)
+
+
+### Performance Improvements
+
+* **graphs:** parallelize independent balance-history queries (QoL-10) ([#1289](https://github.com/heywood8/money-tracker/issues/1289)) ([73ba15b](https://github.com/heywood8/money-tracker/commit/73ba15baf9e045bf09b31e50737921a551752322))
+
 ## [0.204.3](https://github.com/heywood8/money-tracker/compare/penny-v0.204.2...penny-v0.204.3) (2026-07-20)
 
 
