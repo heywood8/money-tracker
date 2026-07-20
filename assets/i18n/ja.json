@@ -320,6 +320,7 @@
   "current_period": "現在の期間",
   "next_period": "次の期間",
   "previous_period": "前の期間",
+  "jump_to_current_period": "今月",
   "all_budgets": "すべての予算",
   "total_budgeted": "予算合計",
   "total_spent": "支出合計",

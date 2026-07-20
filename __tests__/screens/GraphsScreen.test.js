@@ -357,6 +357,40 @@ describe('GraphsScreen', () => {
     });
   });
 
+  describe('Period chevron navigation (QoL-9)', () => {
+    it('reveals jump-to-current after stepping to an older period and hides it back at current', async () => {
+      const GraphsScreen = require('../../app/screens/GraphsScreen').default;
+      const { getAvailableMonths } = require('../../app/services/OperationsDB');
+
+      const now = new Date();
+      // Current month must be present so the wheel starts at it; add an older year
+      // so there is at least one older period to step to.
+      getAvailableMonths.mockResolvedValue([
+        { year: now.getFullYear(), month: now.getMonth() },
+        { year: 2020, month: 0 },
+      ]);
+
+      const { queryByTestId, getByTestId, findByTestId } = await render(<GraphsScreen />);
+
+      // The wheel and its chevrons mount once available months load.
+      await findByTestId('period-chevron-older');
+
+      // Starts at the current period → jump-to-current hidden, newer chevron disabled.
+      expect(queryByTestId('period-jump-current')).toBeNull();
+      expect(getByTestId('period-chevron-newer').props.accessibilityState).toEqual(
+        expect.objectContaining({ disabled: true }),
+      );
+
+      // Step to an older period → jump-to-current appears.
+      fireEvent.press(getByTestId('period-chevron-older'));
+      expect(getByTestId('period-jump-current')).toBeTruthy();
+
+      // Jump back to the current period → the button hides again.
+      fireEvent.press(getByTestId('period-jump-current'));
+      expect(queryByTestId('period-jump-current')).toBeNull();
+    });
+  });
+
   describe('Combined Period Picker Logic', () => {
     describe('Period string parsing', () => {
       it('parses specific month period correctly', async () => {

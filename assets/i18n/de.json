@@ -320,6 +320,7 @@
   "current_period": "Aktueller Zeitraum",
   "next_period": "Nächster Zeitraum",
   "previous_period": "Vorheriger Zeitraum",
+  "jump_to_current_period": "Aktueller Monat",
   "all_budgets": "Alle Budgets",
   "total_budgeted": "Gesamt budgetiert",
   "total_spent": "Gesamt ausgegeben",

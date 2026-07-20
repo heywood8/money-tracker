@@ -320,6 +320,7 @@
   "current_period": "Periodo corrente",
   "next_period": "Periodo successivo",
   "previous_period": "Periodo precedente",
+  "jump_to_current_period": "Mese corrente",
   "all_budgets": "Tutti i budget",
   "total_budgeted": "Totale preventivato",
   "total_spent": "Totale speso",
