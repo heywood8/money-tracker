@@ -1,5 +1,12 @@
 # Changelog
 
+## [0.206.0](https://github.com/heywood8/money-tracker/compare/penny-v0.205.1...penny-v0.206.0) (2026-07-20)
+
+
+### Features
+
+* **graphs:** add chevron period navigation and jump-to-current (QoL-9) ([#1297](https://github.com/heywood8/money-tracker/issues/1297)) ([97f36b7](https://github.com/heywood8/money-tracker/commit/97f36b7974d314743411bdc28d59a396eb04c246))
+
 ## [0.205.1](https://github.com/heywood8/money-tracker/compare/penny-v0.205.0...penny-v0.205.1) (2026-07-20)
 
 
