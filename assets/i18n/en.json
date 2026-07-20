@@ -325,6 +325,7 @@
   "current_period": "Current Period",
   "next_period": "Next Period",
   "previous_period": "Previous Period",
+  "jump_to_current_period": "Current month",
   "all_budgets": "All Budgets",
   "total_budgeted": "Total Budgeted",
   "total_spent": "Total Spent",

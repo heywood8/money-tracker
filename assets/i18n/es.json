@@ -323,6 +323,7 @@
   "current_period": "Periodo actual",
   "next_period": "Próximo periodo",
   "previous_period": "Periodo anterior",
+  "jump_to_current_period": "Mes actual",
   "all_budgets": "Todos los presupuestos",
   "total_budgeted": "Total presupuestado",
   "total_spent": "Total gastado",

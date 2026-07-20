@@ -323,6 +323,7 @@
   "current_period": "현재 기간",
   "next_period": "다음 기간",
   "previous_period": "이전 기간",
+  "jump_to_current_period": "이번 달",
   "all_budgets": "모든 예산",
   "total_budgeted": "총 예산",
   "total_spent": "총 지출",

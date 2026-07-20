@@ -323,6 +323,7 @@
   "current_period": "当前期间",
   "next_period": "下一期间",
   "previous_period": "上一期间",
+  "jump_to_current_period": "本月",
   "all_budgets": "所有预算",
   "total_budgeted": "总预算",
   "total_spent": "总花费",

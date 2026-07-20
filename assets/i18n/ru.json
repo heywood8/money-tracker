@@ -325,6 +325,7 @@
   "current_period": "Текущий период",
   "next_period": "Следующий период",
   "previous_period": "Предыдущий период",
+  "jump_to_current_period": "Текущий месяц",
   "all_budgets": "Все бюджеты",
   "total_budgeted": "Всего запланировано",
   "total_spent": "Всего потрачено",

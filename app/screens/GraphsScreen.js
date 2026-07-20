@@ -887,22 +887,67 @@ const GraphsScreen = () => {
         </TouchableOpacity>
       )}
 
-      {/* Floating period wheel FAB */}
-      {periodItems.length > 0 && (
-        <View style={[styles.fabWheel, styles.fabWheelRight, { backgroundColor: colors.surface + 'DE', borderColor: colors.border + '80' }]}>
-          <WheelPicker
-            data={periodItems}
-            value={selectedPeriod}
-            onValueChanged={({ item }) => item && setSelectedPeriod(item.value)}
-            itemHeight={28}
-            visibleItemCount={3}
-            itemTextStyle={[styles.wheelItemText, { color: colors.text }]}
-            overlayItemStyle={[styles.wheelOverlayItem, { backgroundColor: colors.selected }]}
-            enableScrollByTapOnItem
-            keyExtractor={(item, index) => `period-${index}`}
-          />
-        </View>
-      )}
+      {/* Floating period wheel FAB with chevron navigation (QoL-9) */}
+      {periodItems.length > 0 && (() => {
+        const currentIndex = periodItems.findIndex((i) => i.value === selectedPeriod);
+        const currentPeriodValue = `${now.getFullYear()}-${now.getMonth()}`;
+        // periodItems is sorted newest-first, so a newer period is a lower index
+        // and an older one a higher index. Chevron-up steps newer, down steps older.
+        const canGoNewer = currentIndex > 0;
+        const canGoOlder = currentIndex >= 0 && currentIndex < periodItems.length - 1;
+        const isCurrentPeriod = selectedPeriod === currentPeriodValue;
+        return (
+          <View style={[styles.fabWheel, styles.fabWheelRight, { backgroundColor: colors.surface + 'DE', borderColor: colors.border + '80' }]}>
+            <TouchableOpacity
+              style={styles.periodChevron}
+              onPress={() => { if (canGoNewer) setSelectedPeriod(periodItems[currentIndex - 1].value); }}
+              disabled={!canGoNewer}
+              testID="period-chevron-newer"
+              accessibilityRole="button"
+              accessibilityLabel={t('next_period')}
+              accessibilityState={{ disabled: !canGoNewer }}
+            >
+              <Icon name="chevron-up" size={22} color={canGoNewer ? colors.text : colors.mutedText + '55'} />
+            </TouchableOpacity>
+
+            <WheelPicker
+              data={periodItems}
+              value={selectedPeriod}
+              onValueChanged={({ item }) => item && setSelectedPeriod(item.value)}
+              itemHeight={28}
+              visibleItemCount={3}
+              itemTextStyle={[styles.wheelItemText, { color: colors.text }]}
+              overlayItemStyle={[styles.wheelOverlayItem, { backgroundColor: colors.selected }]}
+              enableScrollByTapOnItem
+              keyExtractor={(item, index) => `period-${index}`}
+            />
+
+            <TouchableOpacity
+              style={styles.periodChevron}
+              onPress={() => { if (canGoOlder) setSelectedPeriod(periodItems[currentIndex + 1].value); }}
+              disabled={!canGoOlder}
+              testID="period-chevron-older"
+              accessibilityRole="button"
+              accessibilityLabel={t('previous_period')}
+              accessibilityState={{ disabled: !canGoOlder }}
+            >
+              <Icon name="chevron-down" size={22} color={canGoOlder ? colors.text : colors.mutedText + '55'} />
+            </TouchableOpacity>
+
+            {!isCurrentPeriod && (
+              <TouchableOpacity
+                style={[styles.periodTodayButton, { borderTopColor: colors.border + '80' }]}
+                onPress={() => setSelectedPeriod(currentPeriodValue)}
+                testID="period-jump-current"
+                accessibilityRole="button"
+                accessibilityLabel={t('jump_to_current_period')}
+              >
+                <Icon name="calendar-today" size={16} color={colors.primary} />
+              </TouchableOpacity>
+            )}
+          </View>
+        );
+      })()}
 
       {/* Long-press hint for the convert-currencies toggle */}
       {hintVisible && (
@@ -1001,6 +1046,17 @@ const styles = StyleSheet.create({
     borderRadius: 40,
     right: 16,
     width: 120,
+  },
+  periodChevron: {
+    alignItems: 'center',
+    justifyContent: 'center',
+    paddingVertical: 2,
+  },
+  periodTodayButton: {
+    alignItems: 'center',
+    borderTopWidth: 1,
+    justifyContent: 'center',
+    paddingVertical: 6,
   },
   scrollContent: {
     paddingBottom: 180,
