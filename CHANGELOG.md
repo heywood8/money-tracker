@@ -1,5 +1,12 @@
 # Changelog
 
+## [0.204.3](https://github.com/heywood8/money-tracker/compare/penny-v0.204.2...penny-v0.204.3) (2026-07-20)
+
+
+### Bug Fixes
+
+* **operations:** normalize comma decimal separator in split amount (QoL-2) ([#1284](https://github.com/heywood8/money-tracker/issues/1284)) ([216f752](https://github.com/heywood8/money-tracker/commit/216f75231c8ae054fdffa8ec98b38d696f7e0168))
+
 ## [0.204.2](https://github.com/heywood8/money-tracker/compare/penny-v0.204.1...penny-v0.204.2) (2026-07-20)
 
 
