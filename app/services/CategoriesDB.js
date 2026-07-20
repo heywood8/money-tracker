@@ -319,9 +319,14 @@ export const deleteCategory = async (id) => {
       );
 
       if (childCheck && childCheck.count > 0) {
-        throw new Error(
+        // Attach a structured code + count so the UI can build a localized,
+        // actionable message without parsing this English string (QoL-4).
+        const err = new Error(
           `Cannot delete category: ${childCheck.count} subcategory(ies) exist. Please delete or reassign the subcategories first.`,
         );
+        err.code = 'CATEGORY_HAS_CHILDREN';
+        err.count = childCheck.count;
+        throw err;
       }
 
       const operationCheck = await db.getFirstAsync(
@@ -330,9 +335,12 @@ export const deleteCategory = async (id) => {
       );
 
       if (operationCheck && operationCheck.count > 0) {
-        throw new Error(
+        const err = new Error(
           `Cannot delete category: ${operationCheck.count} transaction(s) use this category. Please reassign or delete the transactions first.`,
         );
+        err.code = 'CATEGORY_HAS_OPERATIONS';
+        err.count = operationCheck.count;
+        throw err;
       }
 
       await db.runAsync('DELETE FROM categories WHERE id = ?', [id]);

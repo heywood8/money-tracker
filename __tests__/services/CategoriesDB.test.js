@@ -612,6 +612,34 @@ describe('CategoriesDB', () => {
       expect(mockTxDb.runAsync).not.toHaveBeenCalled();
     });
 
+    it('attaches a CATEGORY_HAS_CHILDREN code and count on the error (QoL-4)', async () => {
+      const mockTxDb = {
+        getFirstAsync: jest.fn().mockResolvedValueOnce({ count: 3 }),
+        runAsync: jest.fn(),
+      };
+      mockDb.executeTransaction.mockImplementation(async (callback) => callback(mockTxDb));
+
+      await expect(CategoriesDB.deleteCategory('cat-1')).rejects.toMatchObject({
+        code: 'CATEGORY_HAS_CHILDREN',
+        count: 3,
+      });
+    });
+
+    it('attaches a CATEGORY_HAS_OPERATIONS code and count on the error (QoL-4)', async () => {
+      const mockTxDb = {
+        getFirstAsync: jest.fn()
+          .mockResolvedValueOnce({ count: 0 })
+          .mockResolvedValueOnce({ count: 5 }),
+        runAsync: jest.fn(),
+      };
+      mockDb.executeTransaction.mockImplementation(async (callback) => callback(mockTxDb));
+
+      await expect(CategoriesDB.deleteCategory('cat-1')).rejects.toMatchObject({
+        code: 'CATEGORY_HAS_OPERATIONS',
+        count: 5,
+      });
+    });
+
     it('checks children before checking operations', async () => {
       const mockTxDb = {
         getFirstAsync: jest.fn().mockResolvedValueOnce({ count: 2 }),
