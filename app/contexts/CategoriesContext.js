@@ -21,7 +21,7 @@ export const useCategories = () => {
 
 export const CategoriesProvider = ({ children }) => {
   const { showDialog } = useDialog();
-  const { isFirstLaunch, language } = useLocalization();
+  const { isFirstLaunch, language, t } = useLocalization();
   const [categories, setCategories] = useState([]);
   const [expandedIds, setExpandedIds] = useState(new Set());
   const [loading, setLoading] = useState(true);
@@ -179,14 +179,23 @@ export const CategoriesProvider = ({ children }) => {
     } catch (error) {
       console.error('Failed to delete category:', error);
       setSaveError(error.message);
-      showDialog(
-        'Error',
-        'Failed to delete category. Please try again.',
-        [{ text: 'OK' }],
-      );
+
+      // Surface the specific, actionable reason from the DB layer instead of a
+      // generic "failed to delete" (QoL-4). t() has no interpolation, so the
+      // count is substituted into a {count} placeholder here.
+      let message;
+      if (error.code === 'CATEGORY_HAS_CHILDREN') {
+        message = t('delete_category_error_has_children').replace('{count}', String(error.count));
+      } else if (error.code === 'CATEGORY_HAS_OPERATIONS') {
+        message = t('delete_category_error_has_operations').replace('{count}', String(error.count));
+      } else {
+        message = t('delete_category_error_generic');
+      }
+
+      showDialog(t('error'), message, [{ text: t('ok') }]);
       throw error;
     }
-  }, [showDialog]);
+  }, [showDialog, t]);
 
   const toggleExpanded = useCallback((id) => {
     setExpandedIds(prev => {
