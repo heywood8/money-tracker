@@ -276,6 +276,37 @@ export const getAccountBalanceOnDate = async (accountId, date) => {
 };
 
 /**
+ * Get an account's most recent balance snapshot on or before a date.
+ *
+ * Unlike getAccountBalanceOnDate (which requires an exact-date row), this carries
+ * the last known balance forward when the requested day itself has no snapshot —
+ * mirroring how the chart forward-fills. Used to anchor the burndown line's start
+ * ("balance at end of the first day") so a sparse snapshot history doesn't leave it
+ * undefined.
+ *
+ * @param {number} accountId
+ * @param {string} date - YYYY-MM-DD format
+ * @returns {Promise<string|null>} Balance as string, or null if no snapshot on/before the date
+ */
+export const getAccountBalanceOnOrBeforeDate = async (accountId, date) => {
+  try {
+    const result = await queryAll(
+      `SELECT balance
+       FROM accounts_balance_history
+       WHERE account_id = ?
+         AND date(date) <= date(?) -- date() normalises non-ISO formats from CSV import (#773)
+       ORDER BY date DESC
+       LIMIT 1`,
+      [accountId, date],
+    );
+    return result && result.length > 0 ? result[0].balance : null;
+  } catch (error) {
+    console.error('Failed to get account balance on or before date:', error);
+    throw error;
+  }
+};
+
+/**
  * Get most recent snapshot date for an account
  *
  * @param {number} accountId

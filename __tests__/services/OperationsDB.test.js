@@ -954,6 +954,43 @@ describe('OperationsDB Service', () => {
       expect(result).toBe('1200');
     });
 
+    describe('getTransferTotals', () => {
+      it('splits transfers into incoming (destination_amount) and outgoing (amount)', async () => {
+        queryAll.mockResolvedValue([
+          { account_id: 'acc1', to_account_id: 'acc2', amount: '100', destination_amount: null },  // out 100
+          { account_id: 'acc3', to_account_id: 'acc1', amount: '50', destination_amount: '5000' },  // in 5000 (multi-currency)
+          { account_id: 'acc3', to_account_id: 'acc1', amount: '25', destination_amount: null },     // in 25 (same currency)
+        ]);
+
+        const result = await OperationsDB.getTransferTotals('acc1', '2025-12-02', '2025-12-31');
+
+        expect(queryAll).toHaveBeenCalledWith(
+          expect.stringContaining("type = 'transfer'"),
+          ['2025-12-02', '2025-12-31', 'acc1', 'acc1'],
+        );
+        // Incoming credits the destination_amount when present (5000), else amount (25).
+        expect(result).toEqual({ incoming: '5025', outgoing: '100' });
+      });
+
+      it('counts a self-transfer in both buckets so it nets to zero', async () => {
+        queryAll.mockResolvedValue([
+          { account_id: 'acc1', to_account_id: 'acc1', amount: '75', destination_amount: null },
+        ]);
+
+        const result = await OperationsDB.getTransferTotals('acc1', '2025-12-02', '2025-12-31');
+
+        expect(result).toEqual({ incoming: '75', outgoing: '75' });
+      });
+
+      it('returns zero totals when there are no transfers', async () => {
+        queryAll.mockResolvedValue([]);
+
+        const result = await OperationsDB.getTransferTotals('acc1', '2025-12-02', '2025-12-31');
+
+        expect(result).toEqual({ incoming: '0', outgoing: '0' });
+      });
+    });
+
     it('gets spending by category', async () => {
       const mockResults = [
         { category_id: 'cat1', total: 100.5 },

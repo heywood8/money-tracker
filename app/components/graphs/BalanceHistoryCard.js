@@ -169,8 +169,17 @@ const BalanceHistoryCard = ({
     const maxBalance = actualValues.length > 0 ? Math.max(...actualValues) : 0;
     const daysInMonth = balanceHistoryData.labels[balanceHistoryData.labels.length - 1];
 
+    // Burndown ("plain avg") line starts from the month's spendable ceiling
+    // (day-1 balance + post-day-1 inflows − outgoing transfers), computed in the
+    // hook. Fall back to the peak-actual max when it's unavailable so older data /
+    // accounts younger than the month keep the previous behaviour.
+    const rawPlainAvgMax = balanceHistoryData.plainAvgMax;
+    const plainAvgMax = (rawPlainAvgMax != null && Number.isFinite(rawPlainAvgMax))
+      ? rawPlainAvgMax
+      : maxBalance;
+
     const plainAvgData = balanceHistoryData.labels.map(day =>
-      maxBalance * (1 - (day - 1) / (daysInMonth - 1)),
+      plainAvgMax * (1 - (day - 1) / (daysInMonth - 1)),
     );
 
     const forecastValues = combinedActualForecast.filter(v => v !== undefined);
@@ -219,8 +228,8 @@ const BalanceHistoryCard = ({
       }
     }
 
-    const plainAvgDaily = daysInMonth > 1 ? -maxBalance / (daysInMonth - 1) : 0;
-    const plainAvgCurrent = displayDay ? maxBalance * (1 - (displayDay - 1) / (daysInMonth - 1)) : null;
+    const plainAvgDaily = daysInMonth > 1 ? -plainAvgMax / (daysInMonth - 1) : 0;
+    const plainAvgCurrent = displayDay ? plainAvgMax * (1 - (displayDay - 1) / (daysInMonth - 1)) : null;
 
     let forecastEnd = null;
     let forecastDailyAvg = null;
@@ -267,6 +276,7 @@ const BalanceHistoryCard = ({
       combinedActualForecast,
       actualValues,
       maxBalance,
+      plainAvgMax,
       daysInMonth,
       plainAvgData,
       hasNegativeValues,
@@ -502,7 +512,7 @@ const BalanceHistoryCard = ({
                       <View style={[styles.legendDot, styles.legendDotPlainAvg]} />
                       <Text style={[styles.legendTableLabel, { color: colors.text }]}>{t('plain_avg') || 'Plain avg'}</Text>
                     </View>
-                    <Text style={[styles.legendTableValue, { color: colors.text }]}>{formatCompact(chartComputed.maxBalance, currency)}</Text>
+                    <Text style={[styles.legendTableValue, { color: colors.text }]}>{formatCompact(chartComputed.plainAvgMax, currency)}</Text>
                     <Text style={[styles.legendTableValue, { color: colors.text }]}>{formatCompact(chartComputed.plainAvgCurrent, currency)}</Text>
                     <Text style={[styles.legendTableValue, { color: colors.text }]}>{formatCompact(chartComputed.plainAvgDaily, currency)}</Text>
                     <Text style={[styles.legendTableValue, { color: colors.text }]}>{formatCompact(0, currency)}</Text>
@@ -552,6 +562,7 @@ BalanceHistoryCard.propTypes = {
     prevMonth: PropTypes.array,
     prevMonthTotalExpenses: PropTypes.oneOfType([PropTypes.number, PropTypes.string]),
     prevMonthDaysCount: PropTypes.number,
+    plainAvgMax: PropTypes.number,
   }).isRequired,
   selectedYear: PropTypes.number.isRequired,
   selectedMonth: PropTypes.number,
