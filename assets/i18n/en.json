@@ -85,6 +85,7 @@
   "save": "Save",
   "add": "Add",
   "edit": "Edit",
+  "repeat": "Repeat",
   "delete": "Delete",
   "error": "Error",
   "name_required": "Name required",

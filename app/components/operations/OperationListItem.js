@@ -1,4 +1,4 @@
-import React, { memo, useMemo } from 'react';
+import React, { memo, useMemo, useRef, useCallback } from 'react';
 import { View, Text, StyleSheet } from 'react-native';
 import { TouchableRipple } from 'react-native-paper';
 import { MaterialCommunityIcons as Icon } from '@expo/vector-icons';
@@ -28,11 +28,26 @@ const OperationListItem = ({
   formatCurrency,
   isLast = false,
   onPress,
+  onLongPress = null,
   testID,
   suggestionChips = null,
   onApplySuggestion = () => {},
   onDismissSuggestion = () => {},
 }) => {
+  // Measure the row in window coordinates on long-press so the caller can float
+  // an action menu / lifted clone exactly over it (see OperationActionMenu).
+  const rowRef = useRef(null);
+  const handleLongPress = useCallback(() => {
+    if (!onLongPress) return;
+    const node = rowRef.current;
+    if (!node || typeof node.measureInWindow !== 'function') {
+      onLongPress(operation, null);
+      return;
+    }
+    node.measureInWindow((x, y, width, height) => {
+      onLongPress(operation, { x, y, width, height });
+    });
+  }, [onLongPress, operation]);
   const isExpense = operation.type === 'expense';
   const isIncome = operation.type === 'income';
   const isTransfer = operation.type === 'transfer';
@@ -104,12 +119,13 @@ const OperationListItem = ({
       <TouchableRipple
         testID={testID}
         onPress={onPress}
+        onLongPress={onLongPress ? handleLongPress : undefined}
         rippleColor="rgba(0, 0, 0, .08)"
         accessibilityRole="button"
         accessibilityLabel={accessibilityLabel}
         accessibilityHint={t('edit_operation_hint')}
       >
-        <View style={styles.row}>
+        <View ref={rowRef} style={styles.row}>
           {/* Icon */}
           <View style={styles.iconContainer}>
             <Icon name={categoryInfo.icon} size={ICON_SIZE.md} color={amountColor} />
@@ -205,6 +221,7 @@ OperationListItem.propTypes = {
   formatCurrency: PropTypes.func.isRequired,
   isLast: PropTypes.bool,
   onPress: PropTypes.func.isRequired,
+  onLongPress: PropTypes.func,
   testID: PropTypes.string,
   suggestionChips: PropTypes.arrayOf(PropTypes.string),
   onApplySuggestion: PropTypes.func,

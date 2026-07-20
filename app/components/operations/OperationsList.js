@@ -68,6 +68,7 @@ const OperationsList = forwardRef(({
   hasMoreOperations = false,
   onLoadMore,
   onEditOperation,
+  onLongPressOperation = NOOP,
   onDateSeparatorPress,
   onScroll = NOOP,
   onScrollToIndexFailed = NOOP,
@@ -312,6 +313,27 @@ const OperationsList = forwardRef(({
     />
   ), [colors]);
 
+  // A static, non-interactive copy of a row, handed to the long-press action
+  // menu so it can lift the pressed row above the blurred backdrop. Built here
+  // because this is where the category/account/amount formatters live.
+  const renderClonedRow = useCallback((op) => (
+    <OperationListItem
+      operation={op}
+      colors={colors}
+      t={t}
+      categories={categories}
+      getCategoryInfo={getCategoryInfo}
+      getAccountName={getAccountName}
+      formatCurrency={formatCurrency}
+      isLast
+      onPress={NOOP}
+    />
+  ), [colors, t, categories, getCategoryInfo, getAccountName, formatCurrency]);
+
+  const handleItemLongPress = useCallback((op, layout) => {
+    onLongPressOperation({ operation: op, layout, row: renderClonedRow(op) });
+  }, [onLongPressOperation, renderClonedRow]);
+
   // Render an individual operation row inside the card
   const renderItem = useCallback(({ item, index, section }) => {
     const isLast = index === section.data.length - 1;
@@ -336,13 +358,14 @@ const OperationsList = forwardRef(({
           formatCurrency={formatCurrency}
           isLast={isLast}
           onPress={() => onEditOperation(item)}
+          onLongPress={handleItemLongPress}
           suggestionChips={item.id === pendingSuggestionId ? pendingSuggestions : null}
           onApplySuggestion={onApplySuggestion}
           onDismissSuggestion={onDismissSuggestion}
         />
       </View>
     );
-  }, [colors, t, categories, getCategoryInfo, getAccountName, formatCurrency, onEditOperation, pendingSuggestionId, pendingSuggestions, onApplySuggestion, onDismissSuggestion]);
+  }, [colors, t, categories, getCategoryInfo, getAccountName, formatCurrency, onEditOperation, handleItemLongPress, pendingSuggestionId, pendingSuggestions, onApplySuggestion, onDismissSuggestion]);
 
   const keyExtractor = useCallback((item) => item.id, []);
 
@@ -454,6 +477,7 @@ OperationsList.propTypes = {
   hasMoreOperations: PropTypes.bool,
   onLoadMore: PropTypes.func.isRequired,
   onEditOperation: PropTypes.func.isRequired,
+  onLongPressOperation: PropTypes.func,
   onDateSeparatorPress: PropTypes.func.isRequired,
   onScroll: PropTypes.func,
   onScrollToIndexFailed: PropTypes.func,

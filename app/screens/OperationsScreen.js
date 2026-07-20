@@ -20,6 +20,7 @@ import OperationModal from '../modals/OperationModal';
 import Calculator from '../components/Calculator';
 import ListCard from '../components/ListCard';
 import OperationsList from '../components/operations/OperationsList';
+import OperationActionMenu from '../components/operations/OperationActionMenu';
 import QuickAddForm from '../components/operations/QuickAddForm';
 import NotificationBindingStack, { deckPeekAllowance, deckCardHeight } from '../components/operations/NotificationBindingStack';
 import PickerModal from '../components/operations/PickerModal';
@@ -87,6 +88,8 @@ const OperationsScreen = () => {
   // added back-to-back within the 5-second window.
   const [undoInfo, setUndoInfo] = useState(null); // null | { id, token }
   const undoTokenRef = useRef(0);
+  // Long-press context menu on a row: null | { operation, layout, row }
+  const [actionMenu, setActionMenu] = useState(null);
   const [filterPanelHeight, setFilterPanelHeight] = useState(0);
   // Seeded with an estimate of the collapsed search-pill area so the list's top
   // inset is roughly right on first paint; the real value arrives via onLayout.
@@ -442,6 +445,55 @@ const OperationsScreen = () => {
       ],
     );
   }, [t, showDialog, deleteOperation]);
+
+  // "Repeat" a past operation: create an identical one dated now so it lands at
+  // the top of today's group. Reuses the same undo affordance as a fresh add.
+  const handleDuplicateOperation = useCallback(async (operation) => {
+    try {
+      // Drop identity/timestamp fields and the original's location; re-date to
+      // today (YYYY-MM-DD, matching every other add path) so the copy lands at
+      // the top of today's group and the date separators parse correctly.
+      const {
+        id, created_at: _createdAt, createdAt: _createdAtCamel,
+        latitude: _lat, longitude: _lng, ...rest
+      } = operation;
+      const duplicate = { ...rest, date: toDateString(new Date()) };
+      const created = await addOperation(duplicate);
+      if (created?.id) {
+        undoTokenRef.current += 1;
+        setUndoInfo({ id: created.id, token: undoTokenRef.current });
+      }
+    } catch (error) {
+      // addOperation surfaces its own error dialog.
+    }
+  }, [addOperation]);
+
+  const handleLongPressOperation = useCallback((menu) => {
+    setActionMenu(menu);
+  }, []);
+
+  const closeActionMenu = useCallback(() => setActionMenu(null), []);
+
+  // Read the current menu from state (fresh via deps) and run the side effect
+  // outside setState — a state updater must stay pure (StrictMode double-invokes
+  // it, which would fire the action twice).
+  const handleMenuEdit = useCallback(() => {
+    const op = actionMenu?.operation;
+    setActionMenu(null);
+    if (op) handleEditOperation(op);
+  }, [actionMenu, handleEditOperation]);
+
+  const handleMenuRepeat = useCallback(() => {
+    const op = actionMenu?.operation;
+    setActionMenu(null);
+    if (op) handleDuplicateOperation(op);
+  }, [actionMenu, handleDuplicateOperation]);
+
+  const handleMenuDelete = useCallback(() => {
+    const op = actionMenu?.operation;
+    setActionMenu(null);
+    if (op) handleDeleteOperation(op);
+  }, [actionMenu, handleDeleteOperation]);
 
   const handleDateSeparatorPress = useCallback((dateString) => {
     // Parse the date and set it as the selected date (T00:00:00 anchors the bare
@@ -1036,6 +1088,7 @@ const OperationsScreen = () => {
         hasMoreOperations={hasMoreOperations}
         onLoadMore={loadMoreOperations}
         onEditOperation={handleEditOperation}
+        onLongPressOperation={handleLongPressOperation}
         onDateSeparatorPress={handleDateSeparatorPress}
         onScroll={handleScroll}
         onScrollToIndexFailed={handleScrollToIndexFailed}
@@ -1116,6 +1169,17 @@ const OperationsScreen = () => {
         onSelectCategory={handleSelectCategory}
         onAutoAddWithCategory={handleAutoAddWithCategory}
         onAutoAddWithAccount={handleAutoAddWithAccount}
+      />
+
+      {/* Long-press context menu for a single operation row */}
+      <OperationActionMenu
+        menu={actionMenu}
+        colors={colors}
+        t={t}
+        onClose={closeActionMenu}
+        onEdit={handleMenuEdit}
+        onRepeat={handleMenuRepeat}
+        onDelete={handleMenuDelete}
       />
 
       {/* Scroll to Top Button - only show when scrolled down */}
