@@ -40,6 +40,22 @@ import { useDisplaySettings } from '../contexts/DisplaySettingsContext';
 
 // Note: dynamic createStyles removed to keep linting stable.
 
+// Map a QuickAdd validation failure to the form field that should flash red,
+// so single-field omissions get the same lightweight inline treatment the
+// missing-category case already had (instead of a blocking OK dialog). The
+// order mirrors validateOperation; returns null for anything not tied to a
+// single visible field (e.g. missing type/date), which falls back to a dialog.
+export const getQuickAddFlashField = (op) => {
+  if (!op.amount || isNaN(parseFloat(op.amount)) || parseFloat(op.amount) <= 0) return 'amount';
+  if (!op.accountId) return 'account';
+  if (op.type === 'transfer') {
+    if (!op.toAccountId || op.accountId === op.toAccountId) return 'toAccount';
+  } else if (!op.categoryId) {
+    return 'category';
+  }
+  return null;
+};
+
 const OperationsScreen = () => {
   const { colors } = useThemeColors();
   const insets = useSafeAreaInsets();
@@ -95,7 +111,10 @@ const OperationsScreen = () => {
   // Seeded with an estimate of the collapsed search-pill area so the list's top
   // inset is roughly right on first paint; the real value arrives via onLayout.
   const [searchBarAreaHeight, setSearchBarAreaHeight] = useState(48);
-  const [flashCategoryErrorCount, setFlashCategoryErrorCount] = useState(0);
+  // Which QuickAdd field failed validation, if any. `token` bumps on every failed
+  // attempt so re-omitting the same field re-triggers the red flash.
+  const [quickAddFlash, setQuickAddFlash] = useState(null);
+  const quickAddFlashTokenRef = useRef(0);
 
   const { searchMode, filtersExpanded, openSearch, closeSearch, reopenSearch, toggleFilters } = useSearch();
   const scrollOffsetRef = useRef(0);
@@ -704,8 +723,14 @@ const OperationsScreen = () => {
 
     const error = validateOperation(operationData, t);
     if (error) {
-      if (operationData.type !== 'transfer' && !operationData.categoryId) {
-        setFlashCategoryErrorCount(c => c + 1);
+      // Prefer the lightweight inline flash over a blocking dialog for the common
+      // one-field omissions (zero amount / missing account / missing or duplicate
+      // target account / missing category). The order mirrors validateOperation so
+      // the flashed field matches the error that would have been shown.
+      const flashField = getQuickAddFlashField(operationData);
+      if (flashField) {
+        quickAddFlashTokenRef.current += 1;
+        setQuickAddFlash({ field: flashField, token: quickAddFlashTokenRef.current });
         return;
       }
       showDialog(t('error'), error, [{ text: 'OK' }]);
@@ -1020,7 +1045,7 @@ const OperationsScreen = () => {
                 onOperationCurrencyChange={handleOperationCurrencyChange}
                 foreignRateSource={foreignRateSource}
                 foreignExchangeRate={foreignExchangeRate}
-                flashCategoryError={flashCategoryErrorCount}
+                flashError={quickAddFlash}
               />
             </View>
             {hasSuggestions && quickAddHeight > 0 && (
@@ -1043,7 +1068,7 @@ const OperationsScreen = () => {
       </Animated.View>
       {filtersExpanded && filterPanelHeight > 0 && <View style={{ height: filterPanelHeight }} />}
     </>
-  ), [animatedQuickAddClipStyle, animatedQuickAddSlideStyle, colors, t, quickAddValues, visibleAccounts, filteredCategories, topCategoriesForType, getCategoryInfo, getAccountName, getAccountBalance, getCategoryName, openPicker, handleQuickAdd, handleAmountChange, handleExchangeRateChange, handleDestinationAmountChange, handleAutoAddWithCategory, topTransferAccountsForForm, handleAutoAddWithAccount, TYPES, rateSource, handleOperationCurrencyChange, foreignRateSource, foreignExchangeRate, filterPanelHeight, filtersExpanded, flashCategoryErrorCount, operationSuggestions, hasSuggestions, quickAddHeight, handleQuickAddLayout, accounts, categories, suggestionSaveErrors, suggestionChoices, setSuggestionChoice, acceptSuggestion, dismissSuggestion]);
+  ), [animatedQuickAddClipStyle, animatedQuickAddSlideStyle, colors, t, quickAddValues, visibleAccounts, filteredCategories, topCategoriesForType, getCategoryInfo, getAccountName, getAccountBalance, getCategoryName, openPicker, handleQuickAdd, handleAmountChange, handleExchangeRateChange, handleDestinationAmountChange, handleAutoAddWithCategory, topTransferAccountsForForm, handleAutoAddWithAccount, TYPES, rateSource, handleOperationCurrencyChange, foreignRateSource, foreignExchangeRate, filterPanelHeight, filtersExpanded, quickAddFlash, operationSuggestions, hasSuggestions, quickAddHeight, handleQuickAddLayout, accounts, categories, suggestionSaveErrors, suggestionChoices, setSuggestionChoice, acceptSuggestion, dismissSuggestion]);
 
   // Auto-scroll to top when filter panel closes, but only if the user is still
   // near the top (hasn't scrolled into past dates). The threshold is filterPanelHeight:

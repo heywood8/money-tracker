@@ -163,7 +163,7 @@ CalcButton.propTypes = {
  * - Shows "=" button when expression contains operations
  * - Evaluates expression and replaces with result
  */
-export default function Calculator({ value = '', onValueChange = () => {}, colors, placeholder = '0', onAdd = null, containerBackground = null, compact = false, currencyCode, onCurrencyPress }) {
+export default function Calculator({ value = '', onValueChange = () => {}, colors, placeholder = '0', onAdd = null, containerBackground = null, compact = false, currencyCode, onCurrencyPress, flashError = false }) {
   const [expression, setExpression] = useState(value || '');
   const syncedFromPropRef = useRef(false);
 
@@ -285,7 +285,7 @@ export default function Calculator({ value = '', onValueChange = () => {}, color
     // Use provided containerBackground or fallback to altRow for compatibility
     <View style={[styles.container, compact && styles.containerCompact, { backgroundColor: containerBackground || colors.altRow }]}>
       {/* Display */}
-      <View style={styles.display}>
+      <View style={[styles.display, flashError && { borderColor: '#ef4444' }]}>
         {onCurrencyPress ? (
           <Pressable
             onPress={onCurrencyPress}
@@ -478,6 +478,7 @@ Calculator.propTypes = {
   compact: PropTypes.bool,
   currencyCode: PropTypes.string,
   onCurrencyPress: PropTypes.func,
+  flashError: PropTypes.bool,
 };
 
 const styles = StyleSheet.create({
@@ -529,6 +530,11 @@ const styles = StyleSheet.create({
   },
   display: {
     alignItems: 'center',
+    // Transparent border reserved so the validation flash (red border) can toggle
+    // in without shifting the keypad below by a pixel.
+    borderColor: 'transparent',
+    borderRadius: BORDER_RADIUS.sm,
+    borderWidth: 1,
     flexDirection: 'row',
     justifyContent: 'space-between',
     marginBottom: SPACING.xs,

@@ -2397,75 +2397,119 @@ describe('OperationsScreen', () => {
     });
   });
 
-  describe('Category Validation Flash', () => {
+  // Pure mapping from a validation failure to the field that should flash red.
+  // Kept as a unit test (no render) so the core QoL-12 logic is covered directly
+  // and without the render flakiness the integration tests below are prone to.
+  describe('getQuickAddFlashField', () => {
+    const { getQuickAddFlashField } = require('../../app/screens/OperationsScreen');
+
+    it('maps a zero / empty / non-numeric amount to the amount field', () => {
+      expect(getQuickAddFlashField({ type: 'expense', amount: '', accountId: 'a', categoryId: 'c' })).toBe('amount');
+      expect(getQuickAddFlashField({ type: 'expense', amount: '0', accountId: 'a', categoryId: 'c' })).toBe('amount');
+      expect(getQuickAddFlashField({ type: 'expense', amount: 'abc', accountId: 'a', categoryId: 'c' })).toBe('amount');
+    });
+
+    it('maps a missing source account to the account field (amount takes precedence)', () => {
+      expect(getQuickAddFlashField({ type: 'expense', amount: '100', accountId: '', categoryId: 'c' })).toBe('account');
+      // Amount is checked first, so a bad amount wins even when the account is also missing.
+      expect(getQuickAddFlashField({ type: 'expense', amount: '', accountId: '', categoryId: 'c' })).toBe('amount');
+    });
+
+    it('maps a missing or duplicate transfer target to the toAccount field', () => {
+      expect(getQuickAddFlashField({ type: 'transfer', amount: '100', accountId: 'a', toAccountId: '' })).toBe('toAccount');
+      expect(getQuickAddFlashField({ type: 'transfer', amount: '100', accountId: 'a', toAccountId: 'a' })).toBe('toAccount');
+    });
+
+    it('maps a missing category (non-transfer) to the category field', () => {
+      expect(getQuickAddFlashField({ type: 'expense', amount: '100', accountId: 'a', categoryId: '' })).toBe('category');
+    });
+
+    it('returns null for a fully valid operation', () => {
+      expect(getQuickAddFlashField({ type: 'expense', amount: '100', accountId: 'a', categoryId: 'c' })).toBeNull();
+      expect(getQuickAddFlashField({ type: 'transfer', amount: '100', accountId: 'a', toAccountId: 'b' })).toBeNull();
+    });
+
+    it('returns null for errors not tied to a single visible field (missing type/date)', () => {
+      // type/date failures still fall back to the blocking dialog rather than a flash.
+      expect(getQuickAddFlashField({ amount: '100', accountId: 'a', categoryId: 'c' })).toBeNull();
+    });
+  });
+
+  describe('QuickAdd Validation Flash wiring', () => {
     const { act } = require('@testing-library/react-native');
 
     beforeEach(() => {
       jest.clearAllMocks();
     });
 
-    it('flashes category chips instead of showing dialog when category is missing on expense', async () => {
-      const OperationsScreen = require('../../app/screens/OperationsScreen').default;
-      const { useDialog } = require('../../app/contexts/DialogContext');
+    // Mock the form hook with a given set of QuickAdd values. handleQuickAdd is
+    // reached through the PickerModal's onAutoAddWithCategory shortcut (the
+    // QuickAddForm itself is a list-header mock and not rendered here), so field
+    // mapping is verified separately by the getQuickAddFlashField unit tests; these
+    // two only prove the flash-vs-dialog routing.
+    const mockQuickAddValues = (values) => {
+      const useQuickAddForm = require('../../app/hooks/useQuickAddForm');
+      useQuickAddForm.mockReturnValue({
+        quickAddValues: { description: '', exchangeRate: '', destinationAmount: '', toAccountId: '', categoryId: '', ...values },
+        setQuickAddValues: jest.fn(),
+        getAccountName: jest.fn(() => 'Cash'),
+        getAccountBalance: jest.fn(() => '$1000.00'),
+        getCategoryInfo: jest.fn(() => ({ name: 'Food', icon: 'food' })),
+        getCategoryName: jest.fn(() => 'Food'),
+        filteredCategories: [],
+        resetForm: jest.fn(),
+      });
+    };
+
+    const mockActions = (validateOperation) => {
       const { useOperationsActions } = require('../../app/contexts/OperationsActionsContext');
-
-      const mockShowDialog = jest.fn();
-      const mockValidateOperation = jest.fn((op) =>
-        op.type !== 'transfer' && !op.categoryId ? 'category_required' : null,
-      );
-
-      useDialog.mockReturnValue({ showDialog: mockShowDialog });
       useOperationsActions.mockReturnValue({
         loadMoreOperations: jest.fn(),
         addOperation: jest.fn(),
         updateOperation: jest.fn(),
         deleteOperation: jest.fn(),
-        validateOperation: mockValidateOperation,
+        validateOperation,
         setSearchText: jest.fn(),
         updateSearchFilters: jest.fn(),
         jumpToDate: jest.fn(),
       });
+    };
+
+    it('flashes inline instead of showing a dialog for a single-field omission', async () => {
+      const OperationsScreen = require('../../app/screens/OperationsScreen').default;
+      const { useDialog } = require('../../app/contexts/DialogContext');
+
+      const mockShowDialog = jest.fn();
+      useDialog.mockReturnValue({ showDialog: mockShowDialog });
+      // Valid amount + account so the deciding omission is the (empty) category.
+      mockQuickAddValues({ type: 'expense', amount: '100', accountId: 'acc-1', categoryId: '' });
+      const validateOperation = jest.fn(() => 'category_required');
+      mockActions(validateOperation);
 
       const { getByTestId } = await render(<OperationsScreen />);
-      // onAutoAddWithCategory is exposed on the PickerModal mock and routes through handleQuickAdd
-      const pickerModal = getByTestId('picker-modal');
-
-      // Passing empty string: no categoryId → category error → flash (no dialog)
+      // Passing '' keeps the category empty → getQuickAddFlashField → 'category' → flash.
       await act(async () => {
-        await pickerModal.props.onAutoAddWithCategory('');
+        await getByTestId('picker-modal').props.onAutoAddWithCategory('');
       });
 
+      expect(validateOperation).toHaveBeenCalled();
       expect(mockShowDialog).not.toHaveBeenCalled();
-      expect(mockValidateOperation).toHaveBeenCalled();
     });
 
-    it('shows dialog for non-category validation errors when category is present', async () => {
+    it('still shows a blocking dialog for errors not tied to a single field', async () => {
       const OperationsScreen = require('../../app/screens/OperationsScreen').default;
       const { useDialog } = require('../../app/contexts/DialogContext');
-      const { useOperationsActions } = require('../../app/contexts/OperationsActionsContext');
 
       const mockShowDialog = jest.fn();
-      // Error unrelated to category (amount missing)
-      const mockValidateOperation = jest.fn(() => 'valid_amount_required');
-
       useDialog.mockReturnValue({ showDialog: mockShowDialog });
-      useOperationsActions.mockReturnValue({
-        loadMoreOperations: jest.fn(),
-        addOperation: jest.fn(),
-        updateOperation: jest.fn(),
-        deleteOperation: jest.fn(),
-        validateOperation: mockValidateOperation,
-        setSearchText: jest.fn(),
-        updateSearchFilters: jest.fn(),
-        jumpToDate: jest.fn(),
-      });
+      // All single fields valid, but validation still fails (e.g. a date problem)
+      // → getQuickAddFlashField returns null → fall back to the dialog.
+      mockQuickAddValues({ type: 'expense', amount: '100', accountId: 'acc-1', categoryId: 'cat-1' });
+      mockActions(jest.fn(() => 'date_required'));
 
       const { getByTestId } = await render(<OperationsScreen />);
-      const pickerModal = getByTestId('picker-modal');
-
-      // Passing a real categoryId: category check passes → dialog shown for other error
       await act(async () => {
-        await pickerModal.props.onAutoAddWithCategory('cat-1');
+        await getByTestId('picker-modal').props.onAutoAddWithCategory('cat-1');
       });
 
       expect(mockShowDialog).toHaveBeenCalled();

@@ -19,6 +19,9 @@ import currencies from '../../../assets/currencies.json';
 
 const getCurrencySymbol = (code) => currencies[code]?.symbol || code;
 
+// Red outline used to flash a field that failed validation on a QuickAdd attempt.
+const FLASH_ERROR_COLOR = '#ef4444';
+
 import { hasOperation as checkHasOperation, evaluateExpression } from '../../utils/calculatorUtils';
 import { SPACING, BORDER_RADIUS } from '../../styles/layout';
 import { FONT_SIZE } from '../../styles/designTokens';
@@ -98,28 +101,31 @@ const OperationFormFields = memo(({
   foreignRateSource,
   foreignExchangeRate,
   foreignCurrencyEditable = false,
-  flashCategoryError = 0,
+  flashError = null,
 }) => {
   const { hideBalances } = useDisplaySettings();
 
   // Local state for currency picker visibility
   const [showCurrencyPicker, setShowCurrencyPicker] = useState(false);
 
-  // Category chip error flash: briefly outline the category chips in red when
-  // the user tries to add without selecting a category. Driven by state (not an
-  // animated value) so each chip stays a single Pressable — wrapping a chip in
-  // an extra view to host an animated border collapses its height and hides the
-  // label.
-  const [categoryFlashing, setCategoryFlashing] = useState(false);
+  // Field error flash: briefly outline the offending field in red when the user
+  // tries to add with a one-field omission (missing category / source account /
+  // target account / zero amount). Driven by state (not an animated value) so
+  // each chip stays a single Pressable — wrapping a chip in an extra view to
+  // host an animated border collapses its height and hides the label.
+  // `flashError` carries { field, token }; the token changes on every failed
+  // attempt so repeating the same omission re-triggers the flash.
+  const [flashingField, setFlashingField] = useState(null);
 
   useEffect(() => {
-    if (!flashCategoryError) return undefined;
-    setCategoryFlashing(true);
-    const timer = setTimeout(() => setCategoryFlashing(false), 1500);
+    if (!flashError || !flashError.field) return undefined;
+    setFlashingField(flashError.field);
+    const timer = setTimeout(() => setFlashingField(null), 1500);
     return () => clearTimeout(timer);
-  }, [flashCategoryError]);
+  }, [flashError?.field, flashError?.token]);
 
-  const chipBorderColor = categoryFlashing ? '#ef4444' : colors.border;
+  const chipBorderColor = flashingField === 'category' ? FLASH_ERROR_COLOR : colors.border;
+  const toAccountChipBorderColor = flashingField === 'toAccount' ? FLASH_ERROR_COLOR : colors.border;
 
   // Inline "All categories" browser state — replaces the bottom-sheet picker in
   // QuickAdd. We render the category hierarchy in-place using chips that look
@@ -248,6 +254,15 @@ const OperationFormFields = memo(({
     borderColor: colors.border,
   }), [colors]);
 
+  // Per-field border overrides — flash red when that field is the one that
+  // failed validation, otherwise fall back to the normal group border.
+  const accountBorderStyle = flashingField === 'account'
+    ? { borderColor: FLASH_ERROR_COLOR }
+    : groupBorderStyle;
+  const toAccountBorderStyle = flashingField === 'toAccount'
+    ? { borderColor: FLASH_ERROR_COLOR }
+    : groupBorderStyle;
+
   const disabledStyle = useMemo(() =>
     disabled ? styles.disabledInput : null
   , [disabled]);
@@ -352,9 +367,10 @@ const OperationFormFields = memo(({
     iconName = 'wallet',
     style = styles.formInput,
     testID,
+    borderStyle = groupBorderStyle,
   ) => (
     <Pressable
-      style={[style, compact && styles.formInputCompact, inputStyle, groupBorderStyle, disabledStyle]}
+      style={[style, compact && styles.formInputCompact, inputStyle, borderStyle, disabledStyle]}
       onPress={onPress}
       disabled={disabled}
       testID={testID}
@@ -388,6 +404,10 @@ const OperationFormFields = memo(({
         values.accountId,
         () => !disabled && openPicker('account', accounts),
         t('select_account'),
+        'wallet',
+        styles.formInput,
+        undefined,
+        accountBorderStyle,
       );
     } else if (values.type === 'transfer' && transferLayout === 'stacked') {
       // Stacked layout for OperationModal
@@ -397,6 +417,10 @@ const OperationFormFields = memo(({
             values.accountId,
             () => !disabled && openPicker('account', accounts),
             t('select_account'),
+            'wallet',
+            styles.formInput,
+            undefined,
+            accountBorderStyle,
           )}
           {renderAccountPicker(
             values.toAccountId,
@@ -405,6 +429,7 @@ const OperationFormFields = memo(({
             'wallet',
             styles.formInput,
             'to-account-picker',
+            toAccountBorderStyle,
           )}
         </>
       );
@@ -414,6 +439,10 @@ const OperationFormFields = memo(({
         values.accountId,
         () => !disabled && openPicker('account', accounts),
         t('select_account'),
+        'wallet',
+        styles.formInput,
+        undefined,
+        accountBorderStyle,
       );
     }
   };
@@ -750,7 +779,7 @@ const OperationFormFields = memo(({
               compact && styles.accountShortcutButtonCompact,
               {
                 backgroundColor: isSelected ? colors.primary : colors.inputBackground,
-                borderColor: colors.border,
+                borderColor: isSelected ? colors.primary : toAccountChipBorderColor,
               },
               disabledStyle,
             ]}
@@ -786,7 +815,7 @@ const OperationFormFields = memo(({
           <View style={styles.categoryButtonsContainer}>
             {showAllAccountsButton && (
               <Pressable
-                style={[styles.categoryPickerButton, inputStyle, groupBorderStyle, disabledStyle]}
+                style={[styles.categoryPickerButton, inputStyle, toAccountBorderStyle, disabledStyle]}
                 onPress={() => !disabled && openPicker('toAccount', accounts.filter(acc => acc.id !== values.accountId))}
                 disabled={disabled}
               >
@@ -833,6 +862,7 @@ const OperationFormFields = memo(({
       'swap-horizontal',
       styles.formInput,
       'to-account-picker',
+      toAccountBorderStyle,
     );
   };
 
@@ -851,6 +881,7 @@ const OperationFormFields = memo(({
           compact={compact}
           currencyCode={compact && values.type !== 'transfer' && onOperationCurrencyChange ? getCurrencySymbol(values.operationCurrency) : undefined}
           onCurrencyPress={compact && values.type !== 'transfer' && onOperationCurrencyChange ? () => setShowCurrencyPicker(true) : undefined}
+          flashError={flashingField === 'amount'}
         />
       </View>
       {isForeignCurrencyOp && sourceAccount && !foreignCurrencyEditable && (
@@ -954,7 +985,10 @@ OperationFormFields.propTypes = {
   foreignRateSource: PropTypes.oneOf(['loading', 'live', 'offline']),
   foreignExchangeRate: PropTypes.string,
   foreignCurrencyEditable: PropTypes.bool,
-  flashCategoryError: PropTypes.number,
+  flashError: PropTypes.shape({
+    field: PropTypes.oneOf(['category', 'account', 'toAccount', 'amount']),
+    token: PropTypes.number,
+  }),
 };
 
 const styles = StyleSheet.create({
