@@ -1,5 +1,17 @@
 # Changelog
 
+## [0.205.0](https://github.com/heywood8/money-tracker/compare/penny-v0.204.4...penny-v0.205.0) (2026-07-20)
+
+
+### Features
+
+* **planned:** add execute action to long-press menu for discoverability (QoL-6) ([#1292](https://github.com/heywood8/money-tracker/issues/1292)) ([9fd3571](https://github.com/heywood8/money-tracker/commit/9fd3571e54f6ff3fd132b5dd0b7c3730dc114ed2))
+
+
+### Bug Fixes
+
+* **graphs:** show EmptyState and correct initial loading for balance history (QoL-11) ([#1285](https://github.com/heywood8/money-tracker/issues/1285)) ([888a1a2](https://github.com/heywood8/money-tracker/commit/888a1a29d1865a6a13f37e1d8ecd9249623dbfed))
+
 ## [0.204.4](https://github.com/heywood8/money-tracker/compare/penny-v0.204.3...penny-v0.204.4) (2026-07-20)
 
 
