@@ -1,5 +1,56 @@
 # Changelog
 
+## [0.202.0](https://github.com/heywood8/money-tracker/compare/penny-v0.201.0...penny-v0.202.0) (2026-07-20)
+
+
+### Features
+
+* **bindings:** переработка экрана привязок + всплытие по последнему совпадению ([#1261](https://github.com/heywood8/money-tracker/issues/1261)) ([53d7df1](https://github.com/heywood8/money-tracker/commit/53d7df126dedb1a651d8537143e15fb69bc7ec42))
+* **categories:** inherit parent folder on new category ([#1272](https://github.com/heywood8/money-tracker/issues/1272)) ([e1e8720](https://github.com/heywood8/money-tracker/commit/e1e872099c2749ab912a8de258cf1e56c618363c))
+* **graphs:** пересчёт операций в drill-down категории + оригинальная сумма ([#1247](https://github.com/heywood8/money-tracker/issues/1247)) ([5554d01](https://github.com/heywood8/money-tracker/commit/5554d01deda2a7e6c2da50de776caf456600b389))
+* **notifications:** persist ingestion location on pending notifications ([#1268](https://github.com/heywood8/money-tracker/issues/1268)) ([82f9d1d](https://github.com/heywood8/money-tracker/commit/82f9d1d12b69df2d293afe891737dc6c37afc653))
+* **operations:** non-blocking add of notification suggestions ([#1259](https://github.com/heywood8/money-tracker/issues/1259)) ([87a9b9a](https://github.com/heywood8/money-tracker/commit/87a9b9a38dc34034ff0c07150b9b4e7aed4e6049))
+* **operations:** quick-action menu (repeat + delete) on operation rows ([#1275](https://github.com/heywood8/money-tracker/issues/1275)) ([4349b29](https://github.com/heywood8/money-tracker/commit/4349b29dbfb23b4459b50be218f45d831f7750cb))
+
+
+### Bug Fixes
+
+* **db:** применить миграцию 0016 для установок, полных до 0015 ([#1263](https://github.com/heywood8/money-tracker/issues/1263)) ([a86786d](https://github.com/heywood8/money-tracker/commit/a86786d2728fab345b20c50eba4f762c47fb56ef))
+* **graphs:** тумблер пересчёта валют бейджем в углу колеса + подсказка ([#1251](https://github.com/heywood8/money-tracker/issues/1251)) ([c0d7e88](https://github.com/heywood8/money-tracker/commit/c0d7e88161cff4e6de3ba8f5cea71b50c5fa0c09))
+* **navigation:** block taps only beside and below the tab bar ([#1255](https://github.com/heywood8/money-tracker/issues/1255)) ([13a1b74](https://github.com/heywood8/money-tracker/commit/13a1b74722e93b8ee1374160bc2ba68f112144f7))
+* **operations:** keep the undo bar on screen for its full 5s window ([#1253](https://github.com/heywood8/money-tracker/issues/1253)) ([d557306](https://github.com/heywood8/money-tracker/commit/d5573066de12dcc5da8dccf5ab16ed64ae1288ac))
+* **operations:** stop the undo bar flashing for a split second ([#1249](https://github.com/heywood8/money-tracker/issues/1249)) ([8d78935](https://github.com/heywood8/money-tracker/commit/8d78935835977e6145adee16206be80e2133ca6e))
+
+
+### Documentation
+
+* add quality-of-life backlog from code-level UX audit ([#1270](https://github.com/heywood8/money-tracker/issues/1270)) ([6ae6cbb](https://github.com/heywood8/money-tracker/commit/6ae6cbbf2c31fdfcb13141ccf70bfd815d5ffd8c))
+
+
+### Miscellaneous Chores
+
+* **deps:** bump @sentry/react-native from 8.18.0 to 8.19.0 ([#1267](https://github.com/heywood8/money-tracker/issues/1267)) ([2d4852c](https://github.com/heywood8/money-tracker/commit/2d4852cda32f3559094a2dcf64d47f224dadad2a))
+* **deps:** bump actions/setup-node from 6 to 7 ([#1266](https://github.com/heywood8/money-tracker/issues/1266)) ([12697a2](https://github.com/heywood8/money-tracker/commit/12697a2d36e59a2f8fe7465b74fe23339fc0328d))
+* **main:** release penny 0.196.1 ([#1246](https://github.com/heywood8/money-tracker/issues/1246)) ([248cb91](https://github.com/heywood8/money-tracker/commit/248cb91f8bf03372b40698baa6d0d1600a015d0c))
+* **main:** release penny 0.197.0 ([#1248](https://github.com/heywood8/money-tracker/issues/1248)) ([2e7a99b](https://github.com/heywood8/money-tracker/commit/2e7a99b2692d29598c3af7cbee2e506a458f9fc7))
+* **main:** release penny 0.197.1 ([#1250](https://github.com/heywood8/money-tracker/issues/1250)) ([6be6e5b](https://github.com/heywood8/money-tracker/commit/6be6e5be14bb1f88a12b3a5405ac9b95bef37615))
+* **main:** release penny 0.197.2 ([#1252](https://github.com/heywood8/money-tracker/issues/1252)) ([a28ecf3](https://github.com/heywood8/money-tracker/commit/a28ecf317a0920423ac6ba4fa2b85134cd92946c))
+* **main:** release penny 0.197.3 ([#1254](https://github.com/heywood8/money-tracker/issues/1254)) ([3461c0e](https://github.com/heywood8/money-tracker/commit/3461c0e766cba7ee3df96b26d38210cfa2dd1e2a))
+* **main:** release penny 0.197.4 ([#1256](https://github.com/heywood8/money-tracker/issues/1256)) ([8058b82](https://github.com/heywood8/money-tracker/commit/8058b82218c53105123ceddc93f4468d2ce2117a))
+* **main:** release penny 0.197.5 ([#1258](https://github.com/heywood8/money-tracker/issues/1258)) ([757e77e](https://github.com/heywood8/money-tracker/commit/757e77e411055f88e65e2233fb87c4f183e2ad42))
+* **main:** release penny 0.198.0 ([#1260](https://github.com/heywood8/money-tracker/issues/1260)) ([fd2bbc6](https://github.com/heywood8/money-tracker/commit/fd2bbc6cc005faf3a7c885cf14ca05fb5c8f63e1))
+* **main:** release penny 0.199.0 ([#1262](https://github.com/heywood8/money-tracker/issues/1262)) ([5bea566](https://github.com/heywood8/money-tracker/commit/5bea566af6ecb3d75c658b5b074878af2bc49646))
+* **main:** release penny 0.199.1 ([#1264](https://github.com/heywood8/money-tracker/issues/1264)) ([356f148](https://github.com/heywood8/money-tracker/commit/356f148263e644cefcbd755c2000ce854ec2783c))
+* **main:** release penny 0.200.0 ([#1269](https://github.com/heywood8/money-tracker/issues/1269)) ([46fe852](https://github.com/heywood8/money-tracker/commit/46fe8525bc50b25df6c20de49222119f0bf8efc1))
+* **main:** release penny 0.200.1 ([#1271](https://github.com/heywood8/money-tracker/issues/1271)) ([d9bdaa1](https://github.com/heywood8/money-tracker/commit/d9bdaa1423cf65c76199572854b86a4ddbbaef2c))
+* **main:** release penny 0.200.2 ([#1273](https://github.com/heywood8/money-tracker/issues/1273)) ([792bd09](https://github.com/heywood8/money-tracker/commit/792bd09e08ff740fe2b1b31042a6297064169923))
+* **main:** release penny 0.200.2 ([#1274](https://github.com/heywood8/money-tracker/issues/1274)) ([c8cf2d9](https://github.com/heywood8/money-tracker/commit/c8cf2d9cb365511a10686371897b1337c92026dd))
+
+
+### Code Refactoring
+
+* replace defaultProps with ES default parameters ([#1257](https://github.com/heywood8/money-tracker/issues/1257)) ([760a1ca](https://github.com/heywood8/money-tracker/commit/760a1cade48c175144313fd154505baec4c9547c))
+
 ## [0.201.0](https://github.com/heywood8/money-tracker/compare/penny-v0.200.2...penny-v0.201.0) (2026-07-20)
 
 
