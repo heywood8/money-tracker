@@ -9,7 +9,12 @@ import { appEvents, EVENTS } from '../services/eventEmitter';
  */
 const useBalanceHistory = (selectedAccount, selectedYear, selectedMonth) => {
   const [balanceHistoryData, setBalanceHistoryData] = useState({ labels: [] });
-  const [loadingBalanceHistory, setLoadingBalanceHistory] = useState(false);
+  // Start in the loading state so the first render shows a spinner instead of a
+  // momentary "no data" flash before loadBalanceHistory() runs (QoL-11). The
+  // early-return in loadBalanceHistory() immediately resets this to false when no
+  // account/month is selected, so "nothing selected" reads as a valid empty state
+  // rather than an eternal spinner.
+  const [loadingBalanceHistory, setLoadingBalanceHistory] = useState(true);
   const [balanceHistoryTableData, setBalanceHistoryTableData] = useState([]);
   const [editingBalanceRow, setEditingBalanceRow] = useState(null);
   const [editingBalanceValue, setEditingBalanceValue] = useState('');
