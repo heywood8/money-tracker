@@ -1,5 +1,12 @@
 # Changelog
 
+## [0.205.1](https://github.com/heywood8/money-tracker/compare/penny-v0.205.0...penny-v0.205.1) (2026-07-20)
+
+
+### Bug Fixes
+
+* **categories:** surface specific reason when category delete is blocked (QoL-4) ([#1294](https://github.com/heywood8/money-tracker/issues/1294)) ([9c2c371](https://github.com/heywood8/money-tracker/commit/9c2c371c911b0098127d3cdafd8f8847e0eda060))
+
 ## [0.205.0](https://github.com/heywood8/money-tracker/compare/penny-v0.204.4...penny-v0.205.0) (2026-07-20)
 
 
