@@ -1,5 +1,12 @@
 # Changelog
 
+## [0.201.0](https://github.com/heywood8/money-tracker/compare/penny-v0.200.2...penny-v0.201.0) (2026-07-20)
+
+
+### Features
+
+* **operations:** quick-action menu (repeat + delete) on operation rows ([#1275](https://github.com/heywood8/money-tracker/issues/1275)) ([4349b29](https://github.com/heywood8/money-tracker/commit/4349b29dbfb23b4459b50be218f45d831f7750cb))
+
 ## [0.200.2](https://github.com/heywood8/money-tracker/compare/penny-v0.200.1...penny-v0.200.2) (2026-07-20)
 
 
