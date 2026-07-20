@@ -1,5 +1,12 @@
 # Changelog
 
+## [0.204.2](https://github.com/heywood8/money-tracker/compare/penny-v0.204.1...penny-v0.204.2) (2026-07-20)
+
+
+### Documentation
+
+* sync QoL backlog statuses after audit follow-ups ([#1283](https://github.com/heywood8/money-tracker/issues/1283)) ([4023ec0](https://github.com/heywood8/money-tracker/commit/4023ec0b87123fa87ca09eed27f775bf99273774))
+
 ## [0.204.1](https://github.com/heywood8/money-tracker/compare/penny-v0.204.0...penny-v0.204.1) (2026-07-20)
 
 
