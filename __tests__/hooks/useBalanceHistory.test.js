@@ -113,6 +113,31 @@ describe('useBalanceHistory', () => {
       expect(result.current.balanceHistoryData.labels.length).toBe(31); // January has 31 days
     });
 
+    it('issues the four independent reads concurrently (QoL-10)', async () => {
+      // Gate every read behind one manually-released promise. Serial awaits would
+      // dispatch only the first read before the gate opens; concurrent dispatch
+      // via Promise.all puts all four reads in flight up front.
+      let releaseGate;
+      const gate = new Promise((resolve) => { releaseGate = resolve; });
+      BalanceHistoryDB.getBalanceHistory.mockImplementation(() => gate.then(() => []));
+      OperationsDB.getTotalExpenses.mockImplementation(() => gate.then(() => 0));
+
+      const { result } = await renderHook(() => useBalanceHistory(mockAccountId, mockYear, mockMonth));
+
+      await act(async () => {
+        const loadPromise = result.current.loadBalanceHistory();
+        // Flush the synchronous Promise.all dispatch without opening the gate.
+        await Promise.resolve();
+
+        // All four reads are in flight before any has resolved → concurrent.
+        expect(BalanceHistoryDB.getBalanceHistory).toHaveBeenCalledTimes(2);
+        expect(OperationsDB.getTotalExpenses).toHaveBeenCalledTimes(2);
+
+        releaseGate();
+        await loadPromise;
+      });
+    });
+
     it('should calculate trend line with linear regression', async () => {
       const mockHistory = [
         { date: '2024-01-01', balance: '1000' },
