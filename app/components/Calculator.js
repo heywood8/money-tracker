@@ -6,6 +6,9 @@ import { BORDER_RADIUS, SPACING, HEIGHTS } from '../styles/designTokens';
 import { hasOperation as checkHasOperation, evaluateExpression as evalExpr } from '../utils/calculatorUtils';
 import { getDecimalPlaces } from '../services/currency';
 
+// Validation-flash border color; mirrors FLASH_ERROR_COLOR in OperationFormFields.js
+const FLASH_ERROR_COLOR = '#ef4444';
+
 /**
  * Calculator button component - Memoized for performance
  * Executes on press down and repeats during long holds
@@ -285,7 +288,7 @@ export default function Calculator({ value = '', onValueChange = () => {}, color
     // Use provided containerBackground or fallback to altRow for compatibility
     <View style={[styles.container, compact && styles.containerCompact, { backgroundColor: containerBackground || colors.altRow }]}>
       {/* Display */}
-      <View style={[styles.display, flashError && { borderColor: '#ef4444' }]}>
+      <View style={[styles.display, flashError && styles.displayError]}>
         {onCurrencyPress ? (
           <Pressable
             onPress={onCurrencyPress}
@@ -547,6 +550,9 @@ const styles = StyleSheet.create({
     gap: SPACING.xs,
     justifyContent: 'flex-end',
     width: 80,
+  },
+  displayError: {
+    borderColor: FLASH_ERROR_COLOR,
   },
   displayLeftSpacer: {
     width: 80,
