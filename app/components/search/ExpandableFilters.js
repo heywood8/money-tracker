@@ -7,6 +7,54 @@ import { HORIZONTAL_PADDING } from '../../styles/layout';
 import { formatDate } from '../../services/BalanceHistoryDB';
 import currencies from '../../../assets/currencies.json';
 
+// Quick date-range presets shown above the manual from/to pickers (QoL-8).
+const DATE_PRESETS = [
+  { key: 'this_week', label: 'preset_this_week' },
+  { key: 'this_month', label: 'preset_this_month' },
+  { key: 'last_7_days', label: 'preset_last_7_days' },
+  { key: 'last_30_days', label: 'preset_last_30_days' },
+  { key: 'this_year', label: 'preset_this_year' },
+];
+
+// Compute a preset's [start, end] as local YYYY-MM-DD strings. All arithmetic
+// uses local Date parts (no UTC) to match formatDate and the manual pickers.
+const computePresetRange = (key) => {
+  const now = new Date();
+  const y = now.getFullYear();
+  const m = now.getMonth();
+  const d = now.getDate();
+  let start;
+  let end;
+  switch (key) {
+    case 'this_week': {
+      // Week starts Monday.
+      const diffToMonday = (now.getDay() + 6) % 7;
+      start = new Date(y, m, d - diffToMonday);
+      end = new Date(y, m, d - diffToMonday + 6);
+      break;
+    }
+    case 'this_month':
+      start = new Date(y, m, 1);
+      end = new Date(y, m + 1, 0);
+      break;
+    case 'last_7_days':
+      start = new Date(y, m, d - 6);
+      end = new Date(y, m, d);
+      break;
+    case 'last_30_days':
+      start = new Date(y, m, d - 29);
+      end = new Date(y, m, d);
+      break;
+    case 'this_year':
+      start = new Date(y, 0, 1);
+      end = new Date(y, 11, 31);
+      break;
+    default:
+      return { startDate: null, endDate: null };
+  }
+  return { startDate: formatDate(start), endDate: formatDate(end) };
+};
+
 const ExpandableFilters = ({
   filters,
   onFilterChange,
@@ -128,6 +176,16 @@ const ExpandableFilters = ({
     return parsed;
   };
 
+  const applyDatePreset = (key) => {
+    onFilterChange({ dateRange: computePresetRange(key) });
+  };
+
+  // A preset is active when the current range exactly matches its computed span.
+  const isPresetActive = (key) => {
+    const { startDate, endDate } = computePresetRange(key);
+    return filters.dateRange.startDate === startDate && filters.dateRange.endDate === endDate;
+  };
+
   return (
     <View testID="expandable-filters" style={[styles.container, { backgroundColor: colors.background }]}>
       <ScrollView style={styles.scrollView} showsVerticalScrollIndicator={false}>
@@ -169,6 +227,28 @@ const ExpandableFilters = ({
           <Text style={[styles.sectionLabel, { color: colors.mutedText }]}>
             {t('date_range')}
           </Text>
+          <View style={[styles.chipContainer, { marginBottom: 12 }]}>
+            {DATE_PRESETS.map((preset) => {
+              const active = isPresetActive(preset.key);
+              return (
+                <TouchableOpacity
+                  key={preset.key}
+                  style={[styles.chip, {
+                    backgroundColor: active ? colors.primary : colors.inputBackground,
+                    borderColor: colors.border,
+                  }]}
+                  onPress={() => applyDatePreset(preset.key)}
+                  testID={`date-preset-${preset.key}`}
+                  accessibilityRole="button"
+                  accessibilityState={{ selected: active }}
+                >
+                  <Text style={[styles.chipText, { color: active ? '#fff' : colors.text }]}>
+                    {t(preset.label)}
+                  </Text>
+                </TouchableOpacity>
+              );
+            })}
+          </View>
           <View style={styles.dateRangeContainer}>
             <TouchableOpacity
               style={[styles.dateInput, { backgroundColor: colors.inputBackground, borderColor: colors.inputBorder }]}
