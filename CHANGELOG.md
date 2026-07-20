@@ -1,5 +1,13 @@
 # Changelog
 
+## [0.203.0](https://github.com/heywood8/money-tracker/compare/penny-v0.202.0...penny-v0.203.0) (2026-07-20)
+
+
+### Features
+
+* **operations:** inline validation flash for QuickAdd (QoL-12) ([#1278](https://github.com/heywood8/money-tracker/issues/1278)) ([9af2295](https://github.com/heywood8/money-tracker/commit/9af22957fb3358800e3522913071c33f80c5d55f))
+* QoL-13 settings polish (reset feedback, Sheets setup CTA, update snooze, amount-filter hints) ([#1277](https://github.com/heywood8/money-tracker/issues/1277)) ([27728d5](https://github.com/heywood8/money-tracker/commit/27728d511eb5d63499c72dd1336a9b63f206bc51))
+
 ## [0.202.0](https://github.com/heywood8/money-tracker/compare/penny-v0.201.0...penny-v0.202.0) (2026-07-20)
 
 
