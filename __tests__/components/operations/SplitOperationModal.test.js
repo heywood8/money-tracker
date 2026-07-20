@@ -341,6 +341,63 @@ describe('SplitOperationModal', () => {
     });
   });
 
+  describe('Decimal Separator Normalization (QoL-2)', () => {
+    it('normalizes a comma decimal separator to a dot in the input value', async () => {
+      const { getByTestId } = await render(<SplitOperationModal {...defaultProps} />);
+
+      const input = getByTestId('split-amount-input');
+      await fireEvent.changeText(input, '1,50');
+
+      // decimal-pad on many locales emits ",", but state must hold "1.50"
+      expect(input.props.value).toBe('1.50');
+    });
+
+    it('passes a dot-normalized amount to onConfirm when a comma is typed', async () => {
+      const onConfirm = jest.fn();
+      const { getByTestId, getByText } = await render(
+        <SplitOperationModal {...defaultProps} onConfirm={onConfirm} />,
+      );
+
+      // Enter amount with a comma decimal separator
+      const input = getByTestId('split-amount-input');
+      await fireEvent.changeText(input, '1,50');
+
+      // Select category
+      await fireEvent.press(getByTestId('category-picker-button'));
+      await fireEvent.press(getByText('Food'));
+
+      // Confirm
+      await fireEvent.press(getByTestId('confirm-button'));
+
+      await waitFor(() => {
+        // Must be "1.50", never the raw "1,50" or parseFloat-truncated "1"
+        expect(onConfirm).toHaveBeenCalledWith('1.50', 'cat-1');
+      });
+    });
+
+    it('validates a comma amount against the original instead of truncating it', async () => {
+      // Regression: parseFloat("50,00") === 50, but a raw ">= original" check
+      // on "150,00" would truncate to 150. Ensure the normalized value is
+      // validated so a comma amount below the original passes.
+      const onConfirm = jest.fn();
+      const { getByTestId, getByText } = await render(
+        <SplitOperationModal {...defaultProps} onConfirm={onConfirm} />,
+      );
+
+      const input = getByTestId('split-amount-input');
+      await fireEvent.changeText(input, '99,99');
+
+      await fireEvent.press(getByTestId('category-picker-button'));
+      await fireEvent.press(getByText('Food'));
+
+      await fireEvent.press(getByTestId('confirm-button'));
+
+      await waitFor(() => {
+        expect(onConfirm).toHaveBeenCalledWith('99.99', 'cat-1');
+      });
+    });
+  });
+
   describe('Cancel Action', () => {
     it('calls onClose when cancel button is pressed', async () => {
       const onClose = jest.fn();
