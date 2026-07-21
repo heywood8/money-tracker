@@ -654,6 +654,12 @@ export default function NotificationProcessingContentPanel({ bottomInset = 0 }) 
               overshootRight={false}
               friction={2}
               rightThreshold={60}
+              // The card only reveals right actions (leftward drag). Leave the
+              // rightward direction unrecognized so a rightward swipe passes
+              // through to the panel's swipe-to-dismiss gesture instead of being
+              // swallowed by this Swipeable's pan handler (activeOffsetX positive
+              // threshold is dragOffsetFromLeftEdge).
+              dragOffsetFromLeftEdge={Number.MAX_SAFE_INTEGER}
             >
               {card}
             </Swipeable>
