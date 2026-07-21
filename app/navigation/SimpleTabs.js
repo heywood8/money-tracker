@@ -198,26 +198,33 @@ TabButton.propTypes = {
   updateProgress: PropTypes.number,
 };
 
-// Pre-computed gradient steps: transparent → very dark black overlay
-// Cubic ease-in gives a natural-looking gradient
+// Gradient geometry. The fade tints toward the theme background (not black), so
+// it dissolves the scrolling content into the surface behind the floating bar
+// the same way in both themes — a black fade looked like a dark smudge on the
+// light theme. Cubic ease-in gives a natural-looking ramp.
 const TAB_OVERLAY_HEIGHT = 130;
 const GRADIENT_STEPS = 20;
-const gradientStepColors = Array.from({ length: GRADIENT_STEPS }, (_, i) => {
-  const t = i / (GRADIENT_STEPS - 1);
-  const easedT = t * t * t; // cubic ease-in
-  const opacity = (easedT * 0.82).toFixed(3);
-  return `rgba(0, 0, 0, ${opacity})`;
-});
+const GRADIENT_MAX_OPACITY = 0.82;
 
-// Darkening gradient behind the tab bar region. Purely visual: it must not
-// swallow touches, because it extends well above the bar and would make
-// elements anchored just above the bar (undo bar, FABs) untappable. Touch
-// blocking around the pill lives on floatingBarWrapper instead.
-const TabGradient = memo(() => {
+// Build the transparent → background-colored gradient steps for a given theme
+// background hex. Reuses withAlpha so each step is `${bgHex}${alpha}`.
+const buildGradientSteps = (backgroundHex) =>
+  Array.from({ length: GRADIENT_STEPS }, (_, i) => {
+    const t = i / (GRADIENT_STEPS - 1);
+    const easedT = t * t * t; // cubic ease-in
+    return withAlpha(backgroundHex, easedT * GRADIENT_MAX_OPACITY);
+  });
+
+// Fade behind the tab bar region. Purely visual: it must not swallow touches,
+// because it extends well above the bar and would make elements anchored just
+// above the bar (undo bar, FABs) untappable. Touch blocking around the pill
+// lives on floatingBarWrapper instead. `stepColors` is memoized by the parent
+// on colors.background so the memo() stays stable across unrelated re-renders.
+const TabGradient = memo(({ stepColors }) => {
   const stepHeight = TAB_OVERLAY_HEIGHT / GRADIENT_STEPS;
   return (
     <View style={styles.tabGradientOverlay} pointerEvents="none" testID="tab-gradient">
-      {gradientStepColors.map((color, i) => (
+      {stepColors.map((color, i) => (
         <View key={i} style={{ height: stepHeight, backgroundColor: color }} />
       ))}
     </View>
@@ -225,6 +232,10 @@ const TabGradient = memo(() => {
 });
 
 TabGradient.displayName = 'TabGradient';
+
+TabGradient.propTypes = {
+  stepColors: PropTypes.arrayOf(PropTypes.string).isRequired,
+};
 
 export default function SimpleTabs() {
   const { colors } = useThemeColors();
@@ -525,6 +536,12 @@ export default function SimpleTabs() {
 
   const displayedTab = active;
 
+  // Recomputed only when the theme background changes, not on every tab switch.
+  const gradientStepColors = useMemo(
+    () => buildGradientSteps(colors.background),
+    [colors.background],
+  );
+
   return (
     <SafeAreaView style={[styles.container, { backgroundColor: colors.background }]} edges={['top', 'left', 'right']}>
       <Header />
@@ -542,7 +559,7 @@ export default function SimpleTabs() {
       </View>
       {/* Visual gradient only — rendered before floatingBarWrapper so the tab
           buttons stay on top */}
-      <TabGradient />
+      <TabGradient stepColors={gradientStepColors} />
       {/* Floating bar overlays content so screen shows through behind it.
           The wrapper is exactly as tall as the bar plus its bottom margin and
           safe-area inset, and it uses the default pointerEvents so the empty
