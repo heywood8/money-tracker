@@ -162,3 +162,21 @@ gh pr comment $ARGUMENTS --body-file /tmp/verify-pr-comment.md
 ```
 
 Confirm with the URL returned by gh.
+
+---
+
+## Step 9 — Clean up after yourself
+
+**Always run this last, whether or not the comment was posted.** A verify run can leave heavyweight resources behind (a headless emulator eating 2–3 GB, a Metro dev server, `adb reverse` tunnels, a build's lingering Gradle/Kotlin daemons, screenshot temp files). Tear down everything **this run created**, and be explicit about what you leave alive.
+
+Guiding rule: **remove what you started; do not kill what was already there.** If the emulator/app/Metro were already running when you began (i.e. preflight passed without you launching anything), leave them. If you started them for this run, clean them up.
+
+1. **Stop background dev servers you launched** — any Metro/`expo start` you started for this run. Stop the background task (TaskStop) or `pkill -f "expo start"` if you own it.
+2. **Drop `adb reverse` tunnels you added** — `adb -s <device> reverse --remove-all` (only if you added them).
+3. **Free build daemons** — if you did a local build this run: `pkill -f GradleDaemon; pkill -f KotlinCompileDaemon`.
+4. **Emulator** — if **you** booted it for this run, offer to shut it down: `adb -s <device> emu kill`. If it was the user's pre-existing device, **leave it running** and say so.
+5. **Temp files** — remove scratch screenshots and `/tmp/verify-pr-comment.md`.
+
+End your final message with a short "Cleaned up / left running" summary so the user knows the machine's state (e.g. "Killed the emulator + Metro I started; removed reverse tunnels and temp screenshots. Nothing left running.").
+
+If you are genuinely unsure whether the user wants a resource kept (e.g. they may want to keep poking at the app), ask with AskUserQuestion rather than killing it silently.
