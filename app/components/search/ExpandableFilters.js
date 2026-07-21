@@ -3,7 +3,6 @@ import { View, Text, ScrollView, TouchableOpacity, TextInput, StyleSheet } from 
 import { MaterialCommunityIcons as Icon } from '@expo/vector-icons';
 import DateTimePicker from '@react-native-community/datetimepicker';
 import PropTypes from 'prop-types';
-import { HORIZONTAL_PADDING } from '../../styles/layout';
 import { formatDate } from '../../services/BalanceHistoryDB';
 import currencies from '../../../assets/currencies.json';
 
@@ -200,8 +199,6 @@ const ExpandableFilters = ({
 
   return (
     <View testID="expandable-filters" style={styles.container}>
-      {/* Thin light edge along the top sells the frosted-glass layering. */}
-      <View style={[styles.topHighlight, { backgroundColor: colors.glassHighlight }]} />
       <ScrollView style={styles.scrollView} contentContainerStyle={styles.scrollContent} showsVerticalScrollIndicator={false}>
         {/* Type Section */}
         <View style={tileStyle}>
@@ -448,7 +445,6 @@ ExpandableFilters.propTypes = {
     glassSurface: PropTypes.string,
     glassSurfaceStrong: PropTypes.string,
     glassBorder: PropTypes.string,
-    glassHighlight: PropTypes.string,
   }).isRequired,
   t: PropTypes.func.isRequired,
   isExpanded: PropTypes.bool,
@@ -548,7 +544,7 @@ const styles = StyleSheet.create({
     flexDirection: 'row',
     justifyContent: 'space-between',
     paddingBottom: 12,
-    paddingHorizontal: HORIZONTAL_PADDING,
+    paddingHorizontal: 12,
     paddingTop: 10,
   },
   footerCount: {
@@ -563,8 +559,10 @@ const styles = StyleSheet.create({
   },
   scrollContent: {
     paddingBottom: 8,
-    paddingHorizontal: HORIZONTAL_PADDING,
-    paddingTop: 10,
+    paddingHorizontal: 12,
+    // Clears the search area that overlaps the panel's tucked-in top edge so the
+    // first section label isn't hidden behind the pill (see PANEL_OVERLAP).
+    paddingTop: 20,
   },
   scrollView: {
     flex: 1,
@@ -585,10 +583,6 @@ const styles = StyleSheet.create({
   },
   sectionLast: {
     marginBottom: 0,
-  },
-  topHighlight: {
-    height: StyleSheet.hairlineWidth,
-    width: '100%',
   },
 });
 

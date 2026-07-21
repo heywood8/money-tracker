@@ -5,6 +5,7 @@ import {
 } from 'react-native';
 import Animated, { useSharedValue, useAnimatedStyle, withTiming, Easing } from 'react-native-reanimated';
 import PropTypes from 'prop-types';
+import { HORIZONTAL_PADDING } from '../../styles/layout';
 import ExpandableFilters from './ExpandableFilters';
 import { useOperationsData } from '../../contexts/OperationsDataContext';
 import { useOperationsActions } from '../../contexts/OperationsActionsContext';
@@ -12,6 +13,11 @@ import { useAccountsData } from '../../contexts/AccountsDataContext';
 import { useSearch } from '../../contexts/SearchContext';
 
 const SCREEN_HEIGHT = Dimensions.get('window').height;
+
+// The panel is pulled up under the search area (which sits at a higher zIndex)
+// so its rounded top tucks behind the pill/chip strip and the sheet reads as a
+// continuation of the search bar rather than a detached card below it.
+const PANEL_OVERLAP = 14;
 
 const SearchOverlay = ({ colors, t, visible, onHeightChange = null, topOffset = 0 }) => {
   const { searchState = { text: '', types: [], accountIds: [], categoryIds: [], dateRange: { startDate: null, endDate: null }, amountRange: { min: null, max: null } } } = useOperationsData();
@@ -58,7 +64,7 @@ const SearchOverlay = ({ colors, t, visible, onHeightChange = null, topOffset = 
         {
           backgroundColor: colors.glassSurface || colors.background,
           borderColor: colors.glassBorder || colors.border,
-          top: topOffset,
+          top: Math.max(0, topOffset - PANEL_OVERLAP),
         },
         animatedStyle,
       ]}
@@ -92,17 +98,16 @@ SearchOverlay.propTypes = {
 
 const styles = StyleSheet.create({
   filtersContainer: {
-    borderBottomLeftRadius: 18,
-    borderBottomRightRadius: 18,
-    // Hairline glass edge along the bottom + sides of the sheet.
-    borderBottomWidth: StyleSheet.hairlineWidth,
-    borderLeftWidth: StyleSheet.hairlineWidth,
-    borderRightWidth: StyleSheet.hairlineWidth,
+    // Rounded on all corners and inset to the open search pill's width so the
+    // sheet reads as one floating unit with the bar. The top tucks behind the
+    // search area (see PANEL_OVERLAP), hiding the seam.
+    borderRadius: 18,
+    borderWidth: StyleSheet.hairlineWidth,
     elevation: 8,
-    left: 0,
+    left: HORIZONTAL_PADDING,
     maxHeight: SCREEN_HEIGHT * 0.62,
     position: 'absolute',
-    right: 0,
+    right: HORIZONTAL_PADDING,
     shadowColor: '#000',
     shadowOffset: { width: 0, height: 6 },
     shadowOpacity: 0.35,
