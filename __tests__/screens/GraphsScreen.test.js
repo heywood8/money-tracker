@@ -5,7 +5,7 @@
  */
 
 import React from 'react';
-import { render, fireEvent } from '@testing-library/react-native';
+import { render, fireEvent, waitFor } from '@testing-library/react-native';
 
 // Mock all dependencies
 jest.mock('react-native-chart-kit', () => ({
@@ -354,6 +354,42 @@ describe('GraphsScreen', () => {
       getAvailableMonths.mockResolvedValue(mockMonths);
 
       await render(<GraphsScreen />);
+    });
+  });
+
+  describe('Period chevron navigation (QoL-9)', () => {
+    it('reveals jump-to-current after stepping to an older period and hides it back at current', async () => {
+      const GraphsScreen = require('../../app/screens/GraphsScreen').default;
+      const { getAvailableMonths } = require('../../app/services/OperationsDB');
+
+      const now = new Date();
+      // Current month must be present so the wheel starts at it; add an older year
+      // so there is at least one older period to step to.
+      getAvailableMonths.mockResolvedValue([
+        { year: now.getFullYear(), month: now.getMonth() },
+        { year: 2020, month: 0 },
+      ]);
+
+      const { queryByTestId, getByTestId, findByTestId } = await render(<GraphsScreen />);
+
+      // The wheel and its chevrons mount once available months load.
+      await findByTestId('period-chevron-older');
+
+      // Starts at the current period → jump-to-current hidden, newer chevron disabled.
+      expect(queryByTestId('period-jump-current')).toBeNull();
+      expect(getByTestId('period-chevron-newer').props.accessibilityState).toEqual(
+        expect.objectContaining({ disabled: true }),
+      );
+
+      // Step to an older period → jump-to-current appears. The press only flips
+      // internal state, and the pending available-months mount effect defers the
+      // re-render flush, so poll for the button rather than querying synchronously.
+      fireEvent.press(getByTestId('period-chevron-older'));
+      expect(await findByTestId('period-jump-current')).toBeTruthy();
+
+      // Jump back to the current period → the button hides again.
+      fireEvent.press(getByTestId('period-jump-current'));
+      await waitFor(() => expect(queryByTestId('period-jump-current')).toBeNull());
     });
   });
 
@@ -789,6 +825,34 @@ describe('GraphsScreen', () => {
       // Both cards still in tree
       expect(getByTestId('income-summary-card')).toBeTruthy();
       expect(getByTestId('expense-summary-card')).toBeTruthy();
+    });
+  });
+
+  describe('Balance History Empty State (QoL-11)', () => {
+    it('renders an empty state instead of silently hiding the balance card when no account is available', async () => {
+      const GraphsScreen = require('../../app/screens/GraphsScreen').default;
+      const { useAccountsData } = require('../../app/contexts/AccountsDataContext');
+
+      // No accounts → selectedAccount stays null while a specific month is selected
+      // by default. The balance region must explain the absence rather than vanish.
+      useAccountsData.mockReturnValue({ accounts: [] });
+
+      const { getByTestId } = await render(<GraphsScreen />);
+
+      expect(getByTestId('balance-history-empty')).toBeTruthy();
+    });
+
+    it('renders the balance card (not the empty state) when an account is available', async () => {
+      const GraphsScreen = require('../../app/screens/GraphsScreen').default;
+      const { useAccountsData } = require('../../app/contexts/AccountsDataContext');
+
+      useAccountsData.mockReturnValue({
+        accounts: [{ id: 'acc-1', name: 'Cash', currency: 'USD', balance: '100.00', displayOrder: 0 }],
+      });
+
+      const { queryByTestId } = await render(<GraphsScreen />);
+
+      expect(queryByTestId('balance-history-empty')).toBeNull();
     });
   });
 });

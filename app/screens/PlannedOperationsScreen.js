@@ -260,10 +260,24 @@ export default function PlannedOperationsScreen() {
   }, [updatePlannedOperation, t]);
 
   const handleLongPress = useCallback((op) => {
+    const executed = isExecutedThisMonth(op);
+
+    // Execute / mark-executed were previously reachable only by swiping the row —
+    // an invisible affordance. Surface them in the long-press menu too so the
+    // primary action is discoverable without a gesture (QoL-6). An already-executed
+    // operation offers Undo instead, mirroring the swipe behaviour.
+    const executionActions = executed
+      ? [{ text: t('undo'), onPress: () => handleUndoExecuted(op) }]
+      : [
+        { text: t('execute'), onPress: () => handleExecute(op) },
+        { text: t('mark_as_executed'), onPress: () => handleMarkExecuted(op) },
+      ];
+
     showDialog(
       t('select_action'),
       op.name,
       [
+        ...executionActions,
         {
           text: t('edit'),
           onPress: () => handleEdit(op),
@@ -289,7 +303,7 @@ export default function PlannedOperationsScreen() {
         { text: t('cancel'), style: 'cancel' },
       ],
     );
-  }, [showDialog, t, handleEdit, deletePlannedOperation]);
+  }, [showDialog, t, handleEdit, handleExecute, handleMarkExecuted, handleUndoExecuted, isExecutedThisMonth, deletePlannedOperation]);
 
   const renderRightActions = useCallback((item) => (
     <View style={styles.swipeActionsContainer}>
@@ -354,6 +368,7 @@ export default function PlannedOperationsScreen() {
         style={styles.itemContainer}
         onPress={() => handleEdit(item)}
         onLongPress={() => handleLongPress(item)}
+        testID={`planned-row-${item.id}`}
       >
         {/* Left: Category icon with optional checkmark badge */}
         <View style={[styles.iconContainer, { backgroundColor: typeColor + '1A' }]}>

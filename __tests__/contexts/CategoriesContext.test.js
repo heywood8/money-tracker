@@ -33,6 +33,13 @@ jest.mock('../../app/contexts/LocalizationContext', () => ({
   useLocalization: () => ({
     isFirstLaunch: mockIsFirstLaunch(),
     language: mockLanguage(),
+    // Echo the key, but return a {count} template for the delete-error keys so
+    // tests can assert the count is interpolated (QoL-4).
+    t: (k) => {
+      if (k === 'delete_category_error_has_children') return '{count} sub-categories';
+      if (k === 'delete_category_error_has_operations') return '{count} transactions';
+      return k;
+    },
   }),
 }));
 
@@ -347,6 +354,52 @@ describe('CategoriesContext', () => {
 
       expect(error).toBeDefined();
       expect(mockShowDialog).toHaveBeenCalled();
+    });
+
+    it('shows a specific reason and count when operations use the category (QoL-4)', async () => {
+      const existingCategories = [
+        { id: 'cat1', name: 'Food', type: 'folder', categoryType: 'expense' },
+      ];
+      CategoriesDB.getAllCategories.mockResolvedValue(existingCategories);
+
+      const { result } = await renderHook(() => useCategories(), { wrapper });
+      await waitFor(() => { expect(result.current.loading).toBe(false); });
+
+      const err = new Error('Cannot delete category: 5 transaction(s) use this category.');
+      err.code = 'CATEGORY_HAS_OPERATIONS';
+      err.count = 5;
+      CategoriesDB.deleteCategory.mockRejectedValue(err);
+
+      let error;
+      try {
+        await act(async () => { await result.current.deleteCategory('cat1'); });
+      } catch (e) { error = e; }
+
+      expect(error).toBeDefined();
+      expect(mockShowDialog).toHaveBeenCalledWith('error', '5 transactions', [{ text: 'ok' }]);
+    });
+
+    it('shows a specific reason and count when sub-categories exist (QoL-4)', async () => {
+      const existingCategories = [
+        { id: 'cat1', name: 'Food', type: 'folder', categoryType: 'expense' },
+      ];
+      CategoriesDB.getAllCategories.mockResolvedValue(existingCategories);
+
+      const { result } = await renderHook(() => useCategories(), { wrapper });
+      await waitFor(() => { expect(result.current.loading).toBe(false); });
+
+      const err = new Error('Cannot delete category: 2 subcategory(ies) exist.');
+      err.code = 'CATEGORY_HAS_CHILDREN';
+      err.count = 2;
+      CategoriesDB.deleteCategory.mockRejectedValue(err);
+
+      let error;
+      try {
+        await act(async () => { await result.current.deleteCategory('cat1'); });
+      } catch (e) { error = e; }
+
+      expect(error).toBeDefined();
+      expect(mockShowDialog).toHaveBeenCalledWith('error', '2 sub-categories', [{ text: 'ok' }]);
     });
   });
 

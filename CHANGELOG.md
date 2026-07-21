@@ -1,5 +1,87 @@
 # Changelog
 
+## [0.207.1](https://github.com/heywood8/money-tracker/compare/penny-v0.207.0...penny-v0.207.1) (2026-07-21)
+
+
+### Tests
+
+* add async polling to period navigation assertions ([#1303](https://github.com/heywood8/money-tracker/issues/1303)) ([28cffac](https://github.com/heywood8/money-tracker/commit/28cffacec53897025f7ea8cb30213ec975802510))
+
+## [0.207.0](https://github.com/heywood8/money-tracker/compare/penny-v0.206.1...penny-v0.207.0) (2026-07-21)
+
+
+### Features
+
+* **graphs:** anchor balance-history burndown max to day-1 balance + monthly flows ([#1301](https://github.com/heywood8/money-tracker/issues/1301)) ([2590e25](https://github.com/heywood8/money-tracker/commit/2590e2570803b7a950d3a23f47ec27a9bf875445))
+
+## [0.206.1](https://github.com/heywood8/money-tracker/compare/penny-v0.206.0...penny-v0.206.1) (2026-07-20)
+
+
+### Code Refactoring
+
+* **operations:** replace nested category-picker Modal with inline subpanel (QoL-15) ([#1298](https://github.com/heywood8/money-tracker/issues/1298)) ([7ebfa16](https://github.com/heywood8/money-tracker/commit/7ebfa16034551fcf1e8f0168e89bcd8bbee78400))
+
+## [0.206.0](https://github.com/heywood8/money-tracker/compare/penny-v0.205.1...penny-v0.206.0) (2026-07-20)
+
+
+### Features
+
+* **graphs:** add chevron period navigation and jump-to-current (QoL-9) ([#1297](https://github.com/heywood8/money-tracker/issues/1297)) ([97f36b7](https://github.com/heywood8/money-tracker/commit/97f36b7974d314743411bdc28d59a396eb04c246))
+
+## [0.205.1](https://github.com/heywood8/money-tracker/compare/penny-v0.205.0...penny-v0.205.1) (2026-07-20)
+
+
+### Bug Fixes
+
+* **categories:** surface specific reason when category delete is blocked (QoL-4) ([#1294](https://github.com/heywood8/money-tracker/issues/1294)) ([9c2c371](https://github.com/heywood8/money-tracker/commit/9c2c371c911b0098127d3cdafd8f8847e0eda060))
+
+## [0.205.0](https://github.com/heywood8/money-tracker/compare/penny-v0.204.4...penny-v0.205.0) (2026-07-20)
+
+
+### Features
+
+* **planned:** add execute action to long-press menu for discoverability (QoL-6) ([#1292](https://github.com/heywood8/money-tracker/issues/1292)) ([9fd3571](https://github.com/heywood8/money-tracker/commit/9fd3571e54f6ff3fd132b5dd0b7c3730dc114ed2))
+
+
+### Bug Fixes
+
+* **graphs:** show EmptyState and correct initial loading for balance history (QoL-11) ([#1285](https://github.com/heywood8/money-tracker/issues/1285)) ([888a1a2](https://github.com/heywood8/money-tracker/commit/888a1a29d1865a6a13f37e1d8ecd9249623dbfed))
+
+## [0.204.4](https://github.com/heywood8/money-tracker/compare/penny-v0.204.3...penny-v0.204.4) (2026-07-20)
+
+
+### Performance Improvements
+
+* **graphs:** parallelize independent balance-history queries (QoL-10) ([#1289](https://github.com/heywood8/money-tracker/issues/1289)) ([73ba15b](https://github.com/heywood8/money-tracker/commit/73ba15baf9e045bf09b31e50737921a551752322))
+
+## [0.204.3](https://github.com/heywood8/money-tracker/compare/penny-v0.204.2...penny-v0.204.3) (2026-07-20)
+
+
+### Bug Fixes
+
+* **operations:** normalize comma decimal separator in split amount (QoL-2) ([#1284](https://github.com/heywood8/money-tracker/issues/1284)) ([216f752](https://github.com/heywood8/money-tracker/commit/216f75231c8ae054fdffa8ec98b38d696f7e0168))
+
+## [0.204.2](https://github.com/heywood8/money-tracker/compare/penny-v0.204.1...penny-v0.204.2) (2026-07-20)
+
+
+### Documentation
+
+* sync QoL backlog statuses after audit follow-ups ([#1283](https://github.com/heywood8/money-tracker/issues/1283)) ([4023ec0](https://github.com/heywood8/money-tracker/commit/4023ec0b87123fa87ca09eed27f775bf99273774))
+
+## [0.204.1](https://github.com/heywood8/money-tracker/compare/penny-v0.204.0...penny-v0.204.1) (2026-07-20)
+
+
+### Code Refactoring
+
+* extract flash error color to constant in Calculator ([#1286](https://github.com/heywood8/money-tracker/issues/1286)) ([cc6f5e2](https://github.com/heywood8/money-tracker/commit/cc6f5e2ad7e8226fc0bbb42ba2feeb0d8254653a))
+
+## [0.204.0](https://github.com/heywood8/money-tracker/compare/penny-v0.203.0...penny-v0.204.0) (2026-07-20)
+
+
+### Features
+
+* **operations:** lift row + icon action bar on long-press ([#1281](https://github.com/heywood8/money-tracker/issues/1281)) ([e8f027e](https://github.com/heywood8/money-tracker/commit/e8f027ee67fbb8d74677a041a19fc91efb07093e))
+
 ## [0.203.0](https://github.com/heywood8/money-tracker/compare/penny-v0.202.0...penny-v0.203.0) (2026-07-20)
 
 

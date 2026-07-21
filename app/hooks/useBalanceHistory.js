@@ -1,6 +1,6 @@
 import { useState, useCallback, useEffect } from 'react';
-import { getBalanceHistory, upsertBalanceHistory, deleteBalanceHistory, formatDate } from '../services/BalanceHistoryDB';
-import { getTotalExpenses } from '../services/OperationsDB';
+import { getBalanceHistory, getAccountBalanceOnOrBeforeDate, upsertBalanceHistory, deleteBalanceHistory, formatDate } from '../services/BalanceHistoryDB';
+import { getTotalExpenses, getTotalIncome, getTransferTotals } from '../services/OperationsDB';
 import { appEvents, EVENTS } from '../services/eventEmitter';
 
 /**
@@ -9,7 +9,12 @@ import { appEvents, EVENTS } from '../services/eventEmitter';
  */
 const useBalanceHistory = (selectedAccount, selectedYear, selectedMonth) => {
   const [balanceHistoryData, setBalanceHistoryData] = useState({ labels: [] });
-  const [loadingBalanceHistory, setLoadingBalanceHistory] = useState(false);
+  // Start in the loading state so the first render shows a spinner instead of a
+  // momentary "no data" flash before loadBalanceHistory() runs (QoL-11). The
+  // early-return in loadBalanceHistory() immediately resets this to false when no
+  // account/month is selected, so "nothing selected" reads as a valid empty state
+  // rather than an eternal spinner.
+  const [loadingBalanceHistory, setLoadingBalanceHistory] = useState(true);
   const [balanceHistoryTableData, setBalanceHistoryTableData] = useState([]);
   const [editingBalanceRow, setEditingBalanceRow] = useState(null);
   const [editingBalanceValue, setEditingBalanceValue] = useState('');
@@ -52,9 +57,6 @@ const useBalanceHistory = (selectedAccount, selectedYear, selectedMonth) => {
       const startDateStr = formatDate(startDate);
       const endDateStr = formatDate(endDate);
 
-      // Get balance history from database
-      const history = await getBalanceHistory(selectedAccount, startDateStr, endDateStr);
-
       // Calculate previous month dates.
       // When selectedMonth is 0 (January), selectedMonth - 1 = -1 which JS rolls
       // to December of the *same* year instead of decrementing the year — fix explicitly.
@@ -65,21 +67,59 @@ const useBalanceHistory = (selectedAccount, selectedYear, selectedMonth) => {
       const prevStartDateStr = formatDate(prevMonthStart);
       const prevEndDateStr = formatDate(prevMonthEnd);
 
-      // Get previous month's balance history and total expenses
-      const prevHistory = await getBalanceHistory(selectedAccount, prevStartDateStr, prevEndDateStr);
-      const prevMonthTotalExpenses = await getTotalExpenses(selectedAccount, prevStartDateStr, prevEndDateStr);
-
       // Get current day of month
       const now = new Date();
       const isCurrentMonth = selectedYear === now.getFullYear() && selectedMonth === now.getMonth();
       const currentDay = isCurrentMonth ? now.getDate() : endDate.getDate();
 
-      // Get current month's total expenses for the selected account (used for
-      // spending prediction). For the current month, cap the window at today —
-      // the prediction divides by elapsed days, so future-dated operations
-      // (e.g. scheduled rent later this month) must not inflate the average.
+      // Current month's total expenses feed the spending prediction. For the
+      // current month, cap the window at today — the prediction divides by
+      // elapsed days, so future-dated operations (e.g. scheduled rent later this
+      // month) must not inflate the average.
       const expenseEndStr = isCurrentMonth ? formatDate(now) : endDateStr;
-      const currentMonthTotalExpenses = await getTotalExpenses(selectedAccount, startDateStr, expenseEndStr);
+
+      // Burndown ("plain avg") max is anchored to the balance at end of day 1 plus
+      // every inflow/outflow *after* day 1 — day-1 activity is already baked into
+      // that anchor, so the post-day-1 window starts on the 2nd (see plainAvgMax).
+      const secondDayStr = formatDate(new Date(selectedYear, selectedMonth, 2));
+
+      // These reads are mutually independent — only the date strings above gate
+      // them — so issue them concurrently instead of awaiting in series.
+      const [
+        history,
+        prevHistory,
+        prevMonthTotalExpenses,
+        currentMonthTotalExpenses,
+        firstDayBalance,
+        transferTotals,
+        incomeAfterDay1,
+      ] = await Promise.all([
+        getBalanceHistory(selectedAccount, startDateStr, endDateStr),
+        getBalanceHistory(selectedAccount, prevStartDateStr, prevEndDateStr),
+        getTotalExpenses(selectedAccount, prevStartDateStr, prevEndDateStr),
+        getTotalExpenses(selectedAccount, startDateStr, expenseEndStr),
+        getAccountBalanceOnOrBeforeDate(selectedAccount, startDateStr),
+        getTransferTotals(selectedAccount, secondDayStr, endDateStr),
+        getTotalIncome(selectedAccount, secondDayStr, endDateStr),
+      ]);
+
+      // Burndown line anchor (a.k.a. "plain avg" max): the ceiling of money
+      // available to spend across the month. Start from the balance at end of day 1,
+      // add every post-day-1 inflow (incoming transfers + income) and remove
+      // outgoing transfers. Expenses are intentionally excluded — the burndown line
+      // is precisely the depiction of that ceiling being spent down to zero. Null
+      // when the day-1 balance is unknown (e.g. an account younger than the month);
+      // the card then falls back to the peak-actual max.
+      let plainAvgMax = null;
+      if (firstDayBalance !== null && firstDayBalance !== undefined) {
+        const computed = parseFloat(firstDayBalance)
+          + parseFloat(transferTotals.incoming)
+          - parseFloat(transferTotals.outgoing)
+          + parseFloat(incomeAfterDay1);
+        if (Number.isFinite(computed)) {
+          plainAvgMax = computed;
+        }
+      }
 
       // Transform history data for chart
       const dataPoints = history.map(item => ({
@@ -208,6 +248,7 @@ const useBalanceHistory = (selectedAccount, selectedYear, selectedMonth) => {
         prevMonthTotalExpenses,
         prevMonthDaysCount: prevMonthDays,
         currentMonthTotalExpenses,
+        plainAvgMax,
         labels: allDays,
       });
     } catch (error) {

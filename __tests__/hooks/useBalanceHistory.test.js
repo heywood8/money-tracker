@@ -6,6 +6,7 @@ import * as OperationsDB from '../../app/services/OperationsDB';
 // Mock the BalanceHistoryDB service
 jest.mock('../../app/services/BalanceHistoryDB', () => ({
   getBalanceHistory: jest.fn(),
+  getAccountBalanceOnOrBeforeDate: jest.fn(),
   upsertBalanceHistory: jest.fn(),
   deleteBalanceHistory: jest.fn(),
   formatDate: jest.fn((date) => {
@@ -19,6 +20,8 @@ jest.mock('../../app/services/BalanceHistoryDB', () => ({
 // Mock the OperationsDB service
 jest.mock('../../app/services/OperationsDB', () => ({
   getTotalExpenses: jest.fn(),
+  getTotalIncome: jest.fn(),
+  getTransferTotals: jest.fn(),
 }));
 
 describe('useBalanceHistory', () => {
@@ -30,6 +33,11 @@ describe('useBalanceHistory', () => {
     jest.clearAllMocks();
     // Default: no expenses in previous month
     OperationsDB.getTotalExpenses.mockResolvedValue(0);
+    // Defaults for the burndown-anchor (plainAvgMax) reads: no income, no transfers,
+    // and no known day-1 balance unless a test overrides them.
+    OperationsDB.getTotalIncome.mockResolvedValue('0');
+    OperationsDB.getTransferTotals.mockResolvedValue({ incoming: '0', outgoing: '0' });
+    BalanceHistoryDB.getAccountBalanceOnOrBeforeDate.mockResolvedValue(null);
     // Mock console.error to suppress error logs in tests
     jest.spyOn(console, 'error').mockImplementation(() => {});
   });
@@ -39,16 +47,30 @@ describe('useBalanceHistory', () => {
   });
 
   describe('Initialization', () => {
-    it('should initialize with default state', async () => {
+    it('should initialize in the loading state', async () => {
       const { result } = await renderHook(() => useBalanceHistory(mockAccountId, mockYear, mockMonth));
 
       expect(result.current.balanceHistoryData).toEqual({ labels: [] });
-      // loading starts false — the mount spinner was removed in #933 to avoid
-      // a loading flash on the Graphs screen; load() flips it true on demand.
-      expect(result.current.loadingBalanceHistory).toBe(false);
+      // loading starts true so the Graphs screen shows a spinner on first render
+      // instead of a "no data" flash before loadBalanceHistory() runs (QoL-11).
+      // The early-return in loadBalanceHistory() resets this to false when no
+      // account/month is selected, so "nothing selected" stays a valid empty state.
+      expect(result.current.loadingBalanceHistory).toBe(true);
       expect(result.current.balanceHistoryTableData).toEqual([]);
       expect(result.current.editingBalanceRow).toBeNull();
       expect(result.current.editingBalanceValue).toBe('');
+    });
+
+    it('resets loading to false via early-return when no account is selected', async () => {
+      // Guard against an "eternal spinner": with loading initialized to true, the
+      // early-return path must flip it back to false so the empty state shows.
+      const { result } = await renderHook(() => useBalanceHistory(null, mockYear, mockMonth));
+
+      await act(async () => {
+        await result.current.loadBalanceHistory();
+      });
+
+      expect(result.current.loadingBalanceHistory).toBe(false);
     });
   });
 
@@ -111,6 +133,31 @@ describe('useBalanceHistory', () => {
       expect(result.current.balanceHistoryData).toHaveProperty('prevMonthTotalExpenses');
       expect(result.current.balanceHistoryData).toHaveProperty('prevMonthDaysCount');
       expect(result.current.balanceHistoryData.labels.length).toBe(31); // January has 31 days
+    });
+
+    it('issues the four independent reads concurrently (QoL-10)', async () => {
+      // Gate every read behind one manually-released promise. Serial awaits would
+      // dispatch only the first read before the gate opens; concurrent dispatch
+      // via Promise.all puts all four reads in flight up front.
+      let releaseGate;
+      const gate = new Promise((resolve) => { releaseGate = resolve; });
+      BalanceHistoryDB.getBalanceHistory.mockImplementation(() => gate.then(() => []));
+      OperationsDB.getTotalExpenses.mockImplementation(() => gate.then(() => 0));
+
+      const { result } = await renderHook(() => useBalanceHistory(mockAccountId, mockYear, mockMonth));
+
+      await act(async () => {
+        const loadPromise = result.current.loadBalanceHistory();
+        // Flush the synchronous Promise.all dispatch without opening the gate.
+        await Promise.resolve();
+
+        // All four reads are in flight before any has resolved → concurrent.
+        expect(BalanceHistoryDB.getBalanceHistory).toHaveBeenCalledTimes(2);
+        expect(OperationsDB.getTotalExpenses).toHaveBeenCalledTimes(2);
+
+        releaseGate();
+        await loadPromise;
+      });
     });
 
     it('should calculate trend line with linear regression', async () => {
@@ -197,6 +244,68 @@ describe('useBalanceHistory', () => {
         expect(result.current.loadingBalanceHistory).toBe(false);
         expect(result.current.balanceHistoryData).toEqual({ labels: [] });
         expect(console.error).toHaveBeenCalledWith('Failed to load balance history:', expect.any(Error));
+      });
+    });
+  });
+
+  describe('plainAvgMax (burndown anchor)', () => {
+    it('computes plainAvgMax as day-1 balance + post-day-1 inflows − outgoing transfers', async () => {
+      BalanceHistoryDB.getBalanceHistory
+        .mockResolvedValueOnce([
+          { date: '2024-01-01', balance: '1000' },
+          { date: '2024-01-20', balance: '900' },
+        ])
+        .mockResolvedValueOnce([]);
+      BalanceHistoryDB.getAccountBalanceOnOrBeforeDate.mockResolvedValue('1000'); // end of day 1
+      OperationsDB.getTransferTotals.mockResolvedValue({ incoming: '300', outgoing: '50' });
+      OperationsDB.getTotalIncome.mockResolvedValue('200');
+
+      const { result } = await renderHook(() => useBalanceHistory(mockAccountId, mockYear, mockMonth));
+
+      await act(async () => {
+        await result.current.loadBalanceHistory();
+      });
+
+      await waitFor(() => {
+        // 1000 (day-1 balance) + 300 (incoming) − 50 (outgoing) + 200 (income) = 1450
+        expect(result.current.balanceHistoryData.plainAvgMax).toBe(1450);
+      });
+    });
+
+    it('queries inflows/outflows from day 2 and anchors the balance on day 1 (excludes the first day)', async () => {
+      BalanceHistoryDB.getBalanceHistory
+        .mockResolvedValueOnce([])
+        .mockResolvedValueOnce([]);
+
+      const { result } = await renderHook(() => useBalanceHistory(mockAccountId, mockYear, mockMonth));
+
+      await act(async () => {
+        await result.current.loadBalanceHistory();
+      });
+
+      // January 2024: post-day-1 window is 2024-01-02 … 2024-01-31
+      expect(OperationsDB.getTransferTotals).toHaveBeenCalledWith(mockAccountId, '2024-01-02', '2024-01-31');
+      expect(OperationsDB.getTotalIncome).toHaveBeenCalledWith(mockAccountId, '2024-01-02', '2024-01-31');
+      // The anchor is the balance on (or before) the first of the month
+      expect(BalanceHistoryDB.getAccountBalanceOnOrBeforeDate).toHaveBeenCalledWith(mockAccountId, '2024-01-01');
+    });
+
+    it('leaves plainAvgMax null when the day-1 balance is unknown', async () => {
+      BalanceHistoryDB.getBalanceHistory
+        .mockResolvedValueOnce([{ date: '2024-01-10', balance: '500' }])
+        .mockResolvedValueOnce([]);
+      BalanceHistoryDB.getAccountBalanceOnOrBeforeDate.mockResolvedValue(null);
+      OperationsDB.getTransferTotals.mockResolvedValue({ incoming: '300', outgoing: '50' });
+      OperationsDB.getTotalIncome.mockResolvedValue('200');
+
+      const { result } = await renderHook(() => useBalanceHistory(mockAccountId, mockYear, mockMonth));
+
+      await act(async () => {
+        await result.current.loadBalanceHistory();
+      });
+
+      await waitFor(() => {
+        expect(result.current.balanceHistoryData.plainAvgMax).toBeNull();
       });
     });
   });

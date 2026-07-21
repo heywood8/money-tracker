@@ -26,8 +26,9 @@ jest.mock('../../app/contexts/LocalizationContext', () => ({
   useLocalization: () => ({ t: (k) => k }),
 }));
 
+const mockShowDialog = jest.fn();
 jest.mock('../../app/contexts/DialogContext', () => ({
-  useDialog: () => ({ showDialog: jest.fn() }),
+  useDialog: () => ({ showDialog: mockShowDialog }),
 }));
 
 const mockExecute = jest.fn();
@@ -211,6 +212,52 @@ describe('PlannedOperationsScreen', () => {
       mockIsExecuted.mockReturnValue(false);
       const { queryByTestId } = await renderScreen();
       expect(queryByTestId('undo-action-r1')).toBeNull();
+    });
+  });
+
+  describe('Long-press action menu (QoL-6)', () => {
+    it('offers Execute and Mark-as-executed for an un-executed operation', async () => {
+      mockIsExecuted.mockReturnValue(false);
+      const { getByTestId } = await renderScreen();
+
+      fireEvent(getByTestId('planned-row-r1'), 'longPress');
+
+      expect(mockShowDialog).toHaveBeenCalled();
+      const actions = mockShowDialog.mock.calls[0][2];
+      const labels = actions.map((a) => a.text);
+      expect(labels).toEqual(
+        expect.arrayContaining(['execute', 'mark_as_executed', 'edit', 'delete', 'cancel']),
+      );
+      expect(labels).not.toContain('undo');
+    });
+
+    it('runs executePlannedOperation when the menu Execute item is chosen', async () => {
+      mockIsExecuted.mockReturnValue(false);
+      const { getByTestId } = await renderScreen();
+
+      fireEvent(getByTestId('planned-row-r1'), 'longPress');
+      const execute = mockShowDialog.mock.calls[0][2].find((a) => a.text === 'execute');
+      execute.onPress();
+
+      await waitFor(() => {
+        expect(mockExecute).toHaveBeenCalledWith(expect.objectContaining({ id: 'r1' }));
+      });
+    });
+
+    it('offers Undo instead of Execute for an already-executed operation', async () => {
+      mockIsExecuted.mockReturnValue(true);
+      const { getByTestId } = await renderScreen();
+
+      fireEvent(getByTestId('planned-row-r1'), 'longPress');
+      const actions = mockShowDialog.mock.calls[0][2];
+      const labels = actions.map((a) => a.text);
+      expect(labels).toContain('undo');
+      expect(labels).not.toContain('execute');
+
+      actions.find((a) => a.text === 'undo').onPress();
+      await waitFor(() => {
+        expect(mockUpdate).toHaveBeenCalledWith('r1', { lastExecutedMonth: null });
+      });
     });
   });
 });

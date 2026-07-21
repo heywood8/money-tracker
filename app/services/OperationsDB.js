@@ -1002,6 +1002,53 @@ export const getTotalIncome = async (accountId, startDate, endDate) => {
 };
 
 /**
+ * Get transfer totals for an account in a date range, split into money moved IN
+ * (this account was the destination) and OUT (this account was the source).
+ *
+ * Incoming transfers use destination_amount when present — a multi-currency
+ * transfer credits the destination the converted amount, not the source amount —
+ * falling back to amount for same-currency transfers. Outgoing transfers always use
+ * amount (the debited value). This mirrors the debit/credit split in
+ * calculateBalanceChanges so the totals reconcile with how balances actually move.
+ *
+ * A self-transfer (same account on both sides) lands in both buckets; the +in and
+ * −out cancel wherever the caller nets them, which is the correct zero effect.
+ *
+ * @param {string} accountId
+ * @param {string} startDate - YYYY-MM-DD (inclusive)
+ * @param {string} endDate - YYYY-MM-DD (inclusive)
+ * @returns {Promise<{incoming: string, outgoing: string}>} Decimal-safe string totals
+ */
+export const getTransferTotals = async (accountId, startDate, endDate) => {
+  try {
+    const results = await queryAll(
+      `SELECT account_id, to_account_id, amount, destination_amount
+       FROM operations
+       WHERE type = 'transfer'
+         AND date >= ? AND date <= ?
+         AND (account_id = ? OR to_account_id = ?)`,
+      [startDate, endDate, accountId, accountId],
+    );
+
+    let incoming = '0';
+    let outgoing = '0';
+    for (const row of results || []) {
+      if (String(row.to_account_id) === String(accountId)) {
+        const credit = row.destination_amount || row.amount || '0';
+        incoming = Currency.add(incoming, String(credit));
+      }
+      if (String(row.account_id) === String(accountId)) {
+        outgoing = Currency.add(outgoing, String(row.amount || '0'));
+      }
+    }
+    return { incoming, outgoing };
+  } catch (error) {
+    console.error('Failed to get transfer totals:', error);
+    throw error;
+  }
+};
+
+/**
  * Get spending by category for date range
  * @param {string} startDate
  * @param {string} endDate

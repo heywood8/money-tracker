@@ -12,6 +12,7 @@ import { getAllCategories } from '../services/CategoriesDB';
 import { appEvents, EVENTS } from '../services/eventEmitter';
 import { formatAmount } from '../services/currency';
 import currenciesJson from '../../assets/currencies.json';
+import EmptyState from '../components/EmptyState';
 import BalanceHistoryCard from '../components/graphs/BalanceHistoryCard';
 import CategorySpendingCard from '../components/graphs/CategorySpendingCard';
 import ExpenseSummaryCard from '../components/graphs/ExpenseSummaryCard';
@@ -788,31 +789,42 @@ const GraphsScreen = () => {
             </Animated.View>
           </View>
 
-          {/* Balance History Card */}
-          {selectedMonth !== null && selectedAccount && (
-            <BalanceHistoryCard
-              colors={colors}
-              t={t}
-              selectedAccount={selectedAccount}
-              onAccountChange={setSelectedAccount}
-              accountItems={accountItems}
-              loadingBalanceHistory={loadingBalanceHistory}
-              balanceHistoryData={balanceHistoryData}
-              selectedYear={selectedYear}
-              selectedMonth={selectedMonth}
-              accounts={accounts}
-              spendingPrediction={spendingPrediction}
-              isCurrentMonth={isCurrentMonth}
-              closeLabel={t('close')}
-              onShowCalendar={handleShowCalendar}
-              balanceHistoryTableData={balanceHistoryTableData}
-              editingBalanceValue={editingBalanceValue}
-              onEditingBalanceValueChange={setEditingBalanceValue}
-              onEditBalance={handleEditBalance}
-              onCancelEdit={handleCancelEdit}
-              onSaveBalance={handleSaveBalance}
-              onDeleteBalance={handleDeleteBalance}
-            />
+          {/* Balance History Card — shown for a specific month. When no account is
+              available, render an explicit empty state instead of silently dropping
+              the card, so the user sees an explanation rather than a blank gap
+              (QoL-11). Full-year selection intentionally omits this monthly card. */}
+          {selectedMonth !== null && (
+            selectedAccount ? (
+              <BalanceHistoryCard
+                colors={colors}
+                t={t}
+                selectedAccount={selectedAccount}
+                onAccountChange={setSelectedAccount}
+                accountItems={accountItems}
+                loadingBalanceHistory={loadingBalanceHistory}
+                balanceHistoryData={balanceHistoryData}
+                selectedYear={selectedYear}
+                selectedMonth={selectedMonth}
+                accounts={accounts}
+                spendingPrediction={spendingPrediction}
+                isCurrentMonth={isCurrentMonth}
+                closeLabel={t('close')}
+                onShowCalendar={handleShowCalendar}
+                balanceHistoryTableData={balanceHistoryTableData}
+                editingBalanceValue={editingBalanceValue}
+                onEditingBalanceValueChange={setEditingBalanceValue}
+                onEditBalance={handleEditBalance}
+                onCancelEdit={handleCancelEdit}
+                onSaveBalance={handleSaveBalance}
+                onDeleteBalance={handleDeleteBalance}
+              />
+            ) : (
+              <EmptyState
+                icon="chart-line-variant"
+                message={t('no_balance_history')}
+                testID="balance-history-empty"
+              />
+            )
           )}
 
           {/* Category Spending Trend Card - Last 12 Months */}
@@ -875,22 +887,67 @@ const GraphsScreen = () => {
         </TouchableOpacity>
       )}
 
-      {/* Floating period wheel FAB */}
-      {periodItems.length > 0 && (
-        <View style={[styles.fabWheel, styles.fabWheelRight, { backgroundColor: colors.surface + 'DE', borderColor: colors.border + '80' }]}>
-          <WheelPicker
-            data={periodItems}
-            value={selectedPeriod}
-            onValueChanged={({ item }) => item && setSelectedPeriod(item.value)}
-            itemHeight={28}
-            visibleItemCount={3}
-            itemTextStyle={[styles.wheelItemText, { color: colors.text }]}
-            overlayItemStyle={[styles.wheelOverlayItem, { backgroundColor: colors.selected }]}
-            enableScrollByTapOnItem
-            keyExtractor={(item, index) => `period-${index}`}
-          />
-        </View>
-      )}
+      {/* Floating period wheel FAB with chevron navigation (QoL-9) */}
+      {periodItems.length > 0 && (() => {
+        const currentIndex = periodItems.findIndex((i) => i.value === selectedPeriod);
+        const currentPeriodValue = `${now.getFullYear()}-${now.getMonth()}`;
+        // periodItems is sorted newest-first, so a newer period is a lower index
+        // and an older one a higher index. Chevron-up steps newer, down steps older.
+        const canGoNewer = currentIndex > 0;
+        const canGoOlder = currentIndex >= 0 && currentIndex < periodItems.length - 1;
+        const isCurrentPeriod = selectedPeriod === currentPeriodValue;
+        return (
+          <View style={[styles.fabWheel, styles.fabWheelRight, { backgroundColor: colors.surface + 'DE', borderColor: colors.border + '80' }]}>
+            <TouchableOpacity
+              style={styles.periodChevron}
+              onPress={() => { if (canGoNewer) setSelectedPeriod(periodItems[currentIndex - 1].value); }}
+              disabled={!canGoNewer}
+              testID="period-chevron-newer"
+              accessibilityRole="button"
+              accessibilityLabel={t('next_period')}
+              accessibilityState={{ disabled: !canGoNewer }}
+            >
+              <Icon name="chevron-up" size={22} color={canGoNewer ? colors.text : colors.mutedText + '55'} />
+            </TouchableOpacity>
+
+            <WheelPicker
+              data={periodItems}
+              value={selectedPeriod}
+              onValueChanged={({ item }) => item && setSelectedPeriod(item.value)}
+              itemHeight={28}
+              visibleItemCount={3}
+              itemTextStyle={[styles.wheelItemText, { color: colors.text }]}
+              overlayItemStyle={[styles.wheelOverlayItem, { backgroundColor: colors.selected }]}
+              enableScrollByTapOnItem
+              keyExtractor={(item, index) => `period-${index}`}
+            />
+
+            <TouchableOpacity
+              style={styles.periodChevron}
+              onPress={() => { if (canGoOlder) setSelectedPeriod(periodItems[currentIndex + 1].value); }}
+              disabled={!canGoOlder}
+              testID="period-chevron-older"
+              accessibilityRole="button"
+              accessibilityLabel={t('previous_period')}
+              accessibilityState={{ disabled: !canGoOlder }}
+            >
+              <Icon name="chevron-down" size={22} color={canGoOlder ? colors.text : colors.mutedText + '55'} />
+            </TouchableOpacity>
+
+            {!isCurrentPeriod && (
+              <TouchableOpacity
+                style={[styles.periodTodayButton, { borderTopColor: colors.border + '80' }]}
+                onPress={() => setSelectedPeriod(currentPeriodValue)}
+                testID="period-jump-current"
+                accessibilityRole="button"
+                accessibilityLabel={t('jump_to_current_period')}
+              >
+                <Icon name="calendar-today" size={16} color={colors.primary} />
+              </TouchableOpacity>
+            )}
+          </View>
+        );
+      })()}
 
       {/* Long-press hint for the convert-currencies toggle */}
       {hintVisible && (
@@ -989,6 +1046,17 @@ const styles = StyleSheet.create({
     borderRadius: 40,
     right: 16,
     width: 120,
+  },
+  periodChevron: {
+    alignItems: 'center',
+    justifyContent: 'center',
+    paddingVertical: 2,
+  },
+  periodTodayButton: {
+    alignItems: 'center',
+    borderTopWidth: 1,
+    justifyContent: 'center',
+    paddingVertical: 6,
   },
   scrollContent: {
     paddingBottom: 180,
