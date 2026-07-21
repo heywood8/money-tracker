@@ -422,6 +422,11 @@ export default function PlannedOperationsScreen() {
             overshootRight={false}
             friction={2}
             rightThreshold={60}
+            // The row only reveals right actions (leftward drag). Leave the
+            // rightward direction unrecognized so a rightward swipe passes
+            // through to the tab-strip swipe navigation instead of being
+            // swallowed by this Swipeable's pan handler.
+            dragOffsetFromLeftEdge={Number.MAX_SAFE_INTEGER}
           >
             <View style={[styles.swipeRowCover, { backgroundColor: colors.background }]}>
               {rowContent}
@@ -437,6 +442,11 @@ export default function PlannedOperationsScreen() {
         overshootRight={false}
         friction={2}
         rightThreshold={60}
+        // The row only reveals right actions (leftward drag). Leave the
+        // rightward direction unrecognized so a rightward swipe passes
+        // through to the tab-strip swipe navigation instead of being
+        // swallowed by this Swipeable's pan handler.
+        dragOffsetFromLeftEdge={Number.MAX_SAFE_INTEGER}
       >
         <View
           testID={`item-opacity-${item.id}`}
