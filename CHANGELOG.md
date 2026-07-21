@@ -1,5 +1,12 @@
 # Changelog
 
+## [0.210.1](https://github.com/heywood8/money-tracker/compare/penny-v0.210.0...penny-v0.210.1) (2026-07-21)
+
+
+### Continuous Integration
+
+* fail the test job when tests fail (unmask jest exit code) ([#1317](https://github.com/heywood8/money-tracker/issues/1317)) ([9ec216b](https://github.com/heywood8/money-tracker/commit/9ec216ba92eff1b868964fe61a379657d5f04b9f))
+
 ## [0.210.0](https://github.com/heywood8/money-tracker/compare/penny-v0.209.1...penny-v0.210.0) (2026-07-21)
 
 
