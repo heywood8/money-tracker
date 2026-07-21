@@ -1,5 +1,12 @@
 # Changelog
 
+## [0.208.1](https://github.com/heywood8/money-tracker/compare/penny-v0.208.0...penny-v0.208.1) (2026-07-21)
+
+
+### Continuous Integration
+
+* enforce zero lint warnings in CI ([#1306](https://github.com/heywood8/money-tracker/issues/1306)) ([c4f17fe](https://github.com/heywood8/money-tracker/commit/c4f17fe1ebc598b1bbf58f585d62b1fecdb92408))
+
 ## [0.208.0](https://github.com/heywood8/money-tracker/compare/penny-v0.207.1...penny-v0.208.0) (2026-07-21)
 
 
