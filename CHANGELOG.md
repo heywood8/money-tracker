@@ -1,5 +1,12 @@
 # Changelog
 
+## [0.211.1](https://github.com/heywood8/money-tracker/compare/penny-v0.211.0...penny-v0.211.1) (2026-07-21)
+
+
+### Bug Fixes
+
+* prevent Swipeable from intercepting rightward swipe-to-dismiss ([#1323](https://github.com/heywood8/money-tracker/issues/1323)) ([f858c74](https://github.com/heywood8/money-tracker/commit/f858c743d1a9e699b96685a12883b2f5029196bb))
+
 ## [0.211.0](https://github.com/heywood8/money-tracker/compare/penny-v0.210.1...penny-v0.211.0) (2026-07-21)
 
 
