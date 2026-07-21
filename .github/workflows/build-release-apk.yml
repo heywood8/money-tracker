@@ -2,6 +2,15 @@ name: Build Android APK (EAS)
 
 on:
   workflow_dispatch:
+    inputs:
+      profile:
+        description: 'EAS profile (preview = arm64 only; emulator = arm64 + x86_64 for AVDs)'
+        required: true
+        default: 'preview'
+        type: choice
+        options:
+          - preview
+          - emulator
   push:
     tags:
       - 'penny-v*'
@@ -66,8 +75,9 @@ jobs:
           SENTRY_ORG: ${{ secrets.SENTRY_ORG }}
           SENTRY_PROJECT: ${{ secrets.SENTRY_PROJECT }}
           SENTRY_DSN: ${{ secrets.SENTRY_DSN }}
+          BUILD_PROFILE: ${{ github.event.inputs.profile || 'preview' }}
         run: |
-          eas build --platform android --local --profile preview --non-interactive
+          eas build --platform android --local --profile "$BUILD_PROFILE" --non-interactive
 
       - name: 📦 Find and rename APK
         id: find_apk
