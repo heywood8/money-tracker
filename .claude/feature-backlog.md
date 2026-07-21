@@ -12,7 +12,7 @@ Findings from a code-level UX audit. Each item is small-scope (no major rework) 
 **Note**: budgets are fully implemented in code (`BudgetModal.js`, `BudgetProgressBar.js`, contexts, DB, tests) but the UI entry points were deliberately removed by the owner — the feature is dormant on purpose, not an oversight. Don't propose re-surfacing it. If it ever comes back: `BudgetModal.js:540` has a hardcoded untranslated string to fix.
 
 ### QoL-2. Split operation parses decimal comma wrong (bug)
-**Status**: 🚧 In Progress
+**Status**: ✅ Completed (#1284, merged)
 **Problem**: `SplitOperationModal.js:89-92` stores raw input; `parseFloat` at `:74` turns "12,50" into `12` silently — wrong split amounts in comma-decimal locales (ru, de, fr, es, it, pt). Every other amount field normalizes (`OperationsScreen.js:782-794`, `OperationModal.js:283-300`).
 **Fix**: `text.replace(',', '.')` in `handleAmountChange`.
 
@@ -22,9 +22,10 @@ Findings from a code-level UX audit. Each item is small-scope (no major rework) 
 **Fix**: add a Category section and a Labels multi-select to `ExpandableFilters`.
 
 ### QoL-4. Category delete: generic dead-end error, no impact preview
-**Status**: 🚧 In Progress
+**Status**: ✅ Completed (#1294, merged) — core fix; impact-preview left open
 **Problem**: `CategoriesDB.js:313-344` throws precise reasons ("N transactions use this category…"), but `CategoriesContext.js:184` always shows "Failed to delete category. Please try again." The confirm dialog (`CategoriesScreen.js:125-141`) also never previews how many transactions/subcategories are affected — contrast with the guided account-deletion flow.
 **Fix**: surface the real reason in the dialog; ideally pre-check counts before confirming, like `AccountsScreen.js:533-574`.
+**Implementation**: `CategoriesDB.deleteCategory` now attaches a structured `code` (`CATEGORY_HAS_CHILDREN` / `CATEGORY_HAS_OPERATIONS`) + `count`; `CategoriesContext` maps it to a localized, actionable message (`delete_category_error_*` across all 11 locales). **Still open (optional):** the *pre-confirm* impact preview in `CategoriesScreen` — the reason is shown only after a failed delete attempt, not before confirming.
 
 ### QoL-5. New category ignores the folder you're browsing
 **Status**: ✅ Completed (#1272, 2026-07-20) — `openForm` now defaults `parentId` to `gridParentId` and inherits the folder's type
@@ -32,7 +33,7 @@ Findings from a code-level UX audit. Each item is small-scope (no major rework) 
 **Fix**: default `parentId` to the current `gridParentId`.
 
 ### QoL-6. Planned operations: Execute is swipe-only
-**Status**: 🚧 In Progress
+**Status**: ✅ Completed (#1292, merged)
 **Problem**: the long-press menu (`PlannedOperationsScreen.js:262-292`) offers only Edit/Delete; Execute / Mark as executed / Undo live exclusively behind an unhinted swipe (`renderRightActions`). Poor discoverability and accessibility for the core action.
 **Fix**: add Execute/Mark-done/Undo to the long-press menu (and/or a visible affordance hinting the swipe).
 
@@ -42,24 +43,27 @@ Findings from a code-level UX audit. Each item is small-scope (no major rework) 
 **Fix**: long-press context menu (or swipe) on the row: Delete (with the existing confirm) and **Repeat** — duplicate the operation with today's date. Repeat is a high-value, low-cost feature for daily logging.
 
 ### QoL-8. Date-range filter presets
-**Status**: 🚧 In Progress
+**Status**: ✅ Completed (#1295, merged)
 **Problem**: "show this month" requires opening the native date picker twice (`ExpandableFilters.js:145-181`). No one-tap presets.
 **Fix**: preset chips (Today / This week / This month / Last 30 days) above the manual pickers.
+**Implementation**: preset chips added above the manual pickers — This week / This month / Last 7 days / Last 30 days / This year. Each computes a local `YYYY-MM-DD` range and applies it via `onFilterChange`; the matching chip highlights. `preset_*` keys added to all 11 locales. (Shipped set differs slightly from the proposal — no "Today", added "Last 7 days" + "This year".)
 
 ### QoL-9. Graphs period navigation: wheel-only scrubbing
-**Status**: 🚧 In Progress
+**Status**: ✅ Completed (#1297, merged)
 **Problem**: the only period control is a small floating wheel (`GraphsScreen.js:878-893`, 28px items); going back a year means many drag gestures, and there is no "jump to current month" once you drift away.
 **Fix**: chevron prev/next taps and a "today" pill when not on the current month.
 
 ### QoL-10. Balance history feels slower than the other cards
-**Status**: 🚧 In Progress
+**Status**: ✅ Completed (#1289, merged)
 **Problem**: `useBalanceHistory.js:56-82` awaits 4 independent DB queries sequentially on every account/month switch.
 **Fix**: `Promise.all` — perceived latency drop for free.
 
 ### QoL-11. Graphs: silent disappearances instead of empty states
-**Status**: 🚧 In Progress
+**Status**: 🟡 Partially completed (#1285, merged)
 **Problem**: in Full Year view the balance/prediction section unmounts with zero explanation (`GraphsScreen.js:792`); with no visible accounts the screen shows a wall of individually-blank cards. `EmptyState.js` is reused by 3 screens but never by Graphs. Also the pie cards flash "no data" for a frame on cold load (`useExpenseData.js:19-20` starts `loading: false`).
 **Fix**: placeholder text for year-view balance card, top-level `EmptyState` when no visible accounts, init `loading: true`.
+**Done (#1285)**: month-view balance card now shows an `EmptyState` (`no_balance_history`) instead of silently vanishing when no account is available; `useBalanceHistory` inits `loadingBalanceHistory: true` so the balance card no longer flashes empty on cold load.
+**Still open**: (a) Full-Year-view balance/prediction placeholder — the card is still simply absent when `selectedMonth === null`; (b) top-level `EmptyState` when there are no visible accounts (the blank-cards wall); (c) the *pie* cards' cold-load flash — `useExpenseData`/`useIncomeData` still start `loading: false` (only `useBalanceHistory` was fixed).
 
 ### QoL-12. QuickAdd validation feedback is inconsistent
 **Status**: ✅ Completed (#1278, 2026-07-20) — inline validation flash extended beyond missing-category
@@ -80,9 +84,11 @@ Findings from a code-level UX audit. Each item is small-scope (no major rework) 
 **Fix**: drag-reorder for the categories grid; optional `showCategoriesTab` toggle.
 
 ### QoL-15. Subpanel-convention stragglers
-**Status**: 🚧 In Progress
+**Status**: 🟡 Partially completed (#1298, merged)
 **Problem**: two places still stack a second `Modal` instead of the app's subpanel pattern: the split-operation category picker (`SplitOperationModal.js:241-276`, hides the amount just typed) and `CategorySpendingCard`'s picker (`CategorySpendingCard.js:628-643`, also lacks search). The parent-category picker in `CategoriesScreen.js:560-585` has no type-to-filter either.
 **Fix**: migrate to subpanels; add a search box to category pickers.
+**Done (#1298)**: the split-operation category picker was migrated from a nested `Modal` to an animated in-modal subpanel (slides in over the split form; keeps all testIDs).
+**Still open**: (a) `CategorySpendingCard`'s picker still stacks a second `Modal` and lacks search; (b) the parent-category picker in `CategoriesScreen` still has no type-to-filter search box.
 
 
 ## High Priority Features
