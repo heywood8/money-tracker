@@ -1,5 +1,12 @@
 # Changelog
 
+## [0.211.2](https://github.com/heywood8/money-tracker/compare/penny-v0.211.1...penny-v0.211.2) (2026-07-21)
+
+
+### Bug Fixes
+
+* **navigation:** tint tab gradient toward theme background, not black ([#1322](https://github.com/heywood8/money-tracker/issues/1322)) ([ae3fbce](https://github.com/heywood8/money-tracker/commit/ae3fbcefb615d793a66323e592c3dfcf696b1408))
+
 ## [0.211.1](https://github.com/heywood8/money-tracker/compare/penny-v0.211.0...penny-v0.211.1) (2026-07-21)
 
 
