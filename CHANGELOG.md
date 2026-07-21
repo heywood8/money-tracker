@@ -1,5 +1,12 @@
 # Changelog
 
+## [0.212.0](https://github.com/heywood8/money-tracker/compare/penny-v0.211.2...penny-v0.212.0) (2026-07-21)
+
+
+### Features
+
+* add close-search button to filter footer ([#1325](https://github.com/heywood8/money-tracker/issues/1325)) ([387bc5e](https://github.com/heywood8/money-tracker/commit/387bc5ec2c1387f92ed6b67cc8241fdb89910f49))
+
 ## [0.211.2](https://github.com/heywood8/money-tracker/compare/penny-v0.211.1...penny-v0.211.2) (2026-07-21)
 
 
