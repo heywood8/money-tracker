@@ -18,11 +18,14 @@ SCENARIO_DESCRIPTION: <full description>
 
 ## App topology
 
-- 5 bottom tabs (left→right): **Operations**, **Accounts**, **Categories**, **Graphs**, **Planned**
-- Tab bar sits at the bottom ~80px; tap by text label visible in uiautomator dump
-- FAB (floating action button) is bottom-right on each list screen
-- Modals slide up from the bottom and have a top-row header with a back/close button
-- Quick-add bar is a compact form at the bottom of the Operations list (above the tab bar)
+- **4 bottom tabs** (left→right): **Operations**, **Graphs**, **Planned**, **Settings**. Tap by the `content-desc` / label visible in the uiautomator dump.
+  - An optional **Accounts** tab appears just before Settings **only when** Settings → "Show accounts in main menu" is enabled. It is **off by default**.
+- **Accounts** and **Categories** are **not** tabs. Reach them from the **Settings** tab: tap the "Accounts" row or the "Categories" row — each pushes a full screen with a back arrow at the top-left. (`balance-update`, `add-account`, `transfer`, `categories-list`, etc. all start from Settings.)
+- **Settings sub-panels** (Language, Notification processing, Export, Import, Logs): the row slides a subpanel in over the list; a back arrow at the top-left returns.
+- **Adding an operation**: the **Operations** tab has **no FAB**. New operations are entered through the inline **quick-add form** at the top of the list — an Expense / Income / Transfer segmented control, an account selector, a calculator keypad, category chips, and a checkmark (✓) to save. Tapping an **existing** operation row opens the **edit** modal (which also has Delete / Split, and whose fields populate ~1–2s after it opens).
+- **FAB** (bottom-right "+"): present on the **Accounts**, **Categories**, and **Planned** screens — but **not** on Operations.
+- Modals / subpanels slide in and have a back or close control; the Android back button also dismisses them.
+- **Budgets have no UI entry point** (dormant by design) — do not look for budget progress bars on Graphs.
 - Android back button: `adb shell input keyevent 4`
 
 ## Per-step loop (max 15 steps)
