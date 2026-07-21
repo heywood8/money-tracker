@@ -1293,6 +1293,7 @@ const OperationsScreen = () => {
         topOffset={searchBarAreaHeight}
         colors={colors}
         t={t}
+        onClose={handleCloseSearch}
       />
     </View>
   );

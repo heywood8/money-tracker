@@ -20,7 +20,7 @@ const SCREEN_HEIGHT = Dimensions.get('window').height;
 // Exported so layout tests can assert the tucked position without a magic number.
 export const PANEL_OVERLAP = 14;
 
-const SearchOverlay = ({ colors, t, visible, onHeightChange = null, topOffset = 0 }) => {
+const SearchOverlay = ({ colors, t, visible, onHeightChange = null, topOffset = 0, onClose = null }) => {
   const { searchState = { text: '', types: [], accountIds: [], categoryIds: [], dateRange: { startDate: null, endDate: null }, amountRange: { min: null, max: null } } } = useOperationsData();
   const { filtersExpanded } = useSearch();
   const { updateSearchFilters } = useOperationsActions();
@@ -79,6 +79,7 @@ const SearchOverlay = ({ colors, t, visible, onHeightChange = null, topOffset = 
         colors={colors}
         t={t}
         isExpanded={filtersExpanded}
+        onCloseSearch={onClose}
       />
     </Animated.View>
   );
@@ -95,6 +96,7 @@ SearchOverlay.propTypes = {
   t: PropTypes.func.isRequired,
   visible: PropTypes.bool.isRequired,
   topOffset: PropTypes.number,
+  onClose: PropTypes.func,
 };
 
 const styles = StyleSheet.create({

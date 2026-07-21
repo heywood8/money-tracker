@@ -105,6 +105,38 @@ describe('ExpandableFilters', () => {
     });
   });
 
+  describe('Close button', () => {
+    it('does not render the close button when onCloseSearch is not provided', async () => {
+      const { queryByTestId } = await render(<ExpandableFilters {...defaultProps} />);
+      expect(queryByTestId('close-search-footer-button')).toBeNull();
+    });
+
+    it('renders the close button when onCloseSearch is provided', async () => {
+      const { getByTestId } = await render(
+        <ExpandableFilters {...defaultProps} onCloseSearch={jest.fn()} />,
+      );
+      expect(getByTestId('close-search-footer-button')).toBeTruthy();
+    });
+
+    it('calls onCloseSearch when the close button is pressed', async () => {
+      const onCloseSearch = jest.fn();
+      const { getByTestId } = await render(
+        <ExpandableFilters {...defaultProps} onCloseSearch={onCloseSearch} />,
+      );
+      await fireEvent.press(getByTestId('close-search-footer-button'));
+      expect(onCloseSearch).toHaveBeenCalledTimes(1);
+    });
+
+    it('does not clear filters when the close button is pressed', async () => {
+      const onCloseSearch = jest.fn();
+      const { getByTestId } = await render(
+        <ExpandableFilters {...defaultProps} onCloseSearch={onCloseSearch} />,
+      );
+      await fireEvent.press(getByTestId('close-search-footer-button'));
+      expect(defaultProps.onFilterChange).not.toHaveBeenCalled();
+    });
+  });
+
   describe('Amount range input', () => {
     it('preserves decimal point mid-typing without calling onFilterChange', async () => {
       const { getByPlaceholderText } = await render(<ExpandableFilters {...defaultProps} />);

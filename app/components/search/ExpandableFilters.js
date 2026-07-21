@@ -13,6 +13,7 @@ const ExpandableFilters = ({
   colors,
   t,
   isExpanded = true,
+  onCloseSearch = null,
 }) => {
   const [showStartDatePicker, setShowStartDatePicker] = useState(false);
   const [showEndDatePicker, setShowEndDatePicker] = useState(false);
@@ -283,8 +284,9 @@ const ExpandableFilters = ({
         </View>
       </ScrollView>
 
-      {/* Sticky footer: clear-all + active-filter count, always reachable
-          without scrolling to the end of the sections. */}
+      {/* Sticky footer: active-filter count on the left, clear-all + close on
+          the right so both stay reachable at the bottom without stretching a
+          thumb up to the search pill. */}
       <View style={[styles.footer, { borderTopColor: colors.glassBorder }]}>
         <View style={styles.footerCountWrap}>
           {activeCount > 0 && (
@@ -296,24 +298,38 @@ const ExpandableFilters = ({
             </>
           )}
         </View>
-        <TouchableOpacity
-          testID="clear-all-button"
-          style={[styles.clearAllButton, activeCount === 0 && styles.clearAllButtonDisabled]}
-          onPress={() => onFilterChange({
-            text: '',
-            types: [],
-            accountIds: [],
-            categoryIds: [],
-            labels: [],
-            dateRange: { startDate: null, endDate: null },
-            amountRange: { min: null, max: null },
-          })}
-        >
-          <Icon name="filter-remove-outline" size={16} color={colors.primary} />
-          <Text style={[styles.clearAllText, { color: colors.primary }]}>
-            {t('clear_all')}
-          </Text>
-        </TouchableOpacity>
+        <View style={styles.footerActions}>
+          <TouchableOpacity
+            testID="clear-all-button"
+            style={[styles.footerButton, activeCount === 0 && styles.footerButtonDisabled]}
+            onPress={() => onFilterChange({
+              text: '',
+              types: [],
+              accountIds: [],
+              categoryIds: [],
+              labels: [],
+              dateRange: { startDate: null, endDate: null },
+              amountRange: { min: null, max: null },
+            })}
+          >
+            <Icon name="filter-remove-outline" size={16} color={colors.primary} />
+            <Text style={[styles.footerButtonText, { color: colors.primary }]}>
+              {t('clear_all')}
+            </Text>
+          </TouchableOpacity>
+          {onCloseSearch && (
+            <TouchableOpacity
+              testID="close-search-footer-button"
+              style={styles.footerButton}
+              onPress={onCloseSearch}
+            >
+              <Icon name="close" size={16} color={colors.primary} />
+              <Text style={[styles.footerButtonText, { color: colors.primary }]}>
+                {t('close')}
+              </Text>
+            </TouchableOpacity>
+          )}
+        </View>
       </View>
 
       {/* Date Pickers */}
@@ -367,6 +383,7 @@ ExpandableFilters.propTypes = {
   }).isRequired,
   t: PropTypes.func.isRequired,
   isExpanded: PropTypes.bool,
+  onCloseSearch: PropTypes.func,
 };
 
 const styles = StyleSheet.create({
@@ -414,19 +431,6 @@ const styles = StyleSheet.create({
     fontSize: 13,
     fontWeight: '500',
   },
-  clearAllButton: {
-    alignItems: 'center',
-    flexDirection: 'row',
-    gap: 6,
-    paddingVertical: 6,
-  },
-  clearAllButtonDisabled: {
-    opacity: 0.4,
-  },
-  clearAllText: {
-    fontSize: 14,
-    fontWeight: '600',
-  },
   clearDateButton: {
     marginTop: 7,
   },
@@ -462,6 +466,24 @@ const styles = StyleSheet.create({
     paddingBottom: 12,
     paddingHorizontal: 12,
     paddingTop: 10,
+  },
+  footerActions: {
+    alignItems: 'center',
+    flexDirection: 'row',
+    gap: 18,
+  },
+  footerButton: {
+    alignItems: 'center',
+    flexDirection: 'row',
+    gap: 6,
+    paddingVertical: 6,
+  },
+  footerButtonDisabled: {
+    opacity: 0.4,
+  },
+  footerButtonText: {
+    fontSize: 14,
+    fontWeight: '600',
   },
   footerCount: {
     fontSize: 13,
