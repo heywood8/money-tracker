@@ -276,6 +276,47 @@ export const getAccountBalanceOnDate = async (accountId, date) => {
 };
 
 /**
+ * Get an account's most recent balance snapshot on or before a date.
+ *
+ * Unlike getAccountBalanceOnDate (which requires an exact-date row), this carries
+ * the last known balance forward when the requested day itself has no snapshot —
+ * mirroring how the chart forward-fills, and keeping this anchor consistent with the
+ * (same-snapshot-sourced) actual line. Used to anchor the burndown line's start
+ * ("balance at end of the first day") so a sparse snapshot history doesn't leave it
+ * undefined.
+ *
+ * Caveat: when no row exists exactly on `date` the carried-forward value predates
+ * any activity dated on `date` itself. For the burndown anchor that only matters for
+ * back-dated / import-dated day-1 operations (a real-time op always writes its own
+ * day's snapshot); the caller accepts that approximation.
+ *
+ * @param {number} accountId
+ * @param {string} date - YYYY-MM-DD format
+ * @returns {Promise<string|null>} Balance as string, or null if no snapshot on/before the date
+ */
+export const getAccountBalanceOnOrBeforeDate = async (accountId, date) => {
+  try {
+    // ORDER BY date(date), not the raw column: the WHERE clause already normalises
+    // with date(), and since LIMIT 1 makes the ordering pick the single result, a
+    // raw-text sort could otherwise return a same-day timestamped import row ahead
+    // of the true latest calendar-day snapshot (#773).
+    const result = await queryAll(
+      `SELECT balance
+       FROM accounts_balance_history
+       WHERE account_id = ?
+         AND date(date) <= date(?) -- date() normalises non-ISO formats from CSV import (#773)
+       ORDER BY date(date) DESC
+       LIMIT 1`,
+      [accountId, date],
+    );
+    return result && result.length > 0 ? result[0].balance : null;
+  } catch (error) {
+    console.error('Failed to get account balance on or before date:', error);
+    throw error;
+  }
+};
+
+/**
  * Get most recent snapshot date for an account
  *
  * @param {number} accountId

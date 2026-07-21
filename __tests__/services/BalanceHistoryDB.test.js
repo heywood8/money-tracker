@@ -188,6 +188,58 @@ describe('BalanceHistoryDB', () => {
     });
   });
 
+  describe('getAccountBalanceOnOrBeforeDate', () => {
+    it('returns the most recent balance on or before the date', async () => {
+      queryAll.mockResolvedValue([{ balance: '1000.00' }]);
+
+      const result = await BalanceHistoryDB.getAccountBalanceOnOrBeforeDate(1, '2024-02-01');
+
+      expect(queryAll).toHaveBeenCalledWith(
+        expect.stringContaining('date(date) <= date(?)'),
+        [1, '2024-02-01'],
+      );
+      expect(result).toBe('1000.00');
+    });
+
+    it('orders by the normalized date so a same-day timestamped row cannot outrank the latest calendar day (#773)', async () => {
+      queryAll.mockResolvedValue([{ balance: '1000.00' }]);
+
+      await BalanceHistoryDB.getAccountBalanceOnOrBeforeDate(1, '2024-02-01');
+
+      // Must sort by date(date), not the raw text column, or a raw DESC sort could
+      // place '2024-01-15T06:00:00' ahead of '2024-01-31' and pick the wrong row.
+      const sql = queryAll.mock.calls[0][0];
+      expect(sql).toContain('ORDER BY date(date) DESC');
+    });
+
+    it('returns null when no snapshot exists on or before the date', async () => {
+      queryAll.mockResolvedValue([]);
+
+      const result = await BalanceHistoryDB.getAccountBalanceOnOrBeforeDate(1, '2024-02-01');
+
+      expect(result).toBeNull();
+    });
+
+    it('returns null when query returns null', async () => {
+      queryAll.mockResolvedValue(null);
+
+      const result = await BalanceHistoryDB.getAccountBalanceOnOrBeforeDate(1, '2024-02-01');
+
+      expect(result).toBeNull();
+    });
+
+    it('throws error on database failure', async () => {
+      const consoleSpy = jest.spyOn(console, 'error').mockImplementation(() => {});
+      queryAll.mockRejectedValue(new Error('DB error'));
+
+      await expect(BalanceHistoryDB.getAccountBalanceOnOrBeforeDate(1, '2024-02-01'))
+        .rejects.toThrow('DB error');
+
+      expect(consoleSpy).toHaveBeenCalledWith('Failed to get account balance on or before date:', expect.any(Error));
+      consoleSpy.mockRestore();
+    });
+  });
+
   describe('getLastSnapshotDate', () => {
     it('returns most recent snapshot date for account', async () => {
       queryAll.mockResolvedValue([{ date: '2024-01-20' }]);

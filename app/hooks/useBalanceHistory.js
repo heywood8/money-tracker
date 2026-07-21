@@ -1,6 +1,6 @@
 import { useState, useCallback, useEffect } from 'react';
-import { getBalanceHistory, upsertBalanceHistory, deleteBalanceHistory, formatDate } from '../services/BalanceHistoryDB';
-import { getTotalExpenses } from '../services/OperationsDB';
+import { getBalanceHistory, getAccountBalanceOnOrBeforeDate, upsertBalanceHistory, deleteBalanceHistory, formatDate } from '../services/BalanceHistoryDB';
+import { getTotalExpenses, getTotalIncome, getTransferTotals } from '../services/OperationsDB';
 import { appEvents, EVENTS } from '../services/eventEmitter';
 
 /**
@@ -78,14 +78,48 @@ const useBalanceHistory = (selectedAccount, selectedYear, selectedMonth) => {
       // month) must not inflate the average.
       const expenseEndStr = isCurrentMonth ? formatDate(now) : endDateStr;
 
-      // These four reads are mutually independent — only the date strings above
-      // gate them — so issue them concurrently instead of awaiting in series.
-      const [history, prevHistory, prevMonthTotalExpenses, currentMonthTotalExpenses] = await Promise.all([
+      // Burndown ("plain avg") max is anchored to the balance at end of day 1 plus
+      // every inflow/outflow *after* day 1 — day-1 activity is already baked into
+      // that anchor, so the post-day-1 window starts on the 2nd (see plainAvgMax).
+      const secondDayStr = formatDate(new Date(selectedYear, selectedMonth, 2));
+
+      // These reads are mutually independent — only the date strings above gate
+      // them — so issue them concurrently instead of awaiting in series.
+      const [
+        history,
+        prevHistory,
+        prevMonthTotalExpenses,
+        currentMonthTotalExpenses,
+        firstDayBalance,
+        transferTotals,
+        incomeAfterDay1,
+      ] = await Promise.all([
         getBalanceHistory(selectedAccount, startDateStr, endDateStr),
         getBalanceHistory(selectedAccount, prevStartDateStr, prevEndDateStr),
         getTotalExpenses(selectedAccount, prevStartDateStr, prevEndDateStr),
         getTotalExpenses(selectedAccount, startDateStr, expenseEndStr),
+        getAccountBalanceOnOrBeforeDate(selectedAccount, startDateStr),
+        getTransferTotals(selectedAccount, secondDayStr, endDateStr),
+        getTotalIncome(selectedAccount, secondDayStr, endDateStr),
       ]);
+
+      // Burndown line anchor (a.k.a. "plain avg" max): the ceiling of money
+      // available to spend across the month. Start from the balance at end of day 1,
+      // add every post-day-1 inflow (incoming transfers + income) and remove
+      // outgoing transfers. Expenses are intentionally excluded — the burndown line
+      // is precisely the depiction of that ceiling being spent down to zero. Null
+      // when the day-1 balance is unknown (e.g. an account younger than the month);
+      // the card then falls back to the peak-actual max.
+      let plainAvgMax = null;
+      if (firstDayBalance !== null && firstDayBalance !== undefined) {
+        const computed = parseFloat(firstDayBalance)
+          + parseFloat(transferTotals.incoming)
+          - parseFloat(transferTotals.outgoing)
+          + parseFloat(incomeAfterDay1);
+        if (Number.isFinite(computed)) {
+          plainAvgMax = computed;
+        }
+      }
 
       // Transform history data for chart
       const dataPoints = history.map(item => ({
@@ -214,6 +248,7 @@ const useBalanceHistory = (selectedAccount, selectedYear, selectedMonth) => {
         prevMonthTotalExpenses,
         prevMonthDaysCount: prevMonthDays,
         currentMonthTotalExpenses,
+        plainAvgMax,
         labels: allDays,
       });
     } catch (error) {
