@@ -1,5 +1,12 @@
 # Changelog
 
+## [0.212.1](https://github.com/heywood8/money-tracker/compare/penny-v0.212.0...penny-v0.212.1) (2026-07-21)
+
+
+### Continuous Integration
+
+* build emulator-installable APK artifacts on demand ([#1329](https://github.com/heywood8/money-tracker/issues/1329)) ([1329063](https://github.com/heywood8/money-tracker/commit/13290633067d279a66da7ad9dbcd07896e6a9ee3))
+
 ## [0.212.0](https://github.com/heywood8/money-tracker/compare/penny-v0.211.2...penny-v0.212.0) (2026-07-21)
 
 
