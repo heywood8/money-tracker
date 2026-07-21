@@ -19,6 +19,7 @@ import { useAccountsActions } from '../contexts/AccountsActionsContext';
 import { useOperationsData } from '../contexts/OperationsDataContext';
 import { useLocalization } from '../contexts/LocalizationContext';
 import { getDefaultAccountId, setDefaultAccountId } from '../services/PreferencesDB';
+import { computeNetWorthSummary } from '../services/OperationsDB';
 import { parseCardMasks, serializeCardMasks, cardMaskLast4 } from '../utils/cardMask';
 import currencies from '../../assets/currencies.json';
 
@@ -241,46 +242,43 @@ const NetWorthCard = memo(({ accounts = [], operations = [], colors = {}, t = (k
   const decimals = currencyData?.decimal_digits ?? 2;
   const currencySymbol = currencyData?.symbol || displayCurrency;
 
-  // Filter accounts to only those matching display currency
-  const sameCurrencyAccounts = useMemo(() => {
-    return accounts.filter(acc => acc.currency === displayCurrency);
-  }, [accounts, displayCurrency]);
+  // Net worth converts every account's balance to the display currency at the
+  // current rate (offline first, live fallback) — same path Graphs uses — so
+  // foreign-currency accounts are included, not silently dropped. Conversion is
+  // async (may hit the network), so results land in state. Seed the initial
+  // state with the synchronous same-currency subtotal so the card shows a real
+  // figure on first paint instead of flashing $0 while the conversion resolves.
+  const [summary, setSummary] = useState(() => ({
+    total: accounts
+      .filter(acc => (acc.currency || displayCurrency) === displayCurrency)
+      .reduce((sum, acc) => sum + parseFloat(acc.balance || '0'), 0)
+      .toString(),
+    monthlyChange: '0',
+    unconvertible: [],
+  }));
 
-  // Create account ID set for quick lookup
-  const sameCurrencyAccountIds = useMemo(() => {
-    return new Set(sameCurrencyAccounts.map(acc => acc.id));
-  }, [sameCurrencyAccounts]);
-
-  const totalBalance = useMemo(() => {
-    return sameCurrencyAccounts.reduce((sum, acc) => sum + parseFloat(acc.balance || '0'), 0);
-  }, [sameCurrencyAccounts]);
-
-  // Calculate this month's change (only for accounts with matching currency)
-  const monthlyChange = useMemo(() => {
+  useEffect(() => {
+    let cancelled = false;
     const now = new Date();
     // Compare the YYYY-MM prefix of the stored local date string directly.
     // Parsing "YYYY-MM-DD" with new Date() yields UTC midnight, which shifts
     // ops dated the 1st into the previous month in UTC-negative timezones.
     const currentMonthPrefix = `${now.getFullYear()}-${String(now.getMonth() + 1).padStart(2, '0')}`;
 
-    return operations.reduce((sum, op) => {
-      // Only count operations from accounts with matching currency
-      if (!sameCurrencyAccountIds.has(op.accountId)) {
-        return sum;
-      }
+    computeNetWorthSummary(accounts, operations, displayCurrency, currentMonthPrefix)
+      .then((result) => {
+        if (!cancelled) setSummary(result);
+      })
+      .catch(() => {
+        if (!cancelled) setSummary({ total: '0', monthlyChange: '0', unconvertible: [] });
+      });
 
-      if (typeof op.date === 'string' && op.date.startsWith(currentMonthPrefix)) {
-        const amount = parseFloat(op.amount || '0');
-        if (op.type === 'income') {
-          return sum + amount;
-        } else if (op.type === 'expense') {
-          return sum - amount;
-        }
-        // transfers don't affect net worth
-      }
-      return sum;
-    }, 0);
-  }, [operations, sameCurrencyAccountIds]);
+    return () => { cancelled = true; };
+  }, [accounts, operations, displayCurrency]);
+
+  const totalBalance = parseFloat(summary.total || '0');
+  const monthlyChange = parseFloat(summary.monthlyChange || '0');
+  const unconvertible = summary.unconvertible;
 
   const isNegative = totalBalance < 0;
   const abs = Math.abs(totalBalance);
@@ -310,6 +308,14 @@ const NetWorthCard = memo(({ accounts = [], operations = [], colors = {}, t = (k
             <View style={styles.monthlyChangeRow}>
               <Text style={[styles.monthlyChangeText, { color: changeIsPositive ? colors.income : colors.expense }]}>
                 {changeIsPositive ? '↗' : '↘'} {changeIsPositive ? '+' : '-'}{currencySymbol}{formattedChange} {t('this_month') || 'this month'}
+              </Text>
+            </View>
+          )}
+          {unconvertible.length > 0 && (
+            <View style={styles.netWorthWarningRow}>
+              <Icon name="alert-outline" size={13} color={colors.mutedText} />
+              <Text style={[styles.netWorthWarningText, { color: colors.mutedText }]}>
+                {`${t('graphs_currencies_not_converted')}: ${unconvertible.join(', ')}`}
               </Text>
             </View>
           )}
@@ -1548,6 +1554,16 @@ const styles = StyleSheet.create({
     fontSize: 11,
     fontWeight: '600',
     letterSpacing: 0.8,
+  },
+  netWorthWarningRow: {
+    alignItems: 'center',
+    flexDirection: 'row',
+    gap: 4,
+    marginTop: SPACING.sm,
+  },
+  netWorthWarningText: {
+    flex: 1,
+    fontSize: 12,
   },
   pickerAccountBalance: {
     fontSize: 14,

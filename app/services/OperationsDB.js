@@ -1172,6 +1172,61 @@ export const getUnconvertibleCurrencies = async (fromCurrencies, targetCurrency)
 };
 
 /**
+ * Compute a net-worth summary across ALL accounts, converting foreign-currency
+ * balances to `targetCurrency` at the current rate (offline first, live fallback)
+ * — the same conversion path the Graphs screen uses, so the two surfaces agree.
+ * A single rate map is built once and reused for both balances and the monthly
+ * change, so operations are converted from their own account's currency too.
+ *
+ * Accounts (and operations) whose currency has no available rate are excluded
+ * from the totals and their currency codes reported in `unconvertible`, so the
+ * UI can flag the omission instead of silently dropping them.
+ *
+ * @param {Array<{id: string, currency: string, balance: string}>} accounts
+ * @param {Array<{accountId: string, type: string, amount: string, date: string}>} operations
+ * @param {string} targetCurrency - display/base currency to express totals in
+ * @param {string} monthPrefix - `YYYY-MM` prefix selecting the current month's ops
+ * @returns {Promise<{ total: string, monthlyChange: string, unconvertible: string[] }>}
+ */
+export const computeNetWorthSummary = async (accounts, operations, targetCurrency, monthPrefix) => {
+  const accountList = accounts || [];
+  const rateByCurrency = await fetchRatesToTarget(
+    accountList.map(acc => acc.currency),
+    targetCurrency,
+  );
+  const currencyByAccountId = new Map(accountList.map(acc => [acc.id, acc.currency]));
+  const unconvertible = new Set();
+
+  let total = '0';
+  for (const acc of accountList) {
+    const currency = acc.currency || targetCurrency;
+    const converted = convertWithRateMap(String(acc.balance ?? '0'), currency, targetCurrency, rateByCurrency);
+    if (converted === null) {
+      unconvertible.add(currency);
+      continue;
+    }
+    total = Currency.add(total, converted);
+  }
+
+  let monthlyChange = '0';
+  for (const op of operations || []) {
+    if (op.type !== 'income' && op.type !== 'expense') continue; // transfers don't affect net worth
+    if (typeof op.date !== 'string' || !op.date.startsWith(monthPrefix)) continue;
+    const currency = currencyByAccountId.get(op.accountId);
+    if (!currency) continue; // op for an account not in the list
+    const converted = convertWithRateMap(String(op.amount ?? '0'), currency, targetCurrency, rateByCurrency);
+    // A null rate here means this account's currency is unrateable; the balance
+    // loop above already recorded it in `unconvertible`, so just skip the amount.
+    if (converted === null) continue;
+    monthlyChange = op.type === 'income'
+      ? Currency.add(monthlyChange, converted)
+      : Currency.subtract(monthlyChange, converted);
+  }
+
+  return { total, monthlyChange, unconvertible: [...unconvertible] };
+};
+
+/**
  * Get spending by category filtered by currency and date range
  * @param {string} currency - Currency code (e.g., 'USD', 'AMD')
  * @param {string} startDate - ISO date string

@@ -1159,6 +1159,61 @@ describe('OperationsDB Service', () => {
         expect(result).toEqual(['XYZ']); // AMD resolves via the live mock, EUR offline, USD is target
       });
 
+      describe('computeNetWorthSummary', () => {
+        beforeEach(() => {
+          // Decimal helpers used only by this function — mirror them with floats;
+          // the RATES-based convertAmount above already returns 2dp strings.
+          Currency.add.mockImplementation((a, b) => (parseFloat(a) + parseFloat(b)).toString());
+          Currency.subtract.mockImplementation((a, b) => (parseFloat(a) - parseFloat(b)).toString());
+        });
+
+        it('includes foreign-currency accounts, converted to the display currency', async () => {
+          // Seed-data repro: three USD accounts + one EUR account (1.1 → USD).
+          const accounts = [
+            { id: 'a1', currency: 'USD', balance: '858' },
+            { id: 'a2', currency: 'USD', balance: '5100' },
+            { id: 'a3', currency: 'USD', balance: '100' },
+            { id: 'a4', currency: 'EUR', balance: '100' }, // 100 * 1.1 = 110
+          ];
+
+          const result = await OperationsDB.computeNetWorthSummary(accounts, [], 'USD', '2025-12');
+
+          // 858 + 5100 + 100 + 110 = 6168 — the EUR account is no longer dropped.
+          expect(parseFloat(result.total)).toBeCloseTo(6168);
+          expect(result.unconvertible).toEqual([]);
+        });
+
+        it('converts foreign-account operations into the monthly change', async () => {
+          const accounts = [
+            { id: 'usd', currency: 'USD', balance: '1000' },
+            { id: 'eur', currency: 'EUR', balance: '0' },
+          ];
+          const operations = [
+            { accountId: 'usd', type: 'income', amount: '200', date: '2025-12-10' },
+            { accountId: 'eur', type: 'expense', amount: '50', date: '2025-12-11' }, // 50 * 1.1 = 55
+            { accountId: 'usd', type: 'transfer', amount: '999', date: '2025-12-12' }, // ignored
+            { accountId: 'usd', type: 'income', amount: '10', date: '2025-11-30' }, // wrong month
+          ];
+
+          const result = await OperationsDB.computeNetWorthSummary(accounts, operations, 'USD', '2025-12');
+
+          // +200 (income) − 55 (converted expense) = 145
+          expect(parseFloat(result.monthlyChange)).toBeCloseTo(145);
+        });
+
+        it('excludes accounts whose currency has no rate and reports them', async () => {
+          const accounts = [
+            { id: 'a1', currency: 'USD', balance: '500' },
+            { id: 'a2', currency: 'XYZ', balance: '999' }, // no offline/live rate
+          ];
+
+          const result = await OperationsDB.computeNetWorthSummary(accounts, [], 'USD', '2025-12');
+
+          expect(parseFloat(result.total)).toBeCloseTo(500);
+          expect(result.unconvertible).toEqual(['XYZ']);
+        });
+      });
+
       it('category operations: converts foreign ops, tags account currency, drops unrateable', async () => {
         queryAll.mockResolvedValue([
           { id: '1', type: 'expense', amount: '100', category_id: 'cat1', date: '2025-12-05', account_currency: 'USD' },
