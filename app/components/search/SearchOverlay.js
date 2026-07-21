@@ -53,7 +53,15 @@ const SearchOverlay = ({ colors, t, visible, onHeightChange = null, topOffset = 
 
   return (
     <Animated.View
-      style={[styles.filtersContainer, { backgroundColor: colors.background, top: topOffset }, animatedStyle]}
+      style={[
+        styles.filtersContainer,
+        {
+          backgroundColor: colors.glassSurface || colors.background,
+          borderColor: colors.glassBorder || colors.border,
+          top: topOffset,
+        },
+        animatedStyle,
+      ]}
       pointerEvents={visible ? 'box-none' : 'none'}
       onLayout={handleLayout}
     >
@@ -73,6 +81,9 @@ SearchOverlay.propTypes = {
   onHeightChange: PropTypes.func,
   colors: PropTypes.shape({
     background: PropTypes.string.isRequired,
+    border: PropTypes.string,
+    glassSurface: PropTypes.string,
+    glassBorder: PropTypes.string,
   }).isRequired,
   t: PropTypes.func.isRequired,
   visible: PropTypes.bool.isRequired,
@@ -81,11 +92,15 @@ SearchOverlay.propTypes = {
 
 const styles = StyleSheet.create({
   filtersContainer: {
-    borderBottomLeftRadius: 14,
-    borderBottomRightRadius: 14,
+    borderBottomLeftRadius: 18,
+    borderBottomRightRadius: 18,
+    // Hairline glass edge along the bottom + sides of the sheet.
+    borderBottomWidth: StyleSheet.hairlineWidth,
+    borderLeftWidth: StyleSheet.hairlineWidth,
+    borderRightWidth: StyleSheet.hairlineWidth,
     elevation: 8,
     left: 0,
-    maxHeight: SCREEN_HEIGHT * 0.75,
+    maxHeight: SCREEN_HEIGHT * 0.62,
     position: 'absolute',
     right: 0,
     shadowColor: '#000',
