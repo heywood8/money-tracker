@@ -1,5 +1,12 @@
 # Changelog
 
+## [0.207.1](https://github.com/heywood8/money-tracker/compare/penny-v0.207.0...penny-v0.207.1) (2026-07-21)
+
+
+### Tests
+
+* add async polling to period navigation assertions ([#1303](https://github.com/heywood8/money-tracker/issues/1303)) ([28cffac](https://github.com/heywood8/money-tracker/commit/28cffacec53897025f7ea8cb30213ec975802510))
+
 ## [0.207.0](https://github.com/heywood8/money-tracker/compare/penny-v0.206.1...penny-v0.207.0) (2026-07-21)
 
 
