@@ -28,7 +28,13 @@ jobs:
 
       - name: Run ESLint
         id: lint
-        run: bun run lint 2>&1 | tee lint-output.txt
+        # lint:ci passes --max-warnings 0, so ESLint exits non-zero on any
+        # warning as well as any error. continue-on-error lets us post the
+        # results comment before the job is failed by the final step below.
+        # pipefail keeps ESLint's exit code from being masked by tee.
+        run: |
+          set -o pipefail
+          bun run lint:ci 2>&1 | tee lint-output.txt
         continue-on-error: true
 
       - name: Post lint results
@@ -71,7 +77,6 @@ jobs:
             }
 
             core.setOutput('message', comment);
-            core.setOutput('has_errors', errorCount > 0 ? 'true' : 'false');
 
       - uses: marocchino/sticky-pull-request-comment@v3.0.5
         if: always()
@@ -81,8 +86,10 @@ jobs:
           hide_and_recreate: true
           hide_classify: "OUTDATED"
 
-      - name: Fail if linting errors found
-        if: steps.set-lint-results.outputs.has_errors == 'true'
+      - name: Fail if linting problems found
+        # lint:ci exits non-zero on any error OR warning; outcome reflects that
+        # even though continue-on-error kept the job going to post the comment.
+        if: steps.lint.outcome != 'success'
         run: exit 1
 
   test:
