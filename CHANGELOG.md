@@ -1,5 +1,12 @@
 # Changelog
 
+## [0.207.0](https://github.com/heywood8/money-tracker/compare/penny-v0.206.1...penny-v0.207.0) (2026-07-21)
+
+
+### Features
+
+* **graphs:** anchor balance-history burndown max to day-1 balance + monthly flows ([#1301](https://github.com/heywood8/money-tracker/issues/1301)) ([2590e25](https://github.com/heywood8/money-tracker/commit/2590e2570803b7a950d3a23f47ec27a9bf875445))
+
 ## [0.206.1](https://github.com/heywood8/money-tracker/compare/penny-v0.206.0...penny-v0.206.1) (2026-07-20)
 
 
