@@ -1,5 +1,12 @@
 # Changelog
 
+## [0.209.0](https://github.com/heywood8/money-tracker/compare/penny-v0.208.2...penny-v0.209.0) (2026-07-21)
+
+
+### Features
+
+* add glass styling and active filter counter to search panel ([#1310](https://github.com/heywood8/money-tracker/issues/1310)) ([1f4b268](https://github.com/heywood8/money-tracker/commit/1f4b2684c4968d09168b99a348e24c2972eaf8fe))
+
 ## [0.208.2](https://github.com/heywood8/money-tracker/compare/penny-v0.208.1...penny-v0.208.2) (2026-07-21)
 
 
