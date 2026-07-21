@@ -1,5 +1,12 @@
 # Changelog
 
+## [0.208.2](https://github.com/heywood8/money-tracker/compare/penny-v0.208.1...penny-v0.208.2) (2026-07-21)
+
+
+### Documentation
+
+* sync QoL backlog after QoL-2/4/6/8/9/10/11/15 shipped ([#1308](https://github.com/heywood8/money-tracker/issues/1308)) ([d93eeb4](https://github.com/heywood8/money-tracker/commit/d93eeb4b763a6ef2cb4618052dbefc6bd7887e08))
+
 ## [0.208.1](https://github.com/heywood8/money-tracker/compare/penny-v0.208.0...penny-v0.208.1) (2026-07-21)
 
 
