@@ -17,7 +17,8 @@ const SCREEN_HEIGHT = Dimensions.get('window').height;
 // The panel is pulled up under the search area (which sits at a higher zIndex)
 // so its rounded top tucks behind the pill/chip strip and the sheet reads as a
 // continuation of the search bar rather than a detached card below it.
-const PANEL_OVERLAP = 14;
+// Exported so layout tests can assert the tucked position without a magic number.
+export const PANEL_OVERLAP = 14;
 
 const SearchOverlay = ({ colors, t, visible, onHeightChange = null, topOffset = 0 }) => {
   const { searchState = { text: '', types: [], accountIds: [], categoryIds: [], dateRange: { startDate: null, endDate: null }, amountRange: { min: null, max: null } } } = useOperationsData();

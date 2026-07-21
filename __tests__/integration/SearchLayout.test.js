@@ -1,7 +1,7 @@
 import React from 'react';
 import { render } from '@testing-library/react-native';
 import { StyleSheet } from 'react-native';
-import SearchOverlay from '../../app/components/search/SearchOverlay';
+import SearchOverlay, { PANEL_OVERLAP } from '../../app/components/search/SearchOverlay';
 
 // Mock ExpandableFilters to simplify test
 jest.mock('../../app/components/search/ExpandableFilters', () => {
@@ -100,8 +100,10 @@ describe('SearchLayout integration', () => {
     }
     const styles = StyleSheet.flatten(current.props.style);
 
-    // top comes from topOffset prop so overlay clears the SearchBar
-    expect(styles.top).toBe(50);
+    // top is topOffset pulled up by PANEL_OVERLAP so the panel tucks behind the
+    // search area and reads as one unit with the bar (its content padding keeps
+    // the first section clear of the pill).
+    expect(styles.top).toBe(50 - PANEL_OVERLAP);
   });
 
   it('SearchOverlay has proper zIndex for layering', async () => {
