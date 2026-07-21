@@ -416,6 +416,26 @@ describe('SimpleTabs Component Rendering', () => {
       expect(getByTestId('tab-gradient').props.pointerEvents).toBe('none');
     });
 
+    // Regression: the fade used to be hardcoded rgba(0,0,0,…), which read as an
+    // ugly dark smudge on the light theme. It now tints toward the theme
+    // background (#FFFFFF here) so it dissolves content into the surface behind
+    // the bar identically in both themes.
+    it('tints the gradient toward the theme background, not black', async () => {
+      const { getByTestId } = await render(<SimpleTabs />);
+
+      const steps = getByTestId('tab-gradient').props.children;
+      const stepColors = steps.map((s) => s.props.style.backgroundColor);
+
+      // No step is a black overlay…
+      stepColors.forEach((c) => {
+        expect(c).not.toMatch(/rgba\(0,\s*0,\s*0/);
+      });
+      // …and every step derives from the theme background hex.
+      stepColors.forEach((c) => {
+        expect(c.toLowerCase()).toMatch(/^#ffffff/);
+      });
+    });
+
     it('absorbs taps in the empty space around the pill via the bar wrapper', async () => {
       const { getByTestId } = await render(<SimpleTabs />);
 
