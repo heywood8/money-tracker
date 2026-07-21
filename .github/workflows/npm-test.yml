@@ -109,7 +109,13 @@ jobs:
 
       - name: Run tests
         id: test
-        run: bun run test -- --coverage 2>&1 | tee test-output.txt
+        # pipefail keeps jest's exit code from being masked by tee, so the final
+        # step below can fail the job on a test failure. continue-on-error lets
+        # us post the results comment before the job is failed. Mirrors the lint
+        # job's pattern above.
+        run: |
+          set -o pipefail
+          bun run test -- --coverage 2>&1 | tee test-output.txt
         continue-on-error: true
 
       - name: Post test results
@@ -173,6 +179,7 @@ jobs:
 
       - uses: marocchino/sticky-pull-request-comment@v3.0.5
         id: sticky-comment
+        if: always()
         with:
           header: "Test Results"
           message: ${{ steps.set-results.outputs.message }}
