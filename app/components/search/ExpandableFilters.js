@@ -186,11 +186,25 @@ const ExpandableFilters = ({
     return filters.dateRange.startDate === startDate && filters.dateRange.endDate === endDate;
   };
 
+  // Count of active filter facets, surfaced in the sticky footer so the user
+  // sees how much is applied without scrolling back through every section.
+  const activeCount = (filters.types?.length || 0)
+    + (filters.accountIds?.length || 0)
+    + (filters.categoryIds?.length || 0)
+    + (filters.labels?.length || 0)
+    + (filters.dateRange?.startDate || filters.dateRange?.endDate ? 1 : 0)
+    + (filters.amountRange?.min != null || filters.amountRange?.max != null ? 1 : 0)
+    + (filters.text ? 1 : 0);
+
+  const tileStyle = [styles.section, { backgroundColor: colors.glassSurfaceStrong, borderColor: colors.glassBorder }];
+
   return (
-    <View testID="expandable-filters" style={[styles.container, { backgroundColor: colors.background }]}>
-      <ScrollView style={styles.scrollView} showsVerticalScrollIndicator={false}>
+    <View testID="expandable-filters" style={styles.container}>
+      {/* Thin light edge along the top sells the frosted-glass layering. */}
+      <View style={[styles.topHighlight, { backgroundColor: colors.glassHighlight }]} />
+      <ScrollView style={styles.scrollView} contentContainerStyle={styles.scrollContent} showsVerticalScrollIndicator={false}>
         {/* Type Section */}
-        <View style={[styles.section, { borderBottomColor: colors.border }]}>
+        <View style={tileStyle}>
           <Text style={[styles.sectionLabel, { color: colors.mutedText }]}>
             {t('operation_type')}
           </Text>
@@ -199,7 +213,7 @@ const ExpandableFilters = ({
               const isSelected = filters.types.includes(type);
               const chipStyle = {
                 backgroundColor: isSelected ? colors.primary : colors.inputBackground,
-                borderColor: colors.border,
+                borderColor: colors.glassBorder,
               };
               const chipTextColor = isSelected ? '#fff' : colors.text;
               return (
@@ -223,7 +237,7 @@ const ExpandableFilters = ({
         </View>
 
         {/* Date Range Section */}
-        <View style={[styles.section, { borderBottomColor: colors.border }]}>
+        <View style={tileStyle}>
           <Text style={[styles.sectionLabel, { color: colors.mutedText }]}>
             {t('date_range')}
           </Text>
@@ -236,7 +250,7 @@ const ExpandableFilters = ({
                   key={preset.key}
                   style={[styles.chip, {
                     backgroundColor: active ? colors.primary : colors.inputBackground,
-                    borderColor: colors.border,
+                    borderColor: colors.glassBorder,
                   }]}
                   onPress={() => applyDatePreset(preset.key)}
                   testID={`date-preset-${preset.key}`}
@@ -252,7 +266,7 @@ const ExpandableFilters = ({
           </View>
           <View style={styles.dateRangeContainer}>
             <TouchableOpacity
-              style={[styles.dateInput, { backgroundColor: colors.inputBackground, borderColor: colors.inputBorder }]}
+              style={[styles.dateInput, { backgroundColor: colors.inputBackground, borderColor: colors.glassBorder }]}
               onPress={() => setShowStartDatePicker(true)}
             >
               <Icon name="calendar" size={20} color={colors.mutedText} />
@@ -262,7 +276,7 @@ const ExpandableFilters = ({
             </TouchableOpacity>
 
             <TouchableOpacity
-              style={[styles.dateInput, { backgroundColor: colors.inputBackground, borderColor: colors.inputBorder }]}
+              style={[styles.dateInput, { backgroundColor: colors.inputBackground, borderColor: colors.glassBorder }]}
               onPress={() => setShowEndDatePicker(true)}
             >
               <Icon name="calendar" size={20} color={colors.mutedText} />
@@ -284,12 +298,12 @@ const ExpandableFilters = ({
         </View>
 
         {/* Amount Range Section */}
-        <View style={[styles.section, { borderBottomColor: colors.border }]}>
+        <View style={tileStyle}>
           <Text style={[styles.sectionLabel, { color: colors.mutedText }]}>
             {t('amount_range')}
           </Text>
           <View style={styles.amountRangeContainer}>
-            <View style={[styles.amountInputWrap, { backgroundColor: colors.inputBackground, borderColor: colors.inputBorder }]}>
+            <View style={[styles.amountInputWrap, { backgroundColor: colors.inputBackground, borderColor: colors.glassBorder }]}>
               {currencySymbol && (
                 <Text style={[styles.amountCurrencyHint, { color: colors.mutedText }]}>{currencySymbol}</Text>
               )}
@@ -306,7 +320,7 @@ const ExpandableFilters = ({
               />
             </View>
             <Text style={[styles.amountRangeSeparator, { color: colors.mutedText }]}>-</Text>
-            <View style={[styles.amountInputWrap, { backgroundColor: colors.inputBackground, borderColor: colors.inputBorder }]}>
+            <View style={[styles.amountInputWrap, { backgroundColor: colors.inputBackground, borderColor: colors.glassBorder }]}>
               {currencySymbol && (
                 <Text style={[styles.amountCurrencyHint, { color: colors.mutedText }]}>{currencySymbol}</Text>
               )}
@@ -326,7 +340,7 @@ const ExpandableFilters = ({
         </View>
 
         {/* Accounts Section */}
-        <View style={[styles.section, { borderBottomColor: colors.border }]}>
+        <View style={[tileStyle, styles.sectionLast]}>
           <Text style={[styles.sectionLabel, { color: colors.mutedText }]}>
             {t('accounts')}
           </Text>
@@ -339,7 +353,7 @@ const ExpandableFilters = ({
                   key={account.id}
                   style={[styles.chip, {
                     backgroundColor: isSelected ? colors.primary : colors.inputBackground,
-                    borderColor: colors.border,
+                    borderColor: colors.glassBorder,
                   }]}
                   onPress={() => toggleAccount(account.id)}
                 >
@@ -351,10 +365,24 @@ const ExpandableFilters = ({
             })}
           </View>
         </View>
+      </ScrollView>
 
+      {/* Sticky footer: clear-all + active-filter count, always reachable
+          without scrolling to the end of the sections. */}
+      <View style={[styles.footer, { borderTopColor: colors.glassBorder }]}>
+        <View style={styles.footerCountWrap}>
+          {activeCount > 0 && (
+            <>
+              <Icon name="filter-variant" size={15} color={colors.mutedText} />
+              <Text style={[styles.footerCount, { color: colors.mutedText }]}>
+                {activeCount}
+              </Text>
+            </>
+          )}
+        </View>
         <TouchableOpacity
           testID="clear-all-button"
-          style={styles.clearAllButton}
+          style={[styles.clearAllButton, activeCount === 0 && styles.clearAllButtonDisabled]}
           onPress={() => onFilterChange({
             text: '',
             types: [],
@@ -365,11 +393,12 @@ const ExpandableFilters = ({
             amountRange: { min: null, max: null },
           })}
         >
+          <Icon name="filter-remove-outline" size={16} color={colors.primary} />
           <Text style={[styles.clearAllText, { color: colors.primary }]}>
             {t('clear_all')}
           </Text>
         </TouchableOpacity>
-      </ScrollView>
+      </View>
 
       {/* Date Pickers */}
       {showStartDatePicker && (
@@ -394,6 +423,7 @@ const ExpandableFilters = ({
 
 ExpandableFilters.propTypes = {
   filters: PropTypes.shape({
+    text: PropTypes.string,
     types: PropTypes.array,
     accountIds: PropTypes.array,
     categoryIds: PropTypes.array,
@@ -415,6 +445,10 @@ ExpandableFilters.propTypes = {
     primary: PropTypes.string,
     inputBackground: PropTypes.string,
     inputBorder: PropTypes.string,
+    glassSurface: PropTypes.string,
+    glassSurfaceStrong: PropTypes.string,
+    glassBorder: PropTypes.string,
+    glassHighlight: PropTypes.string,
   }).isRequired,
   t: PropTypes.func.isRequired,
   isExpanded: PropTypes.bool,
@@ -449,25 +483,30 @@ const styles = StyleSheet.create({
   },
   chip: {
     alignItems: 'center',
-    borderRadius: 20,
+    borderRadius: 16,
     borderWidth: 1,
     flexDirection: 'row',
-    gap: 6,
-    paddingHorizontal: HORIZONTAL_PADDING,
-    paddingVertical: 7,
+    gap: 5,
+    paddingHorizontal: 12,
+    paddingVertical: 5,
   },
   chipContainer: {
     flexDirection: 'row',
     flexWrap: 'wrap',
-    gap: 8,
+    gap: 6,
   },
   chipText: {
-    fontSize: 14,
+    fontSize: 13,
     fontWeight: '500',
   },
   clearAllButton: {
     alignItems: 'center',
-    paddingVertical: 14,
+    flexDirection: 'row',
+    gap: 6,
+    paddingVertical: 6,
+  },
+  clearAllButtonDisabled: {
+    opacity: 0.4,
   },
   clearAllText: {
     fontSize: 14,
@@ -497,26 +536,59 @@ const styles = StyleSheet.create({
     fontSize: 14,
   },
   datePresetContainer: {
-    marginBottom: 12,
+    marginBottom: 10,
   },
   dateRangeContainer: {
     flexDirection: 'row',
     gap: 12,
   },
+  footer: {
+    alignItems: 'center',
+    borderTopWidth: StyleSheet.hairlineWidth,
+    flexDirection: 'row',
+    justifyContent: 'space-between',
+    paddingBottom: 12,
+    paddingHorizontal: HORIZONTAL_PADDING,
+    paddingTop: 10,
+  },
+  footerCount: {
+    fontSize: 13,
+    fontWeight: '600',
+  },
+  footerCountWrap: {
+    alignItems: 'center',
+    flexDirection: 'row',
+    gap: 5,
+    minHeight: 18,
+  },
+  scrollContent: {
+    paddingBottom: 8,
+    paddingHorizontal: HORIZONTAL_PADDING,
+    paddingTop: 10,
+  },
   scrollView: {
     flex: 1,
   },
   section: {
-    borderBottomWidth: 1,
-    paddingHorizontal: HORIZONTAL_PADDING,
-    paddingVertical: 14,
+    borderRadius: 14,
+    borderWidth: StyleSheet.hairlineWidth,
+    marginBottom: 8,
+    paddingHorizontal: 12,
+    paddingVertical: 10,
   },
   sectionLabel: {
     fontSize: 11,
     fontWeight: '600',
     letterSpacing: 0.5,
-    marginBottom: 10,
+    marginBottom: 6,
     textTransform: 'uppercase',
+  },
+  sectionLast: {
+    marginBottom: 0,
+  },
+  topHighlight: {
+    height: StyleSheet.hairlineWidth,
+    width: '100%',
   },
 });
 

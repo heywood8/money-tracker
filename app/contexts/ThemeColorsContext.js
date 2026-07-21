@@ -29,6 +29,13 @@ const lightTheme = {
     expenseBackground: '#f5f0f0',
     incomeBackground: '#e5ffe5',
     transferBackground: '#e5e5ff',
+    // Frosted-glass surfaces for the search filters panel. No real backdrop
+    // blur on Android, so the panel stays fairly opaque for legibility while
+    // the highlight/border/tile cues sell the layered "glass" look.
+    glassSurface: 'rgba(250,250,250,0.90)',
+    glassSurfaceStrong: 'rgba(120,120,120,0.08)',
+    glassBorder: 'rgba(0,0,0,0.06)',
+    glassHighlight: 'rgba(255,255,255,0.85)',
   },
 };
 
@@ -57,6 +64,12 @@ const darkTheme = {
     expenseBackground: '#2a2020',
     incomeBackground: '#204a20',
     transferBackground: '#20204a',
+    // See lightTheme note. Dark variant keeps a near-opaque plate so filter
+    // labels stay readable over whatever operations sit behind the panel.
+    glassSurface: 'rgba(20,20,20,0.90)',
+    glassSurfaceStrong: 'rgba(120,120,120,0.12)',
+    glassBorder: 'rgba(255,255,255,0.08)',
+    glassHighlight: 'rgba(255,255,255,0.14)',
   },
 };
 
