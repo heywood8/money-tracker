@@ -230,6 +230,7 @@ const ExpandableFilters = ({
           <View style={[styles.chipContainer, styles.datePresetContainer]}>
             {DATE_PRESETS.map((preset) => {
               const active = isPresetActive(preset.key);
+              const chipTextColor = active ? '#fff' : colors.text;
               return (
                 <TouchableOpacity
                   key={preset.key}
@@ -242,7 +243,7 @@ const ExpandableFilters = ({
                   accessibilityRole="button"
                   accessibilityState={{ selected: active }}
                 >
-                  <Text style={[styles.chipText, { color: active ? '#fff' : colors.text }]}>
+                  <Text style={[styles.chipText, { color: chipTextColor }]}>
                     {t(preset.label)}
                   </Text>
                 </TouchableOpacity>
