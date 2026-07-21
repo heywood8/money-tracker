@@ -1,5 +1,12 @@
 # Changelog
 
+## [0.210.0](https://github.com/heywood8/money-tracker/compare/penny-v0.209.1...penny-v0.210.0) (2026-07-21)
+
+
+### Features
+
+* **search:** unify expanded filters panel with the search bar ([#1313](https://github.com/heywood8/money-tracker/issues/1313)) ([fa165c6](https://github.com/heywood8/money-tracker/commit/fa165c6504b665736e502cee5ee73584ac5b8bf7))
+
 ## [0.209.1](https://github.com/heywood8/money-tracker/compare/penny-v0.209.0...penny-v0.209.1) (2026-07-21)
 
 
