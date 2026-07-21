@@ -1,5 +1,13 @@
 # Changelog
 
+## [0.209.1](https://github.com/heywood8/money-tracker/compare/penny-v0.209.0...penny-v0.209.1) (2026-07-21)
+
+
+### Miscellaneous Chores
+
+* add cleanup step to /verify-pr command ([#1314](https://github.com/heywood8/money-tracker/issues/1314)) ([3aa4bd7](https://github.com/heywood8/money-tracker/commit/3aa4bd711b18b32a2c003d826a867bd8b3e7c5eb))
+* add Linux bootstrap script for headless Android emulator ([#1312](https://github.com/heywood8/money-tracker/issues/1312)) ([c3fde1b](https://github.com/heywood8/money-tracker/commit/c3fde1bce6be1f704dfd4500df49457ea490c4d7))
+
 ## [0.209.0](https://github.com/heywood8/money-tracker/compare/penny-v0.208.2...penny-v0.209.0) (2026-07-21)
 
 
