@@ -2,6 +2,15 @@ name: Build Android APK (EAS)
 
 on:
   workflow_dispatch:
+    inputs:
+      profile:
+        description: 'EAS profile (preview = arm64 only; emulator = arm64 + x86_64 for AVDs)'
+        required: true
+        default: 'preview'
+        type: choice
+        options:
+          - preview
+          - emulator
   push:
     tags:
       - 'penny-v*'
@@ -66,8 +75,9 @@ jobs:
           SENTRY_ORG: ${{ secrets.SENTRY_ORG }}
           SENTRY_PROJECT: ${{ secrets.SENTRY_PROJECT }}
           SENTRY_DSN: ${{ secrets.SENTRY_DSN }}
+          BUILD_PROFILE: ${{ github.event.inputs.profile || 'preview' }}
         run: |
-          eas build --platform android --local --profile preview --non-interactive
+          eas build --platform android --local --profile "$BUILD_PROFILE" --non-interactive
 
       - name: 📦 Find and rename APK
         id: find_apk
@@ -99,6 +109,20 @@ jobs:
           sha256sum "$APK" > "${APK}.sha256"
           echo "checksum_path=${APK}.sha256" >> $GITHUB_OUTPUT
           echo "SHA-256: $(cat ${APK}.sha256)"
+
+      # Makes the APK downloadable from every run — including manual
+      # workflow_dispatch runs off a branch, where there is no release/tag to
+      # attach it to. Without this, a dispatched build produces an APK that is
+      # discarded when the runner is torn down.
+      - name: 📦 Upload APK as workflow artifact
+        uses: actions/upload-artifact@v4
+        with:
+          name: penny-apk
+          path: |
+            ${{ steps.find_apk.outputs.apk_path }}
+            ${{ steps.checksum.outputs.checksum_path }}
+          retention-days: 7
+          if-no-files-found: error
 
       - name: 📤 Upload APK and checksum to Release
         if: github.ref_type == 'tag'

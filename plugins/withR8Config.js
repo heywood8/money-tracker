@@ -26,11 +26,16 @@ const withR8Config = (config) => {
       'org.gradle.daemon': 'true',
     };
 
-    // For preview builds, restrict to arm64-v8a only for faster builds
-    // This is a more reliable method than expo-build-properties buildArchs (known issues)
+    // Restrict native ABIs to speed up builds. This gradle property is a more
+    // reliable method than expo-build-properties buildArchs (known issues).
+    //  - preview:  arm64-v8a only (real devices)
+    //  - emulator: arm64-v8a + x86_64 (installable on x86_64 AVDs for UI testing)
     if (process.env.APP_VARIANT === 'preview') {
       properties['reactNativeArchitectures'] = 'arm64-v8a';
       console.log('🏗️  Building for arm64-v8a only (preview build)');
+    } else if (process.env.APP_VARIANT === 'emulator') {
+      properties['reactNativeArchitectures'] = 'arm64-v8a,x86_64';
+      console.log('🏗️  Building for arm64-v8a + x86_64 (emulator build)');
     }
 
     // Update or add each property
