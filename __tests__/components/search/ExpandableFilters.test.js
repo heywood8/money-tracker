@@ -144,4 +144,59 @@ describe('ExpandableFilters', () => {
       });
     });
   });
+
+  describe('Date presets (QoL-8)', () => {
+    beforeEach(() => {
+      jest.useFakeTimers();
+      // Wednesday, 2024-01-17 (2024-01-01 is a Monday).
+      jest.setSystemTime(new Date(2024, 0, 17, 12, 0, 0));
+    });
+
+    afterEach(() => {
+      jest.useRealTimers();
+    });
+
+    it('renders the date preset chips', async () => {
+      const { getByTestId } = await render(<ExpandableFilters {...defaultProps} />);
+      expect(getByTestId('date-preset-this_month')).toBeTruthy();
+      expect(getByTestId('date-preset-last_7_days')).toBeTruthy();
+      expect(getByTestId('date-preset-this_year')).toBeTruthy();
+    });
+
+    it('applies the This month range on press', async () => {
+      const onFilterChange = jest.fn();
+      const { getByTestId } = await render(
+        <ExpandableFilters {...defaultProps} onFilterChange={onFilterChange} />,
+      );
+      fireEvent.press(getByTestId('date-preset-this_month'));
+      expect(onFilterChange).toHaveBeenCalledWith({
+        dateRange: { startDate: '2024-01-01', endDate: '2024-01-31' },
+      });
+    });
+
+    it('applies the Last 7 days range on press', async () => {
+      const onFilterChange = jest.fn();
+      const { getByTestId } = await render(
+        <ExpandableFilters {...defaultProps} onFilterChange={onFilterChange} />,
+      );
+      fireEvent.press(getByTestId('date-preset-last_7_days'));
+      expect(onFilterChange).toHaveBeenCalledWith({
+        dateRange: { startDate: '2024-01-11', endDate: '2024-01-17' },
+      });
+    });
+
+    it('marks the preset active when the current range matches it', async () => {
+      const props = {
+        ...defaultProps,
+        filters: { ...defaultFilters, dateRange: { startDate: '2024-01-01', endDate: '2024-01-31' } },
+      };
+      const { getByTestId } = await render(<ExpandableFilters {...props} />);
+      expect(getByTestId('date-preset-this_month').props.accessibilityState).toEqual(
+        expect.objectContaining({ selected: true }),
+      );
+      expect(getByTestId('date-preset-last_7_days').props.accessibilityState).toEqual(
+        expect.objectContaining({ selected: false }),
+      );
+    });
+  });
 });
