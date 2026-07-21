@@ -100,6 +100,20 @@ jobs:
           echo "checksum_path=${APK}.sha256" >> $GITHUB_OUTPUT
           echo "SHA-256: $(cat ${APK}.sha256)"
 
+      # Makes the APK downloadable from every run — including manual
+      # workflow_dispatch runs off a branch, where there is no release/tag to
+      # attach it to. Without this, a dispatched build produces an APK that is
+      # discarded when the runner is torn down.
+      - name: 📦 Upload APK as workflow artifact
+        uses: actions/upload-artifact@v4
+        with:
+          name: penny-apk
+          path: |
+            ${{ steps.find_apk.outputs.apk_path }}
+            ${{ steps.checksum.outputs.checksum_path }}
+          retention-days: 7
+          if-no-files-found: error
+
       - name: 📤 Upload APK and checksum to Release
         if: github.ref_type == 'tag'
         uses: softprops/action-gh-release@v3
