@@ -5,7 +5,7 @@
  */
 
 import React from 'react';
-import { render, fireEvent } from '@testing-library/react-native';
+import { render, fireEvent, waitFor } from '@testing-library/react-native';
 
 // Mock all dependencies
 jest.mock('react-native-chart-kit', () => ({
@@ -381,13 +381,15 @@ describe('GraphsScreen', () => {
         expect.objectContaining({ disabled: true }),
       );
 
-      // Step to an older period → jump-to-current appears.
+      // Step to an older period → jump-to-current appears. The press only flips
+      // internal state, and the pending available-months mount effect defers the
+      // re-render flush, so poll for the button rather than querying synchronously.
       fireEvent.press(getByTestId('period-chevron-older'));
-      expect(getByTestId('period-jump-current')).toBeTruthy();
+      expect(await findByTestId('period-jump-current')).toBeTruthy();
 
       // Jump back to the current period → the button hides again.
       fireEvent.press(getByTestId('period-jump-current'));
-      expect(queryByTestId('period-jump-current')).toBeNull();
+      await waitFor(() => expect(queryByTestId('period-jump-current')).toBeNull());
     });
   });
 
