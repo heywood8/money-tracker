@@ -1,5 +1,12 @@
 # Changelog
 
+## [0.211.0](https://github.com/heywood8/money-tracker/compare/penny-v0.210.1...penny-v0.211.0) (2026-07-21)
+
+
+### Features
+
+* **search:** remove date-range preset buttons from filters ([#1320](https://github.com/heywood8/money-tracker/issues/1320)) ([a0b0068](https://github.com/heywood8/money-tracker/commit/a0b0068227aacd8a5be99bef134bc6c3968b052f))
+
 ## [0.210.1](https://github.com/heywood8/money-tracker/compare/penny-v0.210.0...penny-v0.210.1) (2026-07-21)
 
 
