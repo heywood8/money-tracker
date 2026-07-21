@@ -1,5 +1,12 @@
 # Changelog
 
+## [0.208.0](https://github.com/heywood8/money-tracker/compare/penny-v0.207.1...penny-v0.208.0) (2026-07-21)
+
+
+### Features
+
+* **search:** add quick date-range presets to operation filters (QoL-8) ([#1295](https://github.com/heywood8/money-tracker/issues/1295)) ([220f72d](https://github.com/heywood8/money-tracker/commit/220f72d3c5423a96ff41db7a379129c6596b096e))
+
 ## [0.207.1](https://github.com/heywood8/money-tracker/compare/penny-v0.207.0...penny-v0.207.1) (2026-07-21)
 
 
