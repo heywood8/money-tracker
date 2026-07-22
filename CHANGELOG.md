@@ -1,5 +1,12 @@
 # Changelog
 
+## [0.212.2](https://github.com/heywood8/money-tracker/compare/penny-v0.212.1...penny-v0.212.2) (2026-07-22)
+
+
+### Bug Fixes
+
+* convert foreign-currency accounts into Net Worth on Accounts ([#1333](https://github.com/heywood8/money-tracker/issues/1333)) ([bd4cd13](https://github.com/heywood8/money-tracker/commit/bd4cd13d6dc74683d467703a52a70a0f9ddeb03b))
+
 ## [0.212.1](https://github.com/heywood8/money-tracker/compare/penny-v0.212.0...penny-v0.212.1) (2026-07-21)
 
 
