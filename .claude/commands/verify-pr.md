@@ -33,8 +33,8 @@ Read both files from the repo:
 - `scripts/e2e/scenarios.json` — full scenario objects `{id, name, description}`
 
 **Pattern matching rule:** a file path matches a pattern if the path starts with the pattern
-after replacing `*` with `.*` (glob-style prefix match). This is the same logic as in
-`scripts/e2e-agent/src/agent/planner.js → matchDiffToScenarios`.
+after replacing the trailing `*` with a wildcard (glob-style prefix match). E.g.
+`app/screens/SettingsScreen.js` matches `app/screens/SettingsScreen*`.
 
 Collect the union of all matched scenario IDs, then resolve them to full scenario objects
 from `scenarios.json`. Call this the **baseline set**.
