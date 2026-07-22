@@ -242,43 +242,70 @@ const NetWorthCard = memo(({ accounts = [], operations = [], colors = {}, t = (k
   const decimals = currencyData?.decimal_digits ?? 2;
   const currencySymbol = currencyData?.symbol || displayCurrency;
 
-  // Net worth converts every account's balance to the display currency at the
-  // current rate (offline first, live fallback) — same path Graphs uses — so
-  // foreign-currency accounts are included, not silently dropped. Conversion is
-  // async (may hit the network), so results land in state. Seed the initial
-  // state with the synchronous same-currency subtotal so the card shows a real
-  // figure on first paint instead of flashing $0 while the conversion resolves.
-  const [summary, setSummary] = useState(() => ({
-    total: accounts
-      .filter(acc => (acc.currency || displayCurrency) === displayCurrency)
-      .reduce((sum, acc) => sum + parseFloat(acc.balance || '0'), 0)
-      .toString(),
-    monthlyChange: '0',
-    unconvertible: [],
-  }));
+  // Only worth offering a convert toggle when accounts span more than one currency.
+  const hasMultipleCurrencies = useMemo(
+    () => new Set(accounts.map(acc => acc.currency || displayCurrency)).size > 1,
+    [accounts, displayCurrency],
+  );
 
-  useEffect(() => {
-    let cancelled = false;
+  // Same-currency-only summary (the pre-conversion behaviour): sums just the
+  // display-currency accounts and their operations. Used when the toggle is off,
+  // and as the seed for the converted state so the card never flashes $0 before
+  // the async conversion resolves.
+  const baseCurrencySummary = useMemo(() => {
     const now = new Date();
     // Compare the YYYY-MM prefix of the stored local date string directly.
     // Parsing "YYYY-MM-DD" with new Date() yields UTC midnight, which shifts
     // ops dated the 1st into the previous month in UTC-negative timezones.
+    const monthPrefix = `${now.getFullYear()}-${String(now.getMonth() + 1).padStart(2, '0')}`;
+    const sameCurrencyIds = new Set();
+    let total = 0;
+    for (const acc of accounts) {
+      if ((acc.currency || displayCurrency) === displayCurrency) {
+        sameCurrencyIds.add(acc.id);
+        total += parseFloat(acc.balance || '0');
+      }
+    }
+    let change = 0;
+    for (const op of operations) {
+      if (!sameCurrencyIds.has(op.accountId)) continue;
+      if (typeof op.date === 'string' && op.date.startsWith(monthPrefix)) {
+        const amount = parseFloat(op.amount || '0');
+        if (op.type === 'income') change += amount;
+        else if (op.type === 'expense') change -= amount; // transfers don't affect net worth
+      }
+    }
+    return { total: total.toString(), monthlyChange: change.toString(), unconvertible: [] };
+  }, [accounts, operations, displayCurrency]);
+
+  // When the toggle is on, every balance/operation is converted to the display
+  // currency at the current rate (offline first, live fallback) — the same path
+  // Graphs uses — so foreign-currency accounts are included, not silently dropped.
+  // Conversion is async (may hit the network), so results land in state.
+  const [convertAll, setConvertAll] = useState(true);
+  const [convertedSummary, setConvertedSummary] = useState(baseCurrencySummary);
+
+  useEffect(() => {
+    if (!convertAll) return undefined;
+    let cancelled = false;
+    const now = new Date();
     const currentMonthPrefix = `${now.getFullYear()}-${String(now.getMonth() + 1).padStart(2, '0')}`;
 
     computeNetWorthSummary(accounts, operations, displayCurrency, currentMonthPrefix)
       .then((result) => {
-        if (!cancelled) setSummary(result);
+        if (!cancelled) setConvertedSummary(result);
       })
       .catch(() => {
-        if (!cancelled) setSummary({ total: '0', monthlyChange: '0', unconvertible: [] });
+        if (!cancelled) setConvertedSummary(baseCurrencySummary);
       });
 
     return () => { cancelled = true; };
-  }, [accounts, operations, displayCurrency]);
+  }, [convertAll, accounts, operations, displayCurrency, baseCurrencySummary]);
 
+  const summary = convertAll ? convertedSummary : baseCurrencySummary;
   const totalBalance = parseFloat(summary.total || '0');
   const monthlyChange = parseFloat(summary.monthlyChange || '0');
-  const unconvertible = summary.unconvertible;
+  const unconvertible = convertAll ? summary.unconvertible : [];
 
   const isNegative = totalBalance < 0;
   const abs = Math.abs(totalBalance);
@@ -294,6 +321,24 @@ const NetWorthCard = memo(({ accounts = [], operations = [], colors = {}, t = (k
 
   return (
     <View style={[styles.netWorthCard, { backgroundColor: colors.surface, borderColor: colors.border }]}>
+      {hasMultipleCurrencies && !hideBalances && (
+        <TouchableOpacity
+          style={[
+            styles.netWorthConvertToggle,
+            {
+              backgroundColor: convertAll ? colors.primary : colors.surface,
+              borderColor: convertAll ? colors.primary : colors.border,
+            },
+          ]}
+          onPress={() => setConvertAll(v => !v)}
+          activeOpacity={0.7}
+          accessibilityRole="switch"
+          accessibilityState={{ checked: convertAll }}
+          accessibilityLabel={t('graphs_convert_currencies')}
+        >
+          <Icon name="cash-sync" size={16} color={convertAll ? colors.surface : colors.mutedText} />
+        </TouchableOpacity>
+      )}
       <Text style={[styles.netWorthLabel, { color: colors.mutedText }]}>
         {(t('net_worth') || 'NET WORTH').toUpperCase()}
       </Text>
@@ -1549,6 +1594,18 @@ const styles = StyleSheet.create({
     marginHorizontal: SPACING.lg,
     marginTop: SPACING.sm,
     padding: SPACING.xl,
+  },
+  netWorthConvertToggle: {
+    alignItems: 'center',
+    borderRadius: 16,
+    borderWidth: 1,
+    height: 32,
+    justifyContent: 'center',
+    position: 'absolute',
+    right: SPACING.md,
+    top: SPACING.md,
+    width: 32,
+    zIndex: 1,
   },
   netWorthLabel: {
     fontSize: 11,

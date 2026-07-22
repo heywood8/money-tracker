@@ -225,6 +225,54 @@ describe('AccountsScreen', () => {
     });
   });
 
+  describe('Net worth currency conversion toggle', () => {
+    it('hides the convert toggle when all accounts share one currency', async () => {
+      const AccountsScreen = require('../../app/screens/AccountsScreen').default;
+      const { useAccountsData } = require('../../app/contexts/AccountsDataContext');
+
+      const singleCurrency = [
+        { id: '1', name: 'Cash', balance: '100.00', currency: 'USD', order: 0 },
+        { id: '2', name: 'Bank', balance: '200.00', currency: 'USD', order: 1 },
+      ];
+      useAccountsData.mockReturnValue(createAccountsDataMock({
+        accounts: singleCurrency,
+        displayedAccounts: singleCurrency,
+      }));
+
+      const { queryByLabelText } = await render(<AccountsScreen />);
+
+      expect(queryByLabelText('graphs_convert_currencies')).toBeNull();
+    });
+
+    it('shows the convert toggle (default on) and flips it off when pressed', async () => {
+      const AccountsScreen = require('../../app/screens/AccountsScreen').default;
+      const { useAccountsData } = require('../../app/contexts/AccountsDataContext');
+
+      const multiCurrency = [
+        { id: '1', name: 'USD', balance: '100.00', currency: 'USD', order: 0 },
+        { id: '2', name: 'EUR', balance: '100.00', currency: 'EUR', order: 1 },
+      ];
+      useAccountsData.mockReturnValue(createAccountsDataMock({
+        accounts: multiCurrency,
+        displayedAccounts: multiCurrency,
+      }));
+
+      const { getByLabelText } = await render(<AccountsScreen />);
+
+      const toggle = getByLabelText('graphs_convert_currencies');
+      expect(toggle.props.accessibilityState).toEqual(
+        expect.objectContaining({ checked: true }),
+      );
+
+      fireEvent.press(toggle);
+
+      await waitFor(() => {
+        expect(getByLabelText('graphs_convert_currencies').props.accessibilityState)
+          .toEqual(expect.objectContaining({ checked: false }));
+      });
+    });
+  });
+
   describe('Component Logic', () => {
     it('initializes with modal closed', async () => {
       const AccountsScreen = require('../../app/screens/AccountsScreen').default;
