@@ -1,5 +1,12 @@
 # Changelog
 
+## [0.213.0](https://github.com/heywood8/money-tracker/compare/penny-v0.212.2...penny-v0.213.0) (2026-07-22)
+
+
+### Features
+
+* add per-session convert toggle to Net Worth card ([#1335](https://github.com/heywood8/money-tracker/issues/1335)) ([366dda6](https://github.com/heywood8/money-tracker/commit/366dda6d84552141a17849b89dcd14922e5d09e6))
+
 ## [0.212.2](https://github.com/heywood8/money-tracker/compare/penny-v0.212.1...penny-v0.212.2) (2026-07-22)
 
 
