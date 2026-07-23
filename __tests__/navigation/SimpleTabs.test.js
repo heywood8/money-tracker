@@ -326,13 +326,15 @@ describe('SimpleTabs Component Rendering', () => {
     mockShowAccountsTab = false;
   });
 
-  it('mounts all four screens immediately (no lazy mount)', async () => {
-    // Every screen stays mounted so a swipe never reveals an unmounted
-    // (blank/black) screen — no tab press or data load required.
+  it('keeps the active screen real from frame 1 and mounts the rest after interactions', async () => {
+    // The active Operations screen is real on the first commit; the background
+    // tabs mount one idle tick later (requestIdleCallback → setImmediate in
+    // tests) — proactively, before any swipe could reveal them — so a swipe
+    // still never lands on an unmounted (blank/black) screen.
     const { getByText } = await render(<SimpleTabs />);
 
     expect(getByText('Operations Screen')).toBeTruthy();
-    expect(getByText('Graphs Screen')).toBeTruthy();
+    await waitFor(() => expect(getByText('Graphs Screen')).toBeTruthy());
     expect(getByText('Planned Screen')).toBeTruthy();
   });
 
@@ -362,8 +364,10 @@ describe('SimpleTabs Component Rendering', () => {
 
     const { getByTestId } = await render(<SimpleTabs />);
 
+    // The tab button is present from frame 1 (TABS is unaffected by deferral);
+    // the Accounts screen is a background slot, so it mounts after the idle flip.
     expect(getByTestId('tab-accounts')).toBeTruthy();
-    expect(getByTestId('accounts-screen')).toBeTruthy();
+    await waitFor(() => expect(getByTestId('accounts-screen')).toBeTruthy());
     // The rest of the tabs are still present alongside it.
     expect(getByTestId('tab-Operations')).toBeTruthy();
     expect(getByTestId('tab-Graphs')).toBeTruthy();
@@ -545,12 +549,13 @@ describe('SimpleTabs Component Rendering', () => {
     });
   });
 
-  it('keeps every screen mounted on cold start (no lazy mount)', async () => {
+  it('mounts every background screen shortly after cold start (no lazy-on-reveal)', async () => {
     const { getByText } = await render(<SimpleTabs />);
 
-    // All screens are mounted up front so a swipe never reveals a blank screen.
+    // Operations is real immediately; the rest mount proactively one idle tick
+    // later so a swipe never reveals a blank screen.
     expect(getByText('Operations Screen')).toBeTruthy();
-    expect(getByText('Graphs Screen')).toBeTruthy();
+    await waitFor(() => expect(getByText('Graphs Screen')).toBeTruthy());
     expect(getByText('Planned Screen')).toBeTruthy();
   });
 
