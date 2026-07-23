@@ -731,6 +731,40 @@ describe('OperationsContext', () => {
       expect(filtered).toHaveLength(1);
       expect(filtered[0].id).toBe(2);
     });
+
+    // Regression for #1351: getOperationsBy* callbacks must be referentially STABLE
+    // (they no longer list `operations` as a dep) yet still read the LATEST operations
+    // through a ref. A stale-closure regression would either change the callback identity
+    // or make it return the old data after a reload.
+    it('keeps getOperationsByAccount stable across data changes while reading fresh data', async () => {
+      OperationsDB.getOperationsByWeekOffset.mockResolvedValue([
+        { id: 1, accountId: 'acc1', type: 'expense', amount: '100' },
+      ]);
+
+      const { result } = await renderHook(() => useOperations(), { wrapper });
+
+      await waitFor(() => {
+        expect(result.current.loading).toBe(false);
+      });
+
+      const stableRef = result.current.getOperationsByAccount;
+      expect(stableRef('acc1')).toHaveLength(1);
+
+      // Underlying data changes: reloadOperations swaps in a larger set.
+      OperationsDB.getAllOperations.mockResolvedValue([
+        { id: 1, accountId: 'acc1', type: 'expense', amount: '100' },
+        { id: 2, accountId: 'acc1', type: 'income', amount: '200' },
+      ]);
+
+      await act(async () => {
+        await result.current.reloadOperations();
+      });
+
+      // Same callback identity (stability preserved) ...
+      expect(result.current.getOperationsByAccount).toBe(stableRef);
+      // ... and the original reference observes the freshly-loaded data (no stale closure).
+      expect(stableRef('acc1')).toHaveLength(2);
+    });
   });
 
   describe('Reload Functionality', () => {

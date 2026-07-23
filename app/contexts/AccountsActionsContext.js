@@ -1,4 +1,4 @@
-import React, { createContext, useContext, useCallback, useMemo } from 'react';
+import React, { createContext, useContext, useCallback, useMemo, useRef, useEffect } from 'react';
 import PropTypes from 'prop-types';
 import * as AccountsDB from '../services/AccountsDB';
 import * as Currency from '../services/currency';
@@ -29,6 +29,16 @@ export const AccountsActionsProvider = ({ children }) => {
     _setShowHiddenAccounts,
     _initializeDefaultAccounts,
   } = useAccountsData();
+
+  // Ref mirroring `accounts` so updateAccount/reorderAccounts can read the latest list
+  // without depending on it. This keeps those callbacks referentially stable, so the
+  // context value object below doesn't churn on every account change — preserving the
+  // data/actions split for any actions-only consumer. The no-deps effect runs after
+  // every commit, so accountsRef.current always reflects the latest committed state.
+  const accountsRef = useRef(accounts);
+  useEffect(() => {
+    accountsRef.current = accounts;
+  });
 
   const addAccount = useCallback(async (account) => {
     try {
@@ -61,7 +71,7 @@ export const AccountsActionsProvider = ({ children }) => {
 
   const updateAccount = useCallback(async (id, updated, createAdjustmentOperation = true) => {
     try {
-      const currentAccount = accounts.find(a => a.id === id);
+      const currentAccount = accountsRef.current.find(a => a.id === id);
       if (!currentAccount) {
         throw new Error('Account not found');
       }
@@ -133,7 +143,7 @@ export const AccountsActionsProvider = ({ children }) => {
       );
       throw err;
     }
-  }, [accounts, reloadAccounts, showDialog]);
+  }, [reloadAccounts, showDialog]);
 
   const deleteAccount = useCallback(async (id, transferToAccountId = null) => {
     try {
@@ -171,7 +181,7 @@ export const AccountsActionsProvider = ({ children }) => {
       const newOrderIds = new Set(newOrder.map(acc => acc.id));
 
       // Get accounts that aren't in the new order (hidden accounts when showHiddenAccounts=false)
-      const unchangedAccounts = accounts.filter(acc => !newOrderIds.has(acc.id));
+      const unchangedAccounts = accountsRef.current.filter(acc => !newOrderIds.has(acc.id));
 
       // Assign display_order to reordered accounts
       const reorderedAccounts = newOrder.map((account, index) => ({
@@ -210,7 +220,7 @@ export const AccountsActionsProvider = ({ children }) => {
       );
       throw err;
     }
-  }, [accounts, _setAccounts, reloadAccounts, showDialog]);
+  }, [_setAccounts, reloadAccounts, showDialog]);
 
   const resetDatabase = useCallback(async () => {
     try {
