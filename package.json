@@ -15,6 +15,7 @@
     "lint:fix": "eslint . --ext .js,.jsx,.ts,.tsx --fix"
   },
   "dependencies": {
+    "@expo/vector-icons": "^15.0.3",
     "@quidone/react-native-wheel-picker": "^1.6.4",
     "@react-native-async-storage/async-storage": "^2.2.0",
     "@react-native-community/datetimepicker": "9.1.0",
@@ -40,6 +41,7 @@
     "expo-sqlite": "~56.0.5",
     "expo-task-manager": "~56.0.20",
     "expo-updates": "~56.0.19",
+    "prop-types": "^15.8.1",
     "react": "19.2.3",
     "react-native": "0.85.3",
     "react-native-chart-kit": "^7.0.1",
@@ -55,7 +57,6 @@
   "devDependencies": {
     "@babel/core": "^7.29.0",
     "@eslint/js": "^9.39.2",
-    "@expo/vector-icons": "^15.0.3",
     "@testing-library/react-native": "^14.0.0",
     "babel-preset-expo": "~56.0.15",
     "drizzle-kit": "^1.0.0-beta.8-734e789",
@@ -65,7 +66,6 @@
     "globals": "^17.0.0",
     "jest": "~30.4.2",
     "jest-expo": "~56.0.5",
-    "prop-types": "^15.8.1",
     "react-test-renderer": "19.2.3",
     "test-renderer": "1.2"
   },

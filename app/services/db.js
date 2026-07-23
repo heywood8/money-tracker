@@ -6,6 +6,14 @@ import { normalizeSearchText } from './searchNormalize';
 
 const DB_NAME = 'penny.db';
 
+// Verbose init/migration narration is dev-only. Each console.* is intercepted by
+// LogService (entry append + scheduled disk flush + Sentry captureLog), so ~30
+// startup log lines add real work on every cold start. Errors/warnings still use
+// console.error/console.warn so they remain visible in production and Sentry.
+// Bound reference avoids the literal `devLog(` so it survives verbose-log edits.
+const rawConsoleLog = console.log.bind(console);
+const devLog = (...args) => { if (__DEV__) rawConsoleLog(...args); };
+
 /**
  * Schema fingerprint for the startup fast path.
  *
@@ -96,9 +104,9 @@ export const getDatabase = async () => {
   // Start initialization
   initPromise = (async () => {
     try {
-      console.log('Opening database:', DB_NAME);
+      devLog('Opening database:', DB_NAME);
       dbInstance = await SQLite.openDatabaseAsync(DB_NAME);
-      console.log('Database opened successfully, instance:', !!dbInstance);
+      devLog('Database opened successfully, instance:', !!dbInstance);
 
       if (!dbInstance) {
         throw new Error('Database instance is null after opening');
@@ -130,10 +138,10 @@ export const getDatabase = async () => {
       }
 
       drizzleInstance = drizzle(dbInstance, { schema });
-      console.log('Drizzle instance created');
+      devLog('Drizzle instance created');
 
       await initializeDatabase(dbInstance, drizzleInstance);
-      console.log('Database initialized successfully');
+      devLog('Database initialized successfully');
     } catch (error) {
       console.error('Failed to open database:', error);
       console.error('Error details:', error.message, error.stack);
@@ -282,11 +290,11 @@ const syncMigrationRecords = async (rawDb, migrationsConfig) => {
     const countMismatch = existing.length !== journalEntries.length;
 
     if (!hasNullHashes && !countMismatch) {
-      console.log('[DB] Migration records are consistent');
+      devLog('[DB] Migration records are consistent');
       return;
     }
 
-    console.log(`[DB] Fixing migration records (${existing.length} records, ${hasNullHashes ? 'has null hashes' : 'count mismatch'})`);
+    devLog(`[DB] Fixing migration records (${existing.length} records, ${hasNullHashes ? 'has null hashes' : 'count mismatch'})`);
 
     // Drop and recreate with proper records using migration SQL as hash
     // (this matches what Drizzle's expo-sqlite migrator stores)
@@ -307,7 +315,7 @@ const syncMigrationRecords = async (rawDb, migrationsConfig) => {
       );
     }
 
-    console.log(`[DB] Migration records rebuilt: ${journalEntries.length} entries`);
+    devLog(`[DB] Migration records rebuilt: ${journalEntries.length} entries`);
   } catch (error) {
     console.warn('[DB] Failed to sync migration records:', error.message);
     // Non-fatal — schema is already complete, this is just housekeeping
@@ -332,7 +340,7 @@ export const applyPendingMigrations = async (rawDb, migrationsConfig) => {
   // Determine which migrations have been applied by checking schema markers
   const appliedIndices = await detectAppliedMigrations(rawDb);
   const appliedSet = new Set(appliedIndices);
-  console.log(`[DB] Detected ${appliedIndices.length}/${journalEntries.length} migrations as already applied: ${appliedIndices.join(', ')}`);
+  devLog(`[DB] Detected ${appliedIndices.length}/${journalEntries.length} migrations as already applied: ${appliedIndices.join(', ')}`);
 
   const pendingIndices = [];
   for (let i = 0; i < journalEntries.length; i++) {
@@ -340,12 +348,12 @@ export const applyPendingMigrations = async (rawDb, migrationsConfig) => {
   }
 
   if (pendingIndices.length === 0) {
-    console.log('[DB] No pending migrations to apply');
+    devLog('[DB] No pending migrations to apply');
     await syncMigrationRecords(rawDb, migrationsConfig);
     return;
   }
 
-  console.log(`[DB] Applying ${pendingIndices.length} pending migrations: ${pendingIndices.map(i => journalEntries[i].tag).join(', ')}`);
+  devLog(`[DB] Applying ${pendingIndices.length} pending migrations: ${pendingIndices.map(i => journalEntries[i].tag).join(', ')}`);
 
   for (const idx of pendingIndices) {
     const key = migrationKeys[idx];
@@ -356,7 +364,7 @@ export const applyPendingMigrations = async (rawDb, migrationsConfig) => {
     // Split on Drizzle's statement breakpoint marker (same logic as Drizzle internals)
     const statements = rawSql.split('--> statement-breakpoint').map(s => s.trim()).filter(Boolean);
 
-    console.log(`[DB] Applying migration ${tag} (${statements.length} statements)`);
+    devLog(`[DB] Applying migration ${tag} (${statements.length} statements)`);
 
     for (const stmt of statements) {
       try {
@@ -370,7 +378,7 @@ export const applyPendingMigrations = async (rawDb, migrationsConfig) => {
       }
     }
 
-    console.log(`[DB] Migration ${tag} applied successfully`);
+    devLog(`[DB] Migration ${tag} applied successfully`);
   }
 
   // Rebuild __drizzle_migrations to reflect all migrations as applied
@@ -650,7 +658,7 @@ const initializeDatabase = async (rawDb, db) => {
     // the fast path cannot bypass a corruption this codebase can actually detect.
     const storedVersion = await getStoredSchemaVersion(rawDb);
     if (SCHEMA_VERSION > 0 && storedVersion === SCHEMA_VERSION) {
-      console.log(`[DB] Schema fingerprint matches (user_version=${SCHEMA_VERSION}) — fast startup, skipping inspection`);
+      devLog(`[DB] Schema fingerprint matches (user_version=${SCHEMA_VERSION}) — fast startup, skipping inspection`);
       // Per-connection PRAGMAs are connection-scoped, NOT schema state — they must
       // run on every open regardless of the fast path.
       await rawDb.runAsync('PRAGMA foreign_keys = ON');
@@ -658,14 +666,14 @@ const initializeDatabase = async (rawDb, db) => {
       return;
     }
 
-    console.log('Running Drizzle migrations...');
-    console.log('Available migrations:', migrations.journal.entries.map(e => e.tag).join(', '));
+    devLog('Running Drizzle migrations...');
+    devLog('Available migrations:', migrations.journal.entries.map(e => e.tag).join(', '));
 
     // Check existing tables
     const existingTables = await rawDb.getAllAsync(
       'SELECT name FROM sqlite_master WHERE type="table" ORDER BY name',
     );
-    console.log('Existing tables:', (existingTables || []).map(t => t.name).join(', '));
+    devLog('Existing tables:', (existingTables || []).map(t => t.name).join(', '));
 
     // Check for corrupted migration state
     const isCorrupted = await isDatabaseCorrupted(rawDb);
@@ -690,7 +698,7 @@ const initializeDatabase = async (rawDb, db) => {
         await rawDb.runAsync(`DROP TABLE IF EXISTS "${table.name}"`);
       }
       await rawDb.runAsync('PRAGMA foreign_keys = ON');
-      console.log('[DB] Schema reset complete');
+      devLog('[DB] Schema reset complete');
     }
 
     // Check current migration state before running
@@ -701,9 +709,9 @@ const initializeDatabase = async (rawDb, db) => {
     if (drizzleMigrations && drizzleMigrations.length > 0) {
       const appliedMigrations = await rawDb.getAllAsync('SELECT * FROM __drizzle_migrations ORDER BY created_at ASC');
       const hashList = (appliedMigrations || []).map(m => m.hash || 'null').join(', ');
-      console.log('Previously applied migrations:', hashList || 'none');
+      devLog('Previously applied migrations:', hashList || 'none');
     } else {
-      console.log('No migrations table found - database will be migrated from scratch');
+      devLog('No migrations table found - database will be migrated from scratch');
     }
 
     // Get migrations before applying
@@ -716,7 +724,7 @@ const initializeDatabase = async (rawDb, db) => {
     // already-complete schema is wasteful and can produce confusing logs.
     const schemaAlreadyComplete = await isSchemaComplete(rawDb);
     if (schemaAlreadyComplete) {
-      console.log('[DB] Schema is already at latest version — skipping migrate()');
+      devLog('[DB] Schema is already at latest version — skipping migrate()');
 
       // Fix __drizzle_migrations if it has wrong count or null hashes so future
       // startups are even faster (no need to re-check schema).
@@ -731,7 +739,7 @@ const initializeDatabase = async (rawDb, db) => {
 
       // Log final state
       const finalMigrations = await rawDb.getAllAsync('SELECT * FROM __drizzle_migrations ORDER BY created_at ASC').catch(() => []);
-      console.log(`Total migrations applied: ${(finalMigrations || []).length}/${migrations.journal.entries.length}`);
+      devLog(`Total migrations applied: ${(finalMigrations || []).length}/${migrations.journal.entries.length}`);
 
       // Run post-migration handlers for newly applied migrations
       if (migrations.postMigrationHandlers) {
@@ -744,7 +752,7 @@ const initializeDatabase = async (rawDb, db) => {
             : null;
 
           if (migrationEntry && appliedHashesAfter.has(migrationEntry.hash) && !appliedHashesBefore.has(migrationEntry.hash)) {
-            console.log(`Running post-migration handler for ${key}...`);
+            devLog(`Running post-migration handler for ${key}...`);
             try {
               await handler(rawDb);
             } catch (handlerError) {
@@ -768,7 +776,7 @@ const initializeDatabase = async (rawDb, db) => {
             ).catch(() => null);
 
             if (!completionRow) {
-              console.log(`Retrying incomplete post-migration handler for ${key}...`);
+              devLog(`Retrying incomplete post-migration handler for ${key}...`);
               try {
                 await handler(rawDb);
               } catch (retryError) {
@@ -796,7 +804,7 @@ const initializeDatabase = async (rawDb, db) => {
     // returns early above), so it adds no cost to warm cold starts.
     if (await isSchemaComplete(rawDb)) {
       await setStoredSchemaVersion(rawDb, SCHEMA_VERSION);
-      console.log('Database migrations completed successfully');
+      devLog('Database migrations completed successfully');
     } else {
       console.warn('[DB] Schema incomplete after init — not stamping the fast-path fingerprint; next launch will re-verify and heal');
     }
@@ -910,10 +918,10 @@ export const executeTransaction = async (callback) => {
  */
 export const closeDatabase = async () => {
   if (dbInstance) {
-    console.log('Closing database connection...');
+    devLog('Closing database connection...');
     try {
       await dbInstance.closeAsync();
-      console.log('Database closed successfully');
+      devLog('Database closed successfully');
     } catch (error) {
       console.error('Error closing database:', error);
     } finally {
@@ -968,7 +976,7 @@ export const dropAllTables = async () => {
       if (dbInstance) {
         raw = dbInstance;
       } else {
-        console.log('Opening database for table drop...');
+        devLog('Opening database for table drop...');
         raw = await SQLite.openDatabaseAsync(DB_NAME);
         openedNewConnection = true;
       }
@@ -985,12 +993,12 @@ export const dropAllTables = async () => {
       "SELECT name FROM sqlite_master WHERE type='table' AND name NOT LIKE 'sqlite_%'",
     );
 
-    console.log('Tables to drop:', tables.map(t => t.name).join(', '));
+    devLog('Tables to drop:', tables.map(t => t.name).join(', '));
 
     // Drop each table (including migrations)
     for (const table of tables) {
       await raw.runAsync(`DROP TABLE IF EXISTS "${table.name}"`);
-      console.log(`Dropped table: ${table.name}`);
+      devLog(`Dropped table: ${table.name}`);
     }
 
     // Re-enable foreign keys
@@ -1004,13 +1012,13 @@ export const dropAllTables = async () => {
     // (fresh-install branch) on the next open, which recreates the schema.
     await raw.runAsync('PRAGMA user_version = 0');
 
-    console.log('All tables dropped successfully');
+    devLog('All tables dropped successfully');
 
     // Close the database connection properly before resetting instances
     // This ensures the native connection is released
     try {
       await raw.closeAsync();
-      console.log('Database connection closed after dropping tables');
+      devLog('Database connection closed after dropping tables');
     } catch (closeError) {
       console.error('Error closing database after dropping tables:', closeError);
     }
@@ -1040,7 +1048,7 @@ export const resetDatabase = async () => {
   try {
     const FileSystem = require('expo-file-system/legacy');
     await FileSystem.deleteAsync(dbPath, { idempotent: true });
-    console.log('Database file deleted');
+    devLog('Database file deleted');
   } catch (error) {
     console.error('Failed to delete database file:', error);
   }

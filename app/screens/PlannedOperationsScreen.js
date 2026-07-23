@@ -17,6 +17,9 @@ import { useCategories } from '../contexts/CategoriesContext';
 import PlannedOperationModal from '../modals/PlannedOperationModal';
 import currencies from '../../assets/currencies.json';
 
+// Module-level stable reference so the SectionList prop identity never changes.
+const keyExtractor = (item) => item.id;
+
 const TYPE_COLORS = {
   expense: 'expense',
   income: 'income',
@@ -474,7 +477,7 @@ export default function PlannedOperationsScreen() {
       {/* List */}
       <SectionList
         sections={sections}
-        keyExtractor={item => item.id}
+        keyExtractor={keyExtractor}
         renderItem={renderItem}
         renderSectionHeader={renderSectionHeader}
         ListEmptyComponent={renderEmpty}

@@ -47,6 +47,10 @@ const ROUNDING_MODE_OPTIONS = [
   { value: 'down', labelKey: 'rounding_mode_down', fallback: 'Down' },
 ];
 
+// Static currency list is a module-level JSON import that never changes, so its
+// Object.entries() can be computed once and shared as a stable FlatList `data`.
+const CURRENCY_ENTRIES = Object.entries(currencies);
+
 // Memoized currency picker modal component
 const CurrencyPickerModal = memo(({ visible = false, onClose = () => {}, currencies = DEFAULT_CURRENCIES, colors = {}, t = (k) => k, onSelect = () => {} }) => {
   const renderCurrencyItem = useCallback(({ item }) => {
@@ -63,6 +67,9 @@ const CurrencyPickerModal = memo(({ visible = false, onClose = () => {}, currenc
     );
   }, [onSelect]);
 
+  // Stable array identity so the FlatList doesn't re-diff on every modal render.
+  const currencyEntries = useMemo(() => Object.entries(currencies), [currencies]);
+
   return (
     <Portal>
       <Modal
@@ -71,7 +78,7 @@ const CurrencyPickerModal = memo(({ visible = false, onClose = () => {}, currenc
         contentContainerStyle={[styles.pickerModalContent, { backgroundColor: colors.card }]}
       >
         <FlatList
-          data={Object.entries(currencies)}
+          data={currencyEntries}
           keyExtractor={([code]) => code}
           renderItem={renderCurrencyItem}
           style={styles.pickerList}
@@ -541,17 +548,20 @@ export default function AccountsScreen({ onBackStateChange }) {
 
   const balanceInputRef = useRef(null);
 
-  const SCREEN_WIDTH = Dimensions.get('window').width;
+  // Frozen at mount (portrait Android — the window width does not change), so the
+  // interpolations below keep a stable identity across re-renders.
+  const SCREEN_WIDTH = useMemo(() => Dimensions.get('window').width, []);
 
-  // Form panel interpolations
-  const formPanelTranslateX = formPanelAnim.interpolate({
+  // Form panel interpolations — memoized on the stable Animated value so a re-render
+  // of AccountsScreen doesn't allocate a fresh AnimatedInterpolation each time.
+  const formPanelTranslateX = useMemo(() => formPanelAnim.interpolate({
     inputRange: [0, 1],
     outputRange: [SCREEN_WIDTH, 0],
-  });
-  const formPanelOpacity = formPanelAnim.interpolate({
+  }), [formPanelAnim, SCREEN_WIDTH]);
+  const formPanelOpacity = useMemo(() => formPanelAnim.interpolate({
     inputRange: [0, 1],
     outputRange: [0, 1],
-  });
+  }), [formPanelAnim]);
 
   const openFormPanel = useCallback((id, values) => {
     setCurrencyPanelVisible(false);
@@ -1280,7 +1290,7 @@ export default function AccountsScreen({ onBackStateChange }) {
                 </Text>
               </View>
               <FlatList
-                data={Object.entries(currencies)}
+                data={CURRENCY_ENTRIES}
                 keyExtractor={([code]) => code}
                 renderItem={({ item: [code, cur] }) => (
                   <TouchableRipple
