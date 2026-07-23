@@ -785,12 +785,21 @@ const initializeDatabase = async (rawDb, db) => {
     await rawDb.runAsync('PRAGMA foreign_keys = ON');
     await rawDb.runAsync('PRAGMA journal_mode = WAL');
 
-    // Stamp the schema fingerprint now that init has fully succeeded, so the next
-    // cold start can take the fast path above. Written only here (after the whole
-    // slow path completed without throwing) — never on a partial/failed init.
-    await setStoredSchemaVersion(rawDb, SCHEMA_VERSION);
-
-    console.log('Database migrations completed successfully');
+    // Stamp the schema fingerprint ONLY if the schema is actually complete.
+    // applyPendingMigrations() swallows per-statement errors and does not throw
+    // (an ADD COLUMN can fail transiently on a locked DB / disk pressure), so
+    // "init did not throw" is NOT proof the schema is whole. Verifying
+    // completeness here means a half-applied migration leaves user_version
+    // unstamped, so the next launch takes the full path and self-heals — instead
+    // of the fast path locking in a broken schema forever ("no such column" on
+    // every launch). This check runs only on the slow path (the fast path
+    // returns early above), so it adds no cost to warm cold starts.
+    if (await isSchemaComplete(rawDb)) {
+      await setStoredSchemaVersion(rawDb, SCHEMA_VERSION);
+      console.log('Database migrations completed successfully');
+    } else {
+      console.warn('[DB] Schema incomplete after init — not stamping the fast-path fingerprint; next launch will re-verify and heal');
+    }
   } catch (error) {
     console.error('Failed to initialize database:', error);    console.error('Error details:', {
       message: error.message,
@@ -986,6 +995,14 @@ export const dropAllTables = async () => {
 
     // Re-enable foreign keys
     await raw.runAsync('PRAGMA foreign_keys = ON');
+
+    // CRITICAL: clear the schema fingerprint. user_version is a DB-header value
+    // that survives table drops, so leaving it at its stamped SCHEMA_VERSION
+    // would make the next getDatabase() take the startup fast path and skip
+    // recreating the tables we just dropped — bricking the install with
+    // "no such table" until reinstall. Zeroing it forces the full init path
+    // (fresh-install branch) on the next open, which recreates the schema.
+    await raw.runAsync('PRAGMA user_version = 0');
 
     console.log('All tables dropped successfully');
 
