@@ -27,7 +27,7 @@ const OperationListItem = ({
   getAccountName,
   formatCurrency,
   isLast = false,
-  onPress,
+  onEdit,
   onLongPress = () => {},
   testID,
   suggestionChips = null,
@@ -37,6 +37,13 @@ const OperationListItem = ({
   // Measure the row in window coordinates on long-press so the caller can float
   // an action menu / lifted clone exactly over it (see OperationActionMenu).
   const rowRef = useRef(null);
+  // Bind the operation to the edit handler INSIDE the row so the stable `onEdit`
+  // prop can flow down unchanged. This keeps OperationListItem's React.memo
+  // compare stable — the list no longer hands each row a fresh inline
+  // `() => onEditOperation(item)` closure on every parent render (see #1339).
+  const handlePress = useCallback(() => {
+    onEdit(operation);
+  }, [onEdit, operation]);
   const handleLongPress = useCallback(() => {
     const node = rowRef.current;
     if (!node || typeof node.measureInWindow !== 'function') {
@@ -122,7 +129,7 @@ const OperationListItem = ({
     <>
       <TouchableRipple
         testID={testID}
-        onPress={isPending ? undefined : onPress}
+        onPress={isPending ? undefined : handlePress}
         onLongPress={isPending ? undefined : handleLongPress}
         disabled={isPending}
         rippleColor="rgba(0, 0, 0, .08)"
@@ -231,7 +238,7 @@ OperationListItem.propTypes = {
   getAccountName: PropTypes.func.isRequired,
   formatCurrency: PropTypes.func.isRequired,
   isLast: PropTypes.bool,
-  onPress: PropTypes.func.isRequired,
+  onEdit: PropTypes.func.isRequired,
   onLongPress: PropTypes.func,
   testID: PropTypes.string,
   suggestionChips: PropTypes.arrayOf(PropTypes.string),
