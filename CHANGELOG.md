@@ -1,5 +1,12 @@
 # Changelog
 
+## [0.214.6](https://github.com/heywood8/money-tracker/compare/penny-v0.214.5...penny-v0.214.6) (2026-07-23)
+
+
+### Performance Improvements
+
+* **db:** fast-path startup schema check via stored schema version ([#1368](https://github.com/heywood8/money-tracker/issues/1368)) ([664c47d](https://github.com/heywood8/money-tracker/commit/664c47d8a442893ec201048a8a391f3de71ea6f2))
+
 ## [0.214.5](https://github.com/heywood8/money-tracker/compare/penny-v0.214.4...penny-v0.214.5) (2026-07-23)
 
 
