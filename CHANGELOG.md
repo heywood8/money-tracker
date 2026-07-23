@@ -1,5 +1,12 @@
 # Changelog
 
+## [0.214.9](https://github.com/heywood8/money-tracker/compare/penny-v0.214.8...penny-v0.214.9) (2026-07-23)
+
+
+### Performance Improvements
+
+* **i18n:** lazy-load locale bundles instead of eager static imports ([#1373](https://github.com/heywood8/money-tracker/issues/1373)) ([aa7f387](https://github.com/heywood8/money-tracker/commit/aa7f3879a52b67aab2750422098a015d0264988e))
+
 ## [0.214.8](https://github.com/heywood8/money-tracker/compare/penny-v0.214.7...penny-v0.214.8) (2026-07-23)
 
 
