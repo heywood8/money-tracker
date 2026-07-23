@@ -130,6 +130,7 @@ const mockGetExportText = jest.fn(() => 'log text');
 jest.mock('../../app/hooks/useLogEntries', () => ({
   useLogEntries: () => ({
     entries: [],
+    counts: { all: 0, error: 0, warn: 0, info: 0, debug: 0 },
     clearLogs: mockClearLogs,
     getExportText: mockGetExportText,
   }),

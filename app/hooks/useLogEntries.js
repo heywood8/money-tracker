@@ -17,6 +17,7 @@ export function useLogEntries(levelFilter = 'all') {
   }, []);
 
   const entries = logService.getEntries(levelFilter);
+  const counts = logService.getCounts();
 
   const clearLogs = useCallback(() => {
     logService.clear();
@@ -26,5 +27,5 @@ export function useLogEntries(levelFilter = 'all') {
     return logService.formatForExport(filterRef.current);
   }, []);
 
-  return { entries, clearLogs, getExportText };
+  return { entries, counts, clearLogs, getExportText };
 }
