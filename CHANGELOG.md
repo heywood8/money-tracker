@@ -1,5 +1,12 @@
 # Changelog
 
+## [0.214.7](https://github.com/heywood8/money-tracker/compare/penny-v0.214.6...penny-v0.214.7) (2026-07-23)
+
+
+### Build System
+
+* **android:** trim JSC and blanket kotlin keep from ProGuard rules ([#1367](https://github.com/heywood8/money-tracker/issues/1367)) ([16ef1e0](https://github.com/heywood8/money-tracker/commit/16ef1e0454ad18c7a8d3f2a7d371f15941e43a6d))
+
 ## [0.214.6](https://github.com/heywood8/money-tracker/compare/penny-v0.214.5...penny-v0.214.6) (2026-07-23)
 
 
