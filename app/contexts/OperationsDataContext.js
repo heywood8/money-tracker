@@ -1,4 +1,4 @@
-import React, { createContext, useContext, useState, useEffect, useCallback, useMemo, useRef } from 'react';
+import React, { createContext, useContext, useState, useEffect, useCallback, useMemo, useRef, useDeferredValue } from 'react';
 import PropTypes from 'prop-types';
 import { appEvents, EVENTS } from '../services/eventEmitter';
 import { getJsonPreference, PREF_KEYS } from '../services/PreferencesDB';
@@ -134,6 +134,18 @@ export const OperationsDataProvider = ({ children }) => {
   const accountNamesKey = accounts.map(a => `${a.id}:${a.name}`).join('|');
   const accountNameById = useMemo(() => new Map(accounts.map(a => [a.id, a.name])), [accountNamesKey]);
 
+  // Defer ONLY the free-text query that drives the heavy in-memory text scan.
+  // Typing already flows through SearchBar's 300ms debounce before it lands in
+  // searchState.text, so this does not add a second lag on keystrokes: the debounce
+  // gates HOW OFTEN the query commits, and useDeferredValue keeps each committed
+  // recompute non-blocking. When searchState.text changes, React first renders with
+  // the previous deferredSearchText (filteredOperations stays cached → no scan on the
+  // urgent pass), then schedules an interruptible background render where
+  // deferredSearchText catches up and the O(n) filter runs. The structural filters
+  // (types/accounts/categories/labels/date/amount) are discrete toggles, not typed,
+  // so they stay urgent — only the text scan is deferred.
+  const deferredSearchText = useDeferredValue(searchState.text);
+
   // Filtered operations based on search state
   const filteredOperations = useMemo(() => {
     let result = operations;
@@ -143,7 +155,7 @@ export const OperationsDataProvider = ({ children }) => {
     // case-insensitive AND treats Russian ё/е as equivalent (a Russian keyboard's
     // autocomplete frequently swaps one for the other, so "Самолет" must find "Самолёт"
     // and vice versa). This is the same normalization SEARCH_NORM applies in SQL.
-    const trimmedText = searchState.text ? searchState.text.trim() : '';
+    const trimmedText = deferredSearchText ? deferredSearchText.trim() : '';
     if (trimmedText) {
       const searchLower = normalizeSearchText(trimmedText);
       result = result.filter(op => {
@@ -249,7 +261,26 @@ export const OperationsDataProvider = ({ children }) => {
     }
 
     return result;
-  }, [operations, searchState, accountNameById, getCategoryPath, t]);
+    // Depend on the deferred text (not searchState.text) plus each structural filter
+    // field individually. setSearchText spreads prev, so the structural arrays/objects
+    // keep their identity across a text-only change — during the urgent render that
+    // commits new text, every dep here is unchanged (deferredSearchText still holds the
+    // previous value), so the memo returns its cached result and the O(n) scan is skipped
+    // until the deferred background render. Referencing the whole searchState object
+    // instead would invalidate the memo on the urgent pass and defeat the deferral.
+  }, [
+    operations,
+    deferredSearchText,
+    searchState.types,
+    searchState.accountIds,
+    searchState.categoryIds,
+    searchState.labels,
+    searchState.dateRange,
+    searchState.amountRange,
+    accountNameById,
+    getCategoryPath,
+    t,
+  ]);
 
   // Count active filter groups (excluding text search)
   const getSearchFilterCount = useCallback(() => {

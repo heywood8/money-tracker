@@ -1096,5 +1096,75 @@ describe('OperationsDataContext - Search API', () => {
         });
       });
     });
+
+    // The text query is deferred via React 19's useDeferredValue (issue #1353) so a
+    // heavy filter commit does not block typing on large histories. These tests pin
+    // the guarantee that deferral is CORRECTNESS-NEUTRAL: the final filtered set for a
+    // query must be identical to filtering synchronously — only the scheduling changes.
+    describe('deferred text filtering is correctness-neutral (issue #1353)', () => {
+      it('a text query settles on the exact same set the synchronous filter would produce', async () => {
+        const result = await setupWithOperations();
+
+        await waitFor(() => {
+          expect(result.current.data.operations).toHaveLength(5);
+        });
+
+        await act(async () => {
+          result.current.actions.setSearchText('bank');
+        });
+
+        // Once the deferred render flushes, the result must equal the reference set
+        // (same assertion as the non-deferred "filters by account name match" case).
+        await waitFor(() => {
+          expect(result.current.data.operations.map(op => op.id).sort())
+            .toEqual(['op-2', 'op-4', 'op-5']);
+        });
+      });
+
+      it('rapid successive queries converge on the final query result, not an intermediate one', async () => {
+        const result = await setupWithOperations();
+
+        await waitFor(() => {
+          expect(result.current.data.operations).toHaveLength(5);
+        });
+
+        // Simulate the debounce delivering several committed values in quick
+        // succession; the deferred value must ultimately reflect the LAST query.
+        await act(async () => {
+          result.current.actions.setSearchText('coffee');
+          result.current.actions.setSearchText('bus');
+          result.current.actions.setSearchText('food');
+        });
+
+        await waitFor(() => {
+          expect(result.current.data.operations.map(op => op.id).sort())
+            .toEqual(['op-1', 'op-5']);
+        });
+      });
+
+      it('clearing the query restores the full unfiltered set', async () => {
+        const result = await setupWithOperations();
+
+        await waitFor(() => {
+          expect(result.current.data.operations).toHaveLength(5);
+        });
+
+        await act(async () => {
+          result.current.actions.setSearchText('coffee');
+        });
+
+        await waitFor(() => {
+          expect(result.current.data.operations).toHaveLength(1);
+        });
+
+        await act(async () => {
+          result.current.actions.setSearchText('');
+        });
+
+        await waitFor(() => {
+          expect(result.current.data.operations).toHaveLength(5);
+        });
+      });
+    });
   });
 });
