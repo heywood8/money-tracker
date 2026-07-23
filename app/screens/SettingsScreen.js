@@ -190,7 +190,7 @@ export default function SettingsScreen({ setSubPanelActive }) {
     setTheme(colorScheme === 'dark' ? 'light' : 'dark');
   }, [colorScheme, setTheme]);
 
-  const { entries, clearLogs, getExportText } = useLogEntries(logFilter);
+  const { entries, counts, clearLogs, getExportText } = useLogEntries(logFilter);
   const importPickInProgress = useRef(false);
 
   const handleToggleHideBalances = useCallback(async () => {
@@ -961,17 +961,26 @@ export default function SettingsScreen({ setSubPanelActive }) {
 
   const renderLogEntry = useCallback(({ item }) => {
     const isExpanded = expandedLogIds.has(item.id);
+    const levelColor = LOG_LEVEL_COLORS[item.level];
+    // Tint the row background for the two levels that warrant attention so they
+    // stand out while scanning a wall of info/debug lines. `20` = ~12% alpha.
+    const rowBackground = item.level === 'error' || item.level === 'warn'
+      ? `${levelColor}20`
+      : 'transparent';
     return (
       <TouchableOpacity
         onPress={() => toggleLogExpand(item.id)}
         onLongPress={() => Clipboard.setStringAsync(`${item.timestamp} [${item.level.toUpperCase()}] ${item.message}`)}
         activeOpacity={0.7}
-        style={styles.logEntry}
+        style={[
+          styles.logEntry,
+          { borderLeftColor: levelColor, borderBottomColor: colors.border, backgroundColor: rowBackground },
+        ]}
       >
         <Text style={[styles.logTimestamp, { color: colors.mutedText }]}>
-          {item.timestamp.substring(11, 19)}
+          {isExpanded ? item.timestamp.substring(0, 19).replace('T', ' ') : item.timestamp.substring(11, 19)}
         </Text>
-        <Text style={[styles.logLevel, { color: LOG_LEVEL_COLORS[item.level] }]}>
+        <Text style={[styles.logLevel, { color: levelColor }]}>
           {item.level.toUpperCase()}
         </Text>
         <Text style={[styles.logMessage, { color: colors.text }]} numberOfLines={isExpanded ? undefined : 3}>
@@ -1519,10 +1528,19 @@ export default function SettingsScreen({ setSubPanelActive }) {
                   {LOG_FILTERS.map(f => {
                     const isSelected = f === logFilter;
                     const filterLabelKey = `log_level_${f}`;
+                    const label = t(filterLabelKey) || f;
+                    // Badge every level chip that has entries (skip "all"); the
+                    // absence of a badge on Error/Warn reads as "none", so a
+                    // zero count needs no badge.
+                    const count = f === 'all' ? 0 : (counts?.[f] || 0);
+                    const badgeColor = f === 'error' || f === 'warn' ? LOG_LEVEL_COLORS[f] : colors.mutedText;
                     return (
                       <TouchableOpacity
                         key={f}
                         onPress={() => setLogFilter(f)}
+                        accessibilityRole="button"
+                        accessibilityState={{ selected: isSelected }}
+                        accessibilityLabel={count > 0 ? `${label}, ${count}` : label}
                         style={[
                           styles.filterChip,
                           { borderColor: colors.border },
@@ -1533,8 +1551,21 @@ export default function SettingsScreen({ setSubPanelActive }) {
                           styles.filterChipText,
                           isSelected ? styles.filterChipTextSelected : { color: colors.text },
                         ]}>
-                          {t(filterLabelKey) || f}
+                          {label}
                         </Text>
+                        {count > 0 && (
+                          <View style={[
+                            styles.filterChipBadge,
+                            { backgroundColor: isSelected ? 'rgba(255,255,255,0.3)' : `${badgeColor}26` },
+                          ]}>
+                            <Text style={[
+                              styles.filterChipBadgeText,
+                              { color: isSelected ? '#fff' : badgeColor },
+                            ]}>
+                              {count}
+                            </Text>
+                          </View>
+                        )}
                       </TouchableOpacity>
                     );
                   })}
@@ -1542,7 +1573,7 @@ export default function SettingsScreen({ setSubPanelActive }) {
 
                 <FlatList
                   data={entries.slice().reverse()}
-                  keyExtractor={(item) => item.id}
+                  keyExtractor={(item) => String(item.id)}
                   renderItem={renderLogEntry}
                   style={styles.flexList}
                   inverted
@@ -1920,10 +1951,24 @@ const styles = StyleSheet.create({
     fontSize: 14,
   },
   filterChip: {
+    alignItems: 'center',
     borderRadius: 16,
     borderWidth: 1,
+    flexDirection: 'row',
+    gap: 5,
     paddingHorizontal: 12,
     paddingVertical: 6,
+  },
+  filterChipBadge: {
+    alignItems: 'center',
+    borderRadius: 8,
+    justifyContent: 'center',
+    minWidth: 16,
+    paddingHorizontal: 4,
+  },
+  filterChipBadgeText: {
+    fontSize: 10,
+    fontWeight: '700',
   },
   filterChipText: {
     fontSize: 12,
@@ -1971,10 +2016,13 @@ const styles = StyleSheet.create({
     fontSize: 16,
   },
   logEntry: {
+    borderBottomWidth: StyleSheet.hairlineWidth,
+    borderLeftWidth: 3,
     flexDirection: 'row',
     gap: 6,
     paddingHorizontal: HORIZONTAL_PADDING,
-    paddingVertical: 4,
+    paddingLeft: HORIZONTAL_PADDING - 3,
+    paddingVertical: 6,
   },
   logLevel: {
     fontFamily: 'monospace',

@@ -1,5 +1,5 @@
 import { writeTodayLogs, readAllLogs, pruneOldFiles, clearAllLogs } from './LogsFile';
-import { captureLog } from './sentry';
+import { captureLog, redactText } from './sentry';
 
 const MAX_ENTRIES = 500;
 
@@ -121,6 +121,19 @@ class LogService {
     return this._entries.filter(e => e.level === filter);
   }
 
+  /**
+   * Count entries per level in a single pass. Returns `{ all, error, warn,
+   * info, debug }` — used to badge the level filter chips without running
+   * `getEntries` once per level on every render.
+   */
+  getCounts() {
+    const counts = { all: this._entries.length, error: 0, warn: 0, info: 0, debug: 0 };
+    for (const e of this._entries) {
+      if (counts[e.level] !== undefined) counts[e.level] += 1;
+    }
+    return counts;
+  }
+
   clear() {
     if (this._flushTimer) {
       clearTimeout(this._flushTimer);
@@ -146,8 +159,12 @@ class LogService {
 
   formatForExport(filter) {
     const entries = this.getEntries(filter);
+    // Shared logs leave the device, so scrub monetary amounts / PII from each
+    // message with the same redactor used before shipping to Sentry. Timestamp
+    // and level are kept intact — they carry no sensitive data and redactText
+    // would otherwise mangle the ISO date's digit runs.
     return entries.map(e =>
-      `[${e.timestamp}] [${e.level.toUpperCase()}] ${e.message}`,
+      `[${e.timestamp}] [${e.level.toUpperCase()}] ${redactText(e.message)}`,
     ).join('\n');
   }
 }

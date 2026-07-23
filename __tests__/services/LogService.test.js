@@ -166,6 +166,33 @@ describe('LogService', () => {
     it('returns empty string when no entries', async () => {
       expect(service.formatForExport()).toBe('');
     });
+
+    it('redacts monetary amounts and long digit runs from exported messages', async () => {
+      service._addEntry('info', ['Balance updated to 1234.56 for account 987654']);
+
+      const text = service.formatForExport();
+      expect(text).not.toContain('1234.56');
+      expect(text).not.toContain('987654');
+      expect(text).toContain('[redacted]');
+      // Timestamp/level structure is preserved.
+      expect(text).toMatch(/^\[.*\] \[INFO\] /);
+    });
+  });
+
+  describe('Counts', () => {
+    it('returns zeroed counts when empty', () => {
+      expect(service.getCounts()).toEqual({ all: 0, error: 0, warn: 0, info: 0, debug: 0 });
+    });
+
+    it('tallies entries per level and total', () => {
+      service._addEntry('info', ['a']);
+      service._addEntry('info', ['b']);
+      service._addEntry('error', ['c']);
+      service._addEntry('warn', ['d']);
+      service._addEntry('debug', ['e']);
+
+      expect(service.getCounts()).toEqual({ all: 5, error: 1, warn: 1, info: 2, debug: 1 });
+    });
   });
 
   describe('Install', () => {
