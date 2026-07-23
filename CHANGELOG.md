@@ -1,5 +1,12 @@
 # Changelog
 
+## [0.214.1](https://github.com/heywood8/money-tracker/compare/penny-v0.214.0...penny-v0.214.1) (2026-07-23)
+
+
+### Performance Improvements
+
+* **operations:** pass stable onEdit handler to OperationListItem ([#1355](https://github.com/heywood8/money-tracker/issues/1355)) ([4929639](https://github.com/heywood8/money-tracker/commit/49296398268af9582fd13afbae14aa3f4876f534))
+
 ## [0.214.0](https://github.com/heywood8/money-tracker/compare/penny-v0.213.0...penny-v0.214.0) (2026-07-23)
 
 
