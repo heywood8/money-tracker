@@ -1,5 +1,6 @@
 import React, { useState, useCallback, useEffect, useRef } from 'react';
-import { View, TextInput, TouchableOpacity, StyleSheet, Text, Keyboard, Platform, Animated, Easing, Dimensions } from 'react-native';
+import { View, TextInput, TouchableOpacity, StyleSheet, Text, Keyboard, Platform, Dimensions } from 'react-native';
+import Animated, { useSharedValue, useAnimatedStyle, withTiming, Easing } from 'react-native-reanimated';
 import Icon from '@expo/vector-icons/MaterialCommunityIcons';
 import PropTypes from 'prop-types';
 import { HORIZONTAL_PADDING, SPACING } from '../../styles/layout';
@@ -78,42 +79,43 @@ const SearchBar = ({
 
   // ---- width morph between collapsed (~70%) and open (100%) ----
   // The width is animated in PIXELS (smooth numeric tween, both directions) via
-  // RN's Animated. The content sits in a fixed-width holder that the pill clips
-  // with overflow:hidden, so the content lays out exactly once — only the pill's
-  // visible width changes per frame, which keeps open AND close animating
-  // identically (an animated percentage re-flows the flex content every frame).
+  // Reanimated, so the tween runs on the UI thread and stays smooth even while
+  // the JS thread is busy with filter/search work. The content sits in a
+  // fixed-width holder that the pill clips with overflow:hidden, so the content
+  // lays out exactly once — only the pill's visible width changes per frame,
+  // which keeps open AND close animating identically (an animated percentage
+  // re-flows the flex content every frame).
   const [available, setAvailable] = useState(Math.max(0, SCREEN_WIDTH - 2 * HORIZONTAL_PADDING));
-  const morph = useRef(new Animated.Value(collapsed ? 0 : 1)).current;
+  // 0 = collapsed (~70%), 1 = open (100%). Driven by withTiming on the UI thread.
+  const morph = useSharedValue(collapsed ? 0 : 1);
 
   // Only animate on actual open/close transitions, not on first mount — the bar
-  // should appear in its current state without animating in (and a mount-time
-  // animation would needlessly spin the Animated loop).
+  // should appear in its current state without animating in.
   const morphMountedRef = useRef(false);
   useEffect(() => {
     if (!morphMountedRef.current) {
       morphMountedRef.current = true;
-      morph.setValue(collapsed ? 0 : 1);
-      return undefined;
+      morph.value = collapsed ? 0 : 1;
+      return;
     }
-    const anim = Animated.timing(morph, {
-      toValue: collapsed ? 0 : 1,
+    morph.value = withTiming(collapsed ? 0 : 1, {
       duration: MORPH_DURATION,
       easing: Easing.out(Easing.cubic),
-      useNativeDriver: false,
     });
-    anim.start();
-    // Stop on unmount / re-run so a pending animation never leaks a timer.
-    return () => anim.stop();
   }, [collapsed, morph]);
 
   const handleContainerLayout = useCallback((e) => {
     setAvailable(Math.max(0, e.nativeEvent.layout.width - 2 * HORIZONTAL_PADDING));
   }, []);
 
-  const pillWidth = morph.interpolate({
-    inputRange: [0, 1],
-    outputRange: [available * COLLAPSED_WIDTH_RATIO, available],
-  });
+  // Interpolate the pill width on the UI thread. Reanimated animates layout
+  // props (width) directly, so the pill grows from the left just like before.
+  const pillAnimatedStyle = useAnimatedStyle(() => {
+    const collapsedWidth = available * COLLAPSED_WIDTH_RATIO;
+    return {
+      width: collapsedWidth + (available - collapsedWidth) * morph.value,
+    };
+  }, [available]);
 
   const handleClear = useCallback(() => {
     setLocalText('');
@@ -132,8 +134,8 @@ const SearchBar = ({
         testID="search-pill"
         style={[
           styles.pill,
+          pillAnimatedStyle,
           {
-            width: pillWidth,
             backgroundColor: withAlpha(colors.surface, 0.87),
             borderColor: withAlpha(colors.border, 0.5),
           },
