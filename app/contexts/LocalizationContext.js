@@ -2,42 +2,55 @@
 import React, { createContext, useContext, useState, useEffect, useCallback, useMemo } from 'react';
 import * as SplashScreen from 'expo-splash-screen';
 import PropTypes from 'prop-types';
+// Keep English as a static base so there is always a resolved fallback language
+// available at startup without evaluating any other locale.
 import enTranslations from '../../assets/i18n/en.json';
-import itTranslations from '../../assets/i18n/it.json';
-import ruTranslations from '../../assets/i18n/ru.json';
-import esTranslations from '../../assets/i18n/es.json';
-import frTranslations from '../../assets/i18n/fr.json';
-import zhTranslations from '../../assets/i18n/zh.json';
-import deTranslations from '../../assets/i18n/de.json';
-import hyTranslations from '../../assets/i18n/hy.json';
-import jaTranslations from '../../assets/i18n/ja.json';
-import koTranslations from '../../assets/i18n/ko.json';
-import ptTranslations from '../../assets/i18n/pt.json';
 import { getPreference, setPreference, deletePreference, PREF_KEYS } from '../services/PreferencesDB';
 import { appEvents, EVENTS } from '../services/eventEmitter';
 
 const defaultLang = 'en';
 
-// Map language codes to their translation data
-const i18nData = {
-  en: enTranslations,
-  it: itTranslations,
-  ru: ruTranslations,
-  es: esTranslations,
-  fr: frTranslations,
-  zh: zhTranslations,
-  de: deTranslations,
-  hy: hyTranslations,
-  ja: jaTranslations,
-  ko: koTranslations,
-  pt: ptTranslations,
+// Lazy loaders per language code. With Metro's `inlineRequires: true`, each
+// require() is only evaluated the first time it is actually invoked, so only the
+// active language's JSON is materialized at startup instead of all 11 (~309 KB).
+// Metro still bundles every locale — this is a startup-evaluation win, not a
+// bundle-size reduction.
+const i18nLoaders = {
+  en: () => enTranslations,
+  it: () => require('../../assets/i18n/it.json'),
+  ru: () => require('../../assets/i18n/ru.json'),
+  es: () => require('../../assets/i18n/es.json'),
+  fr: () => require('../../assets/i18n/fr.json'),
+  zh: () => require('../../assets/i18n/zh.json'),
+  de: () => require('../../assets/i18n/de.json'),
+  hy: () => require('../../assets/i18n/hy.json'),
+  ja: () => require('../../assets/i18n/ja.json'),
+  ko: () => require('../../assets/i18n/ko.json'),
+  pt: () => require('../../assets/i18n/pt.json'),
 };
+
+// Resolved-translation cache so each locale is evaluated at most once.
+const i18nCache = { en: enTranslations };
+
+// Resolve (and memoize) the translation object for a language code. Returns the
+// language's data, or `undefined` for an unknown code — preserving the original
+// `i18nData[language]?.[key] || key` lookup semantics exactly.
+function loadTranslations(lang) {
+  if (i18nCache[lang]) return i18nCache[lang];
+  const loader = i18nLoaders[lang];
+  if (!loader) return undefined;
+  const data = loader();
+  i18nCache[lang] = data;
+  return data;
+}
+
+const availableLanguages = Object.keys(i18nLoaders);
 
 const LocalizationContext = createContext({
   t: (key) => key,
   language: defaultLang,
   setLanguage: () => {},
-  availableLanguages: Object.keys(i18nData),
+  availableLanguages,
   isFirstLaunch: false,
   isLoading: true,
   setFirstLaunchComplete: () => {},
@@ -56,7 +69,7 @@ export function LocalizationProvider({ children }) {
       try {
         const storedLang = await getPreference(PREF_KEYS.LANGUAGE);
         if (!mounted) return;
-        if (storedLang && i18nData[storedLang]) {
+        if (storedLang && i18nLoaders[storedLang]) {
           setLanguageState(storedLang);
           setIsFirstLaunch(false);
         } else {
@@ -114,7 +127,7 @@ export function LocalizationProvider({ children }) {
     }
   }, []);
 
-  const t = useCallback((key) => i18nData[language]?.[key] || key, [language]);
+  const t = useCallback((key) => loadTranslations(language)?.[key] || key, [language]);
 
   // Hide splash screen once language preference has been loaded
   useEffect(() => {
@@ -127,7 +140,7 @@ export function LocalizationProvider({ children }) {
     t,
     language,
     setLanguage,
-    availableLanguages: Object.keys(i18nData),
+    availableLanguages,
     isFirstLaunch,
     isLoading,
     setFirstLaunchComplete,
