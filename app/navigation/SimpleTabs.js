@@ -246,6 +246,25 @@ export default function SimpleTabs() {
   const [subPanelActive, setSubPanelActive] = React.useState(false);
   const [tabBarWidth, setTabBarWidth] = React.useState(SCREEN_WIDTH);
 
+  // Cold-start optimization: only the active Operations screen is real on the
+  // first commit; the background tab slots render lightweight placeholders so
+  // their (heavy) mount — GraphsScreen's chart-data pipeline in particular —
+  // stays off the cold-start critical path. A single idle callback then flips
+  // this true, mounting every screen for the rest of the session. This does NOT
+  // reintroduce the blank/black-on-swipe bug that forced screens to stay
+  // mounted: the flip fires one idle tick after the first interactive frame —
+  // before a user could physically start a swipe — so by the time any tab can
+  // be revealed every screen is already mounted. After the flip all screens
+  // stay mounted permanently, exactly as before; only the initial mount is
+  // delayed by a moment.
+  const [backgroundMounted, setBackgroundMounted] = React.useState(false);
+  React.useEffect(() => {
+    // requestIdleCallback is the app's deferral primitive (see OperationsScreen /
+    // OperationsActionsContext); InteractionManager is deprecated per jest.setup.
+    const handle = requestIdleCallback(() => setBackgroundMounted(true));
+    return () => cancelIdleCallback(handle);
+  }, []);
+
   // Guard ref — updated synchronously so handleTabPress never reads stale state.
   const isTransitioningRef = useRef(false);
   // Shared value mirror — readable on the worklet thread inside panGesture
@@ -485,24 +504,51 @@ export default function SimpleTabs() {
     };
   });
 
-  // All four screens stay mounted for the whole session. Navigation only ever
+  // All screens stay mounted for the whole session once backgroundMounted flips
+  // (one idle tick after the first interactive frame). Navigation only ever
   // moves the strip (swipe to a neighbour, tap to any tab), so every screen
-  // must already be on-screen — lazy mounting left a not-yet-mounted screen
-  // blank/black when a swipe revealed it before its mount committed.
+  // must already be on-screen — lazy mounting ON reveal left a not-yet-mounted
+  // screen blank/black when a swipe uncovered it before its mount committed.
+  // The deferral below is not lazy-on-reveal: it mounts every background screen
+  // proactively before any swipe is possible, so the invariant still holds.
   //
   // Each screen element is memoized so SimpleTabs re-renders (active-tab
   // highlight, tab-bar layout) don't re-render the heavy screen subtrees: a
   // stable element reference lets React skip reconciling them, which avoids a
   // frame drop / stutter as a switch animation settles.
+  // Placeholder shown in a background tab slot until backgroundMounted flips.
+  // It only ever occupies an off-screen strip position on the very first frame
+  // (the Operations strip is the one on screen), so it is never actually seen;
+  // the theme background keeps it from flashing if a strip edge peeks during a
+  // fast first-frame swipe. Reused across every deferred slot — the keyed
+  // Animated.View wrappers keep the instances distinct.
+  const backgroundPlaceholder = useMemo(
+    () => <View style={[styles.screenPlaceholder, { backgroundColor: colors.background }]} />,
+    [colors.background],
+  );
+
   const operationsScreen = useMemo(() => <OperationsScreen />, []);
   // The Accounts tab reuses the same accounts screen as a full-screen duplicate
   // (all accounts, no subpanel header). Mounted only when the tab is enabled.
-  const accountsScreen = useMemo(() => <AccountsScreen />, []);
-  const graphsScreen = useMemo(() => <GraphsScreen />, []);
-  const plannedScreen = useMemo(() => <PlannedOperationsScreen />, []);
+  // Background screens render a placeholder until backgroundMounted flips true,
+  // then swap to the real screen once and stay mounted for the session.
+  const accountsScreen = useMemo(
+    () => (backgroundMounted ? <AccountsScreen /> : backgroundPlaceholder),
+    [backgroundMounted, backgroundPlaceholder],
+  );
+  const graphsScreen = useMemo(
+    () => (backgroundMounted ? <GraphsScreen /> : backgroundPlaceholder),
+    [backgroundMounted, backgroundPlaceholder],
+  );
+  const plannedScreen = useMemo(
+    () => (backgroundMounted ? <PlannedOperationsScreen /> : backgroundPlaceholder),
+    [backgroundMounted, backgroundPlaceholder],
+  );
   const settingsScreen = useMemo(
-    () => <SettingsScreen setSubPanelActive={setSubPanelActive} />,
-    [setSubPanelActive],
+    () => (backgroundMounted
+      ? <SettingsScreen setSubPanelActive={setSubPanelActive} />
+      : backgroundPlaceholder),
+    [backgroundMounted, backgroundPlaceholder, setSubPanelActive],
   );
 
   // Screens in strip order — matches TABS. Keyed by identity so instances are
@@ -653,6 +699,9 @@ const styles = StyleSheet.create({
   screen: {
     height: '100%',
     width: SCREEN_WIDTH,
+  },
+  screenPlaceholder: {
+    flex: 1,
   },
   screensContainer: {
     flex: 1,
