@@ -1,5 +1,12 @@
 # Changelog
 
+## [0.214.2](https://github.com/heywood8/money-tracker/compare/penny-v0.214.1...penny-v0.214.2) (2026-07-23)
+
+
+### Performance Improvements
+
+* **bundle:** import @expo/vector-icons families directly instead of via barrel ([#1358](https://github.com/heywood8/money-tracker/issues/1358)) ([36fd345](https://github.com/heywood8/money-tracker/commit/36fd3453e91c4830b445816a3c587b72f985a8da))
+
 ## [0.214.1](https://github.com/heywood8/money-tracker/compare/penny-v0.214.0...penny-v0.214.1) (2026-07-23)
 
 
