@@ -1,5 +1,12 @@
 # Changelog
 
+## [0.214.5](https://github.com/heywood8/money-tracker/compare/penny-v0.214.4...penny-v0.214.5) (2026-07-23)
+
+
+### Performance Improvements
+
+* **operations:** memoize SectionList extraData and wrap OperationsList in React.memo ([#1363](https://github.com/heywood8/money-tracker/issues/1363)) ([f8b0089](https://github.com/heywood8/money-tracker/commit/f8b00899bb53d04e22ad2f0fbfe5416b734cd858))
+
 ## [0.214.4](https://github.com/heywood8/money-tracker/compare/penny-v0.214.3...penny-v0.214.4) (2026-07-23)
 
 
