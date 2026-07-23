@@ -379,6 +379,25 @@ Drizzle automatically tracks applied migrations in the `__drizzle_migrations` ta
 - Inconsistent schema states
 - Manual version tracking
 
+### Startup Fast Path (schema fingerprint)
+
+To keep the up-to-date cold start cheap, `initializeDatabase` (`app/services/db.js`)
+stores a schema fingerprint in `PRAGMA user_version` after every fully successful
+init, and on the next start reads that one value first. If it equals
+`SCHEMA_VERSION`, the expensive schema-inspection + migration-detection sweep
+(`isSchemaComplete`, `detectAppliedMigrations`, corruption re-scan) is skipped.
+
+`SCHEMA_VERSION` is **derived** from the migrations journal
+(`migrations.journal.entries.length`), so **adding a migration bumps it
+automatically — there is nothing to hand-edit.** An existing install carries the
+older fingerprint it was stamped with, so `stored !== SCHEMA_VERSION` and the full
+migrate path runs; a pending migration can never be skipped by the fast path.
+
+When you add a migration you still MUST keep `isSchemaComplete` and
+`detectAppliedMigrations` in sync with the new column/table markers (they gate the
+*slow* path that actually applies the migration for older installs). The fast path
+only decides whether that slow path needs to run at all.
+
 ### Database Studio (Limited Support)
 
 Drizzle Kit includes a browser-based database viewer:
