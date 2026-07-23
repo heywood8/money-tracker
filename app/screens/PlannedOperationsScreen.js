@@ -5,7 +5,7 @@ import { Text, Snackbar } from 'react-native-paper';
 import AddFAB from '../components/AddFAB';
 import LoadingView from '../components/LoadingView';
 import EmptyState from '../components/EmptyState';
-import { MaterialCommunityIcons as Icon } from '@expo/vector-icons';
+import Icon from '@expo/vector-icons/MaterialCommunityIcons';
 import { useThemeColors } from '../contexts/ThemeColorsContext';
 import { TOP_CONTENT_SPACING, HORIZONTAL_PADDING, SPACING } from '../styles/layout';
 import { BORDER_RADIUS, FONT_SIZE, HEIGHTS } from '../styles/designTokens';

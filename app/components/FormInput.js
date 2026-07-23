@@ -1,6 +1,6 @@
 import React from 'react';
 import { View, TextInput, Text, StyleSheet } from 'react-native';
-import { MaterialCommunityIcons as Icon } from '@expo/vector-icons';
+import Icon from '@expo/vector-icons/MaterialCommunityIcons';
 import PropTypes from 'prop-types';
 import { useThemeColors } from '../contexts/ThemeColorsContext';
 import { BORDER_RADIUS, SPACING, HEIGHTS, FONT_SIZE, OPACITY } from '../styles/designTokens';

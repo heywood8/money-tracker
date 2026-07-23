@@ -2,7 +2,7 @@ import React, { useState, useMemo } from 'react';
 import { View, Text, StyleSheet, TouchableOpacity, ActivityIndicator, Dimensions } from 'react-native';
 import PropTypes from 'prop-types';
 import { LineChart } from 'react-native-chart-kit/v2';
-import { MaterialCommunityIcons as Icon } from '@expo/vector-icons';
+import Icon from '@expo/vector-icons/MaterialCommunityIcons';
 import SimplePicker from '../SimplePicker';
 import currencies from '../../../assets/currencies.json';
 import { useDisplaySettings } from '../../contexts/DisplaySettingsContext';

@@ -1,7 +1,7 @@
 import React, { useCallback, useMemo, useState } from 'react';
 import PropTypes from 'prop-types';
 import { View, Text, Pressable, StyleSheet } from 'react-native';
-import { MaterialCommunityIcons as Icon } from '@expo/vector-icons';
+import Icon from '@expo/vector-icons/MaterialCommunityIcons';
 import { SPACING, BORDER_RADIUS, FONT_SIZE } from '../styles/designTokens';
 
 // Legacy (flat all-root) grid width vs. the quick-add-style suggestions grid,

@@ -2,7 +2,7 @@ import React, { useCallback, useEffect, useMemo, useRef, useState } from 'react'
 import PropTypes from 'prop-types';
 import { View, StyleSheet, ScrollView, ActivityIndicator, RefreshControl, TouchableOpacity } from 'react-native';
 import { Text, Switch } from 'react-native-paper';
-import { Ionicons } from '@expo/vector-icons';
+import Ionicons from '@expo/vector-icons/Ionicons';
 import { useThemeColors } from '../contexts/ThemeColorsContext';
 import { useLocalization } from '../contexts/LocalizationContext';
 import { HORIZONTAL_PADDING, SPACING, BORDER_RADIUS } from '../styles/layout';

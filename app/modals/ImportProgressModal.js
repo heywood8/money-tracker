@@ -1,7 +1,7 @@
 import React, { useRef, useEffect } from 'react';
 import { View, StyleSheet, ScrollView, Platform } from 'react-native';
 import { Portal, Modal, Text, ActivityIndicator, Button } from 'react-native-paper';
-import { Ionicons } from '@expo/vector-icons';
+import Ionicons from '@expo/vector-icons/Ionicons';
 import * as Updates from 'expo-updates';
 import { useThemeColors } from '../contexts/ThemeColorsContext';
 import { useImportProgress } from '../contexts/ImportProgressContext';

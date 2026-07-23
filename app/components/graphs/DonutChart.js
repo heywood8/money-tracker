@@ -1,7 +1,7 @@
 import React, { useMemo } from 'react';
 import { View, StyleSheet } from 'react-native';
 import Svg, { Circle } from 'react-native-svg';
-import { MaterialCommunityIcons as Icon } from '@expo/vector-icons';
+import Icon from '@expo/vector-icons/MaterialCommunityIcons';
 import PropTypes from 'prop-types';
 
 export const SVG_SIZE = 140;

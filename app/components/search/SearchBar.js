@@ -1,6 +1,6 @@
 import React, { useState, useCallback, useEffect, useRef } from 'react';
 import { View, TextInput, TouchableOpacity, StyleSheet, Text, Keyboard, Platform, Animated, Easing, Dimensions } from 'react-native';
-import { MaterialCommunityIcons as Icon } from '@expo/vector-icons';
+import Icon from '@expo/vector-icons/MaterialCommunityIcons';
 import PropTypes from 'prop-types';
 import { HORIZONTAL_PADDING, SPACING } from '../../styles/layout';
 

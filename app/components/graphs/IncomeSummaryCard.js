@@ -1,6 +1,6 @@
 import React from 'react';
 import { View, Text, StyleSheet, TouchableOpacity } from 'react-native';
-import { MaterialCommunityIcons as Icon } from '@expo/vector-icons';
+import Icon from '@expo/vector-icons/MaterialCommunityIcons';
 import PropTypes from 'prop-types';
 import currencies from '../../../assets/currencies.json';
 import { useDisplaySettings } from '../../contexts/DisplaySettingsContext';

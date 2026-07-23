@@ -17,7 +17,7 @@ import { Svg, Circle } from 'react-native-svg';
 
 const SCREEN_TIMING = { duration: 300, easing: Easing.out(Easing.cubic) };
 const PILL_TIMING = { duration: 200, easing: Easing.out(Easing.quad) };
-import { MaterialCommunityIcons } from '@expo/vector-icons';
+import MaterialCommunityIcons from '@expo/vector-icons/MaterialCommunityIcons';
 import OperationsScreen from '../screens/OperationsScreen';
 import AccountsScreen from '../screens/AccountsScreen';
 import GraphsScreen from '../screens/GraphsScreen';

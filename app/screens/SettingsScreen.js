@@ -7,7 +7,7 @@ import { View, StyleSheet, TouchableOpacity, ScrollView, FlatList, Linking, Acti
 import * as Clipboard from 'expo-clipboard';
 import { HORIZONTAL_PADDING, SPACING, BORDER_RADIUS } from '../styles/layout';
 import { Text, Divider, TouchableRipple, Menu } from 'react-native-paper';
-import { Ionicons } from '@expo/vector-icons';
+import Ionicons from '@expo/vector-icons/Ionicons';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import Animated, {
   useSharedValue,

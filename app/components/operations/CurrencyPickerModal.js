@@ -1,6 +1,6 @@
 import React, { useState, useMemo, useEffect, memo } from 'react';
 import { View, Text, StyleSheet, FlatList, Modal, Pressable, TextInput } from 'react-native';
-import { MaterialCommunityIcons as Icon } from '@expo/vector-icons';
+import Icon from '@expo/vector-icons/MaterialCommunityIcons';
 import PropTypes from 'prop-types';
 import currencies from '../../../assets/currencies.json';
 import ModalBlurOverlay from '../ModalBlurOverlay';

@@ -10,7 +10,7 @@ import Reanimated, {
   Easing,
 } from 'react-native-reanimated';
 import { useDisplaySettings } from '../../contexts/DisplaySettingsContext';
-import { MaterialCommunityIcons as Icon } from '@expo/vector-icons';
+import Icon from '@expo/vector-icons/MaterialCommunityIcons';
 import Calculator from '../Calculator';
 import MultiCurrencyFields from '../modals/MultiCurrencyFields';
 import CurrencyPickerModal from './CurrencyPickerModal';
