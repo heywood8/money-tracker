@@ -376,7 +376,7 @@ const OperationsList = forwardRef(({
   // holds and rows re-render even when nothing they depend on changed.
   const listExtraData = useMemo(
     () => [accounts, categories, pendingSuggestionId],
-    [accounts, categories, pendingSuggestionId]
+    [accounts, categories, pendingSuggestionId],
   );
 
   const sectionListRef = useRef(null);
@@ -476,14 +476,7 @@ const OperationsList = forwardRef(({
 
 OperationsList.displayName = 'OperationsList';
 
-// Wrapped in memo so a parent re-render with unchanged props skips re-rendering
-// the whole list. Paired with the stable extraData above, this keeps the
-// SectionList from redoing work when nothing it depends on has changed.
-const MemoizedOperationsList = memo(OperationsList);
-
-MemoizedOperationsList.displayName = 'OperationsList';
-
-MemoizedOperationsList.propTypes = {
+OperationsList.propTypes = {
   groupedOperations: PropTypes.arrayOf(PropTypes.object).isRequired,
   accounts: PropTypes.arrayOf(PropTypes.object).isRequired,
   categories: PropTypes.arrayOf(PropTypes.object).isRequired,
@@ -508,6 +501,13 @@ MemoizedOperationsList.propTypes = {
   onApplySuggestion: PropTypes.func,
   onDismissSuggestion: PropTypes.func,
 };
+
+// Wrapped in memo so a parent re-render with unchanged props skips re-rendering
+// the whole list. Paired with the stable extraData above, this keeps the
+// SectionList from redoing work when nothing it depends on has changed.
+const MemoizedOperationsList = memo(OperationsList);
+
+MemoizedOperationsList.displayName = 'OperationsList';
 
 const styles = StyleSheet.create({
   cardBottom: {
