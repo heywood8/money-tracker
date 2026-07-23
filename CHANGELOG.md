@@ -1,5 +1,12 @@
 # Changelog
 
+## [0.214.12](https://github.com/heywood8/money-tracker/compare/penny-v0.214.11...penny-v0.214.12) (2026-07-23)
+
+
+### Build System
+
+* **metro:** enable experimental tree shaking for production ([#1378](https://github.com/heywood8/money-tracker/issues/1378)) ([8f3b6a7](https://github.com/heywood8/money-tracker/commit/8f3b6a72b16358ee4d159bdf75510b620b9fae0b))
+
 ## [0.214.11](https://github.com/heywood8/money-tracker/compare/penny-v0.214.10...penny-v0.214.11) (2026-07-23)
 
 
