@@ -16,10 +16,10 @@ import { useDisplaySettings } from '../contexts/DisplaySettingsContext';
 import { TOP_CONTENT_SPACING, HORIZONTAL_PADDING, SPACING, BORDER_RADIUS, HEIGHTS } from '../styles/layout';
 import { useAccountsData } from '../contexts/AccountsDataContext';
 import { useAccountsActions } from '../contexts/AccountsActionsContext';
-import { useOperationsData } from '../contexts/OperationsDataContext';
 import { useLocalization } from '../contexts/LocalizationContext';
 import { getDefaultAccountId, setDefaultAccountId } from '../services/PreferencesDB';
-import { computeNetWorthSummary } from '../services/OperationsDB';
+import { computeNetWorthSummary, getOperationsByDateRange } from '../services/OperationsDB';
+import { appEvents, EVENTS } from '../services/eventEmitter';
 import { parseCardMasks, serializeCardMasks, cardMaskLast4 } from '../utils/cardMask';
 import currencies from '../../assets/currencies.json';
 
@@ -227,8 +227,47 @@ ConfirmationDialog.propTypes = {
 };
 
 // Net worth summary card
-const NetWorthCard = memo(({ accounts = [], operations = [], colors = {}, t = (k) => k }) => {
+const NetWorthCard = memo(({ accounts = [], colors = {}, t = (k) => k }) => {
   const { hideBalances } = useDisplaySettings();
+
+  // Net worth's monthly-change figure only depends on the CURRENT MONTH's
+  // income/expense operations. Sourcing that from the Operations feed was wrong on
+  // two counts: the feed is (a) the SEARCH-FILTERED set, so the figure silently
+  // tracked whatever the user was searching, and (b) lazy-loaded a week at a time,
+  // so every load-more-while-scrolling re-ran the async currency conversion and the
+  // month total was incomplete until enough pages were loaded. Instead we fetch the
+  // whole current month directly from the DB, decoupled from search and pagination,
+  // and refresh only when operations actually mutate (OPERATION_CHANGED) or the data
+  // set is reloaded/reset. (issue #1346)
+  const [monthOperations, setMonthOperations] = useState([]);
+
+  useEffect(() => {
+    let cancelled = false;
+    const load = async () => {
+      const now = new Date();
+      const monthPrefix = `${now.getFullYear()}-${String(now.getMonth() + 1).padStart(2, '0')}`;
+      try {
+        // Loose upper bound: no real date exceeds "-31", and both summary paths
+        // re-filter by the exact monthPrefix, so a slightly wide range is harmless.
+        const ops = await getOperationsByDateRange(`${monthPrefix}-01`, `${monthPrefix}-31`);
+        if (!cancelled) setMonthOperations(ops || []);
+      } catch {
+        if (!cancelled) setMonthOperations([]);
+      }
+    };
+    load();
+    const unsubChanged = appEvents.on(EVENTS.OPERATION_CHANGED, load);
+    const unsubReload = appEvents.on(EVENTS.RELOAD_ALL, load);
+    const unsubReset = appEvents.on(EVENTS.DATABASE_RESET, () => {
+      if (!cancelled) setMonthOperations([]);
+    });
+    return () => {
+      cancelled = true;
+      unsubChanged();
+      unsubReload();
+      unsubReset();
+    };
+  }, []);
 
   // Determine display currency from first account (or default to USD)
   const displayCurrency = useMemo(() => {
@@ -267,7 +306,7 @@ const NetWorthCard = memo(({ accounts = [], operations = [], colors = {}, t = (k
       }
     }
     let change = 0;
-    for (const op of operations) {
+    for (const op of monthOperations) {
       if (!sameCurrencyIds.has(op.accountId)) continue;
       if (typeof op.date === 'string' && op.date.startsWith(monthPrefix)) {
         const amount = parseFloat(op.amount || '0');
@@ -276,7 +315,7 @@ const NetWorthCard = memo(({ accounts = [], operations = [], colors = {}, t = (k
       }
     }
     return { total: total.toString(), monthlyChange: change.toString(), unconvertible: [] };
-  }, [accounts, operations, displayCurrency]);
+  }, [accounts, monthOperations, displayCurrency]);
 
   // When the toggle is on, every balance/operation is converted to the display
   // currency at the current rate (offline first, live fallback) — the same path
@@ -291,7 +330,7 @@ const NetWorthCard = memo(({ accounts = [], operations = [], colors = {}, t = (k
     const now = new Date();
     const currentMonthPrefix = `${now.getFullYear()}-${String(now.getMonth() + 1).padStart(2, '0')}`;
 
-    computeNetWorthSummary(accounts, operations, displayCurrency, currentMonthPrefix)
+    computeNetWorthSummary(accounts, monthOperations, displayCurrency, currentMonthPrefix)
       .then((result) => {
         if (!cancelled) setConvertedSummary(result);
       })
@@ -300,7 +339,7 @@ const NetWorthCard = memo(({ accounts = [], operations = [], colors = {}, t = (k
       });
 
     return () => { cancelled = true; };
-  }, [convertAll, accounts, operations, displayCurrency, baseCurrencySummary]);
+  }, [convertAll, accounts, monthOperations, displayCurrency, baseCurrencySummary]);
 
   const summary = convertAll ? convertedSummary : baseCurrencySummary;
   const totalBalance = parseFloat(summary.total || '0');
@@ -374,7 +413,6 @@ NetWorthCard.displayName = 'NetWorthCard';
 
 NetWorthCard.propTypes = {
   accounts: PropTypes.array,
-  operations: PropTypes.array,
   colors: PropTypes.object,
   t: PropTypes.func,
 };
@@ -499,7 +537,6 @@ export default function AccountsScreen({ onBackStateChange }) {
   const { paperInputTheme } = makeModalStyles(colors);
   const { accounts, displayedAccounts, hiddenAccounts, showHiddenAccounts, loading, error } = useAccountsData();
   const { toggleShowHiddenAccounts, addAccount, updateAccount, deleteAccount, reorderAccounts, validateAccount, getOperationCount } = useAccountsActions();
-  const { operations } = useOperationsData();
   const { t } = useLocalization();
 
   const balanceInputRef = useRef(null);
@@ -915,7 +952,7 @@ export default function AccountsScreen({ onBackStateChange }) {
         style={{ backgroundColor: colors.background }}
       >
         {/* Net Worth Summary Card */}
-        <NetWorthCard accounts={accounts} operations={operations} colors={colors} t={t} />
+        <NetWorthCard accounts={accounts} colors={colors} t={t} />
 
         {/* Accounts Grouped Card */}
         <View style={[styles.accountsCard, { backgroundColor: colors.surface, borderColor: colors.border }]}>

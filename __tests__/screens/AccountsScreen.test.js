@@ -115,6 +115,16 @@ jest.mock('../../app/services/PreferencesDB', () => ({
   setDefaultAccountId: jest.fn(() => Promise.resolve()),
 }));
 
+// NetWorthCard sources its month operations directly from the DB (decoupled from
+// the search-filtered Operations feed — issue #1346). Mock those two entry points so
+// tests can control/observe what net worth is computed over. Safe defaults keep the
+// unrelated toggle tests working.
+jest.mock('../../app/services/OperationsDB', () => ({
+  getOperationsByDateRange: jest.fn(() => Promise.resolve([])),
+  computeNetWorthSummary: jest.fn(() =>
+    Promise.resolve({ total: '0', monthlyChange: '0', unconvertible: [] })),
+}));
+
 // Helper functions to create complete mocks for split contexts
 const createAccountsDataMock = (overrides = {}) => ({
   accounts: [],
@@ -269,6 +279,84 @@ describe('AccountsScreen', () => {
       await waitFor(() => {
         expect(getByLabelText('graphs_convert_currencies').props.accessibilityState)
           .toEqual(expect.objectContaining({ checked: false }));
+      });
+    });
+  });
+
+  // Regression coverage for issue #1346: net worth must be computed over the whole
+  // current month sourced directly from the DB, NOT over the search-filtered, lazily
+  // paginated Operations feed. This locks the corrected data source.
+  describe('Net worth data source (issue #1346)', () => {
+    const OperationsDB = require('../../app/services/OperationsDB');
+    const { appEvents, EVENTS } = require('../../app/services/eventEmitter');
+
+    beforeEach(() => {
+      OperationsDB.getOperationsByDateRange.mockResolvedValue([]);
+      OperationsDB.computeNetWorthSummary.mockResolvedValue({
+        total: '0', monthlyChange: '0', unconvertible: [],
+      });
+    });
+
+    it('computes net worth over DB-fetched current-month operations, not the feed', async () => {
+      const AccountsScreen = require('../../app/screens/AccountsScreen').default;
+      const { useAccountsData } = require('../../app/contexts/AccountsDataContext');
+
+      const accounts = [
+        { id: '1', name: 'USD', balance: '1000.00', currency: 'USD', order: 0 },
+        { id: '2', name: 'EUR', balance: '100.00', currency: 'EUR', order: 1 },
+      ];
+      useAccountsData.mockReturnValue(createAccountsDataMock({
+        accounts,
+        displayedAccounts: accounts,
+      }));
+
+      // The card's own DB source returns the complete month; the search feed is
+      // irrelevant to net worth and is never consulted.
+      const monthOps = [
+        { accountId: '1', type: 'income', amount: '200', date: '2026-07-05' },
+      ];
+      OperationsDB.getOperationsByDateRange.mockResolvedValue(monthOps);
+
+      await render(<AccountsScreen />);
+
+      const now = new Date();
+      const prefix = `${now.getFullYear()}-${String(now.getMonth() + 1).padStart(2, '0')}`;
+
+      await waitFor(() => {
+        expect(OperationsDB.getOperationsByDateRange)
+          .toHaveBeenCalledWith(`${prefix}-01`, `${prefix}-31`);
+      });
+
+      // computeNetWorthSummary must receive the DB month set — never a filtered feed.
+      await waitFor(() => {
+        expect(OperationsDB.computeNetWorthSummary).toHaveBeenCalledWith(
+          accounts, monthOps, 'USD', prefix,
+        );
+      });
+    });
+
+    it('refetches the month when an operation changes', async () => {
+      const AccountsScreen = require('../../app/screens/AccountsScreen').default;
+      const { useAccountsData } = require('../../app/contexts/AccountsDataContext');
+
+      const accounts = [
+        { id: '1', name: 'USD', balance: '1000.00', currency: 'USD', order: 0 },
+      ];
+      useAccountsData.mockReturnValue(createAccountsDataMock({
+        accounts,
+        displayedAccounts: accounts,
+      }));
+
+      await render(<AccountsScreen />);
+
+      await waitFor(() => {
+        expect(OperationsDB.getOperationsByDateRange).toHaveBeenCalledTimes(1);
+      });
+
+      appEvents.emit(EVENTS.OPERATION_CHANGED);
+
+      await waitFor(() => {
+        expect(OperationsDB.getOperationsByDateRange).toHaveBeenCalledTimes(2);
       });
     });
   });
