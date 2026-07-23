@@ -326,7 +326,7 @@ const OperationsList = forwardRef(({
       getAccountName={getAccountName}
       formatCurrency={formatCurrency}
       isLast
-      onPress={NOOP}
+      onEdit={NOOP}
     />
   ), [colors, t, categories, getCategoryInfo, getAccountName, formatCurrency]);
 
@@ -359,7 +359,7 @@ const OperationsList = forwardRef(({
           getAccountName={getAccountName}
           formatCurrency={formatCurrency}
           isLast={isLast}
-          onPress={() => onEditOperation(item)}
+          onEdit={onEditOperation}
           onLongPress={handleItemLongPress}
           suggestionChips={item.id === pendingSuggestionId ? pendingSuggestions : null}
           onApplySuggestion={onApplySuggestion}

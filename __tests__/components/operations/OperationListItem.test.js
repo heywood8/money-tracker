@@ -41,7 +41,7 @@ const baseProps = {
   getAccountName: () => 'Checking',
   formatCurrency: (_, amount) => `$${amount}`,
   isLast: false,
-  onPress: jest.fn(),
+  onEdit: jest.fn(),
 };
 
 describe('OperationListItem', () => {
@@ -504,28 +504,32 @@ describe('OperationListItem', () => {
 
   describe('Pending (in-flight) operation', () => {
     it('does not open the editor while the write is still in flight', async () => {
-      const onPress = jest.fn();
+      const onEdit = jest.fn();
       const { getByTestId } = await render(
         <OperationListItem
           {...baseProps}
           testID="pending-row"
           operation={{ ...baseOperation, _pending: true }}
-          onPress={onPress}
+          onEdit={onEdit}
         />,
       );
       await fireEvent.press(getByTestId('pending-row'));
       // A placeholder row carries a temp id with no DB row behind it; tapping it
       // must not open an editor.
-      expect(onPress).not.toHaveBeenCalled();
+      expect(onEdit).not.toHaveBeenCalled();
     });
 
     it('opens the editor once the operation is settled (not pending)', async () => {
-      const onPress = jest.fn();
+      const onEdit = jest.fn();
+      const operation = { ...baseOperation };
       const { getByTestId } = await render(
-        <OperationListItem {...baseProps} testID="settled-row" onPress={onPress} />,
+        <OperationListItem {...baseProps} testID="settled-row" operation={operation} onEdit={onEdit} />,
       );
       await fireEvent.press(getByTestId('settled-row'));
-      expect(onPress).toHaveBeenCalledTimes(1);
+      // The row binds its own operation to the stable onEdit handler (#1339),
+      // so the pressed operation is forwarded to the caller.
+      expect(onEdit).toHaveBeenCalledTimes(1);
+      expect(onEdit).toHaveBeenCalledWith(operation);
     });
   });
 });
