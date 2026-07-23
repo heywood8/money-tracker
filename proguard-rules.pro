@@ -2,8 +2,15 @@
 # These rules are applied during EAS Build for production releases
 # Place this file in your project root and it will be copied to android/app/proguard-rules.pro
 
-# Allow R8 to continue despite missing class references (canary SDK compatibility)
--ignorewarnings
+# Suppress R8 "missing class reference" warnings for dependency namespaces that
+# emit them under a canary Expo SDK. Replaces the previous blanket `-ignorewarnings`,
+# which masked ALL R8 warnings and could hide real config errors. These targeted
+# `-dontwarn` rules only silence the expected missing-class noise from these deps.
+-dontwarn expo.modules.**
+-dontwarn com.facebook.react.**
+-dontwarn com.facebook.hermes.**
+-dontwarn com.swmansion.**
+-dontwarn org.webkit.**
 
 # React Native Reanimated
 -keep class com.swmansion.reanimated.** { *; }
