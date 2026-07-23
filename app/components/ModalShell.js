@@ -73,6 +73,17 @@ export default function ModalShell({
     // a JS-driven paddingBottom animation on every keyboard show/hide app-wide.
     // Only the visible modal needs keyboard avoidance.
     if (!visible) return undefined;
+
+    // If a keyboard is already open when this modal becomes visible (e.g. focus
+    // retained from a prior field / quick-add flow), keyboardDidShow has already
+    // fired and will not fire again for this subscription — so seed the offset from
+    // the current keyboard metrics, otherwise the sheet stays glued to the bottom
+    // and the keyboard overlaps its input until the user dismisses and refocuses.
+    const currentMetrics = Keyboard.metrics?.();
+    if (currentMetrics?.height) {
+      keyboardOffset.setValue(currentMetrics.height);
+    }
+
     const onShow = (e) => {
       Animated.timing(keyboardOffset, {
         toValue: e?.endCoordinates?.height ?? 0,

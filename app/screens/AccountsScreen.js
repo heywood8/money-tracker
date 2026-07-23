@@ -67,9 +67,6 @@ const CurrencyPickerModal = memo(({ visible = false, onClose = () => {}, currenc
     );
   }, [onSelect]);
 
-  // Stable array identity so the FlatList doesn't re-diff on every modal render.
-  const currencyEntries = useMemo(() => Object.entries(currencies), [currencies]);
-
   return (
     <Portal>
       <Modal
@@ -78,7 +75,7 @@ const CurrencyPickerModal = memo(({ visible = false, onClose = () => {}, currenc
         contentContainerStyle={[styles.pickerModalContent, { backgroundColor: colors.card }]}
       >
         <FlatList
-          data={currencyEntries}
+          data={Object.entries(currencies)}
           keyExtractor={([code]) => code}
           renderItem={renderCurrencyItem}
           style={styles.pickerList}
@@ -548,20 +545,17 @@ export default function AccountsScreen({ onBackStateChange }) {
 
   const balanceInputRef = useRef(null);
 
-  // Frozen at mount (portrait Android — the window width does not change), so the
-  // interpolations below keep a stable identity across re-renders.
-  const SCREEN_WIDTH = useMemo(() => Dimensions.get('window').width, []);
+  const SCREEN_WIDTH = Dimensions.get('window').width;
 
-  // Form panel interpolations — memoized on the stable Animated value so a re-render
-  // of AccountsScreen doesn't allocate a fresh AnimatedInterpolation each time.
-  const formPanelTranslateX = useMemo(() => formPanelAnim.interpolate({
+  // Form panel interpolations
+  const formPanelTranslateX = formPanelAnim.interpolate({
     inputRange: [0, 1],
     outputRange: [SCREEN_WIDTH, 0],
-  }), [formPanelAnim, SCREEN_WIDTH]);
-  const formPanelOpacity = useMemo(() => formPanelAnim.interpolate({
+  });
+  const formPanelOpacity = formPanelAnim.interpolate({
     inputRange: [0, 1],
     outputRange: [0, 1],
-  }), [formPanelAnim]);
+  });
 
   const openFormPanel = useCallback((id, values) => {
     setCurrencyPanelVisible(false);
