@@ -98,10 +98,14 @@ const AppInitializer = () => {
   useNotificationResponseRouter();
 
   // Run the daily backup once on every app open (after first launch is complete).
+  // Defer the initial kick-off until the JS thread is idle so it doesn't contend with
+  // the first data loads / interactive frame on startup.
   useEffect(() => {
-    if (!isFirstLaunch) {
+    if (isFirstLaunch) return undefined;
+    const handle = requestIdleCallback(() => {
       performDailyBackupIfNeeded();
-    }
+    });
+    return () => cancelIdleCallback(handle);
   }, [isFirstLaunch]);
 
   // Poll for app updates every minute while the app is open, regardless of which screen
@@ -163,8 +167,9 @@ const AppInitializer = () => {
       }
     };
 
-    // Check immediately on open, then once a minute.
-    runUpdateCheck();
+    // Kick off the first check once the JS thread is idle (so it doesn't contend with the
+    // first data loads / interactive frame), then keep polling once a minute.
+    const initialCheckHandle = requestIdleCallback(runUpdateCheck);
     const intervalId = setInterval(runUpdateCheck, UPDATE_CHECK_INTERVAL_MS);
 
     // Re-check the moment the app returns to the foreground, so a user coming back to an
@@ -177,6 +182,7 @@ const AppInitializer = () => {
 
     return () => {
       cancelled = true;
+      cancelIdleCallback(initialCheckHandle);
       clearInterval(intervalId);
       subscription.remove();
     };
@@ -196,7 +202,9 @@ const AppInitializer = () => {
       });
     };
 
-    runIngestion();
+    // Defer the initial ingestion until the JS thread is idle so it doesn't contend with
+    // the first data loads / interactive frame on startup.
+    const ingestionHandle = requestIdleCallback(runIngestion);
 
     const subscription = AppState.addEventListener('change', (nextState) => {
       const prev = appStateRef.current;
@@ -206,17 +214,25 @@ const AppInitializer = () => {
       }
     });
 
-    return () => subscription.remove();
+    return () => {
+      cancelIdleCallback(ingestionHandle);
+      subscription.remove();
+    };
   }, [isFirstLaunch]);
 
   // Keep the OS background-task registration in sync with the stored preferences
   // on every app open, so it survives reinstalls/updates and reflects toggles
   // made in a previous session.
+  // Defer the initial registration sync until the JS thread is idle so it doesn't contend
+  // with the first data loads / interactive frame on startup.
   useEffect(() => {
-    if (isFirstLaunch) return;
-    syncBackgroundBankTaskRegistrationAsync().catch((error) => {
-      console.warn('[AppInitializer] Background task sync failed:', error);
+    if (isFirstLaunch) return undefined;
+    const handle = requestIdleCallback(() => {
+      syncBackgroundBankTaskRegistrationAsync().catch((error) => {
+        console.warn('[AppInitializer] Background task sync failed:', error);
+      });
     });
+    return () => cancelIdleCallback(handle);
   }, [isFirstLaunch]);
 
   const handleUpdateDismiss = useCallback(() => {

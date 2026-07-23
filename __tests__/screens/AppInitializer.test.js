@@ -413,6 +413,12 @@ describe('AppInitializer', () => {
     // Flush the promise chain of the immediate on-open check without advancing far
     // enough to trigger the one-minute interval.
     const flushCheck = () => act(async () => {
+      // The initial on-open jobs (update check, backup, ingestion) are now
+      // deferred via requestIdleCallback, polyfilled to setImmediate in jest.
+      // Under fake timers that immediate is queued, so flush it first, then let
+      // the resulting async promise chain settle. advanceTimersByTimeAsync(0)
+      // does not reach the one-minute interval.
+      await jest.advanceTimersByTimeAsync(0);
       await Promise.resolve();
       await Promise.resolve();
     });
