@@ -1,5 +1,12 @@
 # Changelog
 
+## [0.214.8](https://github.com/heywood8/money-tracker/compare/penny-v0.214.7...penny-v0.214.8) (2026-07-23)
+
+
+### Performance Improvements
+
+* **startup:** defer initial background jobs off the first interactive frame ([#1372](https://github.com/heywood8/money-tracker/issues/1372)) ([212fecb](https://github.com/heywood8/money-tracker/commit/212fecbf64f33ab4c57a8842b0e8f6454218d790))
+
 ## [0.214.7](https://github.com/heywood8/money-tracker/compare/penny-v0.214.6...penny-v0.214.7) (2026-07-23)
 
 
