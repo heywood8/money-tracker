@@ -46,12 +46,16 @@ config.resolver.resolveRequest = (context, moduleName, platform) => {
   return context.resolveRequest(context, moduleName, platform);
 };
 
-// Add transformer options for web
+// Transformer options.
+// experimentalImportSupport is required for Expo's experimental tree shaking
+// (paired with EXPO_UNSTABLE_TREE_SHAKING + EXPO_UNSTABLE_METRO_OPTIMIZE_GRAPH,
+// set on the production EAS build). It rewrites ESM imports so Metro can
+// statically analyze and drop unused exports. inlineRequires keeps startup fast.
 config.transformer = {
   ...config.transformer,
   getTransformOptions: async () => ({
     transform: {
-      experimentalImportSupport: false,
+      experimentalImportSupport: true,
       inlineRequires: true,
     },
   }),

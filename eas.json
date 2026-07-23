@@ -41,7 +41,9 @@
         "gradleCommand": ":app:bundleRelease"
       },
       "env": {
-        "APP_VARIANT": "production"
+        "APP_VARIANT": "production",
+        "EXPO_UNSTABLE_TREE_SHAKING": "1",
+        "EXPO_UNSTABLE_METRO_OPTIMIZE_GRAPH": "1"
       },
       "channel": "production"
     }
