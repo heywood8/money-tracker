@@ -66,6 +66,10 @@ const LOG_LEVEL_COLORS = {
 
 const LOG_FILTERS = ['all', 'error', 'warn', 'info', 'debug'];
 
+// Badge background on a selected (primary-filled) filter chip — translucent
+// white so the count reads on the blue fill.
+const SELECTED_BADGE_BG = 'rgba(255,255,255,0.3)';
+
 const SPRING_CONFIG = { mass: 1, damping: 20, stiffness: 200 };
 
 // Red used for the inline "location permission denied" hint under the toggle row.
@@ -1534,6 +1538,8 @@ export default function SettingsScreen({ setSubPanelActive }) {
                     // zero count needs no badge.
                     const count = f === 'all' ? 0 : (counts?.[f] || 0);
                     const badgeColor = f === 'error' || f === 'warn' ? LOG_LEVEL_COLORS[f] : colors.mutedText;
+                    const badgeBackground = isSelected ? SELECTED_BADGE_BG : `${badgeColor}26`;
+                    const badgeTextColor = isSelected ? '#fff' : badgeColor;
                     return (
                       <TouchableOpacity
                         key={f}
@@ -1556,11 +1562,11 @@ export default function SettingsScreen({ setSubPanelActive }) {
                         {count > 0 && (
                           <View style={[
                             styles.filterChipBadge,
-                            { backgroundColor: isSelected ? 'rgba(255,255,255,0.3)' : `${badgeColor}26` },
+                            { backgroundColor: badgeBackground },
                           ]}>
                             <Text style={[
                               styles.filterChipBadgeText,
-                              { color: isSelected ? '#fff' : badgeColor },
+                              { color: badgeTextColor },
                             ]}>
                               {count}
                             </Text>
