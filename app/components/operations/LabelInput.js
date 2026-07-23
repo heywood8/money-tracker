@@ -8,7 +8,7 @@ import {
   StyleSheet,
   Animated,
 } from 'react-native';
-import { MaterialCommunityIcons as Icon } from '@expo/vector-icons';
+import Icon from '@expo/vector-icons/MaterialCommunityIcons';
 import PropTypes from 'prop-types';
 import { SPACING, BORDER_RADIUS, FONT_SIZE } from '../../styles/designTokens';
 import { parseLabels, serializeLabels, addLabel, removeLabel, hasLabel, displayLabel } from '../../utils/labelUtils';

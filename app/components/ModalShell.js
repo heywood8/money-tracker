@@ -13,7 +13,7 @@ import {
 } from 'react-native';
 import Reanimated from 'react-native-reanimated';
 import { Text, TouchableRipple } from 'react-native-paper';
-import { MaterialCommunityIcons as Icon } from '@expo/vector-icons';
+import Icon from '@expo/vector-icons/MaterialCommunityIcons';
 import PropTypes from 'prop-types';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { useThemeColors } from '../contexts/ThemeColorsContext';

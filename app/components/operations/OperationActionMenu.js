@@ -1,7 +1,7 @@
 import React, { useEffect, useRef } from 'react';
 import { Modal, View, Text, Pressable, StyleSheet, Animated, Dimensions } from 'react-native';
 import PropTypes from 'prop-types';
-import { MaterialCommunityIcons as Icon } from '@expo/vector-icons';
+import Icon from '@expo/vector-icons/MaterialCommunityIcons';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import ModalBlurOverlay from '../ModalBlurOverlay';
 import { SPACING, BORDER_RADIUS, FONT_SIZE, ICON_SIZE } from '../../styles/designTokens';

@@ -18,7 +18,7 @@ import {
 } from 'react-native';
 import PropTypes from 'prop-types';
 import DateTimePicker from '@react-native-community/datetimepicker';
-import { MaterialCommunityIcons as Icon } from '@expo/vector-icons';
+import Icon from '@expo/vector-icons/MaterialCommunityIcons';
 import { useThemeColors } from '../contexts/ThemeColorsContext';
 import { useLocalization } from '../contexts/LocalizationContext';
 import { useDialog } from '../contexts/DialogContext';

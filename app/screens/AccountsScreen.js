@@ -7,7 +7,7 @@ import AddFAB from '../components/AddFAB';
 import LoadingView from '../components/LoadingView';
 import EmptyState from '../components/EmptyState';
 import { NestableScrollContainer, NestableDraggableFlatList } from 'react-native-draggable-flatlist';
-import { MaterialCommunityIcons as Icon } from '@expo/vector-icons';
+import Icon from '@expo/vector-icons/MaterialCommunityIcons';
 
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { useThemeConfig } from '../contexts/ThemeConfigContext';

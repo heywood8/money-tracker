@@ -7,7 +7,7 @@ import {
   ScrollView,
   TouchableOpacity,
 } from 'react-native';
-import { Ionicons } from '@expo/vector-icons';
+import Ionicons from '@expo/vector-icons/Ionicons';
 import SimplePicker from '../SimplePicker';
 import FormInput from '../FormInput';
 import CategoryGridSelector from '../CategoryGridSelector';

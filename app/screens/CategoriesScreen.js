@@ -14,7 +14,7 @@ import {
 } from 'react-native';
 import { Text, TouchableRipple, TextInput as PaperTextInput } from 'react-native-paper';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
-import { MaterialCommunityIcons as Icon } from '@expo/vector-icons';
+import Icon from '@expo/vector-icons/MaterialCommunityIcons';
 import { useThemeColors } from '../contexts/ThemeColorsContext';
 import { TOP_CONTENT_SPACING, SPACING, BORDER_RADIUS } from '../styles/designTokens';
 import AddFAB from '../components/AddFAB';

@@ -13,10 +13,11 @@ jest.mock('../../../app/contexts/DisplaySettingsContext', () => ({
   })),
 }));
 
-// Mock vector icons
+// Mock vector icons (barrel + per-family subpath used by the component)
 jest.mock('@expo/vector-icons', () => ({
   MaterialCommunityIcons: 'Icon',
 }));
+jest.mock('@expo/vector-icons/MaterialCommunityIcons', () => 'Icon');
 
 // Mock currencies
 jest.mock('../../../assets/currencies.json', () => ({

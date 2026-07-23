@@ -1,7 +1,7 @@
 import React, { memo, useMemo, useRef, useCallback } from 'react';
 import { View, Text, StyleSheet, ActivityIndicator } from 'react-native';
 import { TouchableRipple } from 'react-native-paper';
-import { MaterialCommunityIcons as Icon } from '@expo/vector-icons';
+import Icon from '@expo/vector-icons/MaterialCommunityIcons';
 import PropTypes from 'prop-types';
 import { getCategoryNames } from '../../utils/categoryUtils';
 import { parseLabels, visibleListLabels, displayLabel } from '../../utils/labelUtils';

@@ -1,7 +1,7 @@
 import React, { useRef, useCallback } from 'react';
 import { View, Text, StyleSheet, Modal, TouchableOpacity, TouchableWithoutFeedback, ScrollView, PanResponder } from 'react-native';
 import PropTypes from 'prop-types';
-import { MaterialCommunityIcons as Icon } from '@expo/vector-icons';
+import Icon from '@expo/vector-icons/MaterialCommunityIcons';
 import { HORIZONTAL_PADDING } from '../../styles/layout';
 import SimplePicker from '../SimplePicker';
 import ExpensePieChart from './ExpensePieChart';

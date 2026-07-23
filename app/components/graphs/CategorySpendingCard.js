@@ -2,7 +2,7 @@ import React, { useMemo, useState, useCallback } from 'react';
 import { View, Text, StyleSheet, ActivityIndicator, Dimensions, TouchableOpacity, Modal, ScrollView } from 'react-native';
 import PropTypes from 'prop-types';
 import Svg, { Line, Rect, Text as SvgText, Path } from 'react-native-svg';
-import { MaterialCommunityIcons as Icon } from '@expo/vector-icons';
+import Icon from '@expo/vector-icons/MaterialCommunityIcons';
 import currencies from '../../../assets/currencies.json';
 import useCategoryMonthlySpending from '../../hooks/useCategoryMonthlySpending';
 import { HORIZONTAL_PADDING } from '../../styles/layout';

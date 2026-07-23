@@ -696,7 +696,8 @@ jest.mock('react-native-paper', () => {
 });
 
 // Mock @expo/vector-icons
-jest.mock('@expo/vector-icons', () => {
+// Prefixed with `mock` so jest permits referencing it inside jest.mock factories.
+const mockCreateVectorIcon = () => {
   const React = require('react');
   const { Text } = require('react-native');
   const PropTypes = require('prop-types');
@@ -709,7 +710,12 @@ jest.mock('@expo/vector-icons', () => {
     color: PropTypes.string,
     testID: PropTypes.string,
   };
+  return MockIcon;
+};
 
+// Barrel entry point (kept for any test importing named families directly).
+jest.mock('@expo/vector-icons', () => {
+  const MockIcon = mockCreateVectorIcon();
   return {
     MaterialCommunityIcons: MockIcon,
     Ionicons: MockIcon,
@@ -718,6 +724,17 @@ jest.mock('@expo/vector-icons', () => {
     MaterialIcons: MockIcon,
   };
 });
+
+// Per-family subpath entry points. App code imports these directly so the
+// bundle no longer pulls in every icon font via the barrel (issue #1340).
+jest.mock('@expo/vector-icons/MaterialCommunityIcons', () => ({
+  __esModule: true,
+  default: mockCreateVectorIcon(),
+}));
+jest.mock('@expo/vector-icons/Ionicons', () => ({
+  __esModule: true,
+  default: mockCreateVectorIcon(),
+}));
 
 // Mock react-native-safe-area-context
 jest.mock('react-native-safe-area-context', () => {
