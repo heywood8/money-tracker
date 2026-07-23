@@ -1,5 +1,12 @@
 # Changelog
 
+## [0.214.3](https://github.com/heywood8/money-tracker/compare/penny-v0.214.2...penny-v0.214.3) (2026-07-23)
+
+
+### Performance Improvements
+
+* **accounts:** compute Net Worth from unfiltered operations, off the search hot path ([#1361](https://github.com/heywood8/money-tracker/issues/1361)) ([dcee961](https://github.com/heywood8/money-tracker/commit/dcee9611aa0c999feb778a9d4d125cebcd9366c6))
+
 ## [0.214.2](https://github.com/heywood8/money-tracker/compare/penny-v0.214.1...penny-v0.214.2) (2026-07-23)
 
 
