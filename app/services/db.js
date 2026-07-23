@@ -6,6 +6,71 @@ import { normalizeSearchText } from './searchNormalize';
 
 const DB_NAME = 'penny.db';
 
+/**
+ * Schema fingerprint for the startup fast path.
+ *
+ * This is the number of migrations this build ships, read straight from the
+ * Drizzle journal. It is DERIVED, not hand-maintained, on purpose: adding a
+ * migration means adding a journal entry, which increments this value
+ * automatically. There is no separate integer to remember to bump.
+ *
+ * How the fast path uses it (see initializeDatabase):
+ *   - After a fully successful init we store this value in `PRAGMA user_version`.
+ *   - On the next cold start we read `user_version` (a single SQLite header read,
+ *     no table access) and, if it equals SCHEMA_VERSION, skip the expensive
+ *     schema-inspection + migration-detection sweep entirely.
+ *
+ * MIGRATION-SAFETY INVARIANT (do not break): because this value tracks the
+ * journal length, ANY new migration raises SCHEMA_VERSION. An existing install
+ * carries the OLDER value it was stamped with, so `stored !== SCHEMA_VERSION`
+ * and the full migrate path runs — a pending migration can never be skipped by
+ * the fast path. This is why the fingerprint is bound to the journal rather than
+ * a manually-edited constant. When you add a migration you do NOT touch this
+ * line; adding the journal entry is what bumps it.
+ *
+ * Note: any build predating this feature never wrote `user_version` (defaults to
+ * 0), so its first launch after upgrade sees 0 !== SCHEMA_VERSION and runs the
+ * full path once, then stamps the fingerprint — identical to today's behavior,
+ * just with a fast path unlocked for every subsequent launch.
+ */
+const SCHEMA_VERSION = migrations.journal.entries.length;
+
+/**
+ * Read the persisted schema fingerprint from `PRAGMA user_version`.
+ * One SQLite header read — no table access, so it is safe and cheap to call
+ * before any schema inspection. Returns 0 on any error or when unset (0 is the
+ * SQLite default), which forces the full init path — the safe direction.
+ */
+const getStoredSchemaVersion = async (rawDb) => {
+  try {
+    const row = await rawDb.getFirstAsync('PRAGMA user_version');
+    // expo-sqlite returns the pragma as a single-column row, e.g. { user_version: 18 }.
+    const value = row
+      ? (row.user_version ?? row.userVersion ?? Object.values(row)[0])
+      : 0;
+    const n = Number(value);
+    return Number.isFinite(n) ? n : 0;
+  } catch (error) {
+    console.warn('[DB] Could not read schema fingerprint (user_version):', error.message);
+    return 0;
+  }
+};
+
+/**
+ * Persist the schema fingerprint into `PRAGMA user_version`.
+ * NOTE: PRAGMA user_version does not accept bound parameters, so the integer is
+ * inlined. `version` is always SCHEMA_VERSION (derived from the journal), never
+ * user input, and is coerced to a 32-bit int — no injection surface.
+ * Failures are non-fatal: the worst case is the next start re-runs the full path.
+ */
+const setStoredSchemaVersion = async (rawDb, version) => {
+  try {
+    await rawDb.runAsync(`PRAGMA user_version = ${Number(version) | 0}`);
+  } catch (error) {
+    console.warn('[DB] Could not persist schema fingerprint (user_version):', error.message);
+  }
+};
+
 let dbInstance = null;
 let drizzleInstance = null;
 let initPromise = null;
@@ -566,6 +631,33 @@ const isDatabaseCorrupted = async (rawDb) => {
  */
 const initializeDatabase = async (rawDb, db) => {
   try {
+    // FAST PATH: read the stored schema fingerprint first (one header read, no
+    // table access). If it equals the schema this build ships, the database was
+    // already brought fully up to date by a previous successful init — the
+    // fingerprint is ONLY ever written at the very end of that init — so we can
+    // skip the whole inspection/migration-detection sweep (isSchemaComplete's
+    // ~10 PRAGMA queries, the __drizzle_migrations SELECTs, the corruption
+    // re-scan). This is the up-to-date cold-start path that gates first paint.
+    //
+    // The `SCHEMA_VERSION > 0` guard keeps the fast path inert in the unit-test
+    // environment (empty migrations journal → SCHEMA_VERSION 0), where the full
+    // path is exercised. In production there is always ≥1 migration.
+    //
+    // Corruption safety: the only corruption isDatabaseCorrupted() detects is a
+    // text-typed accounts.id (migration 0002 never applied). That state is
+    // impossible when user_version === SCHEMA_VERSION, because that value is only
+    // stamped after a run in which 0002 (and every later migration) completed. So
+    // the fast path cannot bypass a corruption this codebase can actually detect.
+    const storedVersion = await getStoredSchemaVersion(rawDb);
+    if (SCHEMA_VERSION > 0 && storedVersion === SCHEMA_VERSION) {
+      console.log(`[DB] Schema fingerprint matches (user_version=${SCHEMA_VERSION}) — fast startup, skipping inspection`);
+      // Per-connection PRAGMAs are connection-scoped, NOT schema state — they must
+      // run on every open regardless of the fast path.
+      await rawDb.runAsync('PRAGMA foreign_keys = ON');
+      await rawDb.runAsync('PRAGMA journal_mode = WAL');
+      return;
+    }
+
     console.log('Running Drizzle migrations...');
     console.log('Available migrations:', migrations.journal.entries.map(e => e.tag).join(', '));
 
@@ -692,6 +784,11 @@ const initializeDatabase = async (rawDb, db) => {
     // Enable foreign keys and WAL mode (always, regardless of migration path)
     await rawDb.runAsync('PRAGMA foreign_keys = ON');
     await rawDb.runAsync('PRAGMA journal_mode = WAL');
+
+    // Stamp the schema fingerprint now that init has fully succeeded, so the next
+    // cold start can take the fast path above. Written only here (after the whole
+    // slow path completed without throwing) — never on a partial/failed init.
+    await setStoredSchemaVersion(rawDb, SCHEMA_VERSION);
 
     console.log('Database migrations completed successfully');
   } catch (error) {
