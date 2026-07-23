@@ -1,4 +1,4 @@
-import React, { useMemo, useCallback, forwardRef, useRef, useImperativeHandle } from 'react';
+import React, { memo, useMemo, useCallback, forwardRef, useRef, useImperativeHandle } from 'react';
 import { View, Text, StyleSheet, SectionList, ActivityIndicator } from 'react-native';
 import Icon from '@expo/vector-icons/MaterialCommunityIcons';
 import PropTypes from 'prop-types';
@@ -371,6 +371,14 @@ const OperationsList = forwardRef(({
 
   const keyExtractor = useCallback((item) => item.id, []);
 
+  // Stable identity for the SectionList's extraData. An inline array literal
+  // allocates anew every render, so the list's shallow-compare bailout never
+  // holds and rows re-render even when nothing they depend on changed.
+  const listExtraData = useMemo(
+    () => [accounts, categories, pendingSuggestionId],
+    [accounts, categories, pendingSuggestionId]
+  );
+
   const sectionListRef = useRef(null);
 
   // Expose FlatList-compatible scroll methods so OperationsScreen can call
@@ -400,7 +408,7 @@ const OperationsList = forwardRef(({
       renderSectionHeader={renderSectionHeader}
       renderSectionFooter={renderSectionFooter}
       keyExtractor={keyExtractor}
-      extraData={[accounts, categories, pendingSuggestionId]}
+      extraData={listExtraData}
       getItemLayout={getItemLayout}
       ListHeaderComponent={
         (topInset > 0 || headerComponent)
@@ -468,7 +476,14 @@ const OperationsList = forwardRef(({
 
 OperationsList.displayName = 'OperationsList';
 
-OperationsList.propTypes = {
+// Wrapped in memo so a parent re-render with unchanged props skips re-rendering
+// the whole list. Paired with the stable extraData above, this keeps the
+// SectionList from redoing work when nothing it depends on has changed.
+const MemoizedOperationsList = memo(OperationsList);
+
+MemoizedOperationsList.displayName = 'OperationsList';
+
+MemoizedOperationsList.propTypes = {
   groupedOperations: PropTypes.arrayOf(PropTypes.object).isRequired,
   accounts: PropTypes.arrayOf(PropTypes.object).isRequired,
   categories: PropTypes.arrayOf(PropTypes.object).isRequired,
@@ -548,4 +563,4 @@ const styles = StyleSheet.create({
   },
 });
 
-export default OperationsList;
+export default MemoizedOperationsList;
