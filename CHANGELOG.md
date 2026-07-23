@@ -1,5 +1,12 @@
 # Changelog
 
+## [0.214.10](https://github.com/heywood8/money-tracker/compare/penny-v0.214.9...penny-v0.214.10) (2026-07-23)
+
+
+### Performance Improvements
+
+* **state:** keep actions-context callbacks stable via refs ([#1374](https://github.com/heywood8/money-tracker/issues/1374)) ([73e9f79](https://github.com/heywood8/money-tracker/commit/73e9f7952ae97d9a3d8f3b705ae536bee80069b0))
+
 ## [0.214.9](https://github.com/heywood8/money-tracker/compare/penny-v0.214.8...penny-v0.214.9) (2026-07-23)
 
 
