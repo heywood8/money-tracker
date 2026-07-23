@@ -1,5 +1,17 @@
 # Changelog
 
+## [0.214.0](https://github.com/heywood8/money-tracker/compare/penny-v0.213.0...penny-v0.214.0) (2026-07-23)
+
+
+### Features
+
+* log level counts and visual hierarchy in logs viewer ([#1337](https://github.com/heywood8/money-tracker/issues/1337)) ([448d641](https://github.com/heywood8/money-tracker/commit/448d64126f3a828049443300159256a73abafb13))
+
+
+### Miscellaneous Chores
+
+* add react-native-best-practices skill ([#1338](https://github.com/heywood8/money-tracker/issues/1338)) ([26a0091](https://github.com/heywood8/money-tracker/commit/26a0091be6ddd1cfb4c50042a6a87f1850a20e48))
+
 ## [0.213.0](https://github.com/heywood8/money-tracker/compare/penny-v0.212.2...penny-v0.213.0) (2026-07-22)
 
 
