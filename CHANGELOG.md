@@ -1,5 +1,12 @@
 # Changelog
 
+## [0.214.4](https://github.com/heywood8/money-tracker/compare/penny-v0.214.3...penny-v0.214.4) (2026-07-23)
+
+
+### Miscellaneous Chores
+
+* **deps:** remove four unused Expo native dependencies ([#1362](https://github.com/heywood8/money-tracker/issues/1362)) ([68520c4](https://github.com/heywood8/money-tracker/commit/68520c45b3606aacfc8c3f1d611c355a20bc90d4))
+
 ## [0.214.3](https://github.com/heywood8/money-tracker/compare/penny-v0.214.2...penny-v0.214.3) (2026-07-23)
 
 
