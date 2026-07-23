@@ -1,3 +1,4 @@
+/* global __DEV__ */
 import { drizzle } from 'drizzle-orm/expo-sqlite';
 import * as SQLite from 'expo-sqlite';
 import * as schema from '../db/schema';
