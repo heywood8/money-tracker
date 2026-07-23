@@ -78,6 +78,29 @@ export const OperationsActionsProvider = ({ children }) => {
     activeFiltersRef.current = activeFilters;
   }, [activeFilters]);
 
+  // Refs mirroring the churning data/pagination state. Reading these inside the
+  // callbacks (instead of closing over the values directly) lets the callbacks drop
+  // those deps and stay referentially stable, so the context value object below does
+  // not churn on every data/pagination change — the whole point of the data/actions
+  // split. This no-deps effect runs after every commit, so ref.current always reflects
+  // the latest committed state; callbacks read the fresh value at call time.
+  const operationsRef = useRef(operations);
+  const oldestLoadedDateRef = useRef(_oldestLoadedDate);
+  const newestLoadedDateRef = useRef(_newestLoadedDate);
+  const hasMoreOperationsRef = useRef(hasMoreOperations);
+  const loadingMoreRef = useRef(loadingMore);
+  const hasNewerOperationsRef = useRef(hasNewerOperations);
+  const loadingNewerRef = useRef(loadingNewer);
+  useEffect(() => {
+    operationsRef.current = operations;
+    oldestLoadedDateRef.current = _oldestLoadedDate;
+    newestLoadedDateRef.current = _newestLoadedDate;
+    hasMoreOperationsRef.current = hasMoreOperations;
+    loadingMoreRef.current = loadingMore;
+    hasNewerOperationsRef.current = hasNewerOperations;
+    loadingNewerRef.current = loadingNewer;
+  });
+
   const _loadCache = useCallback(async () => {
     if (cacheLoadingRef.current || Array.isArray(allOpsCacheRef.current)) return;
     cacheLoadingRef.current = true;
@@ -179,8 +202,16 @@ export const OperationsActionsProvider = ({ children }) => {
 
   // Load more operations (next week with operations)
   const loadMoreOperations = useCallback(async () => {
-    if (loadingMore || !hasMoreOperations) return;
+    if (loadingMoreRef.current || !hasMoreOperationsRef.current) return;
 
+    // Mirror the pagination/loading refs SYNCHRONOUSLY at each write below (not
+    // only via the passive mirroring effect, which lags by one commit). These
+    // values are read back within this same flow — the re-entrancy guard above
+    // and the oldest-date boundary — so a re-fire in the commit→effect window
+    // (e.g. onEndReached during initial layout when the first week is short)
+    // must see the fresh value, or it re-scans the loaded week and regresses the
+    // pointer. The passive effect stays as the backstop for external changes.
+    loadingMoreRef.current = true;
     _setLoadingMore(true);
     try {
       if (Array.isArray(allOpsCacheRef.current)) {
@@ -188,11 +219,12 @@ export const OperationsActionsProvider = ({ children }) => {
         // Cache is sorted DESC (newest first), same as getAllOperations.
         const today = new Date();
         const todayStr = `${today.getFullYear()}-${String(today.getMonth() + 1).padStart(2, '0')}-${String(today.getDate()).padStart(2, '0')}`;
-        const boundary = _oldestLoadedDate ?? todayStr;
+        const boundary = oldestLoadedDateRef.current ?? todayStr;
 
         const olderOps = allOpsCacheRef.current.filter(op => op.date < boundary);
 
         if (olderOps.length === 0) {
+          hasMoreOperationsRef.current = false;
           _setHasMoreOperations(false);
           return;
         }
@@ -213,10 +245,13 @@ export const OperationsActionsProvider = ({ children }) => {
         });
 
         if (chunk.length > 0) {
+          oldestLoadedDateRef.current = chunk[chunk.length - 1].date;
           _setOldestLoadedDate(chunk[chunk.length - 1].date);
         }
 
-        _setHasMoreOperations(olderOps.some(op => op.date < chunkStart));
+        const stillMore = olderOps.some(op => op.date < chunkStart);
+        hasMoreOperationsRef.current = stillMore;
+        _setHasMoreOperations(stillMore);
       } else {
         // Cache not ready yet — fall back to DB queries.
         const currentFilters = activeFiltersRef.current;
@@ -224,18 +259,20 @@ export const OperationsActionsProvider = ({ children }) => {
 
         // Local date — operation dates are stored as local YYYY-MM-DD strings
         const todayStr = formatLocalDate(new Date());
+        const oldestLoadedDate = oldestLoadedDateRef.current;
         let nextOp;
-        if (!_oldestLoadedDate) {
+        if (!oldestLoadedDate) {
           nextOp = isFiltered
             ? await OperationsDB.getNextOldestFilteredOperation(todayStr, currentFilters)
             : await OperationsDB.getNextOldestOperation(todayStr);
         } else {
           nextOp = isFiltered
-            ? await OperationsDB.getNextOldestFilteredOperation(_oldestLoadedDate, currentFilters)
-            : await OperationsDB.getNextOldestOperation(_oldestLoadedDate);
+            ? await OperationsDB.getNextOldestFilteredOperation(oldestLoadedDate, currentFilters)
+            : await OperationsDB.getNextOldestOperation(oldestLoadedDate);
         }
 
         if (!nextOp) {
+          hasMoreOperationsRef.current = false;
           _setHasMoreOperations(false);
         } else {
           const moreOperations = isFiltered
@@ -249,6 +286,7 @@ export const OperationsActionsProvider = ({ children }) => {
           });
 
           if (moreOperations.length > 0) {
+            oldestLoadedDateRef.current = moreOperations[moreOperations.length - 1].date;
             _setOldestLoadedDate(moreOperations[moreOperations.length - 1].date);
           }
         }
@@ -256,12 +294,10 @@ export const OperationsActionsProvider = ({ children }) => {
     } catch (error) {
       console.error('Failed to load more operations:', error);
     } finally {
+      loadingMoreRef.current = false;
       _setLoadingMore(false);
     }
   }, [
-    _oldestLoadedDate,
-    hasMoreOperations,
-    loadingMore,
     _hasActiveFilters,
     _setLoadingMore,
     _setHasMoreOperations,
@@ -271,9 +307,13 @@ export const OperationsActionsProvider = ({ children }) => {
 
   // Load newer operations (previous week with operations)
   const loadNewerOperations = useCallback(async () => {
-    if (loadingNewer || !hasNewerOperations || !_newestLoadedDate) return;
+    const newestLoadedDate = newestLoadedDateRef.current;
+    if (loadingNewerRef.current || !hasNewerOperationsRef.current || !newestLoadedDate) return;
 
     try {
+      // Mirror synchronously (see loadMoreOperations) so a re-fire in the
+      // commit→passive-effect window sees the fresh loading/pagination state.
+      loadingNewerRef.current = true;
       _setLoadingNewer(true);
 
       const currentFilters = activeFiltersRef.current;
@@ -281,11 +321,12 @@ export const OperationsActionsProvider = ({ children }) => {
 
       // Find the next newest operation after our current newest date
       const nextOp = isFiltered
-        ? await OperationsDB.getNextNewestFilteredOperation(_newestLoadedDate, currentFilters)
-        : await OperationsDB.getNextNewestOperation(_newestLoadedDate);
+        ? await OperationsDB.getNextNewestFilteredOperation(newestLoadedDate, currentFilters)
+        : await OperationsDB.getNextNewestOperation(newestLoadedDate);
 
       if (!nextOp) {
         // No more newer operations found
+        hasNewerOperationsRef.current = false;
         _setHasNewerOperations(false);
       } else {
         // Load a week of operations ending at this operation's date
@@ -303,18 +344,17 @@ export const OperationsActionsProvider = ({ children }) => {
         // Update the newest loaded date (oldest stays the same)
         if (newerOperations.length > 0) {
           const newestOp = newerOperations[0]; // Operations are sorted DESC by date
+          newestLoadedDateRef.current = newestOp.date;
           _setNewestLoadedDate(newestOp.date);
         }
       }
     } catch (error) {
       console.error('Failed to load newer operations:', error);
     } finally {
+      loadingNewerRef.current = false;
       _setLoadingNewer(false);
     }
   }, [
-    _newestLoadedDate,
-    hasNewerOperations,
-    loadingNewer,
     _hasActiveFilters,
     _setLoadingNewer,
     _setHasNewerOperations,
@@ -695,19 +735,19 @@ export const OperationsActionsProvider = ({ children }) => {
 
   // Get operations filtered by various criteria
   const getOperationsByAccount = useCallback((accountId) => {
-    return operations.filter(op => op.accountId === accountId);
-  }, [operations]);
+    return operationsRef.current.filter(op => op.accountId === accountId);
+  }, []);
 
   const getOperationsByCategory = useCallback((categoryId) => {
-    return operations.filter(op => op.categoryId === categoryId);
-  }, [operations]);
+    return operationsRef.current.filter(op => op.categoryId === categoryId);
+  }, []);
 
   const getOperationsByDateRange = useCallback((startDate, endDate) => {
-    return operations.filter(op => {
+    return operationsRef.current.filter(op => {
       const opDate = new Date(op.date);
       return opDate >= startDate && opDate <= endDate;
     });
-  }, [operations]);
+  }, []);
 
   // Count active filter groups
   const getActiveFilterCount = useCallback(() => {
