@@ -109,7 +109,8 @@ const SearchBar = ({
   }, []);
 
   // Interpolate the pill width on the UI thread. Reanimated animates layout
-  // props (width) directly, so the pill grows from the left just like before.
+  // props (width) directly. The pill is center-aligned, so the width expands
+  // symmetrically from the center outward (unchanged from the pre-Reanimated version).
   const pillAnimatedStyle = useAnimatedStyle(() => {
     const collapsedWidth = available * COLLAPSED_WIDTH_RATIO;
     return {
