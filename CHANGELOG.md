@@ -1,5 +1,12 @@
 # Changelog
 
+## [0.214.13](https://github.com/heywood8/money-tracker/compare/penny-v0.214.12...penny-v0.214.13) (2026-07-23)
+
+
+### Bug Fixes
+
+* **db:** prevent startup fast path from bricking after reset or half-migration ([#1384](https://github.com/heywood8/money-tracker/issues/1384)) ([f474f1c](https://github.com/heywood8/money-tracker/commit/f474f1c0aff2980ccee5898e1f37b9140d737515))
+
 ## [0.214.12](https://github.com/heywood8/money-tracker/compare/penny-v0.214.11...penny-v0.214.12) (2026-07-23)
 
 
