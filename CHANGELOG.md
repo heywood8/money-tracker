@@ -1,5 +1,12 @@
 # Changelog
 
+## [0.214.11](https://github.com/heywood8/money-tracker/compare/penny-v0.214.10...penny-v0.214.11) (2026-07-23)
+
+
+### Performance Improvements
+
+* **navigation:** defer initial mount of background tabs to after first frame ([#1377](https://github.com/heywood8/money-tracker/issues/1377)) ([a92d8f9](https://github.com/heywood8/money-tracker/commit/a92d8f9513e294679eb9c62dc12e28cb438829dd))
+
 ## [0.214.10](https://github.com/heywood8/money-tracker/compare/penny-v0.214.9...penny-v0.214.10) (2026-07-23)
 
 
