@@ -68,6 +68,22 @@ export default function ModalShell({
   // offset, the bug the old behavior="height" KeyboardAvoidingView left behind).
   const keyboardOffset = useRef(new Animated.Value(0)).current;
   useEffect(() => {
+    // ModalShell instances stay permanently mounted (e.g. OperationModal, and all
+    // tab screens mount eagerly), so without this gate every closed modal would run
+    // a JS-driven paddingBottom animation on every keyboard show/hide app-wide.
+    // Only the visible modal needs keyboard avoidance.
+    if (!visible) return undefined;
+
+    // If a keyboard is already open when this modal becomes visible (e.g. focus
+    // retained from a prior field / quick-add flow), keyboardDidShow has already
+    // fired and will not fire again for this subscription — so seed the offset from
+    // the current keyboard metrics, otherwise the sheet stays glued to the bottom
+    // and the keyboard overlaps its input until the user dismisses and refocuses.
+    const currentMetrics = Keyboard.metrics?.();
+    if (currentMetrics?.height) {
+      keyboardOffset.setValue(currentMetrics.height);
+    }
+
     const onShow = (e) => {
       Animated.timing(keyboardOffset, {
         toValue: e?.endCoordinates?.height ?? 0,
@@ -88,7 +104,7 @@ export default function ModalShell({
       showSub.remove();
       hideSub.remove();
     };
-  }, [keyboardOffset]);
+  }, [keyboardOffset, visible]);
   // Use a ref so the PanResponder closure always calls the latest onDismiss
   const onDismissRef = useRef(onDismiss);
   useEffect(() => { onDismissRef.current = onDismiss; }, [onDismiss]);

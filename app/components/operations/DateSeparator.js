@@ -1,4 +1,4 @@
-import React, { memo } from 'react';
+import React, { memo, useCallback } from 'react';
 import { View, Text, StyleSheet, Pressable } from 'react-native';
 import PropTypes from 'prop-types';
 import currencies from '../../../assets/currencies.json';
@@ -13,10 +13,14 @@ const getCurrencySymbol = (currencyCode) => {
 const DateSeparator = ({ date, spendingSums, formatDate, colors, onPress }) => {
   const hasSpending = spendingSums && Object.keys(spendingSums).length > 0;
 
+  // Bind the date here so the parent can pass a STABLE onPress (onDateSeparatorPress)
+  // instead of a fresh `() => onPress(date)` per render — the latter pierces this memo.
+  const handlePress = useCallback(() => onPress?.(date), [onPress, date]);
+
   return (
     <Pressable
       style={({ pressed }) => [styles.container, pressed && styles.pressed]}
-      onPress={onPress}
+      onPress={handlePress}
       accessibilityRole="button"
       accessibilityLabel={`${formatDate(date)}, press to select date`}
       accessibilityHint="Opens date picker to jump to a specific date"

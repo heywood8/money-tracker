@@ -285,7 +285,7 @@ const OperationsList = forwardRef(({
         spendingSums={section.spendingSums}
         formatDate={formatDate}
         colors={colors}
-        onPress={() => onDateSeparatorPress(section.title)}
+        onPress={onDateSeparatorPress}
       />
       {/* Top of the card surface — provides border, radius, and background */}
       <View

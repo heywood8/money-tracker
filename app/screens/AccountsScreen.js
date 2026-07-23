@@ -47,6 +47,10 @@ const ROUNDING_MODE_OPTIONS = [
   { value: 'down', labelKey: 'rounding_mode_down', fallback: 'Down' },
 ];
 
+// Static currency list is a module-level JSON import that never changes, so its
+// Object.entries() can be computed once and shared as a stable FlatList `data`.
+const CURRENCY_ENTRIES = Object.entries(currencies);
+
 // Memoized currency picker modal component
 const CurrencyPickerModal = memo(({ visible = false, onClose = () => {}, currencies = DEFAULT_CURRENCIES, colors = {}, t = (k) => k, onSelect = () => {} }) => {
   const renderCurrencyItem = useCallback(({ item }) => {
@@ -1280,7 +1284,7 @@ export default function AccountsScreen({ onBackStateChange }) {
                 </Text>
               </View>
               <FlatList
-                data={Object.entries(currencies)}
+                data={CURRENCY_ENTRIES}
                 keyExtractor={([code]) => code}
                 renderItem={({ item: [code, cur] }) => (
                   <TouchableRipple
