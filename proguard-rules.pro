@@ -21,9 +21,6 @@
     @com.facebook.proguard.annotations.DoNotStrip *;
 }
 
-# JavaScriptCore (JSC)
--keep class org.webkit.** { *; }
-
 # Expo Modules - keep all classes and members
 -keep class expo.modules.** { *; }
 -keep interface expo.modules.** { *; }
@@ -51,8 +48,10 @@
 -keep class com.heywood8.monkeep.BuildConfig { *; }
 -keep class com.heywood8.monkeep.dev.BuildConfig { *; }
 
-# Kotlin support - required for Expo Kotlin modules
--keep class kotlin.** { *; }
+# Kotlin support - keep only Metadata for reflection; let R8 shrink the unused
+# parts of kotlin-stdlib (it ships its own consumer ProGuard rules that protect
+# whatever the runtime actually needs). The blanket `-keep class kotlin.** { *; }`
+# was over-keeping the entire stdlib and negating R8's shrinking.
 -keep class kotlin.Metadata { *; }
 -keepclassmembers class kotlin.Metadata {
     public <methods>;
