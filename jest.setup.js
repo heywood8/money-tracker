@@ -842,21 +842,6 @@ jest.mock('react-native-reanimated', () => {
   };
 });
 
-// Mock expo-auth-session (kept for any non-Google auth usage)
-jest.mock('expo-auth-session', () => ({
-  useAutoDiscovery: jest.fn(() => ({
-    authorizationEndpoint: 'https://accounts.google.com/o/oauth2/v2/auth',
-    tokenEndpoint: 'https://oauth2.googleapis.com/token',
-  })),
-  useAuthRequest: jest.fn(() => [
-    { codeVerifier: 'test-verifier' },
-    { type: 'success', params: { code: 'test-code' } },
-    jest.fn().mockResolvedValue({ type: 'success', params: { code: 'test-code' } }),
-  ]),
-  makeRedirectUri: jest.fn(() => 'com.heywood8.monkeep://'),
-  ResponseType: { Code: 'code' },
-}));
-
 // Mock @react-native-google-signin/google-signin
 jest.mock('@react-native-google-signin/google-signin', () => ({
   GoogleSignin: {
@@ -875,12 +860,6 @@ jest.mock('@react-native-google-signin/google-signin', () => ({
     PLAY_SERVICES_NOT_AVAILABLE: 'PLAY_SERVICES_NOT_AVAILABLE',
     SIGN_IN_REQUIRED: 'SIGN_IN_REQUIRED',
   },
-}));
-
-// Mock expo-web-browser
-jest.mock('expo-web-browser', () => ({
-  maybeCompleteAuthSession: jest.fn(() => ({ type: 'success' })),
-  openBrowserAsync: jest.fn(),
 }));
 
 // Mock expo-local-authentication
