@@ -483,15 +483,83 @@ jest.mock('@react-native-community/datetimepicker', () => {
   };
 });
 
-// Mock react-native-chart-kit (legacy root + modern v2 subpath)
-jest.mock('react-native-chart-kit', () => ({
-  LineChart: () => 'LineChart',
-  PieChart: () => 'PieChart',
-}));
+// Mock victory-native (Victory Native XL) — it is Skia/Reanimated-powered and
+// has no jsdom-friendly runtime, so we stub the chart primitives. `virtual: true`
+// because the native package is not resolvable in the Jest environment.
+jest.mock(
+  'victory-native',
+  () => {
+    const React = require('react');
+    const { View } = require('react-native');
+    // Render functions read points[yKey]; a proxy keeps any key access safe.
+    const pointsProxy = new Proxy({}, { get: () => [] });
+    const chartBounds = { left: 0, right: 300, top: 0, bottom: 200 };
+    // eslint-disable-next-line react/prop-types
+    const CartesianChart = ({ children }) =>
+      React.createElement(
+        View,
+        { testID: 'cartesian-chart' },
+        typeof children === 'function'
+          ? children({ points: pointsProxy, chartBounds })
+          : children,
+      );
+    // eslint-disable-next-line react/prop-types
+    const PolarChart = ({ children }) =>
+      React.createElement(
+        View,
+        { testID: 'polar-chart' },
+        typeof children === 'function' ? null : children,
+      );
+    const Line = () => React.createElement(View, { testID: 'vn-line' });
+    const Bar = () => React.createElement(View, { testID: 'vn-bar' });
+    const Area = () => React.createElement(View, { testID: 'vn-area' });
+    const Pie = {
+      // eslint-disable-next-line react/prop-types
+      Chart: ({ children }) =>
+        React.createElement(
+          View,
+          { testID: 'vn-pie' },
+          typeof children === 'function' ? null : children,
+        ),
+      Slice: () => null,
+      SliceAngularInset: () => null,
+      Label: () => null,
+    };
+    return {
+      __esModule: true,
+      CartesianChart,
+      PolarChart,
+      Line,
+      Bar,
+      Area,
+      Pie,
+      useChartPressState: () => ({ state: {}, isActive: false }),
+      useLinePath: () => ({ path: '' }),
+      useAreaPath: () => ({ path: '' }),
+    };
+  },
+  { virtual: true },
+);
 
-jest.mock('react-native-chart-kit/v2', () => ({
-  LineChart: () => 'LineChart',
-}));
+// Mock @shopify/react-native-skia — native Skia bindings are unavailable under
+// Jest. `virtual: true` because the package is not installed in this environment.
+jest.mock(
+  '@shopify/react-native-skia',
+  () => ({
+    __esModule: true,
+    useFont: () => null,
+    matchFont: () => ({ getSize: () => 12, getTextWidth: () => 0 }),
+    Skia: { Font: () => null },
+    Circle: 'SkCircle',
+    Path: 'SkPath',
+    Group: 'SkGroup',
+    Text: 'SkText',
+    Canvas: 'SkCanvas',
+    LinearGradient: 'SkLinearGradient',
+    vec: (x, y) => ({ x, y }),
+  }),
+  { virtual: true },
+);
 
 // Mock react-native-svg
 jest.mock('react-native-svg', () => ({

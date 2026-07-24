@@ -1,20 +1,13 @@
 import React, { useState, useMemo } from 'react';
-import { View, Text, StyleSheet, TouchableOpacity, ActivityIndicator, Dimensions } from 'react-native';
+import { View, Text, StyleSheet, TouchableOpacity, ActivityIndicator } from 'react-native';
 import PropTypes from 'prop-types';
-import { LineChart } from 'react-native-chart-kit/v2';
+import { CartesianChart, Line } from 'victory-native';
+import { matchFont, DashPathEffect } from '@shopify/react-native-skia';
 import Icon from '@expo/vector-icons/MaterialCommunityIcons';
 import SimplePicker from '../SimplePicker';
 import currencies from '../../../assets/currencies.json';
 import { useDisplaySettings } from '../../contexts/DisplaySettingsContext';
 import BalanceHistoryCalendarView from './BalanceHistoryCalendarView';
-
-const screenWidth = Dimensions.get('window').width;
-
-const formatCurrency = (amount, currency) => {
-  const currencyInfo = currencies[currency];
-  const decimals = currencyInfo?.decimal_digits ?? 2;
-  return `${parseFloat(amount).toFixed(decimals)} ${currency}`;
-};
 
 // Helper to format numbers compactly (e.g., 10K, 1.5M)
 const formatCompact = (value, currency) => {
@@ -84,14 +77,252 @@ const formatBalanceCompact = (amount, currency) => {
   return `${symbol}${formatted}`;
 };
 
-// Helper to convert hex color to rgba
-const hexToRgba = (hex, alpha) => {
-  // Remove # if present
-  const cleanHex = hex.replace('#', '');
-  const r = parseInt(cleanHex.substring(0, 2), 16);
-  const g = parseInt(cleanHex.substring(2, 4), 16);
-  const b = parseInt(cleanHex.substring(4, 6), 16);
-  return `rgba(${r}, ${g}, ${b}, ${alpha})`;
+// Compact Y-axis tick formatter. Exported so it can be unit-tested directly
+// (Victory Native XL consumes it via axisOptions.formatYLabel, whose output is
+// rendered on the Skia canvas and therefore not inspectable from the test tree).
+export const formatYAxisLabel = (value, hideBalances) => {
+  if (hideBalances) return '';
+  const numValue = parseFloat(value);
+  if (numValue === 0) return '';
+  const absValue = Math.abs(numValue);
+  const isNegative = numValue < 0;
+
+  if (absValue >= 1000000) {
+    const result = `${(absValue / 1000000).toFixed(0)}M`;
+    return isNegative ? `-${result}` : result;
+  } else if (absValue >= 1000) {
+    const result = `${(absValue / 1000).toFixed(0)}K`;
+    return isNegative ? `-${result}` : result;
+  }
+  return numValue.toFixed(0);
+};
+
+// X-axis tick formatter: only label the milestone days (1/5/10/15/20/25 + last).
+const formatXAxisLabel = (value, lastDay) => {
+  const day = parseInt(value, 10);
+  if (day === 1 || day === 5 || day === 10 || day === 15 ||
+    day === 20 || day === 25 || day === lastDay) {
+    return String(day);
+  }
+  return '';
+};
+
+// Pure builder for the balance-history chart. Returns the derived legend data
+// (`computed`), the Victory Native XL record array (`data`, xKey = day, one
+// numeric field per series) and the per-series descriptors (`series`). Kept as a
+// standalone export so the date-sensitive actual/forecast split and series
+// composition can be unit-tested without rendering the Skia canvas.
+export const computeBalanceChart = ({
+  balanceHistoryData,
+  spendingPrediction,
+  isCurrentMonth,
+  selectedYear,
+  selectedMonth,
+  primaryColor,
+}) => {
+  if (!balanceHistoryData.actual || balanceHistoryData.actual.length === 0) {
+    return { computed: null, data: [], series: [] };
+  }
+
+  const currentDay = new Date().getDate();
+
+  const calculateForecastData = () => {
+    if (!spendingPrediction || !isCurrentMonth) return [];
+    const actualPoints = (balanceHistoryData.actual || []).filter(p => p.x <= currentDay);
+    if (actualPoints.length === 0) return [];
+    const lastActualPoint = actualPoints[actualPoints.length - 1];
+    const predictions = [];
+    for (let day = currentDay; day <= spendingPrediction.daysInMonth; day++) {
+      const daysFromNow = day - currentDay;
+      const predictedBalance = lastActualPoint.y - (spendingPrediction.dailyAverage * daysFromNow);
+      predictions.push({ x: day, y: predictedBalance });
+    }
+    return predictions;
+  };
+
+  const forecastData = calculateForecastData();
+  const hasForecast = forecastData.length > 0;
+
+  const combinedActualForecast = balanceHistoryData.labels.map((day, index) => {
+    if (!isCurrentMonth || day <= currentDay) {
+      return balanceHistoryData.actualForChart[index];
+    } else if (hasForecast) {
+      const point = forecastData.find(p => p.x === day);
+      return point ? point.y : undefined;
+    }
+    return undefined;
+  });
+
+  const actualValues = balanceHistoryData.actualForChart.filter(v => v !== undefined);
+  const maxBalance = actualValues.length > 0 ? Math.max(...actualValues) : 0;
+  const daysInMonth = balanceHistoryData.labels[balanceHistoryData.labels.length - 1];
+
+  // Burndown ("plain avg") line starts from the month's spendable ceiling
+  // (day-1 balance + post-day-1 inflows − outgoing transfers), computed in the
+  // hook. Fall back to the peak-actual max when it's unavailable so older data /
+  // accounts younger than the month keep the previous behaviour.
+  const rawPlainAvgMax = balanceHistoryData.plainAvgMax;
+  const plainAvgMax = (rawPlainAvgMax != null && Number.isFinite(rawPlainAvgMax))
+    ? rawPlainAvgMax
+    : maxBalance;
+
+  const plainAvgData = balanceHistoryData.labels.map(day =>
+    plainAvgMax * (1 - (day - 1) / (daysInMonth - 1)),
+  );
+
+  const forecastValues = combinedActualForecast.filter(v => v !== undefined);
+  const prevMonthValues = (balanceHistoryData.prevMonth || []).filter(v => v !== undefined);
+  const allValues = [...actualValues, ...forecastValues, ...prevMonthValues, ...plainAvgData];
+  const maxValue = allValues.length > 0 ? Math.max(...allValues) : 0;
+  const minValue = allValues.length > 0 ? Math.min(...allValues) : 0;
+  const hasNegativeValues = minValue < 0;
+
+  const { max: niceMax, interval: niceInterval } = calculateNiceScale(maxValue);
+  const lastDay = balanceHistoryData.labels[balanceHistoryData.labels.length - 1];
+
+  // Legend table values
+  const now = new Date();
+  const isCurrentMonthLocal = selectedYear === now.getFullYear() && selectedMonth === now.getMonth();
+  const displayDay = isCurrentMonthLocal
+    ? now.getDate()
+    : (balanceHistoryData.labels && balanceHistoryData.labels.length > 0
+      ? balanceHistoryData.labels[balanceHistoryData.labels.length - 1]
+      : null);
+
+  const findActualAtDay = (day) => {
+    if (!day) return undefined;
+    const point = (balanceHistoryData.actual || []).find(p => p.x === day);
+    if (point) return point.y;
+    const prior = (balanceHistoryData.actual || []).filter(p => p.x <= day);
+    if (prior.length > 0) return prior[prior.length - 1].y;
+    return undefined;
+  };
+
+  const actualCurrent = findActualAtDay(displayDay);
+  const actualEnd = findActualAtDay(daysInMonth);
+
+  let actualDailyAvg = null;
+  if (spendingPrediction && isCurrentMonth) {
+    actualDailyAvg = -spendingPrediction.dailyAverage;
+  } else if (actualValues.length >= 1) {
+    const actualDataPoints = balanceHistoryData.actual || [];
+    if (actualDataPoints.length >= 2) {
+      const firstPoint = actualDataPoints[0];
+      const lastPoint = actualDataPoints[actualDataPoints.length - 1];
+      const daySpan = lastPoint.x - firstPoint.x;
+      actualDailyAvg = daySpan > 0 ? (lastPoint.y - firstPoint.y) / daySpan : 0;
+    } else {
+      actualDailyAvg = 0;
+    }
+  }
+
+  const plainAvgDaily = daysInMonth > 1 ? -plainAvgMax / (daysInMonth - 1) : 0;
+  const plainAvgCurrent = displayDay ? plainAvgMax * (1 - (displayDay - 1) / (daysInMonth - 1)) : null;
+
+  let forecastEnd = null;
+  let forecastDailyAvg = null;
+  const hasForecastData = spendingPrediction && isCurrentMonth;
+  if (hasForecastData && actualCurrent !== undefined) {
+    const daysRemaining = spendingPrediction.daysInMonth - now.getDate();
+    forecastEnd = actualCurrent - (spendingPrediction.dailyAverage * daysRemaining);
+    forecastDailyAvg = -spendingPrediction.dailyAverage;
+  }
+
+  const hasPrevMonthData = balanceHistoryData.prevMonth && balanceHistoryData.prevMonth.some(v => v !== undefined);
+  let prevMonthMax = null;
+  let prevMonthCurrent = null;
+  let prevMonthEnd = null;
+  let prevMonthDailyAvg = null;
+  if (hasPrevMonthData) {
+    const prevMonthAllValues = balanceHistoryData.prevMonth || [];
+    const prevMonthActualValues = prevMonthAllValues.filter(v => v !== undefined);
+    prevMonthMax = prevMonthActualValues.length > 0 ? Math.max(...prevMonthActualValues) : null;
+
+    const prevMonthAtDay = (day) => {
+      if (!day) return null;
+      const idx = Math.min(day - 1, prevMonthAllValues.length - 1);
+      for (let i = idx; i >= 0; i--) {
+        if (prevMonthAllValues[i] !== undefined) return prevMonthAllValues[i];
+      }
+      return null;
+    };
+
+    const prevMonthDaysCount = balanceHistoryData.prevMonthDaysCount || new Date(selectedYear, selectedMonth, 0).getDate();
+    prevMonthCurrent = prevMonthAtDay(displayDay);
+    prevMonthEnd = prevMonthAtDay(prevMonthDaysCount);
+
+    const prevTotalExpenses = balanceHistoryData.prevMonthTotalExpenses;
+    if (prevTotalExpenses != null && prevMonthDaysCount > 0) {
+      prevMonthDailyAvg = -parseFloat(prevTotalExpenses) / prevMonthDaysCount;
+    }
+  }
+
+  const computed = {
+    currentDay,
+    hasForecast,
+    forecastData,
+    combinedActualForecast,
+    actualValues,
+    maxBalance,
+    plainAvgMax,
+    daysInMonth,
+    plainAvgData,
+    hasNegativeValues,
+    niceMax,
+    niceInterval,
+    lastDay,
+    displayDay,
+    actualCurrent,
+    actualEnd,
+    actualDailyAvg,
+    plainAvgDaily,
+    plainAvgCurrent,
+    hasForecastData,
+    forecastEnd,
+    forecastDailyAvg,
+    hasPrevMonthData,
+    prevMonthMax,
+    prevMonthCurrent,
+    prevMonthEnd,
+    prevMonthDailyAvg,
+  };
+
+  // Victory Native XL consumes an array of records (xKey = day + one numeric
+  // field per series) instead of the legacy parallel { labels, datasets } shape.
+  // The actual line is split into a solid "actual" series (up to today) and a
+  // dashed "forecast" series (today onward), which makes the "today" boundary
+  // self-evident — replacing the old hand-drawn vertical decorator line.
+  const prevMonth = balanceHistoryData.prevMonth || [];
+  const showForecast = isCurrentMonth && hasForecast;
+  const data = balanceHistoryData.labels.map((day, i) => {
+    const raw = combinedActualForecast[i];
+    const value = raw === undefined ? null : raw;
+    const isForecastDay = showForecast && day > currentDay;
+    const isBoundaryDay = showForecast && day === currentDay;
+    return {
+      day,
+      actual: isForecastDay ? null : value,
+      // include the boundary day in the forecast series too so the segments touch
+      forecast: (isForecastDay || isBoundaryDay) ? value : null,
+      plainAvg: plainAvgData[i] ?? null,
+      prevMonth: prevMonth[i] ?? null,
+      zero: 0,
+    };
+  });
+
+  const series = [
+    { yKey: 'actual', color: primaryColor, strokeWidth: 3, curveType: 'monotoneX', dashed: false },
+  ];
+  if (showForecast) {
+    series.push({ yKey: 'forecast', color: primaryColor, strokeWidth: 2, curveType: 'monotoneX', dashed: true });
+  }
+  series.push({ yKey: 'plainAvg', color: 'rgba(128, 128, 128, 0.4)', strokeWidth: 2, curveType: 'linear', dashed: false });
+  if (hasPrevMonthData) {
+    series.push({ yKey: 'prevMonth', color: 'rgba(156, 39, 176, 0.5)', strokeWidth: 2, curveType: 'monotoneX', dashed: false });
+  }
+  series.push({ yKey: 'zero', color: 'rgba(128, 128, 128, 0.5)', strokeWidth: 1, curveType: 'linear', dashed: false });
+
+  return { computed, data, series };
 };
 
 const BalanceHistoryCard = ({
@@ -131,231 +362,39 @@ const BalanceHistoryCard = ({
     ? new Date(selectedYear, selectedMonth + 1, 0).getDate()
     : null;
 
-  const chartComputed = useMemo(() => {
-    if (!balanceHistoryData.actual || balanceHistoryData.actual.length === 0) {
+  const { computed: chartComputed, data: chartData, series: chartSeries } = useMemo(
+    () => computeBalanceChart({
+      balanceHistoryData,
+      spendingPrediction,
+      isCurrentMonth,
+      selectedYear,
+      selectedMonth,
+      primaryColor: colors.primary,
+    }),
+    [balanceHistoryData, spendingPrediction, isCurrentMonth, selectedYear, selectedMonth, colors.primary],
+  );
+
+  // yKeys drive Victory's shared y-domain (the always-present "zero" key keeps the
+  // baseline in range). Only the keys with a rendered <Line> are listed.
+  const chartYKeys = useMemo(() => chartSeries.map(s => s.yKey), [chartSeries]);
+
+  // Fixed [0, niceMax] domain unless the data dips negative (then let Victory
+  // auto-scale to include the negative portion), mirroring the old yDomain logic.
+  const yDomain = useMemo(() => {
+    if (!chartComputed) return undefined;
+    if (chartComputed.hasNegativeValues || !chartComputed.niceMax) return undefined;
+    return { y: [0, chartComputed.niceMax] };
+  }, [chartComputed]);
+
+  // System-font axis labels (the project ships no .ttf). Guarded because matchFont
+  // returns a stub under Jest and a real SkFont on device.
+  const axisFont = useMemo(() => {
+    try {
+      return matchFont({ fontFamily: 'sans-serif', fontSize: 11 }) || null;
+    } catch (e) {
       return null;
     }
-
-    const currentDay = new Date().getDate();
-
-    const calculateForecastData = () => {
-      if (!spendingPrediction || !isCurrentMonth) return [];
-      const actualPoints = (balanceHistoryData.actual || []).filter(p => p.x <= currentDay);
-      if (actualPoints.length === 0) return [];
-      const lastActualPoint = actualPoints[actualPoints.length - 1];
-      const predictions = [];
-      for (let day = currentDay; day <= spendingPrediction.daysInMonth; day++) {
-        const daysFromNow = day - currentDay;
-        const predictedBalance = lastActualPoint.y - (spendingPrediction.dailyAverage * daysFromNow);
-        predictions.push({ x: day, y: predictedBalance });
-      }
-      return predictions;
-    };
-
-    const forecastData = calculateForecastData();
-    const hasForecast = forecastData.length > 0;
-
-    const combinedActualForecast = balanceHistoryData.labels.map((day, index) => {
-      if (!isCurrentMonth || day <= currentDay) {
-        return balanceHistoryData.actualForChart[index];
-      } else if (hasForecast) {
-        const point = forecastData.find(p => p.x === day);
-        return point ? point.y : undefined;
-      }
-      return undefined;
-    });
-
-    const actualValues = balanceHistoryData.actualForChart.filter(v => v !== undefined);
-    const maxBalance = actualValues.length > 0 ? Math.max(...actualValues) : 0;
-    const daysInMonth = balanceHistoryData.labels[balanceHistoryData.labels.length - 1];
-
-    // Burndown ("plain avg") line starts from the month's spendable ceiling
-    // (day-1 balance + post-day-1 inflows − outgoing transfers), computed in the
-    // hook. Fall back to the peak-actual max when it's unavailable so older data /
-    // accounts younger than the month keep the previous behaviour.
-    const rawPlainAvgMax = balanceHistoryData.plainAvgMax;
-    const plainAvgMax = (rawPlainAvgMax != null && Number.isFinite(rawPlainAvgMax))
-      ? rawPlainAvgMax
-      : maxBalance;
-
-    const plainAvgData = balanceHistoryData.labels.map(day =>
-      plainAvgMax * (1 - (day - 1) / (daysInMonth - 1)),
-    );
-
-    const forecastValues = combinedActualForecast.filter(v => v !== undefined);
-    const prevMonthValues = (balanceHistoryData.prevMonth || []).filter(v => v !== undefined);
-    const allValues = [...actualValues, ...forecastValues, ...prevMonthValues, ...plainAvgData];
-    const maxValue = allValues.length > 0 ? Math.max(...allValues) : 0;
-    const minValue = allValues.length > 0 ? Math.min(...allValues) : 0;
-    const hasNegativeValues = minValue < 0;
-
-    const { max: niceMax, interval: niceInterval } = calculateNiceScale(maxValue);
-    const lastDay = balanceHistoryData.labels[balanceHistoryData.labels.length - 1];
-
-    // Legend table values
-    const now = new Date();
-    const isCurrentMonthLocal = selectedYear === now.getFullYear() && selectedMonth === now.getMonth();
-    const displayDay = isCurrentMonthLocal
-      ? now.getDate()
-      : (balanceHistoryData.labels && balanceHistoryData.labels.length > 0
-        ? balanceHistoryData.labels[balanceHistoryData.labels.length - 1]
-        : null);
-
-    const findActualAtDay = (day) => {
-      if (!day) return undefined;
-      const point = (balanceHistoryData.actual || []).find(p => p.x === day);
-      if (point) return point.y;
-      const prior = (balanceHistoryData.actual || []).filter(p => p.x <= day);
-      if (prior.length > 0) return prior[prior.length - 1].y;
-      return undefined;
-    };
-
-    const actualCurrent = findActualAtDay(displayDay);
-    const actualEnd = findActualAtDay(daysInMonth);
-
-    let actualDailyAvg = null;
-    if (spendingPrediction && isCurrentMonth) {
-      actualDailyAvg = -spendingPrediction.dailyAverage;
-    } else if (actualValues.length >= 1) {
-      const actualDataPoints = balanceHistoryData.actual || [];
-      if (actualDataPoints.length >= 2) {
-        const firstPoint = actualDataPoints[0];
-        const lastPoint = actualDataPoints[actualDataPoints.length - 1];
-        const daySpan = lastPoint.x - firstPoint.x;
-        actualDailyAvg = daySpan > 0 ? (lastPoint.y - firstPoint.y) / daySpan : 0;
-      } else {
-        actualDailyAvg = 0;
-      }
-    }
-
-    const plainAvgDaily = daysInMonth > 1 ? -plainAvgMax / (daysInMonth - 1) : 0;
-    const plainAvgCurrent = displayDay ? plainAvgMax * (1 - (displayDay - 1) / (daysInMonth - 1)) : null;
-
-    let forecastEnd = null;
-    let forecastDailyAvg = null;
-    const hasForecastData = spendingPrediction && isCurrentMonth;
-    if (hasForecastData && actualCurrent !== undefined) {
-      const daysRemaining = spendingPrediction.daysInMonth - now.getDate();
-      forecastEnd = actualCurrent - (spendingPrediction.dailyAverage * daysRemaining);
-      forecastDailyAvg = -spendingPrediction.dailyAverage;
-    }
-
-    const hasPrevMonthData = balanceHistoryData.prevMonth && balanceHistoryData.prevMonth.some(v => v !== undefined);
-    let prevMonthMax = null;
-    let prevMonthCurrent = null;
-    let prevMonthEnd = null;
-    let prevMonthDailyAvg = null;
-    if (hasPrevMonthData) {
-      const prevMonthAllValues = balanceHistoryData.prevMonth || [];
-      const prevMonthActualValues = prevMonthAllValues.filter(v => v !== undefined);
-      prevMonthMax = prevMonthActualValues.length > 0 ? Math.max(...prevMonthActualValues) : null;
-
-      const prevMonthAtDay = (day) => {
-        if (!day) return null;
-        const idx = Math.min(day - 1, prevMonthAllValues.length - 1);
-        for (let i = idx; i >= 0; i--) {
-          if (prevMonthAllValues[i] !== undefined) return prevMonthAllValues[i];
-        }
-        return null;
-      };
-
-      const prevMonthDaysCount = balanceHistoryData.prevMonthDaysCount || new Date(selectedYear, selectedMonth, 0).getDate();
-      prevMonthCurrent = prevMonthAtDay(displayDay);
-      prevMonthEnd = prevMonthAtDay(prevMonthDaysCount);
-
-      const prevTotalExpenses = balanceHistoryData.prevMonthTotalExpenses;
-      if (prevTotalExpenses != null && prevMonthDaysCount > 0) {
-        prevMonthDailyAvg = -parseFloat(prevTotalExpenses) / prevMonthDaysCount;
-      }
-    }
-
-    return {
-      currentDay,
-      hasForecast,
-      forecastData,
-      combinedActualForecast,
-      actualValues,
-      maxBalance,
-      plainAvgMax,
-      daysInMonth,
-      plainAvgData,
-      hasNegativeValues,
-      niceMax,
-      niceInterval,
-      lastDay,
-      displayDay,
-      actualCurrent,
-      actualEnd,
-      actualDailyAvg,
-      plainAvgDaily,
-      plainAvgCurrent,
-      hasForecastData,
-      forecastEnd,
-      forecastDailyAvg,
-      hasPrevMonthData,
-      prevMonthMax,
-      prevMonthCurrent,
-      prevMonthEnd,
-      prevMonthDailyAvg,
-    };
-  }, [balanceHistoryData, spendingPrediction, isCurrentMonth, selectedYear, selectedMonth, selectedAccount]);
-
-  // v2 LineChart consumes an array of records (xKey + per-series yKeys) instead of
-  // the legacy parallel { labels, datasets } shape. The actual line is split into a
-  // solid "actual" series (up to today) and a dashed "forecast" series (today onward),
-  // which makes the "today" boundary self-evident — replacing the old hand-drawn
-  // vertical decorator line and its hardcoded chart geometry.
-  const chartData = useMemo(() => {
-    if (!chartComputed) return [];
-    const { combinedActualForecast, plainAvgData, currentDay, hasForecast } = chartComputed;
-    const prevMonth = balanceHistoryData.prevMonth || [];
-    const showForecast = isCurrentMonth && hasForecast;
-    return balanceHistoryData.labels.map((day, i) => {
-      const raw = combinedActualForecast[i];
-      const value = raw === undefined ? null : raw;
-      const isForecastDay = showForecast && day > currentDay;
-      const isBoundaryDay = showForecast && day === currentDay;
-      return {
-        day: String(day),
-        actual: isForecastDay ? null : value,
-        // include the boundary day in the forecast series too so the segments touch
-        forecast: (isForecastDay || isBoundaryDay) ? value : null,
-        plainAvg: plainAvgData[i] ?? null,
-        prevMonth: prevMonth[i] ?? null,
-        zero: 0,
-      };
-    });
-  }, [chartComputed, balanceHistoryData, isCurrentMonth]);
-
-  const chartSeries = useMemo(() => {
-    if (!chartComputed) return [];
-    const series = [
-      { yKey: 'actual', label: 'actual', color: colors.primary, strokeWidth: 3, dot: { radius: 2 } },
-    ];
-    if (isCurrentMonth && chartComputed.hasForecast) {
-      series.push({ yKey: 'forecast', label: 'forecast', color: colors.primary, strokeWidth: 3, strokeDasharray: [5, 5], dot: false });
-    }
-    series.push({ yKey: 'plainAvg', label: 'plainAvg', color: 'rgba(128, 128, 128, 0.4)', strokeWidth: 2, dot: false });
-    if (chartComputed.hasPrevMonthData) {
-      series.push({ yKey: 'prevMonth', label: 'prevMonth', color: 'rgba(156, 39, 176, 0.5)', strokeWidth: 2, dot: false });
-    }
-    series.push({ yKey: 'zero', label: 'zero', color: 'rgba(128, 128, 128, 0.5)', strokeWidth: 1, dot: false });
-    return series;
-  }, [chartComputed, colors.primary, isCurrentMonth]);
-
-  const chartTheme = useMemo(() => ({
-    background: colors.altRow,
-    plotBackground: colors.altRow,
-    grid: colors.border,
-    axis: colors.mutedText,
-    text: colors.mutedText,
-    tooltip: {
-      background: colors.surface,
-      border: colors.border,
-      text: colors.text,
-      mutedText: colors.mutedText,
-    },
-  }), [colors.altRow, colors.border, colors.mutedText, colors.surface, colors.text]);
+  }, []);
 
   return (
     <View style={[styles.balanceHistoryCard, { backgroundColor: colors.surface, borderColor: colors.border }]}>
@@ -434,51 +473,49 @@ const BalanceHistoryCard = ({
             </View>
           ) : (
             <View onLayout={(e) => setContentHeight(e.nativeEvent.layout.height)}>
-              <View
-                style={styles.balanceHistoryChartContainer}
-              >
+              <View style={styles.balanceHistoryChartContainer}>
                 {chartComputed && (
-                  <LineChart
-                    data={chartData}
-                    xKey="day"
-                    series={chartSeries}
-                    width={screenWidth - 33}
-                    height={220}
-                    theme={chartTheme}
-                    curve="monotone"
-                    connectNulls
-                    yDomain={chartComputed.hasNegativeValues || !chartComputed.niceMax ? 'auto' : [0, chartComputed.niceMax]}
-                    formatYLabel={hideBalances ? () => '' : (value) => {
-                      const numValue = parseFloat(value);
-                      if (numValue === 0) return '';
-                      const absValue = Math.abs(numValue);
-                      const isNegative = numValue < 0;
-
-                      if (absValue >= 1000000) {
-                        const result = `${(absValue / 1000000).toFixed(0)}M`;
-                        return isNegative ? `-${result}` : result;
-                      } else if (absValue >= 1000) {
-                        const result = `${(absValue / 1000).toFixed(0)}K`;
-                        return isNegative ? `-${result}` : result;
-                      }
-                      return numValue.toFixed(0);
-                    }}
-                    formatXLabel={(value) => {
-                      const day = parseInt(value);
-                      if (day === 1 || day === 5 || day === 10 || day === 15 ||
-                      day === 20 || day === 25 || day === chartComputed.lastDay) {
-                        return value;
-                      }
-                      return '';
-                    }}
-                    showHorizontalGridLines
-                    showVerticalGridLines={false}
-                    legend={false}
-                    crosshair
-                    tooltip={!hideBalances}
+                  <View
+                    style={[styles.balanceHistoryChart, { backgroundColor: colors.altRow }]}
+                    accessibilityRole="image"
                     accessibilityLabel={t('balance_history') || 'Balance history chart'}
-                    style={styles.lineChartStyle}
-                  />
+                  >
+                    <CartesianChart
+                      data={chartData}
+                      xKey="day"
+                      yKeys={chartYKeys}
+                      domain={yDomain}
+                      domainPadding={{ top: 16, bottom: 16 }}
+                      axisOptions={{
+                        font: axisFont,
+                        lineColor: colors.border,
+                        labelColor: colors.mutedText,
+                        formatYLabel: (value) => formatYAxisLabel(value, hideBalances),
+                        formatXLabel: (value) => formatXAxisLabel(value, chartComputed.lastDay),
+                      }}
+                    >
+                      {({ points }) => (
+                        <>
+                          {chartSeries.map((s) => (
+                            <Line
+                              key={s.yKey}
+                              points={points[s.yKey]}
+                              color={s.color}
+                              strokeWidth={s.strokeWidth}
+                              curveType={s.curveType}
+                              connectMissingData
+                            >
+                              {/* DashPathEffect is a Skia paint child; guarded so the
+                                  system stays robust if the effect is unavailable. */}
+                              {s.dashed && DashPathEffect ? (
+                                <DashPathEffect intervals={[6, 6]} />
+                              ) : null}
+                            </Line>
+                          ))}
+                        </>
+                      )}
+                    </CartesianChart>
+                  </View>
                 )}
               </View>
 
@@ -625,6 +662,9 @@ const styles = StyleSheet.create({
     overflow: 'hidden',
     padding: 16,
   },
+  balanceHistoryChart: {
+    height: 220,
+  },
   balanceHistoryChartContainer: {
     marginHorizontal: -16,
   },
@@ -708,9 +748,6 @@ const styles = StyleSheet.create({
     flex: 1,
     fontSize: 12,
     textAlign: 'right',
-  },
-  lineChartStyle: {
-    borderRadius: 8,
   },
 });
 

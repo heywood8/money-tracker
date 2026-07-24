@@ -1,77 +1,80 @@
 import React, { useMemo } from 'react';
 import { View, StyleSheet } from 'react-native';
-import Svg, { Circle } from 'react-native-svg';
+import { Pie, PolarChart } from 'victory-native';
 import Icon from '@expo/vector-icons/MaterialCommunityIcons';
 import PropTypes from 'prop-types';
 
-export const SVG_SIZE = 140;
-export const RADIUS = 48;
-export const STROKE_WIDTH = 26;
-export const CENTER = SVG_SIZE / 2;
-export const CIRCUMFERENCE = 2 * Math.PI * RADIUS;
-export const ICON_THRESHOLD = 0.10;
+// Victory Native fills its container, so the container size doubles as the
+// donut diameter and as the coordinate space for the icon overlay below.
+export const CHART_SIZE = 140;
+export const CENTER = CHART_SIZE / 2;
+// Donut hole as a fraction of the outer radius. Mirrors the old hand-rolled
+// ring (inner edge 35 / outer edge 61 ≈ 0.57) closely enough to read the same.
+export const INNER_RADIUS_RATIO = 0.6;
+export const INNER_RADIUS = `${INNER_RADIUS_RATIO * 100}%`;
+// Icons sit on the middle of the donut band.
+export const ICON_RADIUS = CENTER * ((1 + INNER_RADIUS_RATIO) / 2);
+export const ICON_THRESHOLD = 0.1;
 export const ICON_SIZE = 14;
 
-export const computeSegments = (data) => {
+// Map the shared slice shape ({ amount, color, icon }) onto the keys Victory
+// Native's Pie expects. `label` only needs to be unique per slice — the legend
+// renders category names itself — so we derive it from the icon + index.
+export const mapPieData = (data) =>
+  data.map((item, index) => ({
+    label: `${item.icon ?? 'slice'}-${index}`,
+    value: item.amount,
+    color: item.color,
+  }));
+
+// Victory Native draws pie slices starting at 12 o'clock and sweeping clockwise
+// (d3-shape convention). We mirror that here to lay MaterialCommunityIcons
+// glyphs over each slice, since VN has no vector-icon slice label.
+export const computeIconMarkers = (data) => {
   const total = data.reduce((sum, item) => sum + item.amount, 0);
   if (total === 0) return [];
 
   let cumulative = 0;
   return data.map((item) => {
     const fraction = item.amount / total;
-    const arcLength = fraction * CIRCUMFERENCE;
-    const midAngle = (cumulative + arcLength / 2) / RADIUS;
-    const seg = {
+    const midAngle = (cumulative + fraction / 2) * 2 * Math.PI;
+    const marker = {
       color: item.color,
       icon: item.icon,
-      arcLength,
-      dashOffset: cumulative === 0 ? 0 : -cumulative,
       showIcon: fraction >= ICON_THRESHOLD && !!item.icon,
-      iconX: CENTER + RADIUS * Math.sin(midAngle),
-      iconY: CENTER - RADIUS * Math.cos(midAngle),
+      x: CENTER + ICON_RADIUS * Math.sin(midAngle),
+      y: CENTER - ICON_RADIUS * Math.cos(midAngle),
     };
-    cumulative += arcLength;
-    return seg;
+    cumulative += fraction;
+    return marker;
   });
 };
 
 const DonutChart = ({ data }) => {
-  const segments = useMemo(() => computeSegments(data), [data]);
+  const pieData = useMemo(() => mapPieData(data), [data]);
+  const markers = useMemo(() => computeIconMarkers(data), [data]);
 
   return (
-    <View testID="donut-chart" style={styles.container}>
-      <Svg width={SVG_SIZE} height={SVG_SIZE}>
-        {segments.map((seg, i) => (
-          <Circle
-            key={i}
-            cx={CENTER}
-            cy={CENTER}
-            r={RADIUS}
-            fill="none"
-            stroke={seg.color}
-            strokeWidth={STROKE_WIDTH}
-            strokeDasharray={`${seg.arcLength} ${CIRCUMFERENCE - seg.arcLength}`}
-            strokeDashoffset={seg.dashOffset}
-            rotation={-90}
-            origin={`${CENTER}, ${CENTER}`}
-          />
-        ))}
-      </Svg>
-      {segments
-        .filter((seg) => seg.showIcon)
-        .map((seg, i) => (
+    <View testID="donut-chart" style={styles.container} accessibilityRole="image">
+      <PolarChart data={pieData} labelKey="label" valueKey="value" colorKey="color">
+        <Pie.Chart innerRadius={INNER_RADIUS} />
+      </PolarChart>
+      {markers
+        .filter((marker) => marker.showIcon)
+        .map((marker, i) => (
           <View
             key={i}
-            testID={`icon-${seg.icon}`}
+            testID={`icon-${marker.icon}`}
+            pointerEvents="none"
             style={[
               styles.iconWrapper,
               {
-                left: seg.iconX - ICON_SIZE / 2,
-                top: seg.iconY - ICON_SIZE / 2,
+                left: marker.x - ICON_SIZE / 2,
+                top: marker.y - ICON_SIZE / 2,
               },
             ]}
           >
-            <Icon name={seg.icon} size={ICON_SIZE} color="#fff" />
+            <Icon name={marker.icon} size={ICON_SIZE} color="#fff" />
           </View>
         ))}
     </View>
@@ -90,8 +93,8 @@ DonutChart.propTypes = {
 
 const styles = StyleSheet.create({
   container: {
-    height: SVG_SIZE,
-    width: SVG_SIZE,
+    height: CHART_SIZE,
+    width: CHART_SIZE,
   },
   iconWrapper: {
     position: 'absolute',

@@ -1,7 +1,7 @@
 import React, { useMemo, useState, useCallback } from 'react';
 import { View, Text, StyleSheet, ActivityIndicator, Dimensions, TouchableOpacity, Modal, ScrollView } from 'react-native';
 import PropTypes from 'prop-types';
-import Svg, { Line, Rect, Text as SvgText, Path } from 'react-native-svg';
+import { CartesianChart, Bar } from 'victory-native';
 import Icon from '@expo/vector-icons/MaterialCommunityIcons';
 import currencies from '../../../assets/currencies.json';
 import useCategoryMonthlySpending from '../../hooks/useCategoryMonthlySpending';
@@ -22,6 +22,8 @@ const BAR_HEIGHT = 90;
 const LABEL_HEIGHT = 18;
 const TOP_PADDING = 8;
 const Y_AXIS_WIDTH = 32;
+const CHART_HEIGHT = TOP_PADDING + BAR_HEIGHT;
+const CORNER = 4;
 const VS_COLOR = '#FF7043';
 
 const formatYTick = (value) => {
@@ -32,312 +34,237 @@ const formatYTick = (value) => {
 
 const formatPctTick = (value) => value + '%';
 
-const BarChart = ({ data, vsData, monthAbbreviations, colors, width, selectedIndex, onBarPress }) => {
-  const hasVs = vsData != null && vsData.length === data.length;
-  const max = Math.max(
-    ...data.map(d => d.total),
-    ...(hasVs ? vsData.map(d => d.total) : []),
-    1,
-  );
+// "Nice" y-axis step so ticks land on round numbers.
+const niceStepFor = (max) => {
+  const raw = max / 5;
+  const mag = Math.pow(10, Math.floor(Math.log10(raw)));
+  const normalized = raw / mag;
+  let nice;
+  if (normalized < 1.5) nice = 1;
+  else if (normalized < 3.5) nice = 2;
+  else if (normalized < 7.5) nice = 5;
+  else nice = 10;
+  return nice * mag;
+};
+
+/**
+ * Category-spending bar chart backed by Victory Native XL.
+ *
+ * Three layouts, all driven by the same <CartesianChart>/<Bar> primitives:
+ *  - single:  one series, selected bar highlighted in `primary`, rest dimmed `mutedText`
+ *  - grouped: primary (wide) + vs (narrow) bars overlaid per month for comparison
+ *  - stacked: `vs` full-height behind + `primary` bottom portion in front → 100%-normalized stack
+ *
+ * Axis labels, month ticks, the selection reference line and bar-press hit areas are
+ * rendered as React Native views (not Skia) so they stay themeable, queryable and font-free.
+ */
+const SpendingBarChart = ({
+  data,
+  vsData,
+  stacked,
+  monthAbbreviations,
+  colors,
+  width,
+  selectedIndex,
+  onBarPress,
+}) => {
   const count = data.length;
+  const hasVs = vsData != null && vsData.length === count;
+  const isStacked = stacked && hasVs;
   const chartW = width - Y_AXIS_WIDTH;
-  const slotW = chartW / count;
-  const totalHeight = TOP_PADDING + BAR_HEIGHT + LABEL_HEIGHT;
 
-  const niceStep = (() => {
-    const raw = max / 5;
-    const mag = Math.pow(10, Math.floor(Math.log10(raw)));
-    const normalized = raw / mag;
-    let nice;
-    if (normalized < 1.5) nice = 1;
-    else if (normalized < 3.5) nice = 2;
-    else if (normalized < 7.5) nice = 5;
-    else nice = 10;
-    return nice * mag;
-  })();
+  const { axisMax, yTicks } = useMemo(() => {
+    if (isStacked) {
+      return {
+        axisMax: 100,
+        yTicks: [0, 25, 50, 75, 100].map((v) => ({
+          value: v,
+          label: formatPctTick(v),
+          y: TOP_PADDING + BAR_HEIGHT - (v / 100) * BAR_HEIGHT,
+        })),
+      };
+    }
+    const max = Math.max(
+      ...data.map((d) => d.total),
+      ...(hasVs ? vsData.map((d) => d.total) : []),
+      1,
+    );
+    const step = niceStepFor(max);
+    const aMax = Math.ceil(max / step) * step;
+    const tickCount = Math.round(aMax / step);
+    return {
+      axisMax: aMax,
+      yTicks: Array.from({ length: tickCount + 1 }, (_, i) => ({
+        value: step * i,
+        label: formatYTick(step * i),
+        y: TOP_PADDING + BAR_HEIGHT - ((step * i) / aMax) * BAR_HEIGHT,
+      })),
+    };
+  }, [isStacked, data, vsData, hasVs]);
 
-  const axisMax = Math.ceil(max / niceStep) * niceStep;
-  const tickCount = Math.round(axisMax / niceStep);
-
-  const yTicks = Array.from({ length: tickCount + 1 }, (_, i) => ({
-    value: niceStep * i,
-    y: TOP_PADDING + BAR_HEIGHT - (niceStep * i / axisMax) * BAR_HEIGHT,
-  }));
-
-  // Single bar dimensions (original layout)
-  const singleBarW = slotW * 0.55;
-  const singleGap = slotW * 0.45;
-
-  // Dual bar dimensions
-  const dualGapBetween = Math.max(slotW * 0.04, 1);
-  const dualOuterPad = slotW * 0.07;
-  const dualBarW = (slotW - 2 * dualOuterPad - dualGapBetween) / 2;
-
-  return (
-    <Svg width={width} height={totalHeight} style={styles.barChartSvg}>
-      {/* Y axis ticks */}
-      {yTicks.map(({ value, y }) => (
-        <SvgText
-          key={value}
-          x={Y_AXIS_WIDTH - 4}
-          y={y + 3.5}
-          fontSize={8}
-          fontFamily="Inter"
-          fill={colors.mutedText}
-          textAnchor="end"
-          opacity={0.7}
-        >
-          {formatYTick(value)}
-        </SvgText>
-      ))}
-
-      {/* Selected bar dotted reference line (primary category) */}
-      {selectedIndex !== null && selectedIndex !== undefined && data[selectedIndex] && (() => {
-        const selH = Math.max((data[selectedIndex].total / axisMax) * BAR_HEIGHT, data[selectedIndex].total > 0 ? 2 : 0);
-        const lineY = TOP_PADDING + BAR_HEIGHT - selH;
-        return (
-          <Line
-            x1={Y_AXIS_WIDTH}
-            y1={lineY}
-            x2={width}
-            y2={lineY}
-            stroke={colors.primary}
-            strokeWidth={2}
-            strokeDasharray="5,3"
-            opacity={0.9}
-          />
-        );
-      })()}
-
-      {/* Bars */}
-      {data.map((d, i) => {
-        const isSelected = i === selectedIndex;
-        const label = monthAbbreviations[d.month];
-
-        if (hasVs) {
-          const vsD = vsData[i];
-          const h1 = Math.max((d.total / axisMax) * BAR_HEIGHT, d.total > 0 ? 2 : 0);
-          const h2 = Math.max((vsD.total / axisMax) * BAR_HEIGHT, vsD.total > 0 ? 2 : 0);
-          const bar1X = Y_AXIS_WIDTH + i * slotW + dualOuterPad;
-          const bar2X = bar1X + dualBarW + dualGapBetween;
-          const y1 = TOP_PADDING + BAR_HEIGHT - h1;
-          const y2 = TOP_PADDING + BAR_HEIGHT - h2;
-
-          return (
-            <React.Fragment key={i}>
-              {/* Full-slot transparent hit area */}
-              <Rect
-                x={Y_AXIS_WIDTH + i * slotW}
-                y={TOP_PADDING}
-                width={slotW}
-                height={BAR_HEIGHT}
-                fill="transparent"
-                onPress={() => onBarPress(i)}
-              />
-              {/* Primary bar */}
-              <Rect
-                x={bar1X}
-                y={y1}
-                width={dualBarW}
-                height={h1}
-                rx={2}
-                fill={colors.primary}
-                fillOpacity={isSelected ? 1 : 0.3}
-                onPress={() => onBarPress(i)}
-              />
-              {/* VS bar */}
-              <Rect
-                x={bar2X}
-                y={y2}
-                width={dualBarW}
-                height={h2}
-                rx={2}
-                fill={VS_COLOR}
-                fillOpacity={isSelected ? 1 : 0.3}
-                onPress={() => onBarPress(i)}
-              />
-              {/* Month label centered in slot */}
-              <SvgText
-                x={Y_AXIS_WIDTH + i * slotW + slotW / 2}
-                y={TOP_PADDING + BAR_HEIGHT + 13}
-                fontSize={9.5}
-                fontFamily="Inter"
-                fill={colors.mutedText}
-                textAnchor="middle"
-              >
-                {label}
-              </SvgText>
-            </React.Fragment>
-          );
-        }
-
-        // Single bar (original layout)
-        const h = Math.max((d.total / axisMax) * BAR_HEIGHT, d.total > 0 ? 2 : 0);
-        const x = Y_AXIS_WIDTH + i * slotW + singleGap / 2;
-        const y = TOP_PADDING + BAR_HEIGHT - h;
-        return (
-          <React.Fragment key={i}>
-            <Rect
-              x={x}
-              y={TOP_PADDING}
-              width={singleBarW}
-              height={BAR_HEIGHT}
-              fill="transparent"
-              onPress={() => onBarPress(i)}
-            />
-            <Rect
-              x={x}
-              y={y}
-              width={singleBarW}
-              height={h}
-              rx={3}
-              fill={isSelected ? colors.primary : colors.mutedText}
-              fillOpacity={isSelected ? 1 : 0.3}
-              onPress={() => onBarPress(i)}
-            />
-            <SvgText
-              x={x + singleBarW / 2}
-              y={TOP_PADDING + BAR_HEIGHT + 13}
-              fontSize={9.5}
-              fontFamily="Inter"
-              fill={colors.mutedText}
-              textAnchor="middle"
-            >
-              {label}
-            </SvgText>
-          </React.Fragment>
-        );
-      })}
-    </Svg>
-  );
-};
-
-// Build an SVG path for a rect with rounded top corners only
-const roundedTopPath = (x, y, w, h, r) => {
-  const cr = Math.min(r, w / 2, Math.max(h, 0));
-  return `M ${x + cr},${y} L ${x + w - cr},${y} Q ${x + w},${y} ${x + w},${y + cr} L ${x + w},${y + h} L ${x},${y + h} L ${x},${y + cr} Q ${x},${y} ${x + cr},${y} Z`;
-};
-
-// Build an SVG path for a rect with rounded bottom corners only
-const roundedBottomPath = (x, y, w, h, r) => {
-  const cr = Math.min(r, w / 2, Math.max(h, 0));
-  return `M ${x},${y} L ${x + w},${y} L ${x + w},${y + h - cr} Q ${x + w},${y + h} ${x + w - cr},${y + h} L ${x + cr},${y + h} Q ${x},${y + h} ${x},${y + h - cr} Z`;
-};
-
-const StackedBarChart = ({ data, vsData, monthAbbreviations, colors, width, selectedIndex, onBarPress }) => {
-  const count = data.length;
-  const chartW = width - Y_AXIS_WIDTH;
-  const slotW = chartW / count;
-  const totalHeight = TOP_PADDING + BAR_HEIGHT + LABEL_HEIGHT;
-  const barW = slotW * 0.6;
-  const barPad = (slotW - barW) / 2;
-  const RADIUS = 3;
-
-  const yTicks = [0, 25, 50, 75, 100].map(pct => ({
-    value: pct,
-    y: TOP_PADDING + BAR_HEIGHT - (pct / 100) * BAR_HEIGHT,
-  }));
-
-  return (
-    <Svg width={width} height={totalHeight} style={styles.barChartSvg}>
-      {yTicks.map(({ value, y }) => (
-        <SvgText
-          key={value}
-          x={Y_AXIS_WIDTH - 4}
-          y={y + 3.5}
-          fontSize={8}
-          fontFamily="Inter"
-          fill={colors.mutedText}
-          textAnchor="end"
-          opacity={0.7}
-        >
-          {formatPctTick(value)}
-        </SvgText>
-      ))}
-
-      {data.map((d, i) => {
+  // Per-month field bundle consumed by Victory Native. Every series we draw must be a
+  // field here AND listed in yKeys, otherwise VN never computes points for it.
+  const chartData = useMemo(() => {
+    return data.map((d, i) => {
+      const isSel = i === selectedIndex;
+      if (isStacked) {
         const vsD = vsData[i];
         const totalAmt = d.total + vsD.total;
-        const isSelected = i === selectedIndex;
-        const label = monthAbbreviations[d.month];
-        const barX = Y_AXIS_WIDTH + i * slotW + barPad;
-        const opacity = isSelected ? 1 : 0.3;
+        const primaryPct = totalAmt > 0 ? (d.total / totalAmt) * 100 : 0;
+        // `back` (vs) is full height and sits behind; `front` (primary) covers the
+        // bottom portion, so the exposed top slice reads as the vs share.
+        const back = totalAmt > 0 ? 100 : 0;
+        const front = totalAmt > 0 ? primaryPct : 0;
+        return {
+          x: i,
+          track: totalAmt > 0 ? 0 : 100,
+          back,
+          front,
+          backSel: isSel ? back : 0,
+          frontSel: isSel ? front : 0,
+        };
+      }
+      if (hasVs) {
+        const vsD = vsData[i];
+        return {
+          x: i,
+          primary: d.total,
+          primarySel: isSel ? d.total : 0,
+          vs: vsD.total,
+          vsSel: isSel ? vsD.total : 0,
+        };
+      }
+      return {
+        x: i,
+        amount: d.total,
+        amountSel: isSel ? d.total : 0,
+      };
+    });
+  }, [data, vsData, hasVs, isStacked, selectedIndex]);
 
-        let vsH = 0;
-        let primaryH = 0;
-        if (totalAmt > 0) {
-          vsH = (vsD.total / totalAmt) * BAR_HEIGHT;
-          primaryH = BAR_HEIGHT - vsH;
-        }
+  const yKeys = useMemo(() => {
+    if (isStacked) return ['track', 'back', 'front', 'backSel', 'frontSel'];
+    if (hasVs) return ['primary', 'primarySel', 'vs', 'vsSel'];
+    return ['amount', 'amountSel'];
+  }, [isStacked, hasVs]);
 
+  const domain = useMemo(() => ({ y: [0, axisMax] }), [axisMax]);
+
+  // Dotted reference line at the selected bar's top (single/grouped only, matching the
+  // original which omitted it in stacked mode).
+  const selLineTop = useMemo(() => {
+    if (isStacked) return null;
+    if (selectedIndex == null || !data[selectedIndex]) return null;
+    const sel = data[selectedIndex];
+    const h = Math.max((sel.total / axisMax) * BAR_HEIGHT, sel.total > 0 ? 2 : 0);
+    return TOP_PADDING + BAR_HEIGHT - h;
+  }, [isStacked, selectedIndex, data, axisMax]);
+
+  const renderBars = useCallback(
+    ({ points, chartBounds }) => {
+      const slot = (chartBounds.right - chartBounds.left) / Math.max(count, 1);
+      const wideW = slot * 0.5;
+      const narrowW = slot * 0.28;
+
+      if (isStacked) {
+        const barW = slot * 0.6;
         return (
-          <React.Fragment key={i}>
-            <Rect
-              x={Y_AXIS_WIDTH + i * slotW}
-              y={TOP_PADDING}
-              width={slotW}
-              height={BAR_HEIGHT}
-              fill="transparent"
-              onPress={() => onBarPress(i)}
-            />
-            {totalAmt === 0 ? (
-              <Rect
-                x={barX}
-                y={TOP_PADDING}
-                width={barW}
-                height={BAR_HEIGHT}
-                rx={RADIUS}
-                fill={colors.mutedText}
-                fillOpacity={0.12}
-              />
-            ) : vsH === 0 ? (
-              <Rect
-                x={barX}
-                y={TOP_PADDING}
-                width={barW}
-                height={BAR_HEIGHT}
-                rx={RADIUS}
-                fill={colors.primary}
-                fillOpacity={opacity}
-              />
-            ) : primaryH === 0 ? (
-              <Rect
-                x={barX}
-                y={TOP_PADDING}
-                width={barW}
-                height={BAR_HEIGHT}
-                rx={RADIUS}
-                fill={VS_COLOR}
-                fillOpacity={opacity}
-              />
-            ) : (
-              <>
-                <Path
-                  d={roundedTopPath(barX, TOP_PADDING, barW, vsH, RADIUS)}
-                  fill={VS_COLOR}
-                  fillOpacity={opacity}
-                />
-                <Path
-                  d={roundedBottomPath(barX, TOP_PADDING + vsH, barW, primaryH, RADIUS)}
-                  fill={colors.primary}
-                  fillOpacity={opacity}
-                />
-              </>
-            )}
-            <SvgText
-              x={Y_AXIS_WIDTH + i * slotW + slotW / 2}
-              y={TOP_PADDING + BAR_HEIGHT + 13}
-              fontSize={9.5}
-              fontFamily="Inter"
-              fill={colors.mutedText}
-              textAnchor="middle"
-            >
-              {label}
-            </SvgText>
-          </React.Fragment>
+          <>
+            <Bar points={points.track} chartBounds={chartBounds} color={colors.mutedText} opacity={0.12} barWidth={barW} roundedCorners={{ topLeft: CORNER, topRight: CORNER }} />
+            <Bar points={points.back} chartBounds={chartBounds} color={VS_COLOR} opacity={0.3} barWidth={barW} roundedCorners={{ topLeft: CORNER, topRight: CORNER }} />
+            <Bar points={points.front} chartBounds={chartBounds} color={colors.primary} opacity={0.3} barWidth={barW} roundedCorners={{ bottomLeft: CORNER, bottomRight: CORNER }} />
+            <Bar points={points.backSel} chartBounds={chartBounds} color={VS_COLOR} opacity={1} barWidth={barW} roundedCorners={{ topLeft: CORNER, topRight: CORNER }} />
+            <Bar points={points.frontSel} chartBounds={chartBounds} color={colors.primary} opacity={1} barWidth={barW} roundedCorners={{ bottomLeft: CORNER, bottomRight: CORNER }} />
+          </>
         );
-      })}
-    </Svg>
+      }
+
+      if (hasVs) {
+        return (
+          <>
+            <Bar points={points.primary} chartBounds={chartBounds} color={colors.primary} opacity={0.3} barWidth={wideW} roundedCorners={{ topLeft: CORNER, topRight: CORNER }} />
+            <Bar points={points.primarySel} chartBounds={chartBounds} color={colors.primary} opacity={1} barWidth={wideW} roundedCorners={{ topLeft: CORNER, topRight: CORNER }} />
+            <Bar points={points.vs} chartBounds={chartBounds} color={VS_COLOR} opacity={0.3} barWidth={narrowW} roundedCorners={{ topLeft: CORNER, topRight: CORNER }} />
+            <Bar points={points.vsSel} chartBounds={chartBounds} color={VS_COLOR} opacity={1} barWidth={narrowW} roundedCorners={{ topLeft: CORNER, topRight: CORNER }} />
+          </>
+        );
+      }
+
+      return (
+        <>
+          <Bar points={points.amount} chartBounds={chartBounds} color={colors.mutedText} opacity={0.3} barWidth={wideW} roundedCorners={{ topLeft: CORNER, topRight: CORNER }} />
+          <Bar points={points.amountSel} chartBounds={chartBounds} color={colors.primary} opacity={1} barWidth={wideW} roundedCorners={{ topLeft: CORNER, topRight: CORNER }} />
+        </>
+      );
+    },
+    [isStacked, hasVs, colors.primary, colors.mutedText, count],
+  );
+
+  return (
+    <View style={[styles.chartWrap, { width }]}>
+      <View style={styles.chartRow}>
+        {/* Y axis labels */}
+        <View style={styles.yAxis}>
+          {yTicks.map((tick) => (
+            <Text
+              key={tick.value}
+              style={[styles.yTick, { top: tick.y - 5, color: colors.mutedText }]}
+              numberOfLines={1}
+            >
+              {tick.label}
+            </Text>
+          ))}
+        </View>
+
+        {/* Bars */}
+        <View style={[styles.barsArea, { width: chartW }]}>
+          <CartesianChart
+            data={chartData}
+            xKey="x"
+            yKeys={yKeys}
+            domain={domain}
+            domainPadding={{ left: 6, right: 6, top: TOP_PADDING }}
+          >
+            {renderBars}
+          </CartesianChart>
+
+          {/* Selection reference line */}
+          {selLineTop != null && (
+            <View
+              pointerEvents="none"
+              style={[styles.selLine, { top: selLineTop, borderColor: colors.primary }]}
+            />
+          )}
+
+          {/* Transparent hit areas for bar selection */}
+          <View style={styles.touchRow} pointerEvents="box-none">
+            {data.map((d, i) => (
+              <TouchableOpacity
+                key={i}
+                style={styles.touchSlot}
+                activeOpacity={0.6}
+                onPress={() => onBarPress(i)}
+                accessibilityRole="button"
+                accessibilityLabel={`${monthAbbreviations[d.month]} ${formatYTick(d.total)}`}
+              />
+            ))}
+          </View>
+        </View>
+      </View>
+
+      {/* Month labels */}
+      <View style={styles.monthRow}>
+        {data.map((d, i) => (
+          <Text
+            key={i}
+            style={[styles.monthLabel, { color: colors.mutedText }]}
+            numberOfLines={1}
+          >
+            {monthAbbreviations[d.month]}
+          </Text>
+        ))}
+      </View>
+    </View>
   );
 };
 
@@ -652,20 +579,11 @@ const CategorySpendingCard = ({
             {t('no_spending_data')}
           </Text>
         </View>
-      ) : showStackedBar && hasVsData ? (
-        <StackedBarChart
-          data={monthlyData}
-          vsData={vsMonthlyData}
-          monthAbbreviations={monthAbbreviations}
-          colors={colors}
-          width={screenWidth - 64}
-          selectedIndex={effectiveBarIndex}
-          onBarPress={setSelectedBarIndex}
-        />
       ) : (
-        <BarChart
+        <SpendingBarChart
           data={monthlyData}
           vsData={hasVsData ? vsMonthlyData : null}
+          stacked={showStackedBar && hasVsData}
           monthAbbreviations={monthAbbreviations}
           colors={colors}
           width={screenWidth - 64}
@@ -677,23 +595,14 @@ const CategorySpendingCard = ({
   );
 };
 
-BarChart.propTypes = {
+SpendingBarChart.propTypes = {
   colors: PropTypes.object.isRequired,
   data: PropTypes.arrayOf(PropTypes.shape({ total: PropTypes.number, month: PropTypes.number })).isRequired,
   monthAbbreviations: PropTypes.arrayOf(PropTypes.string).isRequired,
   onBarPress: PropTypes.func.isRequired,
   selectedIndex: PropTypes.number,
+  stacked: PropTypes.bool,
   vsData: PropTypes.arrayOf(PropTypes.shape({ total: PropTypes.number, month: PropTypes.number })),
-  width: PropTypes.number.isRequired,
-};
-
-StackedBarChart.propTypes = {
-  colors: PropTypes.object.isRequired,
-  data: PropTypes.arrayOf(PropTypes.shape({ total: PropTypes.number, month: PropTypes.number })).isRequired,
-  monthAbbreviations: PropTypes.arrayOf(PropTypes.string).isRequired,
-  onBarPress: PropTypes.func.isRequired,
-  selectedIndex: PropTypes.number,
-  vsData: PropTypes.arrayOf(PropTypes.shape({ total: PropTypes.number, month: PropTypes.number })).isRequired,
   width: PropTypes.number.isRequired,
 };
 
@@ -708,8 +617,9 @@ CategorySpendingCard.propTypes = {
 };
 
 const styles = StyleSheet.create({
-  barChartSvg: {
-    marginTop: 12,
+  barsArea: {
+    height: CHART_HEIGHT,
+    position: 'relative',
   },
   card: {
     borderRadius: 16,
@@ -736,6 +646,13 @@ const styles = StyleSheet.create({
   categoryText: {
     fontSize: 16,
     fontWeight: '500',
+  },
+  chartRow: {
+    flexDirection: 'row',
+    height: CHART_HEIGHT,
+  },
+  chartWrap: {
+    marginTop: 12,
   },
   childRow: {
     borderBottomWidth: 1,
@@ -799,6 +716,17 @@ const styles = StyleSheet.create({
     flex: 1,
     justifyContent: 'center',
   },
+  monthLabel: {
+    flex: 1,
+    fontSize: 9.5,
+    textAlign: 'center',
+  },
+  monthRow: {
+    flexDirection: 'row',
+    height: LABEL_HEIGHT,
+    marginLeft: Y_AXIS_WIDTH,
+    paddingTop: 2,
+  },
   parentRow: {
     alignItems: 'center',
     borderBottomWidth: 1,
@@ -808,6 +736,13 @@ const styles = StyleSheet.create({
     fontSize: 11,
     fontWeight: '500',
     letterSpacing: 0.5,
+  },
+  selLine: {
+    borderStyle: 'dashed',
+    borderTopWidth: 2,
+    left: 0,
+    position: 'absolute',
+    right: 0,
   },
   stackedToggleBtn: {
     alignSelf: 'flex-end',
@@ -819,6 +754,17 @@ const styles = StyleSheet.create({
   thisMonthLabel: {
     fontSize: 11,
     marginTop: 2,
+  },
+  touchRow: {
+    bottom: 0,
+    flexDirection: 'row',
+    left: 0,
+    position: 'absolute',
+    right: 0,
+    top: 0,
+  },
+  touchSlot: {
+    flex: 1,
   },
   vsCategoryName: {
     flexShrink: 1,
@@ -839,6 +785,18 @@ const styles = StyleSheet.create({
   vsText: {
     fontSize: 12,
     fontWeight: '500',
+  },
+  yAxis: {
+    height: CHART_HEIGHT,
+    position: 'relative',
+    width: Y_AXIS_WIDTH,
+  },
+  yTick: {
+    fontSize: 8,
+    opacity: 0.7,
+    position: 'absolute',
+    right: 4,
+    textAlign: 'right',
   },
 });
 

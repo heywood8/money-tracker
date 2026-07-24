@@ -1,60 +1,66 @@
 import React from 'react';
 import { render } from '@testing-library/react-native';
 import DonutChart, {
-  computeSegments,
-  CIRCUMFERENCE,
+  mapPieData,
+  computeIconMarkers,
   CENTER,
-  RADIUS,
+  ICON_RADIUS,
   ICON_THRESHOLD,
 } from '../../../app/components/graphs/DonutChart';
 
-describe('computeSegments', () => {
+describe('mapPieData', () => {
+  it('maps amount/color onto Victory Native value/color keys', async () => {
+    const data = [
+      { amount: 450, color: '#f00', icon: 'food' },
+      { amount: 300, color: '#0f0', icon: 'car' },
+    ];
+    expect(mapPieData(data)).toEqual([
+      { label: 'food-0', value: 450, color: '#f00' },
+      { label: 'car-1', value: 300, color: '#0f0' },
+    ]);
+  });
+
+  it('produces a unique label even when icons repeat or are missing', async () => {
+    const data = [
+      { amount: 10, color: '#f00', icon: 'dots-horizontal' },
+      { amount: 10, color: '#0f0', icon: 'dots-horizontal' },
+      { amount: 10, color: '#00f', icon: null },
+    ];
+    const labels = mapPieData(data).map((d) => d.label);
+    expect(new Set(labels).size).toBe(3);
+    expect(labels).toEqual(['dots-horizontal-0', 'dots-horizontal-1', 'slice-2']);
+  });
+
+  it('returns an empty array for empty data', async () => {
+    expect(mapPieData([])).toEqual([]);
+  });
+});
+
+describe('computeIconMarkers', () => {
   it('returns empty array for empty data', async () => {
-    expect(computeSegments([])).toEqual([]);
+    expect(computeIconMarkers([])).toEqual([]);
   });
 
   it('returns empty array when all amounts are zero', async () => {
-    expect(computeSegments([{ amount: 0, color: '#f00', icon: 'food' }])).toEqual([]);
+    expect(computeIconMarkers([{ amount: 0, color: '#f00', icon: 'food' }])).toEqual([]);
   });
 
-  it('arc lengths sum to CIRCUMFERENCE', async () => {
+  it('returns one marker per slice', async () => {
     const data = [
       { amount: 450, color: '#f00', icon: 'food' },
       { amount: 300, color: '#0f0', icon: 'car' },
       { amount: 250, color: '#00f', icon: 'shopping' },
     ];
-    const segs = computeSegments(data);
-    const total = segs.reduce((s, seg) => s + seg.arcLength, 0);
-    expect(total).toBeCloseTo(CIRCUMFERENCE, 5);
-  });
-
-  it('first segment has dashOffset of 0', async () => {
-    const data = [
-      { amount: 500, color: '#f00', icon: 'food' },
-      { amount: 500, color: '#0f0', icon: 'car' },
-    ];
-    expect(computeSegments(data)[0].dashOffset).toBe(0);
-  });
-
-  it('each subsequent segment dashOffset equals negative sum of prior arcLengths', async () => {
-    const data = [
-      { amount: 400, color: '#f00', icon: 'food' },
-      { amount: 300, color: '#0f0', icon: 'car' },
-      { amount: 300, color: '#00f', icon: 'shopping' },
-    ];
-    const segs = computeSegments(data);
-    expect(segs[1].dashOffset).toBeCloseTo(-segs[0].arcLength, 5);
-    expect(segs[2].dashOffset).toBeCloseTo(-(segs[0].arcLength + segs[1].arcLength), 5);
+    expect(computeIconMarkers(data)).toHaveLength(3);
   });
 
   it('shows icon for segment exactly at ICON_THRESHOLD', async () => {
     const pct = ICON_THRESHOLD; // 10%
     const data = [
       { amount: 1 - pct, color: '#f00', icon: 'food' },
-      { amount: pct,     color: '#0f0', icon: 'car' },
+      { amount: pct, color: '#0f0', icon: 'car' },
     ];
-    const segs = computeSegments(data);
-    expect(segs[1].showIcon).toBe(true);
+    expect(computeIconMarkers(data)[1].showIcon).toBe(true);
   });
 
   it('hides icon for segment just below ICON_THRESHOLD', async () => {
@@ -62,43 +68,55 @@ describe('computeSegments', () => {
       { amount: 0.91, color: '#f00', icon: 'food' },
       { amount: 0.09, color: '#0f0', icon: 'car' }, // 9%
     ];
-    expect(computeSegments(data)[1].showIcon).toBe(false);
+    expect(computeIconMarkers(data)[1].showIcon).toBe(false);
   });
 
   it('hides icon when item.icon is falsy', async () => {
     const data = [{ amount: 1000, color: '#f00', icon: null }];
-    expect(computeSegments(data)[0].showIcon).toBe(false);
+    expect(computeIconMarkers(data)[0].showIcon).toBe(false);
   });
 
-  it('single segment spans full circumference', async () => {
-    const segs = computeSegments([{ amount: 100, color: '#f00', icon: 'food' }]);
-    expect(segs[0].arcLength).toBeCloseTo(CIRCUMFERENCE, 5);
-    expect(segs[0].dashOffset).toBe(0);
+  it('single full-circle slice midAngle=π maps to the bottom of the ring', async () => {
+    const markers = computeIconMarkers([{ amount: 1, color: '#f00', icon: 'food' }]);
+    // midAngle = (0 + 0.5) * 2π = π
+    expect(markers[0].x).toBeCloseTo(CENTER, 1); // sin(π) ≈ 0
+    expect(markers[0].y).toBeCloseTo(CENTER + ICON_RADIUS, 1); // −cos(π) = 1
   });
 
-  it('icon position math: full-circle segment midAngle=π maps to bottom (x≈CENTER, y≈CENTER+RADIUS)', async () => {
-    const segs = computeSegments([{ amount: 1, color: '#f00', icon: 'food' }]);
-    // midAngle = (0 + CIRCUMFERENCE/2) / RADIUS = π
-    expect(segs[0].iconX).toBeCloseTo(CENTER, 1);         // sin(π) ≈ 0
-    expect(segs[0].iconY).toBeCloseTo(CENTER + RADIUS, 1); // −cos(π) = 1
+  it('a half-and-half split places markers on opposite sides (top vs bottom)', async () => {
+    const markers = computeIconMarkers([
+      { amount: 1, color: '#f00', icon: 'food' }, // midAngle = π/2 → right
+      { amount: 1, color: '#0f0', icon: 'car' }, //  midAngle = 3π/2 → left
+    ]);
+    expect(markers[0].x).toBeCloseTo(CENTER + ICON_RADIUS, 1); // sin(π/2) = 1
+    expect(markers[0].y).toBeCloseTo(CENTER, 1); // −cos(π/2) ≈ 0
+    expect(markers[1].x).toBeCloseTo(CENTER - ICON_RADIUS, 1); // sin(3π/2) = −1
+    expect(markers[1].y).toBeCloseTo(CENTER, 1); // −cos(3π/2) ≈ 0
   });
 
   it('preserves color and icon from input', async () => {
-    const segs = computeSegments([{ amount: 100, color: '#abc123', icon: 'pizza' }]);
-    expect(segs[0].color).toBe('#abc123');
-    expect(segs[0].icon).toBe('pizza');
+    const markers = computeIconMarkers([{ amount: 100, color: '#abc123', icon: 'pizza' }]);
+    expect(markers[0].color).toBe('#abc123');
+    expect(markers[0].icon).toBe('pizza');
   });
 });
 
 describe('DonutChart', () => {
   const mockData = [
-    { amount: 560, color: '#7c83fd', icon: 'food' },   // 60.9% — above threshold
-    { amount: 280, color: '#fd7c7c', icon: 'car' },    // 30.4% — above threshold
-    { amount: 80,  color: '#7ce8fd', icon: 'heart' },  //  8.7% — below threshold
+    { amount: 560, color: '#7c83fd', icon: 'food' }, // 60.9% — above threshold
+    { amount: 280, color: '#fd7c7c', icon: 'car' }, // 30.4% — above threshold
+    { amount: 80, color: '#7ce8fd', icon: 'heart' }, //  8.7% — below threshold
   ];
 
   it('renders without crashing', async () => {
     await render(<DonutChart data={mockData} />);
+  });
+
+  it('renders the Victory Native polar/pie donut primitives', async () => {
+    const { getByTestId } = await render(<DonutChart data={mockData} />);
+    expect(getByTestId('donut-chart')).toBeTruthy();
+    expect(getByTestId('polar-chart')).toBeTruthy();
+    expect(getByTestId('vn-pie')).toBeTruthy();
   });
 
   it('renders icons for segments at or above threshold', async () => {
@@ -112,8 +130,10 @@ describe('DonutChart', () => {
     expect(queryByTestId('icon-heart')).toBeNull();
   });
 
-  it('renders no icons when data is empty', async () => {
-    const { queryAllByTestId } = await render(<DonutChart data={[]} />);
+  it('still renders the donut (and no icons) when data is empty', async () => {
+    const { getByTestId, queryAllByTestId } = await render(<DonutChart data={[]} />);
+    expect(getByTestId('donut-chart')).toBeTruthy();
+    expect(getByTestId('polar-chart')).toBeTruthy();
     expect(queryAllByTestId(/^icon-/).length).toBe(0);
   });
 
