@@ -1,5 +1,12 @@
 # Changelog
 
+## [0.216.0](https://github.com/heywood8/money-tracker/compare/penny-v0.215.0...penny-v0.216.0) (2026-07-24)
+
+
+### Features
+
+* **budgets:** add Budget tab with multi-currency tracking and hide toggle ([#1394](https://github.com/heywood8/money-tracker/issues/1394)) ([#1399](https://github.com/heywood8/money-tracker/issues/1399)) ([c199e52](https://github.com/heywood8/money-tracker/commit/c199e52e7d1c187137d87b9ade8a23167a017544))
+
 ## [0.215.0](https://github.com/heywood8/money-tracker/compare/penny-v0.214.14...penny-v0.215.0) (2026-07-24)
 
 
