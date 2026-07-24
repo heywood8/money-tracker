@@ -44,7 +44,7 @@ const SCHEMA_VERSION = 3; // must equal the journal entry count above
 import { getDatabase, closeDatabase, dropAllTables } from '../../app/services/db';
 import * as SQLite from 'expo-sqlite';
 
-// The nine tables isSchemaComplete() expects, plus per-table columns that satisfy
+// The tables isSchemaComplete() expects, plus per-table columns that satisfy
 // every column check in it. Used to simulate a genuinely complete post-migration
 // schema so the fast-path fingerprint is stamped (the stamp is now gated on
 // isSchemaComplete — a half-applied migration must NOT be stamped).
@@ -52,6 +52,7 @@ const COMPLETE_TABLES = [
   'accounts', 'categories', 'operations', 'budgets', 'app_metadata',
   'accounts_balance_history', 'planned_operations',
   'notification_merchant_rules', 'pending_notifications',
+  'budget_plans', 'budget_plan_lines',
 ];
 const mockSchemaComplete = (db, storedUserVersion) => {
   db.getFirstAsync.mockImplementation((q) => {

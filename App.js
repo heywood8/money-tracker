@@ -14,6 +14,7 @@ import { CategoriesProvider } from './app/contexts/CategoriesContext';
 import { OperationsDataProvider } from './app/contexts/OperationsDataContext';
 import { OperationsActionsProvider } from './app/contexts/OperationsActionsContext';
 import { BudgetsProvider } from './app/contexts/BudgetsContext';
+import { BudgetPlansProvider } from './app/contexts/BudgetPlansContext';
 import { PlannedOperationsProvider } from './app/contexts/PlannedOperationsContext';
 import { LocalizationProvider } from './app/contexts/LocalizationContext';
 import { DialogProvider } from './app/contexts/DialogContext';
@@ -83,9 +84,11 @@ function App() {
                                   <OperationsDataProvider>
                                     <OperationsActionsProvider>
                                       <BudgetsProvider>
-                                        <PlannedOperationsProvider>
-                                          <AppContent />
-                                        </PlannedOperationsProvider>
+                                        <BudgetPlansProvider>
+                                          <PlannedOperationsProvider>
+                                            <AppContent />
+                                          </PlannedOperationsProvider>
+                                        </BudgetPlansProvider>
                                       </BudgetsProvider>
                                     </OperationsActionsProvider>
                                   </OperationsDataProvider>

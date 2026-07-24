@@ -700,4 +700,100 @@ describe('Database Schema', () => {
       expect(schema.accountsBalanceHistory.date.notNull).toBe(true);
     });
   });
+
+  describe('budgetPlans Table (Budgets v2)', () => {
+    it('has correct table name', async () => {
+      expect(schema.budgetPlans[Symbol.for('drizzle:Name')]).toBe('budget_plans');
+    });
+
+    it('defines all required columns', async () => {
+      const columns = schema.budgetPlans;
+      expect(columns.id).toBeDefined();
+      expect(columns.month).toBeDefined();
+      expect(columns.currency).toBeDefined();
+      expect(columns.expectedIncome).toBeDefined();
+      expect(columns.createdAt).toBeDefined();
+      expect(columns.updatedAt).toBeDefined();
+    });
+
+    it('has a text primary key', async () => {
+      expect(schema.budgetPlans.id.columnType).toBe('SQLiteText');
+      expect(schema.budgetPlans.id.primary).toBe(true);
+    });
+
+    it('stores month, currency, and expectedIncome as text (string decimals)', async () => {
+      expect(schema.budgetPlans.month.columnType).toBe('SQLiteText');
+      expect(schema.budgetPlans.currency.columnType).toBe('SQLiteText');
+      expect(schema.budgetPlans.expectedIncome.columnType).toBe('SQLiteText');
+    });
+
+    it('has notNull constraints on required fields', async () => {
+      expect(schema.budgetPlans.month.notNull).toBe(true);
+      expect(schema.budgetPlans.currency.notNull).toBe(true);
+      expect(schema.budgetPlans.expectedIncome.notNull).toBe(true);
+      expect(schema.budgetPlans.createdAt.notNull).toBe(true);
+      expect(schema.budgetPlans.updatedAt.notNull).toBe(true);
+    });
+
+    it('defaults expectedIncome to "0"', async () => {
+      expect(schema.budgetPlans.expectedIncome.default).toBe('0');
+    });
+  });
+
+  describe('budgetPlanLines Table (Budgets v2)', () => {
+    it('has correct table name', async () => {
+      expect(schema.budgetPlanLines[Symbol.for('drizzle:Name')]).toBe('budget_plan_lines');
+    });
+
+    it('defines all required columns', async () => {
+      const columns = schema.budgetPlanLines;
+      expect(columns.id).toBeDefined();
+      expect(columns.planId).toBeDefined();
+      expect(columns.label).toBeDefined();
+      expect(columns.amount).toBeDefined();
+      expect(columns.comment).toBeDefined();
+      expect(columns.categoryId).toBeDefined();
+      expect(columns.toAccountId).toBeDefined();
+      expect(columns.sortOrder).toBeDefined();
+      expect(columns.createdAt).toBeDefined();
+      expect(columns.updatedAt).toBeDefined();
+    });
+
+    it('has a text primary key and a required plan reference', async () => {
+      expect(schema.budgetPlanLines.id.columnType).toBe('SQLiteText');
+      expect(schema.budgetPlanLines.id.primary).toBe(true);
+      expect(schema.budgetPlanLines.planId.columnType).toBe('SQLiteText');
+      expect(schema.budgetPlanLines.planId.notNull).toBe(true);
+    });
+
+    it('has nullable target columns (exactly-one enforced in the service)', async () => {
+      expect(schema.budgetPlanLines.categoryId.columnType).toBe('SQLiteText');
+      expect(schema.budgetPlanLines.categoryId.notNull).toBeFalsy();
+      // to_account_id is an integer FK to accounts.id
+      expect(schema.budgetPlanLines.toAccountId.columnType).toBe('SQLiteInteger');
+      expect(schema.budgetPlanLines.toAccountId.notNull).toBeFalsy();
+    });
+
+    it('has optional label and comment', async () => {
+      expect(schema.budgetPlanLines.label.notNull).toBeFalsy();
+      expect(schema.budgetPlanLines.comment.notNull).toBeFalsy();
+    });
+
+    it('defaults sortOrder to 0 and requires amount', async () => {
+      expect(schema.budgetPlanLines.sortOrder.default).toBe(0);
+      expect(schema.budgetPlanLines.sortOrder.notNull).toBe(true);
+      expect(schema.budgetPlanLines.amount.notNull).toBe(true);
+      expect(schema.budgetPlanLines.amount.columnType).toBe('SQLiteText');
+    });
+
+    it('planId references budget_plans.id', async () => {
+      const planId = schema.budgetPlanLines.planId;
+      const refs = planId.references;
+      if (typeof refs === 'function') {
+        expect(refs()).toBeDefined();
+      } else if (planId.config?.references) {
+        expect(planId.config.references()).toBeDefined();
+      }
+    });
+  });
 });

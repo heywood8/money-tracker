@@ -19,6 +19,7 @@ import m0014 from './0014_account_rounding_mode.js';
 import m0015 from './0015_account_show_in_main_menu.js';
 import m0016 from './0016_merchant_rule_last_matched.js';
 import m0017 from './0017_add_pending_notification_location.js';
+import m0018 from './0018_budget_plans.js';
 
 export default {
   journal,
@@ -41,6 +42,7 @@ export default {
     m0015,
     m0016,
     m0017,
+    m0018,
   },
   postMigrationHandlers: {
     m0003: m0003PostMigration,

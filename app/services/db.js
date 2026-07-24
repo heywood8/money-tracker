@@ -170,6 +170,7 @@ const isSchemaComplete = async (rawDb) => {
       'accounts', 'categories', 'operations', 'budgets',
       'app_metadata', 'accounts_balance_history', 'planned_operations',
       'notification_merchant_rules', 'pending_notifications',
+      'budget_plans', 'budget_plan_lines',
     ];
     const existingTables = await rawDb.getAllAsync(
       "SELECT name FROM sqlite_master WHERE type='table'",
@@ -258,6 +259,12 @@ const isSchemaComplete = async (rawDb) => {
     // gain the columns.
     const pendingCols = await rawDb.getAllAsync('PRAGMA table_info(pending_notifications)');
     if (!pendingCols.some(c => c.name === 'latitude') || !pendingCols.some(c => c.name === 'longitude')) return false;
+
+    // Migration 0018: adds the budget_plans and budget_plan_lines tables. Both are
+    // covered by the expectedTables check above — a fresh install through 0017 has
+    // neither, so its schema reads "incomplete" here and migrate() runs to create
+    // them (rather than the fast path skipping migrate() and crashing with
+    // `no such table` on the first BudgetPlansDB query).
 
     return true;
   } catch (error) {
@@ -555,6 +562,13 @@ const detectAppliedMigrations = async (rawDb) => {
     if (pnCols.some(c => c.name === 'latitude') && pnCols.some(c => c.name === 'longitude')) {
       applied.push(17);
     }
+  }
+
+  // Migration 0018: Creates budget_plans and budget_plan_lines tables. Require
+  // BOTH — a half-applied 0018 (plans created, lines not) must re-run so the
+  // missing table is created.
+  if ((await tableExists('budget_plans')) && (await tableExists('budget_plan_lines'))) {
+    applied.push(18);
   }
 
   return applied.sort((a, b) => a - b);

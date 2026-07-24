@@ -237,3 +237,58 @@ export const accountsBalanceHistory = sqliteTable('accounts_balance_history', {
   dateIdx: index('idx_balance_history_date').on(table.date),
   uniqueAccountDate: unique().on(table.accountId, table.date),
 }));
+
+/**
+ * Budget Plans table (Budgets v2 — envelope-style monthly income allocation)
+ *
+ * One plan per calendar month. `expected_income` is the total income the user
+ * expects that month; it is split into budget_plan_lines. The un-allocated
+ * remainder (expected_income − Σ lines) is always COMPUTED, never stored.
+ *
+ * Amounts follow the codebase convention: string decimals (see budgets.amount),
+ * with all arithmetic going through app/services/currency.js.
+ */
+export const budgetPlans = sqliteTable('budget_plans', {
+  id: text('id').primaryKey(),
+  // YYYY-MM. Unique — a month has at most one plan.
+  month: text('month').notNull(),
+  // Display/base currency of the plan.
+  currency: text('currency').notNull(),
+  // Total expected income for the month (string decimal). Defaults to '0'.
+  expectedIncome: text('expected_income').notNull().default('0'),
+  createdAt: text('created_at').notNull(),
+  updatedAt: text('updated_at').notNull(),
+}, (table) => ({
+  monthIdx: unique('idx_budget_plans_month').on(table.month),
+}));
+
+/**
+ * Budget Plan Lines table
+ *
+ * Each line allocates part of the plan's expected income to a tracking target.
+ * Every line is linked to EXACTLY ONE of:
+ *   - an expense `category_id` → tracked against category spending, or
+ *   - a destination `to_account_id` → tracked against transfers INTO that account.
+ * The "exactly one" invariant is enforced in the service (BudgetPlansDB), not by
+ * SQL, so a line whose FK is nulled by a category/account deletion (ON DELETE SET
+ * NULL) becomes "broken" (both targets null) instead of crashing — the UI (later
+ * parts) prompts the user to re-link it.
+ *
+ * `to_account_id` is an integer FK to match accounts.id (integer autoincrement),
+ * consistent with operations.to_account_id / planned_operations.to_account_id.
+ */
+export const budgetPlanLines = sqliteTable('budget_plan_lines', {
+  id: text('id').primaryKey(),
+  planId: text('plan_id').notNull().references(() => budgetPlans.id, { onDelete: 'cascade' }),
+  // Optional display name; falls back to the linked category/account name.
+  label: text('label'),
+  amount: text('amount').notNull(),
+  comment: text('comment'),
+  categoryId: text('category_id').references(() => categories.id, { onDelete: 'set null' }),
+  toAccountId: integer('to_account_id').references(() => accounts.id, { onDelete: 'set null' }),
+  sortOrder: integer('sort_order').notNull().default(0),
+  createdAt: text('created_at').notNull(),
+  updatedAt: text('updated_at').notNull(),
+}, (table) => ({
+  planIdx: index('idx_budget_plan_lines_plan').on(table.planId),
+}));
