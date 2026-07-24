@@ -175,8 +175,11 @@ describe('BudgetScreen', () => {
         statuses: [makeStatus(), makeStatus({ budgetId: 'b2', currency: 'RUB', amount: '400', spent: '100' })],
       });
       const { getByText } = await render(<BudgetScreen />);
-      // 3000 AMD + 400 RUB * 5 = 5000 AMD budgeted; 1000 + 100 * 5 = 1500 spent
-      await waitFor(() => expect(getByText(/total_budgeted:.*5[\s,.]?000/)).toBeTruthy());
+      // 3000 AMD + 400 RUB * 5 = 5000 AMD budgeted; 1000 + 100 * 5 = 1500 spent.
+      // Totals arrive after the currency-init effect + the async rate fetch, so
+      // allow a generous timeout — a CPU-starved worker in the full suite can
+      // take well over the 1000ms waitFor default to flush this chain.
+      await waitFor(() => expect(getByText(/total_budgeted:.*5[\s,.]?000/)).toBeTruthy(), { timeout: 5000 });
       expect(getByText(/total_spent:.*1[\s,.]?500/)).toBeTruthy();
     });
 
@@ -198,8 +201,11 @@ describe('BudgetScreen', () => {
         budgets: [makeBudget({ id: 'bx', currency: 'XYZ' })],
         statuses: [makeStatus({ budgetId: 'bx', currency: 'XYZ' })],
       });
-      const { getByTestId, getByText } = await render(<BudgetScreen />);
-      await waitFor(() => expect(getByTestId('budget-unconverted-warning')).toBeTruthy());
+      const { findByTestId, getByText } = await render(<BudgetScreen />);
+      // The warning appears only after the currency-init effect sets the target
+      // currency and the async rate fetch resolves; findByTestId with a generous
+      // timeout keeps this stable under full-suite worker contention.
+      await findByTestId('budget-unconverted-warning', {}, { timeout: 5000 });
       expect(getByText(/XYZ/)).toBeTruthy();
     });
   });
