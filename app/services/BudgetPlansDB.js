@@ -11,6 +11,15 @@
 import uuid from 'react-native-uuid';
 import { executeQuery, queryAll, queryFirst, executeTransaction } from './db';
 import * as Currency from './currency';
+import * as CategoriesDB from './CategoriesDB';
+import { calculateSpendingForBudget, deriveSpendingStatus } from './BudgetsDB';
+import { formatDate as formatLocalDate } from './BalanceHistoryDB';
+import {
+  fetchRatesToTarget,
+  convertWithRateMap,
+  getTransferTotals,
+  getUnconvertibleCurrencies,
+} from './OperationsDB';
 
 // YYYY-MM with a real 01–12 month.
 const MONTH_REGEX = /^\d{4}-(0[1-9]|1[0-2])$/;
@@ -545,6 +554,312 @@ export const copyPlan = async (fromMonth, toMonth) => {
     });
   } catch (error) {
     console.error('Failed to copy budget plan:', error);
+    throw error;
+  }
+};
+
+/* -------------------------------------------------------------------------- */
+/* Plan vs actual                                                              */
+/* -------------------------------------------------------------------------- */
+
+/**
+ * First/last local calendar day of a YYYY-MM month as YYYY-MM-DD strings.
+ * Operation dates are stored as local YYYY-MM-DD, so the boundaries use local
+ * date math (mirroring formatLocalDate usage in BudgetsDB) — a UTC conversion
+ * would shift the month edge in non-UTC timezones.
+ * @param {string} month - YYYY-MM
+ * @returns {{ startDate: string, endDate: string }}
+ */
+export const getMonthDateRange = (month) => {
+  if (!MONTH_REGEX.test(month)) {
+    throw new Error('A valid month (YYYY-MM) is required');
+  }
+  const [year, monthNum] = month.split('-').map(Number);
+  const start = new Date(year, monthNum - 1, 1);
+  const end = new Date(year, monthNum, 0); // day 0 of next month = last day
+  return { startDate: formatLocalDate(start), endDate: formatLocalDate(end) };
+};
+
+/**
+ * Compute the actual amount tracked by one plan line for a month.
+ *
+ * - Category-linked line: expense spending of the category including descendants,
+ *   via the shared convert-all engine ({@link calculateSpendingForBudget}). With
+ *   `convertAll` off, only operations in accounts of `displayCurrency` count.
+ * - Account-linked line (transfer target): incoming transfers into the account
+ *   ({@link getTransferTotals}; values are in the destination account's currency),
+ *   converted into `displayCurrency` regardless of the toggle — a transfer target
+ *   in another currency is still part of the plan.
+ * - Broken line (target deleted, FK nulled): `{ broken: true }`.
+ *
+ * @param {Object} line - Plan line (camelCase, see mapLineFields)
+ * @param {string} month - YYYY-MM
+ * @param {string} displayCurrency - Currency to express the actual in
+ * @param {boolean} convertAll - Count category spending from accounts in any currency
+ * @returns {Promise<{ broken: boolean, actual: string, sourceCurrency?: string }>}
+ *   `sourceCurrency` is set for account-linked lines (the destination account's
+ *   currency); an unconvertible source yields actual '0' and the caller can flag
+ *   the currency via {@link getUnconvertibleCurrencies}.
+ */
+export const calculateLineActual = async (line, month, displayCurrency, convertAll) => {
+  try {
+    const { startDate, endDate } = getMonthDateRange(month);
+
+    if (isSet(line.categoryId)) {
+      const actual = await calculateSpendingForBudget(
+        line.categoryId,
+        displayCurrency,
+        startDate,
+        endDate,
+        true, // include descendant categories
+        convertAll,
+      );
+      return { broken: false, actual: String(actual) };
+    }
+
+    if (isSet(line.toAccountId)) {
+      const account = await queryFirst('SELECT currency FROM accounts WHERE id = ?', [line.toAccountId]);
+      if (!account) {
+        return { broken: true, actual: '0' };
+      }
+      const { incoming } = await getTransferTotals(line.toAccountId, startDate, endDate);
+      const sourceCurrency = account.currency;
+      if (sourceCurrency === displayCurrency) {
+        return { broken: false, actual: incoming, sourceCurrency };
+      }
+      const rateByCurrency = await fetchRatesToTarget([sourceCurrency], displayCurrency);
+      const converted = convertWithRateMap(incoming, sourceCurrency, displayCurrency, rateByCurrency);
+      // No rate: the amount cannot be expressed in the display currency, so it is
+      // dropped (mirroring mergeConvertedByCategory) and the source currency is
+      // reported for the warning UI.
+      return { broken: false, actual: converted === null ? '0' : converted, sourceCurrency };
+    }
+
+    return { broken: true, actual: '0' };
+  } catch (error) {
+    console.error('Failed to calculate plan line actual:', error);
+    throw error;
+  }
+};
+
+/**
+ * Total actual income for a month, expressed in `displayCurrency`. With
+ * `convertAll` on, income from accounts in any currency is converted at the
+ * current rate (offline table first, live fallback — the same path Graphs uses);
+ * currencies with no available rate are dropped. With it off, only income into
+ * accounts of `displayCurrency` counts.
+ * @param {string} month - YYYY-MM
+ * @param {string} displayCurrency
+ * @param {boolean} convertAll
+ * @returns {Promise<string>} Total income (decimal string)
+ */
+export const calculateActualIncome = async (month, displayCurrency, convertAll) => {
+  try {
+    const { startDate, endDate } = getMonthDateRange(month);
+
+    if (convertAll) {
+      const rows = await queryAll(
+        `SELECT a.currency as currency, SUM(CAST(o.amount AS REAL)) as total
+         FROM operations o
+         JOIN accounts a ON o.account_id = a.id
+         WHERE o.type = 'income'
+           AND o.date >= ?
+           AND o.date <= ?
+         GROUP BY a.currency`,
+        [startDate, endDate],
+      );
+
+      const rowList = rows || [];
+      const rateByCurrency = await fetchRatesToTarget(rowList.map(r => r.currency), displayCurrency);
+      let total = '0';
+      for (const row of rowList) {
+        const converted = convertWithRateMap(String(row.total ?? '0'), row.currency, displayCurrency, rateByCurrency);
+        if (converted === null) continue;
+        total = Currency.add(total, converted);
+      }
+      return total;
+    }
+
+    const result = await queryFirst(
+      `SELECT SUM(CAST(o.amount AS REAL)) as total
+       FROM operations o
+       JOIN accounts a ON o.account_id = a.id
+       WHERE o.type = 'income'
+         AND a.currency = ?
+         AND o.date >= ?
+         AND o.date <= ?`,
+      [displayCurrency, startDate, endDate],
+    );
+    return result && result.total != null ? String(result.total) : '0';
+  } catch (error) {
+    console.error('Failed to calculate actual income:', error);
+    throw error;
+  }
+};
+
+/**
+ * Source currencies whose amounts feed a plan's converted actuals: expense
+ * currencies of the linked categories (incl. descendants) and income currencies
+ * when `convertAll` is on, plus the destination currencies of transfer lines
+ * (those convert regardless of the toggle). Used to compute the
+ * unconvertible-currency warning without changing how the sums drop them.
+ */
+const collectPlanSourceCurrencies = async (lines, startDate, endDate, convertAll, transferCurrencies) => {
+  const currencies = new Set(transferCurrencies);
+
+  if (convertAll) {
+    const categoryIds = [];
+    for (const line of lines) {
+      if (!isSet(line.categoryId)) continue;
+      categoryIds.push(line.categoryId);
+      const descendants = await CategoriesDB.getAllDescendants(line.categoryId);
+      categoryIds.push(...descendants.map(cat => cat.id));
+    }
+
+    if (categoryIds.length > 0) {
+      const placeholders = categoryIds.map(() => '?').join(',');
+      const rows = await queryAll(
+        `SELECT DISTINCT a.currency as currency
+         FROM operations o
+         JOIN accounts a ON o.account_id = a.id
+         WHERE o.category_id IN (${placeholders})
+           AND o.type = 'expense'
+           AND o.date >= ?
+           AND o.date <= ?`,
+        [...categoryIds, startDate, endDate],
+      );
+      for (const row of rows || []) currencies.add(row.currency);
+    }
+
+    const incomeRows = await queryAll(
+      `SELECT DISTINCT a.currency as currency
+       FROM operations o
+       JOIN accounts a ON o.account_id = a.id
+       WHERE o.type = 'income'
+         AND o.date >= ?
+         AND o.date <= ?`,
+      [startDate, endDate],
+    );
+    for (const row of incomeRows || []) currencies.add(row.currency);
+  }
+
+  return currencies;
+};
+
+/**
+ * Compute a plan's full plan-vs-actual status: per-line actuals with the shared
+ * budget status bands, income vs expected, and totals — all expressed in
+ * `displayCurrency` (defaults to the plan's own currency).
+ * @param {string} planId
+ * @param {string} [displayCurrency] - Currency to express actuals in (default: plan currency)
+ * @param {boolean} [convertAll=false] - Count operations in any currency, converted
+ * @returns {Promise<Object>} {
+ *   planId, month, currency, convertAll,
+ *   lines: Array<{ lineId, broken, amount, actual, remaining, percentage, isExceeded, status }>,
+ *   totals: { expectedIncome, actualIncome, allocated, totalActual, plannedRemainder, actualRemainder },
+ *   unconvertible: string[],
+ * }
+ */
+export const calculatePlanStatus = async (planId, displayCurrency = null, convertAll = false) => {
+  try {
+    const plan = await getPlanById(planId);
+    if (!plan) {
+      throw new Error(`Budget plan ${planId} not found`);
+    }
+    const target = displayCurrency || plan.currency;
+    const lines = await getPlanLines(planId);
+    const { startDate, endDate } = getMonthDateRange(plan.month);
+
+    const lineStatuses = [];
+    const transferCurrencies = new Set();
+    let allocated = '0';
+    let totalActual = '0';
+
+    for (const line of lines) {
+      allocated = Currency.add(allocated, line.amount, target);
+      const { broken, actual, sourceCurrency } = await calculateLineActual(line, plan.month, target, convertAll);
+
+      if (broken) {
+        lineStatuses.push({
+          lineId: line.id,
+          broken: true,
+          amount: line.amount,
+          actual: '0',
+          remaining: line.amount,
+          percentage: 0,
+          isExceeded: false,
+          status: 'broken',
+        });
+        continue;
+      }
+
+      if (sourceCurrency) {
+        transferCurrencies.add(sourceCurrency);
+      }
+      totalActual = Currency.add(totalActual, actual, target);
+      const remaining = Currency.subtract(line.amount, actual, target);
+      const { isExceeded, percentage, status } = deriveSpendingStatus(actual, line.amount);
+      lineStatuses.push({
+        lineId: line.id,
+        broken: false,
+        amount: line.amount,
+        actual,
+        remaining,
+        percentage,
+        isExceeded,
+        status,
+      });
+    }
+
+    const actualIncome = await calculateActualIncome(plan.month, target, convertAll);
+    const expectedIncome = Currency.add(plan.expectedIncome ?? '0', '0', target);
+    const plannedRemainder = Currency.subtract(expectedIncome, allocated, target);
+    const actualRemainder = Currency.subtract(actualIncome, totalActual, target);
+
+    const sourceCurrencies = await collectPlanSourceCurrencies(
+      lines, startDate, endDate, convertAll, transferCurrencies,
+    );
+    const unconvertible = sourceCurrencies.size > 0
+      ? await getUnconvertibleCurrencies(sourceCurrencies, target)
+      : [];
+
+    return {
+      planId: plan.id,
+      month: plan.month,
+      currency: target,
+      convertAll,
+      lines: lineStatuses,
+      totals: { expectedIncome, actualIncome, allocated, totalActual, plannedRemainder, actualRemainder },
+      unconvertible,
+    };
+  } catch (error) {
+    console.error('Failed to calculate plan status:', error);
+    throw error;
+  }
+};
+
+/**
+ * Compute plan-vs-actual statuses for all plans, keyed by plan ID. Each plan's
+ * status is expressed in its own currency. A single failing plan is logged and
+ * skipped so the rest still refresh (same contract as calculateAllBudgetStatuses).
+ * @param {boolean} [convertAll=false]
+ * @returns {Promise<Map<string, Object>>}
+ */
+export const calculateAllPlanStatuses = async (convertAll = false) => {
+  try {
+    const plans = await getAllPlans();
+    const statusMap = new Map();
+    for (const plan of plans) {
+      try {
+        const status = await calculatePlanStatus(plan.id, plan.currency, convertAll);
+        statusMap.set(plan.id, status);
+      } catch (error) {
+        console.error(`Failed to calculate status for plan ${plan.id}:`, error);
+      }
+    }
+    return statusMap;
+  } catch (error) {
+    console.error('Failed to calculate all plan statuses:', error);
     throw error;
   }
 };

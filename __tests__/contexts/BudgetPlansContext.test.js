@@ -12,7 +12,7 @@ import { appEvents, EVENTS } from '../../app/services/eventEmitter';
 jest.mock('../../app/services/BudgetPlansDB');
 jest.mock('../../app/services/eventEmitter', () => ({
   appEvents: { on: jest.fn(), emit: jest.fn() },
-  EVENTS: { RELOAD_ALL: 'RELOAD_ALL', DATABASE_RESET: 'DATABASE_RESET' },
+  EVENTS: { RELOAD_ALL: 'RELOAD_ALL', DATABASE_RESET: 'DATABASE_RESET', OPERATION_CHANGED: 'OPERATION_CHANGED' },
 }));
 
 const mockShowDialog = jest.fn();
@@ -36,6 +36,7 @@ describe('BudgetPlansContext', () => {
 
     appEvents.on.mockReturnValue(jest.fn());
     BudgetPlansDB.getAllPlans.mockResolvedValue([]);
+    BudgetPlansDB.calculateAllPlanStatuses.mockResolvedValue(new Map());
     BudgetPlansDB.validatePlan.mockReturnValue(null);
     BudgetPlansDB.createPlan.mockImplementation(async (plan) => ({ ...plan }));
     BudgetPlansDB.updatePlan.mockResolvedValue(undefined);
@@ -217,6 +218,91 @@ describe('BudgetPlansContext', () => {
       expect(BudgetPlansDB.getPlanLines).toHaveBeenCalledWith('p1');
       expect(BudgetPlansDB.getBrokenLines).toHaveBeenCalledWith('p1');
       expect(BudgetPlansDB.getPlanByMonth).toHaveBeenCalledWith('2026-07');
+    });
+  });
+
+  describe('Plan statuses (plan vs actual)', () => {
+    const STATUS = { planId: 'p1', month: '2026-07', currency: 'USD', lines: [], totals: {}, unconvertible: [] };
+
+    it('computes statuses on mount with the default convert-all mode (on)', async () => {
+      BudgetPlansDB.getAllPlans.mockResolvedValue([
+        { id: 'p1', month: '2026-07', currency: 'USD', expectedIncome: '0' },
+      ]);
+      BudgetPlansDB.calculateAllPlanStatuses.mockResolvedValue(new Map([['p1', STATUS]]));
+
+      const { result } = await renderHook(() => useBudgetPlans(), { wrapper });
+
+      await waitFor(() => expect(result.current.planStatuses.get('p1')).toEqual(STATUS));
+      expect(BudgetPlansDB.calculateAllPlanStatuses).toHaveBeenCalledWith(true);
+    });
+
+    it('refreshes statuses when an operation changes (integration-style)', async () => {
+      let operationChangedCb;
+      appEvents.on.mockImplementation((event, cb) => {
+        if (event === EVENTS.OPERATION_CHANGED) operationChangedCb = cb;
+        return jest.fn();
+      });
+
+      const { result } = await renderHook(() => useBudgetPlans(), { wrapper });
+      await waitFor(() => expect(result.current.loading).toBe(false));
+      await waitFor(() => expect(operationChangedCb).toBeDefined());
+
+      // A new expense lands: the recompute returns an updated status map.
+      const updated = { ...STATUS, totals: { totalActual: '365' } };
+      BudgetPlansDB.calculateAllPlanStatuses.mockResolvedValue(new Map([['p1', updated]]));
+
+      await act(async () => { operationChangedCb(); });
+
+      await waitFor(() => expect(result.current.planStatuses.get('p1')).toEqual(updated));
+    });
+
+    it('exposes refreshPlanStatuses for explicit recomputes after line edits', async () => {
+      const { result } = await renderHook(() => useBudgetPlans(), { wrapper });
+      await waitFor(() => expect(result.current.loading).toBe(false));
+
+      BudgetPlansDB.calculateAllPlanStatuses.mockClear();
+      BudgetPlansDB.calculateAllPlanStatuses.mockResolvedValue(new Map([['p1', STATUS]]));
+
+      await act(async () => { await result.current.refreshPlanStatuses(); });
+
+      expect(BudgetPlansDB.calculateAllPlanStatuses).toHaveBeenCalledTimes(1);
+      expect(result.current.planStatuses.get('p1')).toEqual(STATUS);
+    });
+
+    it('keeps the previous statuses when a refresh fails', async () => {
+      BudgetPlansDB.getAllPlans.mockResolvedValue([
+        { id: 'p1', month: '2026-07', currency: 'USD', expectedIncome: '0' },
+      ]);
+      BudgetPlansDB.calculateAllPlanStatuses.mockResolvedValue(new Map([['p1', STATUS]]));
+
+      const { result } = await renderHook(() => useBudgetPlans(), { wrapper });
+      await waitFor(() => expect(result.current.planStatuses.get('p1')).toEqual(STATUS));
+
+      BudgetPlansDB.calculateAllPlanStatuses.mockRejectedValue(new Error('rates offline'));
+      await act(async () => { await result.current.refreshPlanStatuses(); });
+
+      expect(result.current.planStatuses.get('p1')).toEqual(STATUS);
+    });
+
+    it('clears statuses on DATABASE_RESET', async () => {
+      let resetCb;
+      appEvents.on.mockImplementation((event, cb) => {
+        if (event === EVENTS.DATABASE_RESET) resetCb = cb;
+        return jest.fn();
+      });
+      BudgetPlansDB.getAllPlans.mockResolvedValue([
+        { id: 'p1', month: '2026-07', currency: 'USD', expectedIncome: '0' },
+      ]);
+      BudgetPlansDB.calculateAllPlanStatuses.mockResolvedValue(new Map([['p1', STATUS]]));
+
+      const { result } = await renderHook(() => useBudgetPlans(), { wrapper });
+      await waitFor(() => expect(result.current.planStatuses.size).toBe(1));
+
+      // After the reset the tables are empty, so any follow-up recompute
+      // (triggered by the plans list clearing) also returns an empty map.
+      BudgetPlansDB.calculateAllPlanStatuses.mockResolvedValue(new Map());
+      await act(async () => { resetCb(); });
+      await waitFor(() => expect(result.current.planStatuses.size).toBe(0));
     });
   });
 

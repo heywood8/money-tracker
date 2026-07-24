@@ -558,6 +558,7 @@
   "allocation_needs_target": "Elige una categoría o una cuenta para seguir",
   "edit_income": "Editar ingresos previstos",
   "allocation_unlinked": "Sin vincular",
+  "relink_target": "Objetivo eliminado — toca para volver a vincular",
   "previous_month": "Mes anterior",
   "next_month": "Mes siguiente"
 }

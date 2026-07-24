@@ -561,6 +561,7 @@
   "allocation_needs_target": "Choose a category or an account to track",
   "edit_income": "Edit expected income",
   "allocation_unlinked": "Unlinked",
+  "relink_target": "Target deleted — tap to re-link",
   "previous_month": "Previous month",
   "next_month": "Next month"
 }

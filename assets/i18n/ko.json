@@ -558,6 +558,7 @@
   "allocation_needs_target": "추적할 카테고리나 계좌를 선택하세요",
   "edit_income": "예상 수입 편집",
   "allocation_unlinked": "연결 안 됨",
+  "relink_target": "대상이 삭제됨 — 눌러서 다시 연결",
   "previous_month": "이전 달",
   "next_month": "다음 달"
 }

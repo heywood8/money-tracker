@@ -9,6 +9,7 @@ import { useBudgetPlans } from '../../contexts/BudgetPlansContext';
 import * as Currency from '../../services/currency';
 import { SPACING } from '../../styles/layout';
 import BudgetPlanLineModal from './BudgetPlanLineModal';
+import StatusProgressBar from '../StatusProgressBar';
 
 /** Current month as YYYY-MM. */
 const currentMonthKey = () => {
@@ -40,8 +41,10 @@ const CLOSED_MODAL = { visible: false, mode: 'line', line: null };
  * MonthlyPlanSection — the envelope-style monthly plan editor that sits at the
  * top of the Budget tab: month header with ‹ › navigation, expected income,
  * allocation lines (category- or transfer-target-linked) with live-computed
- * remainder, and add/reorder/delete actions. Purely declarative — no
- * actual-vs-plan tracking yet (that is a later roadmap part).
+ * remainder, add/reorder/delete actions, and plan-vs-actual tracking: per-line
+ * progress against real spending / incoming transfers, actual vs expected
+ * income, and status coloring (statuses come from BudgetPlansDataContext, which
+ * follows the Budget tab's shared convert-all toggle).
  */
 export default function MonthlyPlanSection({ currency = 'USD', expenseCategories = [], accounts = [] }) {
   const { colors } = useThemeColors();
@@ -49,6 +52,8 @@ export default function MonthlyPlanSection({ currency = 'USD', expenseCategories
   const { showDialog } = useDialog();
   const {
     plans,
+    planStatuses,
+    refreshPlanStatuses,
     addPlan,
     copyPlan,
     updatePlan,
@@ -70,6 +75,16 @@ export default function MonthlyPlanSection({ currency = 'USD', expenseCategories
 
   const planId = plan?.id ?? null;
   const planCurrency = plan?.currency || currency;
+
+  // Plan-vs-actual status for the shown month (may be null while computing).
+  const planStatus = (planId && planStatuses && planStatuses.get(planId)) || null;
+  const lineStatusById = useMemo(() => {
+    const map = new Map();
+    for (const lineStatus of planStatus?.lines || []) {
+      map.set(lineStatus.lineId, lineStatus);
+    }
+    return map;
+  }, [planStatus]);
 
   const categoriesById = useMemo(
     () => new Map(expenseCategories.map(c => [c.id, c])),
@@ -191,24 +206,28 @@ export default function MonthlyPlanSection({ currency = 'USD', expenseCategories
         await addLine(plan.id, { ...lineData, sortOrder: lines.length });
       }
       await reloadLines(plan.id);
+      // Line mutations don't touch the plans list, so trigger the status
+      // recompute explicitly (plan-level edits refresh via the context effect).
+      refreshPlanStatuses?.();
       closeModal();
     } catch (error) {
       console.error('Failed to save plan line:', error);
       showDialog('Error', error.message, [{ text: t('ok') }]);
     }
-  }, [plan, modal.line, updateLine, addLine, lines.length, reloadLines, closeModal, showDialog, t]);
+  }, [plan, modal.line, updateLine, addLine, lines.length, reloadLines, refreshPlanStatuses, closeModal, showDialog, t]);
 
   const handleDeleteLine = useCallback(async (lineId) => {
     if (!plan) return;
     try {
       await deleteLine(lineId);
       await reloadLines(plan.id);
+      refreshPlanStatuses?.();
       closeModal();
     } catch (error) {
       console.error('Failed to delete plan line:', error);
       showDialog('Error', error.message, [{ text: t('ok') }]);
     }
-  }, [plan, deleteLine, reloadLines, closeModal, showDialog, t]);
+  }, [plan, deleteLine, reloadLines, refreshPlanStatuses, closeModal, showDialog, t]);
 
   const handleLongPressLine = useCallback((line) => {
     showDialog(
@@ -327,61 +346,84 @@ export default function MonthlyPlanSection({ currency = 'USD', expenseCategories
               <Text style={[styles.incomeText, { color: colors.text }]}>{t('expected_income')}</Text>
             </View>
             <Text style={[styles.incomeAmount, { color: colors.text }]}>
-              {Currency.formatAmount(totals.income, planCurrency)} {planCurrency}
+              {planStatus
+                ? `${Currency.formatAmount(planStatus.totals.actualIncome, planCurrency)} / ${Currency.formatAmount(totals.income, planCurrency)} ${planCurrency}`
+                : `${Currency.formatAmount(totals.income, planCurrency)} ${planCurrency}`}
             </Text>
           </Pressable>
 
           {/* Allocation lines */}
-          {lines.map((line, index) => (
-            <Pressable
-              key={line.id}
-              style={[styles.lineRow, index % 2 === 1 && { backgroundColor: colors.altRow }]}
-              onPress={() => openEditLine(line)}
-              onLongPress={() => handleLongPressLine(line)}
-              accessibilityRole="button"
-              accessibilityLabel={`${t('edit_allocation')}: ${lineDisplayName(line)}`}
-              testID={`plan-line-${line.id}`}
-            >
-              <Icon name={lineIcon(line)} size={20} color={colors.text} />
-              <View style={styles.lineBody}>
-                <Text style={[styles.lineName, { color: colors.text }]} numberOfLines={1}>
-                  {lineDisplayName(line)}
-                </Text>
-                {!!line.comment && (
-                  <Text style={[styles.lineComment, { color: colors.mutedText }]} numberOfLines={1}>
-                    {line.comment}
+          {lines.map((line, index) => {
+            const lineStatus = lineStatusById.get(line.id);
+            const isBroken = line.isBroken || lineStatus?.broken;
+            return (
+              <Pressable
+                key={line.id}
+                style={[styles.lineRow, index % 2 === 1 && { backgroundColor: colors.altRow }]}
+                onPress={() => openEditLine(line)}
+                onLongPress={() => handleLongPressLine(line)}
+                accessibilityRole="button"
+                accessibilityLabel={`${t('edit_allocation')}: ${lineDisplayName(line)}`}
+                testID={`plan-line-${line.id}`}
+              >
+                <View style={styles.lineTop}>
+                  <Icon name={lineIcon(line)} size={20} color={colors.text} />
+                  <View style={styles.lineBody}>
+                    <Text style={[styles.lineName, { color: colors.text }]} numberOfLines={1}>
+                      {lineDisplayName(line)}
+                    </Text>
+                    {!!line.comment && (
+                      <Text style={[styles.lineComment, { color: colors.mutedText }]} numberOfLines={1}>
+                        {line.comment}
+                      </Text>
+                    )}
+                  </View>
+                  <Text style={[styles.lineAmount, { color: colors.text }]}>
+                    {Currency.formatAmount(line.amount, planCurrency)}
                   </Text>
-                )}
-              </View>
-              <Text style={[styles.lineAmount, { color: colors.text }]}>
-                {Currency.formatAmount(line.amount, planCurrency)}
-              </Text>
-              <View style={styles.moveButtons}>
-                <Pressable
-                  onPress={() => handleMove(index, -1)}
-                  disabled={index === 0}
-                  hitSlop={6}
-                  style={styles.moveButton}
-                  accessibilityRole="button"
-                  accessibilityLabel={t('move_up')}
-                  testID={`plan-line-up-${line.id}`}
-                >
-                  <Icon name="chevron-up" size={20} color={index === 0 ? colors.border : colors.mutedText} />
-                </Pressable>
-                <Pressable
-                  onPress={() => handleMove(index, 1)}
-                  disabled={index === lines.length - 1}
-                  hitSlop={6}
-                  style={styles.moveButton}
-                  accessibilityRole="button"
-                  accessibilityLabel={t('move_down')}
-                  testID={`plan-line-down-${line.id}`}
-                >
-                  <Icon name="chevron-down" size={20} color={index === lines.length - 1 ? colors.border : colors.mutedText} />
-                </Pressable>
-              </View>
-            </Pressable>
-          ))}
+                  <View style={styles.moveButtons}>
+                    <Pressable
+                      onPress={() => handleMove(index, -1)}
+                      disabled={index === 0}
+                      hitSlop={6}
+                      style={styles.moveButton}
+                      accessibilityRole="button"
+                      accessibilityLabel={t('move_up')}
+                      testID={`plan-line-up-${line.id}`}
+                    >
+                      <Icon name="chevron-up" size={20} color={index === 0 ? colors.border : colors.mutedText} />
+                    </Pressable>
+                    <Pressable
+                      onPress={() => handleMove(index, 1)}
+                      disabled={index === lines.length - 1}
+                      hitSlop={6}
+                      style={styles.moveButton}
+                      accessibilityRole="button"
+                      accessibilityLabel={t('move_down')}
+                      testID={`plan-line-down-${line.id}`}
+                    >
+                      <Icon name="chevron-down" size={20} color={index === lines.length - 1 ? colors.border : colors.mutedText} />
+                    </Pressable>
+                  </View>
+                </View>
+                {isBroken ? (
+                  <View style={styles.brokenRow} testID={`plan-line-broken-${line.id}`}>
+                    <Icon name="alert-circle-outline" size={14} color={colors.danger} />
+                    <Text style={[styles.brokenText, { color: colors.danger }]} numberOfLines={1}>
+                      {t('relink_target')}
+                    </Text>
+                  </View>
+                ) : lineStatus ? (
+                  <StatusProgressBar
+                    status={{ ...lineStatus, spent: lineStatus.actual, currency: planCurrency }}
+                    compact
+                    showDetails
+                    style={styles.lineProgress}
+                  />
+                ) : null}
+              </Pressable>
+            );
+          })}
 
           {/* Add allocation */}
           <Pressable
@@ -395,18 +437,42 @@ export default function MonthlyPlanSection({ currency = 'USD', expenseCategories
             <Text style={[styles.addText, { color: colors.primary }]}>{t('add_allocation')}</Text>
           </Pressable>
 
-          {/* Totals */}
+          {/* Totals: allocated vs actual, then the planned remainder */}
           <View style={[styles.totalsRow, { borderTopColor: colors.border }]} testID="plan-totals">
             <Text style={[styles.totalsLabel, { color: colors.mutedText }]}>
               {t('allocated')}: {Currency.formatAmount(totals.allocated, planCurrency)} {planCurrency}
             </Text>
-            <Text
-              style={[styles.totalsRemainder, { color: remainderNegative ? colors.danger : colors.text }]}
-              testID="plan-remainder"
-            >
-              {t('remainder')}: {Currency.formatAmount(totals.remainder, planCurrency)} {planCurrency}
-            </Text>
+            {planStatus ? (
+              <Text style={[styles.totalsLabel, { color: colors.mutedText }]} testID="plan-actual-total">
+                {t('actual')}: {Currency.formatAmount(planStatus.totals.totalActual, planCurrency)} {planCurrency}
+              </Text>
+            ) : (
+              <Text
+                style={[styles.totalsRemainder, { color: remainderNegative ? colors.danger : colors.text }]}
+                testID="plan-remainder"
+              >
+                {t('remainder')}: {Currency.formatAmount(totals.remainder, planCurrency)} {planCurrency}
+              </Text>
+            )}
           </View>
+          {planStatus && (
+            <View style={styles.remainderRow}>
+              <Text
+                style={[styles.totalsRemainder, { color: remainderNegative ? colors.danger : colors.text }]}
+                testID="plan-remainder"
+              >
+                {t('remainder')}: {Currency.formatAmount(totals.remainder, planCurrency)} {planCurrency}
+              </Text>
+            </View>
+          )}
+          {planStatus?.unconvertible?.length > 0 && (
+            <View style={styles.convertWarning} testID="plan-unconverted-warning">
+              <Icon name="alert-circle-outline" size={14} color={colors.mutedText} />
+              <Text style={[styles.convertWarningText, { color: colors.mutedText }]}>
+                {t('graphs_currencies_not_converted')}: {planStatus.unconvertible.join(', ')}
+              </Text>
+            </View>
+          )}
         </>
       )}
 
@@ -449,11 +515,31 @@ const styles = StyleSheet.create({
     fontSize: 15,
     fontWeight: '600',
   },
+  brokenRow: {
+    alignItems: 'center',
+    flexDirection: 'row',
+    gap: 6,
+    marginTop: 4,
+  },
+  brokenText: {
+    flex: 1,
+    fontSize: 12,
+  },
   card: {
     borderRadius: 16,
     borderWidth: 1,
     marginBottom: SPACING.md,
     padding: SPACING.md,
+  },
+  convertWarning: {
+    alignItems: 'center',
+    flexDirection: 'row',
+    gap: 6,
+    marginTop: SPACING.sm,
+  },
+  convertWarningText: {
+    flex: 1,
+    fontSize: 12,
   },
   emptyActions: {
     gap: SPACING.sm,
@@ -504,12 +590,18 @@ const styles = StyleSheet.create({
   lineName: {
     fontSize: 15,
   },
+  lineProgress: {
+    marginBottom: 0,
+    marginTop: 6,
+  },
   lineRow: {
-    alignItems: 'center',
     borderRadius: 8,
-    flexDirection: 'row',
     paddingHorizontal: 4,
     paddingVertical: SPACING.sm,
+  },
+  lineTop: {
+    alignItems: 'center',
+    flexDirection: 'row',
   },
   monthHeader: {
     alignItems: 'center',
@@ -542,6 +634,11 @@ const styles = StyleSheet.create({
   primaryActionText: {
     fontSize: 15,
     fontWeight: '600',
+  },
+  remainderRow: {
+    flexDirection: 'row',
+    justifyContent: 'flex-end',
+    marginTop: 2,
   },
   secondaryAction: {
     alignItems: 'center',

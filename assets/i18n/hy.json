@@ -558,6 +558,7 @@
   "allocation_needs_target": "Ընտրեք կատեգորիա կամ հաշիվ՝ հետևելու համար",
   "edit_income": "Խմբագրել սպասվող եկամուտը",
   "allocation_unlinked": "Չկապակցված",
+  "relink_target": "Թիրախը ջնջված է — հպեք՝ նորից կապելու համար",
   "previous_month": "Նախորդ ամիս",
   "next_month": "Հաջորդ ամիս"
 }

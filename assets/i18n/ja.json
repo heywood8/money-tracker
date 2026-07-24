@@ -558,6 +558,7 @@
   "allocation_needs_target": "追跡するカテゴリーまたは口座を選択してください",
   "edit_income": "予定収入を編集",
   "allocation_unlinked": "未リンク",
+  "relink_target": "対象が削除されました — タップして再リンク",
   "previous_month": "前の月",
   "next_month": "次の月"
 }

@@ -558,6 +558,7 @@
   "allocation_needs_target": "Scegli una categoria o un conto da tracciare",
   "edit_income": "Modifica entrate previste",
   "allocation_unlinked": "Non collegato",
+  "relink_target": "Destinazione eliminata — tocca per ricollegare",
   "previous_month": "Mese precedente",
   "next_month": "Mese successivo"
 }

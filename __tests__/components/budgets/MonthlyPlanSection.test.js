@@ -77,9 +77,11 @@ const ACCOUNTS = [
   { id: 2, name: 'Cash', currency: 'USD' },
 ];
 
-const setPlans = ({ plans = [], lines = [] } = {}) => {
+const setPlans = ({ plans = [], lines = [], planStatuses = new Map() } = {}) => {
   mockPlans = {
     plans,
+    planStatuses,
+    refreshPlanStatuses: jest.fn(async () => {}),
     addPlan: jest.fn(async () => {}),
     copyPlan: jest.fn(async () => {}),
     updatePlan: jest.fn(async () => {}),
@@ -156,6 +158,96 @@ describe('MonthlyPlanSection', () => {
       const { getByTestId } = await renderSection();
       await waitFor(() => expect(getByTestId('plan-line-l1')).toBeTruthy());
       expect(flatColor(getByTestId('plan-remainder'))).toBe(COLORS.danger);
+    });
+  });
+
+  describe('Plan vs actual', () => {
+    const LINES = [
+      { id: 'l1', planId: 'p1', amount: '300', label: 'Groceries', comment: null, categoryId: 'cat1', toAccountId: null, sortOrder: 0, isBroken: false },
+      { id: 'l2', planId: 'p1', amount: '200', label: null, comment: null, categoryId: null, toAccountId: 1, sortOrder: 1, isBroken: false },
+    ];
+    const STATUS = {
+      planId: 'p1',
+      month: THIS_MONTH,
+      currency: 'USD',
+      convertAll: true,
+      lines: [
+        { lineId: 'l1', broken: false, amount: '300', actual: '150.00', remaining: '150.00', percentage: 50, isExceeded: false, status: 'safe' },
+        { lineId: 'l2', broken: false, amount: '200', actual: '250.00', remaining: '-50.00', percentage: 125, isExceeded: true, status: 'exceeded' },
+      ],
+      totals: {
+        expectedIncome: '1000.00', actualIncome: '800.00', allocated: '500.00',
+        totalActual: '400.00', plannedRemainder: '500.00', actualRemainder: '400.00',
+      },
+      unconvertible: [],
+    };
+    const setPlanWithStatus = (status = STATUS, lines = LINES) => setPlans({
+      plans: [{ id: 'p1', month: THIS_MONTH, currency: 'USD', expectedIncome: '1000' }],
+      lines,
+      planStatuses: new Map([['p1', status]]),
+    });
+
+    it('renders per-line progress with actuals and status details', async () => {
+      setPlanWithStatus();
+      const { getByTestId, getByText } = await renderSection();
+      await waitFor(() => expect(getByTestId('plan-line-l1')).toBeTruthy());
+      // StatusProgressBar details: "actual / amount" and the remaining text.
+      expect(getByText('150.00 / 300')).toBeTruthy();
+      expect(getByText('remaining_budget: 150.00')).toBeTruthy();
+      expect(getByText('50%')).toBeTruthy();
+      // The exceeded transfer line shows the over-budget wording.
+      expect(getByText('over_budget_by 50.00')).toBeTruthy();
+    });
+
+    it('shows actual income against expected income in the header', async () => {
+      setPlanWithStatus();
+      const { getByTestId } = await renderSection();
+      await waitFor(() => expect(getByTestId('plan-line-l1')).toBeTruthy());
+      expect(getByTestId('plan-income-row')).toHaveTextContent(/800\.00 \/ 1000\.00 USD/);
+    });
+
+    it('renders the totals row with allocated, actual, and planned remainder', async () => {
+      setPlanWithStatus();
+      const { getByTestId } = await renderSection();
+      await waitFor(() => expect(getByTestId('plan-actual-total')).toBeTruthy());
+      expect(getByTestId('plan-actual-total')).toHaveTextContent(/400\.00/);
+      expect(getByTestId('plan-remainder')).toHaveTextContent(/500\.00/);
+    });
+
+    it('shows an inline warning for a broken line instead of a progress bar', async () => {
+      const brokenLine = { id: 'l3', planId: 'p1', amount: '50', label: 'Old', comment: null, categoryId: null, toAccountId: null, sortOrder: 2, isBroken: true };
+      const status = {
+        ...STATUS,
+        lines: [...STATUS.lines, { lineId: 'l3', broken: true, amount: '50', actual: '0', remaining: '50', percentage: 0, isExceeded: false, status: 'broken' }],
+      };
+      setPlanWithStatus(status, [...LINES, brokenLine]);
+      const { getByTestId } = await renderSection();
+      await waitFor(() => expect(getByTestId('plan-line-broken-l3')).toBeTruthy());
+      expect(getByTestId('plan-line-broken-l3')).toHaveTextContent(/relink_target/);
+    });
+
+    it('warns about unconvertible currencies', async () => {
+      setPlanWithStatus({ ...STATUS, unconvertible: ['XYZ', 'ZAR'] });
+      const { getByTestId } = await renderSection();
+      await waitFor(() => expect(getByTestId('plan-unconverted-warning')).toBeTruthy());
+      expect(getByTestId('plan-unconverted-warning')).toHaveTextContent(/XYZ, ZAR/);
+    });
+
+    it('does not render the unconvertible warning when all currencies convert', async () => {
+      setPlanWithStatus();
+      const { getByTestId, queryByTestId } = await renderSection();
+      await waitFor(() => expect(getByTestId('plan-line-l1')).toBeTruthy());
+      expect(queryByTestId('plan-unconverted-warning')).toBeNull();
+    });
+
+    it('triggers a status refresh after saving a line', async () => {
+      setPlanWithStatus();
+      const { getByTestId } = await renderSection();
+      await fireEvent.press(getByTestId('plan-add-line'));
+      await waitFor(() => expect(getByTestId('mock-line-modal')).toBeTruthy());
+      await fireEvent.press(getByTestId('mock-save-line'));
+      await waitFor(() => expect(mockPlans.addLine).toHaveBeenCalled());
+      expect(mockPlans.refreshPlanStatuses).toHaveBeenCalled();
     });
   });
 
