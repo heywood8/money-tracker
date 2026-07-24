@@ -1,4 +1,5 @@
 // __tests__/screens/BudgetScreen.test.js
+/* eslint-disable react/prop-types */
 import React from 'react';
 import { render, fireEvent, waitFor, within } from '@testing-library/react-native';
 import BudgetScreen from '../../app/screens/BudgetScreen';

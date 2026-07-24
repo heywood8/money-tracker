@@ -390,7 +390,16 @@ If tests fail, DO NOT push. Fix the failures first.
 
 ### Code Review Before a Pull Request
 
-**After implementing a feature and passing tests, run a code review of the change before opening the pull request.** Invoke the `/code-review` skill on the working diff (default effort, or `high`/`max` for larger or riskier changes), address the findings it surfaces (fix them, or consciously decide they're not worth acting on), then open the PR. This is a required step in the feature workflow: implement → tests green → `/code-review` → PR. Do not skip it for non-trivial feature work.
+**After implementing a feature and passing tests, run a code review of the change before opening the pull request.** Invoke the `/code-review` skill on the working diff (default effort, or `high`/`max` for larger or riskier changes), address the findings it surfaces (fix them, or consciously decide they're not worth acting on), then open the PR. This is a required step in the feature workflow: implement → tests green → `/code-review` → PR → CI green. Do not skip it for non-trivial feature work.
+
+### Wait for CI After Opening a Pull Request
+
+**Opening the PR is not the end of the task — the PR is only done when CI is green.** After creating or pushing to a PR, wait for the GitHub Actions checks to finish and inspect the result (`gh pr checks <N> --watch`, or poll `gh pr checks <N>`). If any check fails (lint, tests, CodeQL, title validation, etc.), read the failing job's log (`gh run view --job <job-id> --log`), reproduce the failure locally, fix it, commit, push, and wait for CI again. Repeat until every required check passes. Do not report a PR as finished, and do not move on to the next task, while CI is red or still running.
+
+**Reproduce CI checks locally before and after pushing** so you catch failures without burning CI round-trips:
+- Lint runs `eslint . --ext .js,.jsx,.ts,.tsx --max-warnings 0` — **zero** warnings allowed, so a single new `react/prop-types` (or any) warning fails the build. Run `npx eslint . --ext .js,.jsx,.ts,.tsx --max-warnings 0` locally and get it clean before pushing. For unavoidable warnings in test mocks, follow the existing convention (`/* eslint-disable react/prop-types */` at the top of the test file, as in `__tests__/screens/AccountsScreen.test.js`).
+- Tests must pass (`Run Tests` job). Remember the worktree caveat: run `npx jest --testPathIgnorePatterns=/node_modules/` locally (the default config's `/.claude/` ignore otherwise matches the whole worktree path and runs zero tests).
+- The PR title must follow Conventional Commits (a `Validate PR title` check enforces it).
 
 **Testing Patterns:**
 
