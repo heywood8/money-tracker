@@ -1,5 +1,12 @@
 # Changelog
 
+## [0.215.0](https://github.com/heywood8/money-tracker/compare/penny-v0.214.14...penny-v0.215.0) (2026-07-24)
+
+
+### Features
+
+* **graphs:** migrate all charts to Victory Native XL (drop chart-kit) ([#1391](https://github.com/heywood8/money-tracker/issues/1391)) ([1d77619](https://github.com/heywood8/money-tracker/commit/1d776193028297ece40f79b0b846f1297f4cc5f5))
+
 ## [0.214.14](https://github.com/heywood8/money-tracker/compare/penny-v0.214.13...penny-v0.214.14) (2026-07-23)
 
 
