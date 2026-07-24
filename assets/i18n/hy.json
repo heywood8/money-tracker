@@ -318,6 +318,7 @@
   "spent_amount": "Ծախսված",
   "over_budget_by": "Բյուջեից ավելի՝",
   "no_budget_set": "Բյուջե սահմանված չէ",
+  "no_budgets_yet": "Դեռ բյուջեներ չկան։ Հպեք +՝ ստեղծելու համար։",
   "delete_budget_confirm": "Վստա՞հ եք, որ ցանկանում եք ջնջել այս բյուջեն։",
   "budget_for_category": "Բյուջե՝",
   "current_period": "Ընթացիկ ժամանակահատված",

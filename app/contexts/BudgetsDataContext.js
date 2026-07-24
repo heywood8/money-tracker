@@ -1,4 +1,4 @@
-import React, { createContext, useContext, useState, useEffect, useCallback, useMemo } from 'react';
+import React, { createContext, useContext, useState, useEffect, useCallback, useMemo, useRef } from 'react';
 import PropTypes from 'prop-types';
 import * as BudgetsDB from '../services/BudgetsDB';
 import { appEvents, EVENTS } from '../services/eventEmitter';
@@ -10,18 +10,36 @@ export const BudgetsDataProvider = ({ children }) => {
   const [budgetStatuses, setBudgetStatuses] = useState(new Map());
   const [loading, setLoading] = useState(true);
   const [saveError, setSaveError] = useState(null);
+  // Whether spending in other currencies counts toward each budget (converted
+  // into the budget's currency at the current rate). On by default so
+  // multi-currency totals are complete out of the box — same default as the
+  // Graphs convert toggle. Mirrored in a ref so refreshBudgetStatuses keeps a
+  // stable identity (its consumers subscribe to events with it as a dep).
+  const convertAllRef = useRef(true);
+  const [convertAllBudgets, setConvertAllBudgetsState] = useState(true);
 
   /**
    * Refresh budget statuses for all active budgets
    */
   const refreshBudgetStatuses = useCallback(async () => {
     try {
-      const statusMap = await BudgetsDB.calculateAllBudgetStatuses();
+      const statusMap = await BudgetsDB.calculateAllBudgetStatuses(undefined, convertAllRef.current);
       setBudgetStatuses(statusMap);
     } catch (error) {
       console.error('Failed to refresh budget statuses:', error);
     }
   }, []);
+
+  /**
+   * Flip the convert-all-currencies mode and recompute statuses with it.
+   */
+  const setConvertAllBudgets = useCallback((value) => {
+    const next = typeof value === 'function' ? value(convertAllRef.current) : value;
+    if (next === convertAllRef.current) return;
+    convertAllRef.current = next;
+    setConvertAllBudgetsState(next);
+    refreshBudgetStatuses();
+  }, [refreshBudgetStatuses]);
 
   /**
    * Load all budgets from database
@@ -95,6 +113,8 @@ export const BudgetsDataProvider = ({ children }) => {
     budgetStatuses,
     loading,
     saveError,
+    convertAllBudgets,
+    setConvertAllBudgets,
     reloadBudgets,
     refreshBudgetStatuses,
     // Internal setters for actions context
@@ -106,6 +126,8 @@ export const BudgetsDataProvider = ({ children }) => {
     budgetStatuses,
     loading,
     saveError,
+    convertAllBudgets,
+    setConvertAllBudgets,
     reloadBudgets,
     refreshBudgetStatuses,
   ]);

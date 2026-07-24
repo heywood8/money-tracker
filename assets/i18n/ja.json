@@ -318,6 +318,7 @@
   "spent_amount": "使用済み",
   "over_budget_by": "予算超過額",
   "no_budget_set": "予算が設定されていません",
+  "no_budgets_yet": "まだ予算がありません。+ をタップして作成してください。",
   "delete_budget_confirm": "この予算を削除してもよろしいですか？",
   "budget_for_category": "予算:",
   "current_period": "現在の期間",

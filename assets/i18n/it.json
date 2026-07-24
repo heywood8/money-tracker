@@ -318,6 +318,7 @@
   "spent_amount": "Speso",
   "over_budget_by": "Sforamento di",
   "no_budget_set": "Nessun budget impostato",
+  "no_budgets_yet": "Non ci sono ancora budget. Tocca + per crearne uno.",
   "delete_budget_confirm": "Sei sicuro di voler eliminare questo budget?",
   "budget_for_category": "Budget per",
   "current_period": "Periodo corrente",

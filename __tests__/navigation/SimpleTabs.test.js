@@ -85,6 +85,15 @@ jest.mock('../../app/screens/PlannedOperationsScreen', () => {
   };
 });
 
+jest.mock('../../app/screens/BudgetScreen', () => {
+  const React = require('react');
+  const { View, Text } = require('react-native');
+  return function BudgetScreen() {
+    return React.createElement(View, { testID: 'budget-screen' },
+      React.createElement(Text, {}, 'Budget Screen'));
+  };
+});
+
 // Mock Header component
 jest.mock('../../app/components/Header', () => {
   const React = require('react');

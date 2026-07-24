@@ -318,6 +318,7 @@
   "spent_amount": "사용 금액",
   "over_budget_by": "초과 금액",
   "no_budget_set": "예산이 설정되지 않았습니다",
+  "no_budgets_yet": "아직 예산이 없습니다. +를 눌러 만드세요.",
   "delete_budget_confirm": "이 예산을 삭제하시겠습니까?",
   "budget_for_category": "예산:",
   "current_period": "현재 기간",

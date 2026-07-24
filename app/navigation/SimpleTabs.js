@@ -22,6 +22,7 @@ import OperationsScreen from '../screens/OperationsScreen';
 import AccountsScreen from '../screens/AccountsScreen';
 import GraphsScreen from '../screens/GraphsScreen';
 import PlannedOperationsScreen from '../screens/PlannedOperationsScreen';
+import BudgetScreen from '../screens/BudgetScreen';
 import { useThemeColors } from '../contexts/ThemeColorsContext';
 import { useLocalization } from '../contexts/LocalizationContext';
 import { useDisplaySettings } from '../contexts/DisplaySettingsContext';
@@ -44,6 +45,7 @@ const TAB_ICONS = {
   Accounts: 'wallet-outline',
   Graphs: 'chart-line',
   Planned: 'calendar-clock',
+  Budget: 'piggy-bank-outline',
   Settings: 'cog-outline',
 };
 
@@ -278,6 +280,7 @@ export default function SimpleTabs() {
     const tabs = [{ key: 'Operations', label: t('operations') || 'Operations' }];
     tabs.push({ key: 'Graphs', label: t('graphs') || 'Graphs' });
     tabs.push({ key: 'Planned', label: t('planned') || 'Planned' });
+    tabs.push({ key: 'Budget', label: t('budget') || 'Budget' });
     if (showAccountsTab) {
       tabs.push({ key: 'Accounts', label: t('accounts') || 'Accounts' });
     }
@@ -299,14 +302,15 @@ export default function SimpleTabs() {
   // be adjacent to the source (worklet thread, no React render), animate the
   // strip exactly 1 screen width (same as adjacent), then snap strip to the
   // real resting position and zero the offset — both on the worklet thread so
-  // there is no visible jump. All 4 screens stay pre-mounted; no overlay needed.
-  // Five sets of animation values are allocated up front (hooks can't be
+  // there is no visible jump. All screens stay pre-mounted; no overlay needed.
+  // Six sets of animation values are allocated up front (hooks can't be
   // conditional); only the first TABS.length are used at any time.
   const screenAdjust0 = useSharedValue(0);
   const screenAdjust1 = useSharedValue(0);
   const screenAdjust2 = useSharedValue(0);
   const screenAdjust3 = useSharedValue(0);
   const screenAdjust4 = useSharedValue(0);
+  const screenAdjust5 = useSharedValue(0);
   // Opacity per screen — intermediates are zeroed during non-adjacent transitions
   // so they don't bleed through when the target overlaps their strip position.
   const screenOpacity0 = useSharedValue(1);
@@ -314,12 +318,14 @@ export default function SimpleTabs() {
   const screenOpacity2 = useSharedValue(1);
   const screenOpacity3 = useSharedValue(1);
   const screenOpacity4 = useSharedValue(1);
+  const screenOpacity5 = useSharedValue(1);
 
   const screenAdjustedStyle0 = useAnimatedStyle(() => ({ opacity: screenOpacity0.value, transform: [{ translateX: screenAdjust0.value }] }));
   const screenAdjustedStyle1 = useAnimatedStyle(() => ({ opacity: screenOpacity1.value, transform: [{ translateX: screenAdjust1.value }] }));
   const screenAdjustedStyle2 = useAnimatedStyle(() => ({ opacity: screenOpacity2.value, transform: [{ translateX: screenAdjust2.value }] }));
   const screenAdjustedStyle3 = useAnimatedStyle(() => ({ opacity: screenOpacity3.value, transform: [{ translateX: screenAdjust3.value }] }));
   const screenAdjustedStyle4 = useAnimatedStyle(() => ({ opacity: screenOpacity4.value, transform: [{ translateX: screenAdjust4.value }] }));
+  const screenAdjustedStyle5 = useAnimatedStyle(() => ({ opacity: screenOpacity5.value, transform: [{ translateX: screenAdjust5.value }] }));
 
   // Called on JS thread when a non-adjacent transition finishes.
   const clearTransitioningRef = useCallback(() => {
@@ -353,8 +359,8 @@ export default function SimpleTabs() {
       const direction = newIndex > oldIndex ? 1 : -1;
       // How far to shift the target so it appears one screen width past the source.
       const adjacentOffset = (oldIndex + direction - newIndex) * SCREEN_WIDTH;
-      const adjSharedValues = [screenAdjust0, screenAdjust1, screenAdjust2, screenAdjust3, screenAdjust4];
-      const opacityValues = [screenOpacity0, screenOpacity1, screenOpacity2, screenOpacity3, screenOpacity4];
+      const adjSharedValues = [screenAdjust0, screenAdjust1, screenAdjust2, screenAdjust3, screenAdjust4, screenAdjust5];
+      const opacityValues = [screenOpacity0, screenOpacity1, screenOpacity2, screenOpacity3, screenOpacity4, screenOpacity5];
       const targetAdjust = adjSharedValues[newIndex];
 
       isTransitioningShared.value = true;
@@ -378,6 +384,7 @@ export default function SimpleTabs() {
         opacityValues[2].value = 1;
         opacityValues[3].value = 1;
         opacityValues[4].value = 1;
+        opacityValues[5].value = 1;
         isTransitioningShared.value = false;
         runOnJS(clearTransitioningRef)();
       });
@@ -388,8 +395,8 @@ export default function SimpleTabs() {
     // destination content is on-screen and slides in together with the strip.
     setActive(tabKey);
   }, [TABS, active, activeIndex, translateX, pillPosition, isTransitioningShared,
-    screenAdjust0, screenAdjust1, screenAdjust2, screenAdjust3, screenAdjust4,
-    screenOpacity0, screenOpacity1, screenOpacity2, screenOpacity3, screenOpacity4,
+    screenAdjust0, screenAdjust1, screenAdjust2, screenAdjust3, screenAdjust4, screenAdjust5,
+    screenOpacity0, screenOpacity1, screenOpacity2, screenOpacity3, screenOpacity4, screenOpacity5,
     clearTransitioningRef]);
 
   // When the Accounts tab is toggled on/off the tab set changes size and indices
@@ -544,6 +551,10 @@ export default function SimpleTabs() {
     () => (backgroundMounted ? <PlannedOperationsScreen /> : backgroundPlaceholder),
     [backgroundMounted, backgroundPlaceholder],
   );
+  const budgetScreen = useMemo(
+    () => (backgroundMounted ? <BudgetScreen /> : backgroundPlaceholder),
+    [backgroundMounted, backgroundPlaceholder],
+  );
   const settingsScreen = useMemo(
     () => (backgroundMounted
       ? <SettingsScreen setSubPanelActive={setSubPanelActive} />
@@ -557,15 +568,16 @@ export default function SimpleTabs() {
     const list = [{ key: 'Operations', el: operationsScreen }];
     list.push({ key: 'Graphs', el: graphsScreen });
     list.push({ key: 'Planned', el: plannedScreen });
+    list.push({ key: 'Budget', el: budgetScreen });
     if (showAccountsTab) list.push({ key: 'Accounts', el: accountsScreen });
     list.push({ key: 'Settings', el: settingsScreen });
     return list;
-  }, [showAccountsTab, operationsScreen, accountsScreen, graphsScreen, plannedScreen, settingsScreen]);
+  }, [showAccountsTab, operationsScreen, accountsScreen, graphsScreen, plannedScreen, budgetScreen, settingsScreen]);
 
   const renderScreens = useCallback(() => {
     const positionStyles = [
       screenAdjustedStyle0, screenAdjustedStyle1, screenAdjustedStyle2,
-      screenAdjustedStyle3, screenAdjustedStyle4,
+      screenAdjustedStyle3, screenAdjustedStyle4, screenAdjustedStyle5,
     ];
     return (
       <>
@@ -578,7 +590,7 @@ export default function SimpleTabs() {
     );
   }, [orderedScreens,
     screenAdjustedStyle0, screenAdjustedStyle1, screenAdjustedStyle2,
-    screenAdjustedStyle3, screenAdjustedStyle4]);
+    screenAdjustedStyle3, screenAdjustedStyle4, screenAdjustedStyle5]);
 
   const displayedTab = active;
 
@@ -614,8 +626,9 @@ export default function SimpleTabs() {
       <SafeAreaView edges={['bottom']} style={styles.floatingBarWrapper} testID="tab-bar-wrapper">
         <View style={[
           styles.floatingBar,
-          // Widen the bar for the extra tab so labels don't get cramped.
+          // Widen the bar for the extra tabs so labels don't get cramped.
           TABS.length >= 5 && styles.floatingBarWide,
+          TABS.length >= 6 && styles.floatingBarExtraWide,
           {
             backgroundColor: withAlpha(colors.surface, 0.87),
             borderColor: withAlpha(colors.border, 0.5),
@@ -682,6 +695,9 @@ const styles = StyleSheet.create({
       },
     }),
   },
+  floatingBarExtraWide: {
+    width: '94%',
+  },
   floatingBarWide: {
     width: '84%',
   },
@@ -706,8 +722,8 @@ const styles = StyleSheet.create({
   screensContainer: {
     flex: 1,
     flexDirection: 'row',
-    // Base width; overridden inline to SCREEN_WIDTH * TABS.length (4 or 5 tabs).
-    width: SCREEN_WIDTH * 4,
+    // Base width; overridden inline to SCREEN_WIDTH * TABS.length (5 or 6 tabs).
+    width: SCREEN_WIDTH * 5,
   },
   tab: {
     flex: 1,

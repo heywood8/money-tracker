@@ -318,6 +318,7 @@
   "spent_amount": "已花费",
   "over_budget_by": "超支",
   "no_budget_set": "未设置预算",
+  "no_budgets_yet": "暂无预算。点按 + 创建。",
   "delete_budget_confirm": "确定要删除此预算吗？",
   "budget_for_category": "预算用于",
   "current_period": "当前期间",

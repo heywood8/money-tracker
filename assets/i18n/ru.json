@@ -320,6 +320,7 @@
   "spent_amount": "Потрачено",
   "over_budget_by": "Превышение на",
   "no_budget_set": "Бюджет не установлен",
+  "no_budgets_yet": "Пока нет бюджетов. Нажмите +, чтобы создать.",
   "delete_budget_confirm": "Вы уверены, что хотите удалить этот бюджет?",
   "budget_for_category": "Бюджет для",
   "current_period": "Текущий период",
