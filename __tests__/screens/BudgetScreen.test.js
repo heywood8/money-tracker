@@ -1,6 +1,6 @@
 // __tests__/screens/BudgetScreen.test.js
 import React from 'react';
-import { render, fireEvent, waitFor } from '@testing-library/react-native';
+import { render, fireEvent, waitFor, within } from '@testing-library/react-native';
 import BudgetScreen from '../../app/screens/BudgetScreen';
 
 // ── Mocks ──────────────────────────────────────────────────────────────────
@@ -201,12 +201,14 @@ describe('BudgetScreen', () => {
         budgets: [makeBudget({ id: 'bx', currency: 'XYZ' })],
         statuses: [makeStatus({ budgetId: 'bx', currency: 'XYZ' })],
       });
-      const { findByTestId, getByText } = await render(<BudgetScreen />);
+      const { findByTestId } = await render(<BudgetScreen />);
       // The warning appears only after the currency-init effect sets the target
       // currency and the async rate fetch resolves; findByTestId with a generous
-      // timeout keeps this stable under full-suite worker contention.
-      await findByTestId('budget-unconverted-warning', {}, { timeout: 5000 });
-      expect(getByText(/XYZ/)).toBeTruthy();
+      // timeout keeps this stable under full-suite worker contention. Scope the
+      // XYZ assertion to the warning node — the budget row also renders "· XYZ",
+      // so an unscoped getByText(/XYZ/) would match two elements and throw.
+      const warning = await findByTestId('budget-unconverted-warning', {}, { timeout: 5000 });
+      expect(within(warning).getByText(/XYZ/)).toBeTruthy();
     });
   });
 
