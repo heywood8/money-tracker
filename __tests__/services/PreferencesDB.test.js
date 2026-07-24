@@ -70,6 +70,7 @@ describe('PreferencesDB', () => {
         'HIDE_BALANCES',
         'ATTACH_LOCATION',
         'SHOW_ACCOUNTS_TAB',
+        'SHOW_BUDGET_TAB',
         'GOOGLE_SHEETS_SPREADSHEET_ID',
         'DEFAULT_ACCOUNT_ID',
         'BANK_NOTIFICATIONS_ENABLED',

@@ -2,6 +2,7 @@ import { executeQuery, queryAll, queryFirst, executeTransaction } from './db';
 import * as CategoriesDB from './CategoriesDB';
 import * as Currency from './currency';
 import { formatDate as formatLocalDate } from './BalanceHistoryDB';
+import { fetchRatesToTarget, convertWithRateMap } from './OperationsDB';
 
 /**
  * Map database field names to camelCase for application use
@@ -568,6 +569,11 @@ export const getPreviousPeriodDates = (periodType, currentStart) => {
  * @param {string} startDate - Period start (YYYY-MM-DD)
  * @param {string} endDate - Period end (YYYY-MM-DD)
  * @param {boolean} includeChildren - Include child category spending (default: true)
+ * @param {boolean} convertAll - When true, spending from accounts in ANY
+ *   currency counts toward the budget, converted into the budget's currency at
+ *   the current rate (offline table first, live fallback) — the same
+ *   conversion path Graphs uses, so the two surfaces agree. Currencies with no
+ *   available rate are dropped from the sum, mirroring mergeConvertedByCategory.
  * @returns {Promise<number>} Total spending amount
  */
 export const calculateSpendingForBudget = async (
@@ -576,6 +582,7 @@ export const calculateSpendingForBudget = async (
   startDate,
   endDate,
   includeChildren = true,
+  convertAll = false,
 ) => {
   try {
     let categoryIds = [categoryId];
@@ -586,8 +593,33 @@ export const calculateSpendingForBudget = async (
       categoryIds = [...categoryIds, ...descendants.map(cat => cat.id)];
     }
 
-    // Query operations in date range for these categories and currency
     const placeholders = categoryIds.map(() => '?').join(',');
+
+    if (convertAll) {
+      const rows = await queryAll(
+        `SELECT a.currency as currency, SUM(CAST(o.amount AS REAL)) as total
+         FROM operations o
+         JOIN accounts a ON o.account_id = a.id
+         WHERE o.category_id IN (${placeholders})
+           AND o.type = 'expense'
+           AND o.date >= ?
+           AND o.date <= ?
+         GROUP BY a.currency`,
+        [...categoryIds, startDate, endDate],
+      );
+
+      const rowList = rows || [];
+      const rateByCurrency = await fetchRatesToTarget(rowList.map(r => r.currency), currency);
+      let total = '0';
+      for (const row of rowList) {
+        const converted = convertWithRateMap(String(row.total ?? '0'), row.currency, currency, rateByCurrency);
+        if (converted === null) continue;
+        total = Currency.add(total, converted);
+      }
+      return total;
+    }
+
+    // Query operations in date range for these categories and currency
     const query = `
       SELECT SUM(CAST(o.amount AS REAL)) as total
       FROM operations o
@@ -613,9 +645,11 @@ export const calculateSpendingForBudget = async (
  * Calculate budget status for a budget
  * @param {string} budgetId - Budget ID
  * @param {Date} referenceDate - Date to calculate status for (default: today)
+ * @param {boolean} convertAll - Count spending from accounts in any currency,
+ *   converted into the budget's currency (see calculateSpendingForBudget)
  * @returns {Promise<Object>} Budget status object
  */
-export const calculateBudgetStatus = async (budgetId, referenceDate = new Date()) => {
+export const calculateBudgetStatus = async (budgetId, referenceDate = new Date(), convertAll = false) => {
   try {
     const budget = await getBudgetById(budgetId);
     if (!budget) {
@@ -637,6 +671,7 @@ export const calculateBudgetStatus = async (budgetId, referenceDate = new Date()
       startDateStr,
       endDateStr,
       true, // Include children
+      convertAll,
     );
 
     // Calculate metrics
@@ -678,16 +713,18 @@ export const calculateBudgetStatus = async (budgetId, referenceDate = new Date()
 /**
  * Calculate status for all active budgets
  * @param {Date} referenceDate - Reference date
+ * @param {boolean} convertAll - Count spending from accounts in any currency,
+ *   converted into each budget's currency (see calculateSpendingForBudget)
  * @returns {Promise<Map<string, Object>>} Map of budgetId → status
  */
-export const calculateAllBudgetStatuses = async (referenceDate = new Date()) => {
+export const calculateAllBudgetStatuses = async (referenceDate = new Date(), convertAll = false) => {
   try {
     const activeBudgets = await getActiveBudgets(referenceDate);
     const statusMap = new Map();
 
     for (const budget of activeBudgets) {
       try {
-        const status = await calculateBudgetStatus(budget.id, referenceDate);
+        const status = await calculateBudgetStatus(budget.id, referenceDate, convertAll);
         statusMap.set(budget.id, status);
       } catch (error) {
         console.error(`Failed to calculate status for budget ${budget.id}:`, error);

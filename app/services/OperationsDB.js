@@ -1105,7 +1105,7 @@ export const getIncomeByCategory = async (startDate, endDate) => {
  * @param {string} targetCurrency
  * @returns {Promise<Map<string, string|null>>} source currency → rate string or null
  */
-const fetchRatesToTarget = async (currencies, targetCurrency) => {
+export const fetchRatesToTarget = async (currencies, targetCurrency) => {
   const distinct = [...new Set([...currencies].filter(c => c && c !== targetCurrency))];
   const rateByCurrency = new Map();
   await Promise.all(distinct.map(async (from) => {
@@ -1128,7 +1128,7 @@ const fetchRatesToTarget = async (currencies, targetCurrency) => {
  * @returns {string|null} converted amount, or null when the source currency has
  *   no rate (or conversion failed) so the caller should skip the row.
  */
-const convertWithRateMap = (rawAmount, fromCurrency, targetCurrency, rateByCurrency) => {
+export const convertWithRateMap = (rawAmount, fromCurrency, targetCurrency, rateByCurrency) => {
   if (fromCurrency === targetCurrency) return rawAmount;
   const rate = rateByCurrency.get(fromCurrency);
   if (!rate) return null; // no rate available, cannot express in target
