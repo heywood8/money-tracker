@@ -35,6 +35,7 @@ export const ImportProgressProvider = ({ children }) => {
       { id: 'operations', label: 'Restoring operations', status: 'pending', data: null },
       { id: 'balance_history', label: 'Restoring balance history', status: 'pending', data: null },
       { id: 'budgets', label: 'Restoring budgets', status: 'pending', data: null },
+      { id: 'budget_plans', label: 'Restoring budget plans', status: 'pending', data: null },
       { id: 'metadata', label: 'Restoring metadata', status: 'pending', data: null },
       { id: 'upgrades', label: 'Performing post-restore upgrades', status: 'pending', data: null },
       { id: 'complete', label: 'Database restored successfully', status: 'pending', data: null },

@@ -171,7 +171,9 @@ describe('BackupRestore', () => {
         },
       });
       expect(backup.timestamp).toBeDefined();
-      expect(mockDb.queryAll).toHaveBeenCalledTimes(8);
+      // accounts, categories, operations, budgets, app_metadata, balance_history,
+      // planned_operations, notification_merchant_rules, budget_plans, budget_plan_lines
+      expect(mockDb.queryAll).toHaveBeenCalledTimes(10);
     });
 
     it('includes empty arrays when tables are empty', async () => {
@@ -534,7 +536,7 @@ describe('BackupRestore', () => {
       expect(deleteCalls.length).toBeGreaterThan(0);
     });
 
-    it('deletes in correct order (budgets, operations, categories, accounts)', async () => {
+    it('deletes in correct order (budgets, budget plans, operations, categories, accounts)', async () => {
       const mockDbInstance = {
         runAsync: jest.fn().mockImplementation(() => Promise.resolve({ lastInsertRowId: Math.floor(Math.random() * 1000) })),
         getAllAsync: jest.fn().mockResolvedValue([]),
@@ -559,10 +561,12 @@ describe('BackupRestore', () => {
       expect(deleteCalls[0]).toContain('notification_merchant_rules');
       expect(deleteCalls[1]).toContain('planned_operations');
       expect(deleteCalls[2]).toContain('budgets');
-      expect(deleteCalls[3]).toContain('accounts_balance_history');
-      expect(deleteCalls[4]).toContain('operations');
-      expect(deleteCalls[5]).toContain('categories');
-      expect(deleteCalls[6]).toContain('accounts');
+      expect(deleteCalls[3]).toContain('budget_plan_lines');
+      expect(deleteCalls[4]).toContain('budget_plans');
+      expect(deleteCalls[5]).toContain('accounts_balance_history');
+      expect(deleteCalls[6]).toContain('operations');
+      expect(deleteCalls[7]).toContain('categories');
+      expect(deleteCalls[8]).toContain('accounts');
     });
 
     it('preserves db_version metadata', async () => {
@@ -1560,6 +1564,256 @@ op-2,income,20,acc-1,cat-1`;
 
       // Should still succeed despite snapshot failure
       await expect(BackupRestore.restoreBackup(backup)).resolves.toBeUndefined();
+    });
+  });
+
+  describe('Budget plans round-trip (Budgets v2, issue #1398)', () => {
+    // A UUID account so the restore exercises account-ID remapping on the
+    // transfer line's to_account_id.
+    const planAccount = { id: 'acc-uuid', name: 'Savings', balance: '0', currency: 'USD' };
+    const planCategory = {
+      id: 'cat-1', name: 'Food', type: 'folder', category_type: 'expense',
+      is_shadow: 0, created_at: 'x', updated_at: 'y',
+    };
+    const mockPlan = {
+      id: 'plan-1', month: '2026-07', currency: 'USD', expected_income: '3000.00',
+      created_at: '2026-07-01T00:00:00.000Z', updated_at: '2026-07-01T00:00:00.000Z',
+    };
+    // Non-ASCII comment must survive the round-trip.
+    const NON_ASCII_COMMENT = 'Отложить на 日本 — €100';
+    const categoryLine = {
+      id: 'line-cat', plan_id: 'plan-1', label: 'Groceries', amount: '400.00',
+      comment: NON_ASCII_COMMENT, category_id: 'cat-1', to_account_id: null,
+      sort_order: 0, created_at: 'x', updated_at: 'y',
+    };
+    const transferLine = {
+      id: 'line-xfer', plan_id: 'plan-1', label: 'To savings', amount: '500.00',
+      comment: null, category_id: null, to_account_id: 'acc-uuid',
+      sort_order: 1, created_at: 'x', updated_at: 'y',
+    };
+
+    // The UUID account is auto-assigned a new integer ID on insert; pin it to a
+    // known value so the transfer line's remapped to_account_id is deterministic.
+    const REMAPPED_ACCOUNT_ID = 42;
+    const makeDbInstance = () => {
+      let insertCount = 0;
+      return {
+        runAsync: jest.fn().mockImplementation((query) => {
+          if (typeof query === 'string' && query.includes('INSERT INTO accounts')) {
+            return Promise.resolve({ lastInsertRowId: REMAPPED_ACCOUNT_ID });
+          }
+          return Promise.resolve({ lastInsertRowId: ++insertCount });
+        }),
+        getAllAsync: jest.fn().mockResolvedValue([
+          { id: 'shadow-adjustment-expense' },
+          { id: 'shadow-adjustment-income' },
+        ]),
+      };
+    };
+
+    const findInsert = (dbInstance, table) =>
+      dbInstance.runAsync.mock.calls.filter(
+        (c) => typeof c[0] === 'string' && c[0].includes(`INSERT INTO ${table}`),
+      );
+
+    const backupWithPlan = () => ({
+      version: 1,
+      timestamp: '2026-07-01T00:00:00.000Z',
+      platform: 'native',
+      data: {
+        accounts: [planAccount],
+        categories: [planCategory],
+        operations: [],
+        app_metadata: mockMetadata,
+        budget_plans: [mockPlan],
+        budget_plan_lines: [categoryLine, transferLine],
+      },
+    });
+
+    it('includes budget_plans and budget_plan_lines in a created backup', async () => {
+      mockDb.queryAll.mockImplementation((query) => {
+        if (query.includes('budget_plan_lines')) return Promise.resolve([categoryLine, transferLine]);
+        if (query.includes('budget_plans')) return Promise.resolve([mockPlan]);
+        return Promise.resolve([]);
+      });
+
+      const backup = await BackupRestore.createBackup();
+
+      expect(backup.data.budget_plans).toEqual([mockPlan]);
+      expect(backup.data.budget_plan_lines).toEqual([categoryLine, transferLine]);
+    });
+
+    it('restores a plan with a category line and a transfer line (account FK remapped)', async () => {
+      const dbInstance = makeDbInstance();
+      mockDb.executeTransaction.mockImplementation(async (cb) => { await cb(dbInstance); });
+
+      await BackupRestore.restoreBackup(backupWithPlan());
+
+      const planInserts = findInsert(dbInstance, 'budget_plans');
+      expect(planInserts).toHaveLength(1);
+      expect(planInserts[0][1]).toEqual([
+        'plan-1', '2026-07', 'USD', '3000.00',
+        '2026-07-01T00:00:00.000Z', '2026-07-01T00:00:00.000Z',
+      ]);
+
+      const lineInserts = findInsert(dbInstance, 'budget_plan_lines');
+      expect(lineInserts).toHaveLength(2);
+
+      // Category line: keeps category_id as-is, to_account_id null, comment intact.
+      const catCall = lineInserts.find(c => c[1][0] === 'line-cat');
+      expect(catCall[1]).toEqual([
+        'line-cat', 'plan-1', 'Groceries', '400.00', NON_ASCII_COMMENT,
+        'cat-1', null, 0, 'x', 'y',
+      ]);
+
+      // Transfer line: category_id null, to_account_id remapped 'acc-uuid' -> 42.
+      const xferCall = lineInserts.find(c => c[1][0] === 'line-xfer');
+      expect(xferCall[1]).toEqual([
+        'line-xfer', 'plan-1', 'To savings', '500.00', null,
+        null, REMAPPED_ACCOUNT_ID, 1, 'x', 'y',
+      ]);
+    });
+
+    it('skips a plan line whose parent plan was not restored', async () => {
+      const dbInstance = makeDbInstance();
+      mockDb.executeTransaction.mockImplementation(async (cb) => { await cb(dbInstance); });
+
+      const backup = backupWithPlan();
+      backup.data.budget_plan_lines = [
+        categoryLine,
+        { ...transferLine, id: 'line-orphan', plan_id: 'plan-does-not-exist', to_account_id: null, category_id: 'cat-1' },
+      ];
+
+      await BackupRestore.restoreBackup(backup);
+
+      const lineInserts = findInsert(dbInstance, 'budget_plan_lines');
+      expect(lineInserts).toHaveLength(1);
+      expect(lineInserts[0][1][0]).toBe('line-cat');
+    });
+
+    it('skips lines of a plan that was itself skipped for missing fields (no FK abort)', async () => {
+      const dbInstance = makeDbInstance();
+      mockDb.executeTransaction.mockImplementation(async (cb) => { await cb(dbInstance); });
+
+      const backup = backupWithPlan();
+      // Plan has an id but no currency → skipped on insert. Its line must not be
+      // inserted (else plan_id FK fails and the whole restore aborts).
+      backup.data.budget_plans = [{ ...mockPlan, currency: undefined }];
+      backup.data.budget_plan_lines = [categoryLine];
+
+      await expect(BackupRestore.restoreBackup(backup)).resolves.toBeUndefined();
+      expect(findInsert(dbInstance, 'budget_plans')).toHaveLength(0);
+      expect(findInsert(dbInstance, 'budget_plan_lines')).toHaveLength(0);
+    });
+
+    it('skips a plan line with an empty amount', async () => {
+      const dbInstance = makeDbInstance();
+      mockDb.executeTransaction.mockImplementation(async (cb) => { await cb(dbInstance); });
+
+      const backup = backupWithPlan();
+      backup.data.budget_plan_lines = [{ ...categoryLine, amount: '' }];
+
+      await BackupRestore.restoreBackup(backup);
+      expect(findInsert(dbInstance, 'budget_plan_lines')).toHaveLength(0);
+    });
+
+    it('aborts cleanly when a transfer line references an account absent from the backup', async () => {
+      const backup = backupWithPlan();
+      backup.data.budget_plan_lines = [
+        { ...transferLine, to_account_id: 'ghost-account' },
+      ];
+
+      await expect(BackupRestore.restoreBackup(backup)).rejects.toThrow(
+        /account IDs not found in the backup.*Restore aborted/,
+      );
+      expect(mockDb.executeTransaction).not.toHaveBeenCalled();
+    });
+
+    it('imports an old backup without plan tables cleanly (zero plans, no error)', async () => {
+      const dbInstance = makeDbInstance();
+      mockDb.executeTransaction.mockImplementation(async (cb) => { await cb(dbInstance); });
+
+      const oldBackup = {
+        version: 1,
+        timestamp: '2024-01-01T00:00:00.000Z',
+        platform: 'native',
+        data: {
+          accounts: [planAccount],
+          categories: [planCategory],
+          operations: [],
+          app_metadata: mockMetadata,
+          // No budget_plans / budget_plan_lines keys at all.
+        },
+      };
+
+      await expect(BackupRestore.restoreBackup(oldBackup)).resolves.toBeUndefined();
+      expect(findInsert(dbInstance, 'budget_plans')).toHaveLength(0);
+      expect(findInsert(dbInstance, 'budget_plan_lines')).toHaveLength(0);
+    });
+
+    it('exports budget plan sections (with non-ASCII comment) to CSV', async () => {
+      mockDb.queryAll.mockImplementation((query) => {
+        if (query.includes('budget_plan_lines')) return Promise.resolve([categoryLine, transferLine]);
+        if (query.includes('budget_plans')) return Promise.resolve([mockPlan]);
+        if (query.includes('accounts')) return Promise.resolve([planAccount]);
+        if (query.includes('categories')) return Promise.resolve([planCategory]);
+        return Promise.resolve([]);
+      });
+
+      await BackupRestore.exportBackup('csv');
+
+      const written = mockFileSystem.writeAsStringAsync.mock.calls[0][1];
+      expect(written).toContain('[BUDGET_PLANS]');
+      expect(written).toContain('[BUDGET_PLAN_LINES]');
+      expect(written).toContain('plan-1');
+      expect(written).toContain('2026-07');
+      expect(written).toContain(NON_ASCII_COMMENT);
+    });
+
+    it('round-trips budget plans through CSV import', async () => {
+      const csvContent = `# Money Tracker Backup - 2026-07-01T00:00:00.000Z
+# Version: 1
+
+[ACCOUNTS]
+id,name,balance,currency
+acc-uuid,Savings,0,USD
+
+[CATEGORIES]
+id,name,type,category_type
+cat-1,Food,folder,expense
+
+[OPERATIONS]
+id,type,amount,account_id,category_id
+
+[BUDGET_PLANS]
+id,month,currency,expected_income
+plan-1,2026-07,USD,3000.00
+
+[BUDGET_PLAN_LINES]
+id,plan_id,label,amount,comment,category_id,to_account_id,sort_order
+line-cat,plan-1,Groceries,400.00,"${NON_ASCII_COMMENT}",cat-1,,0`;
+
+      mockDocumentPicker.getDocumentAsync.mockResolvedValue({
+        canceled: false,
+        assets: [{ uri: 'file:///mock/backup.csv', name: 'backup.csv' }],
+      });
+      mockFileSystem.readAsStringAsync.mockResolvedValue(csvContent);
+
+      const dbInstance = makeDbInstance();
+      mockDb.executeTransaction.mockImplementation(async (cb) => { await cb(dbInstance); });
+
+      const backup = await BackupRestore.importBackup();
+
+      expect(backup.data.budget_plans).toHaveLength(1);
+      expect(backup.data.budget_plans[0]).toMatchObject({ id: 'plan-1', month: '2026-07', currency: 'USD' });
+      expect(backup.data.budget_plan_lines).toHaveLength(1);
+      expect(backup.data.budget_plan_lines[0]).toMatchObject({
+        id: 'line-cat', plan_id: 'plan-1', category_id: 'cat-1', comment: NON_ASCII_COMMENT,
+      });
+
+      const lineInserts = findInsert(dbInstance, 'budget_plan_lines');
+      expect(lineInserts).toHaveLength(1);
+      expect(lineInserts[0][1]).toEqual(expect.arrayContaining(['line-cat', 'plan-1', NON_ASCII_COMMENT]));
     });
   });
 });
