@@ -29,7 +29,7 @@ export const createBackup = async () => {
     console.log('Creating database backup...');
 
     // Fetch all data from all tables
-    const [accounts, categories, operations, budgets, appMetadata, balanceHistory, plannedOperations, merchantRules] = await Promise.all([
+    const [accounts, categories, operations, budgets, appMetadata, balanceHistory, plannedOperations, merchantRules, budgetPlans, budgetPlanLines] = await Promise.all([
       queryAll('SELECT * FROM accounts ORDER BY created_at ASC'),
       queryAll('SELECT * FROM categories ORDER BY created_at ASC'),
       queryAll('SELECT * FROM operations ORDER BY created_at ASC'),
@@ -39,6 +39,10 @@ export const createBackup = async () => {
       queryAll('SELECT * FROM planned_operations ORDER BY created_at ASC').catch(() => []),
       // Newer table — guard so backups of pre-0010 databases don't fail.
       queryAll('SELECT * FROM notification_merchant_rules ORDER BY created_at ASC').catch(() => []),
+      // Budgets v2 (migration 0018). Guarded so backups of pre-0018 databases
+      // don't fail. Plans before lines so the FK order is preserved on restore.
+      queryAll('SELECT * FROM budget_plans ORDER BY created_at ASC').catch(() => []),
+      queryAll('SELECT * FROM budget_plan_lines ORDER BY sort_order ASC, created_at ASC').catch(() => []),
     ]);
 
     // Create backup object
@@ -57,6 +61,9 @@ export const createBackup = async () => {
         // Learned merchant -> category rules (the pending_notifications queue is
         // transient state and intentionally not backed up).
         notification_merchant_rules: merchantRules || [],
+        // Budgets v2 monthly plans and their allocation lines.
+        budget_plans: budgetPlans || [],
+        budget_plan_lines: budgetPlanLines || [],
       },
     };
 
@@ -67,6 +74,8 @@ export const createBackup = async () => {
       budgets: backup.data.budgets.length,
       balance_history: backup.data.balance_history.length,
       planned_operations: backup.data.planned_operations.length,
+      budget_plans: backup.data.budget_plans.length,
+      budget_plan_lines: backup.data.budget_plan_lines.length,
     });
 
     return backup;
@@ -87,6 +96,8 @@ const TABLE_FIELDS = {
   balance_history:    ['id', 'account_id', 'date', 'balance', 'created_at'],
   planned_operations: ['id', 'name', 'type', 'amount', 'account_id', 'category_id', 'to_account_id', 'description', 'is_recurring', 'last_executed_month', 'display_order', 'created_at', 'updated_at'],
   notification_merchant_rules: ['id', 'merchant', 'package_name', 'category_id', 'label_override', 'created_at', 'updated_at'],
+  budget_plans: ['id', 'month', 'currency', 'expected_income', 'created_at', 'updated_at'],
+  budget_plan_lines: ['id', 'plan_id', 'label', 'amount', 'comment', 'category_id', 'to_account_id', 'sort_order', 'created_at', 'updated_at'],
 };
 
 /**
@@ -143,6 +154,8 @@ export const exportBackupCSV = async () => {
       'app_metadata.csv': convertToCSV(backup.data.app_metadata, TABLE_FIELDS.app_metadata),
       'balance_history.csv': convertToCSV(backup.data.balance_history, TABLE_FIELDS.balance_history),
       'planned_operations.csv': convertToCSV(backup.data.planned_operations, TABLE_FIELDS.planned_operations),
+      'budget_plans.csv': convertToCSV(backup.data.budget_plans, TABLE_FIELDS.budget_plans),
+      'budget_plan_lines.csv': convertToCSV(backup.data.budget_plan_lines, TABLE_FIELDS.budget_plan_lines),
       'backup_info.csv': `version,timestamp,platform\n${backup.version},${backup.timestamp},${backup.platform}`,
     };
 
@@ -157,7 +170,9 @@ export const exportBackupCSV = async () => {
     combinedCSV += `[BUDGETS]\n${csvFiles['budgets.csv']}\n\n`;
     combinedCSV += `[APP_METADATA]\n${csvFiles['app_metadata.csv']}\n\n`;
     combinedCSV += `[BALANCE_HISTORY]\n${csvFiles['balance_history.csv']}\n\n`;
-    combinedCSV += `[PLANNED_OPERATIONS]\n${csvFiles['planned_operations.csv']}\n`;
+    combinedCSV += `[PLANNED_OPERATIONS]\n${csvFiles['planned_operations.csv']}\n\n`;
+    combinedCSV += `[BUDGET_PLANS]\n${csvFiles['budget_plans.csv']}\n\n`;
+    combinedCSV += `[BUDGET_PLAN_LINES]\n${csvFiles['budget_plan_lines.csv']}\n`;
 
     const filename = `money_tracker_backup_${timestamp}.csv`;
     const fileUri = `${FileSystem.documentDirectory}${filename}`;
@@ -419,6 +434,15 @@ export const restoreBackup = async (backup, cancelToken) => {
         unmappedAccountIds.push(planned.to_account_id);
       }
     }
+    // Budget plan lines may target an account (transfer allocation). Validate that
+    // reference too, so a dangling to_account_id aborts cleanly instead of dying
+    // on a raw FK error mid-transaction. A category-linked or broken line has a
+    // null to_account_id and is skipped here.
+    for (const line of backup.data.budget_plan_lines || []) {
+      if (line.to_account_id != null && !accountIdsInBackup.has(line.to_account_id)) {
+        unmappedAccountIds.push(line.to_account_id);
+      }
+    }
 
     if (unmappedAccountIds.length > 0) {
       const uniqueIds = [...new Set(unmappedAccountIds.map(String))];
@@ -473,6 +497,11 @@ export const restoreBackup = async (backup, cancelToken) => {
       await db.runAsync('DELETE FROM notification_merchant_rules').catch(() => {});
       await db.runAsync('DELETE FROM planned_operations').catch(() => {});
       await db.runAsync('DELETE FROM budgets');
+      // Budgets v2: lines reference plans (cascade), categories and accounts (set
+      // null), so clear lines before plans, and both before categories/accounts.
+      // Guarded so a restore into a pre-0018 database doesn't fail.
+      await db.runAsync('DELETE FROM budget_plan_lines').catch(() => {});
+      await db.runAsync('DELETE FROM budget_plans').catch(() => {});
       await db.runAsync('DELETE FROM accounts_balance_history');
       await db.runAsync('DELETE FROM operations');
       await db.runAsync('DELETE FROM categories');
@@ -777,6 +806,89 @@ export const restoreBackup = async (backup, cancelToken) => {
         });
       }
 
+      // Restore budget plans (Budgets v2) and their allocation lines. Plans are
+      // inserted before lines to satisfy the plan_id FK. Line category_id keeps
+      // its string ID as-is (categories are not remapped); to_account_id is
+      // remapped through accountIdMapping like operations/planned operations.
+      // A single 'budget_plans' progress step covers both tables.
+      {
+        const plans = backup.data.budget_plans || [];
+        const lines = backup.data.budget_plan_lines || [];
+        appEvents.emit(IMPORT_PROGRESS_EVENT, {
+          stepId: 'budget_plans',
+          status: 'in_progress',
+          data: plans.length,
+        });
+
+        // Track the plans actually inserted (not merely present in the backup):
+        // a plan skipped for missing fields must NOT let its lines through, or
+        // their plan_id FK would fail and abort the whole restore.
+        const restoredPlanIds = new Set();
+        let restoredPlans = 0;
+        for (const plan of plans) {
+          if (!plan.id || !plan.month || !plan.currency) {
+            console.warn('Skipping budget plan with missing required fields:', plan);
+            continue;
+          }
+          await db.runAsync(
+            'INSERT INTO budget_plans (id, month, currency, expected_income, created_at, updated_at) VALUES (?, ?, ?, ?, ?, ?)',
+            [
+              plan.id,
+              plan.month,
+              plan.currency,
+              plan.expected_income ?? '0',
+              plan.created_at || new Date().toISOString(),
+              plan.updated_at || new Date().toISOString(),
+            ],
+          );
+          restoredPlanIds.add(plan.id);
+          restoredPlans++;
+        }
+
+        // Only insert lines whose parent plan was actually restored, so an
+        // orphaned line (dangling plan_id) is skipped rather than aborting the
+        // whole import on an FK violation.
+        let restoredLines = 0;
+        for (const line of lines) {
+          // amount is a NOT NULL text column; treat null/empty as invalid and
+          // skip (mirrors how budgets skip rows with missing required fields).
+          if (!line.id || !line.plan_id || line.amount == null || line.amount === '') {
+            console.warn('Skipping budget plan line with missing required fields:', line);
+            continue;
+          }
+          if (!restoredPlanIds.has(line.plan_id)) {
+            console.warn('Skipping budget plan line with unknown plan_id:', line.plan_id);
+            continue;
+          }
+          let mappedToAccountId = null;
+          if (line.to_account_id != null) {
+            mappedToAccountId = accountIdMapping.get(String(line.to_account_id)) ?? line.to_account_id;
+          }
+          await db.runAsync(
+            'INSERT INTO budget_plan_lines (id, plan_id, label, amount, comment, category_id, to_account_id, sort_order, created_at, updated_at) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)',
+            [
+              line.id,
+              line.plan_id,
+              line.label ?? null,
+              line.amount,
+              line.comment ?? null,
+              line.category_id ?? null,
+              mappedToAccountId,
+              Number.isInteger(line.sort_order) ? line.sort_order : Number(line.sort_order) || 0,
+              line.created_at || new Date().toISOString(),
+              line.updated_at || new Date().toISOString(),
+            ],
+          );
+          restoredLines++;
+        }
+        console.log(`Restored ${restoredPlans} budget plans and ${restoredLines} plan lines`);
+        appEvents.emit(IMPORT_PROGRESS_EVENT, {
+          stepId: 'budget_plans',
+          status: 'completed',
+          data: plans.length,
+        });
+      }
+
       // Restore app metadata (except db_version)
       if (backup.data.app_metadata) {
         appEvents.emit(IMPORT_PROGRESS_EVENT, {
@@ -1076,9 +1188,13 @@ const importBackupCSV = async (fileUri, cancelToken) => {
     app_metadata: [],
     balance_history: [],
     planned_operations: [],
+    budget_plans: [],
+    budget_plan_lines: [],
   };
 
-  // Split by section markers
+  // Split by section markers. [BUDGET_PLANS] and [BUDGET_PLAN_LINES] don't
+  // collide: the marker + newline (`[BUDGET_PLANS]\n`) is not a substring of
+  // `[BUDGET_PLAN_LINES]`.
   const accountsMatch = fileContent.match(/\[ACCOUNTS\]\n([\s\S]*?)(?=\n\[|$)/);
   const categoriesMatch = fileContent.match(/\[CATEGORIES\]\n([\s\S]*?)(?=\n\[|$)/);
   const operationsMatch = fileContent.match(/\[OPERATIONS\]\n([\s\S]*?)(?=\n\[|$)/);
@@ -1086,6 +1202,8 @@ const importBackupCSV = async (fileUri, cancelToken) => {
   const metadataMatch = fileContent.match(/\[APP_METADATA\]\n([\s\S]*?)(?=\n\[|$)/);
   const balanceHistoryMatch = fileContent.match(/\[BALANCE_HISTORY\]\n([\s\S]*?)(?=\n\[|$)/);
   const plannedOpsMatch = fileContent.match(/\[PLANNED_OPERATIONS\]\n([\s\S]*?)(?=\n\[|$)/);
+  const budgetPlansMatch = fileContent.match(/\[BUDGET_PLANS\]\n([\s\S]*?)(?=\n\[|$)/);
+  const budgetPlanLinesMatch = fileContent.match(/\[BUDGET_PLAN_LINES\]\n([\s\S]*?)(?=\n\[|$)/);
 
   if (accountsMatch) sections.accounts = parseCSV(accountsMatch[1]);
   if (categoriesMatch) sections.categories = parseCSV(categoriesMatch[1]);
@@ -1094,6 +1212,8 @@ const importBackupCSV = async (fileUri, cancelToken) => {
   if (metadataMatch) sections.app_metadata = parseCSV(metadataMatch[1]);
   if (balanceHistoryMatch) sections.balance_history = parseCSV(balanceHistoryMatch[1]);
   if (plannedOpsMatch) sections.planned_operations = parseCSV(plannedOpsMatch[1]);
+  if (budgetPlansMatch) sections.budget_plans = parseCSV(budgetPlansMatch[1]);
+  if (budgetPlanLinesMatch) sections.budget_plan_lines = parseCSV(budgetPlanLinesMatch[1]);
 
   // Extract version from header
   const versionMatch = fileContent.match(/# Version: (\d+)/);
@@ -1208,6 +1328,16 @@ const importBackupSQLite = async (fileUri, cancelToken) => {
       console.warn('No notification_merchant_rules table in imported database (older format)');
     }
 
+    // Budgets v2 tables may not exist in pre-0018 backups.
+    let budgetPlans = [];
+    let budgetPlanLines = [];
+    try {
+      budgetPlans = await tempDb.getAllAsync('SELECT * FROM budget_plans ORDER BY created_at ASC');
+      budgetPlanLines = await tempDb.getAllAsync('SELECT * FROM budget_plan_lines ORDER BY sort_order ASC, created_at ASC');
+    } catch (e) {
+      console.warn('No budget_plans/budget_plan_lines tables in imported database (older format)');
+    }
+
     // Create backup object
     const backup = {
       version: BACKUP_VERSION,
@@ -1222,6 +1352,8 @@ const importBackupSQLite = async (fileUri, cancelToken) => {
         balance_history: balanceHistory || [],
         planned_operations: plannedOperations || [],
         notification_merchant_rules: merchantRules || [],
+        budget_plans: budgetPlans || [],
+        budget_plan_lines: budgetPlanLines || [],
       },
     };
 

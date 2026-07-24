@@ -141,11 +141,12 @@ describe('GoogleSheetsService', () => {
       },
     };
 
-    it('returns 6 sheets with correct titles', async () => {
+    it('returns 8 sheets with correct titles', async () => {
       const sheets = buildSheetsData(mockBackup);
       const titles = sheets.map(s => s.range.split('!')[0]);
       expect(titles).toEqual([
         'Accounts', 'Operations', 'Categories', 'Budgets', 'Planned Operations', 'Balance History',
+        'Budget Plans', 'Budget Plan Lines',
       ]);
     });
 
@@ -609,6 +610,139 @@ describe('GoogleSheetsService', () => {
     it('maps balance_history account_id by ID column', async () => {
       const backup = await importFromSheets('token');
       expect(backup.data.balance_history[0].account_id).toBe('1');
+    });
+  });
+
+  describe('Budget plans (Budgets v2, issue #1398)', () => {
+    const { getPreference } = require('../../app/services/PreferencesDB');
+    const NON_ASCII_COMMENT = 'Отложить на 日本 — €100';
+
+    const mockBackup = {
+      data: {
+        accounts: [{ id: 1, name: 'Savings', balance: '0', currency: 'USD' }],
+        categories: [{ id: 'cat-1', name: 'Food', type: 'entry', category_type: 'expense', icon: 'food' }],
+        operations: [],
+        budgets: [],
+        planned_operations: [],
+        balance_history: [],
+        budget_plans: [
+          { id: 'plan-1', month: '2026-07', currency: 'USD', expected_income: '3000.00' },
+        ],
+        budget_plan_lines: [
+          { id: 'line-cat', plan_id: 'plan-1', label: 'Groceries', amount: '400', comment: NON_ASCII_COMMENT, category_id: 'cat-1', to_account_id: null, sort_order: 0 },
+          { id: 'line-xfer', plan_id: 'plan-1', label: 'To savings', amount: '500', comment: null, category_id: null, to_account_id: 1, sort_order: 1 },
+        ],
+      },
+    };
+
+    it('builds a Budget Plans sheet with header and rows', () => {
+      const sheets = buildSheetsData(mockBackup);
+      const plans = sheets.find(s => s.range === 'Budget Plans!A1');
+      expect(plans.values[0]).toEqual(['id', 'month', 'currency', 'expected_income']);
+      expect(plans.values[1]).toEqual(['plan-1', '2026-07', 'USD', '3000.00']);
+    });
+
+    it('builds a Budget Plan Lines sheet resolving category/account names, preserving IDs and comment', () => {
+      const sheets = buildSheetsData(mockBackup);
+      const lines = sheets.find(s => s.range === 'Budget Plan Lines!A1');
+      const header = lines.values[0];
+      expect(header).toEqual(['id', 'plan_id', 'label', 'amount', 'comment', 'category', 'account', 'category_id', 'to_account_id', 'sort_order']);
+
+      const catRow = lines.values.find(r => r[0] === 'line-cat');
+      expect(catRow[header.indexOf('category')]).toBe('Food');
+      expect(catRow[header.indexOf('category_id')]).toBe('cat-1');
+      expect(catRow[header.indexOf('comment')]).toBe(NON_ASCII_COMMENT);
+      expect(catRow[header.indexOf('account')]).toBe('');
+
+      const xferRow = lines.values.find(r => r[0] === 'line-xfer');
+      expect(xferRow[header.indexOf('account')]).toBe('Savings');
+      expect(xferRow[header.indexOf('to_account_id')]).toBe(1);
+      expect(xferRow[header.indexOf('category')]).toBe('');
+    });
+
+    it('tolerates a backup that lacks budget plan data (empty sheets)', () => {
+      const legacy = { data: { ...mockBackup.data, budget_plans: undefined, budget_plan_lines: undefined } };
+      const sheets = buildSheetsData(legacy);
+      const plans = sheets.find(s => s.range === 'Budget Plans!A1');
+      const lines = sheets.find(s => s.range === 'Budget Plan Lines!A1');
+      expect(plans.values).toHaveLength(1); // header only
+      expect(lines.values).toHaveLength(1); // header only
+    });
+
+    it('creates spreadsheet with Budget Plans and Budget Plan Lines tabs', async () => {
+      const { setPreference } = require('../../app/services/PreferencesDB');
+      getPreference.mockResolvedValue(null);
+      setPreference.mockResolvedValue(undefined);
+      mockFetch.mockResolvedValueOnce({ ok: true, json: async () => ({ spreadsheetId: 'sid' }) }); // create
+      mockFetch.mockResolvedValue({ ok: true, json: async () => ({ sheets: [] }) });
+
+      await exportToSheets('token', mockBackup);
+
+      const createBody = JSON.parse(mockFetch.mock.calls[0][1].body);
+      const titles = createBody.sheets.map(s => s.properties.title);
+      expect(titles).toContain('Budget Plans');
+      expect(titles).toContain('Budget Plan Lines');
+    });
+
+    it('imports budget plans and lines from sheets, resolving FKs', async () => {
+      getPreference.mockResolvedValue('sheet-id-123');
+      mockFetch.mockResolvedValue({
+        ok: true,
+        json: async () => ({
+          valueRanges: [
+            { range: 'Accounts!A1:D2', values: [['id', 'name', 'balance', 'currency'], ['1', 'Savings', '0', 'USD']] },
+            { range: 'Operations!A1:A1', values: [['id', 'date', 'type', 'amount', 'currency', 'category', 'account', 'to_account', 'description']] },
+            { range: 'Categories!A1:B2', values: [['id', 'name', 'type', 'category_type', 'icon', 'parent_id', 'color', 'is_shadow'], ['cat-1', 'Food', 'entry', 'expense', 'food', '', '', '0']] },
+            { range: 'Budgets!A1:A1', values: [['id']] },
+            { range: 'Planned Operations!A1:A1', values: [['id']] },
+            { range: 'Balance History!A1:A1', values: [['account', 'date', 'balance', 'account_id']] },
+            { range: 'Budget Plans!A1:D2', values: [['id', 'month', 'currency', 'expected_income'], ['plan-1', '2026-07', 'USD', '3000.00']] },
+            {
+              range: 'Budget Plan Lines!A1:J3',
+              values: [
+                ['id', 'plan_id', 'label', 'amount', 'comment', 'category', 'account', 'category_id', 'to_account_id', 'sort_order'],
+                ['line-cat', 'plan-1', 'Groceries', '400', NON_ASCII_COMMENT, 'Food', '', 'cat-1', '', '0'],
+                ['line-xfer', 'plan-1', 'To savings', '500', '', '', 'Savings', '', '1', '1'],
+              ],
+            },
+          ],
+        }),
+      });
+
+      const backup = await importFromSheets('token');
+
+      expect(backup.data.budget_plans).toHaveLength(1);
+      expect(backup.data.budget_plans[0]).toMatchObject({ id: 'plan-1', month: '2026-07', currency: 'USD', expected_income: '3000.00' });
+
+      expect(backup.data.budget_plan_lines).toHaveLength(2);
+      const cat = backup.data.budget_plan_lines.find(l => l.id === 'line-cat');
+      expect(cat.category_id).toBe('cat-1');
+      expect(cat.to_account_id).toBeNull();
+      expect(cat.comment).toBe(NON_ASCII_COMMENT);
+      expect(cat.sort_order).toBe(0);
+
+      const xfer = backup.data.budget_plan_lines.find(l => l.id === 'line-xfer');
+      expect(xfer.to_account_id).toBe('1'); // resolved by ID column
+      expect(xfer.category_id).toBeNull();
+      expect(xfer.sort_order).toBe(1);
+    });
+
+    it('returns empty plan arrays when the sheets are missing (old spreadsheet)', async () => {
+      getPreference.mockResolvedValue('sheet-id-123');
+      mockFetch.mockResolvedValue({
+        ok: true,
+        json: async () => ({
+          valueRanges: [
+            { range: 'Accounts!A1:D2', values: [['id', 'name', 'balance', 'currency'], ['1', 'Savings', '0', 'USD']] },
+            { range: 'Categories!A1:A1', values: [['id', 'name', 'type', 'category_type', 'icon', 'parent_id', 'color', 'is_shadow']] },
+            // No Budget Plans / Budget Plan Lines tabs.
+          ],
+        }),
+      });
+
+      const backup = await importFromSheets('token');
+      expect(backup.data.budget_plans).toEqual([]);
+      expect(backup.data.budget_plan_lines).toEqual([]);
     });
   });
 });

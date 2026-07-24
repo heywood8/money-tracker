@@ -66,12 +66,15 @@ export const signOut = async () => {
 };
 
 /**
- * Build the 6-sheet data structure from a backup object.
+ * Build the 8-sheet data structure from a backup object.
  * @param {Object} backup - Backup object from createBackup()
  * @returns {Array<{range: string, values: Array<Array>}>}
  */
 export const buildSheetsData = (backup) => {
-  const { accounts, categories, operations, budgets, planned_operations, balance_history } = backup.data;
+  const {
+    accounts, categories, operations, budgets, planned_operations, balance_history,
+    budget_plans, budget_plan_lines,
+  } = backup.data;
 
   const accountNames = new Map(accounts.map(a => [a.id, a.name]));
   const categoryNames = new Map(categories.map(c => [c.id, c.name]));
@@ -158,6 +161,29 @@ export const buildSheetsData = (backup) => {
         ]),
       ],
     },
+    {
+      range: 'Budget Plans!A1',
+      values: [
+        ['id', 'month', 'currency', 'expected_income'],
+        ...(budget_plans || []).map(p => [
+          p.id, p.month, p.currency, p.expected_income ?? '0',
+        ]),
+      ],
+    },
+    {
+      range: 'Budget Plan Lines!A1',
+      values: [
+        ['id', 'plan_id', 'label', 'amount', 'comment', 'category', 'account', 'category_id', 'to_account_id', 'sort_order'],
+        ...(budget_plan_lines || []).map(l => [
+          l.id, l.plan_id, l.label || '', l.amount, l.comment || '',
+          categoryNames.get(l.category_id) || '',
+          l.to_account_id ? (accountNames.get(l.to_account_id) || '') : '',
+          l.category_id || '',
+          l.to_account_id || '',
+          l.sort_order ?? 0,
+        ]),
+      ],
+    },
   ];
 };
 
@@ -200,7 +226,7 @@ export const importFromSheets = async (accessToken, onProgress) => {
     throw new Error('no_spreadsheet_configured');
   }
 
-  const sheetNames = ['Accounts', 'Operations', 'Categories', 'Budgets', 'Planned Operations', 'Balance History'];
+  const sheetNames = ['Accounts', 'Operations', 'Categories', 'Budgets', 'Planned Operations', 'Balance History', 'Budget Plans', 'Budget Plan Lines'];
   const rangesParam = sheetNames.map(n => `ranges=${encodeURIComponent(n)}`).join('&');
   const response = await fetch(
     `${SHEETS_API}/${spreadsheetId}/values:batchGet?${rangesParam}`,
@@ -235,6 +261,8 @@ export const importFromSheets = async (accessToken, onProgress) => {
   const budgetRows = findSheet('Budgets');
   const plannedRows = findSheet('Planned Operations');
   const historyRows = findSheet('Balance History');
+  const budgetPlanRows = findSheet('Budget Plans');
+  const budgetPlanLineRows = findSheet('Budget Plan Lines');
 
   // Build lookup maps: id->id (direct) and name->id (fallback)
   const accountIdMap = new Map();
@@ -349,6 +377,29 @@ export const importFromSheets = async (accessToken, onProgress) => {
     created_at: now,
   }));
 
+  const budget_plans = budgetPlanRows.map(p => ({
+    id: p.id,
+    month: p.month,
+    currency: p.currency,
+    expected_income: p.expected_income || '0',
+    created_at: now,
+    updated_at: now,
+  }));
+
+  const budget_plan_lines = budgetPlanLineRows.map(l => ({
+    id: l.id,
+    plan_id: l.plan_id,
+    label: l.label || null,
+    amount: l.amount,
+    comment: l.comment || null,
+    // Exactly one target: resolve category or account, whichever the row carries.
+    category_id: (l.category || l.category_id) ? resolveCategoryId(l, 'category_id', 'category') : null,
+    to_account_id: (l.account || l.to_account_id) ? resolveAccountId(l, 'to_account_id', 'account') : null,
+    sort_order: (l.sort_order !== '' && l.sort_order != null) ? Number(l.sort_order) : 0,
+    created_at: now,
+    updated_at: now,
+  }));
+
   // Preserve current app preferences (language, theme, etc.) so they survive the restore.
   // Do NOT catch DB errors here — a locked or corrupted DB must abort the import loudly
   // rather than silently overwriting all user preferences with an empty set (#747).
@@ -368,6 +419,8 @@ export const importFromSheets = async (accessToken, onProgress) => {
       app_metadata,
       balance_history,
       planned_operations,
+      budget_plans,
+      budget_plan_lines,
     },
   };
 };
@@ -388,6 +441,8 @@ const createSpreadsheet = async (accessToken) => {
         { properties: { title: 'Budgets' } },
         { properties: { title: 'Planned Operations' } },
         { properties: { title: 'Balance History' } },
+        { properties: { title: 'Budget Plans' } },
+        { properties: { title: 'Budget Plan Lines' } },
       ],
     }),
   });

@@ -57,6 +57,8 @@ export default function ImportProgressModal() {
         return `Restoring ${step.data} operations...`;
       case 'budgets':
         return `Restoring ${step.data} budgets...`;
+      case 'budget_plans':
+        return `Restoring ${step.data} budget plans...`;
       case 'metadata':
         return `Restoring ${step.data} metadata entries...`;
       default:
@@ -77,6 +79,8 @@ export default function ImportProgressModal() {
         return `Restored ${step.data} operations`;
       case 'budgets':
         return `Restored ${step.data} budgets`;
+      case 'budget_plans':
+        return `Restored ${step.data} budget plans`;
       case 'metadata':
         return `Restored ${step.data} metadata entries`;
       case 'complete': {

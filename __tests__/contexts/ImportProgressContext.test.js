@@ -86,14 +86,14 @@ describe('ImportProgressContext', () => {
         result.current.startImport();
       });
 
-      expect(result.current.steps).toHaveLength(13);
+      expect(result.current.steps).toHaveLength(14);
       expect(result.current.steps[0]).toEqual({
         id: 'format',
         label: 'Detecting format',
         status: 'pending',
         data: null,
       });
-      expect(result.current.steps[12]).toEqual({
+      expect(result.current.steps[13]).toEqual({
         id: 'complete',
         label: 'Database restored successfully',
         status: 'pending',
@@ -130,6 +130,7 @@ describe('ImportProgressContext', () => {
         'operations',
         'balance_history',
         'budgets',
+        'budget_plans',
         'metadata',
         'upgrades',
         'complete',
@@ -215,7 +216,7 @@ describe('ImportProgressContext', () => {
       });
 
       // Steps should remain unchanged
-      expect(result.current.steps).toHaveLength(13);
+      expect(result.current.steps).toHaveLength(14);
     });
   });
 
@@ -501,7 +502,7 @@ describe('ImportProgressContext', () => {
       });
 
       expect(result.current.isImporting).toBe(true);
-      expect(result.current.steps).toHaveLength(13);
+      expect(result.current.steps).toHaveLength(14);
       expect(result.current.currentStep).toBe('format');
     });
 
@@ -527,7 +528,7 @@ describe('ImportProgressContext', () => {
       });
 
       expect(result.current.isImporting).toBe(true);
-      expect(result.current.steps).toHaveLength(13);
+      expect(result.current.steps).toHaveLength(14);
       expect(result.current.currentStep).toBe('format');
     });
   });
