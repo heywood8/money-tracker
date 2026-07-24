@@ -52,6 +52,10 @@ jest.mock('../app/contexts/BudgetsContext', () => ({
   BudgetsProvider: ({ children }) => children,
 }));
 
+jest.mock('../app/contexts/BudgetPlansContext', () => ({
+  BudgetPlansProvider: ({ children }) => children,
+}));
+
 jest.mock('../app/contexts/PlannedOperationsContext', () => ({
   PlannedOperationsProvider: ({ children }) => children,
 }));
