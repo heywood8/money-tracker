@@ -103,8 +103,6 @@ jest.mock('@quidone/react-native-wheel-picker', () => {
   };
 });
 
-const { getUnconvertibleCurrencies } = require('../../app/services/OperationsDB');
-
 // ── Helpers ────────────────────────────────────────────────────────────────
 const makeStatus = (overrides = {}) => ({
   budgetId: 'b1',
@@ -192,11 +190,17 @@ describe('BudgetScreen', () => {
       await waitFor(() => expect(getAllByText(/total_budgeted/)).toHaveLength(2));
     });
 
-    it('warns when some currencies cannot be converted', async () => {
-      getUnconvertibleCurrencies.mockResolvedValue(['XYZ']);
-      setBudgetsData({ budgets: [makeBudget()], statuses: [makeStatus()] });
-      const { getByTestId } = await render(<BudgetScreen />);
+    it('warns about budget currencies that cannot be converted', async () => {
+      // A budget in a currency with no rate to the selected currency (the mocked
+      // rate map only knows RUB) is dropped from the totals and surfaced as a
+      // warning — derived from the budget's own currency, not account currencies.
+      setBudgetsData({
+        budgets: [makeBudget({ id: 'bx', currency: 'XYZ' })],
+        statuses: [makeStatus({ budgetId: 'bx', currency: 'XYZ' })],
+      });
+      const { getByTestId, getByText } = await render(<BudgetScreen />);
       await waitFor(() => expect(getByTestId('budget-unconverted-warning')).toBeTruthy());
+      expect(getByText(/XYZ/)).toBeTruthy();
     });
   });
 
