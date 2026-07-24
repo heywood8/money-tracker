@@ -1,5 +1,12 @@
 # Changelog
 
+## [0.219.0](https://github.com/heywood8/money-tracker/compare/penny-v0.218.0...penny-v0.219.0) (2026-07-24)
+
+
+### Features
+
+* **budgets:** monthly plan editor UI (income, allocation lines, live remainder) (Budgets v2 4/5) ([#1405](https://github.com/heywood8/money-tracker/issues/1405)) ([791b2fd](https://github.com/heywood8/money-tracker/commit/791b2fd42cc1a59f344abc2e4ee8d9b4eec5504d))
+
 ## [0.218.0](https://github.com/heywood8/money-tracker/compare/penny-v0.217.0...penny-v0.218.0) (2026-07-24)
 
 
