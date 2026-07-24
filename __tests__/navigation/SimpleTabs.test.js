@@ -320,12 +320,16 @@ jest.mock('../../app/contexts/UpdateDownloadContext', () => ({
   }),
 }));
 
-// Controllable per-test so the optional Accounts tab can be exercised both ways.
+// Controllable per-test so the optional Accounts/Budget tabs can be exercised
+// both ways. Budget defaults on (production default), Accounts off.
 let mockShowAccountsTab = false;
+let mockShowBudgetTab = true;
 jest.mock('../../app/contexts/DisplaySettingsContext', () => ({
   useDisplaySettings: () => ({
     showAccountsTab: mockShowAccountsTab,
     setShowAccountsTab: jest.fn(),
+    showBudgetTab: mockShowBudgetTab,
+    setShowBudgetTab: jest.fn(),
   }),
 }));
 
@@ -333,6 +337,7 @@ describe('SimpleTabs Component Rendering', () => {
   beforeEach(() => {
     jest.clearAllMocks();
     mockShowAccountsTab = false;
+    mockShowBudgetTab = true;
   });
 
   it('keeps the active screen real from frame 1 and mounts the rest after interactions', async () => {
@@ -366,6 +371,19 @@ describe('SimpleTabs Component Rendering', () => {
 
     expect(queryByTestId('tab-accounts')).toBeNull();
     expect(queryByTestId('accounts-screen')).toBeNull();
+  });
+
+  it('renders the Budget tab by default (showBudgetTab on)', async () => {
+    const { getByText } = await render(<SimpleTabs />);
+    expect(getByText('budget')).toBeTruthy();
+    await waitFor(() => expect(getByText('Budget Screen')).toBeTruthy());
+  });
+
+  it('hides the Budget tab and screen when showBudgetTab is off', async () => {
+    mockShowBudgetTab = false;
+    const { queryByText } = await render(<SimpleTabs />);
+    expect(queryByText('budget')).toBeNull();
+    expect(queryByText('Budget Screen')).toBeNull();
   });
 
   it('renders the Accounts tab and screen when showAccountsTab is on', async () => {

@@ -10,7 +10,7 @@ import { useBudgetsData } from '../contexts/BudgetsDataContext';
 import { useCategories } from '../contexts/CategoriesContext';
 import { useAccountsData } from '../contexts/AccountsDataContext';
 import * as Currency from '../services/currency';
-import { fetchRatesToTarget, convertWithRateMap, getUnconvertibleCurrencies } from '../services/OperationsDB';
+import { fetchRatesToTarget, convertWithRateMap } from '../services/OperationsDB';
 import BudgetModal from '../modals/BudgetModal';
 import BudgetProgressBar from '../components/BudgetProgressBar';
 import AddFAB from '../components/AddFAB';
@@ -115,27 +115,19 @@ const BudgetScreen = () => {
     }
   }, [accounts, selectedCurrency]);
 
-  // Detect account currencies that cannot be expressed in the selected currency.
-  // Functional guards keep the empty state referentially stable (see the same
-  // pattern in GraphsScreen): a fresh [] every run would re-render and re-fire
-  // this effect through the `currencies` memo — an infinite loop.
-  useEffect(() => {
-    if (!convertAllBudgets || !selectedCurrency) {
-      setUnconvertedCurrencies(prev => (prev.length === 0 ? prev : []));
-      return;
-    }
-    let cancelled = false;
-    getUnconvertibleCurrencies(currencies, selectedCurrency)
-      .then(list => { if (!cancelled) setUnconvertedCurrencies(list); })
-      .catch(() => { if (!cancelled) setUnconvertedCurrencies(prev => (prev.length === 0 ? prev : [])); });
-    return () => { cancelled = true; };
-  }, [convertAllBudgets, selectedCurrency, currencies]);
-
-  // Grand totals across all active budgets, converted into selectedCurrency.
-  // Async because a rate may need a live fetch when the bundled table lacks it.
+  // Grand totals across all active budgets, converted into selectedCurrency,
+  // plus the budget currencies that have no rate to selectedCurrency (their
+  // amounts are dropped from the totals, so warn about exactly those — derived
+  // from the budgets' own currencies, not every account currency). A single
+  // rate map drives both totals and the warning, so the CDN fallback runs at
+  // most once per (currencies, target) change. Async because a rate may need a
+  // live fetch when the bundled table lacks it. Functional guards keep the
+  // empty state referentially stable (same pattern as GraphsScreen): a fresh []
+  // every run would re-render and re-fire this effect in an infinite loop.
   useEffect(() => {
     if (!convertAllBudgets || !selectedCurrency) {
       setConvertedTotals(prev => (prev === null ? prev : null));
+      setUnconvertedCurrencies(prev => (prev.length === 0 ? prev : []));
       return;
     }
     const statuses = [...budgetStatuses.values()];
@@ -145,15 +137,27 @@ const BudgetScreen = () => {
         const rateByCurrency = await fetchRatesToTarget(statuses.map(s => s.currency), selectedCurrency);
         let budgeted = '0';
         let spent = '0';
+        const unconvertible = new Set();
         for (const status of statuses) {
           const amount = convertWithRateMap(String(status.amount), status.currency, selectedCurrency, rateByCurrency);
           const spentConverted = convertWithRateMap(String(status.spent), status.currency, selectedCurrency, rateByCurrency);
-          if (amount !== null) budgeted = Currency.add(budgeted, amount);
-          if (spentConverted !== null) spent = Currency.add(spent, spentConverted);
+          // amount and spent share the currency+rate, so they are null together.
+          if (amount === null || spentConverted === null) {
+            unconvertible.add(status.currency);
+            continue;
+          }
+          budgeted = Currency.add(budgeted, amount);
+          spent = Currency.add(spent, spentConverted);
         }
-        if (!cancelled) setConvertedTotals({ budgeted, spent });
+        if (cancelled) return;
+        setConvertedTotals({ budgeted, spent });
+        const list = [...unconvertible];
+        setUnconvertedCurrencies(prev => (prev.length === 0 && list.length === 0 ? prev : list));
       } catch {
-        if (!cancelled) setConvertedTotals(prev => (prev === null ? prev : null));
+        if (!cancelled) {
+          setConvertedTotals(prev => (prev === null ? prev : null));
+          setUnconvertedCurrencies(prev => (prev.length === 0 ? prev : []));
+        }
       }
     })();
     return () => { cancelled = true; };
@@ -287,6 +291,7 @@ const BudgetScreen = () => {
         data={budgets}
         keyExtractor={(item) => item.id}
         renderItem={renderBudget}
+        extraData={budgetStatuses}
         ListHeaderComponent={listHeader}
         ListEmptyComponent={(
           <EmptyState

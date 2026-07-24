@@ -14,6 +14,10 @@ export const DisplaySettingsProvider = ({ children }) => {
   // Global toggle: when on, a dedicated Accounts tab is shown in the bottom
   // navigation. Defaults off — accounts remain reachable from Settings.
   const [showAccountsTab, setShowAccountsTabState] = useState(false);
+  // Global toggle: when on, the Budget tab is shown in the bottom navigation.
+  // Defaults ON (unlike Accounts) because budgets are reachable from nowhere
+  // else — hiding it is an explicit opt-out.
+  const [showBudgetTab, setShowBudgetTabState] = useState(true);
 
   useEffect(() => {
     getPreference(PREF_KEYS.HIDE_BALANCES, 'false').then(stored => {
@@ -36,6 +40,9 @@ export const DisplaySettingsProvider = ({ children }) => {
       setShowAccountsTabState(hadPins);
       await setPreference(PREF_KEYS.SHOW_ACCOUNTS_TAB, hadPins ? 'true' : 'false');
     });
+    getPreference(PREF_KEYS.SHOW_BUDGET_TAB, 'true').then(stored => {
+      setShowBudgetTabState(stored === 'true');
+    });
   }, []);
 
   const setHideBalances = useCallback(async (value) => {
@@ -53,9 +60,14 @@ export const DisplaySettingsProvider = ({ children }) => {
     await setPreference(PREF_KEYS.SHOW_ACCOUNTS_TAB, value ? 'true' : 'false');
   }, []);
 
+  const setShowBudgetTab = useCallback(async (value) => {
+    setShowBudgetTabState(value);
+    await setPreference(PREF_KEYS.SHOW_BUDGET_TAB, value ? 'true' : 'false');
+  }, []);
+
   const ctxValue = useMemo(
-    () => ({ hideBalances, setHideBalances, attachLocation, setAttachLocation, showAccountsTab, setShowAccountsTab }),
-    [hideBalances, setHideBalances, attachLocation, setAttachLocation, showAccountsTab, setShowAccountsTab],
+    () => ({ hideBalances, setHideBalances, attachLocation, setAttachLocation, showAccountsTab, setShowAccountsTab, showBudgetTab, setShowBudgetTab }),
+    [hideBalances, setHideBalances, attachLocation, setAttachLocation, showAccountsTab, setShowAccountsTab, showBudgetTab, setShowBudgetTab],
   );
 
   return (

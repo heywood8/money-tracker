@@ -68,6 +68,10 @@ jest.mock('../../app/contexts/DisplaySettingsContext', () => ({
   useDisplaySettings: () => ({
     hideBalances: displaySettingsMockState.hideBalances,
     setHideBalances: mockSetHideBalances,
+    showAccountsTab: false,
+    setShowAccountsTab: jest.fn(),
+    showBudgetTab: true,
+    setShowBudgetTab: jest.fn(),
   }),
 }));
 

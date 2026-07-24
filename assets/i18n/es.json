@@ -14,6 +14,8 @@
   "hide_balances_hint": "Enmascarar saldos de cuentas por privacidad",
   "show_accounts_in_menu": "Mostrar cuentas en el menú principal",
   "show_accounts_in_menu_hint": "Añade una pestaña Cuentas a la navegación inferior",
+  "show_budget_in_menu": "Mostrar Presupuesto en el menú principal",
+  "show_budget_in_menu_hint": "Mostrar la pestaña Presupuesto en la navegación inferior",
   "attach_location": "Adjuntar ubicación a las operaciones",
   "attach_location_hint": "Sugerir etiquetas que usaste cerca",
   "getting_location": "Obteniendo ubicación…",

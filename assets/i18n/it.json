@@ -14,6 +14,8 @@
   "hide_balances_hint": "Maschera i saldi dei conti per la privacy",
   "show_accounts_in_menu": "Mostra i conti nel menu principale",
   "show_accounts_in_menu_hint": "Aggiungi una scheda Conti alla navigazione in basso",
+  "show_budget_in_menu": "Mostra Budget nel menu principale",
+  "show_budget_in_menu_hint": "Mostra la scheda Budget nella navigazione in basso",
   "attach_location": "Allega posizione alle operazioni",
   "attach_location_hint": "Suggerisci le etichette usate qui vicino",
   "getting_location": "Recupero posizione…",

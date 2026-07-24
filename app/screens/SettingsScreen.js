@@ -136,7 +136,7 @@ export default function SettingsScreen({ setSubPanelActive }) {
   const { colors } = useThemeColors();
   const { colorScheme, setTheme } = useThemeConfig();
   const { t, language, setLanguage, availableLanguages } = useLocalization();
-  const { hideBalances, setHideBalances, attachLocation, setAttachLocation, showAccountsTab, setShowAccountsTab } = useDisplaySettings();
+  const { hideBalances, setHideBalances, attachLocation, setAttachLocation, showAccountsTab, setShowAccountsTab, showBudgetTab, setShowBudgetTab } = useDisplaySettings();
   const { showDialog } = useDialog();
   const { resetDatabase } = useAccountsActions();
   const { startImport, cancelImport, completeImport, getCancelToken } = useImportProgress();
@@ -221,6 +221,10 @@ export default function SettingsScreen({ setSubPanelActive }) {
   const handleToggleShowAccountsTab = useCallback(() => {
     setShowAccountsTab(!showAccountsTab);
   }, [showAccountsTab, setShowAccountsTab]);
+
+  const handleToggleShowBudgetTab = useCallback(() => {
+    setShowBudgetTab(!showBudgetTab);
+  }, [showBudgetTab, setShowBudgetTab]);
 
   const handleToggleAttachLocation = useCallback(async () => {
     // Turning OFF is non-destructive and needs no permission: just persist false.
@@ -1717,6 +1721,15 @@ export default function SettingsScreen({ setSubPanelActive }) {
           value={showAccountsTab}
           onToggle={handleToggleShowAccountsTab}
           testID="settings-show-accounts-tab-row"
+        />
+
+        <SettingToggleRow
+          icon="pie-chart-outline"
+          label={t('show_budget_in_menu') || 'Show Budget in main menu'}
+          hint={t('show_budget_in_menu_hint') || 'Show the Budget tab in the bottom navigation'}
+          value={showBudgetTab}
+          onToggle={handleToggleShowBudgetTab}
+          testID="settings-show-budget-tab-row"
         />
 
         <TouchableRipple onPress={() => openSubPanel('categories')} style={styles.settingsRow} testID="settings-categories-row">

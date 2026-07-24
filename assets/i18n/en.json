@@ -14,6 +14,8 @@
   "hide_balances_hint": "Mask account balances for privacy",
   "show_accounts_in_menu": "Show accounts in main menu",
   "show_accounts_in_menu_hint": "Add an Accounts tab to the bottom navigation",
+  "show_budget_in_menu": "Show Budget in main menu",
+  "show_budget_in_menu_hint": "Show the Budget tab in the bottom navigation",
   "attach_location": "Attach location to operations",
   "attach_location_hint": "Suggest labels you used nearby before",
   "getting_location": "Getting location…",

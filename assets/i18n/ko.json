@@ -14,6 +14,8 @@
   "hide_balances_hint": "개인 정보 보호를 위해 계정 잔액 마스크",
   "show_accounts_in_menu": "메인 메뉴에 계정 표시",
   "show_accounts_in_menu_hint": "하단 내비게이션에 계정 탭 추가",
+  "show_budget_in_menu": "메인 메뉴에 예산 표시",
+  "show_budget_in_menu_hint": "하단 내비게이션에 예산 탭 표시",
   "attach_location": "작업에 위치 첨부",
   "attach_location_hint": "근처에서 사용한 라벨 제안",
   "getting_location": "위치 가져오는 중…",

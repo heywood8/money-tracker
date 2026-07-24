@@ -306,4 +306,70 @@ describe('DisplaySettingsContext', () => {
       });
     });
   });
+
+  describe('showBudgetTab', () => {
+    it('defaults showBudgetTab=true when no pref is stored (unlike Accounts)', async () => {
+      // getPreference echoes its default arg for an unset key; budgets default on.
+      PreferencesDB.getPreference.mockImplementation((key, def) =>
+        Promise.resolve(key === 'show_budget_tab' ? def : 'false'),
+      );
+
+      const { result } = await renderHook(() => useDisplaySettings(), { wrapper });
+
+      await waitFor(() => {
+        expect(result.current.showBudgetTab).toBe(true);
+      });
+    });
+
+    it('reads stored showBudgetTab="false" on mount', async () => {
+      PreferencesDB.getPreference.mockImplementation((key) =>
+        Promise.resolve(key === 'show_budget_tab' ? 'false' : 'false'),
+      );
+
+      const { result } = await renderHook(() => useDisplaySettings(), { wrapper });
+
+      await waitFor(() => {
+        expect(PreferencesDB.getPreference).toHaveBeenCalled();
+      });
+      expect(result.current.showBudgetTab).toBe(false);
+    });
+
+    it('setShowBudgetTab(false) persists "false"', async () => {
+      PreferencesDB.getPreference.mockImplementation((key, def) =>
+        Promise.resolve(key === 'show_budget_tab' ? def : 'false'),
+      );
+
+      const { result } = await renderHook(() => useDisplaySettings(), { wrapper });
+
+      await waitFor(() => {
+        expect(result.current.showBudgetTab).toBe(true);
+      });
+
+      await act(async () => {
+        await result.current.setShowBudgetTab(false);
+      });
+
+      expect(result.current.showBudgetTab).toBe(false);
+      expect(PreferencesDB.setPreference).toHaveBeenCalledWith('show_budget_tab', 'false');
+    });
+
+    it('setShowBudgetTab(true) persists "true"', async () => {
+      PreferencesDB.getPreference.mockImplementation((key) =>
+        Promise.resolve(key === 'show_budget_tab' ? 'false' : 'false'),
+      );
+
+      const { result } = await renderHook(() => useDisplaySettings(), { wrapper });
+
+      await waitFor(() => {
+        expect(result.current.showBudgetTab).toBe(false);
+      });
+
+      await act(async () => {
+        await result.current.setShowBudgetTab(true);
+      });
+
+      expect(result.current.showBudgetTab).toBe(true);
+      expect(PreferencesDB.setPreference).toHaveBeenCalledWith('show_budget_tab', 'true');
+    });
+  });
 });

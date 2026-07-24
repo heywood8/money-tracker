@@ -242,7 +242,7 @@ TabGradient.propTypes = {
 export default function SimpleTabs() {
   const { colors } = useThemeColors();
   const { t } = useLocalization();
-  const { showAccountsTab } = useDisplaySettings();
+  const { showAccountsTab, showBudgetTab } = useDisplaySettings();
   const { isDownloading, downloadProgress, downloadPhase } = useUpdateDownload();
   const [active, setActive] = React.useState('Operations');
   const [subPanelActive, setSubPanelActive] = React.useState(false);
@@ -280,13 +280,15 @@ export default function SimpleTabs() {
     const tabs = [{ key: 'Operations', label: t('operations') || 'Operations' }];
     tabs.push({ key: 'Graphs', label: t('graphs') || 'Graphs' });
     tabs.push({ key: 'Planned', label: t('planned') || 'Planned' });
-    tabs.push({ key: 'Budget', label: t('budget') || 'Budget' });
+    if (showBudgetTab) {
+      tabs.push({ key: 'Budget', label: t('budget') || 'Budget' });
+    }
     if (showAccountsTab) {
       tabs.push({ key: 'Accounts', label: t('accounts') || 'Accounts' });
     }
     tabs.push({ key: 'Settings', label: t('settings') || 'Settings' });
     return tabs;
-  }, [t, showAccountsTab]);
+  }, [t, showAccountsTab, showBudgetTab]);
 
   // ---- shared animation values ----
   const translateX = useSharedValue(0);
@@ -399,11 +401,12 @@ export default function SimpleTabs() {
     screenOpacity0, screenOpacity1, screenOpacity2, screenOpacity3, screenOpacity4, screenOpacity5,
     clearTransitioningRef]);
 
-  // When the Accounts tab is toggled on/off the tab set changes size and indices
-  // shift, so snap the strip/pill to the current tab's new index. useLayoutEffect
-  // (not useEffect) runs before paint, so the strip is repositioned in the same
-  // commit the tab set changes — otherwise a wrong/blank screen flashes for one
-  // frame. If the active tab was removed, fall back to Operations.
+  // When the Accounts or Budget tab is toggled on/off the tab set changes size
+  // and indices shift, so snap the strip/pill to the current tab's new index.
+  // useLayoutEffect (not useEffect) runs before paint, so the strip is
+  // repositioned in the same commit the tab set changes — otherwise a
+  // wrong/blank screen flashes for one frame. If the active tab was removed
+  // (e.g. Budget hidden while on it), fall back to Operations.
   React.useLayoutEffect(() => {
     const idx = TABS.findIndex(tab => tab.key === active);
     const safeIdx = idx === -1 ? 0 : idx;
@@ -413,7 +416,7 @@ export default function SimpleTabs() {
     translateX.value = -safeIdx * SCREEN_WIDTH;
     // Intentionally only re-run when the tab set is toggled — depending on
     // `active` would re-snap the strip mid-animation on every tab switch.
-  }, [showAccountsTab]);
+  }, [showAccountsTab, showBudgetTab]);
 
   // A tapped "transactions to review" notification routes here: jump to the
   // Settings tab. SettingsScreen listens for the same event and opens the
@@ -568,11 +571,11 @@ export default function SimpleTabs() {
     const list = [{ key: 'Operations', el: operationsScreen }];
     list.push({ key: 'Graphs', el: graphsScreen });
     list.push({ key: 'Planned', el: plannedScreen });
-    list.push({ key: 'Budget', el: budgetScreen });
+    if (showBudgetTab) list.push({ key: 'Budget', el: budgetScreen });
     if (showAccountsTab) list.push({ key: 'Accounts', el: accountsScreen });
     list.push({ key: 'Settings', el: settingsScreen });
     return list;
-  }, [showAccountsTab, operationsScreen, accountsScreen, graphsScreen, plannedScreen, budgetScreen, settingsScreen]);
+  }, [showAccountsTab, showBudgetTab, operationsScreen, accountsScreen, graphsScreen, plannedScreen, budgetScreen, settingsScreen]);
 
   const renderScreens = useCallback(() => {
     const positionStyles = [
