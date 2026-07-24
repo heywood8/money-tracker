@@ -1,5 +1,12 @@
 # Changelog
 
+## [0.217.0](https://github.com/heywood8/money-tracker/compare/penny-v0.216.0...penny-v0.217.0) (2026-07-24)
+
+
+### Features
+
+* **budgets:** monthly income-allocation plan data layer (Budgets v2 2/5) ([#1401](https://github.com/heywood8/money-tracker/issues/1401)) ([029cdf2](https://github.com/heywood8/money-tracker/commit/029cdf2d7bab2547ffc0c5ae1faecbc4e42c5b8f))
+
 ## [0.216.0](https://github.com/heywood8/money-tracker/compare/penny-v0.215.0...penny-v0.216.0) (2026-07-24)
 
 
