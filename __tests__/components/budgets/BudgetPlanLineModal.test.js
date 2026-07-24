@@ -66,24 +66,26 @@ const baseProps = () => ({
 });
 
 describe('BudgetPlanLineModal', () => {
-  it('refuses to save a line with no tracking target', () => {
+  it('refuses to save a line with no tracking target', async () => {
     const props = baseProps();
-    const { getByTestId } = render(<BudgetPlanLineModal {...props} />);
-    fireEvent.changeText(getByTestId('calc-input'), '100');
-    fireEvent.press(getByTestId('plan-line-save'));
+    const { getByTestId } = await render(<BudgetPlanLineModal {...props} />);
+    await waitFor(() => expect(getByTestId('calc-input')).toBeTruthy());
+    await fireEvent.changeText(getByTestId('calc-input'), '100');
+    await fireEvent.press(getByTestId('plan-line-save'));
     expect(props.onSaveLine).not.toHaveBeenCalled();
-    expect(getByTestId('plan-line-error')).toBeTruthy();
+    await waitFor(() => expect(getByTestId('plan-line-error')).toBeTruthy());
   });
 
   it('saves a category-linked line once a target is chosen', async () => {
     const props = baseProps();
-    const { getByTestId } = render(<BudgetPlanLineModal {...props} />);
+    const { getByTestId } = await render(<BudgetPlanLineModal {...props} />);
     // Open the target picker and select the expense category.
-    fireEvent.press(getByTestId('plan-target-picker'));
+    await waitFor(() => expect(getByTestId('plan-target-picker')).toBeTruthy());
+    await fireEvent.press(getByTestId('plan-target-picker'));
     await waitFor(() => expect(getByTestId('plan-target-option-cat-cat1')).toBeTruthy());
-    fireEvent.press(getByTestId('plan-target-option-cat-cat1'));
-    fireEvent.changeText(getByTestId('calc-input'), '150');
-    fireEvent.press(getByTestId('plan-line-save'));
+    await fireEvent.press(getByTestId('plan-target-option-cat-cat1'));
+    await fireEvent.changeText(getByTestId('calc-input'), '150');
+    await fireEvent.press(getByTestId('plan-line-save'));
     expect(props.onSaveLine).toHaveBeenCalledWith(expect.objectContaining({
       amount: '150',
       categoryId: 'cat1',
@@ -93,14 +95,15 @@ describe('BudgetPlanLineModal', () => {
 
   it('saves an account (transfer) target line', async () => {
     const props = baseProps();
-    const { getByTestId } = render(<BudgetPlanLineModal {...props} />);
-    fireEvent.press(getByTestId('plan-target-picker'));
+    const { getByTestId } = await render(<BudgetPlanLineModal {...props} />);
+    await waitFor(() => expect(getByTestId('plan-target-picker')).toBeTruthy());
+    await fireEvent.press(getByTestId('plan-target-picker'));
     await waitFor(() => expect(getByTestId('plan-target-tab-account')).toBeTruthy());
-    fireEvent.press(getByTestId('plan-target-tab-account'));
+    await fireEvent.press(getByTestId('plan-target-tab-account'));
     await waitFor(() => expect(getByTestId('plan-target-option-acc-1')).toBeTruthy());
-    fireEvent.press(getByTestId('plan-target-option-acc-1'));
-    fireEvent.changeText(getByTestId('calc-input'), '400');
-    fireEvent.press(getByTestId('plan-line-save'));
+    await fireEvent.press(getByTestId('plan-target-option-acc-1'));
+    await fireEvent.changeText(getByTestId('calc-input'), '400');
+    await fireEvent.press(getByTestId('plan-line-save'));
     expect(props.onSaveLine).toHaveBeenCalledWith(expect.objectContaining({
       amount: '400',
       categoryId: null,
@@ -108,12 +111,13 @@ describe('BudgetPlanLineModal', () => {
     }));
   });
 
-  it('income mode saves without requiring a target', () => {
+  it('income mode saves without requiring a target', async () => {
     const props = { ...baseProps(), mode: 'income', initialIncome: '1000' };
-    const { getByTestId, queryByTestId } = render(<BudgetPlanLineModal {...props} />);
+    const { getByTestId, queryByTestId } = await render(<BudgetPlanLineModal {...props} />);
     expect(queryByTestId('plan-target-picker')).toBeNull();
-    fireEvent.changeText(getByTestId('calc-input'), '2500');
-    fireEvent.press(getByTestId('plan-line-save'));
+    await waitFor(() => expect(getByTestId('calc-input')).toBeTruthy());
+    await fireEvent.changeText(getByTestId('calc-input'), '2500');
+    await fireEvent.press(getByTestId('plan-line-save'));
     expect(props.onSaveIncome).toHaveBeenCalledWith('2500');
   });
 });

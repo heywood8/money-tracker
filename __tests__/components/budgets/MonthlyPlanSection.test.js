@@ -104,25 +104,25 @@ describe('MonthlyPlanSection', () => {
   });
 
   describe('Empty state', () => {
-    it('shows create action and no copy action when there is no previous plan', () => {
+    it('shows create action and no copy action when there is no previous plan', async () => {
       setPlans({ plans: [] });
-      const { getByTestId, queryByTestId } = renderSection();
+      const { getByTestId, queryByTestId } = await renderSection();
       expect(getByTestId('plan-empty-state')).toBeTruthy();
       expect(getByTestId('plan-create-empty')).toBeTruthy();
       expect(queryByTestId('plan-copy-last')).toBeNull();
     });
 
-    it('creates an empty plan for the current month', () => {
+    it('creates an empty plan for the current month', async () => {
       setPlans({ plans: [] });
-      const { getByTestId } = renderSection();
-      fireEvent.press(getByTestId('plan-create-empty'));
+      const { getByTestId } = await renderSection();
+      await fireEvent.press(getByTestId('plan-create-empty'));
       expect(mockPlans.addPlan).toHaveBeenCalledWith({ month: THIS_MONTH, currency: 'USD' });
     });
 
-    it('offers copy-from-last-month when a previous plan exists', () => {
+    it('offers copy-from-last-month when a previous plan exists', async () => {
       setPlans({ plans: [{ id: 'p0', month: PREV_MONTH, currency: 'USD', expectedIncome: '5000' }] });
-      const { getByTestId } = renderSection();
-      fireEvent.press(getByTestId('plan-copy-last'));
+      const { getByTestId } = await renderSection();
+      await fireEvent.press(getByTestId('plan-copy-last'));
       expect(mockPlans.copyPlan).toHaveBeenCalledWith(PREV_MONTH, THIS_MONTH);
     });
   });
@@ -138,14 +138,14 @@ describe('MonthlyPlanSection', () => {
 
     it('renders income, lines and computed totals', async () => {
       planWithLines();
-      const { getByTestId, getByText } = renderSection();
+      const { getByTestId, getByText } = await renderSection();
       expect(getByTestId('plan-income-row')).toBeTruthy();
       await waitFor(() => expect(getByTestId('plan-line-l1')).toBeTruthy());
       expect(getByTestId('plan-line-l2')).toBeTruthy();
       // Label falls back to the linked account name for the label-less line.
       expect(getByText('Savings')).toBeTruthy();
       // allocated = 300 + 200 = 500, remainder = 1000 - 500 = 500
-      expect(getByTestId('plan-remainder')).toHaveTextContent('500.00');
+      expect(getByTestId('plan-remainder')).toHaveTextContent(/500\.00/);
     });
 
     it('shows the remainder in the danger color when over-allocated', async () => {
@@ -153,7 +153,7 @@ describe('MonthlyPlanSection', () => {
         plans: [{ id: 'p1', month: THIS_MONTH, currency: 'USD', expectedIncome: '100' }],
         lines: [{ id: 'l1', planId: 'p1', amount: '500', label: 'Big', comment: null, categoryId: 'cat1', toAccountId: null, sortOrder: 0, isBroken: false }],
       });
-      const { getByTestId } = renderSection();
+      const { getByTestId } = await renderSection();
       await waitFor(() => expect(getByTestId('plan-line-l1')).toBeTruthy());
       expect(flatColor(getByTestId('plan-remainder'))).toBe(COLORS.danger);
     });
@@ -162,32 +162,32 @@ describe('MonthlyPlanSection', () => {
   describe('Interactions', () => {
     it('adds a line and reloads', async () => {
       setPlans({ plans: [{ id: 'p1', month: THIS_MONTH, currency: 'USD', expectedIncome: '1000' }], lines: [] });
-      const { getByTestId } = renderSection();
-      fireEvent.press(getByTestId('plan-add-line'));
+      const { getByTestId } = await renderSection();
+      await fireEvent.press(getByTestId('plan-add-line'));
       await waitFor(() => expect(getByTestId('mock-line-modal')).toBeTruthy());
-      fireEvent.press(getByTestId('mock-save-line'));
+      await fireEvent.press(getByTestId('mock-save-line'));
       await waitFor(() => expect(mockPlans.addLine).toHaveBeenCalled());
       expect(mockPlans.addLine).toHaveBeenCalledWith('p1', expect.objectContaining({ categoryId: 'cat1', sortOrder: 0 }));
     });
 
     it('saves expected income from the income editor', async () => {
       setPlans({ plans: [{ id: 'p1', month: THIS_MONTH, currency: 'USD', expectedIncome: '1000' }], lines: [] });
-      const { getByTestId } = renderSection();
-      fireEvent.press(getByTestId('plan-income-row'));
+      const { getByTestId } = await renderSection();
+      await fireEvent.press(getByTestId('plan-income-row'));
       await waitFor(() => expect(getByTestId('mock-line-modal')).toBeTruthy());
       expect(capturedModalProps.mode).toBe('income');
-      fireEvent.press(getByTestId('mock-save-income'));
+      await fireEvent.press(getByTestId('mock-save-income'));
       await waitFor(() => expect(mockPlans.updatePlan).toHaveBeenCalledWith('p1', { expectedIncome: '9000' }));
     });
 
-    it('navigates months without state bleed (next month has no plan)', () => {
+    it('navigates months without state bleed (next month has no plan)', async () => {
       setPlans({ plans: [{ id: 'p1', month: THIS_MONTH, currency: 'USD', expectedIncome: '1000' }], lines: [] });
-      const { getByTestId, queryByTestId } = renderSection();
+      const { getByTestId, queryByTestId } = await renderSection();
       // Current month has a plan → income row present.
       expect(getByTestId('plan-income-row')).toBeTruthy();
-      fireEvent.press(getByTestId('plan-next-month'));
+      await fireEvent.press(getByTestId('plan-next-month'));
       // Next month has no plan → empty state, no income row.
-      expect(getByTestId('plan-empty-state')).toBeTruthy();
+      await waitFor(() => expect(getByTestId('plan-empty-state')).toBeTruthy());
       expect(queryByTestId('plan-income-row')).toBeNull();
     });
   });
