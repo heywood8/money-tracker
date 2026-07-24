@@ -5,7 +5,7 @@
 
 import React from 'react';
 import { render, fireEvent } from '@testing-library/react-native';
-import BalanceHistoryCard from '../../app/components/graphs/BalanceHistoryCard';
+import BalanceHistoryCard, { computeBalanceChart, formatYAxisLabel } from '../../app/components/graphs/BalanceHistoryCard';
 
 // Mock DisplaySettingsContext
 jest.mock('../../app/contexts/DisplaySettingsContext', () => ({
@@ -14,10 +14,10 @@ jest.mock('../../app/contexts/DisplaySettingsContext', () => ({
   })),
 }));
 
-// Mock LineChart from the modern v2 charts subpath
-jest.mock('react-native-chart-kit/v2', () => ({
-  LineChart: 'LineChart',
-}));
+// victory-native (CartesianChart → testID "cartesian-chart", Line → testID
+// "vn-line") and @shopify/react-native-skia are virtually mocked in jest.setup.js.
+// The mock does not forward chart/line props, so chart data & series are asserted
+// via the pure computeBalanceChart export, and rendering via the testIDs above.
 
 // Mock SimplePicker
 jest.mock('../../app/components/SimplePicker', () => 'SimplePicker');
@@ -245,7 +245,7 @@ describe('BalanceHistoryCard', () => {
         />,
       );
 
-      expect(container.queryAll(n => n.type === 'LineChart')[0]).toBeFalsy();
+      expect(container.queryAll(n => n.props.testID === 'cartesian-chart')[0]).toBeFalsy();
     });
   });
 
@@ -346,7 +346,7 @@ describe('BalanceHistoryCard', () => {
         />,
       );
 
-      expect(container.queryAll(n => n.type === 'LineChart')[0]).toBeFalsy();
+      expect(container.queryAll(n => n.props.testID === 'cartesian-chart')[0]).toBeFalsy();
     });
   });
 
@@ -394,7 +394,7 @@ describe('BalanceHistoryCard', () => {
         />,
       );
 
-      expect(container.queryAll(n => n.type === 'LineChart')[0]).toBeTruthy();
+      expect(container.queryAll(n => n.props.testID === 'cartesian-chart')[0]).toBeTruthy();
     });
 
     it('configures chart with correct data including plain avg line', async () => {
@@ -423,10 +423,18 @@ describe('BalanceHistoryCard', () => {
         />,
       );
 
-      const lineChart = container.queryAll(n => n.type === 'LineChart')[0];
-      expect(lineChart.props.data.map(d => d.day)).toEqual(['1', '5', '10', '15', '20', '25', '28']);
-      // Should have 4 series: actual + plain avg + prevMonth + zero baseline (no forecast when not current month)
-      expect(lineChart.props.series).toHaveLength(4);
+      expect(container.queryAll(n => n.props.testID === 'vn-line')).toHaveLength(4);
+      const { data, series } = computeBalanceChart({
+        balanceHistoryData: mockBalanceHistoryData,
+        spendingPrediction: null,
+        isCurrentMonth: false,
+        selectedYear: 2024,
+        selectedMonth: 0,
+        primaryColor: mockColors.primary,
+      });
+      expect(data.map(d => d.day)).toEqual([1, 5, 10, 15, 20, 25, 28]);
+      // 4 series: actual + plain avg + prevMonth + zero baseline (no forecast when not current month)
+      expect(series).toHaveLength(4);
     });
 
     it('includes actual dataset with correct styling', async () => {
@@ -453,9 +461,17 @@ describe('BalanceHistoryCard', () => {
         />,
       );
 
-      const lineChart = container.queryAll(n => n.type === 'LineChart')[0];
-      const actualSeries = lineChart.props.series.find(s => s.yKey === 'actual');
-      expect(lineChart.props.data.map(d => d.actual)).toEqual(mockBalanceHistoryData.actualForChart);
+      expect(container.queryAll(n => n.props.testID === 'cartesian-chart')[0]).toBeTruthy();
+      const { data, series } = computeBalanceChart({
+        balanceHistoryData: mockBalanceHistoryData,
+        spendingPrediction: null,
+        isCurrentMonth: false,
+        selectedYear: 2024,
+        selectedMonth: 0,
+        primaryColor: mockColors.primary,
+      });
+      const actualSeries = series.find(s => s.yKey === 'actual');
+      expect(data.map(d => d.actual)).toEqual(mockBalanceHistoryData.actualForChart);
       expect(actualSeries.strokeWidth).toBe(3);
     });
 
@@ -485,9 +501,17 @@ describe('BalanceHistoryCard', () => {
         />,
       );
 
-      const lineChart = container.queryAll(n => n.type === 'LineChart')[0];
-      const plainAvgSeries = lineChart.props.series.find(s => s.yKey === 'plainAvg');
-      expect(plainAvgSeries.dot).toBe(false);
+      expect(container.queryAll(n => n.props.testID === 'cartesian-chart')[0]).toBeTruthy();
+      const { series } = computeBalanceChart({
+        balanceHistoryData: mockBalanceHistoryData,
+        spendingPrediction: null,
+        isCurrentMonth: false,
+        selectedYear: 2024,
+        selectedMonth: 0,
+        primaryColor: mockColors.primary,
+      });
+      const plainAvgSeries = series.find(s => s.yKey === 'plainAvg');
+      expect(plainAvgSeries.dashed).toBe(false);
       expect(plainAvgSeries.strokeWidth).toBe(2);
       // Plain avg should be gray color
       expect(plainAvgSeries.color).toBe('rgba(128, 128, 128, 0.4)');
@@ -533,10 +557,18 @@ describe('BalanceHistoryCard', () => {
         />,
       );
 
-      const lineChart = container.queryAll(n => n.type === 'LineChart')[0];
+      expect(container.queryAll(n => n.props.testID === 'vn-line')).toHaveLength(5);
+      const { series } = computeBalanceChart({
+        balanceHistoryData: mockBalanceHistoryData,
+        spendingPrediction: mockSpendingPrediction,
+        isCurrentMonth: true,
+        selectedYear: 2024,
+        selectedMonth: 0,
+        primaryColor: mockColors.primary,
+      });
       // 5 series: actual + forecast (split) + plain avg + prevMonth + zero baseline
-      expect(lineChart.props.series).toHaveLength(5);
-      expect(lineChart.props.series.find(s => s.yKey === 'forecast')).toBeTruthy();
+      expect(series).toHaveLength(5);
+      expect(series.find(s => s.yKey === 'forecast')).toBeTruthy();
 
       global.Date.mockRestore();
     });
@@ -567,12 +599,20 @@ describe('BalanceHistoryCard', () => {
         />,
       );
 
-      const lineChart = container.queryAll(n => n.type === 'LineChart')[0];
+      expect(container.queryAll(n => n.props.testID === 'vn-line')).toHaveLength(4);
+      const { series } = computeBalanceChart({
+        balanceHistoryData: mockBalanceHistoryData,
+        spendingPrediction: null,
+        isCurrentMonth: false,
+        selectedYear: 2024,
+        selectedMonth: 0,
+        primaryColor: mockColors.primary,
+      });
       // 4 series: actual + plain avg + prevMonth + zero baseline (no forecast)
-      expect(lineChart.props.series).toHaveLength(4);
-      const prevMonthSeries = lineChart.props.series.find(s => s.yKey === 'prevMonth');
+      expect(series).toHaveLength(4);
+      const prevMonthSeries = series.find(s => s.yKey === 'prevMonth');
       expect(prevMonthSeries).toBeTruthy();
-      expect(prevMonthSeries.dot).toBe(false);
+      expect(prevMonthSeries.dashed).toBe(false);
     });
 
     it('excludes prevMonth dataset when not available', async () => {
@@ -604,10 +644,18 @@ describe('BalanceHistoryCard', () => {
         />,
       );
 
-      const lineChart = container.queryAll(n => n.type === 'LineChart')[0];
+      expect(container.queryAll(n => n.props.testID === 'vn-line')).toHaveLength(3);
+      const { series } = computeBalanceChart({
+        balanceHistoryData: dataWithoutPrevMonth,
+        spendingPrediction: null,
+        isCurrentMonth: false,
+        selectedYear: 2024,
+        selectedMonth: 0,
+        primaryColor: mockColors.primary,
+      });
       // 3 series: actual + plain avg + zero baseline (no prevMonth)
-      expect(lineChart.props.series).toHaveLength(3);
-      expect(lineChart.props.series.find(s => s.yKey === 'prevMonth')).toBeFalsy();
+      expect(series).toHaveLength(3);
+      expect(series.find(s => s.yKey === 'prevMonth')).toBeFalsy();
     });
 
     it('excludes prevMonth dataset when all values are undefined', async () => {
@@ -639,9 +687,17 @@ describe('BalanceHistoryCard', () => {
         />,
       );
 
-      const lineChart = container.queryAll(n => n.type === 'LineChart')[0];
+      expect(container.queryAll(n => n.props.testID === 'vn-line')).toHaveLength(3);
+      const { series } = computeBalanceChart({
+        balanceHistoryData: dataWithUndefinedPrevMonth,
+        spendingPrediction: null,
+        isCurrentMonth: false,
+        selectedYear: 2024,
+        selectedMonth: 0,
+        primaryColor: mockColors.primary,
+      });
       // 3 series: actual + plain avg + zero baseline (no prevMonth since all undefined)
-      expect(lineChart.props.series).toHaveLength(3);
+      expect(series).toHaveLength(3);
     });
   });
 
@@ -1031,10 +1087,9 @@ describe('BalanceHistoryCard', () => {
         />,
       );
 
-      const lineChart = container.queryAll(n => n.type === 'LineChart')[0];
-      expect(lineChart).toBeTruthy();
-      // Verify formatYLabel function formats large numbers correctly
-      const formattedValue = lineChart.props.formatYLabel('1500000');
+      expect(container.queryAll(n => n.props.testID === 'cartesian-chart')[0]).toBeTruthy();
+      // Verify the Y-axis label formatter turns large numbers into compact units
+      const formattedValue = formatYAxisLabel('1500000', false);
       expect(formattedValue).toBe('2M'); // Should format as millions
     });
   });
@@ -1219,9 +1274,17 @@ describe('BalanceHistoryCard', () => {
         />,
       );
 
-      const lineChart = container.queryAll(n => n.type === 'LineChart')[0];
-      const actualDataset = { data: lineChart.props.data.map(d => d.actual).filter(v => v !== null) };
-      expect(actualDataset.data).toEqual([1000, 1200]); // undefined should be filtered
+      expect(container.queryAll(n => n.props.testID === 'cartesian-chart')[0]).toBeTruthy();
+      const { data } = computeBalanceChart({
+        balanceHistoryData: dataWithUndefined,
+        spendingPrediction: null,
+        isCurrentMonth: false,
+        selectedYear: 2024,
+        selectedMonth: 0,
+        primaryColor: mockColors.primary,
+      });
+      const actualData = data.map(d => d.actual).filter(v => v !== null);
+      expect(actualData).toEqual([1000, 1200]); // undefined should be filtered
     });
 
     it('handles zero max value in scale calculation', async () => {
@@ -1256,8 +1319,7 @@ describe('BalanceHistoryCard', () => {
         />,
       );
 
-      const lineChart = container.queryAll(n => n.type === 'LineChart')[0];
-      expect(lineChart).toBeTruthy();
+      expect(container.queryAll(n => n.props.testID === 'cartesian-chart')[0]).toBeTruthy();
       // Should handle zero values without crashing
     });
 
@@ -1518,9 +1580,17 @@ describe('BalanceHistoryCard', () => {
         />,
       );
 
-      const lineChart = container.queryAll(n => n.type === 'LineChart')[0];
-      const actualDataset = { data: lineChart.props.data.map(d => d.actual).filter(v => v !== null) };
-      expect(actualDataset.data).toEqual([500, 600, 700, 800, 750, 900, 1000]);
+      expect(container.queryAll(n => n.props.testID === 'cartesian-chart')[0]).toBeTruthy();
+      const { data } = computeBalanceChart({
+        balanceHistoryData: fullMonthData,
+        spendingPrediction: null,
+        isCurrentMonth: false,
+        selectedYear: 2025,
+        selectedMonth: 11,
+        primaryColor: mockColors.primary,
+      });
+      const actualData = data.map(d => d.actual).filter(v => v !== null);
+      expect(actualData).toEqual([500, 600, 700, 800, 750, 900, 1000]);
     });
 
     it('shows all actual data for a past month regardless of current date (day 15)', async () => {
@@ -1552,9 +1622,17 @@ describe('BalanceHistoryCard', () => {
         />,
       );
 
-      const lineChart = container.queryAll(n => n.type === 'LineChart')[0];
-      const actualDataset = { data: lineChart.props.data.map(d => d.actual).filter(v => v !== null) };
-      expect(actualDataset.data).toEqual([500, 600, 700, 800, 750, 900, 1000]);
+      expect(container.queryAll(n => n.props.testID === 'cartesian-chart')[0]).toBeTruthy();
+      const { data } = computeBalanceChart({
+        balanceHistoryData: fullMonthData,
+        spendingPrediction: null,
+        isCurrentMonth: false,
+        selectedYear: 2025,
+        selectedMonth: 5,
+        primaryColor: mockColors.primary,
+      });
+      const actualData = data.map(d => d.actual).filter(v => v !== null);
+      expect(actualData).toEqual([500, 600, 700, 800, 750, 900, 1000]);
     });
 
     it('shows all actual data for a past month regardless of current date (day 28)', async () => {
@@ -1586,9 +1664,17 @@ describe('BalanceHistoryCard', () => {
         />,
       );
 
-      const lineChart = container.queryAll(n => n.type === 'LineChart')[0];
-      const actualDataset = { data: lineChart.props.data.map(d => d.actual).filter(v => v !== null) };
-      expect(actualDataset.data).toEqual([500, 600, 700, 800, 750, 900, 1000]);
+      expect(container.queryAll(n => n.props.testID === 'cartesian-chart')[0]).toBeTruthy();
+      const { data } = computeBalanceChart({
+        balanceHistoryData: fullMonthData,
+        spendingPrediction: null,
+        isCurrentMonth: false,
+        selectedYear: 2025,
+        selectedMonth: 10,
+        primaryColor: mockColors.primary,
+      });
+      const actualData = data.map(d => d.actual).filter(v => v !== null);
+      expect(actualData).toEqual([500, 600, 700, 800, 750, 900, 1000]);
     });
 
     it('shows only data up to current day for the current month (day 10)', async () => {
@@ -1620,10 +1706,18 @@ describe('BalanceHistoryCard', () => {
         />,
       );
 
-      const lineChart = container.queryAll(n => n.type === 'LineChart')[0];
-      const actualDataset = { data: lineChart.props.data.map(d => d.actual).filter(v => v !== null) };
+      expect(container.queryAll(n => n.props.testID === 'cartesian-chart')[0]).toBeTruthy();
+      const { data } = computeBalanceChart({
+        balanceHistoryData: fullMonthData,
+        spendingPrediction: null,
+        isCurrentMonth: true,
+        selectedYear: 2024,
+        selectedMonth: 0,
+        primaryColor: mockColors.primary,
+      });
+      const actualData = data.map(d => d.actual).filter(v => v !== null);
       // Labels are [1, 5, 10, 15, 20, 25, 31] — days 1, 5, 10 are <= 10
-      expect(actualDataset.data).toEqual([500, 600, 700]);
+      expect(actualData).toEqual([500, 600, 700]);
     });
 
     it('shows only first data point for current month when date is early (day 3)', async () => {
@@ -1655,10 +1749,18 @@ describe('BalanceHistoryCard', () => {
         />,
       );
 
-      const lineChart = container.queryAll(n => n.type === 'LineChart')[0];
-      const actualDataset = { data: lineChart.props.data.map(d => d.actual).filter(v => v !== null) };
+      expect(container.queryAll(n => n.props.testID === 'cartesian-chart')[0]).toBeTruthy();
+      const { data } = computeBalanceChart({
+        balanceHistoryData: fullMonthData,
+        spendingPrediction: null,
+        isCurrentMonth: true,
+        selectedYear: 2024,
+        selectedMonth: 0,
+        primaryColor: mockColors.primary,
+      });
+      const actualData = data.map(d => d.actual).filter(v => v !== null);
       // Labels are [1, 5, 10, ...] — only day 1 is <= 3
-      expect(actualDataset.data).toEqual([500]);
+      expect(actualData).toEqual([500]);
     });
 
     it('shows all data points for current month at end of month (day 31)', async () => {
@@ -1690,10 +1792,18 @@ describe('BalanceHistoryCard', () => {
         />,
       );
 
-      const lineChart = container.queryAll(n => n.type === 'LineChart')[0];
-      const actualDataset = { data: lineChart.props.data.map(d => d.actual).filter(v => v !== null) };
+      expect(container.queryAll(n => n.props.testID === 'cartesian-chart')[0]).toBeTruthy();
+      const { data } = computeBalanceChart({
+        balanceHistoryData: fullMonthData,
+        spendingPrediction: null,
+        isCurrentMonth: true,
+        selectedYear: 2024,
+        selectedMonth: 0,
+        primaryColor: mockColors.primary,
+      });
+      const actualData = data.map(d => d.actual).filter(v => v !== null);
       // All labels [1, 5, 10, 15, 20, 25, 31] are <= 31
-      expect(actualDataset.data).toEqual([500, 600, 700, 800, 750, 900, 1000]);
+      expect(actualData).toEqual([500, 600, 700, 800, 750, 900, 1000]);
     });
 
     it('includes forecast data after current day for current month', async () => {
@@ -1735,13 +1845,21 @@ describe('BalanceHistoryCard', () => {
         />,
       );
 
-      const lineChart = container.queryAll(n => n.type === 'LineChart')[0];
+      expect(container.queryAll(n => n.props.testID === 'cartesian-chart')[0]).toBeTruthy();
+      const { data, series } = computeBalanceChart({
+        balanceHistoryData: fullMonthData,
+        spendingPrediction: mockSpendingPrediction,
+        isCurrentMonth: true,
+        selectedYear: 2024,
+        selectedMonth: 0,
+        primaryColor: mockColors.primary,
+      });
       // Forecast now lives in its own dashed series (days after today), not appended to actual
-      const forecastValues = lineChart.props.data.map(d => d.forecast).filter(v => v !== null);
+      const forecastValues = data.map(d => d.forecast).filter(v => v !== null);
       expect(forecastValues.length).toBeGreaterThan(0);
-      expect(lineChart.props.series.find(s => s.yKey === 'forecast')).toBeTruthy();
+      expect(series.find(s => s.yKey === 'forecast')).toBeTruthy();
       // Actual series stops at today: days 1, 5, 10, 15 (<= 16)
-      const actualValues = lineChart.props.data.map(d => d.actual).filter(v => v !== null);
+      const actualValues = data.map(d => d.actual).filter(v => v !== null);
       expect(actualValues).toEqual([500, 600, 700, 800]);
     });
   });
@@ -1836,7 +1954,7 @@ describe('BalanceHistoryCard', () => {
         />,
       );
 
-      expect(container.queryAll(n => n.type === 'LineChart')[0]).toBeTruthy();
+      expect(container.queryAll(n => n.props.testID === 'cartesian-chart')[0]).toBeTruthy();
 
       global.Date.mockRestore();
     });
@@ -1870,10 +1988,10 @@ describe('BalanceHistoryCard', () => {
         />,
       );
 
-      const lineChart = container.queryAll(n => n.type === 'LineChart')[0];
-      expect(lineChart.props.formatYLabel('1000')).toBe('');
-      expect(lineChart.props.formatYLabel('1000000')).toBe('');
-      expect(lineChart.props.formatYLabel('0')).toBe('');
+      expect(container.queryAll(n => n.props.testID === 'cartesian-chart')[0]).toBeTruthy();
+      expect(formatYAxisLabel('1000', true)).toBe('');
+      expect(formatYAxisLabel('1000000', true)).toBe('');
+      expect(formatYAxisLabel('0', true)).toBe('');
 
       global.Date.mockRestore();
     });

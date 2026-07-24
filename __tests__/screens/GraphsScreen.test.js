@@ -7,14 +7,9 @@
 import React from 'react';
 import { render, fireEvent, waitFor } from '@testing-library/react-native';
 
-// Mock all dependencies
-jest.mock('react-native-chart-kit', () => ({
-  PieChart: () => 'PieChart',
-}));
-
-jest.mock('react-native-chart-kit/v2', () => ({
-  LineChart: () => 'LineChart',
-}));
+// Mock all dependencies.
+// Charts are Victory Native XL now — victory-native and @shopify/react-native-skia
+// are virtually mocked globally in jest.setup.js, so no per-file chart mock is needed.
 
 jest.mock('../../app/contexts/ThemeColorsContext', () => ({
   useThemeColors: jest.fn(() => ({

@@ -601,7 +601,7 @@ describe('useBalanceHistory', () => {
 
     it('should not produce undefined/null at end of prevMonth when current month has more days than previous month', async () => {
       // May has 31 days, April has 30 — day 31 previously returned undefined which
-      // react-native-chart-kit rendered as 0, making the purple line drop to zero.
+      // the chart rendered as 0, making the purple line drop to zero.
       const mayYear = 2026;
       const mayMonthIndex = 4; // May (0-based)
 

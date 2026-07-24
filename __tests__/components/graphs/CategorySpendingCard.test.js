@@ -95,13 +95,13 @@ describe('CategorySpendingCard', () => {
       expect(getByText('Food')).toBeTruthy();
     });
 
-    it('renders bar chart SVG with 12 months of bars', async () => {
-      const { container } = await render(
+    it('renders the Victory Native bar chart with bars', async () => {
+      const { getByTestId, getAllByTestId } = await render(
         <CategorySpendingCard {...defaultProps} />,
       );
 
-      const svg = container.queryAll(n => n.type === 'Svg')[0];
-      expect(svg).toBeTruthy();
+      expect(getByTestId('cartesian-chart')).toBeTruthy();
+      expect(getAllByTestId('vn-bar').length).toBeGreaterThan(0);
     });
 
     it('shows loading indicator when loading', async () => {
@@ -128,12 +128,12 @@ describe('CategorySpendingCard', () => {
         loadData: jest.fn(),
       });
 
-      const { getByText, container } = await render(
+      const { getByText, queryByTestId } = await render(
         <CategorySpendingCard {...defaultProps} />,
       );
 
       expect(getByText('no_spending_data')).toBeTruthy();
-      expect(container.queryAll(n => n.type === 'Svg')[0]).toBeFalsy();
+      expect(queryByTestId('cartesian-chart')).toBeFalsy();
     });
 
     it('renders null when no parent expense categories', async () => {
@@ -365,11 +365,11 @@ describe('CategorySpendingCard', () => {
     });
 
     it('still renders the bar chart', async () => {
-      const { container } = await render(
+      const { getByTestId } = await render(
         <CategorySpendingCard {...defaultProps} />,
       );
 
-      expect(container.queryAll(n => n.type === 'Svg')[0]).toBeTruthy();
+      expect(getByTestId('cartesian-chart')).toBeTruthy();
     });
   });
 
