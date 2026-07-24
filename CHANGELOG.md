@@ -1,5 +1,12 @@
 # Changelog
 
+## [0.218.0](https://github.com/heywood8/money-tracker/compare/penny-v0.217.0...penny-v0.218.0) (2026-07-24)
+
+
+### Features
+
+* **budgets:** backup/restore + Sheets export for monthly plans (Budgets v2 3/5) ([#1403](https://github.com/heywood8/money-tracker/issues/1403)) ([45f07f2](https://github.com/heywood8/money-tracker/commit/45f07f2ea22b336ea9aad21715fbf64cafa14c07))
+
 ## [0.217.0](https://github.com/heywood8/money-tracker/compare/penny-v0.216.0...penny-v0.217.0) (2026-07-24)
 
 
