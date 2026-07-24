@@ -94,6 +94,16 @@ jest.mock('../../app/components/AddFAB', () => {
 
 jest.mock('../../app/components/ModalBlurOverlay', () => () => null);
 
+// The monthly plan section has its own dedicated test suite; stub it here so the
+// budgets-list screen tests stay focused and don't need the plan contexts.
+jest.mock('../../app/components/budgets/MonthlyPlanSection', () => {
+  const React = require('react');
+  const { View } = require('react-native');
+  return function MockMonthlyPlanSection() {
+    return React.createElement(View, { testID: 'monthly-plan-section' });
+  };
+});
+
 jest.mock('@quidone/react-native-wheel-picker', () => {
   const React = require('react');
   return {

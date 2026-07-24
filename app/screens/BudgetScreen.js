@@ -12,6 +12,7 @@ import { useAccountsData } from '../contexts/AccountsDataContext';
 import * as Currency from '../services/currency';
 import { fetchRatesToTarget, convertWithRateMap } from '../services/OperationsDB';
 import BudgetModal from '../modals/BudgetModal';
+import MonthlyPlanSection from '../components/budgets/MonthlyPlanSection';
 import BudgetProgressBar from '../components/BudgetProgressBar';
 import AddFAB from '../components/AddFAB';
 import EmptyState from '../components/EmptyState';
@@ -245,41 +246,48 @@ const BudgetScreen = () => {
   }, [categoriesById, budgetStatuses, colors, t, handleEditBudget]);
 
   const listHeader = useMemo(() => (
-    <View style={[styles.totalsCard, { backgroundColor: colors.surface, borderColor: colors.border }]}>
-      <Text variant="titleMedium" style={[styles.totalsTitle, { color: colors.text }]}>
-        {t('all_budgets')}
-      </Text>
-      {convertAllBudgets && convertedTotals ? (
-        <View style={styles.totalsRow}>
-          <Text variant="bodyMedium" style={{ color: colors.mutedText }}>
-            {t('total_spent')}: {Currency.formatAmount(convertedTotals.spent, selectedCurrency)} {selectedCurrency}
-          </Text>
-          <Text variant="bodyMedium" style={{ color: colors.mutedText }}>
-            {t('total_budgeted')}: {Currency.formatAmount(convertedTotals.budgeted, selectedCurrency)} {selectedCurrency}
-          </Text>
-        </View>
-      ) : (
-        perCurrencyTotals.map(([currency, entry]) => (
-          <View key={currency} style={styles.totalsRow}>
+    <>
+      <MonthlyPlanSection
+        currency={selectedCurrency}
+        expenseCategories={expenseCategories}
+        accounts={accounts}
+      />
+      <View style={[styles.totalsCard, { backgroundColor: colors.surface, borderColor: colors.border }]}>
+        <Text variant="titleMedium" style={[styles.totalsTitle, { color: colors.text }]}>
+          {t('all_budgets')}
+        </Text>
+        {convertAllBudgets && convertedTotals ? (
+          <View style={styles.totalsRow}>
             <Text variant="bodyMedium" style={{ color: colors.mutedText }}>
-              {t('total_spent')}: {Currency.formatAmount(entry.spent, currency)} {currency}
+              {t('total_spent')}: {Currency.formatAmount(convertedTotals.spent, selectedCurrency)} {selectedCurrency}
             </Text>
             <Text variant="bodyMedium" style={{ color: colors.mutedText }}>
-              {t('total_budgeted')}: {Currency.formatAmount(entry.budgeted, currency)} {currency}
+              {t('total_budgeted')}: {Currency.formatAmount(convertedTotals.budgeted, selectedCurrency)} {selectedCurrency}
             </Text>
           </View>
-        ))
-      )}
-      {convertAllBudgets && unconvertedCurrencies.length > 0 && (
-        <View style={styles.convertWarning} testID="budget-unconverted-warning">
-          <Icon name="alert-circle-outline" size={16} color={colors.mutedText} />
-          <Text variant="bodySmall" style={[styles.convertWarningText, { color: colors.mutedText }]}>
-            {t('graphs_currencies_not_converted')}: {unconvertedCurrencies.join(', ')}
-          </Text>
-        </View>
-      )}
-    </View>
-  ), [colors, t, convertAllBudgets, convertedTotals, perCurrencyTotals, selectedCurrency, unconvertedCurrencies]);
+        ) : (
+          perCurrencyTotals.map(([currency, entry]) => (
+            <View key={currency} style={styles.totalsRow}>
+              <Text variant="bodyMedium" style={{ color: colors.mutedText }}>
+                {t('total_spent')}: {Currency.formatAmount(entry.spent, currency)} {currency}
+              </Text>
+              <Text variant="bodyMedium" style={{ color: colors.mutedText }}>
+                {t('total_budgeted')}: {Currency.formatAmount(entry.budgeted, currency)} {currency}
+              </Text>
+            </View>
+          ))
+        )}
+        {convertAllBudgets && unconvertedCurrencies.length > 0 && (
+          <View style={styles.convertWarning} testID="budget-unconverted-warning">
+            <Icon name="alert-circle-outline" size={16} color={colors.mutedText} />
+            <Text variant="bodySmall" style={[styles.convertWarningText, { color: colors.mutedText }]}>
+              {t('graphs_currencies_not_converted')}: {unconvertedCurrencies.join(', ')}
+            </Text>
+          </View>
+        )}
+      </View>
+    </>
+  ), [colors, t, convertAllBudgets, convertedTotals, perCurrencyTotals, selectedCurrency, unconvertedCurrencies, expenseCategories, accounts]);
 
   if (loading) {
     return <LoadingView testID="budget-screen-loading" />;
