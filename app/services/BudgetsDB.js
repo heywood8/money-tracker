@@ -642,6 +642,37 @@ export const calculateSpendingForBudget = async (
 };
 
 /**
+ * Derive the spent-vs-amount progress metrics shared by budgets (v1) and
+ * monthly-plan lines (Budgets v2): exceeded flag, rounded percentage, and the
+ * safe (<70) / warning (>=70) / danger (>=90) / exceeded (>100) status band.
+ * @param {string} spent - Amount spent (decimal string)
+ * @param {string} amount - Budgeted amount (decimal string)
+ * @returns {{ isExceeded: boolean, percentage: number, status: string }}
+ */
+export const deriveSpendingStatus = (spent, amount) => {
+  const isExceeded = Currency.compare(spent, amount) > 0;
+  const amountNum = parseFloat(amount);
+  const percentage = amountNum > 0 ? (parseFloat(spent) / amountNum) * 100 : 0;
+
+  let status;
+  if (isExceeded) {
+    status = 'exceeded';
+  } else if (percentage >= 90) {
+    status = 'danger';
+  } else if (percentage >= 70) {
+    status = 'warning';
+  } else {
+    status = 'safe';
+  }
+
+  return {
+    isExceeded,
+    percentage: Math.round(percentage * 100) / 100, // Round to 2 decimals
+    status,
+  };
+};
+
+/**
  * Calculate budget status for a budget
  * @param {string} budgetId - Budget ID
  * @param {Date} referenceDate - Date to calculate status for (default: today)
@@ -676,21 +707,7 @@ export const calculateBudgetStatus = async (budgetId, referenceDate = new Date()
 
     // Calculate metrics
     const remaining = Currency.subtract(budget.amount, spent);
-    const isExceeded = Currency.compare(spent, budget.amount) > 0;
-    const budgetAmountNum = parseFloat(budget.amount);
-    const percentage = budgetAmountNum > 0 ? (parseFloat(spent) / budgetAmountNum) * 100 : 0;
-
-    // Determine status
-    let status;
-    if (isExceeded) {
-      status = 'exceeded';
-    } else if (percentage >= 90) {
-      status = 'danger';
-    } else if (percentage >= 70) {
-      status = 'warning';
-    } else {
-      status = 'safe';
-    }
+    const { isExceeded, percentage, status } = deriveSpendingStatus(spent, budget.amount);
 
     return {
       budgetId: budget.id,
@@ -698,7 +715,7 @@ export const calculateBudgetStatus = async (budgetId, referenceDate = new Date()
       currency: budget.currency,
       spent,
       remaining,
-      percentage: Math.round(percentage * 100) / 100, // Round to 2 decimals
+      percentage,
       isExceeded,
       periodStart: startDateStr,
       periodEnd: endDateStr,
