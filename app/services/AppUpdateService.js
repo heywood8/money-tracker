@@ -62,12 +62,30 @@ export const extractApkAsset = (assets = []) => {
     return null;
   }
 
-  return assets.find((asset) => {
+  const apkAssets = assets.filter((asset) => {
     if (!asset || typeof asset.name !== 'string') {
       return false;
     }
     return asset.name.toLowerCase().endsWith('.apk') && !!asset.browser_download_url;
-  }) || null;
+  });
+
+  // A release may carry more than one ABI (e.g. an arm64 build plus a parallel
+  // "*_x86_64.apk"). Real devices are arm64, so resolve in priority order; asset
+  // order in the GitHub API is not guaranteed, so we must not just take the first
+  // .apk. This already anticipates the planned "<tag>_arm64.apk" rename: it is
+  // preferred now, with the current unsuffixed arm64 APK as the fallback, so the
+  // rename ships without a matching app-side change.
+  const isX86 = (name) => /x86/i.test(name);
+  const isArm64 = (name) => /arm64/i.test(name);
+  return (
+    // 1. Explicit arm64 asset (future "<tag>_arm64.apk").
+    apkAssets.find((asset) => isArm64(asset.name)) ||
+    // 2. Current unsuffixed arm64 APK — any non-x86 .apk.
+    apkAssets.find((asset) => !isX86(asset.name)) ||
+    // 3. Last resort: an x86_64-only release.
+    apkAssets[0] ||
+    null
+  );
 };
 
 // Finds a SHA-256 checksum asset matching the APK filename.
