@@ -72,13 +72,15 @@ export default function BudgetPlanLineModal({
   const [error, setError] = useState(null);
 
   // Currency options for a recurring line: every currency in use across the
-  // user's accounts, plus the plan's own currency (always offered, even if no
-  // account currently uses it).
+  // user's accounts, the plan's own currency (always offered, even if no
+  // account currently uses it), and — when editing — the line's existing
+  // currency (it may no longer match any account, e.g. the account was closed).
   const currencyOptions = useMemo(() => {
     const set = new Set(accounts.map(a => a.currency));
     set.add(currency);
+    if (line?.currency) set.add(line.currency);
     return [...set];
-  }, [accounts, currency]);
+  }, [accounts, currency, line]);
 
   // Subpanel navigation for the target picker.
   const [activeSubPanel, setActiveSubPanel] = useState(null); // null | 'target'
