@@ -23,10 +23,12 @@ jobs:
     runs-on: ubuntu-latest
     permissions:
       contents: write
-    # arm64 (the dispatch-selected profile, default preview) is the primary build;
-    # x86_64 builds in parallel. Both are attached to the GitHub Release, the
-    # x86_64 one suffixed "_x86_64". The app's auto-updater (extractApkAsset)
-    # prefers the non-x86 asset so arm64 devices still get the arm64 APK.
+    # arm64 (the dispatch-selected profile, default preview) is the primary build
+    # and the only one attached to the GitHub Release. x86_64 builds in parallel
+    # but is published as a workflow artifact only — staged rollout: older installs
+    # still pick the first .apk on a release, so we keep x86_64 off the release
+    # until the arch-aware auto-updater (extractApkAsset, prefers non-x86) has
+    # propagated. A later release can start attaching the "_x86_64" APK safely.
     strategy:
       fail-fast: false
       matrix:
@@ -142,8 +144,10 @@ jobs:
           retention-days: 7
           if-no-files-found: error
 
+      # Only the arm64 build is attached to the release. See the strategy comment:
+      # the x86_64 APK stays an artifact until the arch-aware updater propagates.
       - name: 📤 Upload APK and checksum to Release
-        if: github.ref_type == 'tag'
+        if: github.ref_type == 'tag' && matrix.arch == 'arm64'
         uses: softprops/action-gh-release@v3
         with:
           files: |
