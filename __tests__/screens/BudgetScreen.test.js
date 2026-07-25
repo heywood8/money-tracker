@@ -1,7 +1,7 @@
 // __tests__/screens/BudgetScreen.test.js
 /* eslint-disable react/prop-types */
 import React from 'react';
-import { render, fireEvent, waitFor, within } from '@testing-library/react-native';
+import { render, fireEvent, waitFor } from '@testing-library/react-native';
 import BudgetScreen from '../../app/screens/BudgetScreen';
 
 // ── Mocks ──────────────────────────────────────────────────────────────────
@@ -29,7 +29,6 @@ jest.mock('../../app/contexts/LocalizationContext', () => ({
 }));
 
 const mockSetConvertAll = jest.fn();
-const mockSetBudgetStatusMonth = jest.fn();
 let mockBudgetsData;
 jest.mock('../../app/contexts/BudgetsDataContext', () => ({
   useBudgetsData: () => mockBudgetsData,
@@ -95,14 +94,6 @@ jest.mock('../../app/services/OperationsDB', () => ({
   getUnconvertibleCurrencies: jest.fn(async () => []),
 }));
 
-let capturedModalProps = null;
-jest.mock('../../app/modals/BudgetModal', () => {
-  return function MockBudgetModal(props) {
-    capturedModalProps = props;
-    return null;
-  };
-});
-
 let capturedPlannedModalProps = null;
 jest.mock('../../app/modals/PlannedOperationModal', () => {
   return function MockPlannedOperationModal(props) {
@@ -123,13 +114,17 @@ jest.mock('../../app/components/AddFAB', () => {
 jest.mock('../../app/components/ModalBlurOverlay', () => () => null);
 
 // The monthly plan section has its own dedicated test suite; stub it here so the
-// budgets-list screen tests stay focused and don't need the plan contexts.
+// screen-level tests stay focused and don't need the plan contexts. It's a
+// forwardRef component (BudgetScreen's FAB opens its "add allocation" flow via
+// ref), so the mock must be one too.
+const mockOpenAddLine = jest.fn();
 jest.mock('../../app/components/budgets/MonthlyPlanSection', () => {
   const React = require('react');
   const { View } = require('react-native');
-  return function MockMonthlyPlanSection() {
+  return React.forwardRef(function MockMonthlyPlanSection(props, ref) {
+    React.useImperativeHandle(ref, () => ({ openAddLine: mockOpenAddLine }));
     return React.createElement(View, { testID: 'monthly-plan-section' });
-  };
+  });
 });
 
 jest.mock('@quidone/react-native-wheel-picker', () => {
@@ -143,33 +138,6 @@ jest.mock('@quidone/react-native-wheel-picker', () => {
 });
 
 // ── Helpers ────────────────────────────────────────────────────────────────
-const makeStatus = (overrides = {}) => ({
-  budgetId: 'b1',
-  amount: '3000',
-  currency: 'AMD',
-  spent: '1000',
-  remaining: '2000',
-  percentage: 33.33,
-  isExceeded: false,
-  periodStart: '2026-07-01',
-  periodEnd: '2026-07-31',
-  status: 'safe',
-  ...overrides,
-});
-
-const makeBudget = (overrides = {}) => ({
-  id: 'b1',
-  categoryId: 'cat1',
-  amount: '3000',
-  currency: 'AMD',
-  periodType: 'monthly',
-  startDate: '2026-01-01',
-  endDate: null,
-  isRecurring: true,
-  rolloverEnabled: false,
-  ...overrides,
-});
-
 const makePlanned = (overrides = {}) => ({
   id: 'p1',
   name: 'Salary',
@@ -183,14 +151,11 @@ const makePlanned = (overrides = {}) => ({
   ...overrides,
 });
 
-const setBudgetsData = ({ budgets = [], statuses = [], loading = false, convertAll = true } = {}) => {
+const setBudgetsData = ({ loading = false, convertAll = true } = {}) => {
   mockBudgetsData = {
-    budgets,
-    budgetStatuses: new Map(statuses.map(s => [s.budgetId, s])),
     loading,
     convertAllBudgets: convertAll,
     setConvertAllBudgets: mockSetConvertAll,
-    setBudgetStatusMonth: mockSetBudgetStatusMonth,
   };
 };
 
@@ -198,16 +163,19 @@ const setBudgetsData = ({ budgets = [], statuses = [], loading = false, convertA
 describe('BudgetScreen', () => {
   beforeEach(() => {
     jest.clearAllMocks();
-    capturedModalProps = null;
     capturedPlannedModalProps = null;
     mockPlannedOperations = [];
     setBudgetsData();
   });
 
   describe('Rendering', () => {
-    it('shows the empty state when there are no budgets', async () => {
+    // The old per-category "all budgets" list/totals card is gone (Budgets v3
+    // phase 2 — consolidated into MonthlyPlanSection's recurring lines), so the
+    // screen always renders its (stubbed) MonthlyPlanSection instead of an
+    // empty state tied to a `budgets` list.
+    it('renders the monthly plan section', async () => {
       const { getByTestId } = await render(<BudgetScreen />);
-      await waitFor(() => expect(getByTestId('budget-empty-state')).toBeTruthy());
+      await waitFor(() => expect(getByTestId('monthly-plan-section')).toBeTruthy());
     });
 
     it('shows a loading view while budgets load', async () => {
@@ -215,15 +183,6 @@ describe('BudgetScreen', () => {
       const { getByTestId, queryByTestId } = await render(<BudgetScreen />);
       expect(getByTestId('budget-screen-loading')).toBeTruthy();
       expect(queryByTestId('budget-screen')).toBeNull();
-    });
-
-    it('renders a row with the category name and progress bar for each budget', async () => {
-      setBudgetsData({ budgets: [makeBudget()], statuses: [makeStatus()] });
-      const { getByText, getByTestId } = await render(<BudgetScreen />);
-      await waitFor(() => expect(getByText('Food')).toBeTruthy());
-      expect(getByTestId('budget-row-b1')).toBeTruthy();
-      // StatusProgressBar renders the spent/amount detail and a percentage badge.
-      expect(getByText('33%')).toBeTruthy();
     });
 
     it('renders a single shared month header', async () => {
@@ -238,47 +197,10 @@ describe('BudgetScreen', () => {
       await waitFor(() => expect(getByTestId('budget-month-header')).toBeTruthy());
       expect(queryByTestId('budget-jump-current')).toBeNull();
     });
-
-    it('tells the data context which month to compute spend for', async () => {
-      await render(<BudgetScreen />);
-      await waitFor(() => expect(mockSetBudgetStatusMonth).toHaveBeenCalled());
-    });
-
-    it('renders converted grand totals when convert-all is on', async () => {
-      setBudgetsData({
-        budgets: [makeBudget(), makeBudget({ id: 'b2', categoryId: 'cat2', currency: 'RUB' })],
-        statuses: [makeStatus(), makeStatus({ budgetId: 'b2', currency: 'RUB', amount: '400', spent: '100' })],
-      });
-      const { getByText } = await render(<BudgetScreen />);
-      // 3000 AMD + 400 RUB * 5 = 5000 AMD budgeted; 1000 + 100 * 5 = 1500 spent.
-      await waitFor(() => expect(getByText(/total_budgeted:.*5[\s,.]?000/)).toBeTruthy(), { timeout: 5000 });
-      expect(getByText(/total_spent:.*1[\s,.]?500/)).toBeTruthy();
-    });
-
-    it('renders per-currency totals when convert-all is off', async () => {
-      setBudgetsData({
-        convertAll: false,
-        budgets: [makeBudget(), makeBudget({ id: 'b2', categoryId: 'cat2', currency: 'RUB' })],
-        statuses: [makeStatus(), makeStatus({ budgetId: 'b2', currency: 'RUB', amount: '400', spent: '100' })],
-      });
-      const { getAllByText } = await render(<BudgetScreen />);
-      await waitFor(() => expect(getAllByText(/total_budgeted/)).toHaveLength(2));
-    });
-
-    it('warns about budget currencies that cannot be converted', async () => {
-      setBudgetsData({
-        budgets: [makeBudget({ id: 'bx', currency: 'XYZ' })],
-        statuses: [makeStatus({ budgetId: 'bx', currency: 'XYZ' })],
-      });
-      const { findByTestId } = await render(<BudgetScreen />);
-      const warning = await findByTestId('budget-unconverted-warning', {}, { timeout: 5000 });
-      expect(within(warning).getByText(/XYZ/)).toBeTruthy();
-    });
   });
 
   describe('Convert toggle', () => {
     it('flips the convert-all mode via the context setter', async () => {
-      setBudgetsData({ budgets: [makeBudget()], statuses: [makeStatus()] });
       const { getByTestId } = await render(<BudgetScreen />);
       await waitFor(() => expect(getByTestId('budget-convert-toggle')).toBeTruthy());
       fireEvent.press(getByTestId('budget-convert-toggle'));
@@ -304,36 +226,15 @@ describe('BudgetScreen', () => {
     });
   });
 
-  describe('Budget creation and editing', () => {
-    it('opens the category picker with expense categories only from the FAB', async () => {
-      const { getByTestId, queryByTestId } = await render(<BudgetScreen />);
-      fireEvent.press(getByTestId('budget-add-fab'));
-      await waitFor(() => expect(getByTestId('budget-category-option-cat1')).toBeTruthy());
-      expect(getByTestId('budget-category-option-cat2')).toBeTruthy();
-      expect(queryByTestId('budget-category-option-cat3')).toBeNull(); // income category excluded
-    });
-
-    it('opens BudgetModal in create mode after picking a category', async () => {
+  describe('Allocation creation (Budgets v3 phase 2)', () => {
+    // The old category-picker + BudgetModal flow is gone; the FAB now opens
+    // MonthlyPlanSection's own "add allocation" flow via a ref, so it needs no
+    // screen-level modal state of its own.
+    it('opens the monthly plan section\'s add-allocation flow from the FAB', async () => {
       const { getByTestId } = await render(<BudgetScreen />);
+      await waitFor(() => expect(getByTestId('budget-add-fab')).toBeTruthy());
       fireEvent.press(getByTestId('budget-add-fab'));
-      await waitFor(() => expect(getByTestId('budget-category-option-cat1')).toBeTruthy());
-      fireEvent.press(getByTestId('budget-category-option-cat1'));
-      await waitFor(() => expect(capturedModalProps.visible).toBe(true));
-      expect(capturedModalProps.isNew).toBe(true);
-      expect(capturedModalProps.categoryId).toBe('cat1');
-      expect(capturedModalProps.categoryName).toBe('Food');
-    });
-
-    it('opens BudgetModal in edit mode when a budget row is tapped', async () => {
-      const budget = makeBudget();
-      setBudgetsData({ budgets: [budget], statuses: [makeStatus()] });
-      const { getByTestId } = await render(<BudgetScreen />);
-      await waitFor(() => expect(getByTestId('budget-row-b1')).toBeTruthy());
-      fireEvent.press(getByTestId('budget-row-b1'));
-      await waitFor(() => expect(capturedModalProps.visible).toBe(true));
-      expect(capturedModalProps.isNew).toBe(false);
-      expect(capturedModalProps.budget).toBe(budget);
-      expect(capturedModalProps.categoryName).toBe('Food');
+      expect(mockOpenAddLine).toHaveBeenCalledTimes(1);
     });
   });
 
