@@ -233,6 +233,12 @@ describe('BudgetScreen', () => {
       expect(getByTestId('budget-next-month')).toBeTruthy();
     });
 
+    it('does not show a jump-to-current-month affordance while viewing the current month', async () => {
+      const { getByTestId, queryByTestId } = await render(<BudgetScreen />);
+      await waitFor(() => expect(getByTestId('budget-month-header')).toBeTruthy());
+      expect(queryByTestId('budget-jump-current')).toBeNull();
+    });
+
     it('tells the data context which month to compute spend for', async () => {
       await render(<BudgetScreen />);
       await waitFor(() => expect(mockSetBudgetStatusMonth).toHaveBeenCalled());
@@ -277,6 +283,24 @@ describe('BudgetScreen', () => {
       await waitFor(() => expect(getByTestId('budget-convert-toggle')).toBeTruthy());
       fireEvent.press(getByTestId('budget-convert-toggle'));
       expect(mockSetConvertAll).toHaveBeenCalledTimes(1);
+    });
+  });
+
+  describe('Month navigation (Fix 4: jump back to the current month)', () => {
+    it('shows a jump-to-current-month affordance after navigating away, and returns on press', async () => {
+      const { getByTestId, queryByTestId, getByText } = await render(<BudgetScreen />);
+      await waitFor(() => expect(getByTestId('budget-month-header')).toBeTruthy());
+      const originalLabel = getByTestId('budget-month-label').props.children;
+
+      fireEvent.press(getByTestId('budget-prev-month'));
+      await waitFor(() => expect(getByTestId('budget-jump-current')).toBeTruthy());
+      // The month label actually changed away from the current month.
+      expect(getByTestId('budget-month-label').props.children).not.toBe(originalLabel);
+      expect(getByText('jump_to_current_period')).toBeTruthy();
+
+      fireEvent.press(getByTestId('budget-jump-current'));
+      await waitFor(() => expect(queryByTestId('budget-jump-current')).toBeNull());
+      expect(getByTestId('budget-month-label').props.children).toBe(originalLabel);
     });
   });
 
@@ -371,6 +395,48 @@ describe('BudgetScreen', () => {
       await waitFor(() => expect(getByTestId('planned-row-exp1')).toBeTruthy());
       fireEvent(getByTestId('planned-row-exp1'), 'longPress');
       expect(mockShowDialog).toHaveBeenCalledWith('select_action', 'Rent', expect.any(Array));
+    });
+  });
+
+  describe('Summary strip (Fix 1: ported from the former Planned tab)', () => {
+    const thisMonth = () => {
+      const now = new Date();
+      return `${now.getFullYear()}-${String(now.getMonth() + 1).padStart(2, '0')}`;
+    };
+
+    it('is not shown when there are no planned operations', async () => {
+      mockPlannedOperations = [];
+      const { getByTestId, queryByTestId } = await render(<BudgetScreen />);
+      await waitFor(() => expect(getByTestId('budget-month-header')).toBeTruthy());
+      expect(queryByTestId('summary-pending-out')).toBeNull();
+      expect(queryByTestId('summary-done-count')).toBeNull();
+      expect(queryByTestId('summary-pending-in')).toBeNull();
+      expect(queryByTestId('summary-progress-bar')).toBeNull();
+    });
+
+    it('aggregates pending/total amounts and execution progress across all template types', async () => {
+      mockPlannedOperations = [
+        makePlanned({ id: 'inc1', name: 'Salary', type: 'income', amount: '1000', lastExecutedMonth: null }),
+        makePlanned({ id: 'exp1', name: 'Rent', type: 'expense', categoryId: 'cat1', amount: '500', lastExecutedMonth: thisMonth() }),
+      ];
+      const { getByTestId } = await render(<BudgetScreen />);
+      await waitFor(() => expect(getByTestId('summary-pending-out')).toBeTruthy());
+      // Rent (500) is already executed this month, so nothing is pending-out and
+      // done-count is 1 of 2; Salary (1000) is still pending-in, K-formatted.
+      expect(getByTestId('summary-pending-out').props.children).toBe('0 / 500');
+      expect(getByTestId('summary-done-count').props.children).toBe('1 / 2');
+      expect(getByTestId('summary-pending-in').props.children).toBe('1K / 1K');
+      expect(getByTestId('summary-progress-bar')).toBeTruthy();
+    });
+
+    it('hides while viewing a month other than the current one', async () => {
+      mockPlannedOperations = [makePlanned({ id: 'inc1', type: 'income' })];
+      const { getByTestId, queryByTestId } = await render(<BudgetScreen />);
+      await waitFor(() => expect(getByTestId('summary-pending-out')).toBeTruthy());
+
+      fireEvent.press(getByTestId('budget-prev-month'));
+      await waitFor(() => expect(getByTestId('budget-jump-current')).toBeTruthy());
+      expect(queryByTestId('summary-pending-out')).toBeNull();
     });
   });
 });
