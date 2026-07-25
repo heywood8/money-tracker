@@ -1,5 +1,12 @@
 # Changelog
 
+## [0.221.0](https://github.com/heywood8/money-tracker/compare/penny-v0.220.1...penny-v0.221.0) (2026-07-25)
+
+
+### Features
+
+* **budgets:** merge the Planned tab into the unified Budgets tab (v3 phase 1) ([#1412](https://github.com/heywood8/money-tracker/issues/1412)) ([44de975](https://github.com/heywood8/money-tracker/commit/44de97573164779c2f50b0be364ed73853fea133))
+
 ## [0.220.1](https://github.com/heywood8/money-tracker/compare/penny-v0.220.0...penny-v0.220.1) (2026-07-25)
 
 
