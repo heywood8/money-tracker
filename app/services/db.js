@@ -276,6 +276,17 @@ const isSchemaComplete = async (rawDb) => {
     const planLineCols = await rawDb.getAllAsync('PRAGMA table_info(budget_plan_lines)');
     if (!planLineCols.some(c => c.name === 'is_recurring') || !planLineCols.some(c => c.name === 'currency')) return false;
 
+    // Check budget_plan_lines has ALL THREE executable-template columns
+    // (migration 0020: kind, account_id, last_executed_month). All three are
+    // checked for the same reason as operations' 0009 columns: each is a separate
+    // ADD COLUMN statement and applyPendingMigrations continues on failure, so a
+    // half-applied 0020 must not read as complete. Without this check, an install
+    // complete through 0019 would skip migrate() and every plan-line query would
+    // throw `no such column: kind`.
+    if (!planLineCols.some(c => c.name === 'kind')
+      || !planLineCols.some(c => c.name === 'account_id')
+      || !planLineCols.some(c => c.name === 'last_executed_month')) return false;
+
     return true;
   } catch (error) {
     console.warn('[DB] isSchemaComplete check failed:', error.message);
@@ -588,6 +599,15 @@ const detectAppliedMigrations = async (rawDb) => {
     const planLineCols = await getColumns('budget_plan_lines');
     if (planLineCols.some(c => c.name === 'is_recurring') && planLineCols.some(c => c.name === 'currency')) {
       applied.push(19);
+    }
+
+    // Migration 0020: adds the executable-template columns kind / account_id /
+    // last_executed_month to budget_plan_lines. Require ALL THREE — a
+    // half-applied 0020 must re-run so the missing columns are added.
+    if (planLineCols.some(c => c.name === 'kind')
+      && planLineCols.some(c => c.name === 'account_id')
+      && planLineCols.some(c => c.name === 'last_executed_month')) {
+      applied.push(20);
     }
   }
 

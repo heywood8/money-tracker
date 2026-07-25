@@ -25,33 +25,42 @@ import ModalBlurOverlay from '../ModalBlurOverlay';
 import ModalHeader from '../ModalHeader';
 import * as Currency from '../../services/currency';
 
+const KINDS = ['income', 'expense', 'transfer'];
+
 /**
- * BudgetPlanLineModal — editor for a monthly plan's expected income (mode
- * 'income') or a single allocation line (mode 'line'). Follows the repo's
- * subpanel pattern (see CLAUDE.md): the tracking-target picker slides in over
- * the form inside the SAME modal — never a nested Modal.
+ * BudgetPlanLineModal — editor for a single budget line: a monthly target that
+ * may also carry an executable template. Follows the repo's subpanel pattern (see
+ * CLAUDE.md): the target and account pickers slide in over the form inside the
+ * SAME modal — never a nested Modal.
  *
- * A line tracks EXACTLY ONE target: an expense category OR a destination account
- * (transfer). That invariant is enforced here (a target is required to save) and
- * again in BudgetPlansDB.
+ * `kind` decides what the line means and what an execution would create:
+ *   - expense  → tracks spending of ONE expense category (required),
+ *   - transfer → tracks incoming transfers into ONE destination account (required),
+ *   - income   → declares part of the month's expected income; a category is
+ *     optional context (income is compared against the month's real income as a
+ *     whole, see BudgetPlansDB.calculateLineActual).
+ * That "exactly one target" invariant is enforced here and again in BudgetPlansDB.
  *
- * Budgets v3 phase 2 added a recurring toggle: a recurring line is a global
- * template (applies to every calendar month automatically, like the old v1
- * per-category budgets) instead of being scoped to this one month's plan. Since a
- * recurring line has no plan to inherit a currency from, toggling it on also
- * surfaces a currency picker (defaulting to the plan's own currency).
+ * Picking an EXECUTION ACCOUNT turns the line into a one-tap payable (the former
+ * planned operation): the account is what the created operation touches, so the
+ * line's amount is then expressed in that account's currency and the currency
+ * picker steps aside. Without an account the line stays a pure analytic target.
+ *
+ * A recurring line is a global template that applies to every calendar month
+ * automatically (like the old v1 per-category budgets, and like a recurring
+ * planned operation); a one-off line belongs to this month's plan only, and — when
+ * it has a template — is consumed by its execution.
  */
 export default function BudgetPlanLineModal({
   visible = false,
-  mode = 'line',
   line = null,
+  initialKind = 'expense',
   currency = 'USD',
-  initialIncome = '0',
   expenseCategories = [],
+  incomeCategories = [],
   accounts = [],
   saving = false,
   onSaveLine = () => {},
-  onSaveIncome = () => {},
   onDeleteLine = () => {},
   onClose = () => {},
 }) {
@@ -59,18 +68,37 @@ export default function BudgetPlanLineModal({
   const { t } = useLocalization();
   const { showDialog } = useDialog();
 
-  const isIncome = mode === 'income';
-  const isEditingLine = mode === 'line' && line != null;
+  const isEditingLine = line != null;
 
+  const [kind, setKind] = useState(initialKind);
   const [amount, setAmount] = useState('');
   const [label, setLabel] = useState('');
   const [comment, setComment] = useState('');
-  // Exactly one of these is set (the "exactly one target" invariant).
+  // Exactly one of these is set for expense/transfer (the "exactly one target"
+  // invariant); an income line may have neither.
   const [categoryId, setCategoryId] = useState(null);
   const [toAccountId, setToAccountId] = useState(null);
+  // Execution account — set means "this line is executable".
+  const [accountId, setAccountId] = useState(null);
   const [isRecurring, setIsRecurring] = useState(false);
   const [lineCurrency, setLineCurrency] = useState(currency);
   const [error, setError] = useState(null);
+
+  const accountsById = useMemo(
+    () => new Map(accounts.map(a => [a.id, a])),
+    [accounts],
+  );
+  const targetCategories = kind === 'income' ? incomeCategories : expenseCategories;
+  const categoriesById = useMemo(
+    () => new Map([...expenseCategories, ...incomeCategories].map(c => [c.id, c])),
+    [expenseCategories, incomeCategories],
+  );
+
+  // An executable line's amount lives in its account's currency (that is the
+  // currency the created operation is in), so the picker only applies to a
+  // template-less recurring line.
+  const executionCurrency = accountId != null ? accountsById.get(accountId)?.currency : null;
+  const effectiveCurrency = executionCurrency || (isRecurring ? lineCurrency : null);
 
   // Currency options for a recurring line: every currency in use across the
   // user's accounts, the plan's own currency (always offered, even if no
@@ -83,55 +111,39 @@ export default function BudgetPlanLineModal({
     return [...set];
   }, [accounts, currency, line]);
 
-  // Subpanel navigation for the target picker.
-  const [activeSubPanel, setActiveSubPanel] = useState(null); // null | 'target'
-  // Which kind of target the picker is currently showing.
+  // Subpanel navigation for the pickers.
+  const [activeSubPanel, setActiveSubPanel] = useState(null); // null | 'target' | 'account'
+  // Which kind of target the target picker is currently showing.
   const [pickerKind, setPickerKind] = useState('category'); // 'category' | 'account'
   const mainAnim = useRef(new Animated.Value(0)).current;
   const subPanelAnim = useRef(new Animated.Value(0)).current;
-
-  const accountsById = useMemo(
-    () => new Map(accounts.map(a => [a.id, a])),
-    [accounts],
-  );
-  const categoriesById = useMemo(
-    () => new Map(expenseCategories.map(c => [c.id, c])),
-    [expenseCategories],
-  );
 
   // Initialize form each time the modal opens.
   useEffect(() => {
     if (!visible) return;
     setError(null);
-    if (isIncome) {
-      setAmount(initialIncome != null ? String(initialIncome) : '');
-      // Clear line-only fields so nothing bleeds in from a prior line-edit session.
-      setLabel('');
-      setComment('');
-      setCategoryId(null);
-      setToAccountId(null);
-      setIsRecurring(false);
-      setLineCurrency(currency);
-      return;
-    }
     if (line) {
+      setKind(line.kind || 'expense');
       setAmount(line.amount != null ? String(line.amount) : '');
       setLabel(line.label || '');
       setComment(line.comment || '');
       setCategoryId(line.categoryId ?? null);
       setToAccountId(line.toAccountId ?? null);
+      setAccountId(line.accountId ?? null);
       setIsRecurring(!!line.isRecurring);
       setLineCurrency(line.currency || currency);
     } else {
+      setKind(initialKind);
       setAmount('');
       setLabel('');
       setComment('');
       setCategoryId(null);
       setToAccountId(null);
+      setAccountId(null);
       setIsRecurring(false);
       setLineCurrency(currency);
     }
-  }, [visible, isIncome, line, initialIncome, currency]);
+  }, [visible, line, initialKind, currency]);
 
   // Reset subpanel + animations whenever the modal is hidden.
   useEffect(() => {
@@ -142,11 +154,16 @@ export default function BudgetPlanLineModal({
     }
   }, [visible, mainAnim, subPanelAnim]);
 
-  const openSubPanel = useCallback(() => {
+  // Guards the close animation's completion callback against a panel opened in
+  // the meantime: closing runs for 180ms, and a tap on the OTHER picker inside
+  // that window would otherwise be undone when the stale callback fires and
+  // clears activeSubPanel.
+  const subPanelTokenRef = useRef(0);
+
+  const openSubPanel = useCallback((panel) => {
     Keyboard.dismiss();
-    // Open the picker on the tab matching the current selection.
-    setPickerKind(toAccountId != null ? 'account' : 'category');
-    setActiveSubPanel('target');
+    subPanelTokenRef.current++;
+    setActiveSubPanel(panel);
     Animated.parallel([
       Animated.timing(mainAnim, {
         toValue: 1, duration: 200, easing: Easing.in(Easing.quad), useNativeDriver: true,
@@ -155,9 +172,10 @@ export default function BudgetPlanLineModal({
         toValue: 1, duration: 260, easing: Easing.out(Easing.cubic), useNativeDriver: true,
       }),
     ]).start();
-  }, [mainAnim, subPanelAnim, toAccountId]);
+  }, [mainAnim, subPanelAnim]);
 
   const closeSubPanel = useCallback(() => {
+    const token = ++subPanelTokenRef.current;
     Animated.parallel([
       Animated.timing(subPanelAnim, {
         toValue: 0, duration: 180, easing: Easing.in(Easing.quad), useNativeDriver: true,
@@ -165,25 +183,61 @@ export default function BudgetPlanLineModal({
       Animated.timing(mainAnim, {
         toValue: 0, duration: 240, easing: Easing.out(Easing.cubic), useNativeDriver: true,
       }),
-    ]).start(() => setActiveSubPanel(null));
+    ]).start(() => {
+      if (subPanelTokenRef.current === token) setActiveSubPanel(null);
+    });
   }, [subPanelAnim, mainAnim]);
 
+  const openTargetPanel = useCallback(() => {
+    // Open the picker on the tab matching the current selection. An income line
+    // tracks no transfer target, so it only ever shows categories.
+    setPickerKind(kind !== 'income' && toAccountId != null ? 'account' : 'category');
+    openSubPanel('target');
+  }, [kind, toAccountId, openSubPanel]);
+
+  const openAccountPanel = useCallback(() => openSubPanel('account'), [openSubPanel]);
+
+  // Switching kind drops a target that no longer applies, so the line can never
+  // be saved as e.g. a transfer that still carries a category.
+  const handleSelectKind = useCallback((next) => {
+    setKind(next);
+    setError(null);
+    if (next === 'transfer') {
+      setCategoryId(null);
+    } else {
+      setToAccountId(null);
+      if (next === 'income') setCategoryId(prev => (incomeCategories.some(c => c.id === prev) ? prev : null));
+      else setCategoryId(prev => (expenseCategories.some(c => c.id === prev) ? prev : null));
+    }
+  }, [incomeCategories, expenseCategories]);
+
+  // Picking a target also settles the kind, so the two can never contradict each
+  // other: a line tracking a destination account IS a transfer, and one tracking
+  // a category is not (income keeps its kind — an income line may carry an income
+  // category for context).
   const handleSelectCategory = useCallback((cat) => {
     setCategoryId(cat.id);
     setToAccountId(null);
+    setKind(prev => (prev === 'transfer' ? 'expense' : prev));
     setError(null);
     closeSubPanel();
   }, [closeSubPanel]);
 
-  const handleSelectAccount = useCallback((acc) => {
+  const handleSelectTransferTarget = useCallback((acc) => {
     setToAccountId(acc.id);
     setCategoryId(null);
+    setKind('transfer');
+    setError(null);
+    closeSubPanel();
+  }, [closeSubPanel]);
+
+  const handleSelectExecutionAccount = useCallback((acc) => {
+    setAccountId(acc ? acc.id : null);
     setError(null);
     closeSubPanel();
   }, [closeSubPanel]);
 
   const amountIsValid = Currency.isValid(amount) && Currency.compare(amount, '0') > 0;
-  const hasTarget = categoryId != null || toAccountId != null;
 
   const handleSave = useCallback(() => {
     // The host is already mid-save (e.g. the previous tap's ensurePlan()/save is
@@ -192,36 +246,37 @@ export default function BudgetPlanLineModal({
     // line of defense against a tap that lands before the disabled style commits.
     if (saving) return;
     Keyboard.dismiss();
-    if (isIncome) {
-      // Income may be zero; it just must be a valid non-negative number.
-      if (!Currency.isValid(amount) || Currency.isNegative(amount)) {
-        setError(t('amount_must_be_greater_than_zero'));
-        return;
-      }
-      onSaveIncome(String(amount));
+    if (kind === 'expense' && categoryId == null) {
+      setError(t('allocation_needs_target'));
       return;
     }
-    if (!hasTarget) {
-      setError(t('allocation_needs_target'));
+    if (kind === 'transfer' && toAccountId == null) {
+      setError(t('destination_account_required'));
       return;
     }
     if (!amountIsValid) {
       setError(t('amount_must_be_greater_than_zero'));
       return;
     }
+    if (kind === 'transfer' && accountId != null && accountId === toAccountId) {
+      setError(t('accounts_must_be_different'));
+      return;
+    }
     onSaveLine({
+      kind,
       amount: String(amount),
       label: label.trim() || null,
       comment: comment.trim() || null,
-      categoryId: categoryId ?? null,
-      toAccountId: toAccountId ?? null,
+      categoryId: kind === 'transfer' ? null : (categoryId ?? null),
+      toAccountId: kind === 'transfer' ? (toAccountId ?? null) : null,
+      accountId: accountId ?? null,
       isRecurring,
-      // Only meaningful for a recurring line — a one-off line inherits the
-      // plan's currency and doesn't carry one of its own.
-      currency: isRecurring ? lineCurrency : null,
+      // An executable line is priced in its account's currency; a template-less
+      // one-off line inherits the plan's (null).
+      currency: effectiveCurrency,
     });
-  }, [saving, isIncome, amount, hasTarget, amountIsValid, label, comment, categoryId, toAccountId,
-    isRecurring, lineCurrency, onSaveLine, onSaveIncome, t]);
+  }, [saving, kind, amount, amountIsValid, label, comment, categoryId, toAccountId, accountId,
+    isRecurring, effectiveCurrency, onSaveLine, t]);
 
   const handleDelete = useCallback(() => {
     if (!isEditingLine) return;
@@ -249,16 +304,18 @@ export default function BudgetPlanLineModal({
 
   // Selected-target summary for the picker row on the main form.
   const targetSummary = useMemo(() => {
-    if (categoryId != null) {
+    if (kind !== 'transfer' && categoryId != null) {
       const cat = categoriesById.get(categoryId);
       return { icon: cat?.icon || 'shape-outline', name: cat?.name || t('allocation_unlinked') };
     }
-    if (toAccountId != null) {
+    if (kind === 'transfer' && toAccountId != null) {
       const acc = accountsById.get(toAccountId);
       return { icon: 'bank-transfer', name: acc?.name || t('allocation_unlinked') };
     }
     return null;
-  }, [categoryId, toAccountId, categoriesById, accountsById, t]);
+  }, [kind, categoryId, toAccountId, categoriesById, accountsById, t]);
+
+  const executionAccount = accountId != null ? accountsById.get(accountId) : null;
 
   const panelWidth = Dimensions.get('window').width;
   const subPanelTranslateX = subPanelAnim.interpolate({ inputRange: [0, 1], outputRange: [panelWidth, 0] });
@@ -270,7 +327,7 @@ export default function BudgetPlanLineModal({
     const selected = isCat ? categoryId === item.id : toAccountId === item.id;
     return (
       <Pressable
-        onPress={() => (isCat ? handleSelectCategory(item) : handleSelectAccount(item))}
+        onPress={() => (isCat ? handleSelectCategory(item) : handleSelectTransferTarget(item))}
         style={({ pressed }) => [
           styles.pickerOption,
           { borderColor: colors.border },
@@ -285,11 +342,29 @@ export default function BudgetPlanLineModal({
         <Text style={[styles.optionText, { color: colors.text }]} numberOfLines={1}>{item.name}</Text>
       </Pressable>
     );
-  }, [pickerKind, categoryId, toAccountId, colors, handleSelectCategory, handleSelectAccount]);
+  }, [pickerKind, categoryId, toAccountId, colors, handleSelectCategory, handleSelectTransferTarget]);
 
-  const title = isIncome
-    ? t('edit_income')
-    : (isEditingLine ? t('edit_allocation') : t('add_allocation'));
+  const renderExecutionAccountItem = useCallback(({ item }) => (
+    <Pressable
+      onPress={() => handleSelectExecutionAccount(item)}
+      style={({ pressed }) => [
+        styles.pickerOption,
+        { borderColor: colors.border },
+        pressed && { backgroundColor: colors.selected },
+        accountId === item.id && { backgroundColor: colors.selected },
+      ]}
+      accessibilityRole="button"
+      accessibilityLabel={item.name}
+      testID={`plan-account-option-${item.id}`}
+    >
+      <Icon name="wallet-outline" size={22} color={colors.text} />
+      <Text style={[styles.optionText, { color: colors.text }]} numberOfLines={1}>
+        {item.name} · {item.currency}
+      </Text>
+    </Pressable>
+  ), [accountId, colors, handleSelectExecutionAccount]);
+
+  const title = isEditingLine ? t('edit_allocation') : t('add_allocation');
 
   return (
     <>
@@ -316,73 +391,132 @@ export default function BudgetPlanLineModal({
                 >
                   <ModalHeader title={title} />
 
-                  {/* Tracking target (line mode only) */}
-                  {!isIncome && (
-                    <View style={styles.field}>
-                      <Text style={[styles.fieldLabel, { color: colors.mutedText }]}>
-                        {t('tracking_target')}
-                      </Text>
-                      <Pressable
-                        style={[styles.targetButton, { backgroundColor: colors.inputBackground, borderColor: colors.inputBorder }]}
-                        onPress={openSubPanel}
-                        accessibilityRole="button"
-                        accessibilityLabel={t('select_target')}
-                        testID="plan-target-picker"
-                      >
-                        {targetSummary ? (
-                          <View style={styles.targetValue}>
-                            <Icon name={targetSummary.icon} size={20} color={colors.text} />
-                            <Text style={[styles.text16, { color: colors.text }]} numberOfLines={1}>
-                              {targetSummary.name}
-                            </Text>
-                          </View>
-                        ) : (
-                          <Text style={[styles.text16, { color: colors.mutedText }]}>
-                            {t('select_target')}
+                  {/* What this line is: income declares expected income, expense
+                      and transfer allocate it. */}
+                  <View style={styles.field}>
+                    <Text style={[styles.fieldLabel, { color: colors.mutedText }]}>
+                      {t('allocation_type')}
+                    </Text>
+                    <View style={styles.segment}>
+                      {KINDS.map((option) => (
+                        <Pressable
+                          key={option}
+                          style={[
+                            styles.segmentButton,
+                            { borderColor: colors.border },
+                            kind === option && { backgroundColor: colors.primary, borderColor: colors.primary },
+                          ]}
+                          onPress={() => handleSelectKind(option)}
+                          accessibilityRole="button"
+                          accessibilityState={{ selected: kind === option }}
+                          accessibilityLabel={t(option)}
+                          testID={`plan-line-kind-${option}`}
+                        >
+                          <Text style={[styles.segmentText, { color: kind === option ? colors.text : colors.mutedText }]}>
+                            {t(option)}
                           </Text>
-                        )}
-                        <Icon name="chevron-right" size={20} color={colors.mutedText} />
-                      </Pressable>
+                        </Pressable>
+                      ))}
                     </View>
-                  )}
+                  </View>
 
-                  {/* Recurring toggle (line mode only): a recurring allocation is a
-                      global template that applies to every calendar month
-                      automatically, instead of being scoped to this one month. */}
-                  {!isIncome && (
+                  {/* Tracking target */}
+                  <View style={styles.field}>
+                    <Text style={[styles.fieldLabel, { color: colors.mutedText }]}>
+                      {kind === 'income' ? `${t('income_target')} · ${t('optional')}` : t('tracking_target')}
+                    </Text>
                     <Pressable
-                      style={[styles.recurringRow, { borderColor: colors.border }]}
-                      onPress={() => setIsRecurring(v => !v)}
-                      accessibilityRole="switch"
-                      accessibilityState={{ checked: isRecurring }}
-                      accessibilityLabel={t('recurring_allocation')}
-                      testID="plan-line-recurring-toggle"
+                      style={[styles.targetButton, { backgroundColor: colors.inputBackground, borderColor: colors.inputBorder }]}
+                      onPress={openTargetPanel}
+                      accessibilityRole="button"
+                      accessibilityLabel={t('select_target')}
+                      testID="plan-target-picker"
                     >
-                      <View style={styles.recurringLabel}>
-                        <Icon name="repeat" size={20} color={colors.text} />
-                        <Text style={[styles.text16, { color: colors.text }]}>
-                          {t('recurring_allocation')}
+                      {targetSummary ? (
+                        <View style={styles.targetValue}>
+                          <Icon name={targetSummary.icon} size={20} color={colors.text} />
+                          <Text style={[styles.text16, { color: colors.text }]} numberOfLines={1}>
+                            {targetSummary.name}
+                          </Text>
+                        </View>
+                      ) : (
+                        <Text style={[styles.text16, { color: colors.mutedText }]}>
+                          {t('select_target')}
                         </Text>
-                      </View>
+                      )}
+                      <Icon name="chevron-right" size={20} color={colors.mutedText} />
+                    </Pressable>
+                  </View>
+
+                  {/* Execution account — set one and the line becomes a one-tap
+                      payable (the former planned operation). */}
+                  <View style={styles.field}>
+                    <Text style={[styles.fieldLabel, { color: colors.mutedText }]}>
+                      {t('template_account')} · {t('optional')}
+                    </Text>
+                    <Pressable
+                      style={[styles.targetButton, { backgroundColor: colors.inputBackground, borderColor: colors.inputBorder }]}
+                      onPress={openAccountPanel}
+                      accessibilityRole="button"
+                      accessibilityLabel={t('template_account')}
+                      testID="plan-account-picker"
+                    >
+                      {executionAccount ? (
+                        <View style={styles.targetValue}>
+                          <Icon name="wallet-outline" size={20} color={colors.text} />
+                          <Text style={[styles.text16, { color: colors.text }]} numberOfLines={1}>
+                            {executionAccount.name} · {executionAccount.currency}
+                          </Text>
+                        </View>
+                      ) : (
+                        <Text style={[styles.text16, { color: colors.mutedText }]}>
+                          {t('no_template_account')}
+                        </Text>
+                      )}
+                      <Icon name="chevron-right" size={20} color={colors.mutedText} />
+                    </Pressable>
+                    <Text style={[styles.fieldHint, { color: colors.mutedText }]}>
+                      {t('template_account_hint')}
+                    </Text>
+                  </View>
+
+                  {/* Recurring toggle: a recurring line is a global template that
+                      applies to every calendar month automatically, instead of
+                      being scoped to this one month. */}
+                  <Pressable
+                    style={[styles.recurringRow, { borderColor: colors.border }]}
+                    onPress={() => setIsRecurring(v => !v)}
+                    accessibilityRole="switch"
+                    accessibilityState={{ checked: isRecurring }}
+                    accessibilityLabel={t('recurring_allocation')}
+                    testID="plan-line-recurring-toggle"
+                  >
+                    <View style={styles.recurringLabel}>
+                      <Icon name="repeat" size={20} color={colors.text} />
+                      <Text style={[styles.text16, { color: colors.text }]}>
+                        {t('recurring_allocation')}
+                      </Text>
+                    </View>
+                    <View
+                      style={[
+                        styles.switchTrack,
+                        { backgroundColor: isRecurring ? colors.primary : colors.border },
+                      ]}
+                    >
                       <View
                         style={[
-                          styles.switchTrack,
-                          { backgroundColor: isRecurring ? colors.primary : colors.border },
+                          styles.switchThumb,
+                          { transform: [{ translateX: isRecurring ? 18 : 2 }] },
                         ]}
-                      >
-                        <View
-                          style={[
-                            styles.switchThumb,
-                            { transform: [{ translateX: isRecurring ? 18 : 2 }] },
-                          ]}
-                        />
-                      </View>
-                    </Pressable>
-                  )}
+                      />
+                    </View>
+                  </Pressable>
 
-                  {/* Currency picker — a recurring line has no plan to inherit a
-                      currency from, so it needs its own. */}
-                  {!isIncome && isRecurring && currencyOptions.length > 0 && (
+                  {/* Currency picker — only a recurring line without an execution
+                      account needs one: with an account the amount is by
+                      definition in that account's currency, and a one-off line
+                      inherits the plan's. */}
+                  {isRecurring && executionCurrency == null && currencyOptions.length > 0 && (
                     <View style={styles.field}>
                       <Text style={[styles.fieldLabel, { color: colors.mutedText }]}>
                         {t('currency')}
@@ -419,40 +553,36 @@ export default function BudgetPlanLineModal({
                       onValueChange={setAmount}
                       colors={colors}
                       placeholder="0"
-                      currencyCode={isRecurring ? lineCurrency : currency}
+                      currencyCode={effectiveCurrency || currency}
                       containerBackground={colors.card}
                     />
                   </View>
 
-                  {/* Label + comment (line mode only) */}
-                  {!isIncome && (
-                    <>
-                      <View style={styles.field}>
-                        <Text style={[styles.fieldLabel, { color: colors.mutedText }]}>
-                          {t('allocation_label')} · {t('optional')}
-                        </Text>
-                        <FormInput
-                          value={label}
-                          onChangeText={setLabel}
-                          placeholder={targetSummary?.name || t('allocation_label')}
-                          testID="plan-line-label"
-                        />
-                      </View>
-                      <View style={styles.field}>
-                        <Text style={[styles.fieldLabel, { color: colors.mutedText }]}>
-                          {t('allocation_comment')} · {t('optional')}
-                        </Text>
-                        <FormInput
-                          value={comment}
-                          onChangeText={setComment}
-                          placeholder={t('allocation_comment')}
-                          multiline
-                          numberOfLines={2}
-                          testID="plan-line-comment"
-                        />
-                      </View>
-                    </>
-                  )}
+                  {/* Label + comment */}
+                  <View style={styles.field}>
+                    <Text style={[styles.fieldLabel, { color: colors.mutedText }]}>
+                      {t('allocation_label')} · {t('optional')}
+                    </Text>
+                    <FormInput
+                      value={label}
+                      onChangeText={setLabel}
+                      placeholder={targetSummary?.name || t('allocation_label')}
+                      testID="plan-line-label"
+                    />
+                  </View>
+                  <View style={styles.field}>
+                    <Text style={[styles.fieldLabel, { color: colors.mutedText }]}>
+                      {t('allocation_comment')} · {t('optional')}
+                    </Text>
+                    <FormInput
+                      value={comment}
+                      onChangeText={setComment}
+                      placeholder={t('allocation_comment')}
+                      multiline
+                      numberOfLines={2}
+                      testID="plan-line-comment"
+                    />
+                  </View>
 
                   {error && (
                     <Text style={[styles.error, { color: colors.danger }]} testID="plan-line-error">
@@ -523,50 +653,109 @@ export default function BudgetPlanLineModal({
                     <Text style={[styles.subPanelTitle, { color: colors.text }]}>{t('select_target')}</Text>
                   </View>
 
-                  {/* Two-mode toggle: expense category OR destination account */}
-                  <View style={styles.segment}>
-                    <Pressable
-                      style={[
-                        styles.segmentButton,
-                        { borderColor: colors.border },
-                        pickerKind === 'category' && { backgroundColor: colors.primary },
-                      ]}
-                      onPress={() => setPickerKind('category')}
-                      accessibilityRole="button"
-                      accessibilityState={{ selected: pickerKind === 'category' }}
-                      accessibilityLabel={t('category_target')}
-                      testID="plan-target-tab-category"
-                    >
-                      <Text style={[styles.segmentText, { color: pickerKind === 'category' ? colors.text : colors.mutedText }]}>
-                        {t('category_target')}
-                      </Text>
-                    </Pressable>
-                    <Pressable
-                      style={[
-                        styles.segmentButton,
-                        { borderColor: colors.border },
-                        pickerKind === 'account' && { backgroundColor: colors.primary },
-                      ]}
-                      onPress={() => setPickerKind('account')}
-                      accessibilityRole="button"
-                      accessibilityState={{ selected: pickerKind === 'account' }}
-                      accessibilityLabel={t('transfer_target')}
-                      testID="plan-target-tab-account"
-                    >
-                      <Text style={[styles.segmentText, { color: pickerKind === 'account' ? colors.text : colors.mutedText }]}>
-                        {t('transfer_target')}
-                      </Text>
-                    </Pressable>
-                  </View>
+                  {/* Two-mode toggle: category OR destination account. An income
+                      line tracks no transfer target, so it skips the toggle. */}
+                  {kind !== 'income' && (
+                    <View style={styles.segment}>
+                      <Pressable
+                        style={[
+                          styles.segmentButton,
+                          { borderColor: colors.border },
+                          pickerKind === 'category' && { backgroundColor: colors.primary },
+                        ]}
+                        onPress={() => setPickerKind('category')}
+                        accessibilityRole="button"
+                        accessibilityState={{ selected: pickerKind === 'category' }}
+                        accessibilityLabel={t('category_target')}
+                        testID="plan-target-tab-category"
+                      >
+                        <Text style={[styles.segmentText, { color: pickerKind === 'category' ? colors.text : colors.mutedText }]}>
+                          {t('category_target')}
+                        </Text>
+                      </Pressable>
+                      <Pressable
+                        style={[
+                          styles.segmentButton,
+                          { borderColor: colors.border },
+                          pickerKind === 'account' && { backgroundColor: colors.primary },
+                        ]}
+                        onPress={() => setPickerKind('account')}
+                        accessibilityRole="button"
+                        accessibilityState={{ selected: pickerKind === 'account' }}
+                        accessibilityLabel={t('transfer_target')}
+                        testID="plan-target-tab-account"
+                      >
+                        <Text style={[styles.segmentText, { color: pickerKind === 'account' ? colors.text : colors.mutedText }]}>
+                          {t('transfer_target')}
+                        </Text>
+                      </Pressable>
+                    </View>
+                  )}
 
                   <FlatList
-                    data={pickerKind === 'category' ? expenseCategories : accounts}
+                    data={kind !== 'income' && pickerKind === 'account' ? accounts : targetCategories}
                     keyExtractor={(item) => String(item.id)}
                     renderItem={renderTargetItem}
                     keyboardShouldPersistTaps="handled"
                     ListEmptyComponent={(
                       <Text style={[styles.emptyText, { color: colors.mutedText }]}>
                         {pickerKind === 'category' ? t('no_categories') : t('no_accounts')}
+                      </Text>
+                    )}
+                  />
+                </Animated.View>
+              )}
+
+              {/* Execution account subpanel */}
+              {activeSubPanel === 'account' && (
+                <Animated.View
+                  testID="plan-account-subpanel"
+                  style={[
+                    styles.subPanel,
+                    { backgroundColor: colors.card },
+                    { opacity: subPanelAnim, transform: [{ translateX: subPanelTranslateX }] },
+                  ]}
+                >
+                  <View style={styles.subPanelHeader}>
+                    <Pressable
+                      onPress={closeSubPanel}
+                      style={styles.subPanelBack}
+                      hitSlop={8}
+                      accessibilityRole="button"
+                      accessibilityLabel={t('back')}
+                      testID="plan-account-back"
+                    >
+                      <Icon name="arrow-left" size={24} color={colors.text} />
+                    </Pressable>
+                    <Text style={[styles.subPanelTitle, { color: colors.text }]}>{t('template_account')}</Text>
+                  </View>
+
+                  <Pressable
+                    onPress={() => handleSelectExecutionAccount(null)}
+                    style={({ pressed }) => [
+                      styles.pickerOption,
+                      { borderColor: colors.border },
+                      pressed && { backgroundColor: colors.selected },
+                      accountId == null && { backgroundColor: colors.selected },
+                    ]}
+                    accessibilityRole="button"
+                    accessibilityLabel={t('no_template_account')}
+                    testID="plan-account-option-none"
+                  >
+                    <Icon name="close-circle-outline" size={22} color={colors.text} />
+                    <Text style={[styles.optionText, { color: colors.text }]} numberOfLines={1}>
+                      {t('no_template_account')}
+                    </Text>
+                  </Pressable>
+
+                  <FlatList
+                    data={accounts}
+                    keyExtractor={(item) => String(item.id)}
+                    renderItem={renderExecutionAccountItem}
+                    keyboardShouldPersistTaps="handled"
+                    ListEmptyComponent={(
+                      <Text style={[styles.emptyText, { color: colors.mutedText }]}>
+                        {t('no_accounts')}
                       </Text>
                     )}
                   />
@@ -582,7 +771,6 @@ export default function BudgetPlanLineModal({
 
 BudgetPlanLineModal.propTypes = {
   visible: PropTypes.bool,
-  mode: PropTypes.oneOf(['line', 'income']),
   line: PropTypes.shape({
     id: PropTypes.string,
     amount: PropTypes.oneOfType([PropTypes.string, PropTypes.number]),
@@ -590,16 +778,18 @@ BudgetPlanLineModal.propTypes = {
     comment: PropTypes.string,
     categoryId: PropTypes.string,
     toAccountId: PropTypes.oneOfType([PropTypes.string, PropTypes.number]),
+    accountId: PropTypes.oneOfType([PropTypes.string, PropTypes.number]),
+    kind: PropTypes.oneOf(KINDS),
     isRecurring: PropTypes.bool,
     currency: PropTypes.string,
   }),
+  initialKind: PropTypes.oneOf(KINDS),
   currency: PropTypes.string,
-  initialIncome: PropTypes.oneOfType([PropTypes.string, PropTypes.number]),
   expenseCategories: PropTypes.array,
+  incomeCategories: PropTypes.array,
   accounts: PropTypes.array,
   saving: PropTypes.bool,
   onSaveLine: PropTypes.func,
-  onSaveIncome: PropTypes.func,
   onDeleteLine: PropTypes.func,
   onClose: PropTypes.func,
 };
@@ -662,6 +852,10 @@ const styles = StyleSheet.create({
   },
   field: {
     marginBottom: 16,
+  },
+  fieldHint: {
+    fontSize: 11,
+    marginTop: 4,
   },
   fieldLabel: {
     fontSize: 12,

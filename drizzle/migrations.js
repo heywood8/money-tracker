@@ -21,6 +21,7 @@ import m0016 from './0016_merchant_rule_last_matched.js';
 import m0017 from './0017_add_pending_notification_location.js';
 import m0018 from './0018_budget_plans.js';
 import m0019, { postMigration as m0019PostMigration } from './0019_recurring_plan_lines.js';
+import m0020, { postMigration as m0020PostMigration } from './0020_plan_line_templates.js';
 
 export default {
   journal,
@@ -45,15 +46,18 @@ export default {
     m0017,
     m0018,
     m0019,
+    m0020,
   },
   postMigrationHandlers: {
     m0003: m0003PostMigration,
     m0019: m0019PostMigration,
+    m0020: m0020PostMigration,
   },
   // Explicit tag mapping for post-migration handlers to avoid fragile substring matching
   postMigrationTags: {
     m0003: '0003_slow_grandmaster',
     m0019: '0019_recurring_plan_lines',
+    m0020: '0020_plan_line_templates',
   },
 };
   

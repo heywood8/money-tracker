@@ -91,7 +91,11 @@ const mockSchemaComplete = (db, storedUserVersion) => {
       return Promise.resolve([{ name: 'latitude', type: 'REAL' }, { name: 'longitude', type: 'REAL' }]);
     }
     if (q.includes('table_info(budget_plan_lines)')) {
-      return Promise.resolve([{ name: 'is_recurring', type: 'INTEGER' }, { name: 'currency', type: 'TEXT' }]);
+      return Promise.resolve([
+        { name: 'is_recurring', type: 'INTEGER' }, { name: 'currency', type: 'TEXT' },
+        { name: 'kind', type: 'TEXT' }, { name: 'account_id', type: 'INTEGER' },
+        { name: 'last_executed_month', type: 'TEXT' },
+      ]);
     }
     return Promise.resolve([]);
   });

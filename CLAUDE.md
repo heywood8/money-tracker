@@ -8,7 +8,7 @@ This file provides guidance to Claude Code (claude.ai/code) when working with co
 
 ## Project Overview
 
-Penny is a React Native mobile app built with Expo for tracking personal finances. The app targets Android, with features for managing accounts, operations, categories, planned operations, budgets, and viewing graphs. It includes internationalization (11 languages: English, Italian, Russian, Spanish, French, Chinese, German, Armenian, Japanese, Korean, Portuguese) and theme support (light/dark/system). Supports backup/restore (JSON, CSV, SQLite) and Google Sheets export via native Google Sign-In.
+Penny is a React Native mobile app built with Expo for tracking personal finances. The app targets Android, with features for managing accounts, operations, categories, budgets (a single month-scoped Budgets tab that also holds the recurring/one-time templates the former Planned tab used to own), and viewing graphs. It includes internationalization (11 languages: English, Italian, Russian, Spanish, French, Chinese, German, Armenian, Japanese, Korean, Portuguese) and theme support (light/dark/system). Supports backup/restore (JSON, CSV, SQLite) and Google Sheets export via native Google Sign-In.
 
 ## Documentation Verification with context7
 
@@ -38,17 +38,16 @@ The app follows a feature-based organization under the `app/` directory:
   - Accounts: `AccountsContext.js`, `AccountsDataContext.js`, `AccountsActionsContext.js`
   - Operations: `OperationsContext.js`, `OperationsDataContext.js`, `OperationsActionsContext.js`
   - Other: `BudgetsContext.js`, `CategoriesContext.js`, `DialogContext.js`, `LocalizationContext.js`
-  - `PlannedOperationsContext.js`, `SearchContext.js`, `DisplaySettingsContext.js`
+  - `SearchContext.js`, `DisplaySettingsContext.js`
   - `AppBlurContext.js`, `ImportProgressContext.js`, `UpdateDownloadContext.js`
 
-- **screens/** (7 files) - Full-screen components for main navigation
+- **screens/** - Full-screen components for main navigation
   - `AccountsScreen.js`, `AppInitializer.js`, `CategoriesScreen.js`
-  - `GraphsScreen.js`, `LanguageSelectionScreen.js`, `OperationsScreen.js`
-  - `PlannedOperationsScreen.js`
+  - `GraphsScreen.js`, `LanguageSelectionScreen.js`, `OperationsScreen.js`, `BudgetScreen.js`
 
-- **modals/** (5 files) - Modal dialog components for data entry
+- **modals/** - Modal dialog components for data entry
   - `CategoryModal.js`, `OperationModal.js`, `SettingsModal.js`
-  - `PlannedOperationModal.js`, `ImportProgressModal.js`
+  - `ImportProgressModal.js`
 
 - **components/** (40+ files across subdirectories) - Reusable UI components
   - Root: `BudgetProgressBar.js`, `Calculator.js`, `ErrorBoundary.js`, `Header.js`
@@ -75,14 +74,14 @@ The app follows a feature-based organization under the `app/` directory:
 
 - **services/** (18 files) - Business logic and data access layer
   - Database: `AccountsDB.js`, `BudgetsDB.js`, `CategoriesDB.js`, `OperationsDB.js`
-  - Database: `PlannedOperationsDB.js`, `BalanceHistoryDB.js`, `PreferencesDB.js`
+  - Database: `BudgetPlansDB.js`, `BalanceHistoryDB.js`, `PreferencesDB.js`
   - Utilities: `BackupRestore.js`, `currency.js`, `db.js`, `eventEmitter.js`, `LastAccount.js`
   - Features: `GoogleSheetsService.js`, `DailyBackupService.js`, `AppUpdateService.js`
   - Logging: `LogService.js`, `LogsFile.js`
   - Monitoring: `sentry.js` - Privacy-protective crash/error reporting (Sentry)
 
 - **db/** (1 file) - Database schema
-  - `schema.js` - Drizzle ORM schema (tables: accounts, categories, operations, budgets, plannedOperations, balanceHistory, appMetadata)
+  - `schema.js` - Drizzle ORM schema (tables: accounts, categories, operations, budgets, budgetPlans, budgetPlanLines, plannedOperations, balanceHistory, appMetadata; `budgets` and `plannedOperations` are legacy/append-only since Budgets v3 — see docs/DATABASE.md)
 
 - **defaults/** (2 files) - Default/seed data
   - `defaultAccounts.js`, `defaultOperations.js`
@@ -123,7 +122,7 @@ The app uses React Context API for global state, with primary contexts that wrap
 5. **Other Contexts**
    - `BudgetsContext.js` - Budget management
    - `CategoriesContext.js` - Category management
-   - `PlannedOperationsContext.js` - Recurring/planned transactions
+   - `BudgetPlansContext.js` - Monthly plans and their lines (targets + executable templates)
    - `DialogContext.js` - Global dialog/alert system
    - `DisplaySettingsContext.js` - UI preferences (e.g., hide balances)
    - `AppBlurContext.js` - Blur overlay state for security
@@ -137,7 +136,6 @@ Uses custom tab-based navigation (`app/navigation/SimpleTabs.js`) instead of rea
 - **Accounts**: Account management with full CRUD and multi-currency transfers
 - **Categories**: Transaction categories screen
 - **Graphs**: Financial visualizations (expense/income pie charts, balance history, spending prediction)
-- **Planned**: Planned/recurring operations screen
 
 Bottom tab bar height is set to 80px with 24px bottom padding.
 
@@ -154,9 +152,9 @@ Bottom tab bar height is set to 80px with 24px bottom padding.
 
 **Database Layer** (SQLite via Drizzle ORM):
 - SQLite database (`penny.db`)
-- Schema defined in `app/db/schema.js` - tables: accounts, categories, operations, budgets, plannedOperations, balanceHistory, appMetadata
+- Schema defined in `app/db/schema.js` - tables: accounts, categories, operations, budgets, budgetPlans, budgetPlanLines, plannedOperations, balanceHistory, appMetadata
 - Migrations managed by Drizzle Kit in `drizzle/` directory
-- DB modules: `AccountsDB.js`, `BudgetsDB.js`, `CategoriesDB.js`, `OperationsDB.js`, `PlannedOperationsDB.js`, `BalanceHistoryDB.js`, `PreferencesDB.js`
+- DB modules: `AccountsDB.js`, `BudgetsDB.js`, `BudgetPlansDB.js`, `CategoriesDB.js`, `OperationsDB.js`, `BalanceHistoryDB.js`, `PreferencesDB.js`
 
 **Application Preferences** (PreferencesDB via SQLite):
 - Language, theme, Google Sheets spreadsheet ID, and other preferences are stored in the `appMetadata` table via `PreferencesDB.js`
@@ -508,14 +506,14 @@ describe('ComponentOrService', () => {
 
 **Completed:**
 - ✅ Basic app scaffold with Expo
-- ✅ Custom tab navigation (5 tabs: Operations, Accounts, Categories, Graphs, Planned)
+- ✅ Custom tab navigation (Operations, Accounts, Categories, Graphs, Budgets)
 - ✅ Theme system (light/dark/system)
 - ✅ Internationalization (11 languages)
 - ✅ Account management (full CRUD, multi-currency transfers)
 - ✅ Operations management (full CRUD, search, filtering, quick-add, split operations)
 - ✅ Categories management (full CRUD)
 - ✅ Budgets (budget tracking with progress bars)
-- ✅ Planned/recurring operations
+- ✅ Recurring/one-time templates with one-tap execution (part of the Budgets tab)
 - ✅ Graphs (expense/income pie charts, balance history, spending prediction, category spending)
 - ✅ Backup/restore (JSON, CSV, SQLite formats)
 - ✅ Google Sheets export (via native Google Sign-In)

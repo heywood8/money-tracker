@@ -15,7 +15,6 @@ import { OperationsDataProvider } from './app/contexts/OperationsDataContext';
 import { OperationsActionsProvider } from './app/contexts/OperationsActionsContext';
 import { BudgetsProvider } from './app/contexts/BudgetsContext';
 import { BudgetPlansProvider } from './app/contexts/BudgetPlansContext';
-import { PlannedOperationsProvider } from './app/contexts/PlannedOperationsContext';
 import { LocalizationProvider } from './app/contexts/LocalizationContext';
 import { DialogProvider } from './app/contexts/DialogContext';
 import { ImportProgressProvider } from './app/contexts/ImportProgressContext';
@@ -85,9 +84,7 @@ function App() {
                                     <OperationsActionsProvider>
                                       <BudgetsProvider>
                                         <BudgetPlansProvider>
-                                          <PlannedOperationsProvider>
-                                            <AppContent />
-                                          </PlannedOperationsProvider>
+                                          <AppContent />
                                         </BudgetPlansProvider>
                                       </BudgetsProvider>
                                     </OperationsActionsProvider>
