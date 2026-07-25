@@ -1,7 +1,7 @@
 // __tests__/components/budgets/MonthlyPlanSection.test.js
 /* eslint-disable react/prop-types */
 import React from 'react';
-import { render, fireEvent, waitFor } from '@testing-library/react-native';
+import { render, fireEvent, waitFor, act } from '@testing-library/react-native';
 import { StyleSheet } from 'react-native';
 import MonthlyPlanSection from '../../../app/components/budgets/MonthlyPlanSection';
 
@@ -724,8 +724,10 @@ describe('MonthlyPlanSection', () => {
 
       // Two taps in immediate succession (same JS task, before either resolves)
       // — a state-only guard would not catch this; only a synchronous ref does.
-      fireEvent.press(getByTestId('plan-line-down-l-a'));
-      fireEvent.press(getByTestId('plan-line-down-l-a'));
+      await act(async () => {
+        fireEvent.press(getByTestId('plan-line-down-l-a'));
+        fireEvent.press(getByTestId('plan-line-down-l-a'));
+      });
 
       await waitFor(() => expect(mockPlans.getLinesForMonth).toHaveBeenCalledTimes(2)); // mount + one reconcile
 
@@ -744,8 +746,10 @@ describe('MonthlyPlanSection', () => {
       const { getByTestId } = await renderSection();
       await waitFor(() => expect(getByTestId('plan-line-l1')).toBeTruthy());
 
-      fireEvent.press(getByTestId('plan-line-down-l1'));
-      fireEvent.press(getByTestId('plan-line-down-l1'));
+      await act(async () => {
+        fireEvent.press(getByTestId('plan-line-down-l1'));
+        fireEvent.press(getByTestId('plan-line-down-l1'));
+      });
 
       await waitFor(() => expect(mockPlans.getLinesForMonth).toHaveBeenCalledTimes(2));
 
