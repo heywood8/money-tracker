@@ -24,6 +24,7 @@ import LoadingView from '../components/LoadingView';
 import ModalBlurOverlay from '../components/ModalBlurOverlay';
 import ModalHeader from '../components/ModalHeader';
 import { SPACING } from '../styles/layout';
+import { currentMonthKey, addMonths, formatMonthLabel } from '../utils/monthUtils';
 import currenciesData from '../../assets/currencies.json';
 
 const CLOSED_MODAL = { visible: false, budget: null, categoryId: '', categoryName: '', isNew: true };
@@ -32,26 +33,6 @@ const CLOSED_PLANNED_MODAL = { visible: false, plannedOperation: null, isNew: tr
 // Type → theme color / fallback icon for hosted planned templates.
 const TYPE_COLORS = { expense: 'expense', income: 'income', transfer: 'transfer' };
 const TYPE_ICONS = { expense: 'arrow-up', income: 'arrow-down', transfer: 'swap-horizontal' };
-
-/** Current month as YYYY-MM (local calendar). */
-const currentMonthKey = () => {
-  const now = new Date();
-  return `${now.getFullYear()}-${String(now.getMonth() + 1).padStart(2, '0')}`;
-};
-
-/** Shift a YYYY-MM key by `delta` months. */
-const addMonths = (monthKey, delta) => {
-  const [y, m] = monthKey.split('-').map(Number);
-  const d = new Date(y, m - 1 + delta, 1);
-  return `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}`;
-};
-
-/** Localized "Month YYYY" label for a YYYY-MM key. */
-const formatMonthLabel = (monthKey) => {
-  const [y, m] = monthKey.split('-').map(Number);
-  const d = new Date(y, m - 1, 1);
-  return d.toLocaleDateString(undefined, { month: 'long', year: 'numeric' });
-};
 
 // Category picker shown before creating a new budget: budgets attach to expense
 // categories, so the user picks one here and then fills the budget form.
@@ -530,35 +511,38 @@ const BudgetScreen = () => {
     );
   }, [categoriesById, budgetStatuses, colors, t, handleEditBudget]);
 
+  // Sticky month header — kept outside the FlatList so it stays visible while the
+  // budgets/plan content below scrolls. Drives the plan section and budget spend.
+  const monthHeader = useMemo(() => (
+    <View style={[styles.monthHeader, { backgroundColor: colors.background }]} testID="budget-month-header">
+      <Pressable
+        onPress={handlePrevMonth}
+        hitSlop={8}
+        style={styles.navButton}
+        accessibilityRole="button"
+        accessibilityLabel={t('previous_month')}
+        testID="budget-prev-month"
+      >
+        <Icon name="chevron-left" size={26} color={colors.text} />
+      </Pressable>
+      <Text style={[styles.monthTitle, { color: colors.text }]} testID="budget-month-label">
+        {formatMonthLabel(month)}
+      </Text>
+      <Pressable
+        onPress={handleNextMonth}
+        hitSlop={8}
+        style={styles.navButton}
+        accessibilityRole="button"
+        accessibilityLabel={t('next_month')}
+        testID="budget-next-month"
+      >
+        <Icon name="chevron-right" size={26} color={colors.text} />
+      </Pressable>
+    </View>
+  ), [colors.background, colors.text, month, t, handlePrevMonth, handleNextMonth]);
+
   const listHeader = useMemo(() => (
     <>
-      {/* Single shared month header — drives the plan section and budget spend */}
-      <View style={styles.monthHeader} testID="budget-month-header">
-        <Pressable
-          onPress={handlePrevMonth}
-          hitSlop={8}
-          style={styles.navButton}
-          accessibilityRole="button"
-          accessibilityLabel={t('previous_month')}
-          testID="budget-prev-month"
-        >
-          <Icon name="chevron-left" size={26} color={colors.text} />
-        </Pressable>
-        <Text style={[styles.monthTitle, { color: colors.text }]} testID="budget-month-label">
-          {formatMonthLabel(month)}
-        </Text>
-        <Pressable
-          onPress={handleNextMonth}
-          hitSlop={8}
-          style={styles.navButton}
-          accessibilityRole="button"
-          accessibilityLabel={t('next_month')}
-          testID="budget-next-month"
-        >
-          <Icon name="chevron-right" size={26} color={colors.text} />
-        </Pressable>
-      </View>
-
       {/* Income templates (executable, this month only) */}
       {isCurrentMonth && incomeTemplates.length > 0
         && renderPlannedCard(t('income'), incomeTemplates, 'planned-income-section')}
@@ -568,8 +552,6 @@ const BudgetScreen = () => {
         expenseCategories={expenseCategories}
         accounts={accounts}
         month={month}
-        onPrevMonth={handlePrevMonth}
-        onNextMonth={handleNextMonth}
       />
 
       {/* Recurring / one-time expense & transfer templates alongside allocations */}
@@ -626,8 +608,7 @@ const BudgetScreen = () => {
     </>
   ), [colors, t, convertAllBudgets, convertedTotals, perCurrencyTotals, selectedCurrency,
     unconvertedCurrencies, expenseCategories, accounts, month, isCurrentMonth,
-    incomeTemplates, expenseTemplates, renderPlannedCard, handleAddPlanned,
-    handlePrevMonth, handleNextMonth]);
+    incomeTemplates, expenseTemplates, renderPlannedCard, handleAddPlanned]);
 
   if (loading) {
     return <LoadingView testID="budget-screen-loading" />;
@@ -635,6 +616,7 @@ const BudgetScreen = () => {
 
   return (
     <View style={[styles.container, { backgroundColor: colors.background }]} testID="budget-screen">
+      {monthHeader}
       <FlatList
         data={budgets}
         keyExtractor={(item) => item.id}
@@ -858,7 +840,8 @@ const styles = StyleSheet.create({
     alignItems: 'center',
     flexDirection: 'row',
     justifyContent: 'space-between',
-    marginBottom: SPACING.md,
+    paddingHorizontal: SPACING.md,
+    paddingTop: SPACING.md,
   },
   monthTitle: {
     fontSize: 17,
