@@ -1,5 +1,5 @@
-import React, { useState, useEffect, useMemo, useCallback, memo } from 'react';
-import { View, StyleSheet, FlatList, Modal, Pressable, TouchableOpacity } from 'react-native';
+import React, { useState, useEffect, useMemo, useCallback, useRef, memo } from 'react';
+import { View, StyleSheet, FlatList, Pressable, TouchableOpacity } from 'react-native';
 import { Text, Snackbar } from 'react-native-paper';
 import { Swipeable } from 'react-native-gesture-handler';
 import PropTypes from 'prop-types';
@@ -12,82 +12,25 @@ import { useCategories } from '../contexts/CategoriesContext';
 import { useAccountsData } from '../contexts/AccountsDataContext';
 import { usePlannedOperations } from '../contexts/PlannedOperationsContext';
 import { useDialog } from '../contexts/DialogContext';
-import * as Currency from '../services/currency';
-import { fetchRatesToTarget, convertWithRateMap } from '../services/OperationsDB';
-import BudgetModal from '../modals/BudgetModal';
 import PlannedOperationModal from '../modals/PlannedOperationModal';
 import MonthlyPlanSection from '../components/budgets/MonthlyPlanSection';
-import StatusProgressBar from '../components/StatusProgressBar';
 import AddFAB from '../components/AddFAB';
-import EmptyState from '../components/EmptyState';
 import LoadingView from '../components/LoadingView';
-import ModalBlurOverlay from '../components/ModalBlurOverlay';
-import ModalHeader from '../components/ModalHeader';
 import { SPACING } from '../styles/layout';
 import { currentMonthKey, addMonths, formatMonthLabel } from '../utils/monthUtils';
 import currenciesData from '../../assets/currencies.json';
 
-const CLOSED_MODAL = { visible: false, budget: null, categoryId: '', categoryName: '', isNew: true };
 const CLOSED_PLANNED_MODAL = { visible: false, plannedOperation: null, isNew: true };
+// The old per-category budgets list (and its FlatList data) is gone (Budgets v3
+// phase 2 — consolidated into MonthlyPlanSection's recurring lines); the
+// FlatList here now exists purely to host the sticky ListHeaderComponent, so its
+// own data is always empty. Module-level so the reference never changes.
+const EMPTY_LIST = [];
+const renderNothing = () => null;
 
 // Type → theme color / fallback icon for hosted planned templates.
 const TYPE_COLORS = { expense: 'expense', income: 'income', transfer: 'transfer' };
 const TYPE_ICONS = { expense: 'arrow-up', income: 'arrow-down', transfer: 'swap-horizontal' };
-
-// Category picker shown before creating a new budget: budgets attach to expense
-// categories, so the user picks one here and then fills the budget form.
-const CategoryPickerModal = ({ visible, categories, colors, t, onSelect, onClose }) => {
-  const renderItem = useCallback(({ item }) => (
-    <Pressable
-      style={({ pressed }) => [styles.pickerRow, pressed && { backgroundColor: colors.selected }]}
-      onPress={() => onSelect(item)}
-      accessibilityRole="button"
-      accessibilityLabel={item.name}
-      testID={`budget-category-option-${item.id}`}
-    >
-      <Icon name={item.icon || 'shape-outline'} size={22} color={colors.text} />
-      <Text variant="bodyLarge" style={{ color: colors.text }}>{item.name}</Text>
-    </Pressable>
-  ), [colors, onSelect]);
-
-  return (
-    <>
-      {visible && <ModalBlurOverlay />}
-      <Modal
-        visible={visible}
-        animationType="slide"
-        transparent={true}
-        onRequestClose={onClose}
-        testID="budget-category-picker"
-      >
-        <Pressable style={styles.modalOverlay} onPress={onClose}>
-          <Pressable style={[styles.modalContent, { backgroundColor: colors.card }]} onPress={() => {}}>
-            <ModalHeader title={t('select_category')} />
-            <FlatList
-              data={categories}
-              keyExtractor={(item) => item.id}
-              renderItem={renderItem}
-              ListEmptyComponent={(
-                <Text style={[styles.pickerEmpty, { color: colors.mutedText }]}>
-                  {t('no_categories')}
-                </Text>
-              )}
-            />
-          </Pressable>
-        </Pressable>
-      </Modal>
-    </>
-  );
-};
-
-CategoryPickerModal.propTypes = {
-  visible: PropTypes.bool.isRequired,
-  categories: PropTypes.array.isRequired,
-  colors: PropTypes.object.isRequired,
-  t: PropTypes.func.isRequired,
-  onSelect: PropTypes.func.isRequired,
-  onClose: PropTypes.func.isRequired,
-};
 
 // Fix 3 (low-risk perf pass, see BudgetScreen's Hosted planned templates
 // section below): a Swipeable row is nontrivial to build (gesture handler +
@@ -235,7 +178,11 @@ PlannedRow.propTypes = {
 const BudgetScreen = () => {
   const { colors } = useThemeColors();
   const { t } = useLocalization();
-  const { budgets, budgetStatuses, loading, convertAllBudgets, setConvertAllBudgets, setBudgetStatusMonth } = useBudgetsData();
+  // convertAllBudgets/setConvertAllBudgets is the shared multi-currency toggle:
+  // owned here (BudgetsDataContext) and consumed by BudgetPlansDataContext, so
+  // the whole merged screen converts consistently. `loading` is a proxy for "DB
+  // ready" (BudgetsDataContext still loads the legacy `budgets` table on mount).
+  const { loading, convertAllBudgets, setConvertAllBudgets } = useBudgetsData();
   const { categories } = useCategories();
   const { accounts } = useAccountsData();
   const { showDialog } = useDialog();
@@ -249,24 +196,19 @@ const BudgetScreen = () => {
   } = usePlannedOperations();
 
   // The whole screen is scoped to one month via a single shared ‹ Month › header;
-  // MonthlyPlanSection is controlled from here and budget spend is recomputed for
-  // the shown month by the data context.
+  // MonthlyPlanSection is controlled from here.
   const [month, setMonth] = useState(currentMonthKey);
   const isCurrentMonth = month === currentMonthKey();
 
   const [selectedCurrency, setSelectedCurrency] = useState('');
-  // Account currencies with no rate (offline or live) to selectedCurrency —
-  // their operations are excluded from converted totals, so warn (same UX as
-  // the Graphs screen).
-  const [unconvertedCurrencies, setUnconvertedCurrencies] = useState([]);
-  // Converted grand totals { budgeted, spent } in selectedCurrency; null while
-  // conversion is off (per-currency totals render instead) or rates are loading.
-  const [convertedTotals, setConvertedTotals] = useState(null);
-  const [modalState, setModalState] = useState(CLOSED_MODAL);
   const [plannedModal, setPlannedModal] = useState(CLOSED_PLANNED_MODAL);
-  const [categoryPickerVisible, setCategoryPickerVisible] = useState(false);
   const [snackbarVisible, setSnackbarVisible] = useState(false);
   const [snackbarMessage, setSnackbarMessage] = useState('');
+
+  // Lets the FAB open the monthly plan's "add allocation" flow without lifting
+  // that section's modal state up into this screen.
+  const monthlyPlanRef = useRef(null);
+  const handleOpenAddAllocation = useCallback(() => monthlyPlanRef.current?.openAddLine(), []);
 
   const handlePrevMonth = useCallback(() => setMonth(m => addMonths(m, -1)), []);
   const handleNextMonth = useCallback(() => setMonth(m => addMonths(m, 1)), []);
@@ -277,12 +219,6 @@ const BudgetScreen = () => {
   // back. Surface a visible "jump to current month" control instead of
   // silently auto-resetting the month on focus.
   const handleJumpToCurrentMonth = useCallback(() => setMonth(currentMonthKey()), []);
-
-  // Tell the data context which month to compute budget spend for. Guarded with
-  // optional-call so tests that stub the context without this setter still render.
-  useEffect(() => {
-    setBudgetStatusMonth?.(month);
-  }, [month, setBudgetStatusMonth]);
 
   // Memoize unique currencies from accounts
   const currencies = useMemo(() =>
@@ -303,67 +239,6 @@ const BudgetScreen = () => {
       setSelectedCurrency('');
     }
   }, [accounts, selectedCurrency]);
-
-  // Grand totals across all active budgets, converted into selectedCurrency,
-  // plus the budget currencies that have no rate to selectedCurrency (their
-  // amounts are dropped from the totals, so warn about exactly those — derived
-  // from the budgets' own currencies, not every account currency). A single
-  // rate map drives both totals and the warning, so the CDN fallback runs at
-  // most once per (currencies, target) change. Async because a rate may need a
-  // live fetch when the bundled table lacks it. Functional guards keep the
-  // empty state referentially stable (same pattern as GraphsScreen): a fresh []
-  // every run would re-render and re-fire this effect in an infinite loop.
-  useEffect(() => {
-    if (!convertAllBudgets || !selectedCurrency) {
-      setConvertedTotals(prev => (prev === null ? prev : null));
-      setUnconvertedCurrencies(prev => (prev.length === 0 ? prev : []));
-      return;
-    }
-    const statuses = [...budgetStatuses.values()];
-    let cancelled = false;
-    (async () => {
-      try {
-        const rateByCurrency = await fetchRatesToTarget(statuses.map(s => s.currency), selectedCurrency);
-        let budgeted = '0';
-        let spent = '0';
-        const unconvertible = new Set();
-        for (const status of statuses) {
-          const amount = convertWithRateMap(String(status.amount), status.currency, selectedCurrency, rateByCurrency);
-          const spentConverted = convertWithRateMap(String(status.spent), status.currency, selectedCurrency, rateByCurrency);
-          // amount and spent share the currency+rate, so they are null together.
-          if (amount === null || spentConverted === null) {
-            unconvertible.add(status.currency);
-            continue;
-          }
-          budgeted = Currency.add(budgeted, amount);
-          spent = Currency.add(spent, spentConverted);
-        }
-        if (cancelled) return;
-        setConvertedTotals({ budgeted, spent });
-        const list = [...unconvertible];
-        setUnconvertedCurrencies(prev => (prev.length === 0 && list.length === 0 ? prev : list));
-      } catch {
-        if (!cancelled) {
-          setConvertedTotals(prev => (prev === null ? prev : null));
-          setUnconvertedCurrencies(prev => (prev.length === 0 ? prev : []));
-        }
-      }
-    })();
-    return () => { cancelled = true; };
-  }, [convertAllBudgets, selectedCurrency, budgetStatuses]);
-
-  // Per-currency totals for the convert-off mode: each budget counts in its own
-  // currency, one totals line per currency.
-  const perCurrencyTotals = useMemo(() => {
-    const totals = new Map();
-    for (const status of budgetStatuses.values()) {
-      const entry = totals.get(status.currency) || { budgeted: '0', spent: '0' };
-      entry.budgeted = Currency.add(entry.budgeted, status.amount);
-      entry.spent = Currency.add(entry.spent, status.spent);
-      totals.set(status.currency, entry);
-    }
-    return [...totals.entries()];
-  }, [budgetStatuses]);
 
   const categoriesById = useMemo(() =>
     new Map(categories.map(cat => [cat.id, cat])),
@@ -632,66 +507,10 @@ const BudgetScreen = () => {
     </View>
   ), [colors, renderPlannedRow, handleAddPlanned, t]);
 
-  const handleEditBudget = useCallback((budget) => {
-    const category = categoriesById.get(budget.categoryId);
-    setModalState({
-      visible: true,
-      budget,
-      categoryId: budget.categoryId,
-      categoryName: category ? category.name : '',
-      isNew: false,
-    });
-  }, [categoriesById]);
-
-  const handleCategorySelected = useCallback((category) => {
-    setCategoryPickerVisible(false);
-    setModalState({
-      visible: true,
-      budget: null,
-      categoryId: category.id,
-      categoryName: category.name,
-      isNew: true,
-    });
-  }, []);
-
-  const handleCloseModal = useCallback(() => setModalState(CLOSED_MODAL), []);
-  const handleOpenPicker = useCallback(() => setCategoryPickerVisible(true), []);
-  const handleClosePicker = useCallback(() => setCategoryPickerVisible(false), []);
   const handleToggleConvert = useCallback(() => setConvertAllBudgets(prev => !prev), [setConvertAllBudgets]);
 
-  const renderBudget = useCallback(({ item, index }) => {
-    const category = categoriesById.get(item.categoryId);
-    const status = budgetStatuses.get(item.id);
-    return (
-      <TouchableOpacity
-        style={[styles.budgetRow, index % 2 === 1 && { backgroundColor: colors.altRow }]}
-        onPress={() => handleEditBudget(item)}
-        accessibilityRole="button"
-        accessibilityLabel={`${t('edit_budget')}: ${category ? category.name : ''}`}
-        testID={`budget-row-${item.id}`}
-      >
-        <View style={styles.budgetRowHeader}>
-          <Icon name={category?.icon || 'shape-outline'} size={20} color={colors.text} />
-          <Text variant="bodyLarge" style={[styles.budgetRowName, { color: colors.text }]} numberOfLines={1}>
-            {category ? category.name : t('budget')}
-          </Text>
-          <Text variant="bodySmall" style={{ color: colors.mutedText }}>
-            {t(item.periodType)} · {item.currency}
-          </Text>
-        </View>
-        {status ? (
-          <StatusProgressBar status={status} compact showDetails />
-        ) : (
-          <Text variant="bodySmall" style={{ color: colors.mutedText }}>
-            {t('no_budget_set')}
-          </Text>
-        )}
-      </TouchableOpacity>
-    );
-  }, [categoriesById, budgetStatuses, colors, t, handleEditBudget]);
-
   // Sticky month header — kept outside the FlatList so it stays visible while the
-  // budgets/plan content below scrolls. Drives the plan section and budget spend.
+  // plan content below scrolls. Drives the monthly plan section.
   const monthHeader = useMemo(() => (
     <View style={[styles.monthHeaderContainer, { backgroundColor: colors.background }]} testID="budget-month-header">
       <View style={styles.monthHeaderRow}>
@@ -752,6 +571,7 @@ const BudgetScreen = () => {
         && renderPlannedCard(t('income'), incomeTemplates, 'planned-income-section')}
 
       <MonthlyPlanSection
+        ref={monthlyPlanRef}
         currency={selectedCurrency}
         expenseCategories={expenseCategories}
         accounts={accounts}
@@ -774,46 +594,10 @@ const BudgetScreen = () => {
           <Text style={[styles.addText, { color: colors.primary }]}>{t('add_planned_operation')}</Text>
         </Pressable>
       )}
-
-      <View style={[styles.totalsCard, { backgroundColor: colors.surface, borderColor: colors.border }]}>
-        <Text variant="titleMedium" style={[styles.totalsTitle, { color: colors.text }]}>
-          {t('all_budgets')}
-        </Text>
-        {convertAllBudgets && convertedTotals ? (
-          <View style={styles.totalsRow}>
-            <Text variant="bodyMedium" style={{ color: colors.mutedText }}>
-              {t('total_spent')}: {Currency.formatAmount(convertedTotals.spent, selectedCurrency)} {selectedCurrency}
-            </Text>
-            <Text variant="bodyMedium" style={{ color: colors.mutedText }}>
-              {t('total_budgeted')}: {Currency.formatAmount(convertedTotals.budgeted, selectedCurrency)} {selectedCurrency}
-            </Text>
-          </View>
-        ) : (
-          perCurrencyTotals.map(([currency, entry]) => (
-            <View key={currency} style={styles.totalsRow}>
-              <Text variant="bodyMedium" style={{ color: colors.mutedText }}>
-                {t('total_spent')}: {Currency.formatAmount(entry.spent, currency)} {currency}
-              </Text>
-              <Text variant="bodyMedium" style={{ color: colors.mutedText }}>
-                {t('total_budgeted')}: {Currency.formatAmount(entry.budgeted, currency)} {currency}
-              </Text>
-            </View>
-          ))
-        )}
-        {convertAllBudgets && unconvertedCurrencies.length > 0 && (
-          <View style={styles.convertWarning} testID="budget-unconverted-warning">
-            <Icon name="alert-circle-outline" size={16} color={colors.mutedText} />
-            <Text variant="bodySmall" style={[styles.convertWarningText, { color: colors.mutedText }]}>
-              {t('graphs_currencies_not_converted')}: {unconvertedCurrencies.join(', ')}
-            </Text>
-          </View>
-        )}
-      </View>
     </>
-  ), [colors, t, convertAllBudgets, convertedTotals, perCurrencyTotals, selectedCurrency,
-    unconvertedCurrencies, expenseCategories, accounts, month, isCurrentMonth,
+  ), [t, expenseCategories, accounts, month, isCurrentMonth, selectedCurrency,
     plannedOperations, incomeTemplates, expenseTemplates, renderPlannedCard,
-    renderSummaryStrip, handleAddPlanned]);
+    renderSummaryStrip, handleAddPlanned, colors.border, colors.primary]);
 
   if (loading) {
     return <LoadingView testID="budget-screen-loading" />;
@@ -823,18 +607,10 @@ const BudgetScreen = () => {
     <View style={[styles.container, { backgroundColor: colors.background }]} testID="budget-screen">
       {monthHeader}
       <FlatList
-        data={budgets}
+        data={EMPTY_LIST}
         keyExtractor={(item) => item.id}
-        renderItem={renderBudget}
-        extraData={budgetStatuses}
+        renderItem={renderNothing}
         ListHeaderComponent={listHeader}
-        ListEmptyComponent={(
-          <EmptyState
-            icon="piggy-bank-outline"
-            message={t('no_budgets_yet')}
-            testID="budget-empty-state"
-          />
-        )}
         contentContainerStyle={styles.listContent}
       />
 
@@ -881,27 +657,9 @@ const BudgetScreen = () => {
       )}
 
       <AddFAB
-        onPress={handleOpenPicker}
+        onPress={handleOpenAddAllocation}
         testID="budget-add-fab"
-        accessibilityLabel={t('set_budget')}
-      />
-
-      <CategoryPickerModal
-        visible={categoryPickerVisible}
-        categories={expenseCategories}
-        colors={colors}
-        t={t}
-        onSelect={handleCategorySelected}
-        onClose={handleClosePicker}
-      />
-
-      <BudgetModal
-        visible={modalState.visible}
-        onClose={handleCloseModal}
-        budget={modalState.budget}
-        categoryId={modalState.categoryId}
-        categoryName={modalState.categoryName}
-        isNew={modalState.isNew}
+        accessibilityLabel={t('add_allocation')}
       />
 
       <PlannedOperationModal
@@ -942,21 +700,6 @@ const styles = StyleSheet.create({
     fontSize: 15,
     fontWeight: '600',
   },
-  budgetRow: {
-    borderRadius: 12,
-    gap: 4,
-    paddingHorizontal: SPACING.md,
-    paddingVertical: SPACING.sm,
-  },
-  budgetRowHeader: {
-    alignItems: 'center',
-    flexDirection: 'row',
-    gap: SPACING.sm,
-  },
-  budgetRowName: {
-    flex: 1,
-    fontWeight: '600',
-  },
   card: {
     borderRadius: 16,
     borderWidth: 1,
@@ -979,15 +722,6 @@ const styles = StyleSheet.create({
     width: 13,
   },
   container: {
-    flex: 1,
-  },
-  convertWarning: {
-    alignItems: 'center',
-    flexDirection: 'row',
-    gap: 6,
-    marginTop: SPACING.sm,
-  },
-  convertWarningText: {
     flex: 1,
   },
   executedWrapper: {
@@ -1042,17 +776,6 @@ const styles = StyleSheet.create({
     paddingHorizontal: SPACING.md,
     paddingTop: SPACING.md,
   },
-  modalContent: {
-    borderTopLeftRadius: 20,
-    borderTopRightRadius: 20,
-    maxHeight: '75%',
-    padding: SPACING.lg,
-  },
-  modalOverlay: {
-    backgroundColor: 'rgba(0, 0, 0, 0.5)',
-    flex: 1,
-    justifyContent: 'flex-end',
-  },
   monthHeaderContainer: {
     paddingHorizontal: SPACING.md,
     paddingTop: SPACING.md,
@@ -1068,18 +791,6 @@ const styles = StyleSheet.create({
   },
   navButton: {
     padding: 4,
-  },
-  pickerEmpty: {
-    paddingVertical: SPACING.lg,
-    textAlign: 'center',
-  },
-  pickerRow: {
-    alignItems: 'center',
-    borderRadius: 10,
-    flexDirection: 'row',
-    gap: SPACING.md,
-    paddingHorizontal: SPACING.sm,
-    paddingVertical: SPACING.md,
   },
   plannedAmount: {
     fontSize: 15,
@@ -1179,21 +890,6 @@ const styles = StyleSheet.create({
   },
   swipeRowCover: {
     borderRadius: 10,
-  },
-  totalsCard: {
-    borderRadius: 16,
-    borderWidth: 1,
-    marginBottom: SPACING.md,
-    padding: SPACING.md,
-  },
-  totalsRow: {
-    flexDirection: 'row',
-    justifyContent: 'space-between',
-    marginTop: 2,
-  },
-  totalsTitle: {
-    fontWeight: '700',
-    marginBottom: 4,
   },
   wheelItemText: {
     fontSize: 14,

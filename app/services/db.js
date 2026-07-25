@@ -266,6 +266,16 @@ const isSchemaComplete = async (rawDb) => {
     // them (rather than the fast path skipping migrate() and crashing with
     // `no such table` on the first BudgetPlansDB query).
 
+    // Check budget_plan_lines has BOTH is_recurring and currency columns
+    // (migration 0019 — recreate-table migration that also makes plan_id
+    // nullable). Both are checked for the same reason as operations' 0009
+    // columns: a half-applied 0019 must not be mistaken for complete. Without
+    // this check, an install complete through 0018 would report "schema
+    // complete" and skip migrate(), so 0019 would never run and every
+    // recurring-line query would throw `no such column: is_recurring`.
+    const planLineCols = await rawDb.getAllAsync('PRAGMA table_info(budget_plan_lines)');
+    if (!planLineCols.some(c => c.name === 'is_recurring') || !planLineCols.some(c => c.name === 'currency')) return false;
+
     return true;
   } catch (error) {
     console.warn('[DB] isSchemaComplete check failed:', error.message);
@@ -571,7 +581,80 @@ const detectAppliedMigrations = async (rawDb) => {
     applied.push(18);
   }
 
+  // Migration 0019: recreate-table migration adding is_recurring + currency to
+  // budget_plan_lines (and making plan_id nullable). Require BOTH new columns —
+  // a half-applied 0019 must re-run so the recreate-table completes.
+  if (await tableExists('budget_plan_lines')) {
+    const planLineCols = await getColumns('budget_plan_lines');
+    if (planLineCols.some(c => c.name === 'is_recurring') && planLineCols.some(c => c.name === 'currency')) {
+      applied.push(19);
+    }
+  }
+
   return applied.sort((a, b) => a - b);
+};
+
+/**
+ * Run every registered post-migration handler (m0003, m0019, ...) whose
+ * migration has been applied but whose completion flag
+ * (`post_migration_${key}_completed` in `app_metadata`) is not set yet.
+ *
+ * This covers BOTH "the handler never ran" (process died between the DDL and
+ * the handler) and "the handler ran and threw" (e.g. transient SQLite busy) —
+ * both leave the completion flag unset, and both are retried identically.
+ *
+ * MUST be called from every init path that can observe a fully-migrated
+ * schema: the fingerprint fast path, the "schema already complete" path, and
+ * the "migrations just applied" path. A stamped `user_version` fingerprint or
+ * a structurally-complete schema only proves the DDL finished — it says
+ * nothing about whether the accompanying data-bridge handler completed, so
+ * every launch must keep checking, or a failed bridge (e.g. legacy budgets
+ * never becoming recurring plan lines) is silently abandoned forever.
+ *
+ * Deliberately does NOT take a caller-scoped "applied hashes" set (e.g. a
+ * `finalMigrations` query result) as a parameter — that variable only exists
+ * on the slow "migrations were pending" path. Instead it determines whether a
+ * migration is applied by calling {@link detectAppliedMigrations}, which
+ * inspects schema markers directly and works identically on every path.
+ *
+ * Cheap in the steady state: when both completion flags are already set (the
+ * overwhelming majority of launches), this costs one indexed `app_metadata`
+ * lookup per handler and nothing else — the expensive schema-marker sweep
+ * only runs when a flag is actually missing.
+ */
+const retryIncompletePostMigrationHandlers = async (rawDb, migrationsConfig) => {
+  if (!migrationsConfig.postMigrationHandlers) return;
+
+  let appliedIndices = null; // lazily computed, only if some flag is missing
+
+  for (const [key, handler] of Object.entries(migrationsConfig.postMigrationHandlers)) {
+    const completionKey = `post_migration_${key}_completed`;
+    const completionRow = await rawDb.getFirstAsync(
+      'SELECT value FROM app_metadata WHERE key = ?',
+      [completionKey],
+    ).catch(() => null);
+
+    if (completionRow) continue; // already completed - nothing to do
+
+    const tag = migrationsConfig.postMigrationTags?.[key];
+    const migrationEntry = tag
+      ? migrationsConfig.journal.entries.find(e => e.tag === tag)
+      : null;
+    if (!migrationEntry) continue; // no journal entry for this handler - can't verify, skip
+
+    if (appliedIndices === null) {
+      appliedIndices = new Set(await detectAppliedMigrations(rawDb));
+    }
+    const migrationIndex = migrationsConfig.journal.entries.indexOf(migrationEntry);
+    if (!appliedIndices.has(migrationIndex)) continue; // migration itself hasn't run yet
+
+    console.log(`Running/retrying post-migration handler for ${key}...`);
+    try {
+      await handler(rawDb);
+    } catch (handlerError) {
+      console.error(`Post-migration handler ${key} retry failed:`, handlerError);
+    }
+  }
 };
 
 /**
@@ -669,6 +752,11 @@ const initializeDatabase = async (rawDb, db) => {
       // run on every open regardless of the fast path.
       await rawDb.runAsync('PRAGMA foreign_keys = ON');
       await rawDb.runAsync('PRAGMA journal_mode = WAL');
+      // The fingerprint proves the SCHEMA is complete, not that every post-migration
+      // data-bridge handler finished (see retryIncompletePostMigrationHandlers) — a
+      // handler can fail on the very run that completes the schema and stamps this
+      // fingerprint. Retry is cheap when nothing is pending (see function doc).
+      await retryIncompletePostMigrationHandlers(rawDb, migrations);
       return;
     }
 
@@ -720,10 +808,6 @@ const initializeDatabase = async (rawDb, db) => {
       console.log('No migrations table found - database will be migrated from scratch');
     }
 
-    // Get migrations before applying
-    const migrationsBefore = await rawDb.getAllAsync('SELECT * FROM __drizzle_migrations ORDER BY created_at ASC').catch(() => []);
-    const appliedHashesBefore = new Set((migrationsBefore || []).map(m => m.hash));
-
     // SCHEMA COMPLETENESS CHECK: if the database already has the final schema,
     // skip migrate() entirely. This handles imported backups whose __drizzle_migrations
     // table has null hashes or incomplete records — running migrate() against an
@@ -746,54 +830,15 @@ const initializeDatabase = async (rawDb, db) => {
       // Log final state
       const finalMigrations = await rawDb.getAllAsync('SELECT * FROM __drizzle_migrations ORDER BY created_at ASC').catch(() => []);
       console.log(`Total migrations applied: ${(finalMigrations || []).length}/${migrations.journal.entries.length}`);
-
-      // Run post-migration handlers for newly applied migrations
-      if (migrations.postMigrationHandlers) {
-        const appliedHashesAfter = new Set((finalMigrations || []).map(m => m.hash));
-
-        for (const [key, handler] of Object.entries(migrations.postMigrationHandlers)) {
-          const tag = migrations.postMigrationTags?.[key];
-          const migrationEntry = tag
-            ? migrations.journal.entries.find(e => e.tag === tag)
-            : null;
-
-          if (migrationEntry && appliedHashesAfter.has(migrationEntry.hash) && !appliedHashesBefore.has(migrationEntry.hash)) {
-            console.log(`Running post-migration handler for ${key}...`);
-            try {
-              await handler(rawDb);
-            } catch (handlerError) {
-              console.error(`Post-migration handler ${key} failed:`, handlerError);
-            }
-          }
-        }
-
-        // Retry any post-migration handlers that previously failed (completion flag not set)
-        for (const [key, handler] of Object.entries(migrations.postMigrationHandlers)) {
-          const tag = migrations.postMigrationTags?.[key];
-          const migrationEntry = tag
-            ? migrations.journal.entries.find(e => e.tag === tag)
-            : null;
-
-          if (migrationEntry && appliedHashesAfter.has(migrationEntry.hash)) {
-            const completionKey = `post_migration_${key}_completed`;
-            const completionRow = await rawDb.getFirstAsync(
-              'SELECT value FROM app_metadata WHERE key = ?',
-              [completionKey],
-            ).catch(() => null);
-
-            if (!completionRow) {
-              console.log(`Retrying incomplete post-migration handler for ${key}...`);
-              try {
-                await handler(rawDb);
-              } catch (retryError) {
-                console.error(`Post-migration handler ${key} retry failed:`, retryError);
-              }
-            }
-          }
-        }
-      }
-
     } // end of else (schema not yet complete)
+
+    // Run (or retry) post-migration handlers regardless of which branch above ran —
+    // a migration applied moments ago in this very call, one applied on a previous
+    // launch that never got its handler to complete, and one whose handler simply
+    // threw are all indistinguishable from "completion flag not set", and all three
+    // must be retried here. See retryIncompletePostMigrationHandlers's doc for why
+    // this cannot rely on a locally-scoped "applied hashes" set.
+    await retryIncompletePostMigrationHandlers(rawDb, migrations);
 
     // Enable foreign keys and WAL mode (always, regardless of migration path)
     await rawDb.runAsync('PRAGMA foreign_keys = ON');

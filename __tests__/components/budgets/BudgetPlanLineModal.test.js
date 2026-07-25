@@ -120,4 +120,96 @@ describe('BudgetPlanLineModal', () => {
     await fireEvent.press(getByTestId('plan-line-save'));
     expect(props.onSaveIncome).toHaveBeenCalledWith('2500');
   });
+
+  describe('Recurring toggle (Budgets v3 phase 2)', () => {
+    it('defaults a new line to one-off (isRecurring false, currency null)', async () => {
+      const props = baseProps();
+      const { getByTestId } = await render(<BudgetPlanLineModal {...props} />);
+      await waitFor(() => expect(getByTestId('plan-target-picker')).toBeTruthy());
+      await fireEvent.press(getByTestId('plan-target-picker'));
+      await fireEvent.press(getByTestId('plan-target-option-cat-cat1'));
+      await fireEvent.changeText(getByTestId('calc-input'), '150');
+      await fireEvent.press(getByTestId('plan-line-save'));
+      expect(props.onSaveLine).toHaveBeenCalledWith(expect.objectContaining({ isRecurring: false, currency: null }));
+    });
+
+    it('the currency picker is hidden until the recurring toggle is on', async () => {
+      const props = baseProps();
+      const { getByTestId, queryByTestId } = await render(<BudgetPlanLineModal {...props} />);
+      await waitFor(() => expect(getByTestId('plan-line-recurring-toggle')).toBeTruthy());
+      expect(queryByTestId('plan-line-currency-USD')).toBeNull();
+      await fireEvent.press(getByTestId('plan-line-recurring-toggle'));
+      await waitFor(() => expect(getByTestId('plan-line-currency-USD')).toBeTruthy());
+    });
+
+    it('saves a recurring line with the chosen currency and no plan-specific target requirement change', async () => {
+      const props = baseProps();
+      const { getByTestId } = await render(<BudgetPlanLineModal {...props} />);
+      await waitFor(() => expect(getByTestId('plan-line-recurring-toggle')).toBeTruthy());
+      await fireEvent.press(getByTestId('plan-line-recurring-toggle'));
+      await fireEvent.press(getByTestId('plan-target-picker'));
+      await waitFor(() => expect(getByTestId('plan-target-option-cat-cat1')).toBeTruthy());
+      await fireEvent.press(getByTestId('plan-target-option-cat-cat1'));
+      await fireEvent.changeText(getByTestId('calc-input'), '65000');
+      await fireEvent.press(getByTestId('plan-line-save'));
+      expect(props.onSaveLine).toHaveBeenCalledWith(expect.objectContaining({
+        amount: '65000', categoryId: 'cat1', isRecurring: true, currency: 'USD',
+      }));
+    });
+
+    it('picking a different currency chip changes the saved currency', async () => {
+      const props = { ...baseProps(), accounts: [...ACCOUNTS, { id: 2, name: 'Foreign', currency: 'EUR' }] };
+      const { getByTestId } = await render(<BudgetPlanLineModal {...props} />);
+      await waitFor(() => expect(getByTestId('plan-line-recurring-toggle')).toBeTruthy());
+      await fireEvent.press(getByTestId('plan-line-recurring-toggle'));
+      await waitFor(() => expect(getByTestId('plan-line-currency-EUR')).toBeTruthy());
+      await fireEvent.press(getByTestId('plan-line-currency-EUR'));
+      await fireEvent.press(getByTestId('plan-target-picker'));
+      await fireEvent.press(getByTestId('plan-target-option-cat-cat1'));
+      await fireEvent.changeText(getByTestId('calc-input'), '500');
+      await fireEvent.press(getByTestId('plan-line-save'));
+      expect(props.onSaveLine).toHaveBeenCalledWith(expect.objectContaining({ currency: 'EUR' }));
+    });
+
+    it('initializes the toggle and currency from an existing recurring line when editing', async () => {
+      const props = {
+        ...baseProps(),
+        line: {
+          id: 'l1', amount: '65000', label: 'Rent', comment: null,
+          categoryId: 'cat1', toAccountId: null, isRecurring: true, currency: 'EUR',
+        },
+      };
+      const { getByTestId } = await render(<BudgetPlanLineModal {...props} />);
+      await waitFor(() => expect(getByTestId('plan-line-currency-EUR')).toBeTruthy());
+      await fireEvent.press(getByTestId('plan-line-save'));
+      expect(props.onSaveLine).toHaveBeenCalledWith(expect.objectContaining({ isRecurring: true, currency: 'EUR' }));
+    });
+  });
+
+  describe('saving prop (Bug 4, adversarial review — double-tap Save guard)', () => {
+    it('disables the Save button while a save is in flight', async () => {
+      const props = { ...baseProps(), saving: true };
+      const { getByTestId } = await render(<BudgetPlanLineModal {...props} />);
+      await waitFor(() => expect(getByTestId('plan-line-save')).toBeTruthy());
+      expect(getByTestId('plan-line-save').props.accessibilityState.disabled).toBe(true);
+    });
+
+    it('ignores a Save tap while saving=true, even if the disabled style has not applied yet', async () => {
+      // Belt-and-suspenders: handleSave itself checks `saving` and bails, so a
+      // tap that somehow lands on the button before its disabled prop commits
+      // still can't fire a second onSaveLine.
+      const props = { ...baseProps(), saving: true };
+      const { getByTestId } = await render(<BudgetPlanLineModal {...props} />);
+      await waitFor(() => expect(getByTestId('plan-line-save')).toBeTruthy());
+      await fireEvent.press(getByTestId('plan-line-save'));
+      expect(props.onSaveLine).not.toHaveBeenCalled();
+    });
+
+    it('re-enables the Save button once saving becomes false', async () => {
+      const props = { ...baseProps(), saving: false };
+      const { getByTestId } = await render(<BudgetPlanLineModal {...props} />);
+      await waitFor(() => expect(getByTestId('plan-line-save')).toBeTruthy());
+      expect(getByTestId('plan-line-save').props.accessibilityState.disabled).toBe(false);
+    });
+  });
 });

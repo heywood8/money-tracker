@@ -1659,19 +1659,189 @@ op-2,income,20,acc-1,cat-1`;
       const lineInserts = findInsert(dbInstance, 'budget_plan_lines');
       expect(lineInserts).toHaveLength(2);
 
-      // Category line: keeps category_id as-is, to_account_id null, comment intact.
+      // Category line: keeps category_id as-is, to_account_id null, comment
+      // intact; one-off (is_recurring 0, currency null).
       const catCall = lineInserts.find(c => c[1][0] === 'line-cat');
       expect(catCall[1]).toEqual([
         'line-cat', 'plan-1', 'Groceries', '400.00', NON_ASCII_COMMENT,
-        'cat-1', null, 0, 'x', 'y',
+        'cat-1', null, 0, 0, null, 'x', 'y',
       ]);
 
       // Transfer line: category_id null, to_account_id remapped 'acc-uuid' -> 42.
       const xferCall = lineInserts.find(c => c[1][0] === 'line-xfer');
       expect(xferCall[1]).toEqual([
         'line-xfer', 'plan-1', 'To savings', '500.00', null,
-        null, REMAPPED_ACCOUNT_ID, 1, 'x', 'y',
+        null, REMAPPED_ACCOUNT_ID, 1, 0, null, 'x', 'y',
       ]);
+    });
+
+    it('restores a recurring (global template) line with no plan_id and its own currency', async () => {
+      const dbInstance = makeDbInstance();
+      mockDb.executeTransaction.mockImplementation(async (cb) => { await cb(dbInstance); });
+
+      const recurringLine = {
+        id: 'line-rec', plan_id: null, label: 'Rent', amount: '65000',
+        comment: null, category_id: 'cat-1', to_account_id: null,
+        sort_order: 0, is_recurring: 1, currency: 'USD',
+        created_at: 'x', updated_at: 'y',
+      };
+      const backup = backupWithPlan();
+      backup.data.budget_plan_lines = [recurringLine];
+
+      await BackupRestore.restoreBackup(backup);
+
+      const lineInserts = findInsert(dbInstance, 'budget_plan_lines');
+      expect(lineInserts).toHaveLength(1);
+      expect(lineInserts[0][1]).toEqual([
+        'line-rec', null, 'Rent', '65000', null,
+        'cat-1', null, 0, 1, 'USD', 'x', 'y',
+      ]);
+    });
+
+    it('restores a recurring line even when no plan exists in the backup at all', async () => {
+      const dbInstance = makeDbInstance();
+      mockDb.executeTransaction.mockImplementation(async (cb) => { await cb(dbInstance); });
+
+      const recurringLine = {
+        id: 'line-rec', plan_id: null, label: 'Rent', amount: '65000',
+        comment: null, category_id: 'cat-1', to_account_id: null,
+        sort_order: 0, is_recurring: 1, currency: 'USD',
+        created_at: 'x', updated_at: 'y',
+      };
+      const backup = backupWithPlan();
+      backup.data.budget_plans = [];
+      backup.data.budget_plan_lines = [recurringLine];
+
+      await BackupRestore.restoreBackup(backup);
+
+      expect(findInsert(dbInstance, 'budget_plans')).toHaveLength(0);
+      const lineInserts = findInsert(dbInstance, 'budget_plan_lines');
+      expect(lineInserts).toHaveLength(1);
+      expect(lineInserts[0][1][0]).toBe('line-rec');
+    });
+
+    describe('legacy budgets -> recurring lines bridge (Budgets v3 phase 2)', () => {
+      // makeDbInstance() (above) has no getFirstAsync — the bridge's completion-flag
+      // check needs one, so these tests build their own db instance with it.
+      const makeBridgeDbInstance = ({ flagAlreadySet = false, budgetRows = [] } = {}) => {
+        const base = makeDbInstance();
+        base.getFirstAsync = jest.fn().mockImplementation((query) => {
+          if (typeof query === 'string' && query.includes('app_metadata')) {
+            return Promise.resolve(flagAlreadySet ? { value: 'true' } : null);
+          }
+          return Promise.resolve(null);
+        });
+        const originalGetAllAsync = base.getAllAsync;
+        base.getAllAsync = jest.fn().mockImplementation((query) => {
+          if (typeof query === 'string' && query.trim() === 'SELECT * FROM budgets') {
+            return Promise.resolve(budgetRows);
+          }
+          return originalGetAllAsync(query);
+        });
+        return base;
+      };
+
+      it('bridges a monthly legacy budget into a recurring plan line', async () => {
+        const dbInstance = makeBridgeDbInstance({
+          budgetRows: [{ id: 'bud-1', category_id: 'cat-1', amount: '65000', currency: 'USD', period_type: 'monthly' }],
+        });
+        mockDb.executeTransaction.mockImplementation(async (cb) => { await cb(dbInstance); });
+
+        const backup = backupWithPlan();
+        // Old-style backup: budgets present, no budget_plan_lines at all yet.
+        backup.data.budgets = [{
+          id: 'bud-1', category_id: 'cat-1', amount: '65000', currency: 'USD', period_type: 'monthly',
+          start_date: '2026-01-01', end_date: null, is_recurring: 1, rollover_enabled: 0,
+          created_at: 'x', updated_at: 'y',
+        }];
+        backup.data.budget_plan_lines = [];
+
+        await BackupRestore.restoreBackup(backup);
+
+        const lineInserts = findInsert(dbInstance, 'budget_plan_lines');
+        expect(lineInserts).toHaveLength(1);
+        // id, plan_id (NULL literal), amount, category_id, currency, created_at, updated_at
+        expect(lineInserts[0][1]).toEqual(['test-uuid-1234', '65000.00', 'cat-1', 'USD', expect.any(String), expect.any(String)]);
+      });
+
+      it('converts a weekly legacy budget to its monthly-equivalent amount (×365÷84)', async () => {
+        const dbInstance = makeBridgeDbInstance({
+          budgetRows: [{ id: 'bud-2', category_id: 'cat-1', amount: '700', currency: 'USD', period_type: 'weekly' }],
+        });
+        mockDb.executeTransaction.mockImplementation(async (cb) => { await cb(dbInstance); });
+
+        const backup = backupWithPlan();
+        backup.data.budgets = [{
+          id: 'bud-2', category_id: 'cat-1', amount: '700', currency: 'USD', period_type: 'weekly',
+          start_date: '2026-01-01', end_date: null, is_recurring: 1, rollover_enabled: 0,
+          created_at: 'x', updated_at: 'y',
+        }];
+        backup.data.budget_plan_lines = [];
+
+        await BackupRestore.restoreBackup(backup);
+
+        const lineInserts = findInsert(dbInstance, 'budget_plan_lines');
+        expect(lineInserts).toHaveLength(1);
+        // 700 * 365 / 84 = 3041.666... -> rounded to 2 decimals
+        expect(parseFloat(lineInserts[0][1][1])).toBeCloseTo(3041.67, 2);
+      });
+
+      it('converts a yearly legacy budget to its monthly-equivalent amount (÷12)', async () => {
+        const dbInstance = makeBridgeDbInstance({
+          budgetRows: [{ id: 'bud-3', category_id: 'cat-1', amount: '1200', currency: 'USD', period_type: 'yearly' }],
+        });
+        mockDb.executeTransaction.mockImplementation(async (cb) => { await cb(dbInstance); });
+
+        const backup = backupWithPlan();
+        backup.data.budgets = [{
+          id: 'bud-3', category_id: 'cat-1', amount: '1200', currency: 'USD', period_type: 'yearly',
+          start_date: '2026-01-01', end_date: null, is_recurring: 1, rollover_enabled: 0,
+          created_at: 'x', updated_at: 'y',
+        }];
+        backup.data.budget_plan_lines = [];
+
+        await BackupRestore.restoreBackup(backup);
+
+        const lineInserts = findInsert(dbInstance, 'budget_plan_lines');
+        expect(lineInserts).toHaveLength(1);
+        expect(parseFloat(lineInserts[0][1][1])).toBe(100);
+      });
+
+      it('does not re-derive recurring lines when the backup already carries the completion flag', async () => {
+        const dbInstance = makeBridgeDbInstance({
+          flagAlreadySet: true,
+          budgetRows: [{ id: 'bud-1', category_id: 'cat-1', amount: '65000', currency: 'USD', period_type: 'monthly' }],
+        });
+        mockDb.executeTransaction.mockImplementation(async (cb) => { await cb(dbInstance); });
+
+        const backup = backupWithPlan();
+        backup.data.budgets = [{
+          id: 'bud-1', category_id: 'cat-1', amount: '65000', currency: 'USD', period_type: 'monthly',
+          start_date: '2026-01-01', end_date: null, is_recurring: 1, rollover_enabled: 0,
+          created_at: 'x', updated_at: 'y',
+        }];
+        // The backup's own budget_plan_lines already has the derived recurring
+        // line (taken from an install that already migrated) — the app_metadata
+        // flag (restored just before the bridge runs) must stop it being derived
+        // a second time.
+        backup.data.budget_plan_lines = [{
+          id: 'line-rec-existing', plan_id: null, label: null, amount: '65000.00',
+          comment: null, category_id: 'cat-1', to_account_id: null, sort_order: 0,
+          is_recurring: 1, currency: 'USD', created_at: 'x', updated_at: 'y',
+        }];
+        backup.data.app_metadata = [
+          ...mockMetadata,
+          { key: 'post_migration_m0019_completed', value: 'true', updated_at: 'x' },
+        ];
+
+        await BackupRestore.restoreBackup(backup);
+
+        // Only the one line already present in the backup was inserted — no
+        // second, freshly-derived recurring line from `budgets`.
+        const lineInserts = findInsert(dbInstance, 'budget_plan_lines');
+        expect(lineInserts).toHaveLength(1);
+        expect(lineInserts[0][1][0]).toBe('line-rec-existing');
+      });
     });
 
     it('skips a plan line whose parent plan was not restored', async () => {

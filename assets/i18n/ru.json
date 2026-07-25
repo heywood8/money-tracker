@@ -561,5 +561,6 @@
   "allocation_unlinked": "Без привязки",
   "relink_target": "Цель удалена — нажмите, чтобы привязать заново",
   "previous_month": "Предыдущий месяц",
-  "next_month": "Следующий месяц"
+  "next_month": "Следующий месяц",
+  "recurring_allocation": "Повторяющийся"
 }

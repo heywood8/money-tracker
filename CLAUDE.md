@@ -46,8 +46,8 @@ The app follows a feature-based organization under the `app/` directory:
   - `GraphsScreen.js`, `LanguageSelectionScreen.js`, `OperationsScreen.js`
   - `PlannedOperationsScreen.js`
 
-- **modals/** (6 files) - Modal dialog components for data entry
-  - `BudgetModal.js`, `CategoryModal.js`, `OperationModal.js`, `SettingsModal.js`
+- **modals/** (5 files) - Modal dialog components for data entry
+  - `CategoryModal.js`, `OperationModal.js`, `SettingsModal.js`
   - `PlannedOperationModal.js`, `ImportProgressModal.js`
 
 - **components/** (40+ files across subdirectories) - Reusable UI components

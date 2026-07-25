@@ -558,5 +558,6 @@
   "allocation_unlinked": "未关联",
   "relink_target": "目标已删除 — 点击重新关联",
   "previous_month": "上个月",
-  "next_month": "下个月"
+  "next_month": "下个月",
+  "recurring_allocation": "重复"
 }

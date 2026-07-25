@@ -561,5 +561,6 @@
   "allocation_unlinked": "Unlinked",
   "relink_target": "Target deleted — tap to re-link",
   "previous_month": "Previous month",
-  "next_month": "Next month"
+  "next_month": "Next month",
+  "recurring_allocation": "Recurring"
 }

@@ -558,5 +558,6 @@
   "allocation_unlinked": "Չկապակցված",
   "relink_target": "Թիրախը ջնջված է — հպեք՝ նորից կապելու համար",
   "previous_month": "Նախորդ ամիս",
-  "next_month": "Հաջորդ ամիս"
+  "next_month": "Հաջորդ ամիս",
+  "recurring_allocation": "Կրկնվող"
 }

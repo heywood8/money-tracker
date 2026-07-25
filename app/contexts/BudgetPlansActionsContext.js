@@ -7,6 +7,18 @@ import { useBudgetPlansData } from './BudgetPlansDataContext';
 
 const BudgetPlansActionsContext = createContext();
 
+// Prepend `plan` unless its id is already in the list. A double-tap
+// create/copy can fire two DB calls that both resolve to the SAME winning
+// plan (BudgetPlansDB's UNIQUE(month) race recovery hands the loser the
+// winner's row instead of throwing — see BudgetPlansDB.createPlan/copyPlan) —
+// without this guard, both callers' resolved promises would each prepend that
+// plan, leaving two entries with the same id in state (Fix 4, adversarial
+// review round 2). Module-level (not a hook) since it only needs its
+// arguments — no component state/props to close over.
+const prependUnlessPresent = (setPlans, plan) => {
+  setPlans(prev => (prev.some(p => p.id === plan.id) ? prev : [plan, ...prev]));
+};
+
 /**
  * Stable action functions for budget plans (Budgets v2). Plan-level mutations keep
  * the plans list in the data context in sync; line-level mutations delegate to the
@@ -32,7 +44,7 @@ export const BudgetPlansActionsProvider = ({ children }) => {
       }
       const newPlan = { ...plan, id: plan.id || uuid.v4() };
       const created = await BudgetPlansDB.createPlan(newPlan);
-      _setPlans(prev => [created, ...prev]);
+      prependUnlessPresent(_setPlans, created);
       _setSaveError(null);
       return created;
     } catch (error) {
@@ -86,7 +98,7 @@ export const BudgetPlansActionsProvider = ({ children }) => {
   const copyPlan = useCallback(async (fromMonth, toMonth) => {
     try {
       const created = await BudgetPlansDB.copyPlan(fromMonth, toMonth);
-      _setPlans(prev => [created, ...prev]);
+      prependUnlessPresent(_setPlans, created);
       _setSaveError(null);
       return created;
     } catch (error) {
@@ -97,12 +109,20 @@ export const BudgetPlansActionsProvider = ({ children }) => {
   }, [_setPlans, _setSaveError, reportError]);
 
   // Line-level operations delegate straight to the DB (lines are fetched on demand
-  // by consumers via getPlanLines, not held in context state).
+  // by consumers via getPlanLines/getLinesForMonth, not held in context state).
   const addLine = useCallback((planId, line) => BudgetPlansDB.addLine(planId, line), []);
+  // Recurring (global template) lines: not tied to any single month's plan — see
+  // app/db/schema.js's budgetPlanLines doc comment.
+  const addRecurringLine = useCallback((line) => BudgetPlansDB.addRecurringLine(line), []);
   const updateLine = useCallback((id, updates) => BudgetPlansDB.updateLine(id, updates), []);
   const deleteLine = useCallback((id) => BudgetPlansDB.deleteLine(id), []);
   const reorderLines = useCallback((planId, orderedIds) => BudgetPlansDB.reorderLines(planId, orderedIds), []);
+  const reorderRecurringLines = useCallback((orderedIds) => BudgetPlansDB.reorderRecurringLines(orderedIds), []);
   const getPlanLines = useCallback((planId) => BudgetPlansDB.getPlanLines(planId), []);
+  const getRecurringLines = useCallback(() => BudgetPlansDB.getRecurringLines(), []);
+  // The merged view a month's Budgets screen renders: recurring lines UNION the
+  // month's one-off lines (if a plan exists yet) — see BudgetPlansDB.getLinesForMonth.
+  const getLinesForMonth = useCallback((month) => BudgetPlansDB.getLinesForMonth(month), []);
   const getBrokenLines = useCallback((planId) => BudgetPlansDB.getBrokenLines(planId), []);
   const getPlanTotals = useCallback((planId) => BudgetPlansDB.getPlanTotals(planId), []);
   const getPlanByMonth = useCallback((month) => BudgetPlansDB.getPlanByMonth(month), []);
@@ -113,10 +133,14 @@ export const BudgetPlansActionsProvider = ({ children }) => {
     deletePlan,
     copyPlan,
     addLine,
+    addRecurringLine,
     updateLine,
     deleteLine,
     reorderLines,
+    reorderRecurringLines,
     getPlanLines,
+    getRecurringLines,
+    getLinesForMonth,
     getBrokenLines,
     getPlanTotals,
     getPlanByMonth,
@@ -127,10 +151,14 @@ export const BudgetPlansActionsProvider = ({ children }) => {
     deletePlan,
     copyPlan,
     addLine,
+    addRecurringLine,
     updateLine,
     deleteLine,
     reorderLines,
+    reorderRecurringLines,
     getPlanLines,
+    getRecurringLines,
+    getLinesForMonth,
     getBrokenLines,
     getPlanTotals,
     getPlanByMonth,

@@ -237,12 +237,23 @@ describe('BudgetPlansDB plan-vs-actual', () => {
     const lineRow = (id, amount, categoryId = null, toAccountId = null, sortOrder = 0) => ({
       id, plan_id: 'p1', label: null, amount, comment: null,
       category_id: categoryId, to_account_id: toAccountId, sort_order: sortOrder,
+      is_recurring: 0, currency: null,
+      created_at: 't', updated_at: 't',
+    });
+
+    // A recurring (global template) line: no plan_id, carries its own currency.
+    const recurringLineRow = (id, amount, currency, categoryId = null, toAccountId = null, sortOrder = 0) => ({
+      id, plan_id: null, label: null, amount, comment: null,
+      category_id: categoryId, to_account_id: toAccountId, sort_order: sortOrder,
+      is_recurring: 1, currency,
       created_at: 't', updated_at: 't',
     });
 
     // Dispatch the db mocks by SQL shape: plan row, plan lines, income sums,
     // distinct-currency collection, account currency lookup.
-    const setupDb = ({ lines = [], incomeTotal = 0, incomeRows = [], expenseCurrencies = [], accountCurrency = 'USD' }) => {
+    const setupDb = ({
+      lines = [], recurringLines = [], incomeTotal = 0, incomeRows = [], expenseCurrencies = [], accountCurrency = 'USD',
+    }) => {
       queryFirst.mockImplementation(async (sql) => {
         if (sql.includes('FROM budget_plans WHERE id')) return PLAN_ROW;
         if (sql.includes('SELECT currency FROM accounts')) return { currency: accountCurrency };
@@ -250,6 +261,9 @@ describe('BudgetPlansDB plan-vs-actual', () => {
         return null;
       });
       queryAll.mockImplementation(async (sql) => {
+        // Recurring (global template) lines are a separate query from this
+        // plan's one-off lines.
+        if (sql.includes('is_recurring = 1') && !sql.includes('WHERE plan_id')) return recurringLines;
         if (sql.includes('FROM budget_plan_lines')) return lines;
         if (sql.includes('SELECT DISTINCT a.currency') && sql.includes("o.type = 'expense'")) {
           return expenseCurrencies.map(currency => ({ currency }));
@@ -375,6 +389,85 @@ describe('BudgetPlansDB plan-vs-actual', () => {
       queryFirst.mockResolvedValue(null);
       await expect(BudgetPlansDB.calculatePlanStatus('nope', 'USD', false))
         .rejects.toThrow('Budget plan nope not found');
+    });
+
+    describe('recurring lines (Budgets v3 phase 2)', () => {
+      it('merges a same-currency recurring line into totals alongside one-off lines', async () => {
+        setupDb({
+          lines: [lineRow('l-oneoff', '100', 'cat1', null, 0)],
+          recurringLines: [recurringLineRow('l-rec', '50', 'USD', 'cat2', null, 0)],
+          incomeTotal: 0,
+        });
+        calculateSpendingForBudget.mockResolvedValue('10');
+
+        const status = await BudgetPlansDB.calculatePlanStatus('p1', 'USD', false);
+
+        expect(status.lines.map(l => l.lineId).sort()).toEqual(['l-oneoff', 'l-rec']);
+        expect(parseFloat(status.totals.allocated)).toBe(150);
+      });
+
+      it('converts a recurring line carrying a different currency into the display currency', async () => {
+        setupDb({
+          lines: [],
+          recurringLines: [recurringLineRow('l-rec', '100', 'AMD', 'cat2', null, 0)],
+        });
+        calculateSpendingForBudget.mockResolvedValue('0');
+        stubRates({ AMD: '0.0025' });
+
+        const status = await BudgetPlansDB.calculatePlanStatus('p1', 'USD', false);
+
+        const recStatus = status.lines.find(l => l.lineId === 'l-rec');
+        expect(fetchRatesToTarget).toHaveBeenCalledWith(['AMD'], 'USD');
+        expect(parseFloat(recStatus.amount)).toBe(0.25); // 100 AMD * 0.0025
+        expect(parseFloat(status.totals.allocated)).toBe(0.25);
+      });
+
+      it('batches the rate lookup for multiple foreign-currency recurring lines into a single fetchRatesToTarget call (perf regression)', async () => {
+        // Before the fix, calculatePlanStatus called fetchRatesToTarget once PER
+        // LINE inside the loop — N recurring lines in foreign currencies meant N
+        // sequential rate lookups instead of one batched call.
+        setupDb({
+          lines: [],
+          recurringLines: [
+            recurringLineRow('l-rec-1', '100', 'AMD', 'cat2', null, 0),
+            recurringLineRow('l-rec-2', '50', 'EUR', 'cat3', null, 1),
+            recurringLineRow('l-rec-3', '25', 'AMD', 'cat4', null, 2), // duplicate currency
+          ],
+        });
+        calculateSpendingForBudget.mockResolvedValue('0');
+        stubRates({ AMD: '0.0025', EUR: '1.1' });
+
+        await BudgetPlansDB.calculatePlanStatus('p1', 'USD', false);
+
+        expect(fetchRatesToTarget).toHaveBeenCalledTimes(1);
+        const [currencies, target] = fetchRatesToTarget.mock.calls[0];
+        expect([...currencies].sort()).toEqual(['AMD', 'EUR']);
+        expect(target).toBe('USD');
+      });
+
+      it('flags a recurring line as unconvertible when no rate is available, without crashing', async () => {
+        setupDb({
+          lines: [],
+          recurringLines: [recurringLineRow('l-rec', '100', 'XYZ', 'cat2', null, 0)],
+        });
+        stubRates({}); // no rate for XYZ
+
+        const status = await BudgetPlansDB.calculatePlanStatus('p1', 'USD', false);
+
+        const recStatus = status.lines.find(l => l.lineId === 'l-rec');
+        expect(recStatus.status).toBe('unconvertible');
+        // Not counted toward allocated — its amount couldn't be expressed in USD.
+        expect(parseFloat(status.totals.allocated)).toBe(0);
+      });
+
+      it('a one-off line (no currency of its own) is never converted, matching pre-recurring behavior', async () => {
+        setupDb({ lines: [lineRow('l1', '100', 'cat1', null, 0)] });
+        calculateSpendingForBudget.mockResolvedValue('10');
+
+        await BudgetPlansDB.calculatePlanStatus('p1', 'USD', false);
+
+        expect(fetchRatesToTarget).not.toHaveBeenCalled();
+      });
     });
   });
 

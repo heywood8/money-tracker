@@ -90,6 +90,9 @@ const mockSchemaComplete = (db, storedUserVersion) => {
     if (q.includes('table_info(pending_notifications)')) {
       return Promise.resolve([{ name: 'latitude', type: 'REAL' }, { name: 'longitude', type: 'REAL' }]);
     }
+    if (q.includes('table_info(budget_plan_lines)')) {
+      return Promise.resolve([{ name: 'is_recurring', type: 'INTEGER' }, { name: 'currency', type: 'TEXT' }]);
+    }
     return Promise.resolve([]);
   });
 };

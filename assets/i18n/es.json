@@ -558,5 +558,6 @@
   "allocation_unlinked": "Sin vincular",
   "relink_target": "Objetivo eliminado — toca para volver a vincular",
   "previous_month": "Mes anterior",
-  "next_month": "Mes siguiente"
+  "next_month": "Mes siguiente",
+  "recurring_allocation": "Recurrente"
 }

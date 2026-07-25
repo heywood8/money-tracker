@@ -78,7 +78,7 @@ app/
 
 ---
 
-### modals/ (6 files)
+### modals/ (5 files)
 
 **Purpose:** Modal dialog components for data entry and editing
 
@@ -88,7 +88,6 @@ app/
 - Modal-based user interactions
 
 **Files:**
-- `BudgetModal.js` - Add/edit budget modal
 - `CategoryModal.js` - Add/edit category modal
 - `ImportProgressModal.js` - Import progress display modal
 - `OperationModal.js` - Add/edit financial operation modal

@@ -45,6 +45,12 @@ export const mapPlanFields = (row) => {
  * Map a budget_plan_lines row to camelCase. Adds a computed `isBroken` flag: a
  * line is broken when neither target is set (its category/account FK was nulled by
  * an ON DELETE SET NULL). The UI (later parts) prompts to re-link such lines.
+ *
+ * `isRecurring` / `currency` were added in migration 0019 (Budgets v3 phase 2): a
+ * recurring line is a global template (`planId` NULL) that applies to every
+ * month automatically and carries its own `currency` (it has no plan to inherit
+ * one from); a one-off line keeps the original Budgets v2 shape (`currency` null,
+ * inherits the parent plan's currency).
  * @param {Object|null} row
  * @returns {Object|null}
  */
@@ -54,7 +60,7 @@ export const mapLineFields = (row) => {
   const toAccountId = row.to_account_id ?? null;
   return {
     id: row.id,
-    planId: row.plan_id,
+    planId: row.plan_id ?? null,
     label: row.label ?? null,
     amount: row.amount,
     comment: row.comment ?? null,
@@ -62,6 +68,8 @@ export const mapLineFields = (row) => {
     toAccountId,
     sortOrder: row.sort_order ?? 0,
     isBroken: categoryId === null && toAccountId === null,
+    isRecurring: row.is_recurring === 1,
+    currency: row.currency ?? null,
     createdAt: row.created_at,
     updatedAt: row.updated_at,
   };
@@ -116,6 +124,17 @@ export const validatePlanLine = (line) => {
 /* Plans                                                                       */
 /* -------------------------------------------------------------------------- */
 
+// Detects the specific UNIQUE(budget_plans.month) constraint failure a
+// double-tap create/copy race can hit — see {@link createPlan}'s doc comment
+// for the full race description. Shared so every insert path (createPlan's
+// direct executeQuery insert AND copyPlan's transaction-scoped insert)
+// recognizes the same race identically instead of each guessing at the error
+// shape independently.
+const isUniqueMonthViolation = (error) => {
+  const message = error?.message || '';
+  return /UNIQUE constraint failed/i.test(message) && /budget_plans\.month/i.test(message);
+};
+
 /**
  * Create a plan. Requires a unique month.
  * @param {Object} plan - { id, month, currency, expectedIncome? }
@@ -143,10 +162,25 @@ export const createPlan = async (plan) => {
       updated_at: now,
     };
 
-    await executeQuery(
-      'INSERT INTO budget_plans (id, month, currency, expected_income, created_at, updated_at) VALUES (?, ?, ?, ?, ?, ?)',
-      [row.id, row.month, row.currency, row.expected_income, row.created_at, row.updated_at],
-    );
+    try {
+      await executeQuery(
+        'INSERT INTO budget_plans (id, month, currency, expected_income, created_at, updated_at) VALUES (?, ?, ?, ?, ?, ?)',
+        [row.id, row.month, row.currency, row.expected_income, row.created_at, row.updated_at],
+      );
+    } catch (insertError) {
+      // A double-tap Save that lazily creates a plan (e.g. MonthlyPlanSection's
+      // ensurePlan) can fire two createPlan calls for the same month before
+      // either commits — both pass the getPlanByMonth check above, then race at
+      // the UNIQUE(budget_plans.month) constraint here. Rather than surface a
+      // raw constraint-violation error when the first tap already succeeded,
+      // treat this specific failure as "the plan now exists" and hand back the
+      // one that won the race, so the losing caller still gets a usable plan.
+      if (isUniqueMonthViolation(insertError)) {
+        const raced = await getPlanByMonth(plan.month);
+        if (raced) return raced;
+      }
+      throw insertError;
+    }
 
     return mapPlanFields(row);
   } catch (error) {
@@ -300,16 +334,24 @@ export const getBrokenLines = async (planId) => {
 };
 
 /**
- * Add a line to a plan.
- * @param {string} planId
- * @param {Object} line - { label?, amount, comment?, categoryId?, toAccountId?, sortOrder? }
+ * Shared insert path for both a one-off line (`planId` set, inherits the
+ * plan's currency) and a recurring/global-template line (`planId === null`,
+ * carries its own `currency`) — the two used to be near-identical copy-pasted
+ * functions; merging them means a future change to the insert shape (columns,
+ * validation, defaults) can't silently drift between the two copies.
+ * @param {string|null} planId - Plan to scope a one-off line to, or `null` for recurring.
+ * @param {Object} line - { label?, amount, currency?, comment?, categoryId?, toAccountId?, sortOrder? }
  * @returns {Promise<Object>} The created line (camelCase).
  */
-export const addLine = async (planId, line) => {
+const insertPlanLine = async (planId, line) => {
+  const isRecurring = planId === null;
   try {
     const validationError = validatePlanLine(line);
     if (validationError) {
       throw new Error(validationError);
+    }
+    if (isRecurring && !line.currency) {
+      throw new Error('Currency is required for a recurring allocation');
     }
 
     const now = new Date().toISOString();
@@ -322,23 +364,137 @@ export const addLine = async (planId, line) => {
       category_id: isSet(line.categoryId) ? line.categoryId : null,
       to_account_id: isSet(line.toAccountId) ? line.toAccountId : null,
       sort_order: Number.isInteger(line.sortOrder) ? line.sortOrder : 0,
+      is_recurring: isRecurring ? 1 : 0,
+      currency: isRecurring ? line.currency : null,
       created_at: now,
       updated_at: now,
     };
 
     await executeQuery(
-      'INSERT INTO budget_plan_lines (id, plan_id, label, amount, comment, category_id, to_account_id, sort_order, created_at, updated_at) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)',
+      'INSERT INTO budget_plan_lines (id, plan_id, label, amount, comment, category_id, to_account_id, sort_order, is_recurring, currency, created_at, updated_at) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)',
       [
-        row.id, row.plan_id, row.label, row.amount, row.comment,
-        row.category_id, row.to_account_id, row.sort_order, row.created_at, row.updated_at,
+        row.id, row.plan_id, row.label, row.amount, row.comment, row.category_id,
+        row.to_account_id, row.sort_order, row.is_recurring, row.currency, row.created_at, row.updated_at,
       ],
     );
 
     return mapLineFields(row);
   } catch (error) {
-    console.error('Failed to add budget plan line:', error);
+    console.error(`Failed to add ${isRecurring ? 'recurring ' : ''}budget plan line:`, error);
     throw error;
   }
+};
+
+/**
+ * Add a one-off line to a plan (scoped to that plan's month; inherits its
+ * currency). For a recurring (global, every-month) line see {@link addRecurringLine}.
+ * @param {string} planId
+ * @param {Object} line - { label?, amount, comment?, categoryId?, toAccountId?, sortOrder? }
+ * @returns {Promise<Object>} The created line (camelCase).
+ */
+export const addLine = async (planId, line) => insertPlanLine(planId, line);
+
+/**
+ * Add a recurring (global template) line: not tied to any single month's plan
+ * (`plan_id` NULL) — it applies to every calendar month automatically, mirroring
+ * how the legacy per-category `budgets` (v1) behaved. Since it has no plan to
+ * inherit a currency from, `line.currency` is required.
+ * @param {Object} line - { label?, amount, currency, comment?, categoryId?, toAccountId?, sortOrder? }
+ * @returns {Promise<Object>} The created line (camelCase).
+ */
+export const addRecurringLine = async (line) => insertPlanLine(null, line);
+
+/**
+ * Get all recurring lines (global templates, not tied to any one month's plan).
+ * These apply to every calendar month automatically.
+ * @returns {Promise<Array>}
+ */
+export const getRecurringLines = async () => {
+  try {
+    const rows = await queryAll(
+      'SELECT * FROM budget_plan_lines WHERE is_recurring = 1 ORDER BY sort_order ASC, created_at ASC',
+    );
+    return (rows || []).map(mapLineFields);
+  } catch (error) {
+    console.error('Failed to get recurring budget plan lines:', error);
+    throw error;
+  }
+};
+
+/**
+ * Get every line that applies to a given month: recurring (global) lines UNION
+ * the one-off lines of that month's plan, if one exists. This is what the merged
+ * Budgets screen renders — recurring lines show even for a month with no plan
+ * created yet.
+ * @param {string} month - YYYY-MM
+ * @returns {Promise<Array>}
+ */
+export const getLinesForMonth = async (month) => {
+  try {
+    const [recurringLines, plan] = await Promise.all([
+      getRecurringLines(),
+      getPlanByMonth(month),
+    ]);
+    const oneOffLines = plan ? await getPlanLines(plan.id) : [];
+    return [...recurringLines, ...oneOffLines];
+  } catch (error) {
+    console.error('Failed to get lines for month:', error);
+    throw error;
+  }
+};
+
+/**
+ * A plan's currency, by ID. Throws instead of returning undefined so a bad/
+ * stale planId surfaces as a clear error rather than silently flowing into a
+ * currency-conversion call as `undefined`.
+ * @param {string} planId
+ * @returns {Promise<string>}
+ */
+const getPlanCurrencyOrThrow = async (planId) => {
+  const plan = await getPlanById(planId);
+  if (!plan) {
+    throw new Error(`Budget plan ${planId} not found`);
+  }
+  return plan.currency;
+};
+
+/**
+ * Currency a line's amount is presently expressed in: a recurring line's own
+ * `currency` column, or (for a one-off line) the currency of the plan it
+ * belongs to. Used by {@link updateLine} to know what a line's amount means
+ * BEFORE applying a currency-affecting update.
+ * @param {Object} row - Raw budget_plan_lines row (snake_case)
+ * @returns {Promise<string>}
+ */
+const currentLineCurrency = async (row) => (
+  row.is_recurring === 1 ? row.currency : getPlanCurrencyOrThrow(row.plan_id)
+);
+
+/**
+ * Convert `rawAmount` from `fromCurrency` into `toCurrency` via a live rate
+ * lookup. A no-op when the currencies match (or either is missing). Throws
+ * instead of silently persisting an unconverted number when no rate is
+ * available — the caller (only {@link updateLine}) must not write the result
+ * in that case.
+ * @param {string|number} rawAmount
+ * @param {string} fromCurrency
+ * @param {string} toCurrency
+ * @returns {Promise<string>}
+ */
+const convertLineAmount = async (rawAmount, fromCurrency, toCurrency) => {
+  if (!fromCurrency || !toCurrency || fromCurrency === toCurrency) {
+    return String(rawAmount);
+  }
+  const rateByCurrency = await fetchRatesToTarget([fromCurrency], toCurrency);
+  const converted = convertWithRateMap(String(rawAmount), fromCurrency, toCurrency, rateByCurrency);
+  if (converted === null) {
+    // No rate available to express the amount in the new currency — the caller
+    // must not persist the raw digits under a different currency (that would
+    // silently change the line's real value). Surfaced to the UI as
+    // `exchange_rate_unavailable` (see MonthlyPlanSection's save handler).
+    throw new Error('exchange_rate_unavailable');
+  }
+  return converted;
 };
 
 /**
@@ -346,8 +502,28 @@ export const addLine = async (planId, line) => {
  * even for partial updates: (re)assigning one target to a real value implicitly
  * clears the other, so a line can never end up linked to both — a partial update
  * cannot silently pair a new account onto a line that still holds a category.
+ *
+ * Recurring <-> one-off scope changes: pass `isRecurring` to move the line
+ * between the two scopes (see app/db/schema.js doc comment on budgetPlanLines).
+ * Turning recurring ON requires `currency` (the line has no plan to inherit one
+ * from); turning it OFF requires `planId` (the month it becomes scoped to). A
+ * plain edit of an already-recurring line's currency (no scope change) is done by
+ * passing `currency` alone, without `isRecurring`.
+ *
+ * SINGLE CHOKE POINT for the currency-conversion invariant: whenever this call
+ * changes the line's EFFECTIVE currency — via a scope change (isRecurring) OR a
+ * plain currency edit on an already-recurring line — the amount being written
+ * (the caller's `updates.amount` if given, else the row's current stored
+ * amount) is converted from the OLD effective currency into the NEW one before
+ * it's persisted. This is what keeps "250 EUR" from silently becoming "250 USD"
+ * (same digits, ~10% richer/poorer) regardless of which UI path triggered the
+ * change — every caller of updateLine is covered, not just the one that
+ * remembers to convert first. When no exchange rate is available the update is
+ * rejected (see {@link convertLineAmount}) rather than persisting a distorted
+ * number.
  * @param {string} id
- * @param {Object} updates - Partial { label, amount, comment, categoryId, toAccountId, sortOrder }
+ * @param {Object} updates - Partial { label, amount, comment, categoryId, toAccountId,
+ *   sortOrder, isRecurring, currency, planId }
  * @returns {Promise<void>}
  */
 export const updateLine = async (id, updates) => {
@@ -379,10 +555,6 @@ export const updateLine = async (id, updates) => {
       fields.push('label = ?');
       values.push(updates.label ?? null);
     }
-    if (updates.amount !== undefined) {
-      fields.push('amount = ?');
-      values.push(String(updates.amount));
-    }
     if (updates.comment !== undefined) {
       fields.push('comment = ?');
       values.push(updates.comment ?? null);
@@ -398,6 +570,53 @@ export const updateLine = async (id, updates) => {
     if (updates.sortOrder !== undefined) {
       fields.push('sort_order = ?');
       values.push(Number.isInteger(updates.sortOrder) ? updates.sortOrder : 0);
+    }
+
+    // Amount, possibly re-derived below when the effective currency changes.
+    let amount = updates.amount;
+    const changesCurrency = updates.isRecurring !== undefined || updates.currency !== undefined;
+
+    if (changesCurrency) {
+      const row = await queryFirst('SELECT * FROM budget_plan_lines WHERE id = ?', [id]);
+      if (!row) {
+        throw new Error('Budget plan line not found');
+      }
+      const fromCurrency = await currentLineCurrency(row);
+      const rawAmount = amount !== undefined ? amount : row.amount;
+
+      if (updates.isRecurring !== undefined) {
+        if (updates.isRecurring) {
+          if (!updates.currency) {
+            throw new Error('Currency is required for a recurring allocation');
+          }
+          amount = await convertLineAmount(rawAmount, fromCurrency, updates.currency);
+          fields.push('is_recurring = ?', 'plan_id = ?', 'currency = ?');
+          values.push(1, null, updates.currency);
+        } else {
+          if (!updates.planId) {
+            throw new Error('A target plan is required to make an allocation one-time');
+          }
+          const toCurrency = await getPlanCurrencyOrThrow(updates.planId);
+          amount = await convertLineAmount(rawAmount, fromCurrency, toCurrency);
+          fields.push('is_recurring = ?', 'plan_id = ?', 'currency = ?');
+          values.push(0, updates.planId, null);
+        }
+      } else {
+        // Direct currency edit on an already-recurring line — no scope change.
+        // (A one-off line's currency is always NULL/inherited, so there's
+        // nothing meaningful to convert if this ever fires on one — guarded by
+        // only converting when the row IS actually recurring.)
+        if (row.is_recurring === 1) {
+          amount = await convertLineAmount(rawAmount, fromCurrency, updates.currency);
+        }
+        fields.push('currency = ?');
+        values.push(updates.currency ?? null);
+      }
+    }
+
+    if (amount !== undefined) {
+      fields.push('amount = ?');
+      values.push(String(amount));
     }
 
     if (fields.length === 0) {
@@ -430,13 +649,17 @@ export const deleteLine = async (id) => {
 };
 
 /**
- * Persist a new line order for a plan. `orderedIds` is the full list of line IDs
- * in the desired order; each line's sort_order is set to its index.
- * @param {string} planId
- * @param {Array<string>} orderedIds
+ * Shared reorder path for both a plan's one-off lines (`planId` set — the WHERE
+ * clause is scoped to `plan_id = ?`) and the recurring/global-template lines
+ * (`planId === null` — scoped to `is_recurring = 1` instead, since those rows
+ * have no plan). Merged for the same reason as {@link insertPlanLine}: the two
+ * were copy-pasted and could otherwise drift apart on the next change.
+ * @param {string|null} planId - Plan to scope the reorder to, or `null` for recurring.
+ * @param {Array<string>} orderedIds - Full list of line IDs in the desired order.
  * @returns {Promise<void>}
  */
-export const reorderLines = async (planId, orderedIds) => {
+const reorderPlanLines = async (planId, orderedIds) => {
+  const isRecurring = planId === null;
   try {
     const seen = new Set();
     for (const id of orderedIds) {
@@ -450,19 +673,38 @@ export const reorderLines = async (planId, orderedIds) => {
     }
 
     const now = new Date().toISOString();
+    const whereClause = isRecurring ? 'id = ? AND is_recurring = 1' : 'id = ? AND plan_id = ?';
     await executeTransaction(async (db) => {
       for (let i = 0; i < orderedIds.length; i++) {
+        const params = isRecurring ? [i, now, orderedIds[i]] : [i, now, orderedIds[i], planId];
         await db.runAsync(
-          'UPDATE budget_plan_lines SET sort_order = ?, updated_at = ? WHERE id = ? AND plan_id = ?',
-          [i, now, orderedIds[i], planId],
+          `UPDATE budget_plan_lines SET sort_order = ?, updated_at = ? WHERE ${whereClause}`,
+          params,
         );
       }
     });
   } catch (error) {
-    console.error('Failed to reorder budget plan lines:', error);
+    console.error(`Failed to reorder ${isRecurring ? 'recurring ' : ''}budget plan lines:`, error);
     throw error;
   }
 };
+
+/**
+ * Persist a new line order for a plan. `orderedIds` is the full list of line IDs
+ * in the desired order; each line's sort_order is set to its index.
+ * @param {string} planId
+ * @param {Array<string>} orderedIds
+ * @returns {Promise<void>}
+ */
+export const reorderLines = async (planId, orderedIds) => reorderPlanLines(planId, orderedIds);
+
+/**
+ * Persist a new line order for the recurring (global template) lines.
+ * `orderedIds` is the full list of recurring line IDs in the desired order.
+ * @param {Array<string>} orderedIds
+ * @returns {Promise<void>}
+ */
+export const reorderRecurringLines = async (orderedIds) => reorderPlanLines(null, orderedIds);
 
 /* -------------------------------------------------------------------------- */
 /* Derived                                                                     */
@@ -526,23 +768,38 @@ export const copyPlan = async (fromMonth, toMonth) => {
     const now = new Date().toISOString();
     const newPlanId = uuid.v4();
 
-    await executeTransaction(async (db) => {
-      await db.runAsync(
-        'INSERT INTO budget_plans (id, month, currency, expected_income, created_at, updated_at) VALUES (?, ?, ?, ?, ?, ?)',
-        [newPlanId, toMonth, source.currency, source.expectedIncome, now, now],
-      );
-
-      for (let i = 0; i < sourceLines.length; i++) {
-        const line = sourceLines[i];
+    try {
+      await executeTransaction(async (db) => {
         await db.runAsync(
-          'INSERT INTO budget_plan_lines (id, plan_id, label, amount, comment, category_id, to_account_id, sort_order, created_at, updated_at) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)',
-          [
-            uuid.v4(), newPlanId, line.label, line.amount, line.comment,
-            line.categoryId, line.toAccountId, line.sortOrder ?? i, now, now,
-          ],
+          'INSERT INTO budget_plans (id, month, currency, expected_income, created_at, updated_at) VALUES (?, ?, ?, ?, ?, ?)',
+          [newPlanId, toMonth, source.currency, source.expectedIncome, now, now],
         );
+
+        for (let i = 0; i < sourceLines.length; i++) {
+          const line = sourceLines[i];
+          await db.runAsync(
+            'INSERT INTO budget_plan_lines (id, plan_id, label, amount, comment, category_id, to_account_id, sort_order, created_at, updated_at) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)',
+            [
+              uuid.v4(), newPlanId, line.label, line.amount, line.comment,
+              line.categoryId, line.toAccountId, line.sortOrder ?? i, now, now,
+            ],
+          );
+        }
+      });
+    } catch (txError) {
+      // Same double-tap race as createPlan (e.g. handleCopyLast fired twice):
+      // both calls pass the getPlanByMonth pre-check above before either
+      // commits, then race at the UNIQUE(budget_plans.month) constraint here.
+      // executeTransaction serializes actual commits (see app/services/db.js),
+      // so by the time the loser's INSERT fails inside its own transaction,
+      // the winner's plan (and lines) are already committed and visible — hand
+      // that back instead of surfacing a raw constraint error.
+      if (isUniqueMonthViolation(txError)) {
+        const raced = await getPlanByMonth(toMonth);
+        if (raced) return raced;
       }
-    });
+      throw txError;
+    }
 
     return mapPlanFields({
       id: newPlanId,
@@ -749,7 +1006,13 @@ const collectPlanSourceCurrencies = async (lines, startDate, endDate, convertAll
 /**
  * Compute a plan's full plan-vs-actual status: per-line actuals with the shared
  * budget status bands, income vs expected, and totals — all expressed in
- * `displayCurrency` (defaults to the plan's own currency).
+ * `displayCurrency` (defaults to the plan's own currency). Lines include BOTH the
+ * plan's one-off lines and every recurring (global) line — see
+ * {@link getLinesForMonth}. A recurring line's own `currency` (when it differs
+ * from the display currency) is converted the same way an account-linked line's
+ * destination currency is: always, regardless of `convertAll` — the target
+ * amount itself needs a consistent currency to be comparable, unlike the actual
+ * spending sum which is gated by the toggle.
  * @param {string} planId
  * @param {string} [displayCurrency] - Currency to express actuals in (default: plan currency)
  * @param {boolean} [convertAll=false] - Count operations in any currency, converted
@@ -767,7 +1030,8 @@ export const calculatePlanStatus = async (planId, displayCurrency = null, conver
       throw new Error(`Budget plan ${planId} not found`);
     }
     const target = displayCurrency || plan.currency;
-    const lines = await getPlanLines(planId);
+    const [oneOffLines, recurringLines] = await Promise.all([getPlanLines(planId), getRecurringLines()]);
+    const lines = [...recurringLines, ...oneOffLines];
     const { startDate, endDate } = getMonthDateRange(plan.month);
 
     const lineStatuses = [];
@@ -775,17 +1039,54 @@ export const calculatePlanStatus = async (planId, displayCurrency = null, conver
     let allocated = '0';
     let totalActual = '0';
 
+    // Batch the rate lookup for every line's currency up front (one call, same
+    // pattern as calculateActualIncome below) instead of a per-line fetch inside
+    // the loop — with N recurring lines in foreign currencies, that used to mean
+    // N sequential network/offline-table round trips instead of one.
+    const distinctLineCurrencies = [...new Set(
+      lines.map(line => line.currency || target).filter(c => c !== target),
+    )];
+    const lineRateByCurrency = distinctLineCurrencies.length > 0
+      ? await fetchRatesToTarget(distinctLineCurrencies, target)
+      : new Map();
+
     for (const line of lines) {
-      allocated = Currency.add(allocated, line.amount, target);
+      // One-off lines have no currency of their own (null) — they inherit the
+      // plan's currency, matching pre-recurring behavior exactly.
+      const lineCurrency = line.currency || target;
+      let amount = line.amount;
+      if (lineCurrency !== target) {
+        const converted = convertWithRateMap(amount, lineCurrency, target, lineRateByCurrency);
+        if (converted === null) {
+          // No rate to express this recurring line's target in the display
+          // currency — flag it (reusing the unconvertible-currency plumbing)
+          // rather than silently comparing mismatched currencies.
+          transferCurrencies.add(lineCurrency);
+          lineStatuses.push({
+            lineId: line.id,
+            broken: false,
+            amount: line.amount,
+            actual: '0',
+            remaining: line.amount,
+            percentage: 0,
+            isExceeded: false,
+            status: 'unconvertible',
+          });
+          continue;
+        }
+        amount = converted;
+      }
+
+      allocated = Currency.add(allocated, amount, target);
       const { broken, actual, sourceCurrency } = await calculateLineActual(line, plan.month, target, convertAll);
 
       if (broken) {
         lineStatuses.push({
           lineId: line.id,
           broken: true,
-          amount: line.amount,
+          amount,
           actual: '0',
-          remaining: line.amount,
+          remaining: amount,
           percentage: 0,
           isExceeded: false,
           status: 'broken',
@@ -797,12 +1098,12 @@ export const calculatePlanStatus = async (planId, displayCurrency = null, conver
         transferCurrencies.add(sourceCurrency);
       }
       totalActual = Currency.add(totalActual, actual, target);
-      const remaining = Currency.subtract(line.amount, actual, target);
-      const { isExceeded, percentage, status } = deriveSpendingStatus(actual, line.amount);
+      const remaining = Currency.subtract(amount, actual, target);
+      const { isExceeded, percentage, status } = deriveSpendingStatus(actual, amount);
       lineStatuses.push({
         lineId: line.id,
         broken: false,
-        amount: line.amount,
+        amount,
         actual,
         remaining,
         percentage,
@@ -862,4 +1163,91 @@ export const calculateAllPlanStatuses = async (convertAll = false) => {
     console.error('Failed to calculate all plan statuses:', error);
     throw error;
   }
+};
+
+/* -------------------------------------------------------------------------- */
+/* Legacy budgets (v1) -> recurring plan lines bridge (Budgets v3 phase 2)     */
+/* -------------------------------------------------------------------------- */
+
+// Same completion flag migration 0019's postMigration handler writes (see
+// drizzle/0019_recurring_plan_lines.js and app/services/db.js's post-migration
+// retry logic, which expects the key `post_migration_${handlerKey}_completed`).
+// Reused here so BackupRestore.js's restore-time bridge and the live migration
+// share one idempotency check — a backup taken after this migration shipped
+// already carries this flag in its app_metadata, so restoring it does not
+// re-derive (and double) the recurring lines.
+export const BUDGETS_MIGRATION_FLAG_KEY = 'post_migration_m0019_completed';
+
+/**
+ * Convert a legacy `budgets` (v1) amount into an equivalent MONTHLY amount, per
+ * the product owner's decision:
+ *   - weekly → amount × (365 / 12 / 7) ≈ ×4.345, computed as ×365÷84 (365/84 ==
+ *     365/12/7 exactly) so the division stays exact decimal math, not a
+ *     hardcoded floating-point multiplier.
+ *   - yearly → amount ÷ 12
+ *   - monthly → unchanged (just re-formatted)
+ * @param {string|number} amount
+ * @param {'weekly'|'monthly'|'yearly'} periodType
+ * @param {string} currency
+ * @returns {string} Monthly-equivalent amount (decimal string)
+ */
+export const convertBudgetAmountToMonthly = (amount, periodType, currency) => {
+  switch (periodType) {
+  case 'weekly':
+    return Currency.divide(Currency.multiply(amount, 365, currency), 84, currency);
+  case 'yearly':
+    return Currency.divide(amount, 12, currency);
+  case 'monthly':
+  default:
+    return Currency.add(amount, '0', currency);
+  }
+};
+
+/**
+ * Bridge every legacy per-category `budgets` (v1) row into a recurring
+ * `budget_plan_lines` row (global template, applies to every month), so the
+ * merged Budgets screen has a single source of truth. Idempotent — a no-op once
+ * {@link BUDGETS_MIGRATION_FLAG_KEY} is set in `app_metadata`.
+ *
+ * Weekly/yearly budgets are converted to their monthly equivalent (see
+ * {@link convertBudgetAmountToMonthly}). The `budgets` table itself is left
+ * untouched (append-only) — it simply stops being read by the app once its rows
+ * have been mirrored here.
+ *
+ * Takes a raw db-like object (`getAllAsync`/`getFirstAsync`/`runAsync`) rather
+ * than going through the `./db` service singleton, so the SAME function works
+ * both as migration 0019's postMigration handler (raw SQLite instance) and as a
+ * restore-time bridge inside BackupRestore.js's `executeTransaction` callback
+ * (the transaction's db handle) — see BackupRestore.js.
+ * @param {Object} db - Raw SQLite database instance (or transaction handle)
+ * @returns {Promise<{ migrated: number, skipped: boolean }>}
+ */
+export const migrateLegacyBudgetsToRecurringLines = async (db) => {
+  const flagRow = await db.getFirstAsync(
+    'SELECT value FROM app_metadata WHERE key = ?',
+    [BUDGETS_MIGRATION_FLAG_KEY],
+  ).catch(() => null);
+  if (flagRow) {
+    return { migrated: 0, skipped: true };
+  }
+
+  const budgetRows = await db.getAllAsync('SELECT * FROM budgets').catch(() => []);
+  const now = new Date().toISOString();
+  let migrated = 0;
+
+  for (const budget of budgetRows || []) {
+    const monthlyAmount = convertBudgetAmountToMonthly(budget.amount, budget.period_type, budget.currency);
+    await db.runAsync(
+      'INSERT INTO budget_plan_lines (id, plan_id, label, amount, comment, category_id, to_account_id, sort_order, is_recurring, currency, created_at, updated_at) VALUES (?, NULL, NULL, ?, NULL, ?, NULL, 0, 1, ?, ?, ?)',
+      [uuid.v4(), monthlyAmount, budget.category_id, budget.currency, now, now],
+    );
+    migrated++;
+  }
+
+  await db.runAsync(
+    "INSERT OR REPLACE INTO app_metadata (key, value, updated_at) VALUES (?, 'true', ?)",
+    [BUDGETS_MIGRATION_FLAG_KEY, now],
+  );
+
+  return { migrated, skipped: false };
 };

@@ -558,5 +558,6 @@
   "allocation_unlinked": "Non lié",
   "relink_target": "Cible supprimée — appuyez pour relier à nouveau",
   "previous_month": "Mois précédent",
-  "next_month": "Mois suivant"
+  "next_month": "Mois suivant",
+  "recurring_allocation": "Récurrent"
 }
