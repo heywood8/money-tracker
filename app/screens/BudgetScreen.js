@@ -1,6 +1,7 @@
 import React, { useState, useEffect, useMemo, useCallback } from 'react';
 import { View, StyleSheet, FlatList, Modal, Pressable, TouchableOpacity } from 'react-native';
-import { Text } from 'react-native-paper';
+import { Text, Snackbar } from 'react-native-paper';
+import { Swipeable } from 'react-native-gesture-handler';
 import PropTypes from 'prop-types';
 import WheelPicker from '@quidone/react-native-wheel-picker';
 import Icon from '@expo/vector-icons/MaterialCommunityIcons';
@@ -9,19 +10,48 @@ import { useLocalization } from '../contexts/LocalizationContext';
 import { useBudgetsData } from '../contexts/BudgetsDataContext';
 import { useCategories } from '../contexts/CategoriesContext';
 import { useAccountsData } from '../contexts/AccountsDataContext';
+import { usePlannedOperations } from '../contexts/PlannedOperationsContext';
+import { useDialog } from '../contexts/DialogContext';
 import * as Currency from '../services/currency';
 import { fetchRatesToTarget, convertWithRateMap } from '../services/OperationsDB';
 import BudgetModal from '../modals/BudgetModal';
+import PlannedOperationModal from '../modals/PlannedOperationModal';
 import MonthlyPlanSection from '../components/budgets/MonthlyPlanSection';
-import BudgetProgressBar from '../components/BudgetProgressBar';
+import StatusProgressBar from '../components/StatusProgressBar';
 import AddFAB from '../components/AddFAB';
 import EmptyState from '../components/EmptyState';
 import LoadingView from '../components/LoadingView';
 import ModalBlurOverlay from '../components/ModalBlurOverlay';
 import ModalHeader from '../components/ModalHeader';
 import { SPACING } from '../styles/layout';
+import currenciesData from '../../assets/currencies.json';
 
 const CLOSED_MODAL = { visible: false, budget: null, categoryId: '', categoryName: '', isNew: true };
+const CLOSED_PLANNED_MODAL = { visible: false, plannedOperation: null, isNew: true };
+
+// Type → theme color / fallback icon for hosted planned templates.
+const TYPE_COLORS = { expense: 'expense', income: 'income', transfer: 'transfer' };
+const TYPE_ICONS = { expense: 'arrow-up', income: 'arrow-down', transfer: 'swap-horizontal' };
+
+/** Current month as YYYY-MM (local calendar). */
+const currentMonthKey = () => {
+  const now = new Date();
+  return `${now.getFullYear()}-${String(now.getMonth() + 1).padStart(2, '0')}`;
+};
+
+/** Shift a YYYY-MM key by `delta` months. */
+const addMonths = (monthKey, delta) => {
+  const [y, m] = monthKey.split('-').map(Number);
+  const d = new Date(y, m - 1 + delta, 1);
+  return `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}`;
+};
+
+/** Localized "Month YYYY" label for a YYYY-MM key. */
+const formatMonthLabel = (monthKey) => {
+  const [y, m] = monthKey.split('-').map(Number);
+  const d = new Date(y, m - 1, 1);
+  return d.toLocaleDateString(undefined, { month: 'long', year: 'numeric' });
+};
 
 // Category picker shown before creating a new budget: budgets attach to expense
 // categories, so the user picks one here and then fills the budget form.
@@ -81,9 +111,24 @@ CategoryPickerModal.propTypes = {
 const BudgetScreen = () => {
   const { colors } = useThemeColors();
   const { t } = useLocalization();
-  const { budgets, budgetStatuses, loading, convertAllBudgets, setConvertAllBudgets } = useBudgetsData();
+  const { budgets, budgetStatuses, loading, convertAllBudgets, setConvertAllBudgets, setBudgetStatusMonth } = useBudgetsData();
   const { categories } = useCategories();
   const { accounts } = useAccountsData();
+  const { showDialog } = useDialog();
+  const {
+    plannedOperations,
+    executePlannedOperation,
+    markPlannedOperationExecuted,
+    updatePlannedOperation,
+    deletePlannedOperation,
+    isExecutedThisMonth,
+  } = usePlannedOperations();
+
+  // The whole screen is scoped to one month via a single shared ‹ Month › header;
+  // MonthlyPlanSection is controlled from here and budget spend is recomputed for
+  // the shown month by the data context.
+  const [month, setMonth] = useState(currentMonthKey);
+  const isCurrentMonth = month === currentMonthKey();
 
   const [selectedCurrency, setSelectedCurrency] = useState('');
   // Account currencies with no rate (offline or live) to selectedCurrency —
@@ -94,7 +139,19 @@ const BudgetScreen = () => {
   // conversion is off (per-currency totals render instead) or rates are loading.
   const [convertedTotals, setConvertedTotals] = useState(null);
   const [modalState, setModalState] = useState(CLOSED_MODAL);
+  const [plannedModal, setPlannedModal] = useState(CLOSED_PLANNED_MODAL);
   const [categoryPickerVisible, setCategoryPickerVisible] = useState(false);
+  const [snackbarVisible, setSnackbarVisible] = useState(false);
+  const [snackbarMessage, setSnackbarMessage] = useState('');
+
+  const handlePrevMonth = useCallback(() => setMonth(m => addMonths(m, -1)), []);
+  const handleNextMonth = useCallback(() => setMonth(m => addMonths(m, 1)), []);
+
+  // Tell the data context which month to compute budget spend for. Guarded with
+  // optional-call so tests that stub the context without this setter still render.
+  useEffect(() => {
+    setBudgetStatusMonth?.(month);
+  }, [month, setBudgetStatusMonth]);
 
   // Memoize unique currencies from accounts
   const currencies = useMemo(() =>
@@ -187,6 +244,234 @@ const BudgetScreen = () => {
   [categories],
   );
 
+  const accountsById = useMemo(() =>
+    new Map(accounts.map(acc => [acc.id, acc])),
+  [accounts],
+  );
+
+  // ── Planned templates (hosted from the former Planned tab) ──────────────────
+  // Execution is inherently "this month", so the executable template sections
+  // only render for the current month; other months still recompute budgets and
+  // monthly-plan allocations for their range.
+  const sortByExecution = useCallback((ops) => {
+    return [...ops].sort((a, b) => {
+      const aEx = isExecutedThisMonth(a);
+      const bEx = isExecutedThisMonth(b);
+      if (aEx === bEx) return 0;
+      return aEx ? 1 : -1;
+    });
+  }, [isExecutedThisMonth]);
+
+  const incomeTemplates = useMemo(
+    () => sortByExecution(plannedOperations.filter(op => op.type === 'income')),
+    [plannedOperations, sortByExecution],
+  );
+  const expenseTemplates = useMemo(
+    () => sortByExecution(plannedOperations.filter(op => op.type === 'expense' || op.type === 'transfer')),
+    [plannedOperations, sortByExecution],
+  );
+
+  const getAccountName = useCallback((accountId) => accountsById.get(accountId)?.name || '?', [accountsById]);
+  const getCurrencySymbol = useCallback((accountId) => {
+    const code = accountsById.get(accountId)?.currency;
+    if (!code) return '';
+    const currency = currenciesData[code];
+    return currency ? currency.symbol : code;
+  }, [accountsById]);
+
+  const handleExecute = useCallback(async (op) => {
+    try {
+      await executePlannedOperation(op);
+      setSnackbarMessage(t('added_to_operations'));
+      setSnackbarVisible(true);
+    } catch (error) {
+      // Error handled by context
+    }
+  }, [executePlannedOperation, t]);
+
+  const handleMarkExecuted = useCallback(async (op) => {
+    try {
+      await markPlannedOperationExecuted(op);
+      setSnackbarMessage(t('marked_as_executed'));
+      setSnackbarVisible(true);
+    } catch (error) {
+      // Error handled by context
+    }
+  }, [markPlannedOperationExecuted, t]);
+
+  const handleUndoExecuted = useCallback(async (op) => {
+    try {
+      await updatePlannedOperation(op.id, { lastExecutedMonth: null });
+      setSnackbarMessage(t('marked_as_pending'));
+      setSnackbarVisible(true);
+    } catch (error) {
+      // Error handled by context
+    }
+  }, [updatePlannedOperation, t]);
+
+  const handleAddPlanned = useCallback(() => {
+    setPlannedModal({ visible: true, plannedOperation: null, isNew: true });
+  }, []);
+  const handleEditPlanned = useCallback((op) => {
+    setPlannedModal({ visible: true, plannedOperation: op, isNew: false });
+  }, []);
+  const handleClosePlannedModal = useCallback(() => setPlannedModal(CLOSED_PLANNED_MODAL), []);
+
+  const handleLongPressPlanned = useCallback((op) => {
+    const executed = isExecutedThisMonth(op);
+    const executionActions = executed
+      ? [{ text: t('undo'), onPress: () => handleUndoExecuted(op) }]
+      : [
+        { text: t('execute'), onPress: () => handleExecute(op) },
+        { text: t('mark_as_executed'), onPress: () => handleMarkExecuted(op) },
+      ];
+    showDialog(
+      t('select_action'),
+      op.name,
+      [
+        ...executionActions,
+        { text: t('edit'), onPress: () => handleEditPlanned(op) },
+        {
+          text: t('delete'),
+          style: 'destructive',
+          onPress: () => {
+            showDialog(
+              t('delete_planned_operation'),
+              t('delete_planned_confirm'),
+              [
+                { text: t('cancel'), style: 'cancel' },
+                { text: t('delete'), style: 'destructive', onPress: () => deletePlannedOperation(op.id) },
+              ],
+            );
+          },
+        },
+        { text: t('cancel'), style: 'cancel' },
+      ],
+    );
+  }, [isExecutedThisMonth, t, showDialog, handleExecute, handleMarkExecuted, handleUndoExecuted, handleEditPlanned, deletePlannedOperation]);
+
+  const renderPlannedRow = useCallback((op) => {
+    const executed = isExecutedThisMonth(op);
+    const category = categoriesById.get(op.categoryId);
+    const typeColor = colors[TYPE_COLORS[op.type]] || colors.text;
+    const mutedTypeColor = typeColor + '60';
+    const symbol = getCurrencySymbol(op.accountId);
+
+    const rowContent = (
+      <Pressable
+        style={styles.plannedRow}
+        onPress={() => handleEditPlanned(op)}
+        onLongPress={() => handleLongPressPlanned(op)}
+        accessibilityRole="button"
+        accessibilityLabel={op.name}
+        testID={`planned-row-${op.id}`}
+      >
+        <View style={[styles.plannedIcon, { backgroundColor: typeColor + '1A' }]}>
+          <Icon
+            name={category?.icon || TYPE_ICONS[op.type]}
+            size={20}
+            color={executed ? mutedTypeColor : typeColor}
+          />
+          {executed && (
+            <View
+              testID={`planned-check-${op.id}`}
+              style={[styles.checkBadge, { borderColor: colors.background, backgroundColor: colors.income }]}
+            >
+              <Icon name="check" size={7} color="white" />
+            </View>
+          )}
+        </View>
+        <View style={styles.plannedDetails}>
+          <Text style={[styles.plannedName, { color: executed ? colors.mutedText : colors.text }]} numberOfLines={1}>
+            {op.name}
+          </Text>
+          <Text style={[styles.plannedMeta, { color: colors.mutedText }]} numberOfLines={1}>
+            {getAccountName(op.accountId)}
+            {category?.name ? ` · ${category.name}` : ''}
+            {op.isRecurring ? ` · ${t('recurring')}` : ` · ${t('one_time')}`}
+          </Text>
+        </View>
+        <Text style={[styles.plannedAmount, { color: executed ? mutedTypeColor : typeColor }]} numberOfLines={1}>
+          {symbol}{op.amount}
+        </Text>
+      </Pressable>
+    );
+
+    const rightActions = executed
+      ? () => (
+        <Pressable
+          testID={`undo-action-${op.id}`}
+          style={[styles.swipeAction, { backgroundColor: colors.mutedText }]}
+          onPress={() => handleUndoExecuted(op)}
+          accessibilityRole="button"
+          accessibilityLabel={t('undo')}
+        >
+          <Icon name="undo" size={20} color="white" />
+          <Text style={styles.swipeActionText}>{t('undo')}</Text>
+        </Pressable>
+      )
+      : () => (
+        <View style={styles.swipeActionsRow}>
+          <Pressable
+            testID={`execute-action-${op.id}`}
+            style={[styles.swipeAction, { backgroundColor: colors.primary }]}
+            onPress={() => handleExecute(op)}
+            accessibilityRole="button"
+            accessibilityLabel={t('execute')}
+          >
+            <Icon name="play" size={20} color="white" />
+            <Text style={styles.swipeActionText}>{t('execute')}</Text>
+          </Pressable>
+          <Pressable
+            testID={`mark-executed-action-${op.id}`}
+            style={[styles.swipeAction, { backgroundColor: colors.income }]}
+            onPress={() => handleMarkExecuted(op)}
+            accessibilityRole="button"
+            accessibilityLabel={t('mark_as_executed')}
+          >
+            <Icon name="check-bold" size={20} color="white" />
+            <Text style={styles.swipeActionText}>{t('done')}</Text>
+          </Pressable>
+        </View>
+      );
+
+    return (
+      <View key={op.id} style={executed ? styles.executedWrapper : undefined}>
+        <Swipeable
+          renderRightActions={rightActions}
+          overshootRight={false}
+          friction={2}
+          rightThreshold={60}
+          // Only leftward drags reveal actions; leave rightward unrecognized so a
+          // rightward swipe passes through to the tab-strip swipe navigation.
+          dragOffsetFromLeftEdge={Number.MAX_SAFE_INTEGER}
+        >
+          <View style={[styles.swipeRowCover, { backgroundColor: colors.background }]}>
+            {rowContent}
+          </View>
+        </Swipeable>
+      </View>
+    );
+  }, [isExecutedThisMonth, categoriesById, colors, getCurrencySymbol, getAccountName, t,
+    handleEditPlanned, handleLongPressPlanned, handleUndoExecuted, handleExecute, handleMarkExecuted]);
+
+  const renderPlannedCard = useCallback((title, ops, testID) => (
+    <View style={[styles.card, { backgroundColor: colors.surface, borderColor: colors.border }]} testID={testID}>
+      <Text variant="titleMedium" style={[styles.cardTitle, { color: colors.text }]}>{title}</Text>
+      {ops.map(renderPlannedRow)}
+      <Pressable
+        style={[styles.addRow, { borderColor: colors.border }]}
+        onPress={handleAddPlanned}
+        accessibilityRole="button"
+        accessibilityLabel={t('add_planned_operation')}
+        testID={`${testID}-add`}
+      >
+        <Icon name="plus" size={20} color={colors.primary} />
+        <Text style={[styles.addText, { color: colors.primary }]}>{t('add_planned_operation')}</Text>
+      </Pressable>
+    </View>
+  ), [colors, renderPlannedRow, handleAddPlanned, t]);
+
   const handleEditBudget = useCallback((budget) => {
     const category = categoriesById.get(budget.categoryId);
     setModalState({
@@ -216,7 +501,7 @@ const BudgetScreen = () => {
 
   const renderBudget = useCallback(({ item, index }) => {
     const category = categoriesById.get(item.categoryId);
-    const isActive = budgetStatuses.has(item.id);
+    const status = budgetStatuses.get(item.id);
     return (
       <TouchableOpacity
         style={[styles.budgetRow, index % 2 === 1 && { backgroundColor: colors.altRow }]}
@@ -234,8 +519,8 @@ const BudgetScreen = () => {
             {t(item.periodType)} · {item.currency}
           </Text>
         </View>
-        {isActive ? (
-          <BudgetProgressBar budgetId={item.id} compact showDetails />
+        {status ? (
+          <StatusProgressBar status={status} compact showDetails />
         ) : (
           <Text variant="bodySmall" style={{ color: colors.mutedText }}>
             {t('no_budget_set')}
@@ -247,11 +532,63 @@ const BudgetScreen = () => {
 
   const listHeader = useMemo(() => (
     <>
+      {/* Single shared month header — drives the plan section and budget spend */}
+      <View style={styles.monthHeader} testID="budget-month-header">
+        <Pressable
+          onPress={handlePrevMonth}
+          hitSlop={8}
+          style={styles.navButton}
+          accessibilityRole="button"
+          accessibilityLabel={t('previous_month')}
+          testID="budget-prev-month"
+        >
+          <Icon name="chevron-left" size={26} color={colors.text} />
+        </Pressable>
+        <Text style={[styles.monthTitle, { color: colors.text }]} testID="budget-month-label">
+          {formatMonthLabel(month)}
+        </Text>
+        <Pressable
+          onPress={handleNextMonth}
+          hitSlop={8}
+          style={styles.navButton}
+          accessibilityRole="button"
+          accessibilityLabel={t('next_month')}
+          testID="budget-next-month"
+        >
+          <Icon name="chevron-right" size={26} color={colors.text} />
+        </Pressable>
+      </View>
+
+      {/* Income templates (executable, this month only) */}
+      {isCurrentMonth && incomeTemplates.length > 0
+        && renderPlannedCard(t('income'), incomeTemplates, 'planned-income-section')}
+
       <MonthlyPlanSection
         currency={selectedCurrency}
         expenseCategories={expenseCategories}
         accounts={accounts}
+        month={month}
+        onPrevMonth={handlePrevMonth}
+        onNextMonth={handleNextMonth}
       />
+
+      {/* Recurring / one-time expense & transfer templates alongside allocations */}
+      {isCurrentMonth && expenseTemplates.length > 0
+        && renderPlannedCard(t('planned_operations'), expenseTemplates, 'planned-expense-section')}
+
+      {isCurrentMonth && incomeTemplates.length === 0 && expenseTemplates.length === 0 && (
+        <Pressable
+          style={[styles.addRow, styles.addRowStandalone, { borderColor: colors.border }]}
+          onPress={handleAddPlanned}
+          accessibilityRole="button"
+          accessibilityLabel={t('add_planned_operation')}
+          testID="planned-add-empty"
+        >
+          <Icon name="plus" size={20} color={colors.primary} />
+          <Text style={[styles.addText, { color: colors.primary }]}>{t('add_planned_operation')}</Text>
+        </Pressable>
+      )}
+
       <View style={[styles.totalsCard, { backgroundColor: colors.surface, borderColor: colors.border }]}>
         <Text variant="titleMedium" style={[styles.totalsTitle, { color: colors.text }]}>
           {t('all_budgets')}
@@ -287,7 +624,10 @@ const BudgetScreen = () => {
         )}
       </View>
     </>
-  ), [colors, t, convertAllBudgets, convertedTotals, perCurrencyTotals, selectedCurrency, unconvertedCurrencies, expenseCategories, accounts]);
+  ), [colors, t, convertAllBudgets, convertedTotals, perCurrencyTotals, selectedCurrency,
+    unconvertedCurrencies, expenseCategories, accounts, month, isCurrentMonth,
+    incomeTemplates, expenseTemplates, renderPlannedCard, handleAddPlanned,
+    handlePrevMonth, handleNextMonth]);
 
   if (loading) {
     return <LoadingView testID="budget-screen-loading" />;
@@ -376,11 +716,45 @@ const BudgetScreen = () => {
         categoryName={modalState.categoryName}
         isNew={modalState.isNew}
       />
+
+      <PlannedOperationModal
+        visible={plannedModal.visible}
+        onClose={handleClosePlannedModal}
+        plannedOperation={plannedModal.plannedOperation}
+        isNew={plannedModal.isNew}
+      />
+
+      <Snackbar
+        visible={snackbarVisible}
+        onDismiss={() => setSnackbarVisible(false)}
+        duration={2000}
+        style={styles.snackbar}
+      >
+        {snackbarMessage}
+      </Snackbar>
     </View>
   );
 };
 
 const styles = StyleSheet.create({
+  addRow: {
+    alignItems: 'center',
+    borderRadius: 8,
+    borderStyle: 'dashed',
+    borderWidth: 1,
+    flexDirection: 'row',
+    gap: 8,
+    justifyContent: 'center',
+    marginTop: SPACING.sm,
+    paddingVertical: SPACING.sm,
+  },
+  addRowStandalone: {
+    marginBottom: SPACING.md,
+  },
+  addText: {
+    fontSize: 15,
+    fontWeight: '600',
+  },
   budgetRow: {
     borderRadius: 12,
     gap: 4,
@@ -396,6 +770,27 @@ const styles = StyleSheet.create({
     flex: 1,
     fontWeight: '600',
   },
+  card: {
+    borderRadius: 16,
+    borderWidth: 1,
+    marginBottom: SPACING.md,
+    padding: SPACING.md,
+  },
+  cardTitle: {
+    fontWeight: '700',
+    marginBottom: SPACING.xs,
+  },
+  checkBadge: {
+    alignItems: 'center',
+    borderRadius: 7,
+    borderWidth: 1.5,
+    bottom: -2,
+    height: 13,
+    justifyContent: 'center',
+    position: 'absolute',
+    right: -2,
+    width: 13,
+  },
   container: {
     flex: 1,
   },
@@ -407,6 +802,9 @@ const styles = StyleSheet.create({
   },
   convertWarningText: {
     flex: 1,
+  },
+  executedWrapper: {
+    opacity: 0.4,
   },
   fabToggle: {
     alignItems: 'center',
@@ -456,6 +854,19 @@ const styles = StyleSheet.create({
     flex: 1,
     justifyContent: 'flex-end',
   },
+  monthHeader: {
+    alignItems: 'center',
+    flexDirection: 'row',
+    justifyContent: 'space-between',
+    marginBottom: SPACING.md,
+  },
+  monthTitle: {
+    fontSize: 17,
+    fontWeight: '700',
+  },
+  navButton: {
+    padding: 4,
+  },
   pickerEmpty: {
     paddingVertical: SPACING.lg,
     textAlign: 'center',
@@ -467,6 +878,60 @@ const styles = StyleSheet.create({
     gap: SPACING.md,
     paddingHorizontal: SPACING.sm,
     paddingVertical: SPACING.md,
+  },
+  plannedAmount: {
+    fontSize: 15,
+    fontWeight: '700',
+    textAlign: 'right',
+  },
+  plannedDetails: {
+    flex: 1,
+    gap: 2,
+  },
+  plannedIcon: {
+    alignItems: 'center',
+    borderRadius: 10,
+    height: 40,
+    justifyContent: 'center',
+    width: 40,
+  },
+  plannedMeta: {
+    fontSize: 12,
+  },
+  plannedName: {
+    fontSize: 15,
+    fontWeight: '600',
+  },
+  plannedRow: {
+    alignItems: 'center',
+    flexDirection: 'row',
+    gap: SPACING.md,
+    paddingHorizontal: SPACING.sm,
+    paddingVertical: SPACING.sm,
+  },
+  snackbar: {
+    marginBottom: 100,
+  },
+  swipeAction: {
+    alignItems: 'center',
+    borderRadius: 10,
+    justifyContent: 'center',
+    marginBottom: SPACING.xs,
+    marginLeft: SPACING.xs,
+    paddingHorizontal: SPACING.md,
+    width: 72,
+  },
+  swipeActionText: {
+    color: 'white',
+    fontSize: 12,
+    fontWeight: '600',
+    marginTop: 2,
+  },
+  swipeActionsRow: {
+    flexDirection: 'row',
+  },
+  swipeRowCover: {
+    borderRadius: 10,
   },
   totalsCard: {
     borderRadius: 16,

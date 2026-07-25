@@ -5,6 +5,12 @@ import { appEvents, EVENTS } from '../services/eventEmitter';
 
 const BudgetsDataContext = createContext();
 
+/** Current month as YYYY-MM (local calendar). */
+const currentMonthKey = () => {
+  const now = new Date();
+  return `${now.getFullYear()}-${String(now.getMonth() + 1).padStart(2, '0')}`;
+};
+
 export const BudgetsDataProvider = ({ children }) => {
   const [budgets, setBudgets] = useState([]);
   const [budgetStatuses, setBudgetStatuses] = useState(new Map());
@@ -17,18 +23,45 @@ export const BudgetsDataProvider = ({ children }) => {
   // stable identity (its consumers subscribe to events with it as a dep).
   const convertAllRef = useRef(true);
   const [convertAllBudgets, setConvertAllBudgetsState] = useState(true);
+  // Reference date the budget statuses are computed for. `undefined` means
+  // "today" (default). The merged Budgets screen sets this to a mid-month date
+  // when the user navigates to another month, so per-category spent/exceeded
+  // reflects the shown month. Kept in a ref so refreshBudgetStatuses keeps a
+  // stable identity while event-driven refreshes still honor the chosen month.
+  const referenceDateRef = useRef(undefined);
 
   /**
    * Refresh budget statuses for all active budgets
    */
   const refreshBudgetStatuses = useCallback(async () => {
     try {
-      const statusMap = await BudgetsDB.calculateAllBudgetStatuses(undefined, convertAllRef.current);
+      const statusMap = await BudgetsDB.calculateAllBudgetStatuses(referenceDateRef.current, convertAllRef.current);
       setBudgetStatuses(statusMap);
     } catch (error) {
       console.error('Failed to refresh budget statuses:', error);
     }
   }, []);
+
+  /**
+   * Point the status computation at a specific month (YYYY-MM) and recompute.
+   * The current month resolves to `undefined` (today) so behavior is unchanged
+   * for the common case; other months use a mid-month reference date, which
+   * keeps monthly budgets scoped to that calendar month. Weekly/yearly budgets
+   * fall back to their own period around that date (documented edge case).
+   */
+  const setBudgetStatusMonth = useCallback((monthKey) => {
+    const nextRef = (!monthKey || monthKey === currentMonthKey())
+      ? undefined
+      : (() => {
+        const [y, m] = monthKey.split('-').map(Number);
+        return new Date(y, m - 1, 15);
+      })();
+    const prevTime = referenceDateRef.current ? referenceDateRef.current.getTime() : null;
+    const nextTime = nextRef ? nextRef.getTime() : null;
+    if (prevTime === nextTime) return;
+    referenceDateRef.current = nextRef;
+    refreshBudgetStatuses();
+  }, [refreshBudgetStatuses]);
 
   /**
    * Flip the convert-all-currencies mode and recompute statuses with it.
@@ -115,6 +148,7 @@ export const BudgetsDataProvider = ({ children }) => {
     saveError,
     convertAllBudgets,
     setConvertAllBudgets,
+    setBudgetStatusMonth,
     reloadBudgets,
     refreshBudgetStatuses,
     // Internal setters for actions context
@@ -128,6 +162,7 @@ export const BudgetsDataProvider = ({ children }) => {
     saveError,
     convertAllBudgets,
     setConvertAllBudgets,
+    setBudgetStatusMonth,
     reloadBudgets,
     refreshBudgetStatuses,
   ]);
