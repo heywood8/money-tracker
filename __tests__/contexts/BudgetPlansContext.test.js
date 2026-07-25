@@ -119,6 +119,29 @@ describe('BudgetPlansContext', () => {
       })).rejects.toThrow('duplicate month');
       expect(mockShowDialog).toHaveBeenCalledWith('Error', 'duplicate month', [{ text: 'OK' }]);
     });
+
+    // Fix 4 (adversarial review round 2): BudgetPlansDB.createPlan recovers
+    // from a double-tap UNIQUE(month) race by handing BOTH racing callers the
+    // SAME winning plan object (instead of the loser throwing) — so without a
+    // dedup guard here, both addPlan calls would each prepend that plan,
+    // leaving two entries with the same id in `plans`.
+    it('does not duplicate the same plan id in state when two racing calls resolve to the same winning plan', async () => {
+      const { result } = await renderHook(() => useBudgetPlans(), { wrapper });
+      await waitFor(() => expect(result.current.loading).toBe(false));
+
+      BudgetPlansDB.createPlan.mockResolvedValue({
+        id: 'winner', month: '2026-07', currency: 'USD', expectedIncome: '0',
+      });
+
+      await act(async () => {
+        await Promise.all([
+          result.current.addPlan({ month: '2026-07', currency: 'USD' }),
+          result.current.addPlan({ month: '2026-07', currency: 'USD' }),
+        ]);
+      });
+
+      expect(result.current.plans.map(p => p.id)).toEqual(['winner']);
+    });
   });
 
   describe('updatePlan / deletePlan', () => {
@@ -188,6 +211,27 @@ describe('BudgetPlansContext', () => {
       expect(BudgetPlansDB.copyPlan).toHaveBeenCalledWith('2026-07', '2026-08');
       expect(created.id).toBe('copied');
       expect(result.current.plans[0].id).toBe('copied');
+    });
+
+    // Fix 4 (adversarial review round 2): same dedup as addPlan — a double-tap
+    // "copy from last month" race, recovered at the DB layer, must not leave a
+    // duplicate id in state either.
+    it('does not duplicate the same plan id in state when two racing copies resolve to the same winning plan', async () => {
+      const { result } = await renderHook(() => useBudgetPlans(), { wrapper });
+      await waitFor(() => expect(result.current.loading).toBe(false));
+
+      BudgetPlansDB.copyPlan.mockResolvedValue({
+        id: 'winner', month: '2026-08', currency: 'USD', expectedIncome: '100',
+      });
+
+      await act(async () => {
+        await Promise.all([
+          result.current.copyPlan('2026-07', '2026-08'),
+          result.current.copyPlan('2026-07', '2026-08'),
+        ]);
+      });
+
+      expect(result.current.plans.map(p => p.id)).toEqual(['winner']);
     });
   });
 

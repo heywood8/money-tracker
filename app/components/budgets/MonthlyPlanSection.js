@@ -1,4 +1,6 @@
-import React, { useState, useEffect, useMemo, useCallback, forwardRef, useImperativeHandle } from 'react';
+import React, {
+  useState, useEffect, useMemo, useCallback, useRef, forwardRef, useImperativeHandle,
+} from 'react';
 import { View, Text, Pressable, StyleSheet } from 'react-native';
 import PropTypes from 'prop-types';
 import Icon from '@expo/vector-icons/MaterialCommunityIcons';
@@ -6,7 +8,6 @@ import { useThemeColors } from '../../contexts/ThemeColorsContext';
 import { useLocalization } from '../../contexts/LocalizationContext';
 import { useDialog } from '../../contexts/DialogContext';
 import { useBudgetPlans } from '../../contexts/BudgetPlansContext';
-import { fetchRatesToTarget, convertWithRateMap } from '../../services/OperationsDB';
 import * as Currency from '../../services/currency';
 import { SPACING } from '../../styles/layout';
 import BudgetPlanLineModal from './BudgetPlanLineModal';
@@ -73,6 +74,18 @@ const MonthlyPlanSection = forwardRef(function MonthlyPlanSection({
   const [lines, setLines] = useState([]);
   const [modal, setModal] = useState(CLOSED_MODAL);
   const [busy, setBusy] = useState(false);
+  // Synchronous double-tap guard (Fix 3, adversarial review round 2): `busy`
+  // (React state) only reflects reality AFTER a re-render commits, so two taps
+  // landing in the same JS task/microtask both read `busy === false` before
+  // either's setBusy(true) has flushed — a state-only guard does not actually
+  // stop the race, it just makes it less likely. A ref is mutated synchronously,
+  // so the second tap in the same task sees the first tap's guard immediately.
+  // `busy` (state) is kept alongside it purely to drive the UI (disabled
+  // buttons/spinner) — it is not relied on for correctness anymore.
+  const busyRef = useRef(false);
+  // Separate guard for the reorder (move) handlers below, which have no
+  // save-in-flight UI to disable and shouldn't be blocked by an unrelated save.
+  const moveGuardRef = useRef(false);
 
   const plan = useMemo(() => plans.find(p => p.month === month) || null, [plans, month]);
   const prevMonth = useMemo(() => addMonths(month, -1), [month]);
@@ -83,6 +96,28 @@ const MonthlyPlanSection = forwardRef(function MonthlyPlanSection({
 
   // Plan-vs-actual status for the shown month (may be null while computing).
   const planStatus = (planId && planStatuses && planStatuses.get(planId)) || null;
+
+  // Freshness tracking (Fix 2, adversarial review round 2 — mirrors Bug 3):
+  // refreshPlanStatuses() is fired-and-forgotten by the mutation handlers below
+  // (it's async and NOT awaited), while this component's own `lines`/`plan`
+  // state is already fresh by the time a save/delete resolves (reloadLines()
+  // IS awaited, and plan-level edits update context state synchronously). That
+  // means `planStatus` can lag behind the local state for one or more renders
+  // right after a mutation — showing its (now stale) totals would contradict
+  // the numbers the user just saved. Each successful mutation below marks
+  // `statusStale`; it clears the moment a NEW planStatus object lands (context
+  // always produces a fresh object/Map on every recompute, so a reference
+  // change reliably means "the recompute finished").
+  const [statusStale, setStatusStale] = useState(false);
+  const planStatusRef = useRef(planStatus);
+  useEffect(() => {
+    if (planStatus !== planStatusRef.current) {
+      planStatusRef.current = planStatus;
+      setStatusStale(false);
+    }
+  }, [planStatus]);
+  const freshPlanStatus = statusStale ? null : planStatus;
+
   const lineStatusById = useMemo(() => {
     const map = new Map();
     for (const lineStatus of planStatus?.lines || []) {
@@ -157,14 +192,18 @@ const MonthlyPlanSection = forwardRef(function MonthlyPlanSection({
     return { income, allocated, remainder };
   }, [plan, lines, planCurrency]);
 
-  // Once the plan status has resolved, prefer its allocated/remainder — those are
-  // computed with correct cross-currency conversion for recurring lines whose
-  // currency differs from the plan's (see BudgetPlansDB.calculatePlanStatus). The
-  // local `totals` memo above is only a same-currency estimate and undercounts a
-  // mixed-currency plan; showing it after planStatus is ready would silently
-  // contradict the more accurate number the app already computed.
-  const displayAllocated = planStatus ? planStatus.totals.allocated : totals.allocated;
-  const displayRemainder = planStatus ? planStatus.totals.plannedRemainder : totals.remainder;
+  // Once the plan status has resolved (and is not stale — see freshPlanStatus
+  // above), prefer its allocated/remainder — those are computed with correct
+  // cross-currency conversion for recurring lines whose currency differs from
+  // the plan's (see BudgetPlansDB.calculatePlanStatus). The local `totals` memo
+  // above is only a same-currency estimate and undercounts a mixed-currency
+  // plan; showing it after planStatus is ready would silently contradict the
+  // more accurate number the app already computed. But a STALE planStatus is
+  // worse than either — it would contradict the mutation just saved — so a
+  // stale one is treated as "not ready yet" and the fresh local estimate is
+  // shown instead until the recompute lands.
+  const displayAllocated = freshPlanStatus ? freshPlanStatus.totals.allocated : totals.allocated;
+  const displayRemainder = freshPlanStatus ? freshPlanStatus.totals.plannedRemainder : totals.remainder;
 
   const remainderNegative = Currency.isNegative(displayRemainder);
 
@@ -185,28 +224,32 @@ const MonthlyPlanSection = forwardRef(function MonthlyPlanSection({
   const handleNext = useCallback(() => setInternalMonth(m => addMonths(m, 1)), []);
 
   const handleCreateEmpty = useCallback(async () => {
-    if (busy) return;
+    if (busyRef.current) return;
+    busyRef.current = true;
     setBusy(true);
     try {
       await addPlan({ month, currency: currency || 'USD' });
     } catch (error) {
       // Error dialog already shown by the context.
     } finally {
+      busyRef.current = false;
       setBusy(false);
     }
-  }, [busy, addPlan, month, currency]);
+  }, [addPlan, month, currency]);
 
   const handleCopyLast = useCallback(async () => {
-    if (busy) return;
+    if (busyRef.current) return;
+    busyRef.current = true;
     setBusy(true);
     try {
       await copyPlan(prevMonth, month);
     } catch (error) {
       // Error dialog already shown by the context.
     } finally {
+      busyRef.current = false;
       setBusy(false);
     }
-  }, [busy, copyPlan, prevMonth, month]);
+  }, [copyPlan, prevMonth, month]);
 
   const openIncomeEditor = useCallback(() => {
     setModal({ visible: true, mode: 'income', line: null });
@@ -236,96 +279,96 @@ const MonthlyPlanSection = forwardRef(function MonthlyPlanSection({
     // creates the plan when there isn't one yet, and a double-tap Save (two
     // fingers, or a slow first response) can fire this handler twice before
     // either commit lands, racing two createPlan calls for the same month.
-    if (busy) return;
+    if (busyRef.current) return;
+    busyRef.current = true;
     setBusy(true);
     try {
       const targetPlan = await ensurePlan();
       await updatePlan(targetPlan.id, { expectedIncome: amount });
+      // The plans-list update above triggers BudgetPlansDataContext's own
+      // effect to recompute planStatus asynchronously (unawaited from here) —
+      // see the freshness tracking above displayAllocated/displayRemainder.
+      setStatusStale(true);
     } catch (error) {
       // Error dialog already shown by the context.
     } finally {
+      busyRef.current = false;
       setBusy(false);
       closeModal();
     }
-  }, [busy, ensurePlan, updatePlan, closeModal]);
+  }, [ensurePlan, updatePlan, closeModal]);
 
   // Line-level context actions don't surface their own errors (unlike plan-level
   // ones), so report failures here and keep the editor open on error rather than
   // silently dropping the user's input.
+  //
+  // Currency conversion note: this handler used to convert the amount itself
+  // whenever the recurring<->one-off SCOPE toggle changed, but left a direct
+  // currency-chip edit on an already-recurring line (no scope change) totally
+  // unconverted — same digits silently repriced into a different currency.
+  // That invariant now lives in BudgetPlansDB.updateLine itself (the single
+  // choke point for every currency-affecting update, not just this one caller)
+  // — this handler just forwards the raw amount/currency the user entered and
+  // lets the DB layer convert (or reject with `exchange_rate_unavailable` when
+  // no rate exists, translated for display below).
   const handleSaveLine = useCallback(async (lineData) => {
     // Same double-tap guard as handleCreateEmpty/handleSaveIncome: the one-off
     // branch below lazily creates the plan via ensurePlan(), which races the same
     // way a bare "create empty plan" tap does.
-    if (busy) return;
+    if (busyRef.current) return;
+    busyRef.current = true;
     setBusy(true);
     try {
       const { isRecurring: wantsRecurring, currency: lineCurrency, ...core } = lineData;
       const wasRecurring = modal.line?.isRecurring ?? false;
       const scopeChanged = !!modal.line && wasRecurring !== wantsRecurring;
 
-      // A recurring line carries its OWN currency; a one-off line inherits the
-      // plan's. Flipping scope therefore changes the line's effective currency,
-      // but the raw amount the user typed is not automatically re-expressed in
-      // it — without converting here, a recurring 250 EUR turning one-off would
-      // be saved as a one-off 250 USD (same digits, wrong value). Convert
-      // whenever scope changes AND the source/target currencies actually differ.
-      let amount = core.amount;
-      if (scopeChanged) {
-        const fromCurrency = wasRecurring ? modal.line.currency : planCurrency;
-        const toCurrency = wantsRecurring ? lineCurrency : planCurrency;
-        if (fromCurrency && toCurrency && fromCurrency !== toCurrency) {
-          const rateByCurrency = await fetchRatesToTarget([fromCurrency], toCurrency);
-          const converted = convertWithRateMap(amount, fromCurrency, toCurrency, rateByCurrency);
-          if (converted === null) {
-            // No rate available — do NOT silently save the un-converted (wrong)
-            // amount under the new currency; surface it and let the user retry.
-            showDialog('Error', t('exchange_rate_unavailable'), [{ text: t('ok') }]);
-            return;
-          }
-          amount = converted;
-        }
-      }
-      const convertedCore = { ...core, amount };
-
       if (wantsRecurring) {
         if (modal.line) {
-          const updates = { ...convertedCore, currency: lineCurrency };
+          const updates = { ...core, currency: lineCurrency };
           if (scopeChanged) updates.isRecurring = true;
           await updateLine(modal.line.id, updates);
         } else {
-          await addRecurringLine({ ...convertedCore, currency: lineCurrency, sortOrder: recurringLines.length });
+          await addRecurringLine({ ...core, currency: lineCurrency, sortOrder: recurringLines.length });
         }
       } else {
         const targetPlan = await ensurePlan();
         if (modal.line) {
-          const updates = { ...convertedCore };
+          const updates = { ...core };
           if (scopeChanged) {
             updates.isRecurring = false;
             updates.planId = targetPlan.id;
           }
           await updateLine(modal.line.id, updates);
         } else {
-          await addLine(targetPlan.id, { ...convertedCore, sortOrder: oneOffLines.length });
+          await addLine(targetPlan.id, { ...core, sortOrder: oneOffLines.length });
         }
       }
       await reloadLines();
+      setStatusStale(true);
       // Line mutations don't touch the plans list, so trigger the status
       // recompute explicitly (plan-level edits refresh via the context effect).
       refreshPlanStatuses?.();
       closeModal();
     } catch (error) {
       console.error('Failed to save plan line:', error);
-      showDialog('Error', error.message, [{ text: t('ok') }]);
+      // BudgetPlansDB.updateLine throws this specific (untranslated) message
+      // when a currency change has no rate to convert through — translate it
+      // for display; other errors are already user-facing English strings.
+      const message = error.message === 'exchange_rate_unavailable' ? t('exchange_rate_unavailable') : error.message;
+      showDialog('Error', message, [{ text: t('ok') }]);
     } finally {
+      busyRef.current = false;
       setBusy(false);
     }
-  }, [busy, modal.line, planCurrency, updateLine, addLine, addRecurringLine, recurringLines.length, oneOffLines.length,
+  }, [modal.line, updateLine, addLine, addRecurringLine, recurringLines.length, oneOffLines.length,
     ensurePlan, reloadLines, refreshPlanStatuses, closeModal, showDialog, t]);
 
   const handleDeleteLine = useCallback(async (lineId) => {
     try {
       await deleteLine(lineId);
       await reloadLines();
+      setStatusStale(true);
       refreshPlanStatuses?.();
       closeModal();
     } catch (error) {
@@ -350,9 +393,19 @@ const MonthlyPlanSection = forwardRef(function MonthlyPlanSection({
   // (no lag waiting on the round-trip), then reconciles with the DB truth via
   // reloadLines() either way — on success to pick up any server-side
   // normalization, on failure to revert a reorder that didn't actually persist.
+  // moveGuardRef (Fix 3, adversarial review round 2): neither move handler had
+  // ANY double-tap guard before — two fast taps on the same arrow (or one tap
+  // each on the recurring and one-off lists) could both read the same
+  // pre-move `lines`/`recurringLines`/`oneOffLines` snapshot and fire two
+  // overlapping reorder calls, the second clobbering the first's optimistic
+  // update and persisting a wrong order. A synchronous ref (not `busy` state,
+  // and not shared with the save guard above — a move shouldn't be blocked by
+  // an unrelated in-flight save) closes that off the same way busyRef does.
   const handleMoveRecurring = useCallback(async (index, direction) => {
+    if (moveGuardRef.current) return;
     const target = index + direction;
     if (target < 0 || target >= recurringLines.length) return;
+    moveGuardRef.current = true;
     const reordered = recurringLines.slice();
     const [moved] = reordered.splice(index, 1);
     reordered.splice(target, 0, moved);
@@ -363,15 +416,19 @@ const MonthlyPlanSection = forwardRef(function MonthlyPlanSection({
     } catch (error) {
       console.error('Failed to reorder recurring plan lines:', error);
       await reloadLines();
+    } finally {
+      moveGuardRef.current = false;
     }
   }, [recurringLines, oneOffLines, reorderRecurringLines, reloadLines]);
 
   // Move a one-off line up/down within this month's block and persist order.
   // Same optimistic-then-reconcile approach as handleMoveRecurring above.
   const handleMoveOneOff = useCallback(async (index, direction) => {
+    if (moveGuardRef.current) return;
     if (!plan) return;
     const target = index + direction;
     if (target < 0 || target >= oneOffLines.length) return;
+    moveGuardRef.current = true;
     const reordered = oneOffLines.slice();
     const [moved] = reordered.splice(index, 1);
     reordered.splice(target, 0, moved);
@@ -382,6 +439,8 @@ const MonthlyPlanSection = forwardRef(function MonthlyPlanSection({
     } catch (error) {
       console.error('Failed to reorder plan lines:', error);
       await reloadLines();
+    } finally {
+      moveGuardRef.current = false;
     }
   }, [plan, oneOffLines, recurringLines, reorderLines, reloadLines]);
 

@@ -37,15 +37,6 @@ jest.mock('../../../app/contexts/BudgetPlansContext', () => ({
   useBudgetPlans: () => mockPlans,
 }));
 
-// Bug 2 regression coverage needs a real (mocked) rate lookup — MonthlyPlanSection
-// converts amount when scope changes (recurring <-> one-off) via these two.
-const mockFetchRatesToTarget = jest.fn();
-const mockConvertWithRateMap = jest.fn();
-jest.mock('../../../app/services/OperationsDB', () => ({
-  fetchRatesToTarget: (...args) => mockFetchRatesToTarget(...args),
-  convertWithRateMap: (...args) => mockConvertWithRateMap(...args),
-}));
-
 // Stub the line editor modal: dedicated tests cover its internals. Here it just
 // exposes buttons to drive the section's save/income handlers.
 let capturedModalProps = null;
@@ -72,10 +63,12 @@ jest.mock('../../../app/components/budgets/BudgetPlanLineModal', () => {
         testID: 'mock-save-income',
         onPress: () => props.onSaveIncome('9000'),
       }, React.createElement(Text, {}, 'income')),
-      // Bug 2: re-save the currently-edited line (props.line) with its scope
-      // flipped, keeping the SAME raw amount typed in the editor — exactly what
-      // a real user toggling the recurring switch without touching the amount
-      // field would produce. The section is expected to convert it.
+      // Fix 1 (adversarial review round 2): re-save the currently-edited line
+      // (props.line) with its scope flipped, keeping the SAME raw amount typed
+      // in the editor — exactly what a real user toggling the recurring switch
+      // without touching the amount field would produce. Conversion now
+      // happens in BudgetPlansDB.updateLine (mocked at this level), so the
+      // component is expected to forward the raw values UNTOUCHED.
       React.createElement(Pressable, {
         testID: 'mock-save-scope-to-oneoff',
         onPress: () => props.onSaveLine({
@@ -99,7 +92,25 @@ jest.mock('../../../app/components/budgets/BudgetPlanLineModal', () => {
           isRecurring: true,
           currency: 'EUR',
         }),
-      }, React.createElement(Text, {}, 'to recurring')));
+      }, React.createElement(Text, {}, 'to recurring')),
+      // Fix 1's previously-missed sibling path: SAME scope (still recurring),
+      // only the currency-chip picker changed — no isRecurring flip at all.
+      React.createElement(Pressable, {
+        testID: 'mock-save-currency-only',
+        onPress: () => props.onSaveLine({
+          amount: String(props.line?.amount ?? '0'),
+          label: props.line?.label ?? null,
+          comment: props.line?.comment ?? null,
+          categoryId: props.line?.categoryId ?? null,
+          toAccountId: props.line?.toAccountId ?? null,
+          isRecurring: true,
+          currency: 'USD',
+        }),
+      }, React.createElement(Text, {}, 'currency only')),
+      React.createElement(Pressable, {
+        testID: 'mock-delete-line',
+        onPress: () => props.onDeleteLine(props.line?.id),
+      }, React.createElement(Text, {}, 'delete')));
   };
 });
 
@@ -153,10 +164,6 @@ describe('MonthlyPlanSection', () => {
   beforeEach(() => {
     jest.clearAllMocks();
     capturedModalProps = null;
-    // Default: no rate needed / same-currency passthrough. Individual Bug 2
-    // tests override these with real cross-currency stubs.
-    mockFetchRatesToTarget.mockResolvedValue(new Map());
-    mockConvertWithRateMap.mockImplementation((amount, from, to) => (from === to ? amount : null));
   });
 
   describe('Empty state', () => {
@@ -390,18 +397,17 @@ describe('MonthlyPlanSection', () => {
     });
   });
 
-  describe('Scope-change currency conversion (Bug 2, adversarial review)', () => {
-    const stubRate = (from, to, rate) => {
-      mockFetchRatesToTarget.mockResolvedValue(new Map([[from, rate]]));
-      mockConvertWithRateMap.mockImplementation((amount, f, t, map) => {
-        if (f === t) return amount;
-        const r = map.get(f);
-        if (!r) return null;
-        return String(parseFloat(amount) * parseFloat(r));
-      });
-    };
+  describe('Currency/scope changes forwarded raw to updateLine (Fix 1, adversarial review round 2)', () => {
+    // The conversion invariant used to live HERE (in the component), and only
+    // fired on a scope change — a direct currency-chip edit with no scope
+    // change went completely unconverted (the actual money-corrupting bug).
+    // It now lives in BudgetPlansDB.updateLine (see BudgetPlansDB.test.js's
+    // "currency-conversion invariant" describe block for the real conversion
+    // coverage) — this component's job is just to forward the raw values
+    // untouched, for EVERY path: scope-to-one-off, scope-to-recurring, AND the
+    // previously-missed same-scope currency-only edit.
 
-    it('converts the amount from the recurring line\'s own currency into the plan currency when scope changes to one-off', async () => {
+    it('forwards the raw amount and target plan when scope changes to one-off, without converting', async () => {
       setPlans({
         plans: [{ id: 'p1', month: THIS_MONTH, currency: 'USD', expectedIncome: '1000' }],
         lines: [{
@@ -410,7 +416,6 @@ describe('MonthlyPlanSection', () => {
           isRecurring: true, currency: 'EUR',
         }],
       });
-      stubRate('EUR', 'USD', '1.1');
       const { getByTestId } = await renderSection();
       await waitFor(() => expect(getByTestId('plan-line-l-eur')).toBeTruthy());
       await fireEvent.press(getByTestId('plan-line-l-eur'));
@@ -419,13 +424,12 @@ describe('MonthlyPlanSection', () => {
       await fireEvent.press(getByTestId('mock-save-scope-to-oneoff'));
 
       await waitFor(() => expect(mockPlans.updateLine).toHaveBeenCalled());
-      expect(mockFetchRatesToTarget).toHaveBeenCalledWith(['EUR'], 'USD');
       expect(mockPlans.updateLine).toHaveBeenCalledWith('l-eur', expect.objectContaining({
-        amount: '275', isRecurring: false, planId: 'p1',
+        amount: '250', isRecurring: false, planId: 'p1',
       }));
     });
 
-    it('converts the amount from the plan currency into the newly selected currency when scope changes to recurring', async () => {
+    it('forwards the raw amount and new currency when scope changes to recurring, without converting', async () => {
       setPlans({
         plans: [{ id: 'p1', month: THIS_MONTH, currency: 'USD', expectedIncome: '1000' }],
         lines: [{
@@ -434,7 +438,6 @@ describe('MonthlyPlanSection', () => {
           isRecurring: false, currency: null,
         }],
       });
-      stubRate('USD', 'EUR', '0.9');
       const { getByTestId } = await renderSection();
       await waitFor(() => expect(getByTestId('plan-line-l-oneoff')).toBeTruthy());
       await fireEvent.press(getByTestId('plan-line-l-oneoff'));
@@ -443,13 +446,17 @@ describe('MonthlyPlanSection', () => {
       await fireEvent.press(getByTestId('mock-save-scope-to-recurring'));
 
       await waitFor(() => expect(mockPlans.updateLine).toHaveBeenCalled());
-      expect(mockFetchRatesToTarget).toHaveBeenCalledWith(['USD'], 'EUR');
       expect(mockPlans.updateLine).toHaveBeenCalledWith('l-oneoff', expect.objectContaining({
-        amount: '90', isRecurring: true, currency: 'EUR',
+        amount: '100', isRecurring: true, currency: 'EUR',
       }));
     });
 
-    it('shows an error and does not save when no exchange rate is available for the scope change', async () => {
+    // The sibling path the previous round's fix missed entirely: SAME scope
+    // (still recurring), only the currency changed. Must reach updateLine
+    // WITHOUT an `isRecurring` key (so BudgetPlansDB.updateLine takes its
+    // direct-currency-edit branch, not the scope-change one) and with the
+    // raw amount untouched — the DB layer is what converts it now.
+    it('forwards a direct currency-chip edit on an already-recurring line (no scope change), without converting', async () => {
       setPlans({
         plans: [{ id: 'p1', month: THIS_MONTH, currency: 'USD', expectedIncome: '1000' }],
         lines: [{
@@ -458,20 +465,45 @@ describe('MonthlyPlanSection', () => {
           isRecurring: true, currency: 'EUR',
         }],
       });
-      // No rate available.
-      mockFetchRatesToTarget.mockResolvedValue(new Map());
-      mockConvertWithRateMap.mockReturnValue(null);
       const { getByTestId } = await renderSection();
       await waitFor(() => expect(getByTestId('plan-line-l-eur')).toBeTruthy());
       await fireEvent.press(getByTestId('plan-line-l-eur'));
       await waitFor(() => expect(getByTestId('mock-line-modal')).toBeTruthy());
 
-      await fireEvent.press(getByTestId('mock-save-scope-to-oneoff'));
+      await fireEvent.press(getByTestId('mock-save-currency-only'));
+
+      await waitFor(() => expect(mockPlans.updateLine).toHaveBeenCalled());
+      expect(mockPlans.updateLine).toHaveBeenCalledWith('l-eur', expect.objectContaining({
+        amount: '250', currency: 'USD',
+      }));
+      const updates = mockPlans.updateLine.mock.calls[0][1];
+      expect(updates.isRecurring).toBeUndefined();
+    });
+
+    it('shows a translated error and does not save when updateLine rejects with exchange_rate_unavailable', async () => {
+      setPlans({
+        plans: [{ id: 'p1', month: THIS_MONTH, currency: 'USD', expectedIncome: '1000' }],
+        lines: [{
+          id: 'l-eur', planId: null, amount: '250', label: 'Rent', comment: null,
+          categoryId: 'cat1', toAccountId: null, sortOrder: 0, isBroken: false,
+          isRecurring: true, currency: 'EUR',
+        }],
+      });
+      // BudgetPlansDB.updateLine throws this specific (untranslated) message
+      // when no rate is available to convert through (see BudgetPlansDB.js).
+      mockPlans.updateLine = jest.fn(async () => { throw new Error('exchange_rate_unavailable'); });
+      const { getByTestId } = await renderSection();
+      await waitFor(() => expect(getByTestId('plan-line-l-eur')).toBeTruthy());
+      await fireEvent.press(getByTestId('plan-line-l-eur'));
+      await waitFor(() => expect(getByTestId('mock-line-modal')).toBeTruthy());
+
+      await fireEvent.press(getByTestId('mock-save-currency-only'));
 
       await waitFor(() => expect(mockShowDialog).toHaveBeenCalledWith(
         'Error', 'exchange_rate_unavailable', expect.anything(),
       ));
-      expect(mockPlans.updateLine).not.toHaveBeenCalled();
+      // The modal stays open on error (not silently closed) so the user can retry.
+      expect(getByTestId('mock-line-modal')).toBeTruthy();
     });
   });
 
@@ -503,6 +535,88 @@ describe('MonthlyPlanSection', () => {
       expect(getByTestId('plan-totals')).toHaveTextContent(/410\.00/);
       expect(getByTestId('plan-totals')).not.toHaveTextContent(/300\.00 USD/);
       expect(getByTestId('plan-remainder')).toHaveTextContent(/590\.00/);
+    });
+  });
+
+  describe('Totals freshness after a mutation (Fix 2, adversarial review round 2)', () => {
+    // Mirrors Bug 3 above but from the OTHER direction: refreshPlanStatuses()
+    // is fired-and-forgotten by the save/delete handlers (never awaited), so a
+    // still-in-flight (or, as here, permanently stubbed no-op) status recompute
+    // must not keep showing its now-stale totals once the user has saved —
+    // this component's own `lines`/`plan` state is already fresh at that point.
+    it('shows fresh local totals immediately after adding a line, not the stale planStatus', async () => {
+      const staleStatus = {
+        planId: 'p1', month: THIS_MONTH, currency: 'USD', convertAll: false,
+        lines: [],
+        totals: {
+          expectedIncome: '1000.00', actualIncome: '0.00', allocated: '999.00',
+          totalActual: '0.00', plannedRemainder: '1.00', actualRemainder: '1000.00',
+        },
+        unconvertible: [],
+      };
+      setPlans({
+        plans: [{ id: 'p1', month: THIS_MONTH, currency: 'USD', expectedIncome: '1000' }],
+        lines: [],
+        planStatuses: new Map([['p1', staleStatus]]),
+      });
+      // refreshPlanStatuses is a no-op jest.fn() in this test (setPlans's
+      // default) — planStatus never actually changes, so the ONLY way the
+      // totals row can stop showing 999.00/1.00 after the save is by no longer
+      // trusting a stale planStatus.
+      mockPlans.getLinesForMonth = jest.fn()
+        .mockResolvedValueOnce([]) // initial mount load
+        .mockResolvedValue([
+          { id: 'l1', planId: 'p1', amount: '300', label: 'New', comment: null, categoryId: 'cat1', toAccountId: null, sortOrder: 0, isBroken: false },
+        ]);
+      const { getByTestId } = await renderSection();
+
+      // Before any mutation: the (not-yet-stale) planStatus totals show as-is.
+      await waitFor(() => expect(getByTestId('plan-totals')).toHaveTextContent(/999\.00/));
+
+      await fireEvent.press(getByTestId('plan-add-line'));
+      await waitFor(() => expect(getByTestId('mock-line-modal')).toBeTruthy());
+      await fireEvent.press(getByTestId('mock-save-line'));
+      await waitFor(() => expect(mockPlans.addLine).toHaveBeenCalled());
+
+      // allocated = 300 (the new line), remainder = 1000 - 300 = 700 — the
+      // fresh LOCAL estimate, not the stale planStatus's 999.00 / 1.00.
+      await waitFor(() => expect(getByTestId('plan-totals')).toHaveTextContent(/300\.00/));
+      expect(getByTestId('plan-totals')).not.toHaveTextContent(/999\.00/);
+      expect(getByTestId('plan-remainder')).toHaveTextContent(/700\.00/);
+    });
+
+    it('shows fresh local totals immediately after deleting a line, not the stale planStatus', async () => {
+      const staleStatus = {
+        planId: 'p1', month: THIS_MONTH, currency: 'USD', convertAll: false,
+        lines: [],
+        totals: {
+          expectedIncome: '1000.00', actualIncome: '0.00', allocated: '300.00',
+          totalActual: '0.00', plannedRemainder: '700.00', actualRemainder: '1000.00',
+        },
+        unconvertible: [],
+      };
+      setPlans({
+        plans: [{ id: 'p1', month: THIS_MONTH, currency: 'USD', expectedIncome: '1000' }],
+        lines: [
+          { id: 'l1', planId: 'p1', amount: '300', label: 'Groceries', comment: null, categoryId: 'cat1', toAccountId: null, sortOrder: 0, isBroken: false },
+        ],
+        planStatuses: new Map([['p1', staleStatus]]),
+      });
+      mockPlans.getLinesForMonth = jest.fn()
+        .mockResolvedValueOnce([
+          { id: 'l1', planId: 'p1', amount: '300', label: 'Groceries', comment: null, categoryId: 'cat1', toAccountId: null, sortOrder: 0, isBroken: false },
+        ])
+        .mockResolvedValue([]); // after delete
+      const { getByTestId } = await renderSection();
+      await waitFor(() => expect(getByTestId('plan-line-l1')).toBeTruthy());
+
+      await fireEvent.press(getByTestId('plan-line-l1'));
+      await waitFor(() => expect(getByTestId('mock-line-modal')).toBeTruthy());
+      await fireEvent.press(getByTestId('mock-delete-line'));
+
+      // allocated = 0, remainder = 1000 — fresh, not the stale 300.00 / 700.00.
+      await waitFor(() => expect(getByTestId('plan-remainder')).toHaveTextContent(/1000\.00/));
+      expect(getByTestId('plan-totals')).not.toHaveTextContent(/300\.00 USD/);
     });
   });
 
@@ -583,6 +697,59 @@ describe('MonthlyPlanSection', () => {
         expect(getByTestId('plan-line-up-l-a').props.accessibilityState.disabled).toBe(false);
         expect(getByTestId('plan-line-up-l-b').props.accessibilityState.disabled).toBe(true);
       });
+    });
+  });
+
+  describe('Move double-tap race guard (Fix 3, adversarial review round 2)', () => {
+    // Neither move handler had ANY double-tap guard before this fix — two fast
+    // taps on the same arrow (both landing before reorderRecurringLines/
+    // reorderLines resolves) could each read the same pre-move snapshot and
+    // fire two overlapping, conflicting reorder calls.
+    it('ignores a second rapid move tap on a recurring line while the first reorder is still in flight', async () => {
+      setPlans({
+        plans: [],
+        lines: [
+          { id: 'l-a', planId: null, amount: '10', label: 'A', comment: null, categoryId: 'cat1', toAccountId: null, sortOrder: 0, isBroken: false, isRecurring: true, currency: 'USD' },
+          { id: 'l-b', planId: null, amount: '20', label: 'B', comment: null, categoryId: 'cat2', toAccountId: null, sortOrder: 1, isBroken: false, isRecurring: true, currency: 'USD' },
+        ],
+      });
+      // Resolves on its own microtask (not manually controlled) — the two taps
+      // below still land in the same synchronous JS task, before that microtask
+      // runs, which is all the race needs; avoids leaving a manually-resolved
+      // promise's continuation to settle at some unpredictable point relative
+      // to test boundaries.
+      mockPlans.reorderRecurringLines = jest.fn().mockResolvedValue(undefined);
+      const { getByTestId } = await renderSection();
+      await waitFor(() => expect(getByTestId('plan-line-l-a')).toBeTruthy());
+
+      // Two taps in immediate succession (same JS task, before either resolves)
+      // — a state-only guard would not catch this; only a synchronous ref does.
+      fireEvent.press(getByTestId('plan-line-down-l-a'));
+      fireEvent.press(getByTestId('plan-line-down-l-a'));
+
+      await waitFor(() => expect(mockPlans.getLinesForMonth).toHaveBeenCalledTimes(2)); // mount + one reconcile
+
+      expect(mockPlans.reorderRecurringLines).toHaveBeenCalledTimes(1);
+    });
+
+    it('ignores a second rapid move tap on a one-off line while the first reorder is still in flight', async () => {
+      setPlans({
+        plans: [{ id: 'p1', month: THIS_MONTH, currency: 'USD', expectedIncome: '1000' }],
+        lines: [
+          { id: 'l1', planId: 'p1', amount: '100', label: 'A', comment: null, categoryId: 'cat1', toAccountId: null, sortOrder: 0, isBroken: false },
+          { id: 'l2', planId: 'p1', amount: '200', label: 'B', comment: null, categoryId: 'cat2', toAccountId: null, sortOrder: 1, isBroken: false },
+        ],
+      });
+      mockPlans.reorderLines = jest.fn().mockResolvedValue(undefined);
+      const { getByTestId } = await renderSection();
+      await waitFor(() => expect(getByTestId('plan-line-l1')).toBeTruthy());
+
+      fireEvent.press(getByTestId('plan-line-down-l1'));
+      fireEvent.press(getByTestId('plan-line-down-l1'));
+
+      await waitFor(() => expect(mockPlans.getLinesForMonth).toHaveBeenCalledTimes(2));
+
+      expect(mockPlans.reorderLines).toHaveBeenCalledTimes(1);
     });
   });
 

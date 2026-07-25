@@ -7,8 +7,18 @@
 
 import * as BudgetPlansDB from '../../app/services/BudgetPlansDB';
 import { executeQuery, queryAll, queryFirst, executeTransaction } from '../../app/services/db';
+import { fetchRatesToTarget, convertWithRateMap } from '../../app/services/OperationsDB';
 
 jest.mock('../../app/services/db');
+// Only the two rate helpers updateLine's currency-conversion invariant needs
+// (Fix 1, adversarial review round 2) — the rest of OperationsDB is exercised
+// via BudgetPlansDB.status.test.js, not here.
+jest.mock('../../app/services/OperationsDB', () => ({
+  fetchRatesToTarget: jest.fn(),
+  convertWithRateMap: jest.fn(),
+  getTransferTotals: jest.fn(),
+  getUnconvertibleCurrencies: jest.fn(),
+}));
 
 // Predictable UUIDs.
 let mockUuidCounter = 0;
@@ -18,6 +28,19 @@ jest.mock('react-native-uuid', () => ({
 
 let mockRunAsync;
 
+// Deterministic stand-in for the rate helpers, same contract as
+// BudgetPlansDB.status.test.js's stubRates: a fixed single-pair rate map and a
+// plain multiply; an unmapped `from` currency converts to null (no rate).
+const stubRates = (from, to, rate) => {
+  fetchRatesToTarget.mockResolvedValue(new Map([[from, rate]]));
+  convertWithRateMap.mockImplementation((amount, f, t, map) => {
+    if (f === t) return amount;
+    const r = map.get(f);
+    if (!r) return null;
+    return String(parseFloat(amount) * parseFloat(r));
+  });
+};
+
 describe('BudgetPlansDB', () => {
   beforeEach(() => {
     jest.clearAllMocks();
@@ -26,6 +49,8 @@ describe('BudgetPlansDB', () => {
     executeQuery.mockResolvedValue(undefined);
     queryAll.mockResolvedValue([]);
     queryFirst.mockResolvedValue(null);
+    fetchRatesToTarget.mockResolvedValue(new Map());
+    convertWithRateMap.mockImplementation((amount, f, t) => (f === t ? amount : null));
 
     mockRunAsync = jest.fn().mockResolvedValue(undefined);
     executeTransaction.mockImplementation(async (cb) => cb({ runAsync: mockRunAsync }));
@@ -364,6 +389,112 @@ describe('BudgetPlansDB', () => {
       expect(executeQuery).not.toHaveBeenCalled();
     });
 
+    // Fix 1 (adversarial review round 2, main money-corrupting bug): the
+    // conversion invariant used to live ONLY in MonthlyPlanSection's save
+    // handler, and only fired when the recurring<->one-off scope toggle
+    // changed — a user opening a recurring 250 EUR line, changing ONLY the
+    // currency chip to USD (no scope change) and saving persisted a raw 250
+    // USD (same digits, wrong value). It now lives here, in updateLine itself,
+    // so every caller is covered — not just the one that remembers to convert.
+    describe('currency-conversion invariant (Fix 1, adversarial review round 2)', () => {
+      it('converts a recurring line\'s amount on a direct currency-chip edit (no scope change)', async () => {
+        queryFirst.mockResolvedValueOnce({
+          id: 'l1', plan_id: null, is_recurring: 1, currency: 'EUR', amount: '250',
+        });
+        stubRates('EUR', 'USD', '1.1');
+
+        await BudgetPlansDB.updateLine('l1', { currency: 'USD', amount: '250' });
+
+        expect(fetchRatesToTarget).toHaveBeenCalledWith(['EUR'], 'USD');
+        const [sql, params] = executeQuery.mock.calls[0];
+        expect(sql).toContain('currency = ?');
+        expect(sql).toContain('amount = ?');
+        expect(params).toEqual(expect.arrayContaining(['USD', '275', 'l1']));
+      });
+
+      it('converts using the row\'s stored amount when the caller does not pass amount at all', async () => {
+        // The previously-missed sibling path in miniature: a currency-only
+        // update with no `amount` key present in `updates` at all — still must
+        // not leave the row silently mismatched (old amount, new currency).
+        queryFirst.mockResolvedValueOnce({
+          id: 'l1', plan_id: null, is_recurring: 1, currency: 'EUR', amount: '250',
+        });
+        stubRates('EUR', 'USD', '1.1');
+
+        await BudgetPlansDB.updateLine('l1', { currency: 'USD' });
+
+        expect(fetchRatesToTarget).toHaveBeenCalledWith(['EUR'], 'USD');
+        const [, params] = executeQuery.mock.calls[0];
+        expect(params).toEqual(expect.arrayContaining(['USD', '275', 'l1']));
+      });
+
+      it('throws and does not persist a direct currency edit when no exchange rate is available', async () => {
+        queryFirst.mockResolvedValueOnce({
+          id: 'l1', plan_id: null, is_recurring: 1, currency: 'EUR', amount: '250',
+        });
+        // No rate available (default beforeEach stub: same-currency passthrough only).
+
+        await expect(BudgetPlansDB.updateLine('l1', { currency: 'USD', amount: '250' }))
+          .rejects.toThrow('exchange_rate_unavailable');
+        expect(executeQuery).not.toHaveBeenCalled();
+      });
+
+      it('is a no-op conversion when the currency does not actually change', async () => {
+        queryFirst.mockResolvedValueOnce({
+          id: 'l1', plan_id: null, is_recurring: 1, currency: 'USD', amount: '250',
+        });
+
+        await BudgetPlansDB.updateLine('l1', { currency: 'USD', amount: '300' });
+
+        expect(fetchRatesToTarget).not.toHaveBeenCalled();
+        const [, params] = executeQuery.mock.calls[0];
+        expect(params).toEqual(expect.arrayContaining(['USD', '300', 'l1']));
+      });
+
+      it('converts the amount when scope changes from recurring to one-off', async () => {
+        queryFirst
+          .mockResolvedValueOnce({ id: 'l1', plan_id: null, is_recurring: 1, currency: 'EUR', amount: '250' }) // the line
+          .mockResolvedValueOnce({ id: 'p1', month: '2026-07', currency: 'USD', expected_income: '0' }); // target plan
+        stubRates('EUR', 'USD', '1.1');
+
+        await BudgetPlansDB.updateLine('l1', { isRecurring: false, planId: 'p1', amount: '250' });
+
+        expect(fetchRatesToTarget).toHaveBeenCalledWith(['EUR'], 'USD');
+        const [, params] = executeQuery.mock.calls[0];
+        expect(params).toEqual(expect.arrayContaining([0, 'p1', null, '275', 'l1']));
+      });
+
+      it('converts the amount when scope changes from one-off to recurring', async () => {
+        queryFirst
+          .mockResolvedValueOnce({ id: 'l1', plan_id: 'p1', is_recurring: 0, currency: null, amount: '100' }) // the line
+          .mockResolvedValueOnce({ id: 'p1', month: '2026-07', currency: 'USD', expected_income: '0' }); // current plan
+        stubRates('USD', 'EUR', '0.9');
+
+        await BudgetPlansDB.updateLine('l1', { isRecurring: true, currency: 'EUR', amount: '100' });
+
+        expect(fetchRatesToTarget).toHaveBeenCalledWith(['USD'], 'EUR');
+        const [, params] = executeQuery.mock.calls[0];
+        expect(params).toEqual(expect.arrayContaining([1, null, 'EUR', '90', 'l1']));
+      });
+
+      it('throws and does not persist a scope change when no exchange rate is available', async () => {
+        queryFirst
+          .mockResolvedValueOnce({ id: 'l1', plan_id: null, is_recurring: 1, currency: 'EUR', amount: '250' })
+          .mockResolvedValueOnce({ id: 'p1', month: '2026-07', currency: 'USD', expected_income: '0' });
+        // No rate available (default beforeEach stub).
+
+        await expect(BudgetPlansDB.updateLine('l1', { isRecurring: false, planId: 'p1', amount: '250' }))
+          .rejects.toThrow('exchange_rate_unavailable');
+        expect(executeQuery).not.toHaveBeenCalled();
+      });
+
+      it('throws when the line being updated does not exist', async () => {
+        queryFirst.mockResolvedValueOnce(null);
+        await expect(BudgetPlansDB.updateLine('nope', { currency: 'USD' }))
+          .rejects.toThrow('not found');
+      });
+    });
+
     it('deleteLine deletes by id', async () => {
       await BudgetPlansDB.deleteLine('l1');
       expect(executeQuery).toHaveBeenCalledWith('DELETE FROM budget_plan_lines WHERE id = ?', ['l1']);
@@ -479,6 +610,49 @@ describe('BudgetPlansDB', () => {
 
     it('rejects an invalid target month', async () => {
       await expect(BudgetPlansDB.copyPlan('2026-06', 'bad')).rejects.toThrow('A valid month (YYYY-MM) is required');
+    });
+
+    // Fix 4 (adversarial review round 2): createPlan already recovered from a
+    // double-tap UNIQUE(month) race; copyPlan (handleCopyLast double-tapped)
+    // had the identical race but no recovery, so the loser threw a raw
+    // constraint error instead of getting the plan back. Both now share the
+    // same isUniqueMonthViolation recovery helper.
+    describe('UNIQUE(month) race recovery (Fix 4, adversarial review round 2)', () => {
+      it('returns the winning plan instead of throwing when the transaction INSERT hits the UNIQUE(month) constraint', async () => {
+        queryFirst
+          .mockResolvedValueOnce({ id: 'src', month: '2026-06', currency: 'USD', expected_income: '445000' }) // fromMonth
+          .mockResolvedValueOnce(null) // toMonth pre-check: free (this call "wins" the check)
+          .mockResolvedValueOnce({
+            id: 'winner', month: '2026-07', currency: 'USD', expected_income: '445000',
+          }); // recovery lookup after the loser's transaction fails
+        queryAll.mockResolvedValue([]); // no lines, keep the race scenario minimal
+        mockRunAsync.mockRejectedValueOnce(new Error('UNIQUE constraint failed: budget_plans.month'));
+
+        const plan = await BudgetPlansDB.copyPlan('2026-06', '2026-07');
+        expect(plan).toMatchObject({ id: 'winner', month: '2026-07' });
+      });
+
+      it('re-throws a non-UNIQUE-constraint transaction error', async () => {
+        queryFirst
+          .mockResolvedValueOnce({ id: 'src', month: '2026-06', currency: 'USD', expected_income: '0' })
+          .mockResolvedValueOnce(null);
+        queryAll.mockResolvedValue([]);
+        mockRunAsync.mockRejectedValueOnce(new Error('disk I/O error'));
+
+        await expect(BudgetPlansDB.copyPlan('2026-06', '2026-07')).rejects.toThrow('disk I/O error');
+      });
+
+      it('re-throws the UNIQUE-constraint error if the recovery lookup somehow finds nothing', async () => {
+        queryFirst
+          .mockResolvedValueOnce({ id: 'src', month: '2026-06', currency: 'USD', expected_income: '0' })
+          .mockResolvedValueOnce(null)
+          .mockResolvedValueOnce(null); // recovery lookup found nothing — genuinely unexplained
+        queryAll.mockResolvedValue([]);
+        mockRunAsync.mockRejectedValueOnce(new Error('UNIQUE constraint failed: budget_plans.month'));
+
+        await expect(BudgetPlansDB.copyPlan('2026-06', '2026-07'))
+          .rejects.toThrow('UNIQUE constraint failed: budget_plans.month');
+      });
     });
   });
 

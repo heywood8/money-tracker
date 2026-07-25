@@ -7,6 +7,18 @@ import { useBudgetPlansData } from './BudgetPlansDataContext';
 
 const BudgetPlansActionsContext = createContext();
 
+// Prepend `plan` unless its id is already in the list. A double-tap
+// create/copy can fire two DB calls that both resolve to the SAME winning
+// plan (BudgetPlansDB's UNIQUE(month) race recovery hands the loser the
+// winner's row instead of throwing — see BudgetPlansDB.createPlan/copyPlan) —
+// without this guard, both callers' resolved promises would each prepend that
+// plan, leaving two entries with the same id in state (Fix 4, adversarial
+// review round 2). Module-level (not a hook) since it only needs its
+// arguments — no component state/props to close over.
+const prependUnlessPresent = (setPlans, plan) => {
+  setPlans(prev => (prev.some(p => p.id === plan.id) ? prev : [plan, ...prev]));
+};
+
 /**
  * Stable action functions for budget plans (Budgets v2). Plan-level mutations keep
  * the plans list in the data context in sync; line-level mutations delegate to the
@@ -32,7 +44,7 @@ export const BudgetPlansActionsProvider = ({ children }) => {
       }
       const newPlan = { ...plan, id: plan.id || uuid.v4() };
       const created = await BudgetPlansDB.createPlan(newPlan);
-      _setPlans(prev => [created, ...prev]);
+      prependUnlessPresent(_setPlans, created);
       _setSaveError(null);
       return created;
     } catch (error) {
@@ -86,7 +98,7 @@ export const BudgetPlansActionsProvider = ({ children }) => {
   const copyPlan = useCallback(async (fromMonth, toMonth) => {
     try {
       const created = await BudgetPlansDB.copyPlan(fromMonth, toMonth);
-      _setPlans(prev => [created, ...prev]);
+      prependUnlessPresent(_setPlans, created);
       _setSaveError(null);
       return created;
     } catch (error) {
