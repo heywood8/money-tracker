@@ -97,12 +97,20 @@ export const BudgetPlansActionsProvider = ({ children }) => {
   }, [_setPlans, _setSaveError, reportError]);
 
   // Line-level operations delegate straight to the DB (lines are fetched on demand
-  // by consumers via getPlanLines, not held in context state).
+  // by consumers via getPlanLines/getLinesForMonth, not held in context state).
   const addLine = useCallback((planId, line) => BudgetPlansDB.addLine(planId, line), []);
+  // Recurring (global template) lines: not tied to any single month's plan — see
+  // app/db/schema.js's budgetPlanLines doc comment.
+  const addRecurringLine = useCallback((line) => BudgetPlansDB.addRecurringLine(line), []);
   const updateLine = useCallback((id, updates) => BudgetPlansDB.updateLine(id, updates), []);
   const deleteLine = useCallback((id) => BudgetPlansDB.deleteLine(id), []);
   const reorderLines = useCallback((planId, orderedIds) => BudgetPlansDB.reorderLines(planId, orderedIds), []);
+  const reorderRecurringLines = useCallback((orderedIds) => BudgetPlansDB.reorderRecurringLines(orderedIds), []);
   const getPlanLines = useCallback((planId) => BudgetPlansDB.getPlanLines(planId), []);
+  const getRecurringLines = useCallback(() => BudgetPlansDB.getRecurringLines(), []);
+  // The merged view a month's Budgets screen renders: recurring lines UNION the
+  // month's one-off lines (if a plan exists yet) — see BudgetPlansDB.getLinesForMonth.
+  const getLinesForMonth = useCallback((month) => BudgetPlansDB.getLinesForMonth(month), []);
   const getBrokenLines = useCallback((planId) => BudgetPlansDB.getBrokenLines(planId), []);
   const getPlanTotals = useCallback((planId) => BudgetPlansDB.getPlanTotals(planId), []);
   const getPlanByMonth = useCallback((month) => BudgetPlansDB.getPlanByMonth(month), []);
@@ -113,10 +121,14 @@ export const BudgetPlansActionsProvider = ({ children }) => {
     deletePlan,
     copyPlan,
     addLine,
+    addRecurringLine,
     updateLine,
     deleteLine,
     reorderLines,
+    reorderRecurringLines,
     getPlanLines,
+    getRecurringLines,
+    getLinesForMonth,
     getBrokenLines,
     getPlanTotals,
     getPlanByMonth,
@@ -127,10 +139,14 @@ export const BudgetPlansActionsProvider = ({ children }) => {
     deletePlan,
     copyPlan,
     addLine,
+    addRecurringLine,
     updateLine,
     deleteLine,
     reorderLines,
+    reorderRecurringLines,
     getPlanLines,
+    getRecurringLines,
+    getLinesForMonth,
     getBrokenLines,
     getPlanTotals,
     getPlanByMonth,

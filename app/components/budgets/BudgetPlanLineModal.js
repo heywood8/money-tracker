@@ -34,6 +34,12 @@ import * as Currency from '../../services/currency';
  * A line tracks EXACTLY ONE target: an expense category OR a destination account
  * (transfer). That invariant is enforced here (a target is required to save) and
  * again in BudgetPlansDB.
+ *
+ * Budgets v3 phase 2 added a recurring toggle: a recurring line is a global
+ * template (applies to every calendar month automatically, like the old v1
+ * per-category budgets) instead of being scoped to this one month's plan. Since a
+ * recurring line has no plan to inherit a currency from, toggling it on also
+ * surfaces a currency picker (defaulting to the plan's own currency).
  */
 export default function BudgetPlanLineModal({
   visible = false,
@@ -61,7 +67,18 @@ export default function BudgetPlanLineModal({
   // Exactly one of these is set (the "exactly one target" invariant).
   const [categoryId, setCategoryId] = useState(null);
   const [toAccountId, setToAccountId] = useState(null);
+  const [isRecurring, setIsRecurring] = useState(false);
+  const [lineCurrency, setLineCurrency] = useState(currency);
   const [error, setError] = useState(null);
+
+  // Currency options for a recurring line: every currency in use across the
+  // user's accounts, plus the plan's own currency (always offered, even if no
+  // account currently uses it).
+  const currencyOptions = useMemo(() => {
+    const set = new Set(accounts.map(a => a.currency));
+    set.add(currency);
+    return [...set];
+  }, [accounts, currency]);
 
   // Subpanel navigation for the target picker.
   const [activeSubPanel, setActiveSubPanel] = useState(null); // null | 'target'
@@ -90,6 +107,8 @@ export default function BudgetPlanLineModal({
       setComment('');
       setCategoryId(null);
       setToAccountId(null);
+      setIsRecurring(false);
+      setLineCurrency(currency);
       return;
     }
     if (line) {
@@ -98,14 +117,18 @@ export default function BudgetPlanLineModal({
       setComment(line.comment || '');
       setCategoryId(line.categoryId ?? null);
       setToAccountId(line.toAccountId ?? null);
+      setIsRecurring(!!line.isRecurring);
+      setLineCurrency(line.currency || currency);
     } else {
       setAmount('');
       setLabel('');
       setComment('');
       setCategoryId(null);
       setToAccountId(null);
+      setIsRecurring(false);
+      setLineCurrency(currency);
     }
-  }, [visible, isIncome, line, initialIncome]);
+  }, [visible, isIncome, line, initialIncome, currency]);
 
   // Reset subpanel + animations whenever the modal is hidden.
   useEffect(() => {
@@ -184,8 +207,13 @@ export default function BudgetPlanLineModal({
       comment: comment.trim() || null,
       categoryId: categoryId ?? null,
       toAccountId: toAccountId ?? null,
+      isRecurring,
+      // Only meaningful for a recurring line — a one-off line inherits the
+      // plan's currency and doesn't carry one of its own.
+      currency: isRecurring ? lineCurrency : null,
     });
-  }, [isIncome, amount, hasTarget, amountIsValid, label, comment, categoryId, toAccountId, onSaveLine, onSaveIncome, t]);
+  }, [isIncome, amount, hasTarget, amountIsValid, label, comment, categoryId, toAccountId,
+    isRecurring, lineCurrency, onSaveLine, onSaveIncome, t]);
 
   const handleDelete = useCallback(() => {
     if (!isEditingLine) return;
@@ -310,6 +338,69 @@ export default function BudgetPlanLineModal({
                     </View>
                   )}
 
+                  {/* Recurring toggle (line mode only): a recurring allocation is a
+                      global template that applies to every calendar month
+                      automatically, instead of being scoped to this one month. */}
+                  {!isIncome && (
+                    <Pressable
+                      style={[styles.recurringRow, { borderColor: colors.border }]}
+                      onPress={() => setIsRecurring(v => !v)}
+                      accessibilityRole="switch"
+                      accessibilityState={{ checked: isRecurring }}
+                      accessibilityLabel={t('recurring_allocation')}
+                      testID="plan-line-recurring-toggle"
+                    >
+                      <View style={styles.recurringLabel}>
+                        <Icon name="repeat" size={20} color={colors.text} />
+                        <Text style={[styles.text16, { color: colors.text }]}>
+                          {t('recurring_allocation')}
+                        </Text>
+                      </View>
+                      <View
+                        style={[
+                          styles.switchTrack,
+                          { backgroundColor: isRecurring ? colors.primary : colors.border },
+                        ]}
+                      >
+                        <View
+                          style={[
+                            styles.switchThumb,
+                            { transform: [{ translateX: isRecurring ? 18 : 2 }] },
+                          ]}
+                        />
+                      </View>
+                    </Pressable>
+                  )}
+
+                  {/* Currency picker — a recurring line has no plan to inherit a
+                      currency from, so it needs its own. */}
+                  {!isIncome && isRecurring && currencyOptions.length > 0 && (
+                    <View style={styles.field}>
+                      <Text style={[styles.fieldLabel, { color: colors.mutedText }]}>
+                        {t('currency')}
+                      </Text>
+                      <View style={styles.currencyRow}>
+                        {currencyOptions.map((code) => (
+                          <Pressable
+                            key={code}
+                            style={[
+                              styles.currencyChip,
+                              { borderColor: colors.border },
+                              lineCurrency === code && { backgroundColor: colors.primary, borderColor: colors.primary },
+                            ]}
+                            onPress={() => setLineCurrency(code)}
+                            accessibilityRole="button"
+                            accessibilityState={{ selected: lineCurrency === code }}
+                            accessibilityLabel={code}
+                            testID={`plan-line-currency-${code}`}
+                          >
+                            <Text style={[styles.currencyChipText, { color: colors.text }]}>{code}</Text>
+                          </Pressable>
+                        ))}
+                      </View>
+                    </View>
+                  )}
+
                   {/* Amount */}
                   <View style={styles.field}>
                     <Text style={[styles.fieldLabel, { color: colors.mutedText }]}>
@@ -320,7 +411,7 @@ export default function BudgetPlanLineModal({
                       onValueChange={setAmount}
                       colors={colors}
                       placeholder="0"
-                      currencyCode={currency}
+                      currencyCode={isRecurring ? lineCurrency : currency}
                       containerBackground={colors.card}
                     />
                   </View>
@@ -489,6 +580,8 @@ BudgetPlanLineModal.propTypes = {
     comment: PropTypes.string,
     categoryId: PropTypes.string,
     toAccountId: PropTypes.oneOfType([PropTypes.string, PropTypes.number]),
+    isRecurring: PropTypes.bool,
+    currency: PropTypes.string,
   }),
   currency: PropTypes.string,
   initialIncome: PropTypes.oneOfType([PropTypes.string, PropTypes.number]),
@@ -516,6 +609,21 @@ const styles = StyleSheet.create({
   buttonText: {
     fontSize: 16,
     fontWeight: '500',
+  },
+  currencyChip: {
+    borderRadius: 8,
+    borderWidth: 1,
+    paddingHorizontal: 14,
+    paddingVertical: 8,
+  },
+  currencyChipText: {
+    fontSize: 14,
+    fontWeight: '600',
+  },
+  currencyRow: {
+    flexDirection: 'row',
+    flexWrap: 'wrap',
+    gap: 8,
   },
   deleteRow: {
     alignItems: 'center',
@@ -582,6 +690,20 @@ const styles = StyleSheet.create({
     paddingHorizontal: 8,
     paddingVertical: 14,
   },
+  recurringLabel: {
+    alignItems: 'center',
+    flexDirection: 'row',
+    gap: 10,
+  },
+  recurringRow: {
+    alignItems: 'center',
+    borderRadius: 4,
+    borderWidth: 1,
+    flexDirection: 'row',
+    justifyContent: 'space-between',
+    marginBottom: 16,
+    padding: 12,
+  },
   scrollContent: {
     paddingBottom: 12,
   },
@@ -617,6 +739,18 @@ const styles = StyleSheet.create({
   subPanelTitle: {
     fontSize: 18,
     fontWeight: 'bold',
+  },
+  switchThumb: {
+    backgroundColor: '#fff',
+    borderRadius: 8,
+    height: 16,
+    width: 16,
+  },
+  switchTrack: {
+    borderRadius: 10,
+    height: 20,
+    justifyContent: 'center',
+    width: 36,
   },
   targetButton: {
     alignItems: 'center',

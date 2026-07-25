@@ -173,14 +173,16 @@ export const buildSheetsData = (backup) => {
     {
       range: 'Budget Plan Lines!A1',
       values: [
-        ['id', 'plan_id', 'label', 'amount', 'comment', 'category', 'account', 'category_id', 'to_account_id', 'sort_order'],
+        ['id', 'plan_id', 'label', 'amount', 'comment', 'category', 'account', 'category_id', 'to_account_id', 'sort_order', 'is_recurring', 'currency'],
         ...(budget_plan_lines || []).map(l => [
-          l.id, l.plan_id, l.label || '', l.amount, l.comment || '',
+          l.id, l.plan_id || '', l.label || '', l.amount, l.comment || '',
           categoryNames.get(l.category_id) || '',
           l.to_account_id ? (accountNames.get(l.to_account_id) || '') : '',
           l.category_id || '',
           l.to_account_id || '',
           l.sort_order ?? 0,
+          l.is_recurring ?? 0,
+          l.currency || '',
         ]),
       ],
     },
@@ -386,19 +388,25 @@ export const importFromSheets = async (accessToken, onProgress) => {
     updated_at: now,
   }));
 
-  const budget_plan_lines = budgetPlanLineRows.map(l => ({
-    id: l.id,
-    plan_id: l.plan_id,
-    label: l.label || null,
-    amount: l.amount,
-    comment: l.comment || null,
-    // Exactly one target: resolve category or account, whichever the row carries.
-    category_id: (l.category || l.category_id) ? resolveCategoryId(l, 'category_id', 'category') : null,
-    to_account_id: (l.account || l.to_account_id) ? resolveAccountId(l, 'to_account_id', 'account') : null,
-    sort_order: (l.sort_order !== '' && l.sort_order != null) ? Number(l.sort_order) : 0,
-    created_at: now,
-    updated_at: now,
-  }));
+  const budget_plan_lines = budgetPlanLineRows.map(l => {
+    const isRecurring = l.is_recurring !== '' && l.is_recurring != null ? Number(l.is_recurring) : 0;
+    return {
+      id: l.id,
+      // A recurring (global template) line has no plan_id (migration 0019).
+      plan_id: isRecurring ? null : (l.plan_id || null),
+      label: l.label || null,
+      amount: l.amount,
+      comment: l.comment || null,
+      // Exactly one target: resolve category or account, whichever the row carries.
+      category_id: (l.category || l.category_id) ? resolveCategoryId(l, 'category_id', 'category') : null,
+      to_account_id: (l.account || l.to_account_id) ? resolveAccountId(l, 'to_account_id', 'account') : null,
+      sort_order: (l.sort_order !== '' && l.sort_order != null) ? Number(l.sort_order) : 0,
+      is_recurring: isRecurring,
+      currency: isRecurring ? (l.currency || null) : null,
+      created_at: now,
+      updated_at: now,
+    };
+  });
 
   // Preserve current app preferences (language, theme, etc.) so they survive the restore.
   // Do NOT catch DB errors here — a locked or corrupted DB must abort the import loudly

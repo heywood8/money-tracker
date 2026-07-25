@@ -266,6 +266,16 @@ const isSchemaComplete = async (rawDb) => {
     // them (rather than the fast path skipping migrate() and crashing with
     // `no such table` on the first BudgetPlansDB query).
 
+    // Check budget_plan_lines has BOTH is_recurring and currency columns
+    // (migration 0019 — recreate-table migration that also makes plan_id
+    // nullable). Both are checked for the same reason as operations' 0009
+    // columns: a half-applied 0019 must not be mistaken for complete. Without
+    // this check, an install complete through 0018 would report "schema
+    // complete" and skip migrate(), so 0019 would never run and every
+    // recurring-line query would throw `no such column: is_recurring`.
+    const planLineCols = await rawDb.getAllAsync('PRAGMA table_info(budget_plan_lines)');
+    if (!planLineCols.some(c => c.name === 'is_recurring') || !planLineCols.some(c => c.name === 'currency')) return false;
+
     return true;
   } catch (error) {
     console.warn('[DB] isSchemaComplete check failed:', error.message);
@@ -569,6 +579,16 @@ const detectAppliedMigrations = async (rawDb) => {
   // missing table is created.
   if ((await tableExists('budget_plans')) && (await tableExists('budget_plan_lines'))) {
     applied.push(18);
+  }
+
+  // Migration 0019: recreate-table migration adding is_recurring + currency to
+  // budget_plan_lines (and making plan_id nullable). Require BOTH new columns —
+  // a half-applied 0019 must re-run so the recreate-table completes.
+  if (await tableExists('budget_plan_lines')) {
+    const planLineCols = await getColumns('budget_plan_lines');
+    if (planLineCols.some(c => c.name === 'is_recurring') && planLineCols.some(c => c.name === 'currency')) {
+      applied.push(19);
+    }
   }
 
   return applied.sort((a, b) => a - b);

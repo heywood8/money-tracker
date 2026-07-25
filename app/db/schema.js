@@ -276,10 +276,24 @@ export const budgetPlans = sqliteTable('budget_plans', {
  *
  * `to_account_id` is an integer FK to match accounts.id (integer autoincrement),
  * consistent with operations.to_account_id / planned_operations.to_account_id.
+ *
+ * Budgets v3 phase 2 (migration 0019) consolidated the old per-category `budgets`
+ * table (C) into this model as RECURRING lines:
+ *   - `is_recurring` = 0 (one-time): scoped to a single month via `plan_id`
+ *     (required). This is the original Budgets v2 line.
+ *   - `is_recurring` = 1 (recurring): a global template NOT tied to any one
+ *     month's plan — `plan_id` is NULL — that applies to every calendar month
+ *     automatically (mirroring how v1 `budgets` behaved). Since it has no plan to
+ *     inherit a currency from, it carries its own `currency`.
+ * `plan_id` was made nullable via a recreate-table migration (SQLite cannot
+ * ALTER COLUMN DROP NOT NULL) — see drizzle/0019_recurring_plan_lines.js.
  */
 export const budgetPlanLines = sqliteTable('budget_plan_lines', {
   id: text('id').primaryKey(),
-  planId: text('plan_id').notNull().references(() => budgetPlans.id, { onDelete: 'cascade' }),
+  // Nullable: NULL for a recurring (global template) line. Non-null one-off lines
+  // still reference an existing plan (ON DELETE CASCADE); recurring lines have no
+  // plan to cascade from.
+  planId: text('plan_id').references(() => budgetPlans.id, { onDelete: 'cascade' }),
   // Optional display name; falls back to the linked category/account name.
   label: text('label'),
   amount: text('amount').notNull(),
@@ -287,8 +301,14 @@ export const budgetPlanLines = sqliteTable('budget_plan_lines', {
   categoryId: text('category_id').references(() => categories.id, { onDelete: 'set null' }),
   toAccountId: integer('to_account_id').references(() => accounts.id, { onDelete: 'set null' }),
   sortOrder: integer('sort_order').notNull().default(0),
+  // 0 = one-time (scoped to `plan_id`'s month), 1 = recurring (global, every month).
+  isRecurring: integer('is_recurring').notNull().default(0),
+  // Currency for a recurring line's `amount` (it has no plan to inherit one from).
+  // NULL for one-off lines, which keep inheriting the parent plan's currency.
+  currency: text('currency'),
   createdAt: text('created_at').notNull(),
   updatedAt: text('updated_at').notNull(),
 }, (table) => ({
   planIdx: index('idx_budget_plan_lines_plan').on(table.planId),
+  recurringIdx: index('idx_budget_plan_lines_recurring').on(table.isRecurring),
 }));

@@ -7,6 +7,7 @@ import * as Sharing from 'expo-sharing';
 import * as DocumentPicker from 'expo-document-picker';
 import { queryAll, executeQuery, executeTransaction, getDatabase } from './db';
 import { appEvents } from './eventEmitter';
+import * as BudgetPlansDB from './BudgetPlansDB';
 
 const BACKUP_VERSION = 1;
 
@@ -97,7 +98,9 @@ const TABLE_FIELDS = {
   planned_operations: ['id', 'name', 'type', 'amount', 'account_id', 'category_id', 'to_account_id', 'description', 'is_recurring', 'last_executed_month', 'display_order', 'created_at', 'updated_at'],
   notification_merchant_rules: ['id', 'merchant', 'package_name', 'category_id', 'label_override', 'created_at', 'updated_at'],
   budget_plans: ['id', 'month', 'currency', 'expected_income', 'created_at', 'updated_at'],
-  budget_plan_lines: ['id', 'plan_id', 'label', 'amount', 'comment', 'category_id', 'to_account_id', 'sort_order', 'created_at', 'updated_at'],
+  // `plan_id` is nullable (NULL for a recurring/global line, migration 0019).
+  // `is_recurring` / `currency` were added by that same migration.
+  budget_plan_lines: ['id', 'plan_id', 'label', 'amount', 'comment', 'category_id', 'to_account_id', 'sort_order', 'is_recurring', 'currency', 'created_at', 'updated_at'],
 };
 
 /**
@@ -845,36 +848,46 @@ export const restoreBackup = async (backup, cancelToken) => {
           restoredPlans++;
         }
 
-        // Only insert lines whose parent plan was actually restored, so an
+        // Only insert one-off lines whose parent plan was actually restored, so an
         // orphaned line (dangling plan_id) is skipped rather than aborting the
-        // whole import on an FK violation.
+        // whole import on an FK violation. A recurring (global) line has no
+        // plan_id at all (migration 0019) and is restored regardless of `plans`.
         let restoredLines = 0;
         for (const line of lines) {
           // amount is a NOT NULL text column; treat null/empty as invalid and
           // skip (mirrors how budgets skip rows with missing required fields).
-          if (!line.id || !line.plan_id || line.amount == null || line.amount === '') {
+          if (!line.id || line.amount == null || line.amount === '') {
             console.warn('Skipping budget plan line with missing required fields:', line);
             continue;
           }
-          if (!restoredPlanIds.has(line.plan_id)) {
-            console.warn('Skipping budget plan line with unknown plan_id:', line.plan_id);
-            continue;
+          const isRecurring = Number(line.is_recurring) === 1;
+          if (!isRecurring) {
+            if (!line.plan_id) {
+              console.warn('Skipping budget plan line with missing required fields:', line);
+              continue;
+            }
+            if (!restoredPlanIds.has(line.plan_id)) {
+              console.warn('Skipping budget plan line with unknown plan_id:', line.plan_id);
+              continue;
+            }
           }
           let mappedToAccountId = null;
           if (line.to_account_id != null) {
             mappedToAccountId = accountIdMapping.get(String(line.to_account_id)) ?? line.to_account_id;
           }
           await db.runAsync(
-            'INSERT INTO budget_plan_lines (id, plan_id, label, amount, comment, category_id, to_account_id, sort_order, created_at, updated_at) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)',
+            'INSERT INTO budget_plan_lines (id, plan_id, label, amount, comment, category_id, to_account_id, sort_order, is_recurring, currency, created_at, updated_at) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)',
             [
               line.id,
-              line.plan_id,
+              isRecurring ? null : line.plan_id,
               line.label ?? null,
               line.amount,
               line.comment ?? null,
               line.category_id ?? null,
               mappedToAccountId,
               Number.isInteger(line.sort_order) ? line.sort_order : Number(line.sort_order) || 0,
+              isRecurring ? 1 : 0,
+              isRecurring ? (line.currency || null) : null,
               line.created_at || new Date().toISOString(),
               line.updated_at || new Date().toISOString(),
             ],
@@ -921,6 +934,23 @@ export const restoreBackup = async (backup, cancelToken) => {
           status: 'completed',
           data: 0,
         });
+      }
+
+      // Bridge legacy per-category budgets (v1) into recurring budget_plan_lines
+      // (Budgets v3 phase 2), so a backup that predates that consolidation still
+      // ends up with a single source of truth after restore. Idempotent — reuses
+      // the SAME completion flag the live migration's postMigration handler sets
+      // (app_metadata was just restored above), so a backup taken AFTER this
+      // migration shipped — whose app_metadata already carries the flag — is not
+      // re-derived, avoiding double-counted recurring lines.
+      try {
+        const bridgeResult = await BudgetPlansDB.migrateLegacyBudgetsToRecurringLines(db);
+        console.log(
+          `Bridged ${bridgeResult.migrated} legacy budget(s) into recurring plan lines`
+          + (bridgeResult.skipped ? ' (already migrated, skipped)' : ''),
+        );
+      } catch (bridgeError) {
+        console.warn('Failed to bridge legacy budgets into recurring plan lines:', bridgeError);
       }
 
       // Restore planned operations

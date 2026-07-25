@@ -1,4 +1,4 @@
-import React, { useState, useEffect, useMemo, useCallback } from 'react';
+import React, { useState, useEffect, useMemo, useCallback, forwardRef, useImperativeHandle } from 'react';
 import { View, Text, Pressable, StyleSheet } from 'react-native';
 import PropTypes from 'prop-types';
 import Icon from '@expo/vector-icons/MaterialCommunityIcons';
@@ -28,13 +28,23 @@ const CLOSED_MODAL = { visible: false, mode: 'line', line: null };
  * section's own header is hidden and the host owns navigation. When `month` is
  * omitted the section stays self-contained and renders its own month header
  * (uncontrolled, used in isolation/tests).
+ *
+ * Budgets v3 phase 2 consolidated the old per-category `budgets` (v1) model into
+ * RECURRING lines here: a recurring line is a global template (not scoped to any
+ * one month's plan) that applies to every calendar month automatically, exactly
+ * like a v1 budget did. Lines shown for a month are the union of every recurring
+ * line and the month's own one-off lines (see BudgetPlansDB.getLinesForMonth) —
+ * recurring lines show even for a month that has no plan created yet; income and
+ * one-off allocations still need a plan, which is created lazily the first time
+ * one is saved. Exposes `openAddLine` via ref so a host FAB can open the "add
+ * allocation" flow without lifting the modal's state.
  */
-export default function MonthlyPlanSection({
+const MonthlyPlanSection = forwardRef(function MonthlyPlanSection({
   currency = 'USD',
   expenseCategories = [],
   accounts = [],
   month: monthProp = null,
-}) {
+}, ref) {
   const { colors } = useThemeColors();
   const { t } = useLocalization();
   const { showDialog } = useDialog();
@@ -46,10 +56,12 @@ export default function MonthlyPlanSection({
     copyPlan,
     updatePlan,
     addLine,
+    addRecurringLine,
     updateLine,
     deleteLine,
     reorderLines,
-    getPlanLines,
+    reorderRecurringLines,
+    getLinesForMonth,
   } = useBudgetPlans();
 
   // Month is controlled by the host when `monthProp` is provided; otherwise the
@@ -87,32 +99,25 @@ export default function MonthlyPlanSection({
     [accounts],
   );
 
-  const reloadLines = useCallback(async (planId) => {
-    if (!planId) {
-      setLines([]);
-      return;
-    }
+  // Lines shown for the month are the union of every recurring (global) line and
+  // the month's own one-off lines — recurring lines render even for a month with
+  // no plan created yet (see BudgetPlansDB.getLinesForMonth).
+  const reloadLines = useCallback(async () => {
     try {
-      const data = await getPlanLines(planId);
+      const data = await getLinesForMonth(month);
       setLines(data);
     } catch (error) {
       console.error('Failed to load plan lines:', error);
       setLines([]);
     }
-  }, [getPlanLines]);
+  }, [getLinesForMonth, month]);
 
-  // Load lines whenever the shown plan changes (month navigation, create, copy).
-  // Keyed on planId (not the plan object) so an income edit — which produces a new
-  // plan object but the same id — doesn't trigger a redundant lines re-fetch.
+  // Load lines whenever the shown month changes (navigation, plan create/copy).
   useEffect(() => {
     let cancelled = false;
     (async () => {
-      if (!planId) {
-        if (!cancelled) setLines([]);
-        return;
-      }
       try {
-        const data = await getPlanLines(planId);
+        const data = await getLinesForMonth(month);
         if (!cancelled) setLines(data);
       } catch (error) {
         console.error('Failed to load plan lines:', error);
@@ -120,15 +125,27 @@ export default function MonthlyPlanSection({
       }
     })();
     return () => { cancelled = true; };
-  }, [planId, getPlanLines]);
+  }, [month, getLinesForMonth]);
+
+  // Recurring (global template) lines and this month's one-off lines are edited
+  // and reordered independently — each has its own sort_order sequence at the DB
+  // layer (see BudgetPlansDB) — so they're split for rendering/move actions.
+  const recurringLines = useMemo(() => lines.filter(l => l.isRecurring), [lines]);
+  const oneOffLines = useMemo(() => lines.filter(l => !l.isRecurring), [lines]);
 
   // Live totals: allocated = Σ line amounts, remainder = income − allocated.
   // Same precise decimal math as BudgetPlansDB.getPlanTotals, computed locally so
-  // the remainder updates immediately as lines/income change.
+  // the remainder updates immediately as lines/income change. One-off lines
+  // always share the plan's currency; a recurring line carries its own and is
+  // only added here when it matches (mixed-currency recurring lines still count
+  // correctly once the async plan status lands — see planStatus.totals.allocated
+  // — this is just the instant, pre-status estimate).
   const totals = useMemo(() => {
     const income = plan?.expectedIncome ?? '0';
     let allocated = '0';
     for (const line of lines) {
+      const lineCurrency = line.currency || planCurrency;
+      if (lineCurrency !== planCurrency) continue;
       allocated = Currency.add(allocated, line.amount, planCurrency);
     }
     const remainder = Currency.subtract(income, allocated, planCurrency);
@@ -188,29 +205,60 @@ export default function MonthlyPlanSection({
   }, []);
   const closeModal = useCallback(() => setModal(CLOSED_MODAL), []);
 
+  // Let a host FAB (BudgetScreen) open the "add allocation" flow without
+  // lifting this section's modal state up.
+  useImperativeHandle(ref, () => ({ openAddLine }), [openAddLine]);
+
+  // Income needs a real plan to attach to; auto-create an empty one for the
+  // shown month the first time the user sets an income figure, so recurring
+  // lines showing for a plan-less month don't block income entry.
+  const ensurePlan = useCallback(async () => {
+    if (plan) return plan;
+    return addPlan({ month, currency: currency || 'USD' });
+  }, [plan, addPlan, month, currency]);
+
   const handleSaveIncome = useCallback(async (amount) => {
-    if (!plan) return;
     try {
-      await updatePlan(plan.id, { expectedIncome: amount });
+      const targetPlan = await ensurePlan();
+      await updatePlan(targetPlan.id, { expectedIncome: amount });
     } catch (error) {
       // Error dialog already shown by the context.
     } finally {
       closeModal();
     }
-  }, [plan, updatePlan, closeModal]);
+  }, [ensurePlan, updatePlan, closeModal]);
 
   // Line-level context actions don't surface their own errors (unlike plan-level
   // ones), so report failures here and keep the editor open on error rather than
   // silently dropping the user's input.
   const handleSaveLine = useCallback(async (lineData) => {
-    if (!plan) return;
+    const { isRecurring: wantsRecurring, currency: lineCurrency, ...core } = lineData;
+    const wasRecurring = modal.line?.isRecurring ?? false;
+    const scopeChanged = !!modal.line && wasRecurring !== wantsRecurring;
+
     try {
-      if (modal.line) {
-        await updateLine(modal.line.id, lineData);
+      if (wantsRecurring) {
+        if (modal.line) {
+          const updates = { ...core, currency: lineCurrency };
+          if (scopeChanged) updates.isRecurring = true;
+          await updateLine(modal.line.id, updates);
+        } else {
+          await addRecurringLine({ ...core, currency: lineCurrency, sortOrder: recurringLines.length });
+        }
       } else {
-        await addLine(plan.id, { ...lineData, sortOrder: lines.length });
+        const targetPlan = await ensurePlan();
+        if (modal.line) {
+          const updates = { ...core };
+          if (scopeChanged) {
+            updates.isRecurring = false;
+            updates.planId = targetPlan.id;
+          }
+          await updateLine(modal.line.id, updates);
+        } else {
+          await addLine(targetPlan.id, { ...core, sortOrder: oneOffLines.length });
+        }
       }
-      await reloadLines(plan.id);
+      await reloadLines();
       // Line mutations don't touch the plans list, so trigger the status
       // recompute explicitly (plan-level edits refresh via the context effect).
       refreshPlanStatuses?.();
@@ -219,20 +267,20 @@ export default function MonthlyPlanSection({
       console.error('Failed to save plan line:', error);
       showDialog('Error', error.message, [{ text: t('ok') }]);
     }
-  }, [plan, modal.line, updateLine, addLine, lines.length, reloadLines, refreshPlanStatuses, closeModal, showDialog, t]);
+  }, [modal.line, updateLine, addLine, addRecurringLine, recurringLines.length, oneOffLines.length,
+    ensurePlan, reloadLines, refreshPlanStatuses, closeModal, showDialog, t]);
 
   const handleDeleteLine = useCallback(async (lineId) => {
-    if (!plan) return;
     try {
       await deleteLine(lineId);
-      await reloadLines(plan.id);
+      await reloadLines();
       refreshPlanStatuses?.();
       closeModal();
     } catch (error) {
       console.error('Failed to delete plan line:', error);
       showDialog('Error', error.message, [{ text: t('ok') }]);
     }
-  }, [plan, deleteLine, reloadLines, refreshPlanStatuses, closeModal, showDialog, t]);
+  }, [deleteLine, reloadLines, refreshPlanStatuses, closeModal, showDialog, t]);
 
   const handleLongPressLine = useCallback((line) => {
     showDialog(
@@ -245,23 +293,38 @@ export default function MonthlyPlanSection({
     );
   }, [showDialog, t, handleDeleteLine]);
 
-  // Move a line up/down and persist the new sort order.
-  const handleMove = useCallback(async (index, direction) => {
-    if (!plan) return;
+  // Move a recurring line up/down within the recurring block and persist order.
+  const handleMoveRecurring = useCallback(async (index, direction) => {
     const target = index + direction;
-    if (target < 0 || target >= lines.length) return;
-    const reordered = lines.slice();
+    if (target < 0 || target >= recurringLines.length) return;
+    const reordered = recurringLines.slice();
     const [moved] = reordered.splice(index, 1);
     reordered.splice(target, 0, moved);
-    setLines(reordered); // optimistic
+    try {
+      await reorderRecurringLines(reordered.map(l => l.id));
+      await reloadLines();
+    } catch (error) {
+      console.error('Failed to reorder recurring plan lines:', error);
+      await reloadLines();
+    }
+  }, [recurringLines, reorderRecurringLines, reloadLines]);
+
+  // Move a one-off line up/down within this month's block and persist order.
+  const handleMoveOneOff = useCallback(async (index, direction) => {
+    if (!plan) return;
+    const target = index + direction;
+    if (target < 0 || target >= oneOffLines.length) return;
+    const reordered = oneOffLines.slice();
+    const [moved] = reordered.splice(index, 1);
+    reordered.splice(target, 0, moved);
     try {
       await reorderLines(plan.id, reordered.map(l => l.id));
-      await reloadLines(plan.id);
+      await reloadLines();
     } catch (error) {
       console.error('Failed to reorder plan lines:', error);
-      await reloadLines(plan.id); // revert to persisted order
+      await reloadLines();
     }
-  }, [plan, lines, reorderLines, reloadLines]);
+  }, [plan, oneOffLines, reorderLines, reloadLines]);
 
   const lineDisplayName = useCallback((line) => {
     if (line.label) return line.label;
@@ -275,6 +338,89 @@ export default function MonthlyPlanSection({
     if (line.toAccountId != null) return 'bank-transfer';
     return categoriesById.get(line.categoryId)?.icon || 'shape-outline';
   }, [categoriesById]);
+
+  // Shared row renderer for both the recurring block and this month's one-off
+  // block — each list moves independently (own sort_order sequence), so `list`
+  // and `onMove` are passed in per block.
+  const renderLine = useCallback((line, index, list, onMove) => {
+    const lineStatus = lineStatusById.get(line.id);
+    const isBroken = line.isBroken || lineStatus?.broken;
+    const lineCurrency = line.currency || planCurrency;
+    return (
+      <Pressable
+        key={line.id}
+        style={[styles.lineRow, index % 2 === 1 && { backgroundColor: colors.altRow }]}
+        onPress={() => openEditLine(line)}
+        onLongPress={() => handleLongPressLine(line)}
+        accessibilityRole="button"
+        accessibilityLabel={`${t('edit_allocation')}: ${lineDisplayName(line)}`}
+        testID={`plan-line-${line.id}`}
+      >
+        <View style={styles.lineTop}>
+          <Icon name={lineIcon(line)} size={20} color={colors.text} />
+          <View style={styles.lineBody}>
+            <Text style={[styles.lineName, { color: colors.text }]} numberOfLines={1}>
+              {lineDisplayName(line)}
+            </Text>
+            {line.isRecurring && (
+              <Text style={[styles.recurringBadge, { color: colors.mutedText }]} numberOfLines={1}>
+                {t('recurring_allocation')}
+              </Text>
+            )}
+            {!!line.comment && (
+              <Text style={[styles.lineComment, { color: colors.mutedText }]} numberOfLines={1}>
+                {line.comment}
+              </Text>
+            )}
+          </View>
+          <Text style={[styles.lineAmount, { color: colors.text }]}>
+            {Currency.formatAmount(line.amount, lineCurrency)} {line.isRecurring ? lineCurrency : ''}
+          </Text>
+          <View style={styles.moveButtons}>
+            <Pressable
+              onPress={() => onMove(index, -1)}
+              disabled={index === 0}
+              hitSlop={6}
+              style={styles.moveButton}
+              accessibilityRole="button"
+              accessibilityLabel={t('move_up')}
+              testID={`plan-line-up-${line.id}`}
+            >
+              <Icon name="chevron-up" size={20} color={index === 0 ? colors.border : colors.mutedText} />
+            </Pressable>
+            <Pressable
+              onPress={() => onMove(index, 1)}
+              disabled={index === list.length - 1}
+              hitSlop={6}
+              style={styles.moveButton}
+              accessibilityRole="button"
+              accessibilityLabel={t('move_down')}
+              testID={`plan-line-down-${line.id}`}
+            >
+              <Icon name="chevron-down" size={20} color={index === list.length - 1 ? colors.border : colors.mutedText} />
+            </Pressable>
+          </View>
+        </View>
+        {isBroken ? (
+          <View style={styles.brokenRow} testID={`plan-line-broken-${line.id}`}>
+            <Icon name="alert-circle-outline" size={14} color={colors.danger} />
+            <Text style={[styles.brokenText, { color: colors.danger }]} numberOfLines={1}>
+              {t('relink_target')}
+            </Text>
+          </View>
+        ) : lineStatus ? (
+          <StatusProgressBar
+            status={{ ...lineStatus, spent: lineStatus.actual, currency: planCurrency }}
+            compact
+            showDetails
+            style={styles.lineProgress}
+          />
+        ) : null}
+      </Pressable>
+    );
+  }, [colors, t, lineStatusById, planCurrency, openEditLine, handleLongPressLine, lineDisplayName, lineIcon]);
+
+  const hasAnyLines = recurringLines.length > 0 || oneOffLines.length > 0;
 
   return (
     <View style={[styles.card, { backgroundColor: colors.surface, borderColor: colors.border }]} testID="monthly-plan-section">
@@ -308,7 +454,50 @@ export default function MonthlyPlanSection({
         </View>
       )}
 
-      {!plan ? (
+      {/* Expected income (tap to edit) — only meaningful once a plan exists for
+          this month; a plan-less month with only recurring lines gets one lazily
+          the first time income or a one-off allocation is saved. */}
+      {plan && (
+        <Pressable
+          style={[styles.incomeRow, { borderColor: colors.border }]}
+          onPress={openIncomeEditor}
+          accessibilityRole="button"
+          accessibilityLabel={t('expected_income')}
+          testID="plan-income-row"
+        >
+          <View style={styles.incomeLabel}>
+            <Icon name="cash-plus" size={20} color={colors.text} />
+            <Text style={[styles.incomeText, { color: colors.text }]}>{t('expected_income')}</Text>
+          </View>
+          <Text style={[styles.incomeAmount, { color: colors.text }]}>
+            {planStatus
+              ? `${Currency.formatAmount(planStatus.totals.actualIncome, planCurrency)} / ${Currency.formatAmount(totals.income, planCurrency)} ${planCurrency}`
+              : `${Currency.formatAmount(totals.income, planCurrency)} ${planCurrency}`}
+          </Text>
+        </Pressable>
+      )}
+
+      {/* Recurring (global) allocations — shown for every month regardless of
+          whether a plan was created for it. */}
+      {recurringLines.map((line, index) => renderLine(line, index, recurringLines, handleMoveRecurring))}
+
+      {/* This month's one-off allocations */}
+      {oneOffLines.map((line, index) => renderLine(line, index, oneOffLines, handleMoveOneOff))}
+
+      {/* Add allocation — always available: a recurring line needs no plan, a
+          one-off one lazily creates the month's plan on save. */}
+      <Pressable
+        style={[styles.addRow, { borderColor: colors.border }]}
+        onPress={openAddLine}
+        accessibilityRole="button"
+        accessibilityLabel={t('add_allocation')}
+        testID="plan-add-line"
+      >
+        <Icon name="plus" size={20} color={colors.primary} />
+        <Text style={[styles.addText, { color: colors.primary }]}>{t('add_allocation')}</Text>
+      </Pressable>
+
+      {!plan && (
         <View style={styles.emptyPlan} testID="plan-empty-state">
           <Icon name="clipboard-text-outline" size={40} color={colors.mutedText} />
           <Text style={[styles.emptyText, { color: colors.mutedText }]}>{t('no_plan_for_month')}</Text>
@@ -339,112 +528,10 @@ export default function MonthlyPlanSection({
             )}
           </View>
         </View>
-      ) : (
+      )}
+
+      {(plan || hasAnyLines) && (
         <>
-          {/* Expected income (tap to edit) */}
-          <Pressable
-            style={[styles.incomeRow, { borderColor: colors.border }]}
-            onPress={openIncomeEditor}
-            accessibilityRole="button"
-            accessibilityLabel={t('expected_income')}
-            testID="plan-income-row"
-          >
-            <View style={styles.incomeLabel}>
-              <Icon name="cash-plus" size={20} color={colors.text} />
-              <Text style={[styles.incomeText, { color: colors.text }]}>{t('expected_income')}</Text>
-            </View>
-            <Text style={[styles.incomeAmount, { color: colors.text }]}>
-              {planStatus
-                ? `${Currency.formatAmount(planStatus.totals.actualIncome, planCurrency)} / ${Currency.formatAmount(totals.income, planCurrency)} ${planCurrency}`
-                : `${Currency.formatAmount(totals.income, planCurrency)} ${planCurrency}`}
-            </Text>
-          </Pressable>
-
-          {/* Allocation lines */}
-          {lines.map((line, index) => {
-            const lineStatus = lineStatusById.get(line.id);
-            const isBroken = line.isBroken || lineStatus?.broken;
-            return (
-              <Pressable
-                key={line.id}
-                style={[styles.lineRow, index % 2 === 1 && { backgroundColor: colors.altRow }]}
-                onPress={() => openEditLine(line)}
-                onLongPress={() => handleLongPressLine(line)}
-                accessibilityRole="button"
-                accessibilityLabel={`${t('edit_allocation')}: ${lineDisplayName(line)}`}
-                testID={`plan-line-${line.id}`}
-              >
-                <View style={styles.lineTop}>
-                  <Icon name={lineIcon(line)} size={20} color={colors.text} />
-                  <View style={styles.lineBody}>
-                    <Text style={[styles.lineName, { color: colors.text }]} numberOfLines={1}>
-                      {lineDisplayName(line)}
-                    </Text>
-                    {!!line.comment && (
-                      <Text style={[styles.lineComment, { color: colors.mutedText }]} numberOfLines={1}>
-                        {line.comment}
-                      </Text>
-                    )}
-                  </View>
-                  <Text style={[styles.lineAmount, { color: colors.text }]}>
-                    {Currency.formatAmount(line.amount, planCurrency)}
-                  </Text>
-                  <View style={styles.moveButtons}>
-                    <Pressable
-                      onPress={() => handleMove(index, -1)}
-                      disabled={index === 0}
-                      hitSlop={6}
-                      style={styles.moveButton}
-                      accessibilityRole="button"
-                      accessibilityLabel={t('move_up')}
-                      testID={`plan-line-up-${line.id}`}
-                    >
-                      <Icon name="chevron-up" size={20} color={index === 0 ? colors.border : colors.mutedText} />
-                    </Pressable>
-                    <Pressable
-                      onPress={() => handleMove(index, 1)}
-                      disabled={index === lines.length - 1}
-                      hitSlop={6}
-                      style={styles.moveButton}
-                      accessibilityRole="button"
-                      accessibilityLabel={t('move_down')}
-                      testID={`plan-line-down-${line.id}`}
-                    >
-                      <Icon name="chevron-down" size={20} color={index === lines.length - 1 ? colors.border : colors.mutedText} />
-                    </Pressable>
-                  </View>
-                </View>
-                {isBroken ? (
-                  <View style={styles.brokenRow} testID={`plan-line-broken-${line.id}`}>
-                    <Icon name="alert-circle-outline" size={14} color={colors.danger} />
-                    <Text style={[styles.brokenText, { color: colors.danger }]} numberOfLines={1}>
-                      {t('relink_target')}
-                    </Text>
-                  </View>
-                ) : lineStatus ? (
-                  <StatusProgressBar
-                    status={{ ...lineStatus, spent: lineStatus.actual, currency: planCurrency }}
-                    compact
-                    showDetails
-                    style={styles.lineProgress}
-                  />
-                ) : null}
-              </Pressable>
-            );
-          })}
-
-          {/* Add allocation */}
-          <Pressable
-            style={[styles.addRow, { borderColor: colors.border }]}
-            onPress={openAddLine}
-            accessibilityRole="button"
-            accessibilityLabel={t('add_allocation')}
-            testID="plan-add-line"
-          >
-            <Icon name="plus" size={20} color={colors.primary} />
-            <Text style={[styles.addText, { color: colors.primary }]}>{t('add_allocation')}</Text>
-          </Pressable>
-
           {/* Totals: allocated vs actual, then the planned remainder */}
           <View style={[styles.totalsRow, { borderTopColor: colors.border }]} testID="plan-totals">
             <Text style={[styles.totalsLabel, { color: colors.mutedText }]}>
@@ -489,8 +576,9 @@ export default function MonthlyPlanSection({
       />
     </View>
   );
-}
+});
 
+MonthlyPlanSection.displayName = 'MonthlyPlanSection';
 MonthlyPlanSection.propTypes = {
   currency: PropTypes.string,
   expenseCategories: PropTypes.array,
@@ -633,6 +721,12 @@ const styles = StyleSheet.create({
   primaryActionText: {
     fontSize: 15,
     fontWeight: '600',
+  },
+  recurringBadge: {
+    fontSize: 11,
+    fontWeight: '600',
+    marginTop: 1,
+    textTransform: 'uppercase',
   },
   remainderRow: {
     flexDirection: 'row',
