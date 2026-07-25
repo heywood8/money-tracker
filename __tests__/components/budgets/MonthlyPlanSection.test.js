@@ -49,8 +49,16 @@ jest.mock('../../../app/components/budgets/BudgetPlanLineModal', () => {
     return React.createElement(View, { testID: 'mock-line-modal' },
       React.createElement(Pressable, {
         testID: 'mock-save-line',
-        onPress: () => props.onSaveLine({ amount: '250', label: 'New', comment: null, categoryId: 'cat1', toAccountId: null }),
+        onPress: () => props.onSaveLine({
+          amount: '250', label: 'New', comment: null, categoryId: 'cat1', toAccountId: null, isRecurring: false, currency: null,
+        }),
       }, React.createElement(Text, {}, 'save')),
+      React.createElement(Pressable, {
+        testID: 'mock-save-recurring-line',
+        onPress: () => props.onSaveLine({
+          amount: '65000', label: 'Rent', comment: null, categoryId: 'cat1', toAccountId: null, isRecurring: true, currency: 'USD',
+        }),
+      }, React.createElement(Text, {}, 'save recurring')),
       React.createElement(Pressable, {
         testID: 'mock-save-income',
         onPress: () => props.onSaveIncome('9000'),
@@ -82,19 +90,24 @@ const setPlans = ({ plans = [], lines = [], planStatuses = new Map() } = {}) => 
     plans,
     planStatuses,
     refreshPlanStatuses: jest.fn(async () => {}),
-    addPlan: jest.fn(async () => {}),
+    addPlan: jest.fn(async () => ({ id: 'p1' })),
     copyPlan: jest.fn(async () => {}),
     updatePlan: jest.fn(async () => {}),
     addLine: jest.fn(async () => {}),
+    addRecurringLine: jest.fn(async () => {}),
     updateLine: jest.fn(async () => {}),
     deleteLine: jest.fn(async () => {}),
     reorderLines: jest.fn(async () => {}),
+    reorderRecurringLines: jest.fn(async () => {}),
     getPlanLines: jest.fn(async () => lines),
+    // The section now loads its lines (recurring UNION this month's one-off
+    // lines) via getLinesForMonth rather than getPlanLines directly.
+    getLinesForMonth: jest.fn(async () => lines),
   };
 };
 
-const renderSection = () => render(
-  <MonthlyPlanSection currency="USD" expenseCategories={EXPENSE_CATEGORIES} accounts={ACCOUNTS} />,
+const renderSection = (ref) => render(
+  <MonthlyPlanSection ref={ref} currency="USD" expenseCategories={EXPENSE_CATEGORIES} accounts={ACCOUNTS} />,
 );
 
 const flatColor = (node) => StyleSheet.flatten(node.props.style)?.color;
@@ -281,6 +294,58 @@ describe('MonthlyPlanSection', () => {
       // Next month has no plan → empty state, no income row.
       await waitFor(() => expect(getByTestId('plan-empty-state')).toBeTruthy());
       expect(queryByTestId('plan-income-row')).toBeNull();
+    });
+  });
+
+  describe('Recurring lines (Budgets v3 phase 2)', () => {
+    const recurringLine = {
+      id: 'l-rec', planId: null, amount: '65000', label: 'Rent', comment: null,
+      categoryId: 'cat1', toAccountId: null, sortOrder: 0, isBroken: false,
+      isRecurring: true, currency: 'USD',
+    };
+
+    it('renders a recurring line even for a month with no plan created yet', async () => {
+      setPlans({ plans: [], lines: [recurringLine] });
+      const { getByTestId, getByText, queryByTestId } = await renderSection();
+      // No plan for this month, but the recurring line still shows (and so does
+      // the empty-plan CTA below it, for income/one-off allocations).
+      await waitFor(() => expect(getByTestId('plan-line-l-rec')).toBeTruthy());
+      expect(getByTestId('plan-empty-state')).toBeTruthy();
+      expect(queryByTestId('plan-income-row')).toBeNull();
+      expect(getByText('recurring_allocation')).toBeTruthy();
+    });
+
+    it('adding a recurring allocation calls addRecurringLine, not addLine, and needs no plan', async () => {
+      setPlans({ plans: [], lines: [] });
+      const { getByTestId } = await renderSection();
+      await fireEvent.press(getByTestId('plan-add-line'));
+      await waitFor(() => expect(getByTestId('mock-line-modal')).toBeTruthy());
+      await fireEvent.press(getByTestId('mock-save-recurring-line'));
+      await waitFor(() => expect(mockPlans.addRecurringLine).toHaveBeenCalled());
+      expect(mockPlans.addRecurringLine).toHaveBeenCalledWith(
+        expect.objectContaining({ currency: 'USD', categoryId: 'cat1', sortOrder: 0 }),
+      );
+      expect(mockPlans.addPlan).not.toHaveBeenCalled();
+    });
+
+    it('saving a one-off allocation for a plan-less month lazily creates the plan first', async () => {
+      setPlans({ plans: [], lines: [recurringLine] });
+      const { getByTestId } = await renderSection();
+      await fireEvent.press(getByTestId('plan-add-line'));
+      await waitFor(() => expect(getByTestId('mock-line-modal')).toBeTruthy());
+      await fireEvent.press(getByTestId('mock-save-line'));
+      await waitFor(() => expect(mockPlans.addPlan).toHaveBeenCalledWith({ month: THIS_MONTH, currency: 'USD' }));
+      expect(mockPlans.addLine).toHaveBeenCalledWith('p1', expect.objectContaining({ categoryId: 'cat1' }));
+    });
+
+    it('exposes openAddLine via ref for a host FAB', async () => {
+      setPlans({ plans: [], lines: [] });
+      const ref = React.createRef();
+      const { getByTestId } = await renderSection(ref);
+      expect(getByTestId).toBeTruthy();
+      await waitFor(() => expect(ref.current).toBeTruthy());
+      ref.current.openAddLine();
+      await waitFor(() => expect(getByTestId('mock-line-modal')).toBeTruthy());
     });
   });
 });

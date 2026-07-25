@@ -586,6 +586,8 @@ MonthlyPlanSection.propTypes = {
   month: PropTypes.string,
 };
 
+export default MonthlyPlanSection;
+
 const styles = StyleSheet.create({
   addRow: {
     alignItems: 'center',
