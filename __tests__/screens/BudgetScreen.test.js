@@ -17,6 +17,9 @@ jest.mock('../../app/contexts/ThemeColorsContext', () => ({
       primary: '#4A90D9',
       selected: '#2a2e38',
       altRow: '#16191f',
+      income: '#4caf50',
+      expense: '#f44336',
+      transfer: '#2196f3',
     },
   }),
 }));
@@ -26,9 +29,34 @@ jest.mock('../../app/contexts/LocalizationContext', () => ({
 }));
 
 const mockSetConvertAll = jest.fn();
+const mockSetBudgetStatusMonth = jest.fn();
 let mockBudgetsData;
 jest.mock('../../app/contexts/BudgetsDataContext', () => ({
   useBudgetsData: () => mockBudgetsData,
+}));
+
+const mockShowDialog = jest.fn();
+jest.mock('../../app/contexts/DialogContext', () => ({
+  useDialog: () => ({ showDialog: mockShowDialog }),
+}));
+
+// Planned-operations context: mechanics stay in the standalone context; the
+// merged screen hosts the list + execution UI. Configurable per test.
+const mockExecute = jest.fn(async () => {});
+const mockMarkExecuted = jest.fn(async () => {});
+const mockUpdatePlanned = jest.fn(async () => {});
+const mockDeletePlanned = jest.fn(async () => {});
+let mockPlannedOperations = [];
+jest.mock('../../app/contexts/PlannedOperationsContext', () => ({
+  usePlannedOperations: () => ({
+    plannedOperations: mockPlannedOperations,
+    executePlannedOperation: mockExecute,
+    markPlannedOperationExecuted: mockMarkExecuted,
+    updatePlannedOperation: mockUpdatePlanned,
+    deletePlannedOperation: mockDeletePlanned,
+    // A planned op counts as done this month when it carries a lastExecutedMonth.
+    isExecutedThisMonth: (op) => op.lastExecutedMonth != null,
+  }),
 }));
 
 // Context values must be referentially stable across renders (the real
@@ -75,11 +103,11 @@ jest.mock('../../app/modals/BudgetModal', () => {
   };
 });
 
-jest.mock('../../app/components/BudgetProgressBar', () => {
-  const React = require('react');
-  const { View } = require('react-native');
-  return function MockBudgetProgressBar({ budgetId }) {
-    return React.createElement(View, { testID: `progress-${budgetId}` });
+let capturedPlannedModalProps = null;
+jest.mock('../../app/modals/PlannedOperationModal', () => {
+  return function MockPlannedOperationModal(props) {
+    capturedPlannedModalProps = props;
+    return null;
   };
 });
 
@@ -142,6 +170,19 @@ const makeBudget = (overrides = {}) => ({
   ...overrides,
 });
 
+const makePlanned = (overrides = {}) => ({
+  id: 'p1',
+  name: 'Salary',
+  type: 'income',
+  amount: '1000',
+  accountId: 'a1',
+  categoryId: 'cat3',
+  toAccountId: null,
+  isRecurring: true,
+  lastExecutedMonth: null,
+  ...overrides,
+});
+
 const setBudgetsData = ({ budgets = [], statuses = [], loading = false, convertAll = true } = {}) => {
   mockBudgetsData = {
     budgets,
@@ -149,6 +190,7 @@ const setBudgetsData = ({ budgets = [], statuses = [], loading = false, convertA
     loading,
     convertAllBudgets: convertAll,
     setConvertAllBudgets: mockSetConvertAll,
+    setBudgetStatusMonth: mockSetBudgetStatusMonth,
   };
 };
 
@@ -157,6 +199,8 @@ describe('BudgetScreen', () => {
   beforeEach(() => {
     jest.clearAllMocks();
     capturedModalProps = null;
+    capturedPlannedModalProps = null;
+    mockPlannedOperations = [];
     setBudgetsData();
   });
 
@@ -177,7 +221,21 @@ describe('BudgetScreen', () => {
       setBudgetsData({ budgets: [makeBudget()], statuses: [makeStatus()] });
       const { getByText, getByTestId } = await render(<BudgetScreen />);
       await waitFor(() => expect(getByText('Food')).toBeTruthy());
-      expect(getByTestId('progress-b1')).toBeTruthy();
+      expect(getByTestId('budget-row-b1')).toBeTruthy();
+      // StatusProgressBar renders the spent/amount detail and a percentage badge.
+      expect(getByText('33%')).toBeTruthy();
+    });
+
+    it('renders a single shared month header', async () => {
+      const { getByTestId } = await render(<BudgetScreen />);
+      await waitFor(() => expect(getByTestId('budget-month-header')).toBeTruthy());
+      expect(getByTestId('budget-prev-month')).toBeTruthy();
+      expect(getByTestId('budget-next-month')).toBeTruthy();
+    });
+
+    it('tells the data context which month to compute spend for', async () => {
+      await render(<BudgetScreen />);
+      await waitFor(() => expect(mockSetBudgetStatusMonth).toHaveBeenCalled());
     });
 
     it('renders converted grand totals when convert-all is on', async () => {
@@ -187,9 +245,6 @@ describe('BudgetScreen', () => {
       });
       const { getByText } = await render(<BudgetScreen />);
       // 3000 AMD + 400 RUB * 5 = 5000 AMD budgeted; 1000 + 100 * 5 = 1500 spent.
-      // Totals arrive after the currency-init effect + the async rate fetch, so
-      // allow a generous timeout — a CPU-starved worker in the full suite can
-      // take well over the 1000ms waitFor default to flush this chain.
       await waitFor(() => expect(getByText(/total_budgeted:.*5[\s,.]?000/)).toBeTruthy(), { timeout: 5000 });
       expect(getByText(/total_spent:.*1[\s,.]?500/)).toBeTruthy();
     });
@@ -205,19 +260,11 @@ describe('BudgetScreen', () => {
     });
 
     it('warns about budget currencies that cannot be converted', async () => {
-      // A budget in a currency with no rate to the selected currency (the mocked
-      // rate map only knows RUB) is dropped from the totals and surfaced as a
-      // warning — derived from the budget's own currency, not account currencies.
       setBudgetsData({
         budgets: [makeBudget({ id: 'bx', currency: 'XYZ' })],
         statuses: [makeStatus({ budgetId: 'bx', currency: 'XYZ' })],
       });
       const { findByTestId } = await render(<BudgetScreen />);
-      // The warning appears only after the currency-init effect sets the target
-      // currency and the async rate fetch resolves; findByTestId with a generous
-      // timeout keeps this stable under full-suite worker contention. Scope the
-      // XYZ assertion to the warning node — the budget row also renders "· XYZ",
-      // so an unscoped getByText(/XYZ/) would match two elements and throw.
       const warning = await findByTestId('budget-unconverted-warning', {}, { timeout: 5000 });
       expect(within(warning).getByText(/XYZ/)).toBeTruthy();
     });
@@ -263,6 +310,67 @@ describe('BudgetScreen', () => {
       expect(capturedModalProps.isNew).toBe(false);
       expect(capturedModalProps.budget).toBe(budget);
       expect(capturedModalProps.categoryName).toBe('Food');
+    });
+  });
+
+  describe('Hosted planned templates', () => {
+    it('renders income templates in their own section and expense templates alongside allocations', async () => {
+      mockPlannedOperations = [
+        makePlanned({ id: 'inc1', name: 'Salary', type: 'income' }),
+        makePlanned({ id: 'exp1', name: 'Rent', type: 'expense', categoryId: 'cat1' }),
+      ];
+      const { getByTestId } = await render(<BudgetScreen />);
+      await waitFor(() => expect(getByTestId('planned-income-section')).toBeTruthy());
+      expect(getByTestId('planned-expense-section')).toBeTruthy();
+      expect(getByTestId('planned-row-inc1')).toBeTruthy();
+      expect(getByTestId('planned-row-exp1')).toBeTruthy();
+    });
+
+    it('executes a planned template from its swipe action', async () => {
+      const op = makePlanned({ id: 'exp1', name: 'Rent', type: 'expense', categoryId: 'cat1' });
+      mockPlannedOperations = [op];
+      const { getByTestId } = await render(<BudgetScreen />);
+      await waitFor(() => expect(getByTestId('execute-action-exp1')).toBeTruthy());
+      fireEvent.press(getByTestId('execute-action-exp1'));
+      await waitFor(() => expect(mockExecute).toHaveBeenCalledWith(op));
+    });
+
+    it('marks a planned template as executed without creating an operation', async () => {
+      const op = makePlanned({ id: 'exp1', name: 'Rent', type: 'expense', categoryId: 'cat1' });
+      mockPlannedOperations = [op];
+      const { getByTestId } = await render(<BudgetScreen />);
+      await waitFor(() => expect(getByTestId('mark-executed-action-exp1')).toBeTruthy());
+      fireEvent.press(getByTestId('mark-executed-action-exp1'));
+      await waitFor(() => expect(mockMarkExecuted).toHaveBeenCalledWith(op));
+    });
+
+    it('shows the done badge and an undo action for an already-executed template', async () => {
+      const now = new Date();
+      const thisMonth = `${now.getFullYear()}-${String(now.getMonth() + 1).padStart(2, '0')}`;
+      const op = makePlanned({ id: 'inc1', name: 'Salary', type: 'income', lastExecutedMonth: thisMonth });
+      mockPlannedOperations = [op];
+      const { getByTestId } = await render(<BudgetScreen />);
+      await waitFor(() => expect(getByTestId('planned-check-inc1')).toBeTruthy());
+      fireEvent.press(getByTestId('undo-action-inc1'));
+      await waitFor(() => expect(mockUpdatePlanned).toHaveBeenCalledWith('inc1', { lastExecutedMonth: null }));
+    });
+
+    it('opens the planned-operation modal to add a template', async () => {
+      mockPlannedOperations = [makePlanned({ id: 'inc1', type: 'income' })];
+      const { getByTestId } = await render(<BudgetScreen />);
+      await waitFor(() => expect(getByTestId('planned-income-section-add')).toBeTruthy());
+      fireEvent.press(getByTestId('planned-income-section-add'));
+      await waitFor(() => expect(capturedPlannedModalProps.visible).toBe(true));
+      expect(capturedPlannedModalProps.isNew).toBe(true);
+    });
+
+    it('opens a long-press menu with execution and edit actions', async () => {
+      const op = makePlanned({ id: 'exp1', name: 'Rent', type: 'expense', categoryId: 'cat1' });
+      mockPlannedOperations = [op];
+      const { getByTestId } = await render(<BudgetScreen />);
+      await waitFor(() => expect(getByTestId('planned-row-exp1')).toBeTruthy());
+      fireEvent(getByTestId('planned-row-exp1'), 'longPress');
+      expect(mockShowDialog).toHaveBeenCalledWith('select_action', 'Rent', expect.any(Array));
     });
   });
 });
