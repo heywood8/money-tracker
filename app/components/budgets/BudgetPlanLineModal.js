@@ -49,6 +49,7 @@ export default function BudgetPlanLineModal({
   initialIncome = '0',
   expenseCategories = [],
   accounts = [],
+  saving = false,
   onSaveLine = () => {},
   onSaveIncome = () => {},
   onDeleteLine = () => {},
@@ -185,6 +186,11 @@ export default function BudgetPlanLineModal({
   const hasTarget = categoryId != null || toAccountId != null;
 
   const handleSave = useCallback(() => {
+    // The host is already mid-save (e.g. the previous tap's ensurePlan()/save is
+    // still in flight) — ignore this tap rather than fire a second concurrent
+    // save. The button itself is also disabled while saving; this is a second
+    // line of defense against a tap that lands before the disabled style commits.
+    if (saving) return;
     Keyboard.dismiss();
     if (isIncome) {
       // Income may be zero; it just must be a valid non-negative number.
@@ -214,7 +220,7 @@ export default function BudgetPlanLineModal({
       // plan's currency and doesn't carry one of its own.
       currency: isRecurring ? lineCurrency : null,
     });
-  }, [isIncome, amount, hasTarget, amountIsValid, label, comment, categoryId, toAccountId,
+  }, [saving, isIncome, amount, hasTarget, amountIsValid, label, comment, categoryId, toAccountId,
     isRecurring, lineCurrency, onSaveLine, onSaveIncome, t]);
 
   const handleDelete = useCallback(() => {
@@ -480,10 +486,12 @@ export default function BudgetPlanLineModal({
                     <Text style={[styles.buttonText, { color: colors.text }]}>{t('cancel')}</Text>
                   </Pressable>
                   <Pressable
-                    style={[styles.button, { backgroundColor: colors.primary }]}
+                    style={[styles.button, { backgroundColor: colors.primary }, saving && styles.buttonDisabled]}
                     onPress={handleSave}
+                    disabled={saving}
                     accessibilityRole="button"
                     accessibilityLabel={t('save')}
+                    accessibilityState={{ disabled: saving, busy: saving }}
                     testID="plan-line-save"
                   >
                     <Text style={[styles.buttonText, { color: colors.text }]}>{t('save')}</Text>
@@ -589,6 +597,7 @@ BudgetPlanLineModal.propTypes = {
   initialIncome: PropTypes.oneOfType([PropTypes.string, PropTypes.number]),
   expenseCategories: PropTypes.array,
   accounts: PropTypes.array,
+  saving: PropTypes.bool,
   onSaveLine: PropTypes.func,
   onSaveIncome: PropTypes.func,
   onDeleteLine: PropTypes.func,
@@ -602,6 +611,9 @@ const styles = StyleSheet.create({
     flex: 1,
     marginHorizontal: 8,
     paddingVertical: 12,
+  },
+  buttonDisabled: {
+    opacity: 0.5,
   },
   buttonRow: {
     flexDirection: 'row',

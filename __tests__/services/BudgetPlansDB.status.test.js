@@ -422,6 +422,29 @@ describe('BudgetPlansDB plan-vs-actual', () => {
         expect(parseFloat(status.totals.allocated)).toBe(0.25);
       });
 
+      it('batches the rate lookup for multiple foreign-currency recurring lines into a single fetchRatesToTarget call (perf regression)', async () => {
+        // Before the fix, calculatePlanStatus called fetchRatesToTarget once PER
+        // LINE inside the loop — N recurring lines in foreign currencies meant N
+        // sequential rate lookups instead of one batched call.
+        setupDb({
+          lines: [],
+          recurringLines: [
+            recurringLineRow('l-rec-1', '100', 'AMD', 'cat2', null, 0),
+            recurringLineRow('l-rec-2', '50', 'EUR', 'cat3', null, 1),
+            recurringLineRow('l-rec-3', '25', 'AMD', 'cat4', null, 2), // duplicate currency
+          ],
+        });
+        calculateSpendingForBudget.mockResolvedValue('0');
+        stubRates({ AMD: '0.0025', EUR: '1.1' });
+
+        await BudgetPlansDB.calculatePlanStatus('p1', 'USD', false);
+
+        expect(fetchRatesToTarget).toHaveBeenCalledTimes(1);
+        const [currencies, target] = fetchRatesToTarget.mock.calls[0];
+        expect([...currencies].sort()).toEqual(['AMD', 'EUR']);
+        expect(target).toBe('USD');
+      });
+
       it('flags a recurring line as unconvertible when no rate is available, without crashing', async () => {
         setupDb({
           lines: [],

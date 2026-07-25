@@ -144,6 +144,44 @@ describe('BudgetPlansDB', () => {
         .rejects.toThrow('A plan for this month already exists');
       expect(executeQuery).not.toHaveBeenCalled();
     });
+
+    describe('concurrent createPlan race for the same month (adversarial review, Bug 4)', () => {
+      // A double-tap Save that lazily creates a plan (MonthlyPlanSection's
+      // ensurePlan) can fire createPlan twice before either commits: both calls
+      // pass the getPlanByMonth pre-check above (neither sees the other yet),
+      // then race at the UNIQUE(budget_plans.month) constraint on INSERT. The
+      // loser must recover gracefully instead of surfacing a raw constraint error.
+      it('returns the winning plan instead of throwing when the INSERT hits the UNIQUE(month) constraint', async () => {
+        queryFirst
+          .mockResolvedValueOnce(null) // pre-check: no plan yet (this call "wins" the check)
+          .mockResolvedValueOnce({
+            id: 'winner', month: '2026-07', currency: 'USD', expected_income: '0',
+            created_at: 't1', updated_at: 't1',
+          }); // post-race recovery lookup finds the plan the OTHER call created
+        executeQuery.mockRejectedValueOnce(new Error('UNIQUE constraint failed: budget_plans.month'));
+
+        const result = await BudgetPlansDB.createPlan({ month: '2026-07', currency: 'USD' });
+
+        expect(result).toMatchObject({ id: 'winner', month: '2026-07', currency: 'USD' });
+      });
+
+      it('still throws a non-UNIQUE-constraint insert error', async () => {
+        queryFirst.mockResolvedValueOnce(null);
+        executeQuery.mockRejectedValueOnce(new Error('disk I/O error'));
+        await expect(BudgetPlansDB.createPlan({ month: '2026-07', currency: 'USD' }))
+          .rejects.toThrow('disk I/O error');
+      });
+
+      it('re-throws the UNIQUE-constraint error if the recovery lookup somehow finds nothing', async () => {
+        queryFirst
+          .mockResolvedValueOnce(null)
+          .mockResolvedValueOnce(null); // recovery lookup found nothing — genuinely unexplained
+        executeQuery.mockRejectedValueOnce(new Error('UNIQUE constraint failed: budget_plans.month'));
+
+        await expect(BudgetPlansDB.createPlan({ month: '2026-07', currency: 'USD' }))
+          .rejects.toThrow('UNIQUE constraint failed: budget_plans.month');
+      });
+    });
   });
 
   describe('read queries', () => {
@@ -249,6 +287,43 @@ describe('BudgetPlansDB', () => {
       expect(executeQuery).not.toHaveBeenCalled();
     });
 
+    // Bug 10 (adversarial review): addLine/addRecurringLine share one insertPlanLine
+    // implementation now (planId === null ⇒ recurring). These lock in that the
+    // merge preserved each function's distinct behavior.
+    describe('addRecurringLine (shares insertPlanLine with addLine)', () => {
+      it('inserts a recurring line with plan_id NULL and is_recurring=1', async () => {
+        const line = await BudgetPlansDB.addRecurringLine({ amount: '65000', categoryId: 'cat1', currency: 'EUR', label: 'Rent' });
+        expect(executeQuery).toHaveBeenCalledWith(
+          expect.stringContaining('INSERT INTO budget_plan_lines'),
+          expect.arrayContaining([null, 'Rent', '65000', 'cat1', 1, 'EUR']),
+        );
+        expect(line).toMatchObject({ planId: null, isRecurring: true, currency: 'EUR', amount: '65000' });
+      });
+
+      it('requires a currency', async () => {
+        await expect(BudgetPlansDB.addRecurringLine({ amount: '100', categoryId: 'c1' }))
+          .rejects.toThrow('Currency is required for a recurring allocation');
+        expect(executeQuery).not.toHaveBeenCalled();
+      });
+
+      it('still enforces the exactly-one-target invariant', async () => {
+        await expect(BudgetPlansDB.addRecurringLine({ amount: '100', categoryId: 'c1', toAccountId: 2, currency: 'USD' }))
+          .rejects.toThrow('not both');
+        expect(executeQuery).not.toHaveBeenCalled();
+      });
+    });
+
+    // addLine must NOT pick up a stray `currency` field — a one-off line always
+    // has currency NULL in the DB (inherits the plan's), regardless of what's on
+    // the input object. Guards insertPlanLine's `isRecurring ? line.currency :
+    // null` branch from a future regression.
+    it('addLine writes currency NULL even if the input object carries one', async () => {
+      const line = await BudgetPlansDB.addLine('p1', { amount: '10', categoryId: 'c1', currency: 'EUR' });
+      const [, params] = executeQuery.mock.calls[0];
+      expect(params).not.toContain('EUR');
+      expect(line).toMatchObject({ isRecurring: false, currency: null });
+    });
+
     it('updateLine builds a dynamic UPDATE', async () => {
       await BudgetPlansDB.updateLine('l1', { amount: '200', comment: 'x' });
       expect(executeQuery).toHaveBeenCalledWith(
@@ -310,6 +385,32 @@ describe('BudgetPlansDB', () => {
     it('reorderLines rejects a missing id', async () => {
       await expect(BudgetPlansDB.reorderLines('p1', ['l1', null]))
         .rejects.toThrow('missing id');
+    });
+
+    // Bug 10 (adversarial review): reorderLines/reorderRecurringLines share one
+    // reorderPlanLines implementation now (planId === null ⇒ recurring, scoped by
+    // `is_recurring = 1` instead of `plan_id = ?`).
+    describe('reorderRecurringLines (shares reorderPlanLines with reorderLines)', () => {
+      it('updates sort_order scoped by is_recurring, with no plan_id param', async () => {
+        await BudgetPlansDB.reorderRecurringLines(['l-rec-2', 'l-rec-1']);
+        expect(executeTransaction).toHaveBeenCalled();
+        expect(mockRunAsync).toHaveBeenCalledTimes(2);
+        expect(mockRunAsync).toHaveBeenNthCalledWith(1, expect.any(String), [0, expect.any(String), 'l-rec-2']);
+        expect(mockRunAsync).toHaveBeenNthCalledWith(2, expect.any(String), [1, expect.any(String), 'l-rec-1']);
+        const [sql] = mockRunAsync.mock.calls[0];
+        expect(sql).toContain('is_recurring = 1');
+        expect(sql).not.toContain('plan_id');
+      });
+
+      it('rejects duplicate ids', async () => {
+        await expect(BudgetPlansDB.reorderRecurringLines(['l1', 'l1']))
+          .rejects.toThrow('Duplicate line ID');
+      });
+
+      it('rejects a missing id', async () => {
+        await expect(BudgetPlansDB.reorderRecurringLines(['l1', null]))
+          .rejects.toThrow('missing id');
+      });
     });
   });
 

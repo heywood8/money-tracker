@@ -185,4 +185,31 @@ describe('BudgetPlanLineModal', () => {
       expect(props.onSaveLine).toHaveBeenCalledWith(expect.objectContaining({ isRecurring: true, currency: 'EUR' }));
     });
   });
+
+  describe('saving prop (Bug 4, adversarial review — double-tap Save guard)', () => {
+    it('disables the Save button while a save is in flight', async () => {
+      const props = { ...baseProps(), saving: true };
+      const { getByTestId } = await render(<BudgetPlanLineModal {...props} />);
+      await waitFor(() => expect(getByTestId('plan-line-save')).toBeTruthy());
+      expect(getByTestId('plan-line-save').props.accessibilityState.disabled).toBe(true);
+    });
+
+    it('ignores a Save tap while saving=true, even if the disabled style has not applied yet', async () => {
+      // Belt-and-suspenders: handleSave itself checks `saving` and bails, so a
+      // tap that somehow lands on the button before its disabled prop commits
+      // still can't fire a second onSaveLine.
+      const props = { ...baseProps(), saving: true };
+      const { getByTestId } = await render(<BudgetPlanLineModal {...props} />);
+      await waitFor(() => expect(getByTestId('plan-line-save')).toBeTruthy());
+      await fireEvent.press(getByTestId('plan-line-save'));
+      expect(props.onSaveLine).not.toHaveBeenCalled();
+    });
+
+    it('re-enables the Save button once saving becomes false', async () => {
+      const props = { ...baseProps(), saving: false };
+      const { getByTestId } = await render(<BudgetPlanLineModal {...props} />);
+      await waitFor(() => expect(getByTestId('plan-line-save')).toBeTruthy());
+      expect(getByTestId('plan-line-save').props.accessibilityState.disabled).toBe(false);
+    });
+  });
 });

@@ -6,6 +6,7 @@ import { useThemeColors } from '../../contexts/ThemeColorsContext';
 import { useLocalization } from '../../contexts/LocalizationContext';
 import { useDialog } from '../../contexts/DialogContext';
 import { useBudgetPlans } from '../../contexts/BudgetPlansContext';
+import { fetchRatesToTarget, convertWithRateMap } from '../../services/OperationsDB';
 import * as Currency from '../../services/currency';
 import { SPACING } from '../../styles/layout';
 import BudgetPlanLineModal from './BudgetPlanLineModal';
@@ -135,11 +136,15 @@ const MonthlyPlanSection = forwardRef(function MonthlyPlanSection({
 
   // Live totals: allocated = Σ line amounts, remainder = income − allocated.
   // Same precise decimal math as BudgetPlansDB.getPlanTotals, computed locally so
-  // the remainder updates immediately as lines/income change. One-off lines
-  // always share the plan's currency; a recurring line carries its own and is
-  // only added here when it matches (mixed-currency recurring lines still count
-  // correctly once the async plan status lands — see planStatus.totals.allocated
-  // — this is just the instant, pre-status estimate).
+  // the remainder updates immediately as lines/income change, BEFORE the async
+  // plan status lands. One-off lines always share the plan's currency; a
+  // recurring line carries its own and is only added here when it matches —
+  // mixed-currency recurring lines are simply skipped in this local estimate
+  // (converting them needs an exchange-rate lookup, which is exactly what
+  // planStatus.totals.allocated already did asynchronously). This local memo is
+  // ONLY the instant placeholder shown before planStatus resolves; the actual
+  // render below prefers planStatus.totals once it's available (see
+  // displayAllocated/displayRemainder).
   const totals = useMemo(() => {
     const income = plan?.expectedIncome ?? '0';
     let allocated = '0';
@@ -152,7 +157,16 @@ const MonthlyPlanSection = forwardRef(function MonthlyPlanSection({
     return { income, allocated, remainder };
   }, [plan, lines, planCurrency]);
 
-  const remainderNegative = Currency.isNegative(totals.remainder);
+  // Once the plan status has resolved, prefer its allocated/remainder — those are
+  // computed with correct cross-currency conversion for recurring lines whose
+  // currency differs from the plan's (see BudgetPlansDB.calculatePlanStatus). The
+  // local `totals` memo above is only a same-currency estimate and undercounts a
+  // mixed-currency plan; showing it after planStatus is ready would silently
+  // contradict the more accurate number the app already computed.
+  const displayAllocated = planStatus ? planStatus.totals.allocated : totals.allocated;
+  const displayRemainder = planStatus ? planStatus.totals.plannedRemainder : totals.remainder;
+
+  const remainderNegative = Currency.isNegative(displayRemainder);
 
   // Single definition of the remainder line, rendered either inline in the
   // totals row (no actuals yet) or on its own row below (once actuals show).
@@ -161,7 +175,7 @@ const MonthlyPlanSection = forwardRef(function MonthlyPlanSection({
       style={[styles.totalsRemainder, { color: remainderNegative ? colors.danger : colors.text }]}
       testID="plan-remainder"
     >
-      {t('remainder')}: {Currency.formatAmount(totals.remainder, planCurrency)} {planCurrency}
+      {t('remainder')}: {Currency.formatAmount(displayRemainder, planCurrency)} {planCurrency}
     </Text>
   );
 
@@ -218,44 +232,80 @@ const MonthlyPlanSection = forwardRef(function MonthlyPlanSection({
   }, [plan, addPlan, month, currency]);
 
   const handleSaveIncome = useCallback(async (amount) => {
+    // Guards the same race handleCreateEmpty guards against: ensurePlan() lazily
+    // creates the plan when there isn't one yet, and a double-tap Save (two
+    // fingers, or a slow first response) can fire this handler twice before
+    // either commit lands, racing two createPlan calls for the same month.
+    if (busy) return;
+    setBusy(true);
     try {
       const targetPlan = await ensurePlan();
       await updatePlan(targetPlan.id, { expectedIncome: amount });
     } catch (error) {
       // Error dialog already shown by the context.
     } finally {
+      setBusy(false);
       closeModal();
     }
-  }, [ensurePlan, updatePlan, closeModal]);
+  }, [busy, ensurePlan, updatePlan, closeModal]);
 
   // Line-level context actions don't surface their own errors (unlike plan-level
   // ones), so report failures here and keep the editor open on error rather than
   // silently dropping the user's input.
   const handleSaveLine = useCallback(async (lineData) => {
-    const { isRecurring: wantsRecurring, currency: lineCurrency, ...core } = lineData;
-    const wasRecurring = modal.line?.isRecurring ?? false;
-    const scopeChanged = !!modal.line && wasRecurring !== wantsRecurring;
-
+    // Same double-tap guard as handleCreateEmpty/handleSaveIncome: the one-off
+    // branch below lazily creates the plan via ensurePlan(), which races the same
+    // way a bare "create empty plan" tap does.
+    if (busy) return;
+    setBusy(true);
     try {
+      const { isRecurring: wantsRecurring, currency: lineCurrency, ...core } = lineData;
+      const wasRecurring = modal.line?.isRecurring ?? false;
+      const scopeChanged = !!modal.line && wasRecurring !== wantsRecurring;
+
+      // A recurring line carries its OWN currency; a one-off line inherits the
+      // plan's. Flipping scope therefore changes the line's effective currency,
+      // but the raw amount the user typed is not automatically re-expressed in
+      // it — without converting here, a recurring 250 EUR turning one-off would
+      // be saved as a one-off 250 USD (same digits, wrong value). Convert
+      // whenever scope changes AND the source/target currencies actually differ.
+      let amount = core.amount;
+      if (scopeChanged) {
+        const fromCurrency = wasRecurring ? modal.line.currency : planCurrency;
+        const toCurrency = wantsRecurring ? lineCurrency : planCurrency;
+        if (fromCurrency && toCurrency && fromCurrency !== toCurrency) {
+          const rateByCurrency = await fetchRatesToTarget([fromCurrency], toCurrency);
+          const converted = convertWithRateMap(amount, fromCurrency, toCurrency, rateByCurrency);
+          if (converted === null) {
+            // No rate available — do NOT silently save the un-converted (wrong)
+            // amount under the new currency; surface it and let the user retry.
+            showDialog('Error', t('exchange_rate_unavailable'), [{ text: t('ok') }]);
+            return;
+          }
+          amount = converted;
+        }
+      }
+      const convertedCore = { ...core, amount };
+
       if (wantsRecurring) {
         if (modal.line) {
-          const updates = { ...core, currency: lineCurrency };
+          const updates = { ...convertedCore, currency: lineCurrency };
           if (scopeChanged) updates.isRecurring = true;
           await updateLine(modal.line.id, updates);
         } else {
-          await addRecurringLine({ ...core, currency: lineCurrency, sortOrder: recurringLines.length });
+          await addRecurringLine({ ...convertedCore, currency: lineCurrency, sortOrder: recurringLines.length });
         }
       } else {
         const targetPlan = await ensurePlan();
         if (modal.line) {
-          const updates = { ...core };
+          const updates = { ...convertedCore };
           if (scopeChanged) {
             updates.isRecurring = false;
             updates.planId = targetPlan.id;
           }
           await updateLine(modal.line.id, updates);
         } else {
-          await addLine(targetPlan.id, { ...core, sortOrder: oneOffLines.length });
+          await addLine(targetPlan.id, { ...convertedCore, sortOrder: oneOffLines.length });
         }
       }
       await reloadLines();
@@ -266,8 +316,10 @@ const MonthlyPlanSection = forwardRef(function MonthlyPlanSection({
     } catch (error) {
       console.error('Failed to save plan line:', error);
       showDialog('Error', error.message, [{ text: t('ok') }]);
+    } finally {
+      setBusy(false);
     }
-  }, [modal.line, updateLine, addLine, addRecurringLine, recurringLines.length, oneOffLines.length,
+  }, [busy, modal.line, planCurrency, updateLine, addLine, addRecurringLine, recurringLines.length, oneOffLines.length,
     ensurePlan, reloadLines, refreshPlanStatuses, closeModal, showDialog, t]);
 
   const handleDeleteLine = useCallback(async (lineId) => {
@@ -294,12 +346,17 @@ const MonthlyPlanSection = forwardRef(function MonthlyPlanSection({
   }, [showDialog, t, handleDeleteLine]);
 
   // Move a recurring line up/down within the recurring block and persist order.
+  // Updates `lines` optimistically first so the reorder is visible immediately
+  // (no lag waiting on the round-trip), then reconciles with the DB truth via
+  // reloadLines() either way — on success to pick up any server-side
+  // normalization, on failure to revert a reorder that didn't actually persist.
   const handleMoveRecurring = useCallback(async (index, direction) => {
     const target = index + direction;
     if (target < 0 || target >= recurringLines.length) return;
     const reordered = recurringLines.slice();
     const [moved] = reordered.splice(index, 1);
     reordered.splice(target, 0, moved);
+    setLines([...reordered, ...oneOffLines]);
     try {
       await reorderRecurringLines(reordered.map(l => l.id));
       await reloadLines();
@@ -307,9 +364,10 @@ const MonthlyPlanSection = forwardRef(function MonthlyPlanSection({
       console.error('Failed to reorder recurring plan lines:', error);
       await reloadLines();
     }
-  }, [recurringLines, reorderRecurringLines, reloadLines]);
+  }, [recurringLines, oneOffLines, reorderRecurringLines, reloadLines]);
 
   // Move a one-off line up/down within this month's block and persist order.
+  // Same optimistic-then-reconcile approach as handleMoveRecurring above.
   const handleMoveOneOff = useCallback(async (index, direction) => {
     if (!plan) return;
     const target = index + direction;
@@ -317,6 +375,7 @@ const MonthlyPlanSection = forwardRef(function MonthlyPlanSection({
     const reordered = oneOffLines.slice();
     const [moved] = reordered.splice(index, 1);
     reordered.splice(target, 0, moved);
+    setLines([...recurringLines, ...reordered]);
     try {
       await reorderLines(plan.id, reordered.map(l => l.id));
       await reloadLines();
@@ -324,7 +383,7 @@ const MonthlyPlanSection = forwardRef(function MonthlyPlanSection({
       console.error('Failed to reorder plan lines:', error);
       await reloadLines();
     }
-  }, [plan, oneOffLines, reorderLines, reloadLines]);
+  }, [plan, oneOffLines, recurringLines, reorderLines, reloadLines]);
 
   const lineDisplayName = useCallback((line) => {
     if (line.label) return line.label;
@@ -406,6 +465,18 @@ const MonthlyPlanSection = forwardRef(function MonthlyPlanSection({
             <Icon name="alert-circle-outline" size={14} color={colors.danger} />
             <Text style={[styles.brokenText, { color: colors.danger }]} numberOfLines={1}>
               {t('relink_target')}
+            </Text>
+          </View>
+        ) : lineStatus?.status === 'unconvertible' ? (
+          // calculatePlanStatus couldn't find a rate to express this recurring
+          // line's own currency in the plan's currency — showing its amount
+          // formatted/labeled as planCurrency (like the progress bar below does)
+          // would silently mislabel the real value. Show it in its OWN currency
+          // instead, with the same unconvertible-warning language used elsewhere.
+          <View style={styles.brokenRow} testID={`plan-line-unconvertible-${line.id}`}>
+            <Icon name="alert-circle-outline" size={14} color={colors.mutedText} />
+            <Text style={[styles.brokenText, { color: colors.mutedText }]} numberOfLines={1}>
+              {t('graphs_currencies_not_converted')}: {Currency.formatAmount(lineStatus.amount, lineCurrency)} {lineCurrency}
             </Text>
           </View>
         ) : lineStatus ? (
@@ -535,7 +606,7 @@ const MonthlyPlanSection = forwardRef(function MonthlyPlanSection({
           {/* Totals: allocated vs actual, then the planned remainder */}
           <View style={[styles.totalsRow, { borderTopColor: colors.border }]} testID="plan-totals">
             <Text style={[styles.totalsLabel, { color: colors.mutedText }]}>
-              {t('allocated')}: {Currency.formatAmount(totals.allocated, planCurrency)} {planCurrency}
+              {t('allocated')}: {Currency.formatAmount(displayAllocated, planCurrency)} {planCurrency}
             </Text>
             {planStatus ? (
               <Text style={[styles.totalsLabel, { color: colors.mutedText }]} testID="plan-actual-total">
@@ -569,6 +640,7 @@ const MonthlyPlanSection = forwardRef(function MonthlyPlanSection({
         initialIncome={totals.income}
         expenseCategories={expenseCategories}
         accounts={accounts}
+        saving={busy}
         onSaveLine={handleSaveLine}
         onSaveIncome={handleSaveIncome}
         onDeleteLine={handleDeleteLine}

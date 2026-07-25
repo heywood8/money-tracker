@@ -151,10 +151,27 @@ export const createPlan = async (plan) => {
       updated_at: now,
     };
 
-    await executeQuery(
-      'INSERT INTO budget_plans (id, month, currency, expected_income, created_at, updated_at) VALUES (?, ?, ?, ?, ?, ?)',
-      [row.id, row.month, row.currency, row.expected_income, row.created_at, row.updated_at],
-    );
+    try {
+      await executeQuery(
+        'INSERT INTO budget_plans (id, month, currency, expected_income, created_at, updated_at) VALUES (?, ?, ?, ?, ?, ?)',
+        [row.id, row.month, row.currency, row.expected_income, row.created_at, row.updated_at],
+      );
+    } catch (insertError) {
+      // A double-tap Save that lazily creates a plan (e.g. MonthlyPlanSection's
+      // ensurePlan) can fire two createPlan calls for the same month before
+      // either commits — both pass the getPlanByMonth check above, then race at
+      // the UNIQUE(budget_plans.month) constraint here. Rather than surface a
+      // raw constraint-violation error when the first tap already succeeded,
+      // treat this specific failure as "the plan now exists" and hand back the
+      // one that won the race, so the losing caller still gets a usable plan.
+      const isUniqueMonthViolation = /UNIQUE constraint failed/i.test(insertError?.message || '')
+        && /budget_plans\.month/i.test(insertError?.message || '');
+      if (isUniqueMonthViolation) {
+        const raced = await getPlanByMonth(plan.month);
+        if (raced) return raced;
+      }
+      throw insertError;
+    }
 
     return mapPlanFields(row);
   } catch (error) {
@@ -308,17 +325,24 @@ export const getBrokenLines = async (planId) => {
 };
 
 /**
- * Add a one-off line to a plan (scoped to that plan's month; inherits its
- * currency). For a recurring (global, every-month) line see {@link addRecurringLine}.
- * @param {string} planId
- * @param {Object} line - { label?, amount, comment?, categoryId?, toAccountId?, sortOrder? }
+ * Shared insert path for both a one-off line (`planId` set, inherits the
+ * plan's currency) and a recurring/global-template line (`planId === null`,
+ * carries its own `currency`) — the two used to be near-identical copy-pasted
+ * functions; merging them means a future change to the insert shape (columns,
+ * validation, defaults) can't silently drift between the two copies.
+ * @param {string|null} planId - Plan to scope a one-off line to, or `null` for recurring.
+ * @param {Object} line - { label?, amount, currency?, comment?, categoryId?, toAccountId?, sortOrder? }
  * @returns {Promise<Object>} The created line (camelCase).
  */
-export const addLine = async (planId, line) => {
+const insertPlanLine = async (planId, line) => {
+  const isRecurring = planId === null;
   try {
     const validationError = validatePlanLine(line);
     if (validationError) {
       throw new Error(validationError);
+    }
+    if (isRecurring && !line.currency) {
+      throw new Error('Currency is required for a recurring allocation');
     }
 
     const now = new Date().toISOString();
@@ -331,8 +355,8 @@ export const addLine = async (planId, line) => {
       category_id: isSet(line.categoryId) ? line.categoryId : null,
       to_account_id: isSet(line.toAccountId) ? line.toAccountId : null,
       sort_order: Number.isInteger(line.sortOrder) ? line.sortOrder : 0,
-      is_recurring: 0,
-      currency: null,
+      is_recurring: isRecurring ? 1 : 0,
+      currency: isRecurring ? line.currency : null,
       created_at: now,
       updated_at: now,
     };
@@ -347,10 +371,19 @@ export const addLine = async (planId, line) => {
 
     return mapLineFields(row);
   } catch (error) {
-    console.error('Failed to add budget plan line:', error);
+    console.error(`Failed to add ${isRecurring ? 'recurring ' : ''}budget plan line:`, error);
     throw error;
   }
 };
+
+/**
+ * Add a one-off line to a plan (scoped to that plan's month; inherits its
+ * currency). For a recurring (global, every-month) line see {@link addRecurringLine}.
+ * @param {string} planId
+ * @param {Object} line - { label?, amount, comment?, categoryId?, toAccountId?, sortOrder? }
+ * @returns {Promise<Object>} The created line (camelCase).
+ */
+export const addLine = async (planId, line) => insertPlanLine(planId, line);
 
 /**
  * Add a recurring (global template) line: not tied to any single month's plan
@@ -360,46 +393,7 @@ export const addLine = async (planId, line) => {
  * @param {Object} line - { label?, amount, currency, comment?, categoryId?, toAccountId?, sortOrder? }
  * @returns {Promise<Object>} The created line (camelCase).
  */
-export const addRecurringLine = async (line) => {
-  try {
-    const validationError = validatePlanLine(line);
-    if (validationError) {
-      throw new Error(validationError);
-    }
-    if (!line.currency) {
-      throw new Error('Currency is required for a recurring allocation');
-    }
-
-    const now = new Date().toISOString();
-    const row = {
-      id: line.id || uuid.v4(),
-      plan_id: null,
-      label: line.label ?? null,
-      amount: String(line.amount),
-      comment: line.comment ?? null,
-      category_id: isSet(line.categoryId) ? line.categoryId : null,
-      to_account_id: isSet(line.toAccountId) ? line.toAccountId : null,
-      sort_order: Number.isInteger(line.sortOrder) ? line.sortOrder : 0,
-      is_recurring: 1,
-      currency: line.currency,
-      created_at: now,
-      updated_at: now,
-    };
-
-    await executeQuery(
-      'INSERT INTO budget_plan_lines (id, plan_id, label, amount, comment, category_id, to_account_id, sort_order, is_recurring, currency, created_at, updated_at) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)',
-      [
-        row.id, row.plan_id, row.label, row.amount, row.comment, row.category_id,
-        row.to_account_id, row.sort_order, row.is_recurring, row.currency, row.created_at, row.updated_at,
-      ],
-    );
-
-    return mapLineFields(row);
-  } catch (error) {
-    console.error('Failed to add recurring budget plan line:', error);
-    throw error;
-  }
-};
+export const addRecurringLine = async (line) => insertPlanLine(null, line);
 
 /**
  * Get all recurring lines (global templates, not tied to any one month's plan).
@@ -557,13 +551,17 @@ export const deleteLine = async (id) => {
 };
 
 /**
- * Persist a new line order for a plan. `orderedIds` is the full list of line IDs
- * in the desired order; each line's sort_order is set to its index.
- * @param {string} planId
- * @param {Array<string>} orderedIds
+ * Shared reorder path for both a plan's one-off lines (`planId` set — the WHERE
+ * clause is scoped to `plan_id = ?`) and the recurring/global-template lines
+ * (`planId === null` — scoped to `is_recurring = 1` instead, since those rows
+ * have no plan). Merged for the same reason as {@link insertPlanLine}: the two
+ * were copy-pasted and could otherwise drift apart on the next change.
+ * @param {string|null} planId - Plan to scope the reorder to, or `null` for recurring.
+ * @param {Array<string>} orderedIds - Full list of line IDs in the desired order.
  * @returns {Promise<void>}
  */
-export const reorderLines = async (planId, orderedIds) => {
+const reorderPlanLines = async (planId, orderedIds) => {
+  const isRecurring = planId === null;
   try {
     const seen = new Set();
     for (const id of orderedIds) {
@@ -577,19 +575,30 @@ export const reorderLines = async (planId, orderedIds) => {
     }
 
     const now = new Date().toISOString();
+    const whereClause = isRecurring ? 'id = ? AND is_recurring = 1' : 'id = ? AND plan_id = ?';
     await executeTransaction(async (db) => {
       for (let i = 0; i < orderedIds.length; i++) {
+        const params = isRecurring ? [i, now, orderedIds[i]] : [i, now, orderedIds[i], planId];
         await db.runAsync(
-          'UPDATE budget_plan_lines SET sort_order = ?, updated_at = ? WHERE id = ? AND plan_id = ?',
-          [i, now, orderedIds[i], planId],
+          `UPDATE budget_plan_lines SET sort_order = ?, updated_at = ? WHERE ${whereClause}`,
+          params,
         );
       }
     });
   } catch (error) {
-    console.error('Failed to reorder budget plan lines:', error);
+    console.error(`Failed to reorder ${isRecurring ? 'recurring ' : ''}budget plan lines:`, error);
     throw error;
   }
 };
+
+/**
+ * Persist a new line order for a plan. `orderedIds` is the full list of line IDs
+ * in the desired order; each line's sort_order is set to its index.
+ * @param {string} planId
+ * @param {Array<string>} orderedIds
+ * @returns {Promise<void>}
+ */
+export const reorderLines = async (planId, orderedIds) => reorderPlanLines(planId, orderedIds);
 
 /**
  * Persist a new line order for the recurring (global template) lines.
@@ -597,33 +606,7 @@ export const reorderLines = async (planId, orderedIds) => {
  * @param {Array<string>} orderedIds
  * @returns {Promise<void>}
  */
-export const reorderRecurringLines = async (orderedIds) => {
-  try {
-    const seen = new Set();
-    for (const id of orderedIds) {
-      if (!id) {
-        throw new Error('Invalid line data: missing id');
-      }
-      if (seen.has(id)) {
-        throw new Error(`Duplicate line ID in reorder: ${id}`);
-      }
-      seen.add(id);
-    }
-
-    const now = new Date().toISOString();
-    await executeTransaction(async (db) => {
-      for (let i = 0; i < orderedIds.length; i++) {
-        await db.runAsync(
-          'UPDATE budget_plan_lines SET sort_order = ?, updated_at = ? WHERE id = ? AND is_recurring = 1',
-          [i, now, orderedIds[i]],
-        );
-      }
-    });
-  } catch (error) {
-    console.error('Failed to reorder recurring budget plan lines:', error);
-    throw error;
-  }
-};
+export const reorderRecurringLines = async (orderedIds) => reorderPlanLines(null, orderedIds);
 
 /* -------------------------------------------------------------------------- */
 /* Derived                                                                     */
@@ -943,14 +926,24 @@ export const calculatePlanStatus = async (planId, displayCurrency = null, conver
     let allocated = '0';
     let totalActual = '0';
 
+    // Batch the rate lookup for every line's currency up front (one call, same
+    // pattern as calculateActualIncome below) instead of a per-line fetch inside
+    // the loop — with N recurring lines in foreign currencies, that used to mean
+    // N sequential network/offline-table round trips instead of one.
+    const distinctLineCurrencies = [...new Set(
+      lines.map(line => line.currency || target).filter(c => c !== target),
+    )];
+    const lineRateByCurrency = distinctLineCurrencies.length > 0
+      ? await fetchRatesToTarget(distinctLineCurrencies, target)
+      : new Map();
+
     for (const line of lines) {
       // One-off lines have no currency of their own (null) — they inherit the
       // plan's currency, matching pre-recurring behavior exactly.
       const lineCurrency = line.currency || target;
       let amount = line.amount;
       if (lineCurrency !== target) {
-        const rateByCurrency = await fetchRatesToTarget([lineCurrency], target);
-        const converted = convertWithRateMap(amount, lineCurrency, target, rateByCurrency);
+        const converted = convertWithRateMap(amount, lineCurrency, target, lineRateByCurrency);
         if (converted === null) {
           // No rate to express this recurring line's target in the display
           // currency — flag it (reusing the unconvertible-currency plumbing)
