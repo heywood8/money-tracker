@@ -175,6 +175,15 @@ describe('AppUpdateService', () => {
       expect(asset.browser_download_url).toBe('https://example.com/penny.apk');
     });
 
+    it('prefers the _arm64-suffixed apk over other ABIs (future rename)', async () => {
+      const asset = extractApkAsset([
+        { name: 'penny-v1.0.0_x86_64.apk', browser_download_url: 'https://example.com/penny-x86_64.apk' },
+        { name: 'penny-v1.0.0_arm64.apk', browser_download_url: 'https://example.com/penny-arm64.apk' },
+      ]);
+
+      expect(asset.browser_download_url).toBe('https://example.com/penny-arm64.apk');
+    });
+
     it('falls back to an x86_64 apk when it is the only option', async () => {
       const asset = extractApkAsset([
         { name: 'penny-v1.0.0_x86_64.apk', browser_download_url: 'https://example.com/penny-x86_64.apk' },

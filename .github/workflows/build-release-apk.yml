@@ -28,7 +28,14 @@ jobs:
     # but is published as a workflow artifact only — staged rollout: older installs
     # still pick the first .apk on a release, so we keep x86_64 off the release
     # until the arch-aware auto-updater (extractApkAsset, prefers non-x86) has
-    # propagated. A later release can start attaching the "_x86_64" APK safely.
+    # propagated.
+    #
+    # NEXT RELEASE (once the arch-aware updater has propagated): flip x86_64 onto
+    # the release by dropping the "&& matrix.arch == 'arm64'" guard on the release
+    # upload step, and rename the primary asset by setting the arm64 entry's
+    # apk_suffix to '_arm64'. Result: "<tag>_arm64.apk" + "<tag>_x86_64.apk".
+    # No app-side change needed then — extractApkAsset already prefers "_arm64",
+    # falling back to the unsuffixed arm64 APK.
     strategy:
       fail-fast: false
       matrix:
