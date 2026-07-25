@@ -68,7 +68,7 @@ app/
 - `GraphsScreen.js` - Financial visualizations/charts screen
 - `LanguageSelectionScreen.js` - Language selection during onboarding
 - `OperationsScreen.js` - Financial operations/transactions screen
-- `PlannedOperationsScreen.js` - Planned/recurring operations screen
+- `BudgetScreen.js` - Unified Budgets tab: budgets, monthly plan, and hosted planned/recurring templates with one-tap execution
 
 **Guidelines:**
 - One file per screen
@@ -139,7 +139,7 @@ SimpleTabs was moved here from `components/` to resolve a circular dependency. N
 
 **Root files:**
 - `AddFAB.js` - Floating action button for adding items
-- `BudgetProgressBar.js` - Budget progress visualization
+- `StatusProgressBar.js` - Shared spent-vs-amount progress bar (budgets and monthly-plan lines)
 - `Calculator.js` - Calculator widget for amount entry
 - `EmptyState.js` - Empty list placeholder
 - `ErrorBoundary.js` - React error boundary wrapper

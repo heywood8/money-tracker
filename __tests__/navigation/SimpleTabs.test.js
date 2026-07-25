@@ -76,15 +76,6 @@ jest.mock('../../app/screens/GraphsScreen', () => {
   };
 });
 
-jest.mock('../../app/screens/PlannedOperationsScreen', () => {
-  const React = require('react');
-  const { View, Text } = require('react-native');
-  return function PlannedOperationsScreen() {
-    return React.createElement(View, { testID: 'planned-screen' },
-      React.createElement(Text, {}, 'Planned Screen'));
-  };
-});
-
 jest.mock('../../app/screens/BudgetScreen', () => {
   const React = require('react');
   const { View, Text } = require('react-native');
@@ -349,7 +340,7 @@ describe('SimpleTabs Component Rendering', () => {
 
     expect(getByText('Operations Screen')).toBeTruthy();
     await waitFor(() => expect(getByText('Graphs Screen')).toBeTruthy());
-    expect(getByText('Planned Screen')).toBeTruthy();
+    expect(getByText('Budget Screen')).toBeTruthy();
   });
 
   it('renders without crashing', async () => {
@@ -362,7 +353,7 @@ describe('SimpleTabs Component Rendering', () => {
 
     expect(getByText('Operations')).toBeTruthy();
     expect(getByText('Graphs')).toBeTruthy();
-    expect(getByText('Planned')).toBeTruthy();
+    expect(getByText('budget')).toBeTruthy();
     expect(getByText('settings')).toBeTruthy();
   });
 
@@ -410,8 +401,8 @@ describe('SimpleTabs Component Rendering', () => {
     await act(async () => { fireEvent(getByTestId('tab-Graphs'), 'pressIn'); });
     await waitFor(() => expect(getByTestId('graphs-screen')).toBeTruthy());
 
-    await act(async () => { fireEvent(getByTestId('tab-Planned'), 'pressIn'); });
-    await waitFor(() => expect(getByTestId('planned-screen')).toBeTruthy());
+    await act(async () => { fireEvent(getByTestId('tab-budget'), 'pressIn'); });
+    await waitFor(() => expect(getByTestId('budget-screen')).toBeTruthy());
 
     await act(async () => { fireEvent(getByTestId('tab-settings'), 'pressIn'); });
     await waitFor(() => expect(getByTestId('settings-screen')).toBeTruthy());
@@ -489,7 +480,7 @@ describe('SimpleTabs Component Rendering', () => {
   it('renders a Settings tab button', async () => {
     const { getAllByRole } = await render(<SimpleTabs />);
     const tabs = getAllByRole('button');
-    // 4 tabs total: Operations, Graphs, Planned, Settings
+    // 4 tabs total: Operations, Graphs, Budget, Settings
     expect(tabs.length).toBeGreaterThanOrEqual(4);
   });
 
@@ -506,10 +497,10 @@ describe('SimpleTabs Component Rendering', () => {
     // Press each tab
     await fireEvent.press(getByTestId('tab-Operations'));
     await fireEvent.press(getByTestId('tab-Graphs'));
-    await fireEvent.press(getByTestId('tab-Planned'));
+    await fireEvent.press(getByTestId('tab-budget'));
 
     // All should work without errors
-    expect(getByTestId('tab-Planned')).toBeTruthy();
+    expect(getByTestId('tab-budget')).toBeTruthy();
   });
 
   it('applies styles based on active state', async () => {
@@ -535,7 +526,7 @@ describe('SimpleTabs Component Rendering', () => {
     for (let i = 0; i < 5; i++) {
       await fireEvent.press(getByTestId('tab-Operations'));
       await fireEvent.press(getByTestId('tab-Graphs'));
-      await fireEvent.press(getByTestId('tab-Planned'));
+      await fireEvent.press(getByTestId('tab-budget'));
     }
 
     // Component should still be stable (overlay may duplicate a screen testID)
@@ -568,11 +559,11 @@ describe('SimpleTabs Component Rendering', () => {
   it('re-renders when active tab changes', async () => {
     const { getByTestId, getByText } = await render(<SimpleTabs />);
 
-    // Press Planned tab
-    await fireEvent.press(getByTestId('tab-Planned'));
+    // Press Budget tab
+    await fireEvent.press(getByTestId('tab-budget'));
 
     await waitFor(() => {
-      expect(getByText('Planned')).toBeTruthy();
+      expect(getByText('budget')).toBeTruthy();
     });
   });
 
@@ -583,7 +574,7 @@ describe('SimpleTabs Component Rendering', () => {
     // later so a swipe never reveals a blank screen.
     expect(getByText('Operations Screen')).toBeTruthy();
     await waitFor(() => expect(getByText('Graphs Screen')).toBeTruthy());
-    expect(getByText('Planned Screen')).toBeTruthy();
+    expect(getByText('Budget Screen')).toBeTruthy();
   });
 
   it('mounts Graphs screen after navigating to it', async () => {
@@ -651,11 +642,11 @@ describe('SimpleTabs Component Rendering', () => {
   it('activates non-adjacent tab via overlay on pressIn', async () => {
     const { getByTestId } = await render(<SimpleTabs />);
 
-    // Operations (index 0) → Planned (index 2) — distance=2, triggers overlay path
-    fireEvent(getByTestId('tab-Planned'), 'pressIn');
+    // Operations (index 0) → Budget (index 2) — distance=2, triggers overlay path
+    fireEvent(getByTestId('tab-budget'), 'pressIn');
 
     await waitFor(() => {
-      expect(getByTestId('tab-Planned').props.accessibilityState).toEqual({ selected: true });
+      expect(getByTestId('tab-budget').props.accessibilityState).toEqual({ selected: true });
     });
   });
 });

@@ -114,13 +114,6 @@ jest.mock('../../app/modals/BudgetModal', () => {
   };
 });
 
-jest.mock('../../app/components/BudgetProgressBar', () => {
-  const React = require('react');
-  return function MockBudgetProgressBar() {
-    return React.createElement('BudgetProgressBar', null);
-  };
-});
-
 describe('CategoriesScreen', () => {
   beforeEach(() => {
     jest.clearAllMocks();

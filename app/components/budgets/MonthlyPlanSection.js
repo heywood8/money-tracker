@@ -10,30 +10,7 @@ import * as Currency from '../../services/currency';
 import { SPACING } from '../../styles/layout';
 import BudgetPlanLineModal from './BudgetPlanLineModal';
 import StatusProgressBar from '../StatusProgressBar';
-
-/** Current month as YYYY-MM. */
-const currentMonthKey = () => {
-  const now = new Date();
-  const y = now.getFullYear();
-  const m = String(now.getMonth() + 1).padStart(2, '0');
-  return `${y}-${m}`;
-};
-
-/** Shift a YYYY-MM key by `delta` months. */
-const addMonths = (monthKey, delta) => {
-  const [y, m] = monthKey.split('-').map(Number);
-  const d = new Date(y, m - 1 + delta, 1);
-  const ny = d.getFullYear();
-  const nm = String(d.getMonth() + 1).padStart(2, '0');
-  return `${ny}-${nm}`;
-};
-
-/** Localized "Month YYYY" label for a YYYY-MM key. */
-const formatMonthLabel = (monthKey) => {
-  const [y, m] = monthKey.split('-').map(Number);
-  const d = new Date(y, m - 1, 1);
-  return d.toLocaleDateString(undefined, { month: 'long', year: 'numeric' });
-};
+import { currentMonthKey, addMonths, formatMonthLabel } from '../../utils/monthUtils';
 
 const CLOSED_MODAL = { visible: false, mode: 'line', line: null };
 
@@ -45,8 +22,19 @@ const CLOSED_MODAL = { visible: false, mode: 'line', line: null };
  * progress against real spending / incoming transfers, actual vs expected
  * income, and status coloring (statuses come from BudgetPlansDataContext, which
  * follows the Budget tab's shared convert-all toggle).
+ *
+ * Month can be controlled by the host (Budgets screen) via the `month` prop so a
+ * single shared ‹ Month › header drives the whole screen; in that mode the
+ * section's own header is hidden and the host owns navigation. When `month` is
+ * omitted the section stays self-contained and renders its own month header
+ * (uncontrolled, used in isolation/tests).
  */
-export default function MonthlyPlanSection({ currency = 'USD', expenseCategories = [], accounts = [] }) {
+export default function MonthlyPlanSection({
+  currency = 'USD',
+  expenseCategories = [],
+  accounts = [],
+  month: monthProp = null,
+}) {
   const { colors } = useThemeColors();
   const { t } = useLocalization();
   const { showDialog } = useDialog();
@@ -64,7 +52,11 @@ export default function MonthlyPlanSection({ currency = 'USD', expenseCategories
     getPlanLines,
   } = useBudgetPlans();
 
-  const [month, setMonth] = useState(currentMonthKey);
+  // Month is controlled by the host when `monthProp` is provided; otherwise the
+  // section owns it via internal state (uncontrolled).
+  const controlledMonth = monthProp != null;
+  const [internalMonth, setInternalMonth] = useState(currentMonthKey);
+  const month = controlledMonth ? monthProp : internalMonth;
   const [lines, setLines] = useState([]);
   const [modal, setModal] = useState(CLOSED_MODAL);
   const [busy, setBusy] = useState(false);
@@ -156,8 +148,10 @@ export default function MonthlyPlanSection({ currency = 'USD', expenseCategories
     </Text>
   );
 
-  const handlePrev = useCallback(() => setMonth(m => addMonths(m, -1)), []);
-  const handleNext = useCallback(() => setMonth(m => addMonths(m, 1)), []);
+  // Only invoked from the section's own header, which renders in uncontrolled
+  // mode only; in controlled mode the host header drives month navigation.
+  const handlePrev = useCallback(() => setInternalMonth(m => addMonths(m, -1)), []);
+  const handleNext = useCallback(() => setInternalMonth(m => addMonths(m, 1)), []);
 
   const handleCreateEmpty = useCallback(async () => {
     if (busy) return;
@@ -284,32 +278,35 @@ export default function MonthlyPlanSection({ currency = 'USD', expenseCategories
 
   return (
     <View style={[styles.card, { backgroundColor: colors.surface, borderColor: colors.border }]} testID="monthly-plan-section">
-      {/* Month header with ‹ › navigation */}
-      <View style={styles.monthHeader}>
-        <Pressable
-          onPress={handlePrev}
-          hitSlop={8}
-          style={styles.navButton}
-          accessibilityRole="button"
-          accessibilityLabel={t('previous_month')}
-          testID="plan-prev-month"
-        >
-          <Icon name="chevron-left" size={26} color={colors.text} />
-        </Pressable>
-        <Text style={[styles.monthTitle, { color: colors.text }]} testID="plan-month-label">
-          {formatMonthLabel(month)}
-        </Text>
-        <Pressable
-          onPress={handleNext}
-          hitSlop={8}
-          style={styles.navButton}
-          accessibilityRole="button"
-          accessibilityLabel={t('next_month')}
-          testID="plan-next-month"
-        >
-          <Icon name="chevron-right" size={26} color={colors.text} />
-        </Pressable>
-      </View>
+      {/* Month header with ‹ › navigation — rendered only when the section owns
+          the month; when the host controls it a single shared header sits above. */}
+      {!controlledMonth && (
+        <View style={styles.monthHeader}>
+          <Pressable
+            onPress={handlePrev}
+            hitSlop={8}
+            style={styles.navButton}
+            accessibilityRole="button"
+            accessibilityLabel={t('previous_month')}
+            testID="plan-prev-month"
+          >
+            <Icon name="chevron-left" size={26} color={colors.text} />
+          </Pressable>
+          <Text style={[styles.monthTitle, { color: colors.text }]} testID="plan-month-label">
+            {formatMonthLabel(month)}
+          </Text>
+          <Pressable
+            onPress={handleNext}
+            hitSlop={8}
+            style={styles.navButton}
+            accessibilityRole="button"
+            accessibilityLabel={t('next_month')}
+            testID="plan-next-month"
+          >
+            <Icon name="chevron-right" size={26} color={colors.text} />
+          </Pressable>
+        </View>
+      )}
 
       {!plan ? (
         <View style={styles.emptyPlan} testID="plan-empty-state">
@@ -498,6 +495,7 @@ MonthlyPlanSection.propTypes = {
   currency: PropTypes.string,
   expenseCategories: PropTypes.array,
   accounts: PropTypes.array,
+  month: PropTypes.string,
 };
 
 const styles = StyleSheet.create({
