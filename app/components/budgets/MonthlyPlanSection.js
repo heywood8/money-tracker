@@ -145,6 +145,17 @@ export default function MonthlyPlanSection({ currency = 'USD', expenseCategories
 
   const remainderNegative = Currency.isNegative(totals.remainder);
 
+  // Single definition of the remainder line, rendered either inline in the
+  // totals row (no actuals yet) or on its own row below (once actuals show).
+  const remainderNode = (
+    <Text
+      style={[styles.totalsRemainder, { color: remainderNegative ? colors.danger : colors.text }]}
+      testID="plan-remainder"
+    >
+      {t('remainder')}: {Currency.formatAmount(totals.remainder, planCurrency)} {planCurrency}
+    </Text>
+  );
+
   const handlePrev = useCallback(() => setMonth(m => addMonths(m, -1)), []);
   const handleNext = useCallback(() => setMonth(m => addMonths(m, 1)), []);
 
@@ -447,22 +458,12 @@ export default function MonthlyPlanSection({ currency = 'USD', expenseCategories
                 {t('actual')}: {Currency.formatAmount(planStatus.totals.totalActual, planCurrency)} {planCurrency}
               </Text>
             ) : (
-              <Text
-                style={[styles.totalsRemainder, { color: remainderNegative ? colors.danger : colors.text }]}
-                testID="plan-remainder"
-              >
-                {t('remainder')}: {Currency.formatAmount(totals.remainder, planCurrency)} {planCurrency}
-              </Text>
+              remainderNode
             )}
           </View>
           {planStatus && (
             <View style={styles.remainderRow}>
-              <Text
-                style={[styles.totalsRemainder, { color: remainderNegative ? colors.danger : colors.text }]}
-                testID="plan-remainder"
-              >
-                {t('remainder')}: {Currency.formatAmount(totals.remainder, planCurrency)} {planCurrency}
-              </Text>
+              {remainderNode}
             </View>
           )}
           {planStatus?.unconvertible?.length > 0 && (

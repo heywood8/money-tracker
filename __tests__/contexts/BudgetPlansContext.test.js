@@ -284,6 +284,37 @@ describe('BudgetPlansContext', () => {
       expect(result.current.planStatuses.get('p1')).toEqual(STATUS);
     });
 
+    it('discards a stale refresh whose result resolves after a newer one', async () => {
+      BudgetPlansDB.getAllPlans.mockResolvedValue([
+        { id: 'p1', month: '2026-07', currency: 'USD', expectedIncome: '0' },
+      ]);
+      BudgetPlansDB.calculateAllPlanStatuses.mockResolvedValue(new Map([['p1', STATUS]]));
+
+      const { result } = await renderHook(() => useBudgetPlans(), { wrapper });
+      await waitFor(() => expect(result.current.planStatuses.get('p1')).toEqual(STATUS));
+
+      let resolveStale;
+      const staleMap = new Map([['p1', { ...STATUS, totals: { totalActual: 'STALE' } }]]);
+      const freshMap = new Map([['p1', { ...STATUS, totals: { totalActual: 'FRESH' } }]]);
+
+      // First refresh (older token) stays pending; second (newer token) resolves
+      // first with the fresh map, then the stale one resolves last.
+      BudgetPlansDB.calculateAllPlanStatuses
+        .mockReset()
+        .mockImplementationOnce(() => new Promise((r) => { resolveStale = r; }))
+        .mockResolvedValueOnce(freshMap);
+
+      await act(async () => {
+        const stalePromise = result.current.refreshPlanStatuses();
+        await result.current.refreshPlanStatuses();
+        resolveStale(staleMap);
+        await stalePromise;
+      });
+
+      // The stale result must not clobber the fresher one.
+      expect(result.current.planStatuses.get('p1').totals.totalActual).toBe('FRESH');
+    });
+
     it('clears statuses on DATABASE_RESET', async () => {
       let resetCb;
       appEvents.on.mockImplementation((event, cb) => {

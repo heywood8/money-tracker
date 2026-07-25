@@ -28,13 +28,24 @@ export const BudgetPlansDataProvider = ({ children }) => {
   const convertAllPlans = budgetsData?.convertAllBudgets ?? true;
   const convertAllRef = useRef(convertAllPlans);
 
+  // Monotonic token guarding against out-of-order status refreshes. Two
+  // independent triggers race here — the convert-all toggle and OPERATION_CHANGED
+  // — and their async recomputes can resolve in any order; a slow stale one must
+  // not clobber a fresher result. Bumped on every refresh start and on
+  // DATABASE_RESET (so an in-flight refresh can't repopulate after a reset).
+  const refreshTokenRef = useRef(0);
+
   /**
    * Recompute plan-vs-actual statuses for all plans (each in its own currency).
+   * Only the newest in-flight refresh is allowed to commit its result.
    */
   const refreshPlanStatuses = useCallback(async () => {
+    const token = ++refreshTokenRef.current;
     try {
       const statusMap = await BudgetPlansDB.calculateAllPlanStatuses(convertAllRef.current);
-      setPlanStatuses(statusMap);
+      if (token === refreshTokenRef.current) {
+        setPlanStatuses(statusMap);
+      }
     } catch (error) {
       console.error('Failed to refresh plan statuses:', error);
     }
@@ -93,6 +104,9 @@ export const BudgetPlansDataProvider = ({ children }) => {
   useEffect(() => {
     const unsubscribe = appEvents.on(EVENTS.DATABASE_RESET, () => {
       console.log('BudgetPlansDataContext: Database reset detected, clearing plans');
+      // Invalidate any in-flight refresh so its result can't repopulate the map
+      // for plans that no longer exist after the reset.
+      refreshTokenRef.current++;
       setPlans([]);
       setPlanStatuses(new Map());
     });
