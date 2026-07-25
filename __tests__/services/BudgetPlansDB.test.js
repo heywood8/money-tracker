@@ -393,4 +393,57 @@ describe('BudgetPlansDB', () => {
         .rejects.toThrow('insert failed');
     });
   });
+
+  describe('convertBudgetAmountToMonthly (Budgets v3 phase 2 — weekly/yearly -> monthly)', () => {
+    it('leaves a monthly amount unchanged (just reformatted)', () => {
+      expect(BudgetPlansDB.convertBudgetAmountToMonthly('65000', 'monthly', 'USD')).toBe('65000.00');
+    });
+
+    it('converts a weekly amount to its monthly equivalent (x365/84)', () => {
+      // 700 * 365 / 84 = 3041.666... -> rounds to 2 decimals
+      expect(BudgetPlansDB.convertBudgetAmountToMonthly('700', 'weekly', 'USD')).toBe('3041.67');
+    });
+
+    it('converts a yearly amount to its monthly equivalent (/12)', () => {
+      expect(BudgetPlansDB.convertBudgetAmountToMonthly('1200', 'yearly', 'USD')).toBe('100.00');
+    });
+
+    it('defaults to treating an unrecognized period type as monthly', () => {
+      expect(BudgetPlansDB.convertBudgetAmountToMonthly('500', 'bogus', 'USD')).toBe('500.00');
+    });
+  });
+
+  describe('migrateLegacyBudgetsToRecurringLines (Budgets v3 phase 2 bridge)', () => {
+    const makeBridgeDb = ({ flagSet = false, budgetRows = [] } = {}) => ({
+      getFirstAsync: jest.fn().mockResolvedValue(flagSet ? { value: 'true' } : null),
+      getAllAsync: jest.fn().mockResolvedValue(budgetRows),
+      runAsync: jest.fn().mockResolvedValue(undefined),
+    });
+
+    it('is a no-op when the completion flag is already set', async () => {
+      const db = makeBridgeDb({ flagSet: true, budgetRows: [{ id: 'b1', category_id: 'c1', amount: '100', currency: 'USD', period_type: 'monthly' }] });
+      const result = await BudgetPlansDB.migrateLegacyBudgetsToRecurringLines(db);
+      expect(result).toEqual({ migrated: 0, skipped: true });
+      expect(db.runAsync).not.toHaveBeenCalled();
+    });
+
+    it('inserts one recurring line per legacy budget and sets the completion flag', async () => {
+      const db = makeBridgeDb({
+        budgetRows: [
+          { id: 'b1', category_id: 'c1', amount: '100', currency: 'USD', period_type: 'monthly' },
+          { id: 'b2', category_id: 'c2', amount: '700', currency: 'USD', period_type: 'weekly' },
+        ],
+      });
+      const result = await BudgetPlansDB.migrateLegacyBudgetsToRecurringLines(db);
+      expect(result).toEqual({ migrated: 2, skipped: false });
+
+      const lineInserts = db.runAsync.mock.calls.filter(c => c[0].includes('INSERT INTO budget_plan_lines'));
+      expect(lineInserts).toHaveLength(2);
+      expect(lineInserts[0][1]).toEqual(['uuid-1', '100.00', 'c1', 'USD', expect.any(String), expect.any(String)]);
+
+      const flagInsert = db.runAsync.mock.calls.find(c => c[0].includes('app_metadata'));
+      expect(flagInsert[0]).toContain("'true'"); // the flag value is inlined in the SQL, not bound
+      expect(flagInsert[1][0]).toBe(BudgetPlansDB.BUDGETS_MIGRATION_FLAG_KEY);
+    });
+  });
 });
