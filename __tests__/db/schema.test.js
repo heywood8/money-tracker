@@ -755,15 +755,27 @@ describe('Database Schema', () => {
       expect(columns.categoryId).toBeDefined();
       expect(columns.toAccountId).toBeDefined();
       expect(columns.sortOrder).toBeDefined();
+      expect(columns.isRecurring).toBeDefined();
+      expect(columns.currency).toBeDefined();
       expect(columns.createdAt).toBeDefined();
       expect(columns.updatedAt).toBeDefined();
     });
 
-    it('has a text primary key and a required plan reference', async () => {
+    // Budgets v3 phase 2 (migration 0019): plan_id became nullable — NULL means a
+    // recurring (global template) line, not tied to any one month's plan.
+    it('has a text primary key and a nullable plan reference', async () => {
       expect(schema.budgetPlanLines.id.columnType).toBe('SQLiteText');
       expect(schema.budgetPlanLines.id.primary).toBe(true);
       expect(schema.budgetPlanLines.planId.columnType).toBe('SQLiteText');
-      expect(schema.budgetPlanLines.planId.notNull).toBe(true);
+      expect(schema.budgetPlanLines.planId.notNull).toBeFalsy();
+    });
+
+    it('defaults isRecurring to 0 (one-time) and allows a nullable currency', async () => {
+      expect(schema.budgetPlanLines.isRecurring.columnType).toBe('SQLiteInteger');
+      expect(schema.budgetPlanLines.isRecurring.notNull).toBe(true);
+      expect(schema.budgetPlanLines.isRecurring.default).toBe(0);
+      expect(schema.budgetPlanLines.currency.columnType).toBe('SQLiteText');
+      expect(schema.budgetPlanLines.currency.notNull).toBeFalsy();
     });
 
     it('has nullable target columns (exactly-one enforced in the service)', async () => {

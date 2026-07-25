@@ -629,8 +629,9 @@ describe('GoogleSheetsService', () => {
           { id: 'plan-1', month: '2026-07', currency: 'USD', expected_income: '3000.00' },
         ],
         budget_plan_lines: [
-          { id: 'line-cat', plan_id: 'plan-1', label: 'Groceries', amount: '400', comment: NON_ASCII_COMMENT, category_id: 'cat-1', to_account_id: null, sort_order: 0 },
-          { id: 'line-xfer', plan_id: 'plan-1', label: 'To savings', amount: '500', comment: null, category_id: null, to_account_id: 1, sort_order: 1 },
+          { id: 'line-cat', plan_id: 'plan-1', label: 'Groceries', amount: '400', comment: NON_ASCII_COMMENT, category_id: 'cat-1', to_account_id: null, sort_order: 0, is_recurring: 0, currency: null },
+          { id: 'line-xfer', plan_id: 'plan-1', label: 'To savings', amount: '500', comment: null, category_id: null, to_account_id: 1, sort_order: 1, is_recurring: 0, currency: null },
+          { id: 'line-rec', plan_id: null, label: 'Rent', amount: '65000', comment: null, category_id: 'cat-1', to_account_id: null, sort_order: 0, is_recurring: 1, currency: 'USD' },
         ],
       },
     };
@@ -646,18 +647,26 @@ describe('GoogleSheetsService', () => {
       const sheets = buildSheetsData(mockBackup);
       const lines = sheets.find(s => s.range === 'Budget Plan Lines!A1');
       const header = lines.values[0];
-      expect(header).toEqual(['id', 'plan_id', 'label', 'amount', 'comment', 'category', 'account', 'category_id', 'to_account_id', 'sort_order']);
+      expect(header).toEqual(['id', 'plan_id', 'label', 'amount', 'comment', 'category', 'account', 'category_id', 'to_account_id', 'sort_order', 'is_recurring', 'currency']);
 
       const catRow = lines.values.find(r => r[0] === 'line-cat');
       expect(catRow[header.indexOf('category')]).toBe('Food');
       expect(catRow[header.indexOf('category_id')]).toBe('cat-1');
       expect(catRow[header.indexOf('comment')]).toBe(NON_ASCII_COMMENT);
       expect(catRow[header.indexOf('account')]).toBe('');
+      expect(catRow[header.indexOf('is_recurring')]).toBe(0);
+      expect(catRow[header.indexOf('currency')]).toBe('');
 
       const xferRow = lines.values.find(r => r[0] === 'line-xfer');
       expect(xferRow[header.indexOf('account')]).toBe('Savings');
       expect(xferRow[header.indexOf('to_account_id')]).toBe(1);
       expect(xferRow[header.indexOf('category')]).toBe('');
+
+      // Recurring (global template) line: no plan_id, carries its own currency.
+      const recRow = lines.values.find(r => r[0] === 'line-rec');
+      expect(recRow[header.indexOf('plan_id')]).toBe('');
+      expect(recRow[header.indexOf('is_recurring')]).toBe(1);
+      expect(recRow[header.indexOf('currency')]).toBe('USD');
     });
 
     it('tolerates a backup that lacks budget plan data (empty sheets)', () => {
@@ -698,11 +707,12 @@ describe('GoogleSheetsService', () => {
             { range: 'Balance History!A1:A1', values: [['account', 'date', 'balance', 'account_id']] },
             { range: 'Budget Plans!A1:D2', values: [['id', 'month', 'currency', 'expected_income'], ['plan-1', '2026-07', 'USD', '3000.00']] },
             {
-              range: 'Budget Plan Lines!A1:J3',
+              range: 'Budget Plan Lines!A1:J4',
               values: [
-                ['id', 'plan_id', 'label', 'amount', 'comment', 'category', 'account', 'category_id', 'to_account_id', 'sort_order'],
-                ['line-cat', 'plan-1', 'Groceries', '400', NON_ASCII_COMMENT, 'Food', '', 'cat-1', '', '0'],
-                ['line-xfer', 'plan-1', 'To savings', '500', '', '', 'Savings', '', '1', '1'],
+                ['id', 'plan_id', 'label', 'amount', 'comment', 'category', 'account', 'category_id', 'to_account_id', 'sort_order', 'is_recurring', 'currency'],
+                ['line-cat', 'plan-1', 'Groceries', '400', NON_ASCII_COMMENT, 'Food', '', 'cat-1', '', '0', '0', ''],
+                ['line-xfer', 'plan-1', 'To savings', '500', '', '', 'Savings', '', '1', '1', '0', ''],
+                ['line-rec', '', 'Rent', '65000', '', 'Food', '', 'cat-1', '', '0', '1', 'USD'],
               ],
             },
           ],
@@ -714,17 +724,26 @@ describe('GoogleSheetsService', () => {
       expect(backup.data.budget_plans).toHaveLength(1);
       expect(backup.data.budget_plans[0]).toMatchObject({ id: 'plan-1', month: '2026-07', currency: 'USD', expected_income: '3000.00' });
 
-      expect(backup.data.budget_plan_lines).toHaveLength(2);
+      expect(backup.data.budget_plan_lines).toHaveLength(3);
       const cat = backup.data.budget_plan_lines.find(l => l.id === 'line-cat');
       expect(cat.category_id).toBe('cat-1');
       expect(cat.to_account_id).toBeNull();
       expect(cat.comment).toBe(NON_ASCII_COMMENT);
       expect(cat.sort_order).toBe(0);
+      expect(cat.is_recurring).toBe(0);
+      expect(cat.currency).toBeNull();
 
       const xfer = backup.data.budget_plan_lines.find(l => l.id === 'line-xfer');
       expect(xfer.to_account_id).toBe('1'); // resolved by ID column
       expect(xfer.category_id).toBeNull();
       expect(xfer.sort_order).toBe(1);
+
+      // Recurring (global template) line: plan_id forced to null regardless of
+      // the sheet's own column, carries its own currency.
+      const rec = backup.data.budget_plan_lines.find(l => l.id === 'line-rec');
+      expect(rec.plan_id).toBeNull();
+      expect(rec.is_recurring).toBe(1);
+      expect(rec.currency).toBe('USD');
     });
 
     it('returns empty plan arrays when the sheets are missing (old spreadsheet)', async () => {
