@@ -4,7 +4,7 @@ on:
   workflow_dispatch:
     inputs:
       profile:
-        description: 'EAS profile (preview = arm64 only; emulator = arm64 + x86_64 for AVDs)'
+        description: 'Primary build profile (preview = arm64 only; emulator = arm64 + x86_64). A separate x86_64-only APK always builds in parallel.'
         required: true
         default: 'preview'
         type: choice
@@ -19,10 +19,24 @@ on:
 
 jobs:
   build:
-    name: Build Android APK
+    name: Build Android APK (${{ matrix.arch }})
     runs-on: ubuntu-latest
     permissions:
       contents: write
+    # arm64 (the dispatch-selected profile, default preview) is the primary build;
+    # x86_64 builds in parallel. Both are attached to the GitHub Release, the
+    # x86_64 one suffixed "_x86_64". The app's auto-updater (extractApkAsset)
+    # prefers the non-x86 asset so arm64 devices still get the arm64 APK.
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+          - arch: arm64
+            profile: ${{ github.event.inputs.profile || 'preview' }}
+            apk_suffix: ''
+          - arch: x86_64
+            profile: x86
+            apk_suffix: '_x86_64'
 
     steps:
       - name: 🏗 Setup repo
@@ -75,12 +89,15 @@ jobs:
           SENTRY_ORG: ${{ secrets.SENTRY_ORG }}
           SENTRY_PROJECT: ${{ secrets.SENTRY_PROJECT }}
           SENTRY_DSN: ${{ secrets.SENTRY_DSN }}
-          BUILD_PROFILE: ${{ github.event.inputs.profile || 'preview' }}
+          BUILD_PROFILE: ${{ matrix.profile }}
         run: |
           eas build --platform android --local --profile "$BUILD_PROFILE" --non-interactive
 
       - name: 📦 Find and rename APK
         id: find_apk
+        env:
+          REF_NAME: ${{ github.ref_name }}
+          APK_SUFFIX: ${{ matrix.apk_suffix }}
         run: |
           # EAS build outputs APK in current directory or android/app/build/outputs/apk
           APK_PATH=$(find . -name "*.apk" -type f 2>/dev/null | grep -v "node_modules" | grep -v unaligned | head -1)
@@ -94,9 +111,10 @@ jobs:
           # Use git ref for filename. Sanitize "/" (present in branch names such
           # as those used for workflow_dispatch runs) so cp does not try to write
           # into a non-existent directory. Tag names like "penny-v*" are unaffected.
-          TAG_NAME="${{ github.ref_name }}"
-          SAFE_NAME="${TAG_NAME//\//-}"
-          NEW_NAME="${SAFE_NAME}.apk"
+          # APK_SUFFIX distinguishes parallel ABI builds (e.g. "_x86_64"); it is
+          # empty for the primary arm64 build so its release asset name is unchanged.
+          SAFE_NAME="${REF_NAME//\//-}"
+          NEW_NAME="${SAFE_NAME}${APK_SUFFIX}.apk"
           cp "$APK_PATH" "$NEW_NAME"
           echo "apk_path=$NEW_NAME" >> $GITHUB_OUTPUT
           echo "Renamed to: $NEW_NAME"
@@ -117,7 +135,7 @@ jobs:
       - name: 📦 Upload APK as workflow artifact
         uses: actions/upload-artifact@v4
         with:
-          name: penny-apk
+          name: penny-apk-${{ matrix.arch }}
           path: |
             ${{ steps.find_apk.outputs.apk_path }}
             ${{ steps.checksum.outputs.checksum_path }}
@@ -135,10 +153,16 @@ jobs:
 
       - name: Post build summary
         if: github.ref_type == 'tag'
+        env:
+          BUILD_PROFILE: ${{ matrix.profile }}
+          BUILD_ARCH: ${{ matrix.arch }}
+          REF_NAME: ${{ github.ref_name }}
+          APK_PATH: ${{ steps.find_apk.outputs.apk_path }}
+          CHECKSUM_PATH: ${{ steps.checksum.outputs.checksum_path }}
         run: |
           echo "## 🚀 Android Build Completed (EAS)" >> $GITHUB_STEP_SUMMARY
           echo "" >> $GITHUB_STEP_SUMMARY
-          echo "**Profile:** preview" >> $GITHUB_STEP_SUMMARY
-          echo "**Tag:** ${{ github.ref_name }}" >> $GITHUB_STEP_SUMMARY
-          echo "**APK:** ${{ steps.find_apk.outputs.apk_path }}" >> $GITHUB_STEP_SUMMARY
-          echo "**SHA-256:** $(cat ${{ steps.checksum.outputs.checksum_path }})" >> $GITHUB_STEP_SUMMARY
+          echo "**Profile:** $BUILD_PROFILE ($BUILD_ARCH)" >> $GITHUB_STEP_SUMMARY
+          echo "**Tag:** $REF_NAME" >> $GITHUB_STEP_SUMMARY
+          echo "**APK:** $APK_PATH" >> $GITHUB_STEP_SUMMARY
+          echo "**SHA-256:** $(cat "$CHECKSUM_PATH")" >> $GITHUB_STEP_SUMMARY

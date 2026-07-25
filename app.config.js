@@ -1,14 +1,18 @@
 // Architecture filtering to speed up build time:
 //  - preview:  arm64-v8a only (real devices; ~75% faster than all-ABI)
 //  - emulator: arm64-v8a + x86_64 (installable on x86_64 AVDs for UI testing)
+//  - x86:      x86_64 only (parallel CI build for x86_64 AVDs / Chromebooks)
 //  - other:    all architectures
 const IS_PREVIEW = process.env.APP_VARIANT === 'preview';
 const IS_EMULATOR = process.env.APP_VARIANT === 'emulator';
+const IS_X86 = process.env.APP_VARIANT === 'x86';
 const ANDROID_ARCHITECTURES = IS_PREVIEW
   ? ['arm64-v8a']
   : IS_EMULATOR
     ? ['arm64-v8a', 'x86_64']
-    : undefined; // undefined = all architectures
+    : IS_X86
+      ? ['x86_64']
+      : undefined; // undefined = all architectures
 
 module.exports = {
   expo: {

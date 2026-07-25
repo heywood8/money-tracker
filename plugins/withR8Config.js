@@ -30,12 +30,16 @@ const withR8Config = (config) => {
     // reliable method than expo-build-properties buildArchs (known issues).
     //  - preview:  arm64-v8a only (real devices)
     //  - emulator: arm64-v8a + x86_64 (installable on x86_64 AVDs for UI testing)
+    //  - x86:      x86_64 only (parallel CI build for x86_64 AVDs / Chromebooks)
     if (process.env.APP_VARIANT === 'preview') {
       properties['reactNativeArchitectures'] = 'arm64-v8a';
       console.log('🏗️  Building for arm64-v8a only (preview build)');
     } else if (process.env.APP_VARIANT === 'emulator') {
       properties['reactNativeArchitectures'] = 'arm64-v8a,x86_64';
       console.log('🏗️  Building for arm64-v8a + x86_64 (emulator build)');
+    } else if (process.env.APP_VARIANT === 'x86') {
+      properties['reactNativeArchitectures'] = 'x86_64';
+      console.log('🏗️  Building for x86_64 only (x86 build)');
     }
 
     // Update or add each property

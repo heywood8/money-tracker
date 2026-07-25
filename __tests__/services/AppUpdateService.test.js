@@ -163,6 +163,25 @@ describe('AppUpdateService', () => {
     it('returns null when no apk assets exist', async () => {
       expect(extractApkAsset([{ name: 'archive.zip', browser_download_url: 'https://example.com/archive.zip' }])).toBeNull();
     });
+
+    it('prefers the non-x86 apk when a release carries both ABIs', async () => {
+      // Asset order is not guaranteed by the GitHub API, so the x86_64 build may
+      // come first. Real devices are arm64 and must not be handed an x86_64 APK.
+      const asset = extractApkAsset([
+        { name: 'penny-v1.0.0_x86_64.apk', browser_download_url: 'https://example.com/penny-x86_64.apk' },
+        { name: 'penny-v1.0.0.apk', browser_download_url: 'https://example.com/penny.apk' },
+      ]);
+
+      expect(asset.browser_download_url).toBe('https://example.com/penny.apk');
+    });
+
+    it('falls back to an x86_64 apk when it is the only option', async () => {
+      const asset = extractApkAsset([
+        { name: 'penny-v1.0.0_x86_64.apk', browser_download_url: 'https://example.com/penny-x86_64.apk' },
+      ]);
+
+      expect(asset.browser_download_url).toBe('https://example.com/penny-x86_64.apk');
+    });
   });
 
   describe('checkAlreadyDownloaded', () => {

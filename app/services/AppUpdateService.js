@@ -62,12 +62,21 @@ export const extractApkAsset = (assets = []) => {
     return null;
   }
 
-  return assets.find((asset) => {
+  const apkAssets = assets.filter((asset) => {
     if (!asset || typeof asset.name !== 'string') {
       return false;
     }
     return asset.name.toLowerCase().endsWith('.apk') && !!asset.browser_download_url;
-  }) || null;
+  });
+
+  // A release may carry more than one ABI (e.g. an arm64 build plus a parallel
+  // "*_x86_64.apk"). Real devices are arm64, so prefer the non-x86 asset and
+  // only fall back to an x86_64 APK when it is the sole option (asset order in
+  // the GitHub API is not guaranteed, so we must not just take the first .apk).
+  const isX86 = (name) => /x86/i.test(name);
+  return (
+    apkAssets.find((asset) => !isX86(asset.name)) || apkAssets[0] || null
+  );
 };
 
 // Finds a SHA-256 checksum asset matching the APK filename.
