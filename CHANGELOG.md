@@ -1,5 +1,12 @@
 # Changelog
 
+## [0.222.0](https://github.com/heywood8/money-tracker/compare/penny-v0.221.0...penny-v0.222.0) (2026-07-25)
+
+
+### Features
+
+* **budgets:** consolidate per-category budgets into recurring plan lines (v3 phase 2) ([#1413](https://github.com/heywood8/money-tracker/issues/1413)) ([d6a17e8](https://github.com/heywood8/money-tracker/commit/d6a17e81a597e7993002a21269bb5bc4419bcec5))
+
 ## [0.221.0](https://github.com/heywood8/money-tracker/compare/penny-v0.220.1...penny-v0.221.0) (2026-07-25)
 
 
