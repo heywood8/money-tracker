@@ -1,5 +1,12 @@
 # Changelog
 
+## [0.220.0](https://github.com/heywood8/money-tracker/compare/penny-v0.219.0...penny-v0.220.0) (2026-07-25)
+
+
+### Features
+
+* **budgets:** plan vs actual — track spending and income against the monthly plan (Budgets v2 5/5) ([#1407](https://github.com/heywood8/money-tracker/issues/1407)) ([c41d204](https://github.com/heywood8/money-tracker/commit/c41d20404f9c37e05c1489de1814a96f01d69bad))
+
 ## [0.219.0](https://github.com/heywood8/money-tracker/compare/penny-v0.218.0...penny-v0.219.0) (2026-07-24)
 
 
