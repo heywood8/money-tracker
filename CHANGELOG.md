@@ -1,5 +1,12 @@
 # Changelog
 
+## [0.220.1](https://github.com/heywood8/money-tracker/compare/penny-v0.220.0...penny-v0.220.1) (2026-07-25)
+
+
+### Build System
+
+* **ci:** parallel x86_64 APK build with staged ABI-aware auto-update ([#1409](https://github.com/heywood8/money-tracker/issues/1409)) ([2f9c8c1](https://github.com/heywood8/money-tracker/commit/2f9c8c14b6fd4549fadaa9dab980818a5fc5b67f))
+
 ## [0.220.0](https://github.com/heywood8/money-tracker/compare/penny-v0.219.0...penny-v0.220.0) (2026-07-25)
 
 
