@@ -93,9 +93,16 @@ Financial transactions (expenses, income, transfers):
 
 **Indexes**: `date`, `account_id`, `category_id`, `type`
 
-### 5. budgets
+### 5. budgets (legacy — superseded by budget_plan_lines)
 
-Budget tracking for categories:
+Per-category budget caps (Budgets v1). **Budgets v3 phase 2** consolidated this
+model into `budget_plan_lines` as recurring lines (see below): every row here is
+mirrored into a recurring `budget_plan_lines` row by a one-time, idempotent
+bridge (`BudgetPlansDB.migrateLegacyBudgetsToRecurringLines`, gated by the
+`post_migration_m0019_completed` `app_metadata` flag) — weekly/yearly amounts
+are converted to their monthly equivalent (weekly × 365/12/7, yearly ÷ 12). The
+table itself is kept **append-only** (never dropped) and is no longer read by
+the app; it exists only for historical/backup continuity.
 
 ```javascript
 {
@@ -154,6 +161,68 @@ Tracks daily end-of-day balances per account for the balance history graph:
 ```
 
 **Indexes**: `(account_id, date)` composite (unique), `date`
+
+### 8. budget_plans (Budgets v2)
+
+One monthly envelope-style plan per calendar month. `expected_income` is split
+across the month's `budget_plan_lines`; the un-allocated remainder is always
+computed, never stored.
+
+```javascript
+{
+  id: TEXT PRIMARY KEY,
+  month: TEXT NOT NULL,             // YYYY-MM, unique — one plan per month
+  currency: TEXT NOT NULL,
+  expected_income: TEXT NOT NULL DEFAULT '0',
+  created_at: TEXT NOT NULL,
+  updated_at: TEXT NOT NULL
+}
+```
+
+**Indexes**: `month` (unique)
+
+### 9. budget_plan_lines (Budgets v2 + v3 phase 2)
+
+Each line allocates an amount to exactly one tracking target: an expense
+`category_id` or a transfer destination `to_account_id` (enforced in
+`BudgetPlansDB`, not by SQL — a line whose target is deleted becomes "broken"
+instead of crashing).
+
+**Budgets v3 phase 2** (migration 0019) added `is_recurring` and `currency`,
+and made `plan_id` nullable (a recreate-table migration, since SQLite has no
+`ALTER COLUMN DROP NOT NULL`), turning this into the single "budget row" model
+that also absorbs the old per-category `budgets` (v1) caps:
+
+- `is_recurring = 0` (one-time): scoped to a single month via `plan_id`
+  (the original Budgets v2 line). `currency` is NULL — it inherits the
+  parent plan's currency.
+- `is_recurring = 1` (recurring): a global template, **not** tied to any one
+  month's plan — `plan_id` is NULL. It applies to every calendar month
+  automatically (mirroring how v1 `budgets` behaved) and carries its own
+  `currency`, since it has no plan to inherit one from.
+
+A month's full set of lines is the recurring lines UNION that month's one-off
+lines (`BudgetPlansDB.getLinesForMonth`) — recurring lines show even for a
+month that has no `budget_plans` row yet.
+
+```javascript
+{
+  id: TEXT PRIMARY KEY,
+  plan_id: TEXT REFERENCES budget_plans(id) ON DELETE CASCADE,  // NULL = recurring
+  label: TEXT,                      // optional; falls back to the target's name
+  amount: TEXT NOT NULL,
+  comment: TEXT,
+  category_id: TEXT REFERENCES categories(id) ON DELETE SET NULL,
+  to_account_id: INTEGER REFERENCES accounts(id) ON DELETE SET NULL,
+  sort_order: INTEGER NOT NULL DEFAULT 0,
+  is_recurring: INTEGER NOT NULL DEFAULT 0,
+  currency: TEXT,                   // set only for recurring lines
+  created_at: TEXT NOT NULL,
+  updated_at: TEXT NOT NULL
+}
+```
+
+**Indexes**: `plan_id`, `is_recurring`
 
 ## Design Principles
 
