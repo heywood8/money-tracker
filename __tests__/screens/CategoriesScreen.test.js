@@ -107,13 +107,6 @@ jest.mock('../../app/modals/CategoryModal', () => {
   };
 });
 
-jest.mock('../../app/modals/BudgetModal', () => {
-  const React = require('react');
-  return function MockBudgetModal() {
-    return React.createElement('BudgetModal', null);
-  };
-});
-
 describe('CategoriesScreen', () => {
   beforeEach(() => {
     jest.clearAllMocks();
@@ -676,13 +669,6 @@ describe('CategoriesScreen', () => {
       const CategoriesScreen = require('../../app/screens/CategoriesScreen').default;
 
       // Component uses CategoryModal for editing/creating categories
-      await render(<CategoriesScreen />);
-    });
-
-    it('integrates with BudgetModal', async () => {
-      const CategoriesScreen = require('../../app/screens/CategoriesScreen').default;
-
-      // Component uses BudgetModal for budget management
       await render(<CategoriesScreen />);
     });
 
