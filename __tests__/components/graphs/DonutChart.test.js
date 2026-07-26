@@ -3,6 +3,7 @@ import { render } from '@testing-library/react-native';
 import DonutChart, {
   mapPieData,
   computeIconMarkers,
+  computeSliceGradient,
   CENTER,
   ICON_RADIUS,
   ICON_THRESHOLD,
@@ -101,6 +102,40 @@ describe('computeIconMarkers', () => {
   });
 });
 
+// Slice gradients are built inside the Pie.Chart render function, which runs on
+// the Skia canvas and is stubbed by the global victory-native mock — so the
+// geometry is asserted directly.
+describe('computeSliceGradient', () => {
+  const slice = {
+    radius: 100,
+    startAngle: 0,
+    endAngle: 90,
+    center: { x: 0, y: 0 },
+    color: '#f00',
+  };
+
+  it('starts halfway out along the leading edge', async () => {
+    const { start } = computeSliceGradient(slice);
+    expect(start.x).toBeCloseTo(50, 5);
+    expect(start.y).toBeCloseTo(0, 5);
+  });
+
+  it('ends on the rim along the slice midline', async () => {
+    const { end } = computeSliceGradient(slice);
+    // Midline of a 0..90 slice is 45°, so both components are r/√2.
+    expect(end.x).toBeCloseTo(70.71, 1);
+    expect(end.y).toBeCloseTo(70.71, 1);
+  });
+
+  it('offsets both endpoints by the slice centre', async () => {
+    const { start, end } = computeSliceGradient({ ...slice, center: { x: 10, y: 20 } });
+    expect(start.x).toBeCloseTo(60, 5);
+    expect(start.y).toBeCloseTo(20, 5);
+    expect(end.x).toBeCloseTo(80.71, 1);
+    expect(end.y).toBeCloseTo(90.71, 1);
+  });
+});
+
 describe('DonutChart', () => {
   const mockData = [
     { amount: 560, color: '#7c83fd', icon: 'food' }, // 60.9% — above threshold
@@ -147,5 +182,11 @@ describe('DonutChart', () => {
     const data = [{ amount: 100, color: '#7c83fd', icon: 'food' }];
     const { queryAllByTestId } = await render(<DonutChart data={data} />);
     expect(queryAllByTestId('icon-food').length).toBeGreaterThan(0);
+  });
+
+  it('renders the same tree with slice insets enabled', async () => {
+    const { getByTestId } = await render(<DonutChart data={mockData} insetColor="#ffffff" />);
+    expect(getByTestId('donut-chart')).toBeTruthy();
+    expect(getByTestId('vn-pie')).toBeTruthy();
   });
 });

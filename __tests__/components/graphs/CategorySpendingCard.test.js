@@ -1,6 +1,6 @@
 import React from 'react';
 import { render, fireEvent } from '@testing-library/react-native';
-import CategorySpendingCard from '../../../app/components/graphs/CategorySpendingCard';
+import CategorySpendingCard, { formatPctTick, formatYTick } from '../../../app/components/graphs/CategorySpendingCard';
 import useCategoryMonthlySpending from '../../../app/hooks/useCategoryMonthlySpending';
 
 // Mock the hook
@@ -681,17 +681,61 @@ describe('CategorySpendingCard', () => {
       expect(updatedIcons.find(i => i.props.name === 'chart-bar-stacked')).toBeTruthy();
     });
 
-    it('renders percentage y-axis labels (0%, 25%, 50%, 75%, 100%) in stacked mode', async () => {
-      const { getByText, getAllByText, getByTestId, queryByText } = await render(
+    it('swaps the grouped series for a stacked one in stacked mode', async () => {
+      const { getByText, getAllByText, getByTestId, queryByTestId } = await render(
         <CategorySpendingCard {...defaultProps} />,
       );
 
       await selectVsCategory({ getByText, getAllByText });
+
+      // Side-by-side mode draws the two series through <BarGroup>...
+      expect(queryByTestId('vn-bar-group')).toBeTruthy();
+      expect(queryByTestId('vn-stacked-bar')).toBeFalsy();
+
       await fireEvent.press(getByTestId('stacked-bar-toggle-btn'));
 
-      expect(queryByText('0%')).toBeTruthy();
-      expect(queryByText('50%')).toBeTruthy();
-      expect(queryByText('100%')).toBeTruthy();
+      // ...and the toggle replaces them with a single <StackedBar>. The 0%/50%/100%
+      // ticks it is scaled against are painted on the Skia canvas by Victory's
+      // yAxis, so they are covered via formatPctTick below instead of by query.
+      expect(getByTestId('vn-stacked-bar')).toBeTruthy();
+      expect(queryByTestId('vn-bar-group')).toBeFalsy();
+    });
+  });
+
+  // Victory calls these through xAxis/yAxis and renders the result on the Skia
+  // canvas, where it is not reachable from the test tree — so they are exported
+  // and asserted directly.
+  describe('Axis formatters', () => {
+    describe('formatYTick', () => {
+      it('formats sub-thousand amounts as whole numbers', () => {
+        expect(formatYTick(0)).toBe('0');
+        expect(formatYTick(42.4)).toBe('42');
+        expect(formatYTick(999)).toBe('999');
+      });
+
+      it('abbreviates thousands and millions', () => {
+        expect(formatYTick(1000)).toBe('1K');
+        expect(formatYTick(15400)).toBe('15K');
+        expect(formatYTick(1000000)).toBe('1.0M');
+        expect(formatYTick(2500000)).toBe('2.5M');
+      });
+
+      it('accepts the string values Victory may hand back', () => {
+        expect(formatYTick('2000')).toBe('2K');
+      });
+    });
+
+    describe('formatPctTick', () => {
+      it('renders whole-percent ticks for the 100%-normalized stack', () => {
+        expect(formatPctTick(0)).toBe('0%');
+        expect(formatPctTick(50)).toBe('50%');
+        expect(formatPctTick(100)).toBe('100%');
+      });
+
+      it('rounds fractional ticks', () => {
+        expect(formatPctTick(33.333)).toBe('33%');
+        expect(formatPctTick('66.7')).toBe('67%');
+      });
     });
   });
 });

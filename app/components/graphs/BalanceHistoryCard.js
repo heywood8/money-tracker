@@ -1,8 +1,23 @@
-import React, { useState, useMemo } from 'react';
+import React, { useState, useMemo, useRef, useEffect, useCallback } from 'react';
 import { View, Text, StyleSheet, TouchableOpacity, ActivityIndicator } from 'react-native';
 import PropTypes from 'prop-types';
-import { CartesianChart, Line } from 'victory-native';
-import { matchFont, DashPathEffect } from '@shopify/react-native-skia';
+import {
+  CartesianChart,
+  Line,
+  Area,
+  AreaRange,
+  useChartPressState,
+  useChartTransformState,
+} from 'victory-native';
+import {
+  matchFont,
+  DashPathEffect,
+  LinearGradient,
+  Circle,
+  Line as SkiaLine,
+  vec,
+} from '@shopify/react-native-skia';
+import { runOnJS, useAnimatedReaction, useDerivedValue } from 'react-native-reanimated';
 import Icon from '@expo/vector-icons/MaterialCommunityIcons';
 import SimplePicker from '../SimplePicker';
 import currencies from '../../../assets/currencies.json';
@@ -325,6 +340,224 @@ export const computeBalanceChart = ({
   return { computed, data, series };
 };
 
+// Skia needs concrete colour strings for gradient stops, and theme colours may be
+// hex or rgb(a). Normalising here keeps the gradient from throwing on an unexpected
+// format. Exported for unit testing.
+export const toRgba = (color, alpha) => {
+  if (typeof color !== 'string') return `rgba(0, 0, 0, ${alpha})`;
+  const value = color.trim();
+  const hex = /^#([0-9a-f]{6})$/i.exec(value);
+  if (hex) {
+    const int = parseInt(hex[1], 16);
+    return `rgba(${(int >> 16) & 255}, ${(int >> 8) & 255}, ${int & 255}, ${alpha})`;
+  }
+  const rgb = /^rgba?\(([^)]+)\)$/i.exec(value);
+  if (rgb) {
+    const [r, g, b] = rgb[1].split(',').map((part) => parseFloat(part));
+    return `rgba(${r}, ${g}, ${b}, ${alpha})`;
+  }
+  return value;
+};
+
+const CHART_ANIMATION = { type: 'timing', duration: 300 };
+// A plain drag scrubs values, so panning/zooming only starts after a long press —
+// otherwise the chart would fight the vertical ScrollView it lives in.
+const TRANSFORM_CONFIG = {
+  pan: { dimensions: 'x', activateAfterLongPress: 200 },
+  pinch: { dimensions: 'x' },
+};
+
+// Skia cursor drawn at the pressed x position: a dashed vertical rule plus a dot
+// on the actual-balance line. Both take Reanimated shared values, so tracking the
+// finger never crosses back into JS.
+const ChartCursor = ({ x, y, color, top, bottom }) => {
+  const start = useDerivedValue(() => vec(x.value, top), [x, top]);
+  const end = useDerivedValue(() => vec(x.value, bottom), [x, bottom]);
+  return (
+    <>
+      <SkiaLine p1={start} p2={end} color={color} strokeWidth={1} opacity={0.6}>
+        <DashPathEffect intervals={[4, 4]} />
+      </SkiaLine>
+      <Circle cx={x} cy={y} r={5} color={color} />
+    </>
+  );
+};
+
+ChartCursor.propTypes = {
+  bottom: PropTypes.number.isRequired,
+  color: PropTypes.string.isRequired,
+  top: PropTypes.number.isRequired,
+  x: PropTypes.object.isRequired,
+  y: PropTypes.object.isRequired,
+};
+
+// Shaded band between the actual balance and the burndown norm: it reads as
+// "how far ahead of / behind plan you are" without a second axis. Points are
+// paired by index and gaps (forecast days) dropped so the band never collapses.
+const DeviationBand = ({ actualPoints, normPoints, color }) => {
+  const { upper, lower } = useMemo(() => {
+    const up = [];
+    const low = [];
+    (actualPoints || []).forEach((point, index) => {
+      const norm = normPoints?.[index];
+      if (!point || !norm) return;
+      if (point.yValue == null || norm.yValue == null) return;
+      up.push(point);
+      low.push(norm);
+    });
+    return { upper: up, lower: low };
+  }, [actualPoints, normPoints]);
+
+  if (upper.length < 2) return null;
+
+  return (
+    <AreaRange
+      upperPoints={upper}
+      lowerPoints={lower}
+      color={color}
+      opacity={0.1}
+      animate={CHART_ANIMATION}
+    />
+  );
+};
+
+DeviationBand.propTypes = {
+  actualPoints: PropTypes.array,
+  color: PropTypes.string.isRequired,
+  normPoints: PropTypes.array,
+};
+
+/**
+ * The Skia canvas itself. Split out from the card so it can be remounted (via a
+ * `key` on the series signature) whenever the set of yKeys changes — the press
+ * state is allocated per series key and cannot change shape in place.
+ */
+const BalanceChart = ({
+  chartData,
+  chartYKeys,
+  chartSeries,
+  yDomain,
+  colors,
+  axisFont,
+  hideBalances,
+  lastDay,
+  onScrub,
+}) => {
+  const pressInit = useRef({
+    x: 0,
+    y: Object.fromEntries(chartYKeys.map((key) => [key, 0])),
+  }).current;
+  const { state: pressState, isActive } = useChartPressState(pressInit);
+  const { state: transformState } = useChartTransformState();
+
+  useAnimatedReaction(
+    () => pressState.x.value.value,
+    (current, previous) => {
+      if (current !== previous) runOnJS(onScrub)(Math.round(current));
+    },
+    [onScrub],
+  );
+
+  useEffect(() => {
+    if (!isActive) onScrub(null);
+  }, [isActive, onScrub]);
+
+  const xAxis = useMemo(() => ({
+    font: axisFont,
+    lineColor: colors.border,
+    labelColor: colors.mutedText,
+    formatXLabel: (value) => formatXAxisLabel(value, lastDay),
+    enableRescaling: true,
+  }), [axisFont, colors.border, colors.mutedText, lastDay]);
+
+  const yAxis = useMemo(() => ([{
+    font: axisFont,
+    lineColor: colors.border,
+    labelColor: colors.mutedText,
+    formatYLabel: (value) => formatYAxisLabel(value, hideBalances),
+    linePathEffect: <DashPathEffect intervals={[4, 4]} />,
+    enableRescaling: true,
+  }]), [axisFont, colors.border, colors.mutedText, hideBalances]);
+
+  return (
+    <CartesianChart
+      data={chartData}
+      xKey="day"
+      yKeys={chartYKeys}
+      domain={yDomain}
+      domainPadding={{ top: 16, bottom: 16 }}
+      chartPressState={pressState}
+      transformState={transformState}
+      transformConfig={TRANSFORM_CONFIG}
+      xAxis={xAxis}
+      yAxis={yAxis}
+      frame={{ lineWidth: 0 }}
+    >
+      {({ points, chartBounds }) => (
+        <>
+          <DeviationBand
+            actualPoints={points.actual}
+            normPoints={points.plainAvg}
+            color={colors.primary}
+          />
+          {/* Gradient fill under the actual balance, fading to transparent at the axis. */}
+          <Area
+            points={points.actual}
+            y0={chartBounds.bottom}
+            curveType="monotoneX"
+            animate={CHART_ANIMATION}
+            connectMissingData
+          >
+            <LinearGradient
+              start={vec(0, chartBounds.top)}
+              end={vec(0, chartBounds.bottom)}
+              colors={[toRgba(colors.primary, 0.35), toRgba(colors.primary, 0)]}
+            />
+          </Area>
+          {chartSeries.map((s) => (
+            <Line
+              key={s.yKey}
+              points={points[s.yKey]}
+              color={s.color}
+              strokeWidth={s.strokeWidth}
+              curveType={s.curveType}
+              animate={CHART_ANIMATION}
+              connectMissingData
+            >
+              {/* DashPathEffect is a Skia paint child; guarded so the
+                  system stays robust if the effect is unavailable. */}
+              {s.dashed && DashPathEffect ? (
+                <DashPathEffect intervals={[6, 6]} />
+              ) : null}
+            </Line>
+          ))}
+          {isActive && (
+            <ChartCursor
+              x={pressState.x.position}
+              y={pressState.y.actual.position}
+              color={colors.primary}
+              top={chartBounds.top}
+              bottom={chartBounds.bottom}
+            />
+          )}
+        </>
+      )}
+    </CartesianChart>
+  );
+};
+
+BalanceChart.propTypes = {
+  axisFont: PropTypes.object,
+  chartData: PropTypes.array.isRequired,
+  chartSeries: PropTypes.array.isRequired,
+  chartYKeys: PropTypes.arrayOf(PropTypes.string).isRequired,
+  colors: PropTypes.object.isRequired,
+  hideBalances: PropTypes.bool,
+  lastDay: PropTypes.number,
+  onScrub: PropTypes.func.isRequired,
+  yDomain: PropTypes.object,
+};
+
 const BalanceHistoryCard = ({
   colors,
   t,
@@ -351,6 +584,8 @@ const BalanceHistoryCard = ({
   const { hideBalances } = useDisplaySettings();
   const [showCalendar, setShowCalendar] = useState(false);
   const [contentHeight, setContentHeight] = useState(340);
+  // Day currently under the finger while scrubbing the chart (null when idle).
+  const [scrubDay, setScrubDay] = useState(null);
 
   const selectedAccountData = accounts.find(acc => acc.id === selectedAccount);
   const currency = selectedAccountData?.currency || 'USD';
@@ -396,6 +631,24 @@ const BalanceHistoryCard = ({
     }
   }, []);
 
+  const handleScrub = useCallback((day) => setScrubDay(day), []);
+
+  // While scrubbing, the header reports the balance under the finger instead of
+  // the latest one — the chart itself carries no numbers.
+  const scrubbedBalance = useMemo(() => {
+    if (scrubDay == null) return null;
+    const point = chartData.find((d) => d.day === scrubDay);
+    if (!point) return null;
+    return point.actual ?? point.forecast ?? null;
+  }, [scrubDay, chartData]);
+
+  const headerBalance = scrubbedBalance != null ? scrubbedBalance : currentBalance;
+  const headerDay = scrubDay != null ? scrubDay : headerDayNum;
+  const showDayContext = (isCurrentMonth || scrubDay != null) && headerDaysInMonth !== null;
+
+  // Series composition drives the press-state shape; remount the canvas when it changes.
+  const chartKey = chartYKeys.join('|');
+
   return (
     <View style={[styles.balanceHistoryCard, { backgroundColor: colors.surface, borderColor: colors.border }]}>
       <View style={styles.balanceHistoryHeader}>
@@ -403,14 +656,14 @@ const BalanceHistoryCard = ({
           <Text style={[styles.balanceHistoryLabel, { color: colors.mutedText }]}>
             {(t('balance') || 'Balance').toUpperCase()}
           </Text>
-          {currentBalance !== null && (
+          {headerBalance !== null && (
             <View style={styles.balanceAmountRow}>
               <Text style={[styles.balanceAmount, { color: colors.text }]} numberOfLines={1}>
-                {hideBalances ? '••••' : formatBalanceCompact(currentBalance, currency)}
+                {hideBalances ? '••••' : formatBalanceCompact(headerBalance, currency)}
               </Text>
-              {isCurrentMonth && headerDaysInMonth !== null && (
+              {showDayContext && (
                 <Text style={[styles.balanceDayContext, { color: colors.mutedText }]}>
-                  {`day ${headerDayNum}/${headerDaysInMonth}`}
+                  {`day ${headerDay}/${headerDaysInMonth}`}
                 </Text>
               )}
             </View>
@@ -480,41 +733,18 @@ const BalanceHistoryCard = ({
                     accessibilityRole="image"
                     accessibilityLabel={t('balance_history') || 'Balance history chart'}
                   >
-                    <CartesianChart
-                      data={chartData}
-                      xKey="day"
-                      yKeys={chartYKeys}
-                      domain={yDomain}
-                      domainPadding={{ top: 16, bottom: 16 }}
-                      axisOptions={{
-                        font: axisFont,
-                        lineColor: colors.border,
-                        labelColor: colors.mutedText,
-                        formatYLabel: (value) => formatYAxisLabel(value, hideBalances),
-                        formatXLabel: (value) => formatXAxisLabel(value, chartComputed.lastDay),
-                      }}
-                    >
-                      {({ points }) => (
-                        <>
-                          {chartSeries.map((s) => (
-                            <Line
-                              key={s.yKey}
-                              points={points[s.yKey]}
-                              color={s.color}
-                              strokeWidth={s.strokeWidth}
-                              curveType={s.curveType}
-                              connectMissingData
-                            >
-                              {/* DashPathEffect is a Skia paint child; guarded so the
-                                  system stays robust if the effect is unavailable. */}
-                              {s.dashed && DashPathEffect ? (
-                                <DashPathEffect intervals={[6, 6]} />
-                              ) : null}
-                            </Line>
-                          ))}
-                        </>
-                      )}
-                    </CartesianChart>
+                    <BalanceChart
+                      key={chartKey}
+                      chartData={chartData}
+                      chartYKeys={chartYKeys}
+                      chartSeries={chartSeries}
+                      yDomain={yDomain}
+                      colors={colors}
+                      axisFont={axisFont}
+                      hideBalances={hideBalances}
+                      lastDay={chartComputed.lastDay}
+                      onScrub={handleScrub}
+                    />
                   </View>
                 )}
               </View>

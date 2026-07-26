@@ -5,7 +5,7 @@
 
 import React from 'react';
 import { render, fireEvent } from '@testing-library/react-native';
-import BalanceHistoryCard, { computeBalanceChart, formatYAxisLabel } from '../../app/components/graphs/BalanceHistoryCard';
+import BalanceHistoryCard, { computeBalanceChart, formatYAxisLabel, toRgba } from '../../app/components/graphs/BalanceHistoryCard';
 
 // Mock DisplaySettingsContext
 jest.mock('../../app/contexts/DisplaySettingsContext', () => ({
@@ -347,6 +347,28 @@ describe('BalanceHistoryCard', () => {
       );
 
       expect(container.queryAll(n => n.props.testID === 'cartesian-chart')[0]).toBeFalsy();
+    });
+  });
+
+  describe('toRgba', () => {
+    it('expands a six-digit hex colour into rgba', () => {
+      expect(toRgba('#6200ee', 0.35)).toBe('rgba(98, 0, 238, 0.35)');
+      expect(toRgba('#FFFFFF', 1)).toBe('rgba(255, 255, 255, 1)');
+    });
+
+    it('re-alphas an existing rgb/rgba colour', () => {
+      expect(toRgba('rgb(10, 20, 30)', 0.5)).toBe('rgba(10, 20, 30, 0.5)');
+      expect(toRgba('rgba(10, 20, 30, 0.9)', 0)).toBe('rgba(10, 20, 30, 0)');
+    });
+
+    it('passes through colours it cannot parse', () => {
+      expect(toRgba('papayawhip', 0.5)).toBe('papayawhip');
+      expect(toRgba('#abc', 0.5)).toBe('#abc');
+    });
+
+    it('falls back to transparent black for non-strings', () => {
+      expect(toRgba(undefined, 0.2)).toBe('rgba(0, 0, 0, 0.2)');
+      expect(toRgba(null, 0)).toBe('rgba(0, 0, 0, 0)');
     });
   });
 
