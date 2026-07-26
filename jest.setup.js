@@ -520,7 +520,9 @@ jest.mock(
     // eslint-disable-next-line react/prop-types
     const BarGroup = ({ children }) =>
       React.createElement(View, { testID: 'vn-bar-group' }, children);
-    BarGroup.Bar = () => React.createElement(View, { testID: 'vn-bar-group-bar' });
+    const BarGroupBar = () => React.createElement(View, { testID: 'vn-bar-group-bar' });
+    BarGroupBar.displayName = 'BarGroup.Bar';
+    BarGroup.Bar = BarGroupBar;
     // Gesture state stubs: components read `.value` off Reanimated shared values,
     // so every axis slot has to be an object with a `value` field.
     const shared = (v) => ({ value: v });
