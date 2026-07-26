@@ -1,5 +1,12 @@
 # Changelog
 
+## [0.224.0](https://github.com/heywood8/money-tracker/compare/penny-v0.223.0...penny-v0.224.0) (2026-07-26)
+
+
+### Features
+
+* **ci:** attach x86_64 APK to GitHub releases ([#1418](https://github.com/heywood8/money-tracker/issues/1418)) ([3f6a644](https://github.com/heywood8/money-tracker/commit/3f6a6442128252915d13f7ed675d43fb438257dc))
+
 ## [0.223.0](https://github.com/heywood8/money-tracker/compare/penny-v0.222.0...penny-v0.223.0) (2026-07-26)
 
 
