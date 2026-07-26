@@ -1,5 +1,12 @@
 # Changelog
 
+## [0.224.2](https://github.com/heywood8/money-tracker/compare/penny-v0.224.1...penny-v0.224.2) (2026-07-26)
+
+
+### Bug Fixes
+
+* **budgets:** four defects found reviewing the v3 executable-templates diff ([#1422](https://github.com/heywood8/money-tracker/issues/1422)) ([28553d1](https://github.com/heywood8/money-tracker/commit/28553d10a1f357e002f392021e84a6dfb4c6d77d))
+
 ## [0.224.1](https://github.com/heywood8/money-tracker/compare/penny-v0.224.0...penny-v0.224.1) (2026-07-26)
 
 
