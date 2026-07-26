@@ -397,7 +397,14 @@ const MonthlyPlanSection = forwardRef(function MonthlyPlanSection({
   // usable title on its own. Hoisted above the handlers that consume it.
   const lineDisplayName = useCallback((line) => {
     if (line.label) return line.label;
-    if (line.categoryId != null) return categoriesById.get(line.categoryId)?.name || t('allocation_unlinked');
+    const categoryIds = line.categoryIds ?? (line.categoryId != null ? [line.categoryId] : []);
+    if (categoryIds.length > 0) {
+      const first = categoriesById.get(categoryIds[0])?.name || t('allocation_unlinked');
+      // A multi-category line names its first category and counts the rest, the
+      // same shorthand the editor's target row uses. The label field is right
+      // there for anyone who wants "Eating out" instead of "Groceries +2".
+      return categoryIds.length > 1 ? `${first} +${categoryIds.length - 1}` : first;
+    }
     if (line.toAccountId != null) return accountsById.get(line.toAccountId)?.name || t('allocation_unlinked');
     if (line.kind === 'income') return t('expected_income');
     return t('allocation_unlinked');

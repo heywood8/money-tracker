@@ -550,6 +550,8 @@
   "no_template_account": "없음 (추적만)",
   "edit_allocation": "배정 편집",
   "tracking_target": "추적 대상",
+  "include_subcategories": "하위 카테고리 포함",
+  "include_subcategories_hint": "선택한 카테고리의 하위 카테고리 지출도 이 항목에 포함됩니다.",
   "select_target": "대상 선택",
   "allocation_label": "라벨",
   "allocation_comment": "메모",

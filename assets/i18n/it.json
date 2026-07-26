@@ -550,6 +550,8 @@
   "no_template_account": "Nessuno (solo monitoraggio)",
   "edit_allocation": "Modifica voce",
   "tracking_target": "Obiettivo di tracciamento",
+  "include_subcategories": "Includi sottocategorie",
+  "include_subcategories_hint": "Le spese nelle categorie annidate sotto quelle selezionate contano in questa riga.",
   "select_target": "Seleziona obiettivo",
   "allocation_label": "Etichetta",
   "allocation_comment": "Commento",

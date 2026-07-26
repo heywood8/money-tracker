@@ -74,12 +74,79 @@ describe('BudgetPlanLineModal', () => {
     await fireEvent.press(getByTestId('plan-target-picker'));
     await waitFor(() => expect(getByTestId('plan-target-option-cat-cat1')).toBeTruthy());
     await fireEvent.press(getByTestId('plan-target-option-cat-cat1'));
+    // The picker stays open for further categories now, so close it explicitly.
+    await fireEvent.press(getByTestId('plan-target-done'));
     await fireEvent.changeText(getByTestId('plan-line-amount'), '150');
     await fireEvent.press(getByTestId('plan-line-save'));
     expect(props.onSaveLine).toHaveBeenCalledWith(expect.objectContaining({
       amount: '150',
-      categoryId: 'cat1',
+      categoryIds: ['cat1'],
       toAccountId: null,
+    }));
+  });
+
+  // Migration 0021: one line, several categories.
+  it('saves every category picked, and drops one that is tapped again', async () => {
+    const props = {
+      ...baseProps(),
+      expenseCategories: [
+        { id: 'cat1', name: 'Groceries', categoryType: 'expense' },
+        { id: 'cat2', name: 'Cafes', categoryType: 'expense' },
+        { id: 'cat3', name: 'Taxi', categoryType: 'expense' },
+      ],
+    };
+    const { getByTestId } = await render(<BudgetPlanLineModal {...props} />);
+    await fireEvent.press(getByTestId('plan-target-picker'));
+    await waitFor(() => expect(getByTestId('plan-target-option-cat-cat1')).toBeTruthy());
+    await fireEvent.press(getByTestId('plan-target-option-cat-cat1'));
+    await fireEvent.press(getByTestId('plan-target-option-cat-cat2'));
+    await fireEvent.press(getByTestId('plan-target-option-cat-cat3'));
+    // Tapping a selected category removes it — the picker toggles, not replaces.
+    await fireEvent.press(getByTestId('plan-target-option-cat-cat2'));
+    await fireEvent.press(getByTestId('plan-target-done'));
+    await fireEvent.changeText(getByTestId('plan-line-amount'), '150');
+    await fireEvent.press(getByTestId('plan-line-save'));
+    expect(props.onSaveLine).toHaveBeenCalledWith(expect.objectContaining({
+      categoryIds: ['cat1', 'cat3'],
+    }));
+  });
+
+  it('defaults includeChildren on and lets it be switched off', async () => {
+    const props = baseProps();
+    const { getByTestId, queryByTestId } = await render(<BudgetPlanLineModal {...props} />);
+    // The roll-up toggle only exists once the line tracks a category.
+    expect(queryByTestId('plan-line-include-children-toggle')).toBeNull();
+    await fireEvent.press(getByTestId('plan-target-picker'));
+    await waitFor(() => expect(getByTestId('plan-target-option-cat-cat1')).toBeTruthy());
+    await fireEvent.press(getByTestId('plan-target-option-cat-cat1'));
+    await fireEvent.press(getByTestId('plan-target-done'));
+    await fireEvent.changeText(getByTestId('plan-line-amount'), '150');
+    await waitFor(() => expect(getByTestId('plan-line-include-children-toggle')).toBeTruthy());
+    await fireEvent.press(getByTestId('plan-line-include-children-toggle'));
+    await fireEvent.press(getByTestId('plan-line-save'));
+    expect(props.onSaveLine).toHaveBeenCalledWith(expect.objectContaining({
+      includeChildren: false,
+    }));
+  });
+
+  it('seeds the picker from an edited line\'s stored category set', async () => {
+    const props = {
+      ...baseProps(),
+      expenseCategories: [
+        { id: 'cat1', name: 'Groceries', categoryType: 'expense' },
+        { id: 'cat2', name: 'Cafes', categoryType: 'expense' },
+      ],
+      line: {
+        id: 'l1', amount: '150', kind: 'expense',
+        categoryId: 'cat1', categoryIds: ['cat1', 'cat2'], includeChildren: false,
+      },
+    };
+    const { getByTestId } = await render(<BudgetPlanLineModal {...props} />);
+    await waitFor(() => expect(getByTestId('plan-line-save')).toBeTruthy());
+    await fireEvent.press(getByTestId('plan-line-save'));
+    expect(props.onSaveLine).toHaveBeenCalledWith(expect.objectContaining({
+      categoryIds: ['cat1', 'cat2'],
+      includeChildren: false,
     }));
   });
 
@@ -98,7 +165,7 @@ describe('BudgetPlanLineModal', () => {
     expect(props.onSaveLine).toHaveBeenCalledWith(expect.objectContaining({
       amount: '400',
       kind: 'transfer',
-      categoryId: null,
+      categoryIds: [],
       toAccountId: 1,
     }));
   });
@@ -111,7 +178,7 @@ describe('BudgetPlanLineModal', () => {
       await fireEvent.changeText(getByTestId('plan-line-amount'), '2500');
       await fireEvent.press(getByTestId('plan-line-save'));
       expect(props.onSaveLine).toHaveBeenCalledWith(expect.objectContaining({
-        kind: 'income', amount: '2500', categoryId: null, toAccountId: null,
+        kind: 'income', amount: '2500', categoryIds: [], toAccountId: null,
       }));
     });
 
@@ -219,7 +286,7 @@ describe('BudgetPlanLineModal', () => {
       await fireEvent.changeText(getByTestId('plan-line-amount'), '65000');
       await fireEvent.press(getByTestId('plan-line-save'));
       expect(props.onSaveLine).toHaveBeenCalledWith(expect.objectContaining({
-        amount: '65000', categoryId: 'cat1', isRecurring: true, currency: 'USD',
+        amount: '65000', categoryIds: ['cat1'], isRecurring: true, currency: 'USD',
       }));
     });
 

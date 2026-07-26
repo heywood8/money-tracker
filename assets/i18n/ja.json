@@ -550,6 +550,8 @@
   "no_template_account": "なし（記録のみ）",
   "edit_allocation": "配分を編集",
   "tracking_target": "追跡対象",
+  "include_subcategories": "サブカテゴリを含める",
+  "include_subcategories_hint": "選択したカテゴリの下位カテゴリの支出もこの項目に含まれます。",
   "select_target": "対象を選択",
   "allocation_label": "ラベル",
   "allocation_comment": "コメント",

@@ -172,8 +172,9 @@ describe('BackupRestore', () => {
       });
       expect(backup.timestamp).toBeDefined();
       // accounts, categories, operations, budgets, app_metadata, balance_history,
-      // planned_operations, notification_merchant_rules, budget_plans, budget_plan_lines
-      expect(mockDb.queryAll).toHaveBeenCalledTimes(10);
+      // planned_operations, notification_merchant_rules, budget_plans,
+      // budget_plan_lines, budget_plan_line_categories
+      expect(mockDb.queryAll).toHaveBeenCalledTimes(11);
     });
 
     it('includes empty arrays when tables are empty', async () => {
@@ -561,12 +562,14 @@ describe('BackupRestore', () => {
       expect(deleteCalls[0]).toContain('notification_merchant_rules');
       expect(deleteCalls[1]).toContain('planned_operations');
       expect(deleteCalls[2]).toContain('budgets');
-      expect(deleteCalls[3]).toContain('budget_plan_lines');
-      expect(deleteCalls[4]).toContain('budget_plans');
-      expect(deleteCalls[5]).toContain('accounts_balance_history');
-      expect(deleteCalls[6]).toContain('operations');
-      expect(deleteCalls[7]).toContain('categories');
-      expect(deleteCalls[8]).toContain('accounts');
+      // The 0021 junction is cleared before the lines it hangs off.
+      expect(deleteCalls[3]).toContain('budget_plan_line_categories');
+      expect(deleteCalls[4]).toContain('budget_plan_lines');
+      expect(deleteCalls[5]).toContain('budget_plans');
+      expect(deleteCalls[6]).toContain('accounts_balance_history');
+      expect(deleteCalls[7]).toContain('operations');
+      expect(deleteCalls[8]).toContain('categories');
+      expect(deleteCalls[9]).toContain('accounts');
     });
 
     it('preserves db_version metadata', async () => {
@@ -1616,6 +1619,13 @@ op-2,income,20,acc-1,cat-1`;
         (c) => typeof c[0] === 'string' && c[0].includes(`INSERT INTO ${table}`),
       );
 
+    // The 0021 junction is written with INSERT OR IGNORE, which findInsert's
+    // `INSERT INTO <table>` match doesn't cover.
+    const findLinkInserts = (dbInstance) =>
+      dbInstance.runAsync.mock.calls.filter(
+        (c) => typeof c[0] === 'string' && c[0].includes('INTO budget_plan_line_categories'),
+      );
+
     const backupWithPlan = () => ({
       version: 1,
       timestamp: '2026-07-01T00:00:00.000Z',
@@ -1661,18 +1671,78 @@ op-2,income,20,acc-1,cat-1`;
 
       // Category line: keeps category_id as-is, to_account_id null, comment
       // intact; one-off (is_recurring 0, currency null).
+      // include_children restores as 1 (roll descendants up) for a backup that
+      // predates the flag — the behaviour those lines had when written.
       const catCall = lineInserts.find(c => c[1][0] === 'line-cat');
       expect(catCall[1]).toEqual([
         'line-cat', 'plan-1', 'Groceries', '400.00', NON_ASCII_COMMENT,
-        'cat-1', null, 0, 0, null, null, null, null, 'x', 'y',
+        'cat-1', null, 0, 0, null, null, null, null, 1, 'x', 'y',
       ]);
 
       // Transfer line: category_id null, to_account_id remapped 'acc-uuid' -> 42.
       const xferCall = lineInserts.find(c => c[1][0] === 'line-xfer');
       expect(xferCall[1]).toEqual([
         'line-xfer', 'plan-1', 'To savings', '500.00', null,
-        null, REMAPPED_ACCOUNT_ID, 1, 0, null, null, null, null, 'x', 'y',
+        null, REMAPPED_ACCOUNT_ID, 1, 0, null, null, null, null, 1, 'x', 'y',
       ]);
+
+      // A pre-0021 backup carries no junction, so the category line's link is
+      // rebuilt from its category_id — otherwise it would restore as broken.
+      const linkInserts = findLinkInserts(dbInstance);
+      expect(linkInserts.map(c => c[1])).toEqual([['line-cat', 'cat-1']]);
+    });
+
+    // Regression: a CSV backup yields '' for a column the file doesn't carry,
+    // and Number('') is 0 — so a naive numeric check would silently switch the
+    // descendant roll-up OFF for every line restored from a CSV.
+    it('treats a blank include_children as on, not off', async () => {
+      const dbInstance = makeDbInstance();
+      mockDb.executeTransaction.mockImplementation(async (cb) => { await cb(dbInstance); });
+
+      const backup = backupWithPlan();
+      backup.data.budget_plan_lines = [{ ...categoryLine, include_children: '' }];
+
+      await BackupRestore.restoreBackup(backup);
+
+      const lineInserts = findInsert(dbInstance, 'budget_plan_lines');
+      expect(lineInserts[0][1][13]).toBe(1);
+    });
+
+    // Migration 0021: a line tracking several categories round-trips through the
+    // junction, not through the single category_id column.
+    it('restores every category link of a multi-category line', async () => {
+      const dbInstance = makeDbInstance();
+      mockDb.executeTransaction.mockImplementation(async (cb) => { await cb(dbInstance); });
+
+      const backup = backupWithPlan();
+      backup.data.categories = [
+        { id: 'cat-1', name: 'Groceries', type: 'entry', category_type: 'expense' },
+        { id: 'cat-2', name: 'Cafes', type: 'entry', category_type: 'expense' },
+      ];
+      backup.data.budget_plan_lines = [{
+        ...categoryLine, category_id: 'cat-1', include_children: 0,
+      }];
+      backup.data.budget_plan_line_categories = [
+        { line_id: 'line-cat', category_id: 'cat-1' },
+        { line_id: 'line-cat', category_id: 'cat-2' },
+        // A link to a category the backup doesn't contain is dropped rather than
+        // failing the NOT NULL FK and aborting the whole restore.
+        { line_id: 'line-cat', category_id: 'cat-gone' },
+        // Same for a link to a line that was never inserted.
+        { line_id: 'line-gone', category_id: 'cat-2' },
+      ];
+
+      await BackupRestore.restoreBackup(backup);
+
+      const linkInserts = findLinkInserts(dbInstance);
+      expect(linkInserts.map(c => c[1])).toEqual([
+        ['line-cat', 'cat-1'],
+        ['line-cat', 'cat-2'],
+      ]);
+      // ...and the stored flag survives the round trip.
+      const lineInserts = findInsert(dbInstance, 'budget_plan_lines');
+      expect(lineInserts[0][1]).toContain(0);
+      expect(lineInserts[0][1][13]).toBe(0);
     });
 
     it('restores a recurring (global template) line with no plan_id and its own currency', async () => {
@@ -1694,7 +1764,7 @@ op-2,income,20,acc-1,cat-1`;
       expect(lineInserts).toHaveLength(1);
       expect(lineInserts[0][1]).toEqual([
         'line-rec', null, 'Rent', '65000', null,
-        'cat-1', null, 0, 1, 'USD', null, null, null, 'x', 'y',
+        'cat-1', null, 0, 1, 'USD', null, null, null, 1, 'x', 'y',
       ]);
     });
 

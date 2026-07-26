@@ -22,6 +22,7 @@ import m0017 from './0017_add_pending_notification_location.js';
 import m0018 from './0018_budget_plans.js';
 import m0019, { postMigration as m0019PostMigration } from './0019_recurring_plan_lines.js';
 import m0020, { postMigration as m0020PostMigration } from './0020_plan_line_templates.js';
+import m0021 from './0021_plan_line_categories.js';
 
 export default {
   journal,
@@ -47,6 +48,7 @@ export default {
     m0018,
     m0019,
     m0020,
+    m0021,
   },
   postMigrationHandlers: {
     m0003: m0003PostMigration,

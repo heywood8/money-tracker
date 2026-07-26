@@ -550,6 +550,8 @@
   "no_template_account": "无（仅跟踪）",
   "edit_allocation": "编辑分配",
   "tracking_target": "跟踪目标",
+  "include_subcategories": "包含子类别",
+  "include_subcategories_hint": "所选类别下嵌套类别的支出计入此行。",
   "select_target": "选择目标",
   "allocation_label": "标签",
   "allocation_comment": "备注",

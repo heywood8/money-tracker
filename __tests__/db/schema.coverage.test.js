@@ -12,6 +12,11 @@ const mockUnique = jest.fn(() => ({
   on: jest.fn((...columns) => ({ type: 'unique', columns })),
 }));
 
+// Composite primary key (budget_plan_line_categories, migration 0021). Unlike
+// index()/unique() this one takes its columns up front and returns the
+// constraint directly — there is no .on() to chain.
+const mockPrimaryKey = jest.fn(({ columns }) => ({ type: 'primaryKey', columns }));
+
 jest.mock('drizzle-orm/sqlite-core', () => {
   // Helper to create column with chained methods
   const createColumnMethods = () => {
@@ -74,6 +79,7 @@ jest.mock('drizzle-orm/sqlite-core', () => {
     }),
     index: mockIndex,
     unique: mockUnique,
+    primaryKey: mockPrimaryKey,
   };
 });
 

@@ -189,4 +189,80 @@ describe('BudgetsDB convert-all spending', () => {
       expect(parseFloat(statuses.get('b1').spent)).toBe(2500);
     });
   });
+
+  // Migration 0021: a plan line can track several categories at once.
+  describe('calculateSpendingForCategories (multi-category)', () => {
+    it('sums over every tracked category and their descendants', async () => {
+      CategoriesDB.getAllDescendants.mockImplementation(async (id) => (
+        id === 'groceries' ? [{ id: 'groceries-child' }] : []
+      ));
+      queryFirst.mockResolvedValue({ total: 900 });
+
+      const total = await BudgetsDB.calculateSpendingForCategories(
+        ['groceries', 'cafes'], 'AMD', '2026-07-01', '2026-07-31', true, false,
+      );
+
+      expect(parseFloat(total)).toBe(900);
+      const [sql, params] = queryFirst.mock.calls[0];
+      expect(sql).toContain('o.category_id IN (?,?,?)');
+      expect(params.slice(0, 3)).toEqual(['groceries', 'cafes', 'groceries-child']);
+    });
+
+    it('counts a category once even when it is also a descendant of another', async () => {
+      // Tracking a parent AND its own child: with the roll-up on, the child
+      // would otherwise be listed twice.
+      CategoriesDB.getAllDescendants.mockImplementation(async (id) => (
+        id === 'food' ? [{ id: 'cafes' }] : []
+      ));
+      queryFirst.mockResolvedValue({ total: 100 });
+
+      await BudgetsDB.calculateSpendingForCategories(
+        ['food', 'cafes'], 'AMD', '2026-07-01', '2026-07-31', true, false,
+      );
+
+      const [sql, params] = queryFirst.mock.calls[0];
+      expect(sql).toContain('o.category_id IN (?,?)');
+      expect(params.slice(0, 2)).toEqual(['food', 'cafes']);
+    });
+
+    it('leaves descendants out when the roll-up is switched off', async () => {
+      CategoriesDB.getAllDescendants.mockResolvedValue([{ id: 'child' }]);
+      queryFirst.mockResolvedValue({ total: 50 });
+
+      await BudgetsDB.calculateSpendingForCategories(
+        ['food'], 'AMD', '2026-07-01', '2026-07-31', false, false,
+      );
+
+      expect(CategoriesDB.getAllDescendants).not.toHaveBeenCalled();
+      const [, params] = queryFirst.mock.calls[0];
+      expect(params.slice(0, 1)).toEqual(['food']);
+    });
+
+    it('returns 0 without querying when nothing is tracked', async () => {
+      // An empty IN () is a SQL syntax error, so the empty set must short-circuit
+      // — this is the state of a line whose every category was deleted.
+      expect(await BudgetsDB.calculateSpendingForCategories(
+        [], 'AMD', '2026-07-01', '2026-07-31', true, false,
+      )).toBe('0');
+      expect(await BudgetsDB.calculateSpendingForCategories(
+        [null, undefined, ''], 'AMD', '2026-07-01', '2026-07-31', true, true,
+      )).toBe('0');
+      expect(queryFirst).not.toHaveBeenCalled();
+      expect(queryAll).not.toHaveBeenCalled();
+    });
+
+    it('converts across currencies for a multi-category set too', async () => {
+      stubRates({ RUB: '5' });
+      queryAll.mockResolvedValue([
+        { currency: 'AMD', total: 1000 },
+        { currency: 'RUB', total: 200 },
+      ]);
+
+      const total = await BudgetsDB.calculateSpendingForCategories(
+        ['a', 'b'], 'AMD', '2026-07-01', '2026-07-31', false, true,
+      );
+
+      expect(parseFloat(total)).toBe(2000);
+    });
+  });
 });

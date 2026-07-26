@@ -30,7 +30,7 @@ export const createBackup = async () => {
     console.log('Creating database backup...');
 
     // Fetch all data from all tables
-    const [accounts, categories, operations, budgets, appMetadata, balanceHistory, plannedOperations, merchantRules, budgetPlans, budgetPlanLines] = await Promise.all([
+    const [accounts, categories, operations, budgets, appMetadata, balanceHistory, plannedOperations, merchantRules, budgetPlans, budgetPlanLines, budgetPlanLineCategories] = await Promise.all([
       queryAll('SELECT * FROM accounts ORDER BY created_at ASC'),
       queryAll('SELECT * FROM categories ORDER BY created_at ASC'),
       queryAll('SELECT * FROM operations ORDER BY created_at ASC'),
@@ -44,6 +44,10 @@ export const createBackup = async () => {
       // don't fail. Plans before lines so the FK order is preserved on restore.
       queryAll('SELECT * FROM budget_plans ORDER BY created_at ASC').catch(() => []),
       queryAll('SELECT * FROM budget_plan_lines ORDER BY sort_order ASC, created_at ASC').catch(() => []),
+      // Multi-category plan lines (migration 0021). Guarded like the tables above
+      // so a backup of a pre-0021 database still succeeds — restore rebuilds the
+      // links from each line's category_id when this section is absent.
+      queryAll('SELECT * FROM budget_plan_line_categories ORDER BY line_id ASC, category_id ASC').catch(() => []),
     ]);
 
     // Create backup object
@@ -65,6 +69,7 @@ export const createBackup = async () => {
         // Budgets v2 monthly plans and their allocation lines.
         budget_plans: budgetPlans || [],
         budget_plan_lines: budgetPlanLines || [],
+        budget_plan_line_categories: budgetPlanLineCategories || [],
       },
     };
 
@@ -77,6 +82,7 @@ export const createBackup = async () => {
       planned_operations: backup.data.planned_operations.length,
       budget_plans: backup.data.budget_plans.length,
       budget_plan_lines: backup.data.budget_plan_lines.length,
+      budget_plan_line_categories: backup.data.budget_plan_line_categories.length,
     });
 
     return backup;
@@ -100,7 +106,12 @@ const TABLE_FIELDS = {
   budget_plans: ['id', 'month', 'currency', 'expected_income', 'created_at', 'updated_at'],
   // `plan_id` is nullable (NULL for a recurring/global line, migration 0019).
   // `is_recurring` / `currency` were added by that same migration.
-  budget_plan_lines: ['id', 'plan_id', 'label', 'amount', 'comment', 'category_id', 'to_account_id', 'sort_order', 'is_recurring', 'currency', 'kind', 'account_id', 'last_executed_month', 'created_at', 'updated_at'],
+  // `include_children` (migration 0021) says whether descendants of the linked
+  // categories roll up into the line's actual.
+  budget_plan_lines: ['id', 'plan_id', 'label', 'amount', 'comment', 'category_id', 'to_account_id', 'sort_order', 'is_recurring', 'currency', 'kind', 'account_id', 'last_executed_month', 'include_children', 'created_at', 'updated_at'],
+  // The full category set of each line (migration 0021); `category_id` above is
+  // only its primary entry.
+  budget_plan_line_categories: ['line_id', 'category_id'],
 };
 
 /**
@@ -159,6 +170,7 @@ export const exportBackupCSV = async () => {
       'planned_operations.csv': convertToCSV(backup.data.planned_operations, TABLE_FIELDS.planned_operations),
       'budget_plans.csv': convertToCSV(backup.data.budget_plans, TABLE_FIELDS.budget_plans),
       'budget_plan_lines.csv': convertToCSV(backup.data.budget_plan_lines, TABLE_FIELDS.budget_plan_lines),
+      'budget_plan_line_categories.csv': convertToCSV(backup.data.budget_plan_line_categories, TABLE_FIELDS.budget_plan_line_categories),
       'backup_info.csv': `version,timestamp,platform\n${backup.version},${backup.timestamp},${backup.platform}`,
     };
 
@@ -175,7 +187,8 @@ export const exportBackupCSV = async () => {
     combinedCSV += `[BALANCE_HISTORY]\n${csvFiles['balance_history.csv']}\n\n`;
     combinedCSV += `[PLANNED_OPERATIONS]\n${csvFiles['planned_operations.csv']}\n\n`;
     combinedCSV += `[BUDGET_PLANS]\n${csvFiles['budget_plans.csv']}\n\n`;
-    combinedCSV += `[BUDGET_PLAN_LINES]\n${csvFiles['budget_plan_lines.csv']}\n`;
+    combinedCSV += `[BUDGET_PLAN_LINES]\n${csvFiles['budget_plan_lines.csv']}\n\n`;
+    combinedCSV += `[BUDGET_PLAN_LINE_CATEGORIES]\n${csvFiles['budget_plan_line_categories.csv']}\n`;
 
     const filename = `money_tracker_backup_${timestamp}.csv`;
     const fileUri = `${FileSystem.documentDirectory}${filename}`;
@@ -503,6 +516,10 @@ export const restoreBackup = async (backup, cancelToken) => {
       // Budgets v2: lines reference plans (cascade), categories and accounts (set
       // null), so clear lines before plans, and both before categories/accounts.
       // Guarded so a restore into a pre-0018 database doesn't fail.
+      // The junction cascades off both lines and categories, but clear it first
+      // and explicitly — relying on a cascade would leave stale links behind on
+      // any build where foreign_keys happens to be off.
+      await db.runAsync('DELETE FROM budget_plan_line_categories').catch(() => {});
       await db.runAsync('DELETE FROM budget_plan_lines').catch(() => {});
       await db.runAsync('DELETE FROM budget_plans').catch(() => {});
       await db.runAsync('DELETE FROM accounts_balance_history');
@@ -606,6 +623,10 @@ export const restoreBackup = async (backup, cancelToken) => {
         status: 'in_progress',
         data: backup.data.categories.length,
       });
+      // Which categories actually landed — plan-line category links (migration
+      // 0021) reference them through a NOT NULL FK, so a link to a category that
+      // was skipped here has to be dropped rather than abort the restore.
+      const restoredCategoryIds = new Set();
       for (const category of backup.data.categories) {
         // Validate required fields
         if (!category.id || !category.name) {
@@ -630,6 +651,7 @@ export const restoreBackup = async (backup, cancelToken) => {
             category.updated_at || new Date().toISOString(),
           ],
         );
+        restoredCategoryIds.add(category.id);
       }
       console.log(`Restored ${backup.data.categories.length} categories`);
       appEvents.emit(IMPORT_PROGRESS_EVENT, {
@@ -852,6 +874,9 @@ export const restoreBackup = async (backup, cancelToken) => {
         // orphaned line (dangling plan_id) is skipped rather than aborting the
         // whole import on an FK violation. A recurring (global) line has no
         // plan_id at all (migration 0019) and is restored regardless of `plans`.
+        // Same idea as restoredPlanIds, one level down: only a line that really
+        // made it into the table may be given category links.
+        const restoredLineIds = new Set();
         let restoredLines = 0;
         for (const line of lines) {
           // amount is a NOT NULL text column; treat null/empty as invalid and
@@ -885,7 +910,7 @@ export const restoreBackup = async (backup, cancelToken) => {
             mappedAccountId = accountIdMapping.get(String(line.account_id)) ?? null;
           }
           await db.runAsync(
-            'INSERT INTO budget_plan_lines (id, plan_id, label, amount, comment, category_id, to_account_id, sort_order, is_recurring, currency, kind, account_id, last_executed_month, created_at, updated_at) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)',
+            'INSERT INTO budget_plan_lines (id, plan_id, label, amount, comment, category_id, to_account_id, sort_order, is_recurring, currency, kind, account_id, last_executed_month, include_children, created_at, updated_at) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)',
             [
               line.id,
               isRecurring ? null : line.plan_id,
@@ -903,13 +928,53 @@ export const restoreBackup = async (backup, cancelToken) => {
               VALID_OPERATION_TYPES.includes(line.kind) ? line.kind : null,
               mappedAccountId,
               line.last_executed_month || null,
+              // Absent on every pre-0021 backup, where descendants always rolled
+              // up — so absent restores as 1, not 0. A CSV backup yields '' for a
+              // missing column and `Number('')` is 0, so the blank case has to be
+              // caught before any numeric comparison.
+              (line.include_children === '' || line.include_children == null)
+                ? 1
+                : (Number(line.include_children) === 0 ? 0 : 1),
               line.created_at || new Date().toISOString(),
               line.updated_at || new Date().toISOString(),
             ],
           );
+          restoredLineIds.add(line.id);
           restoredLines++;
         }
-        console.log(`Restored ${restoredPlans} budget plans and ${restoredLines} plan lines`);
+
+        // Category links (migration 0021). A backup that carries the junction is
+        // restored from it; an older one has only each line's single category_id,
+        // so the links are rebuilt from that — without this, every line restored
+        // from a pre-0021 backup would read as broken and track nothing.
+        const backedUpLinks = backup.data.budget_plan_line_categories || [];
+        const linkRows = backedUpLinks.length > 0
+          ? backedUpLinks.map(link => ({ lineId: link.line_id, categoryId: link.category_id }))
+          : lines
+            .filter(line => restoredLineIds.has(line.id) && line.category_id)
+            .map(line => ({ lineId: line.id, categoryId: line.category_id }));
+
+        let restoredLinks = 0;
+        for (const { lineId, categoryId } of linkRows) {
+          // Skip a link whose line was skipped above or whose category the backup
+          // doesn't contain: the FKs are NOT NULL here, so an unknown reference
+          // would abort the entire restore rather than lose one link.
+          if (!lineId || !categoryId) continue;
+          if (!restoredLineIds.has(lineId)) {
+            console.warn('Skipping plan line category link for an unknown line:', lineId);
+            continue;
+          }
+          if (!restoredCategoryIds.has(categoryId)) {
+            console.warn('Skipping plan line category link for an unknown category:', categoryId);
+            continue;
+          }
+          await db.runAsync(
+            'INSERT OR IGNORE INTO budget_plan_line_categories (line_id, category_id) VALUES (?, ?)',
+            [lineId, categoryId],
+          );
+          restoredLinks++;
+        }
+        console.log(`Restored ${restoredPlans} budget plans, ${restoredLines} plan lines and ${restoredLinks} category links`);
         appEvents.emit(IMPORT_PROGRESS_EVENT, {
           stepId: 'budget_plans',
           status: 'completed',
@@ -1253,11 +1318,12 @@ const importBackupCSV = async (fileUri, cancelToken) => {
     planned_operations: [],
     budget_plans: [],
     budget_plan_lines: [],
+    budget_plan_line_categories: [],
   };
 
-  // Split by section markers. [BUDGET_PLANS] and [BUDGET_PLAN_LINES] don't
-  // collide: the marker + newline (`[BUDGET_PLANS]\n`) is not a substring of
-  // `[BUDGET_PLAN_LINES]`.
+  // Split by section markers. The three [BUDGET_PLAN*] markers don't collide:
+  // each marker + newline (`[BUDGET_PLANS]\n`, `[BUDGET_PLAN_LINES]\n`) is not a
+  // substring of any of the others.
   const accountsMatch = fileContent.match(/\[ACCOUNTS\]\n([\s\S]*?)(?=\n\[|$)/);
   const categoriesMatch = fileContent.match(/\[CATEGORIES\]\n([\s\S]*?)(?=\n\[|$)/);
   const operationsMatch = fileContent.match(/\[OPERATIONS\]\n([\s\S]*?)(?=\n\[|$)/);
@@ -1267,6 +1333,7 @@ const importBackupCSV = async (fileUri, cancelToken) => {
   const plannedOpsMatch = fileContent.match(/\[PLANNED_OPERATIONS\]\n([\s\S]*?)(?=\n\[|$)/);
   const budgetPlansMatch = fileContent.match(/\[BUDGET_PLANS\]\n([\s\S]*?)(?=\n\[|$)/);
   const budgetPlanLinesMatch = fileContent.match(/\[BUDGET_PLAN_LINES\]\n([\s\S]*?)(?=\n\[|$)/);
+  const budgetPlanLineCategoriesMatch = fileContent.match(/\[BUDGET_PLAN_LINE_CATEGORIES\]\n([\s\S]*?)(?=\n\[|$)/);
 
   if (accountsMatch) sections.accounts = parseCSV(accountsMatch[1]);
   if (categoriesMatch) sections.categories = parseCSV(categoriesMatch[1]);
@@ -1277,6 +1344,7 @@ const importBackupCSV = async (fileUri, cancelToken) => {
   if (plannedOpsMatch) sections.planned_operations = parseCSV(plannedOpsMatch[1]);
   if (budgetPlansMatch) sections.budget_plans = parseCSV(budgetPlansMatch[1]);
   if (budgetPlanLinesMatch) sections.budget_plan_lines = parseCSV(budgetPlanLinesMatch[1]);
+  if (budgetPlanLineCategoriesMatch) sections.budget_plan_line_categories = parseCSV(budgetPlanLineCategoriesMatch[1]);
 
   // Extract version from header
   const versionMatch = fileContent.match(/# Version: (\d+)/);
@@ -1401,6 +1469,18 @@ const importBackupSQLite = async (fileUri, cancelToken) => {
       console.warn('No budget_plans/budget_plan_lines tables in imported database (older format)');
     }
 
+    // The multi-category junction (migration 0021) is newer still, so it gets its
+    // own guard: a database that has plan lines but no junction is a pre-0021 one
+    // whose links restoreBackup rebuilds from each line's category_id.
+    let budgetPlanLineCategories = [];
+    try {
+      budgetPlanLineCategories = await tempDb.getAllAsync(
+        'SELECT * FROM budget_plan_line_categories ORDER BY line_id ASC, category_id ASC',
+      );
+    } catch (e) {
+      console.warn('No budget_plan_line_categories table in imported database (older format)');
+    }
+
     // Create backup object
     const backup = {
       version: BACKUP_VERSION,
@@ -1417,6 +1497,7 @@ const importBackupSQLite = async (fileUri, cancelToken) => {
         notification_merchant_rules: merchantRules || [],
         budget_plans: budgetPlans || [],
         budget_plan_lines: budgetPlanLines || [],
+        budget_plan_line_categories: budgetPlanLineCategories || [],
       },
     };
 

@@ -563,21 +563,60 @@ export const getPreviousPeriodDates = (periodType, currentStart) => {
 };
 
 /**
- * Calculate spending for a budget in current period
- * @param {string} categoryId - Category ID
+ * Expand a set of category IDs into the full set to sum over, optionally pulling
+ * in descendants, with duplicates removed.
+ *
+ * De-duplication is not cosmetic: a plan line may track a parent AND one of its
+ * own children (migration 0021 lets it track several categories at once), and
+ * with `includeChildren` on, the child would then appear twice in the IN list —
+ * SQLite's `IN` ignores the repeat, but the roll-up walk is O(duplicates) and any
+ * future GROUP BY over this list would double-count. Keeping the set clean here
+ * means every caller is safe by construction.
+ * @param {Array<string>} categoryIds - Explicitly tracked category IDs
+ * @param {boolean} includeChildren - Also count spending in descendant categories
+ * @returns {Promise<Array<string>>} Unique category IDs to sum over
+ */
+export const expandCategoryIds = async (categoryIds, includeChildren) => {
+  const seen = new Set();
+  const out = [];
+  const push = (id) => {
+    if (id === null || id === undefined || id === '' || seen.has(id)) return;
+    seen.add(id);
+    out.push(id);
+  };
+
+  for (const id of categoryIds || []) push(id);
+
+  if (includeChildren) {
+    // Snapshot first: `out` grows as descendants are appended, and re-walking a
+    // category that is itself a descendant of another is pure waste.
+    for (const id of [...out]) {
+      const descendants = await CategoriesDB.getAllDescendants(id);
+      for (const cat of descendants || []) push(cat.id);
+    }
+  }
+
+  return out;
+};
+
+/**
+ * Calculate spending across a SET of categories in a date range. The
+ * multi-category form of {@link calculateSpendingForBudget} (migration 0021),
+ * used by plan lines that track several categories at once.
+ * @param {Array<string>} categoryIds - Category IDs to sum over
  * @param {string} currency - Currency code
  * @param {string} startDate - Period start (YYYY-MM-DD)
  * @param {string} endDate - Period end (YYYY-MM-DD)
- * @param {boolean} includeChildren - Include child category spending (default: true)
+ * @param {boolean} includeChildren - Include descendant category spending (default: true)
  * @param {boolean} convertAll - When true, spending from accounts in ANY
  *   currency counts toward the budget, converted into the budget's currency at
  *   the current rate (offline table first, live fallback) — the same
  *   conversion path Graphs uses, so the two surfaces agree. Currencies with no
  *   available rate are dropped from the sum, mirroring mergeConvertedByCategory.
- * @returns {Promise<number>} Total spending amount
+ * @returns {Promise<string>} Total spending amount (decimal string)
  */
-export const calculateSpendingForBudget = async (
-  categoryId,
+export const calculateSpendingForCategories = async (
+  categoryIds,
   currency,
   startDate,
   endDate,
@@ -585,15 +624,13 @@ export const calculateSpendingForBudget = async (
   convertAll = false,
 ) => {
   try {
-    let categoryIds = [categoryId];
+    const expandedIds = await expandCategoryIds(categoryIds, includeChildren);
 
-    // If including children, get all descendant category IDs
-    if (includeChildren) {
-      const descendants = await CategoriesDB.getAllDescendants(categoryId);
-      categoryIds = [...categoryIds, ...descendants.map(cat => cat.id)];
-    }
+    // No categories tracked (a line whose every category was deleted) — there is
+    // nothing to sum, and an empty IN () is a SQL syntax error.
+    if (expandedIds.length === 0) return '0';
 
-    const placeholders = categoryIds.map(() => '?').join(',');
+    const placeholders = expandedIds.map(() => '?').join(',');
 
     if (convertAll) {
       const rows = await queryAll(
@@ -605,7 +642,7 @@ export const calculateSpendingForBudget = async (
            AND o.date >= ?
            AND o.date <= ?
          GROUP BY a.currency`,
-        [...categoryIds, startDate, endDate],
+        [...expandedIds, startDate, endDate],
       );
 
       const rowList = rows || [];
@@ -631,7 +668,7 @@ export const calculateSpendingForBudget = async (
         AND o.date <= ?
     `;
 
-    const params = [...categoryIds, currency, startDate, endDate];
+    const params = [...expandedIds, currency, startDate, endDate];
     const result = await queryFirst(query, params);
 
     return result && result.total != null ? String(result.total) : '0';
@@ -640,6 +677,34 @@ export const calculateSpendingForBudget = async (
     throw error;
   }
 };
+
+/**
+ * Calculate spending for a single category in a date range — the single-category
+ * form kept for v1 budgets (one category by schema) and for callers that only
+ * ever have one. Delegates to {@link calculateSpendingForCategories}.
+ * @param {string} categoryId - Category ID
+ * @param {string} currency - Currency code
+ * @param {string} startDate - Period start (YYYY-MM-DD)
+ * @param {string} endDate - Period end (YYYY-MM-DD)
+ * @param {boolean} includeChildren - Include child category spending (default: true)
+ * @param {boolean} convertAll - See {@link calculateSpendingForCategories}
+ * @returns {Promise<string>} Total spending amount (decimal string)
+ */
+export const calculateSpendingForBudget = async (
+  categoryId,
+  currency,
+  startDate,
+  endDate,
+  includeChildren = true,
+  convertAll = false,
+) => calculateSpendingForCategories(
+  [categoryId],
+  currency,
+  startDate,
+  endDate,
+  includeChildren,
+  convertAll,
+);
 
 /**
  * Derive the spent-vs-amount progress metrics shared by budgets (v1) and
