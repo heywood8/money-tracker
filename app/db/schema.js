@@ -287,6 +287,22 @@ export const budgetPlans = sqliteTable('budget_plans', {
  *     inherit a currency from, it carries its own `currency`.
  * `plan_id` was made nullable via a recreate-table migration (SQLite cannot
  * ALTER COLUMN DROP NOT NULL) — see drizzle/0019_recurring_plan_lines.js.
+ *
+ * Budgets v3 phase 3 (migration 0020) absorbed the standalone `planned_operations`
+ * model into this one: a line may now carry an EXECUTABLE TEMPLATE. `kind` says
+ * what an execution creates (income / expense / transfer), `account_id` is the
+ * account it touches (same meaning as `operations.account_id`: source for an
+ * expense/transfer, destination for income), and `last_executed_month` records
+ * the last YYYY-MM it ran. A line WITH `account_id` shows the execute action; a
+ * line without it is a pure analytic target, exactly as before. `is_recurring`
+ * doubles as the old "recurring vs one-time" planned-operation flag: executing a
+ * ONE-OFF template deletes it, mirroring `executeAndMark`.
+ *
+ * Income lines (`kind` = 'income') are the plan's expected income: their sum
+ * replaces the stored `budget_plans.expected_income` (kept, append-only, but no
+ * longer written or read by the app after migration 0020 bridges it into lines).
+ * They are NOT counted in `allocated` and get no per-line actual — the income
+ * section compares the month's real income against their total.
  */
 export const budgetPlanLines = sqliteTable('budget_plan_lines', {
   id: text('id').primaryKey(),
@@ -302,13 +318,27 @@ export const budgetPlanLines = sqliteTable('budget_plan_lines', {
   toAccountId: integer('to_account_id').references(() => accounts.id, { onDelete: 'set null' }),
   sortOrder: integer('sort_order').notNull().default(0),
   // 0 = one-time (scoped to `plan_id`'s month), 1 = recurring (global, every month).
+  // For a line with an executable template this also carries the old planned-
+  // operation meaning: a one-time template is deleted once executed.
   isRecurring: integer('is_recurring').notNull().default(0),
-  // Currency for a recurring line's `amount` (it has no plan to inherit one from).
-  // NULL for one-off lines, which keep inheriting the parent plan's currency.
+  // Currency this line's `amount` is expressed in. Required for a recurring line
+  // (it has no plan to inherit one from); optional elsewhere — NULL means "inherit
+  // the parent plan's currency", which is what every pre-0020 one-off line does.
   currency: text('currency'),
+  // Executable template (migration 0020, Budgets v3 phase 3). NULL `kind` on
+  // legacy rows: inferred from the target (toAccountId → transfer, else expense).
+  kind: text('kind', { enum: ['income', 'expense', 'transfer'] }),
+  // Account an execution touches — source for expense/transfer, destination for
+  // income (same semantics as operations.account_id). NULL = no template, i.e. a
+  // pure analytic target with no execute action.
+  accountId: integer('account_id').references(() => accounts.id, { onDelete: 'set null' }),
+  // YYYY-MM of the last execution (or manual "mark as done"), like the old
+  // planned_operations.last_executed_month.
+  lastExecutedMonth: text('last_executed_month'),
   createdAt: text('created_at').notNull(),
   updatedAt: text('updated_at').notNull(),
 }, (table) => ({
   planIdx: index('idx_budget_plan_lines_plan').on(table.planId),
   recurringIdx: index('idx_budget_plan_lines_recurring').on(table.isRecurring),
+  kindIdx: index('idx_budget_plan_lines_kind').on(table.kind),
 }));

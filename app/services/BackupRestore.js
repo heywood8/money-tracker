@@ -100,7 +100,7 @@ const TABLE_FIELDS = {
   budget_plans: ['id', 'month', 'currency', 'expected_income', 'created_at', 'updated_at'],
   // `plan_id` is nullable (NULL for a recurring/global line, migration 0019).
   // `is_recurring` / `currency` were added by that same migration.
-  budget_plan_lines: ['id', 'plan_id', 'label', 'amount', 'comment', 'category_id', 'to_account_id', 'sort_order', 'is_recurring', 'currency', 'created_at', 'updated_at'],
+  budget_plan_lines: ['id', 'plan_id', 'label', 'amount', 'comment', 'category_id', 'to_account_id', 'sort_order', 'is_recurring', 'currency', 'kind', 'account_id', 'last_executed_month', 'created_at', 'updated_at'],
 };
 
 /**
@@ -875,8 +875,17 @@ export const restoreBackup = async (backup, cancelToken) => {
           if (line.to_account_id != null) {
             mappedToAccountId = accountIdMapping.get(String(line.to_account_id)) ?? line.to_account_id;
           }
+          // Execution account of a line carrying a template (migration 0020) —
+          // remapped like every other account reference. A reference the backup
+          // has no account for drops to NULL (the line stays, as a pure analytic
+          // target) rather than failing the FK and aborting the whole restore:
+          // losing one execute button beats losing the import.
+          let mappedAccountId = null;
+          if (line.account_id != null && line.account_id !== '') {
+            mappedAccountId = accountIdMapping.get(String(line.account_id)) ?? null;
+          }
           await db.runAsync(
-            'INSERT INTO budget_plan_lines (id, plan_id, label, amount, comment, category_id, to_account_id, sort_order, is_recurring, currency, created_at, updated_at) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)',
+            'INSERT INTO budget_plan_lines (id, plan_id, label, amount, comment, category_id, to_account_id, sort_order, is_recurring, currency, kind, account_id, last_executed_month, created_at, updated_at) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)',
             [
               line.id,
               isRecurring ? null : line.plan_id,
@@ -887,7 +896,13 @@ export const restoreBackup = async (backup, cancelToken) => {
               mappedToAccountId,
               Number.isInteger(line.sort_order) ? line.sort_order : Number(line.sort_order) || 0,
               isRecurring ? 1 : 0,
-              isRecurring ? (line.currency || null) : null,
+              // A one-off line may carry its own currency too since 0020 (a
+              // template is priced in its account's currency), so this is no
+              // longer gated on is_recurring.
+              line.currency || null,
+              VALID_OPERATION_TYPES.includes(line.kind) ? line.kind : null,
+              mappedAccountId,
+              line.last_executed_month || null,
               line.created_at || new Date().toISOString(),
               line.updated_at || new Date().toISOString(),
             ],
@@ -998,6 +1013,24 @@ export const restoreBackup = async (backup, cancelToken) => {
           status: 'completed',
           data: backup.data.planned_operations.length,
         });
+      }
+
+      // Bridge planned operations (and any plan's stored expected income) into
+      // plan lines carrying an executable template (Budgets v3 phase 3), so a
+      // backup that predates that consolidation still ends up with a single
+      // source of truth. Runs AFTER the planned_operations insert above — it
+      // reads that table. Idempotent via the same completion flag migration
+      // 0020's postMigration handler sets (app_metadata was restored above), so
+      // a newer backup is not re-derived into duplicate lines.
+      try {
+        const plannedBridge = await BudgetPlansDB.migratePlannedOperationsToLines(db);
+        console.log(
+          `Bridged ${plannedBridge.migratedTemplates} planned operation(s) and `
+          + `${plannedBridge.migratedIncome} expected-income figure(s) into plan lines`
+          + (plannedBridge.skipped ? ' (already migrated, skipped)' : ''),
+        );
+      } catch (bridgeError) {
+        console.warn('Failed to bridge planned operations into plan lines:', bridgeError);
       }
 
       // Restore learned merchant -> category rules

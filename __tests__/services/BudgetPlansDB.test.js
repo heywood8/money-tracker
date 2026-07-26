@@ -7,7 +7,7 @@
 
 import * as BudgetPlansDB from '../../app/services/BudgetPlansDB';
 import { executeQuery, queryAll, queryFirst, executeTransaction } from '../../app/services/db';
-import { fetchRatesToTarget, convertWithRateMap } from '../../app/services/OperationsDB';
+import { fetchRatesToTarget, convertWithRateMap, createOperationInTx } from '../../app/services/OperationsDB';
 
 jest.mock('../../app/services/db');
 // Only the two rate helpers updateLine's currency-conversion invariant needs
@@ -18,6 +18,9 @@ jest.mock('../../app/services/OperationsDB', () => ({
   convertWithRateMap: jest.fn(),
   getTransferTotals: jest.fn(),
   getUnconvertibleCurrencies: jest.fn(),
+  // Budgets v3 phase 3: executing a line inserts a real operation in the same
+  // transaction (the old PlannedOperationsDB.executeAndMark path).
+  createOperationInTx: jest.fn(async () => ({ id: 77 })),
 }));
 
 // Predictable UUIDs.
@@ -338,14 +341,19 @@ describe('BudgetPlansDB', () => {
       });
     });
 
-    // addLine must NOT pick up a stray `currency` field — a one-off line always
-    // has currency NULL in the DB (inherits the plan's), regardless of what's on
-    // the input object. Guards insertPlanLine's `isRecurring ? line.currency :
-    // null` branch from a future regression.
-    it('addLine writes currency NULL even if the input object carries one', async () => {
+    // Since migration 0020 a one-off line MAY carry its own currency (an
+    // executable template is priced in its account's currency), so addLine
+    // stores what it is given...
+    it('addLine keeps a one-off line currency when one is given', async () => {
       const line = await BudgetPlansDB.addLine('p1', { amount: '10', categoryId: 'c1', currency: 'EUR' });
       const [, params] = executeQuery.mock.calls[0];
-      expect(params).not.toContain('EUR');
+      expect(params).toContain('EUR');
+      expect(line).toMatchObject({ isRecurring: false, currency: 'EUR' });
+    });
+
+    // ...and null when it is not, which still means "inherit the plan's currency".
+    it('addLine writes currency NULL when the line carries none', async () => {
+      const line = await BudgetPlansDB.addLine('p1', { amount: '10', categoryId: 'c1' });
       expect(line).toMatchObject({ isRecurring: false, currency: null });
     });
 
@@ -719,6 +727,245 @@ describe('BudgetPlansDB', () => {
       const flagInsert = db.runAsync.mock.calls.find(c => c[0].includes('app_metadata'));
       expect(flagInsert[0]).toContain("'true'"); // the flag value is inlined in the SQL, not bound
       expect(flagInsert[1][0]).toBe(BudgetPlansDB.BUDGETS_MIGRATION_FLAG_KEY);
+    });
+  });
+  /* ────────────────────────────────────────────────────────────────────────
+     Budgets v3 phase 3: executable templates + income lines
+     ──────────────────────────────────────────────────────────────────────── */
+
+  describe('Line kinds (phase 3)', () => {
+    it('accepts an income line with no tracking target at all', () => {
+      expect(BudgetPlansDB.validatePlanLine({ amount: '1000', kind: 'income' })).toBeNull();
+    });
+
+    it('accepts an income line with an income category for context', () => {
+      expect(BudgetPlansDB.validatePlanLine({ amount: '1000', kind: 'income', categoryId: 'inc1' })).toBeNull();
+    });
+
+    it('rejects an income line linked to a transfer target', () => {
+      expect(BudgetPlansDB.validatePlanLine({ amount: '1000', kind: 'income', toAccountId: 2 }))
+        .toBe('An income line cannot link to a transfer target');
+    });
+
+    it('rejects a transfer line that only carries a category', () => {
+      expect(BudgetPlansDB.validatePlanLine({ amount: '100', kind: 'transfer', categoryId: 'c1' }))
+        .toBe('A transfer line must link to a destination account');
+    });
+
+    it('rejects an unknown kind', () => {
+      expect(BudgetPlansDB.validatePlanLine({ amount: '100', kind: 'refund', categoryId: 'c1' }))
+        .toBe('A line must be an income, expense or transfer');
+    });
+
+    it('infers the kind of a legacy row from its target', async () => {
+      queryAll.mockResolvedValue([
+        { id: 'l1', plan_id: 'p1', amount: '10', category_id: 'c1', to_account_id: null, is_recurring: 0 },
+        { id: 'l2', plan_id: 'p1', amount: '20', category_id: null, to_account_id: 3, is_recurring: 0 },
+      ]);
+      const [category, transfer] = await BudgetPlansDB.getPlanLines('p1');
+      expect(category.kind).toBe('expense');
+      expect(transfer.kind).toBe('transfer');
+      // Neither carries a template, so neither is executable.
+      expect(category.hasTemplate).toBe(false);
+      expect(transfer.hasTemplate).toBe(false);
+    });
+
+    it('maps the template fields and flags an executable line', async () => {
+      queryAll.mockResolvedValue([{
+        id: 'l1', plan_id: null, amount: '65000', category_id: 'c1', to_account_id: null,
+        is_recurring: 1, currency: 'AMD', kind: 'expense', account_id: 4,
+        last_executed_month: '2026-07',
+      }]);
+      const [line] = await BudgetPlansDB.getRecurringLines();
+      expect(line).toMatchObject({
+        kind: 'expense', accountId: 4, lastExecutedMonth: '2026-07', hasTemplate: true,
+      });
+      expect(BudgetPlansDB.isExecutable(line)).toBe(true);
+    });
+
+    it('never marks a targetless income line as broken', async () => {
+      queryAll.mockResolvedValue([
+        { id: 'i1', plan_id: 'p1', amount: '1000', category_id: null, to_account_id: null, is_recurring: 0, kind: 'income' },
+        { id: 'l1', plan_id: 'p1', amount: '10', category_id: null, to_account_id: null, is_recurring: 0, kind: 'expense' },
+      ]);
+      const [income, expense] = await BudgetPlansDB.getPlanLines('p1');
+      expect(income.isBroken).toBe(false);
+      expect(expense.isBroken).toBe(true);
+    });
+  });
+
+  describe('Executing a template (phase 3)', () => {
+    const template = (overrides = {}) => ({
+      id: 'l-tpl', amount: '65000', label: 'Rent', comment: null, kind: 'expense',
+      categoryId: 'cat1', toAccountId: null, accountId: 4, isRecurring: true,
+      lastExecutedMonth: null, hasTemplate: true, ...overrides,
+    });
+
+    it('refuses to execute a line with no execution account', async () => {
+      await expect(BudgetPlansDB.executeLine(template({ accountId: null })))
+        .rejects.toThrow('no account to execute from');
+      expect(executeTransaction).not.toHaveBeenCalled();
+    });
+
+    it('creates the operation and marks the line done in one transaction', async () => {
+      await BudgetPlansDB.executeLine(template());
+
+      expect(createOperationInTx).toHaveBeenCalledWith(
+        expect.anything(),
+        expect.objectContaining({
+          type: 'expense', amount: '65000', accountId: 4, categoryId: 'cat1',
+          toAccountId: null, description: 'Rent',
+        }),
+      );
+      const updates = mockRunAsync.mock.calls.filter(c => c[0].includes('UPDATE budget_plan_lines'));
+      expect(updates).toHaveLength(1);
+      // A recurring template survives its execution.
+      expect(mockRunAsync.mock.calls.some(c => c[0].includes('DELETE FROM budget_plan_lines'))).toBe(false);
+    });
+
+    it('deletes a one-off template once executed', async () => {
+      await BudgetPlansDB.executeLine(template({ isRecurring: false }));
+      expect(mockRunAsync.mock.calls.some(c => c[0].includes('DELETE FROM budget_plan_lines'))).toBe(true);
+    });
+
+    it('creates a transfer operation for a transfer template', async () => {
+      await BudgetPlansDB.executeLine(template({
+        kind: 'transfer', categoryId: null, toAccountId: 9, label: 'To savings',
+      }));
+      expect(createOperationInTx).toHaveBeenCalledWith(
+        expect.anything(),
+        expect.objectContaining({ type: 'transfer', accountId: 4, toAccountId: 9 }),
+      );
+    });
+
+    it('marks a template done without creating an operation', async () => {
+      await BudgetPlansDB.markLineExecuted(template());
+      expect(createOperationInTx).not.toHaveBeenCalled();
+      expect(mockRunAsync.mock.calls.some(c => c[0].includes('UPDATE budget_plan_lines'))).toBe(true);
+    });
+
+    it('clears the executed mark on undo', async () => {
+      await BudgetPlansDB.unmarkLineExecuted('l-tpl');
+      expect(executeQuery).toHaveBeenCalledWith(
+        expect.stringContaining('last_executed_month = NULL'),
+        expect.arrayContaining(['l-tpl']),
+      );
+    });
+  });
+
+  describe('Income lines feed the expected income (phase 3)', () => {
+    it('sums income lines instead of the stored expected_income, and keeps them out of allocated', async () => {
+      queryFirst.mockResolvedValue({ id: 'p1', month: '2026-07', currency: 'USD', expected_income: '9999' });
+      queryAll.mockResolvedValue([
+        { id: 'i1', plan_id: 'p1', amount: '220', category_id: null, to_account_id: null, is_recurring: 0, kind: 'income' },
+        { id: 'i2', plan_id: 'p1', amount: '180', category_id: null, to_account_id: null, is_recurring: 0, kind: 'income' },
+        { id: 'l1', plan_id: 'p1', amount: '300', category_id: 'c1', to_account_id: null, is_recurring: 0, kind: 'expense' },
+      ]);
+      const totals = await BudgetPlansDB.getPlanTotals('p1');
+      expect(totals.expectedIncome).toBe('400.00');
+      expect(totals.allocated).toBe('300.00');
+      expect(totals.remainder).toBe('100.00');
+    });
+
+    it('falls back to the stored expected_income when the plan has no income line', async () => {
+      queryFirst.mockResolvedValue({ id: 'p1', month: '2026-07', currency: 'USD', expected_income: '1000' });
+      queryAll.mockResolvedValue([
+        { id: 'l1', plan_id: 'p1', amount: '300', category_id: 'c1', to_account_id: null, is_recurring: 0, kind: 'expense' },
+      ]);
+      const totals = await BudgetPlansDB.getPlanTotals('p1');
+      expect(totals.expectedIncome).toBe('1000.00');
+    });
+  });
+
+  describe('migratePlannedOperationsToLines (phase 3 bridge)', () => {
+    const makeDb = ({ flagSet = false, plans = [], accounts = [], planned = [] } = {}) => ({
+      getFirstAsync: jest.fn(async (query) => {
+        if (query.includes('app_metadata')) return flagSet ? { value: 'true' } : null;
+        if (query.includes('FROM budget_plans')) return plans.find(p => p.month) || null;
+        return null;
+      }),
+      getAllAsync: jest.fn(async (query) => {
+        if (query.includes('FROM budget_plans')) return plans;
+        if (query.includes('FROM accounts')) return accounts;
+        if (query.includes('FROM planned_operations')) return planned;
+        return [];
+      }),
+      runAsync: jest.fn(async () => {}),
+    });
+    const lineInserts = (db) => db.runAsync.mock.calls.filter(c => c[0].includes('INSERT INTO budget_plan_lines'));
+
+    it('is a no-op once the completion flag is set', async () => {
+      const db = makeDb({ flagSet: true, planned: [{ id: 'po1', type: 'expense', amount: '10', account_id: 1, is_recurring: 1 }] });
+      const result = await BudgetPlansDB.migratePlannedOperationsToLines(db);
+      expect(result).toEqual({ migratedTemplates: 0, migratedIncome: 0, skipped: true });
+      expect(db.runAsync).not.toHaveBeenCalled();
+    });
+
+    it('turns a recurring planned operation into a recurring line with a template', async () => {
+      const db = makeDb({
+        accounts: [{ id: 1, currency: 'AMD' }],
+        planned: [{
+          id: 'po1', name: 'Rent', type: 'expense', amount: '65000', account_id: 1,
+          category_id: 'cat1', to_account_id: null, description: 'monthly',
+          is_recurring: 1, last_executed_month: '2026-07', display_order: 3,
+        }],
+      });
+      const result = await BudgetPlansDB.migratePlannedOperationsToLines(db);
+      expect(result.migratedTemplates).toBe(1);
+      const [, params] = lineInserts(db)[0];
+      // id, plan_id, label, amount, comment, category_id, to_account_id,
+      // sort_order, is_recurring, currency, kind, account_id, last_executed_month
+      expect(params.slice(1, 13)).toEqual([
+        null, 'Rent', '65000', 'monthly', 'cat1', null, 3, 1, 'AMD', 'expense', 1, '2026-07',
+      ]);
+      // ...and no plan had to be created for a recurring template.
+      expect(db.runAsync.mock.calls.some(c => c[0].includes('INSERT INTO budget_plans'))).toBe(false);
+    });
+
+    it('scopes a one-time planned operation to the current month, creating that plan if missing', async () => {
+      const db = makeDb({
+        accounts: [{ id: 1, currency: 'USD' }],
+        planned: [{
+          id: 'po2', name: 'Insurance', type: 'expense', amount: '500', account_id: 1,
+          category_id: 'cat1', to_account_id: null, is_recurring: 0,
+        }],
+      });
+      await BudgetPlansDB.migratePlannedOperationsToLines(db);
+      expect(db.runAsync.mock.calls.some(c => c[0].includes('INSERT INTO budget_plans'))).toBe(true);
+      const [, params] = lineInserts(db)[0];
+      expect(params[1]).not.toBeNull(); // scoped to the created plan
+      expect(params[8]).toBe(0); // one-off
+    });
+
+    it('bridges a stored expected income into an income line', async () => {
+      const db = makeDb({ plans: [{ id: 'p1', month: '2026-07', currency: 'USD', expected_income: '450000' }] });
+      const result = await BudgetPlansDB.migratePlannedOperationsToLines(db);
+      expect(result.migratedIncome).toBe(1);
+      const [, params] = lineInserts(db)[0];
+      expect(params[1]).toBe('p1');
+      expect(params[3]).toBe('450000');
+      expect(params[10]).toBe('income');
+    });
+
+    it('does not double-count: expected income is skipped when recurring income templates exist', async () => {
+      const db = makeDb({
+        plans: [{ id: 'p1', month: '2026-07', currency: 'USD', expected_income: '450000' }],
+        accounts: [{ id: 1, currency: 'RUB' }],
+        planned: [{ id: 'po3', name: 'Salary', type: 'income', amount: '220000', account_id: 1, category_id: 'inc1', is_recurring: 1 }],
+      });
+      const result = await BudgetPlansDB.migratePlannedOperationsToLines(db);
+      expect(result.migratedIncome).toBe(0);
+      expect(result.migratedTemplates).toBe(1);
+      expect(lineInserts(db)).toHaveLength(1);
+    });
+
+    it('sets the completion flag so a second run is a no-op', async () => {
+      const db = makeDb({});
+      await BudgetPlansDB.migratePlannedOperationsToLines(db);
+      expect(db.runAsync).toHaveBeenCalledWith(
+        expect.stringContaining('INSERT OR REPLACE INTO app_metadata'),
+        expect.arrayContaining([BudgetPlansDB.PLANNED_MIGRATION_FLAG_KEY]),
+      );
     });
   });
 });

@@ -50,19 +50,31 @@ jest.mock('../../../app/components/budgets/BudgetPlanLineModal', () => {
       React.createElement(Pressable, {
         testID: 'mock-save-line',
         onPress: () => props.onSaveLine({
-          amount: '250', label: 'New', comment: null, categoryId: 'cat1', toAccountId: null, isRecurring: false, currency: null,
+          amount: '250', label: 'New', comment: null, kind: 'expense', categoryId: 'cat1', toAccountId: null, accountId: null, isRecurring: false, currency: null,
         }),
       }, React.createElement(Text, {}, 'save')),
       React.createElement(Pressable, {
         testID: 'mock-save-recurring-line',
         onPress: () => props.onSaveLine({
-          amount: '65000', label: 'Rent', comment: null, categoryId: 'cat1', toAccountId: null, isRecurring: true, currency: 'USD',
+          amount: '65000', label: 'Rent', comment: null, kind: 'expense', categoryId: 'cat1', toAccountId: null, accountId: null, isRecurring: true, currency: 'USD',
         }),
       }, React.createElement(Text, {}, 'save recurring')),
+      // Budgets v3 phase 3: expected income is a LINE now (kind 'income'), not a
+      // plan-level figure — there is no separate income editor any more.
       React.createElement(Pressable, {
-        testID: 'mock-save-income',
-        onPress: () => props.onSaveIncome('9000'),
-      }, React.createElement(Text, {}, 'income')),
+        testID: 'mock-save-income-line',
+        onPress: () => props.onSaveLine({
+          amount: '9000', label: 'Salary', comment: null, kind: 'income',
+          categoryId: null, toAccountId: null, accountId: null, isRecurring: false, currency: null,
+        }),
+      }, React.createElement(Text, {}, 'income line')),
+      React.createElement(Pressable, {
+        testID: 'mock-save-template-line',
+        onPress: () => props.onSaveLine({
+          amount: '65000', label: 'Rent', comment: null, kind: 'expense',
+          categoryId: 'cat1', toAccountId: null, accountId: 1, isRecurring: true, currency: 'USD',
+        }),
+      }, React.createElement(Text, {}, 'save template')),
       // Fix 1 (adversarial review round 2): re-save the currently-edited line
       // (props.line) with its scope flipped, keeping the SAME raw amount typed
       // in the editor — exactly what a real user toggling the recurring switch
@@ -151,11 +163,35 @@ const setPlans = ({ plans = [], lines = [], planStatuses = new Map() } = {}) => 
     // The section now loads its lines (recurring UNION this month's one-off
     // lines) via getLinesForMonth rather than getPlanLines directly.
     getLinesForMonth: jest.fn(async () => lines),
+    // Executable templates (Budgets v3 phase 3)
+    executeLine: jest.fn(async () => ({ id: 99 })),
+    markLineExecuted: jest.fn(async () => {}),
+    unmarkLineExecuted: jest.fn(async () => {}),
   };
 };
 
-const renderSection = (ref) => render(
-  <MonthlyPlanSection ref={ref} currency="USD" expenseCategories={EXPENSE_CATEGORIES} accounts={ACCOUNTS} />,
+const INCOME_CATEGORIES = [
+  { id: 'inc1', name: 'Salary', icon: 'cash', categoryType: 'income' },
+];
+
+// A recurring expense line carrying an executable template (Budgets v3 phase 3):
+// accountId / hasTemplate are what make the execute actions appear.
+const TEMPLATE_LINE = {
+  id: 'l-tpl', planId: null, amount: '65000', label: 'Rent', comment: null,
+  kind: 'expense', categoryId: 'cat1', toAccountId: null, accountId: 1,
+  sortOrder: 0, isBroken: false, isRecurring: true, currency: 'USD',
+  hasTemplate: true, lastExecutedMonth: null,
+};
+
+const renderSection = (ref, extraProps = {}) => render(
+  <MonthlyPlanSection
+    ref={ref}
+    currency="USD"
+    expenseCategories={EXPENSE_CATEGORIES}
+    incomeCategories={INCOME_CATEGORIES}
+    accounts={ACCOUNTS}
+    {...extraProps}
+  />,
 );
 
 const flatColor = (node) => StyleSheet.flatten(node.props.style)?.color;
@@ -202,7 +238,7 @@ describe('MonthlyPlanSection', () => {
     it('renders income, lines and computed totals', async () => {
       planWithLines();
       const { getByTestId, getByText } = await renderSection();
-      expect(getByTestId('plan-income-row')).toBeTruthy();
+      expect(getByTestId('plan-income-header')).toBeTruthy();
       await waitFor(() => expect(getByTestId('plan-line-l1')).toBeTruthy());
       expect(getByTestId('plan-line-l2')).toBeTruthy();
       // Label falls back to the linked account name for the label-less line.
@@ -264,7 +300,7 @@ describe('MonthlyPlanSection', () => {
       setPlanWithStatus();
       const { getByTestId } = await renderSection();
       await waitFor(() => expect(getByTestId('plan-line-l1')).toBeTruthy());
-      expect(getByTestId('plan-income-row')).toHaveTextContent(/800\.00 \/ 1000\.00 USD/);
+      expect(getByTestId('plan-income-total')).toHaveTextContent(/800\.00 \/ 1000\.00 USD/);
     });
 
     it('renders the totals row with allocated, actual, and planned remainder', async () => {
@@ -323,25 +359,27 @@ describe('MonthlyPlanSection', () => {
       expect(mockPlans.addLine).toHaveBeenCalledWith('p1', expect.objectContaining({ categoryId: 'cat1', sortOrder: 0 }));
     });
 
-    it('saves expected income from the income editor', async () => {
-      setPlans({ plans: [{ id: 'p1', month: THIS_MONTH, currency: 'USD', expectedIncome: '1000' }], lines: [] });
+    it('adds an income line from the income section (Budgets v3 phase 3)', async () => {
+      setPlans({ plans: [{ id: 'p1', month: THIS_MONTH, currency: 'USD', expectedIncome: '0' }], lines: [] });
       const { getByTestId } = await renderSection();
-      await fireEvent.press(getByTestId('plan-income-row'));
+      await fireEvent.press(getByTestId('plan-add-income'));
       await waitFor(() => expect(getByTestId('mock-line-modal')).toBeTruthy());
-      expect(capturedModalProps.mode).toBe('income');
-      await fireEvent.press(getByTestId('mock-save-income'));
-      await waitFor(() => expect(mockPlans.updatePlan).toHaveBeenCalledWith('p1', { expectedIncome: '9000' }));
+      // The editor opens pre-set to the income kind.
+      expect(capturedModalProps.initialKind).toBe('income');
+      await fireEvent.press(getByTestId('mock-save-income-line'));
+      await waitFor(() => expect(mockPlans.addLine).toHaveBeenCalledWith(
+        'p1', expect.objectContaining({ kind: 'income', amount: '9000' }),
+      ));
     });
 
     it('navigates months without state bleed (next month has no plan)', async () => {
       setPlans({ plans: [{ id: 'p1', month: THIS_MONTH, currency: 'USD', expectedIncome: '1000' }], lines: [] });
       const { getByTestId, queryByTestId } = await renderSection();
-      // Current month has a plan → income row present.
-      expect(getByTestId('plan-income-row')).toBeTruthy();
+      // Current month has a plan → no empty-plan CTA.
+      expect(queryByTestId('plan-empty-state')).toBeNull();
       await fireEvent.press(getByTestId('plan-next-month'));
-      // Next month has no plan → empty state, no income row.
+      // Next month has no plan → empty state.
       await waitFor(() => expect(getByTestId('plan-empty-state')).toBeTruthy());
-      expect(queryByTestId('plan-income-row')).toBeNull();
     });
   });
 
@@ -359,8 +397,8 @@ describe('MonthlyPlanSection', () => {
       // the empty-plan CTA below it, for income/one-off allocations).
       await waitFor(() => expect(getByTestId('plan-line-l-rec')).toBeTruthy());
       expect(getByTestId('plan-empty-state')).toBeTruthy();
-      expect(queryByTestId('plan-income-row')).toBeNull();
-      expect(getByText('recurring_allocation')).toBeTruthy();
+      expect(queryByTestId('plan-line-execute-l-rec')).toBeNull(); // no template → not executable
+      expect(getByText('recurring')).toBeTruthy();
     });
 
     it('adding a recurring allocation calls addRecurringLine, not addLine, and needs no plan', async () => {
@@ -648,24 +686,23 @@ describe('MonthlyPlanSection', () => {
       expect(mockPlans.addPlan).toHaveBeenCalledTimes(1);
     });
 
-    it('ignores a second rapid income-save while the first save is still in flight', async () => {
-      setPlans({ plans: [{ id: 'p1', month: THIS_MONTH, currency: 'USD', expectedIncome: '1000' }], lines: [] });
-      let resolveUpdatePlan;
-      mockPlans.updatePlan = jest.fn(() => new Promise((resolve) => { resolveUpdatePlan = resolve; }));
-      const { getByTestId, queryByTestId } = await renderSection();
-      await fireEvent.press(getByTestId('plan-income-row'));
-      await waitFor(() => expect(getByTestId('mock-line-modal')).toBeTruthy());
+    it('ignores a second rapid execute tap while the first execution is still in flight', async () => {
+      // Executing twice would create the operation twice — the exact
+      // double-charge the atomic executeAndMark path exists to prevent.
+      setPlans({
+        plans: [{ id: 'p1', month: THIS_MONTH, currency: 'USD', expectedIncome: '1000' }],
+        lines: [TEMPLATE_LINE],
+      });
+      mockPlans.executeLine = jest.fn().mockResolvedValue({ id: 1 });
+      const { getByTestId } = await renderSection();
+      await waitFor(() => expect(getByTestId('plan-line-execute-l-tpl')).toBeTruthy());
 
-      fireEvent.press(getByTestId('mock-save-income'));
-      await waitFor(() => expect(mockPlans.updatePlan).toHaveBeenCalledTimes(1));
+      await act(async () => {
+        fireEvent.press(getByTestId('plan-line-execute-l-tpl'));
+        fireEvent.press(getByTestId('plan-line-execute-l-tpl'));
+      });
 
-      // Second tap while the first save is still in flight — must be a no-op.
-      fireEvent.press(getByTestId('mock-save-income'));
-
-      resolveUpdatePlan();
-      await waitFor(() => expect(queryByTestId('mock-line-modal')).toBeNull()); // modal closed = save completed
-
-      expect(mockPlans.updatePlan).toHaveBeenCalledTimes(1);
+      expect(mockPlans.executeLine).toHaveBeenCalledTimes(1);
     });
   });
 
@@ -785,6 +822,140 @@ describe('MonthlyPlanSection', () => {
       expect(getByTestId('plan-line-unconvertible-l-jpy')).toHaveTextContent(/JPY/);
       // Not rendered as a normal progress bar (which would mislabel it as USD).
       expect(queryByTestId('plan-line-broken-l-jpy')).toBeNull();
+    });
+  });
+  describe('Executable templates (Budgets v3 phase 3)', () => {
+    it('offers execute / mark-done on a line with a template and runs the execution', async () => {
+      setPlans({ plans: [], lines: [TEMPLATE_LINE] });
+      const { getByTestId } = await renderSection();
+      await waitFor(() => expect(getByTestId('plan-line-execute-l-tpl')).toBeTruthy());
+      expect(getByTestId('plan-line-done-l-tpl')).toBeTruthy();
+
+      await fireEvent.press(getByTestId('plan-line-execute-l-tpl'));
+      await waitFor(() => expect(mockPlans.executeLine).toHaveBeenCalledWith(
+        expect.objectContaining({ id: 'l-tpl' }),
+      ));
+      // Lines are reloaded so the row picks up its new done state.
+      expect(mockPlans.getLinesForMonth).toHaveBeenCalledTimes(2);
+    });
+
+    it('marks a template done without creating an operation', async () => {
+      setPlans({ plans: [], lines: [TEMPLATE_LINE] });
+      const { getByTestId } = await renderSection();
+      await waitFor(() => expect(getByTestId('plan-line-done-l-tpl')).toBeTruthy());
+      await fireEvent.press(getByTestId('plan-line-done-l-tpl'));
+      await waitFor(() => expect(mockPlans.markLineExecuted).toHaveBeenCalled());
+      expect(mockPlans.executeLine).not.toHaveBeenCalled();
+    });
+
+    it('shows a done badge and an undo action once executed this month', async () => {
+      setPlans({
+        plans: [],
+        lines: [{ ...TEMPLATE_LINE, lastExecutedMonth: THIS_MONTH }],
+      });
+      const { getByTestId, queryByTestId } = await renderSection();
+      await waitFor(() => expect(getByTestId('plan-line-check-l-tpl')).toBeTruthy());
+      expect(queryByTestId('plan-line-execute-l-tpl')).toBeNull();
+      await fireEvent.press(getByTestId('plan-line-undo-l-tpl'));
+      await waitFor(() => expect(mockPlans.unmarkLineExecuted).toHaveBeenCalledWith('l-tpl'));
+    });
+
+    it('does not offer execution for a month other than the current one', async () => {
+      setPlans({ plans: [], lines: [TEMPLATE_LINE] });
+      const { getByTestId, queryByTestId } = await renderSection();
+      await waitFor(() => expect(getByTestId('plan-line-execute-l-tpl')).toBeTruthy());
+      await fireEvent.press(getByTestId('plan-next-month'));
+      await waitFor(() => expect(queryByTestId('plan-line-execute-l-tpl')).toBeNull());
+    });
+
+    it('reports execution feedback to the host via onNotify', async () => {
+      setPlans({ plans: [], lines: [TEMPLATE_LINE] });
+      const onNotify = jest.fn();
+      const { getByTestId } = await renderSection(undefined, { onNotify });
+      await waitFor(() => expect(getByTestId('plan-line-execute-l-tpl')).toBeTruthy());
+      await fireEvent.press(getByTestId('plan-line-execute-l-tpl'));
+      await waitFor(() => expect(onNotify).toHaveBeenCalledWith('added_to_operations'));
+    });
+
+    it('summarizes template progress (pending out / done / pending in)', async () => {
+      setPlans({
+        plans: [],
+        lines: [
+          TEMPLATE_LINE,
+          {
+            ...TEMPLATE_LINE, id: 'l-inc', kind: 'income', label: 'Salary', amount: '220000',
+            categoryId: null, accountId: 2, lastExecutedMonth: THIS_MONTH,
+          },
+        ],
+      });
+      const { getByTestId } = await renderSection();
+      await waitFor(() => expect(getByTestId('planned-summary-strip')).toBeTruthy());
+      expect(getByTestId('summary-done-count')).toHaveTextContent('1 / 2');
+      expect(getByTestId('summary-pending-out')).toHaveTextContent('65K / 65K');
+      // The income template is already done, so nothing is pending in.
+      expect(getByTestId('summary-pending-in')).toHaveTextContent('0 / 220K');
+    });
+
+    it('has no summary strip when no line carries a template', async () => {
+      setPlans({
+        plans: [],
+        lines: [{ ...TEMPLATE_LINE, accountId: null, hasTemplate: false }],
+      });
+      const { queryByTestId, getByTestId } = await renderSection();
+      await waitFor(() => expect(getByTestId('plan-line-l-tpl')).toBeTruthy());
+      expect(queryByTestId('planned-summary-strip')).toBeNull();
+    });
+  });
+
+  describe('Income lines (Budgets v3 phase 3)', () => {
+    it('sums income lines into the expected income shown in the income header', async () => {
+      setPlans({
+        plans: [{ id: 'p1', month: THIS_MONTH, currency: 'USD', expectedIncome: '0' }],
+        lines: [
+          { id: 'i1', planId: 'p1', amount: '220', label: 'Salary', comment: null, kind: 'income', categoryId: null, toAccountId: null, sortOrder: 0, isBroken: false, isRecurring: false, currency: null },
+          { id: 'i2', planId: 'p1', amount: '180', label: 'Advance', comment: null, kind: 'income', categoryId: null, toAccountId: null, sortOrder: 1, isBroken: false, isRecurring: false, currency: null },
+          { id: 'l1', planId: 'p1', amount: '300', label: 'Groceries', comment: null, kind: 'expense', categoryId: 'cat1', toAccountId: null, sortOrder: 2, isBroken: false, isRecurring: false, currency: null },
+        ],
+      });
+      const { getByTestId } = await renderSection();
+      await waitFor(() => expect(getByTestId('plan-line-i1')).toBeTruthy());
+      // Expected income = 220 + 180 = 400; income lines are NOT allocations, so
+      // allocated stays 300 and the remainder is 100.
+      expect(getByTestId('plan-income-total')).toHaveTextContent(/400\.00 USD/);
+      expect(getByTestId('plan-totals')).toHaveTextContent(/300\.00/);
+      expect(getByTestId('plan-remainder')).toHaveTextContent(/100\.00/);
+    });
+
+    it('falls back to the stored expected income of the plan when there are no income lines', async () => {
+      setPlans({
+        plans: [{ id: 'p1', month: THIS_MONTH, currency: 'USD', expectedIncome: '1000' }],
+        lines: [],
+      });
+      const { getByTestId } = await renderSection();
+      await waitFor(() => expect(getByTestId('plan-income-total')).toBeTruthy());
+      expect(getByTestId('plan-income-total')).toHaveTextContent(/1000\.00 USD/);
+    });
+
+    it('renders no progress bar for an income line', async () => {
+      setPlans({
+        plans: [{ id: 'p1', month: THIS_MONTH, currency: 'USD', expectedIncome: '0' }],
+        lines: [
+          { id: 'i1', planId: 'p1', amount: '220', label: 'Salary', comment: null, kind: 'income', categoryId: null, toAccountId: null, sortOrder: 0, isBroken: false, isRecurring: false, currency: null },
+        ],
+        planStatuses: new Map([['p1', {
+          planId: 'p1', month: THIS_MONTH, currency: 'USD', convertAll: false,
+          lines: [{ lineId: 'i1', broken: false, amount: '220', actual: '0', remaining: '220', percentage: 0, isExceeded: false, status: 'income' }],
+          totals: {
+            expectedIncome: '220.00', actualIncome: '150.00', allocated: '0.00',
+            totalActual: '0.00', plannedRemainder: '220.00', actualRemainder: '150.00',
+          },
+          unconvertible: [],
+        }]]),
+      });
+      const { getByTestId, queryByText } = await renderSection();
+      await waitFor(() => expect(getByTestId('plan-line-i1')).toBeTruthy());
+      expect(queryByText('0 / 220')).toBeNull();
+      expect(getByTestId('plan-income-total')).toHaveTextContent(/150\.00 \/ 220\.00 USD/);
     });
   });
 });

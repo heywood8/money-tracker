@@ -37,7 +37,6 @@ app/
 - `CategoriesContext.js` - Transaction categories state
 - `DialogContext.js` - Global dialog/alert management
 - `LocalizationContext.js` - i18n and language state
-- `PlannedOperationsContext.js` - Planned/recurring operations state
 - `SearchContext.js` - Search and filter state for operations
 - `DisplaySettingsContext.js` - UI preferences (e.g., hide balances)
 - `AppBlurContext.js` - Blur overlay state for security
@@ -68,7 +67,7 @@ app/
 - `GraphsScreen.js` - Financial visualizations/charts screen
 - `LanguageSelectionScreen.js` - Language selection during onboarding
 - `OperationsScreen.js` - Financial operations/transactions screen
-- `BudgetScreen.js` - Unified Budgets tab: budgets, monthly plan, and hosted planned/recurring templates with one-tap execution
+- `BudgetScreen.js` - Unified Budgets tab: one month-scoped list of income and allocation lines, each optionally an executable template (one-tap execution)
 
 **Guidelines:**
 - One file per screen
@@ -91,7 +90,6 @@ app/
 - `CategoryModal.js` - Add/edit category modal
 - `ImportProgressModal.js` - Import progress display modal
 - `OperationModal.js` - Add/edit financial operation modal
-- `PlannedOperationModal.js` - Add/edit planned/recurring operation modal
 - `SettingsModal.js` - App settings modal (theme, language, backup/restore)
 
 **Guidelines:**
@@ -216,7 +214,6 @@ SimpleTabs was moved here from `components/` to resolve a circular dependency. N
 - `BudgetsDB.js` - Budget database operations
 - `CategoriesDB.js` - Category database operations
 - `OperationsDB.js` - Operation database operations
-- `PlannedOperationsDB.js` - Planned operations database operations
 - `PreferencesDB.js` - App preferences stored in SQLite
 - `db.js` - SQLite database wrapper
 

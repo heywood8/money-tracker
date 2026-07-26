@@ -122,9 +122,19 @@ the app; it exists only for historical/backup continuity.
 
 **Indexes**: `category_id`, `period_type`, `start_date`+`end_date`, `currency`, `is_recurring`
 
-### 6. planned_operations
+### 6. planned_operations (legacy — superseded by budget_plan_lines)
 
-Templates for recurring or one-time planned expenses/income/transfers:
+Templates for recurring or one-time planned expenses/income/transfers.
+**Budgets v3 phase 3** absorbed this model into `budget_plan_lines`: every row
+here is mirrored into a plan line carrying an executable template
+(`kind` / `account_id` / `last_executed_month`) by a one-time, idempotent bridge
+(`BudgetPlansDB.migratePlannedOperationsToLines`, gated by the
+`post_migration_m0020_completed` `app_metadata` flag) — recurring templates
+become recurring lines, one-time ones become one-off lines on the current
+month's plan. Like `budgets`, the table is kept **append-only** (never dropped)
+and is no longer read by the app; it exists only for historical/backup
+continuity (an older backup still restores into it, and the same bridge then
+converts it).
 
 ```javascript
 {
@@ -164,9 +174,13 @@ Tracks daily end-of-day balances per account for the balance history graph:
 
 ### 8. budget_plans (Budgets v2)
 
-One monthly envelope-style plan per calendar month. `expected_income` is split
-across the month's `budget_plan_lines`; the un-allocated remainder is always
-computed, never stored.
+One monthly envelope-style plan per calendar month. The un-allocated remainder
+(expected income − Σ allocation lines) is always computed, never stored.
+
+`expected_income` itself is **legacy since Budgets v3 phase 3**: the month's
+expected income is now the sum of its `kind = 'income'` lines, and migration
+0020 bridges each plan's stored figure into such a line. The column is kept
+append-only and is only read as a fallback for a plan that has no income line.
 
 ```javascript
 {
@@ -181,7 +195,7 @@ computed, never stored.
 
 **Indexes**: `month` (unique)
 
-### 9. budget_plan_lines (Budgets v2 + v3 phase 2)
+### 9. budget_plan_lines (Budgets v2 + v3)
 
 Each line allocates an amount to exactly one tracking target: an expense
 `category_id` or a transfer destination `to_account_id` (enforced in
@@ -194,8 +208,10 @@ and made `plan_id` nullable (a recreate-table migration, since SQLite has no
 that also absorbs the old per-category `budgets` (v1) caps:
 
 - `is_recurring = 0` (one-time): scoped to a single month via `plan_id`
-  (the original Budgets v2 line). `currency` is NULL — it inherits the
-  parent plan's currency.
+  (the original Budgets v2 line). `currency` is usually NULL — it then inherits
+  the parent plan's currency; since phase 3 a one-off line with a template
+  carries the currency of its execution account. A one-time template is consumed
+  (deleted) by its execution, exactly as a one-time planned operation was.
 - `is_recurring = 1` (recurring): a global template, **not** tied to any one
   month's plan — `plan_id` is NULL. It applies to every calendar month
   automatically (mirroring how v1 `budgets` behaved) and carries its own
@@ -204,6 +220,30 @@ that also absorbs the old per-category `budgets` (v1) caps:
 A month's full set of lines is the recurring lines UNION that month's one-off
 lines (`BudgetPlansDB.getLinesForMonth`) — recurring lines show even for a
 month that has no `budget_plans` row yet.
+
+**Budgets v3 phase 3** (migration 0020) added `kind`, `account_id` and
+`last_executed_month`, which turn a line into an optionally EXECUTABLE template
+— the last of the three planning models folded into this one:
+
+- `kind`: `'income'`, `'expense'` or `'transfer'`. NULL on pre-0020 rows, where
+  the effective kind is inferred from the target (`to_account_id` set →
+  transfer, otherwise expense).
+- `account_id`: the account an execution touches — same meaning as
+  `operations.account_id` (source for an expense/transfer, destination for
+  income). Set = the line shows the execute action; NULL = a pure analytic
+  target, exactly as before.
+- `last_executed_month`: `YYYY-MM` of the last execution or manual
+  "mark as done", like the old `planned_operations.last_executed_month`.
+
+Executing a line inserts the real operation (dated today), marks the line for the
+current month and — for a ONE-OFF template — deletes it, all in one transaction
+(`BudgetPlansDB.executeLine`, the phase-3 home of the old
+`PlannedOperationsDB.executeAndMark`).
+
+Income lines declare the month's expected income: they are excluded from the
+allocation total and have no per-line actual (the income section compares their
+sum against the month's real income). They are the only lines allowed to have no
+tracking target.
 
 ```javascript
 {
@@ -216,13 +256,16 @@ month that has no `budget_plans` row yet.
   to_account_id: INTEGER REFERENCES accounts(id) ON DELETE SET NULL,
   sort_order: INTEGER NOT NULL DEFAULT 0,
   is_recurring: INTEGER NOT NULL DEFAULT 0,
-  currency: TEXT,                   // set only for recurring lines
+  currency: TEXT,                   // NULL = inherit the plan's currency
+  kind: TEXT,                       // 'income' | 'expense' | 'transfer' (NULL = legacy)
+  account_id: INTEGER REFERENCES accounts(id) ON DELETE SET NULL,  // set = executable
+  last_executed_month: TEXT,        // YYYY-MM of the last execution
   created_at: TEXT NOT NULL,
   updated_at: TEXT NOT NULL
 }
 ```
 
-**Indexes**: `plan_id`, `is_recurring`
+**Indexes**: `plan_id`, `is_recurring`, `kind`
 
 ## Design Principles
 

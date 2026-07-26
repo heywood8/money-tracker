@@ -1664,14 +1664,14 @@ op-2,income,20,acc-1,cat-1`;
       const catCall = lineInserts.find(c => c[1][0] === 'line-cat');
       expect(catCall[1]).toEqual([
         'line-cat', 'plan-1', 'Groceries', '400.00', NON_ASCII_COMMENT,
-        'cat-1', null, 0, 0, null, 'x', 'y',
+        'cat-1', null, 0, 0, null, null, null, null, 'x', 'y',
       ]);
 
       // Transfer line: category_id null, to_account_id remapped 'acc-uuid' -> 42.
       const xferCall = lineInserts.find(c => c[1][0] === 'line-xfer');
       expect(xferCall[1]).toEqual([
         'line-xfer', 'plan-1', 'To savings', '500.00', null,
-        null, REMAPPED_ACCOUNT_ID, 1, 0, null, 'x', 'y',
+        null, REMAPPED_ACCOUNT_ID, 1, 0, null, null, null, null, 'x', 'y',
       ]);
     });
 
@@ -1694,7 +1694,7 @@ op-2,income,20,acc-1,cat-1`;
       expect(lineInserts).toHaveLength(1);
       expect(lineInserts[0][1]).toEqual([
         'line-rec', null, 'Rent', '65000', null,
-        'cat-1', null, 0, 1, 'USD', 'x', 'y',
+        'cat-1', null, 0, 1, 'USD', null, null, null, 'x', 'y',
       ]);
     });
 
@@ -1735,6 +1735,14 @@ op-2,income,20,acc-1,cat-1`;
         base.getAllAsync = jest.fn().mockImplementation((query) => {
           if (typeof query === 'string' && query.trim() === 'SELECT * FROM budgets') {
             return Promise.resolve(budgetRows);
+          }
+          // The phase-3 bridge (planned operations -> lines) reads these two on
+          // the same restore; keep them empty so these tests only observe the
+          // phase-2 bridge they are about.
+          if (typeof query === 'string'
+            && (query.includes('FROM planned_operations') || query.includes('FROM budget_plans')
+              || query.includes('FROM accounts'))) {
+            return Promise.resolve([]);
           }
           return originalGetAllAsync(query);
         });

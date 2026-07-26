@@ -66,13 +66,18 @@ export const signOut = async () => {
 };
 
 /**
- * Build the 8-sheet data structure from a backup object.
+ * Build the 7-sheet data structure from a backup object.
+ *
+ * The "Planned Operations" sheet is gone as of Budgets v3 phase 3: planned
+ * operations are now plan lines carrying an executable template, exported in
+ * "Budget Plan Lines" (kind / account / last_executed_month). Spreadsheets
+ * created before this keep a stale tab — it is simply no longer written or read.
  * @param {Object} backup - Backup object from createBackup()
  * @returns {Array<{range: string, values: Array<Array>}>}
  */
 export const buildSheetsData = (backup) => {
   const {
-    accounts, categories, operations, budgets, planned_operations, balance_history,
+    accounts, categories, operations, budgets, balance_history,
     budget_plans, budget_plan_lines,
   } = backup.data;
 
@@ -134,23 +139,6 @@ export const buildSheetsData = (backup) => {
       ],
     },
     {
-      range: 'Planned Operations!A1',
-      values: [
-        ['id', 'name', 'type', 'amount', 'account', 'category', 'to_account', 'description', 'is_recurring', 'account_id', 'category_id', 'to_account_id'],
-        ...(planned_operations || []).map(p => [
-          p.id, p.name, p.type, p.amount,
-          accountNames.get(p.account_id) || '',
-          categoryNames.get(p.category_id) || '',
-          p.to_account_id ? (accountNames.get(p.to_account_id) || '') : '',
-          p.description || '',
-          p.is_recurring,
-          p.account_id,
-          p.category_id || '',
-          p.to_account_id || '',
-        ]),
-      ],
-    },
-    {
       range: 'Balance History!A1',
       values: [
         ['account', 'date', 'balance', 'account_id'],
@@ -173,7 +161,7 @@ export const buildSheetsData = (backup) => {
     {
       range: 'Budget Plan Lines!A1',
       values: [
-        ['id', 'plan_id', 'label', 'amount', 'comment', 'category', 'account', 'category_id', 'to_account_id', 'sort_order', 'is_recurring', 'currency'],
+        ['id', 'plan_id', 'label', 'amount', 'comment', 'category', 'account', 'category_id', 'to_account_id', 'sort_order', 'is_recurring', 'currency', 'kind', 'execution_account', 'account_id', 'last_executed_month'],
         ...(budget_plan_lines || []).map(l => [
           l.id, l.plan_id || '', l.label || '', l.amount, l.comment || '',
           categoryNames.get(l.category_id) || '',
@@ -183,6 +171,10 @@ export const buildSheetsData = (backup) => {
           l.sort_order ?? 0,
           l.is_recurring ?? 0,
           l.currency || '',
+          l.kind || '',
+          l.account_id ? (accountNames.get(l.account_id) || '') : '',
+          l.account_id || '',
+          l.last_executed_month || '',
         ]),
       ],
     },
@@ -208,7 +200,7 @@ const parseSheet = (valueRange) => {
 
 /**
  * Import all app data from the saved Google Sheets spreadsheet.
- * Fetches all 6 sheets in one batchGet call, resolves foreign keys
+ * Fetches all 7 sheets in one batchGet call, resolves foreign keys
  * (ID-first, name fallback), and returns a backup object compatible
  * with restoreBackup(). Does NOT call restoreBackup itself.
  *
@@ -228,7 +220,7 @@ export const importFromSheets = async (accessToken, onProgress) => {
     throw new Error('no_spreadsheet_configured');
   }
 
-  const sheetNames = ['Accounts', 'Operations', 'Categories', 'Budgets', 'Planned Operations', 'Balance History', 'Budget Plans', 'Budget Plan Lines'];
+  const sheetNames = ['Accounts', 'Operations', 'Categories', 'Budgets', 'Balance History', 'Budget Plans', 'Budget Plan Lines'];
   const rangesParam = sheetNames.map(n => `ranges=${encodeURIComponent(n)}`).join('&');
   const response = await fetch(
     `${SHEETS_API}/${spreadsheetId}/values:batchGet?${rangesParam}`,
@@ -261,7 +253,6 @@ export const importFromSheets = async (accessToken, onProgress) => {
   const categoryRows = findSheet('Categories');
   const operationRows = findSheet('Operations');
   const budgetRows = findSheet('Budgets');
-  const plannedRows = findSheet('Planned Operations');
   const historyRows = findSheet('Balance History');
   const budgetPlanRows = findSheet('Budget Plans');
   const budgetPlanLineRows = findSheet('Budget Plan Lines');
@@ -354,24 +345,6 @@ export const importFromSheets = async (accessToken, onProgress) => {
     updated_at: now,
   }));
 
-  const planned_operations = plannedRows.map(p => ({
-    id: p.id,
-    name: p.name,
-    type: p.type,
-    amount: p.amount,
-    account_id: resolveAccountId(p, 'account_id', 'account'),
-    category_id: resolveCategoryId(p, 'category_id', 'category'),
-    to_account_id: (p.to_account || p.to_account_id)
-      ? resolveAccountId(p, 'to_account_id', 'to_account')
-      : null,
-    description: p.description || null,
-    is_recurring: p.is_recurring !== '' ? Number(p.is_recurring) : 1,
-    last_executed_month: null,
-    display_order: null,
-    created_at: now,
-    updated_at: now,
-  }));
-
   const balance_history = historyRows.map(h => ({
     account_id: resolveAccountId(h, 'account_id', 'account'),
     date: h.date,
@@ -402,7 +375,16 @@ export const importFromSheets = async (accessToken, onProgress) => {
       to_account_id: (l.account || l.to_account_id) ? resolveAccountId(l, 'to_account_id', 'account') : null,
       sort_order: (l.sort_order !== '' && l.sort_order != null) ? Number(l.sort_order) : 0,
       is_recurring: isRecurring,
-      currency: isRecurring ? (l.currency || null) : null,
+      // Since migration 0020 a one-off line may carry its own currency too (an
+      // executable template is priced in its account's currency), so this is no
+      // longer gated on is_recurring.
+      currency: l.currency || null,
+      kind: l.kind || null,
+      // Execution account — present only on a line with a template.
+      account_id: (l.execution_account || l.account_id)
+        ? resolveAccountId(l, 'account_id', 'execution_account')
+        : null,
+      last_executed_month: l.last_executed_month || null,
       created_at: now,
       updated_at: now,
     };
@@ -426,7 +408,9 @@ export const importFromSheets = async (accessToken, onProgress) => {
       budgets,
       app_metadata,
       balance_history,
-      planned_operations,
+      // Planned operations are plan lines now (Budgets v3 phase 3) — the sheet is
+      // no longer exported or read, so nothing is imported into the legacy table.
+      planned_operations: [],
       budget_plans,
       budget_plan_lines,
     },
@@ -447,7 +431,6 @@ const createSpreadsheet = async (accessToken) => {
         { properties: { title: 'Operations' } },
         { properties: { title: 'Categories' } },
         { properties: { title: 'Budgets' } },
-        { properties: { title: 'Planned Operations' } },
         { properties: { title: 'Balance History' } },
         { properties: { title: 'Budget Plans' } },
         { properties: { title: 'Budget Plan Lines' } },

@@ -141,13 +141,20 @@ describe('GoogleSheetsService', () => {
       },
     };
 
-    it('returns 8 sheets with correct titles', async () => {
+    // The "Planned Operations" tab is gone as of Budgets v3 phase 3 — planned
+    // operations are plan lines with a template now, exported in Budget Plan Lines.
+    it('returns 7 sheets with correct titles', async () => {
       const sheets = buildSheetsData(mockBackup);
       const titles = sheets.map(s => s.range.split('!')[0]);
       expect(titles).toEqual([
-        'Accounts', 'Operations', 'Categories', 'Budgets', 'Planned Operations', 'Balance History',
+        'Accounts', 'Operations', 'Categories', 'Budgets', 'Balance History',
         'Budget Plans', 'Budget Plan Lines',
       ]);
+    });
+
+    it('no longer exports a Planned Operations sheet', async () => {
+      const sheets = buildSheetsData(mockBackup);
+      expect(sheets.find(s => s.range.startsWith('Planned Operations'))).toBeUndefined();
     });
 
     it('maps Accounts sheet with correct headers and data row', async () => {
@@ -193,14 +200,6 @@ describe('GoogleSheetsService', () => {
       const sheets = buildSheetsData(mockBackup);
       const budgets = sheets.find(s => s.range.startsWith('Budgets'));
       expect(budgets.values[1][1]).toBe('Food');
-    });
-
-    it('maps Planned Operations with account and category names', async () => {
-      const sheets = buildSheetsData(mockBackup);
-      const planned = sheets.find(s => s.range.startsWith('Planned Operations'));
-      expect(planned.values[1][1]).toBe('Rent');
-      expect(planned.values[1][4]).toBe('Checking');
-      expect(planned.values[1][5]).toBe('Food');
     });
 
     it('maps Balance History with account name instead of id', async () => {
@@ -279,16 +278,6 @@ describe('GoogleSheetsService', () => {
       expect(budgets.values[1]).toContain('cat-1');
     });
 
-    it('Planned Operations sheet includes account_id, category_id, to_account_id', async () => {
-      const sheets = buildSheetsData(mockBackup);
-      const planned = sheets.find(s => s.range === 'Planned Operations!A1');
-      expect(planned.values[0]).toContain('account_id');
-      expect(planned.values[0]).toContain('category_id');
-      expect(planned.values[0]).toContain('to_account_id');
-      expect(planned.values[1]).toContain(1);
-      expect(planned.values[1]).toContain('cat-1');
-    });
-
     it('Balance History sheet includes account_id', async () => {
       const sheets = buildSheetsData(mockBackup);
       const history = sheets.find(s => s.range === 'Balance History!A1');
@@ -354,7 +343,7 @@ describe('GoogleSheetsService', () => {
       expect(setPreference).not.toHaveBeenCalled();
     });
 
-    it('applies basic filters to all 6 sheets after writing data', async () => {
+    it('applies basic filters to every exported sheet after writing data', async () => {
       getPreference.mockResolvedValue('sheet-id');
       mockFetch.mockResolvedValueOnce({ ok: true, json: async () => ({}) }); // clearSheets
       mockFetch.mockResolvedValueOnce({ ok: true, json: async () => ({}) }); // writeSheets
@@ -365,9 +354,9 @@ describe('GoogleSheetsService', () => {
 
       const applyFiltersCall = mockFetch.mock.calls[3];
       const body = JSON.parse(applyFiltersCall[1].body);
-      expect(body.requests).toHaveLength(6);
+      expect(body.requests).toHaveLength(5);
       expect(body.requests[0].setBasicFilter.filter.range.sheetId).toBe(0);
-      expect(body.requests[5].setBasicFilter.filter.range.sheetId).toBe(5);
+      expect(body.requests[4].setBasicFilter.filter.range.sheetId).toBe(5);
     });
 
     it('throws refresh_failed and signs out when clearSheets returns 401', async () => {
@@ -647,7 +636,7 @@ describe('GoogleSheetsService', () => {
       const sheets = buildSheetsData(mockBackup);
       const lines = sheets.find(s => s.range === 'Budget Plan Lines!A1');
       const header = lines.values[0];
-      expect(header).toEqual(['id', 'plan_id', 'label', 'amount', 'comment', 'category', 'account', 'category_id', 'to_account_id', 'sort_order', 'is_recurring', 'currency']);
+      expect(header).toEqual(['id', 'plan_id', 'label', 'amount', 'comment', 'category', 'account', 'category_id', 'to_account_id', 'sort_order', 'is_recurring', 'currency', 'kind', 'execution_account', 'account_id', 'last_executed_month']);
 
       const catRow = lines.values.find(r => r[0] === 'line-cat');
       expect(catRow[header.indexOf('category')]).toBe('Food');

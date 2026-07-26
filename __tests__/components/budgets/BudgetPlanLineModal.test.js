@@ -47,20 +47,22 @@ jest.mock('../../../app/components/Calculator', () => {
 const EXPENSE_CATEGORIES = [
   { id: 'cat1', name: 'Food', icon: 'food', categoryType: 'expense' },
 ];
+const INCOME_CATEGORIES = [
+  { id: 'inc1', name: 'Salary', icon: 'cash', categoryType: 'income' },
+];
 const ACCOUNTS = [
   { id: 1, name: 'Savings', currency: 'USD' },
 ];
 
 const baseProps = () => ({
   visible: true,
-  mode: 'line',
   line: null,
+  initialKind: 'expense',
   currency: 'USD',
-  initialIncome: '0',
   expenseCategories: EXPENSE_CATEGORIES,
+  incomeCategories: INCOME_CATEGORIES,
   accounts: ACCOUNTS,
   onSaveLine: jest.fn(),
-  onSaveIncome: jest.fn(),
   onDeleteLine: jest.fn(),
   onClose: jest.fn(),
 });
@@ -104,21 +106,97 @@ describe('BudgetPlanLineModal', () => {
     await fireEvent.press(getByTestId('plan-target-option-acc-1'));
     await fireEvent.changeText(getByTestId('calc-input'), '400');
     await fireEvent.press(getByTestId('plan-line-save'));
+    // Choosing a destination account settles the kind as a transfer.
     expect(props.onSaveLine).toHaveBeenCalledWith(expect.objectContaining({
       amount: '400',
+      kind: 'transfer',
       categoryId: null,
       toAccountId: 1,
     }));
   });
 
-  it('income mode saves without requiring a target', async () => {
-    const props = { ...baseProps(), mode: 'income', initialIncome: '1000' };
-    const { getByTestId, queryByTestId } = await render(<BudgetPlanLineModal {...props} />);
-    expect(queryByTestId('plan-target-picker')).toBeNull();
-    await waitFor(() => expect(getByTestId('calc-input')).toBeTruthy());
-    await fireEvent.changeText(getByTestId('calc-input'), '2500');
-    await fireEvent.press(getByTestId('plan-line-save'));
-    expect(props.onSaveIncome).toHaveBeenCalledWith('2500');
+  describe('Line kinds (Budgets v3 phase 3)', () => {
+    it('an income line saves without requiring a target', async () => {
+      const props = { ...baseProps(), initialKind: 'income' };
+      const { getByTestId } = await render(<BudgetPlanLineModal {...props} />);
+      await waitFor(() => expect(getByTestId('calc-input')).toBeTruthy());
+      await fireEvent.changeText(getByTestId('calc-input'), '2500');
+      await fireEvent.press(getByTestId('plan-line-save'));
+      expect(props.onSaveLine).toHaveBeenCalledWith(expect.objectContaining({
+        kind: 'income', amount: '2500', categoryId: null, toAccountId: null,
+      }));
+    });
+
+    it('an income line offers income categories, not expense ones', async () => {
+      const props = { ...baseProps(), initialKind: 'income' };
+      const { getByTestId, queryByTestId } = await render(<BudgetPlanLineModal {...props} />);
+      await fireEvent.press(getByTestId('plan-target-picker'));
+      await waitFor(() => expect(getByTestId('plan-target-option-cat-inc1')).toBeTruthy());
+      expect(queryByTestId('plan-target-option-cat-cat1')).toBeNull();
+      // ...and no transfer-target tab: income tracks no destination account.
+      expect(queryByTestId('plan-target-tab-account')).toBeNull();
+    });
+
+    it('switching kind to transfer drops a category picked for an expense line', async () => {
+      const props = baseProps();
+      const { getByTestId } = await render(<BudgetPlanLineModal {...props} />);
+      await fireEvent.press(getByTestId('plan-target-picker'));
+      await waitFor(() => expect(getByTestId('plan-target-option-cat-cat1')).toBeTruthy());
+      await fireEvent.press(getByTestId('plan-target-option-cat-cat1'));
+      await fireEvent.press(getByTestId('plan-line-kind-transfer'));
+      await fireEvent.changeText(getByTestId('calc-input'), '100');
+      await fireEvent.press(getByTestId('plan-line-save'));
+      // No destination account chosen, so the save is refused rather than saved
+      // as a transfer that still carries a category.
+      expect(props.onSaveLine).not.toHaveBeenCalled();
+      await waitFor(() => expect(getByTestId('plan-line-error')).toBeTruthy());
+    });
+  });
+
+  describe('Execution template (Budgets v3 phase 3)', () => {
+    it('saves no execution account by default (analytic target only)', async () => {
+      const props = baseProps();
+      const { getByTestId } = await render(<BudgetPlanLineModal {...props} />);
+      await fireEvent.press(getByTestId('plan-target-picker'));
+      await waitFor(() => expect(getByTestId('plan-target-option-cat-cat1')).toBeTruthy());
+      await fireEvent.press(getByTestId('plan-target-option-cat-cat1'));
+      await fireEvent.changeText(getByTestId('calc-input'), '150');
+      await fireEvent.press(getByTestId('plan-line-save'));
+      expect(props.onSaveLine).toHaveBeenCalledWith(expect.objectContaining({ accountId: null }));
+    });
+
+    it('picking an execution account makes the line executable and prices it in that account currency', async () => {
+      const props = { ...baseProps(), accounts: [{ id: 3, name: 'Card', currency: 'EUR' }] };
+      const { getByTestId } = await render(<BudgetPlanLineModal {...props} />);
+      await fireEvent.press(getByTestId('plan-target-picker'));
+      await waitFor(() => expect(getByTestId('plan-target-option-cat-cat1')).toBeTruthy());
+      await fireEvent.press(getByTestId('plan-target-option-cat-cat1'));
+      await fireEvent.press(getByTestId('plan-account-picker'));
+      await waitFor(() => expect(getByTestId('plan-account-option-3')).toBeTruthy());
+      await fireEvent.press(getByTestId('plan-account-option-3'));
+      await fireEvent.changeText(getByTestId('calc-input'), '65000');
+      await fireEvent.press(getByTestId('plan-line-save'));
+      expect(props.onSaveLine).toHaveBeenCalledWith(expect.objectContaining({
+        accountId: 3, currency: 'EUR',
+      }));
+    });
+
+    it('the None option clears a previously chosen execution account', async () => {
+      const props = {
+        ...baseProps(),
+        line: {
+          id: 'l1', amount: '100', label: 'Rent', comment: null, kind: 'expense',
+          categoryId: 'cat1', toAccountId: null, accountId: 1, isRecurring: false, currency: 'USD',
+        },
+      };
+      const { getByTestId } = await render(<BudgetPlanLineModal {...props} />);
+      await waitFor(() => expect(getByTestId('plan-account-picker')).toBeTruthy());
+      await fireEvent.press(getByTestId('plan-account-picker'));
+      await waitFor(() => expect(getByTestId('plan-account-option-none')).toBeTruthy());
+      await fireEvent.press(getByTestId('plan-account-option-none'));
+      await fireEvent.press(getByTestId('plan-line-save'));
+      expect(props.onSaveLine).toHaveBeenCalledWith(expect.objectContaining({ accountId: null }));
+    });
   });
 
   describe('Recurring toggle (Budgets v3 phase 2)', () => {
@@ -176,7 +254,7 @@ describe('BudgetPlanLineModal', () => {
         ...baseProps(),
         line: {
           id: 'l1', amount: '65000', label: 'Rent', comment: null,
-          categoryId: 'cat1', toAccountId: null, isRecurring: true, currency: 'EUR',
+          categoryId: 'cat1', toAccountId: null, kind: 'expense', isRecurring: true, currency: 'EUR',
         },
       };
       const { getByTestId } = await render(<BudgetPlanLineModal {...props} />);
