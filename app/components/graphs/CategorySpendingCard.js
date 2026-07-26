@@ -1,7 +1,9 @@
 import React, { useMemo, useState, useCallback } from 'react';
 import { View, Text, StyleSheet, ActivityIndicator, Dimensions, TouchableOpacity, Modal, ScrollView } from 'react-native';
 import PropTypes from 'prop-types';
-import { CartesianChart, Bar } from 'victory-native';
+import { CartesianChart, Bar, BarGroup, StackedBar, useChartPressState } from 'victory-native';
+import { matchFont, DashPathEffect, RoundedRect } from '@shopify/react-native-skia';
+import { runOnJS, useAnimatedReaction } from 'react-native-reanimated';
 import Icon from '@expo/vector-icons/MaterialCommunityIcons';
 import currencies from '../../../assets/currencies.json';
 import useCategoryMonthlySpending from '../../hooks/useCategoryMonthlySpending';
@@ -21,18 +23,26 @@ const formatCurrency = (amount, currency) => {
 const BAR_HEIGHT = 90;
 const LABEL_HEIGHT = 18;
 const TOP_PADDING = 8;
-const Y_AXIS_WIDTH = 32;
-const CHART_HEIGHT = TOP_PADDING + BAR_HEIGHT;
+// The x-axis labels now live on the Skia canvas, so the canvas owns their height too.
+const CHART_HEIGHT = TOP_PADDING + BAR_HEIGHT + LABEL_HEIGHT;
 const CORNER = 4;
 const VS_COLOR = '#FF7043';
+const BAR_ANIMATION = { type: 'spring' };
+// Press state key sets must match the chart's yKeys, so the canvas remounts
+// (via `key`) whenever the vs-series is added or removed.
+const PRESS_INIT_SINGLE = { x: 0, y: { amount: 0 } };
+const PRESS_INIT_VS = { x: 0, y: { primary: 0, vs: 0 } };
+// TalkBack can still step through months now that the RN hit slots are gone.
+const ACCESSIBILITY_ACTIONS = [{ name: 'increment' }, { name: 'decrement' }];
 
-const formatYTick = (value) => {
-  if (value >= 1000000) return `${(value / 1000000).toFixed(1)}M`;
-  if (value >= 1000) return `${(value / 1000).toFixed(0)}K`;
-  return value.toFixed(0);
+export const formatYTick = (value) => {
+  const num = Number(value);
+  if (num >= 1000000) return `${(num / 1000000).toFixed(1)}M`;
+  if (num >= 1000) return `${(num / 1000).toFixed(0)}K`;
+  return num.toFixed(0);
 };
 
-const formatPctTick = (value) => value + '%';
+export const formatPctTick = (value) => `${Math.round(Number(value))}%`;
 
 // "Nice" y-axis step so ticks land on round numbers.
 const niceStepFor = (max) => {
@@ -50,13 +60,14 @@ const niceStepFor = (max) => {
 /**
  * Category-spending bar chart backed by Victory Native XL.
  *
- * Three layouts, all driven by the same <CartesianChart>/<Bar> primitives:
- *  - single:  one series, selected bar highlighted in `primary`, rest dimmed `mutedText`
- *  - grouped: primary (wide) + vs (narrow) bars overlaid per month for comparison
- *  - stacked: `vs` full-height behind + `primary` bottom portion in front → 100%-normalized stack
+ * Three layouts, all driven by Victory's own bar primitives:
+ *  - single:  one <Bar> series
+ *  - grouped: <BarGroup> with primary + vs bars side by side per month
+ *  - stacked: <StackedBar> over 100%-normalized shares of primary vs vs
  *
- * Axis labels, month ticks, the selection reference line and bar-press hit areas are
- * rendered as React Native views (not Skia) so they stay themeable, queryable and font-free.
+ * Axes are drawn by Victory on the Skia canvas (xAxis/yAxis/frame). Month selection
+ * runs through `useChartPressState`, so dragging across the chart scrubs months on
+ * the UI thread; the selected month is marked by a translucent column highlight.
  */
 const SpendingBarChart = ({
   data,
@@ -71,198 +82,201 @@ const SpendingBarChart = ({
   const count = data.length;
   const hasVs = vsData != null && vsData.length === count;
   const isStacked = stacked && hasVs;
-  const chartW = width - Y_AXIS_WIDTH;
 
-  const { axisMax, yTicks } = useMemo(() => {
-    if (isStacked) {
-      return {
-        axisMax: 100,
-        yTicks: [0, 25, 50, 75, 100].map((v) => ({
-          value: v,
-          label: formatPctTick(v),
-          y: TOP_PADDING + BAR_HEIGHT - (v / 100) * BAR_HEIGHT,
-        })),
-      };
-    }
+  const axisMax = useMemo(() => {
+    if (isStacked) return 100;
     const max = Math.max(
       ...data.map((d) => d.total),
       ...(hasVs ? vsData.map((d) => d.total) : []),
       1,
     );
     const step = niceStepFor(max);
-    const aMax = Math.ceil(max / step) * step;
-    const tickCount = Math.round(aMax / step);
-    return {
-      axisMax: aMax,
-      yTicks: Array.from({ length: tickCount + 1 }, (_, i) => ({
-        value: step * i,
-        label: formatYTick(step * i),
-        y: TOP_PADDING + BAR_HEIGHT - ((step * i) / aMax) * BAR_HEIGHT,
-      })),
-    };
+    return Math.ceil(max / step) * step;
   }, [isStacked, data, vsData, hasVs]);
 
   // Per-month field bundle consumed by Victory Native. Every series we draw must be a
   // field here AND listed in yKeys, otherwise VN never computes points for it.
   const chartData = useMemo(() => {
     return data.map((d, i) => {
-      const isSel = i === selectedIndex;
       if (isStacked) {
-        const vsD = vsData[i];
-        const totalAmt = d.total + vsD.total;
-        const primaryPct = totalAmt > 0 ? (d.total / totalAmt) * 100 : 0;
-        // `back` (vs) is full height and sits behind; `front` (primary) covers the
-        // bottom portion, so the exposed top slice reads as the vs share.
-        const back = totalAmt > 0 ? 100 : 0;
-        const front = totalAmt > 0 ? primaryPct : 0;
+        // 100%-normalized stack: the two shares always add up to a full-height bar.
+        const totalAmt = d.total + vsData[i].total;
         return {
           x: i,
-          track: totalAmt > 0 ? 0 : 100,
-          back,
-          front,
-          backSel: isSel ? back : 0,
-          frontSel: isSel ? front : 0,
+          primary: totalAmt > 0 ? (d.total / totalAmt) * 100 : 0,
+          vs: totalAmt > 0 ? (vsData[i].total / totalAmt) * 100 : 0,
         };
       }
       if (hasVs) {
-        const vsD = vsData[i];
-        return {
-          x: i,
-          primary: d.total,
-          primarySel: isSel ? d.total : 0,
-          vs: vsD.total,
-          vsSel: isSel ? vsD.total : 0,
-        };
+        return { x: i, primary: d.total, vs: vsData[i].total };
       }
-      return {
-        x: i,
-        amount: d.total,
-        amountSel: isSel ? d.total : 0,
-      };
+      return { x: i, amount: d.total };
     });
-  }, [data, vsData, hasVs, isStacked, selectedIndex]);
+  }, [data, vsData, hasVs, isStacked]);
 
-  const yKeys = useMemo(() => {
-    if (isStacked) return ['track', 'back', 'front', 'backSel', 'frontSel'];
-    if (hasVs) return ['primary', 'primarySel', 'vs', 'vsSel'];
-    return ['amount', 'amountSel'];
-  }, [isStacked, hasVs]);
+  const yKeys = useMemo(() => (hasVs ? ['primary', 'vs'] : ['amount']), [hasVs]);
 
   const domain = useMemo(() => ({ y: [0, axisMax] }), [axisMax]);
 
-  // Dotted reference line at the selected bar's top (single/grouped only, matching the
-  // original which omitted it in stacked mode).
-  const selLineTop = useMemo(() => {
-    if (isStacked) return null;
-    if (selectedIndex == null || !data[selectedIndex]) return null;
-    const sel = data[selectedIndex];
-    const h = Math.max((sel.total / axisMax) * BAR_HEIGHT, sel.total > 0 ? 2 : 0);
-    return TOP_PADDING + BAR_HEIGHT - h;
-  }, [isStacked, selectedIndex, data, axisMax]);
+  // System-font axis labels (the project ships no .ttf). matchFont returns a stub
+  // under Jest and a real SkFont on device, so the call is guarded.
+  const axisFont = useMemo(() => {
+    try {
+      return matchFont({ fontFamily: 'sans-serif', fontSize: 9 }) || null;
+    } catch (e) {
+      return null;
+    }
+  }, []);
 
-  const renderBars = useCallback(
-    ({ points, chartBounds }) => {
-      const slot = (chartBounds.right - chartBounds.left) / Math.max(count, 1);
-      const wideW = slot * 0.5;
-      const narrowW = slot * 0.28;
+  // Dragging across the canvas scrubs the selected month. x values are the month
+  // indices themselves, so the pressed x rounds straight to a data index.
+  const { state: pressState } = useChartPressState(
+    hasVs ? PRESS_INIT_VS : PRESS_INIT_SINGLE,
+  );
 
+  useAnimatedReaction(
+    () => pressState.x.value.value,
+    (current, previous) => {
+      if (current === previous) return;
+      const index = Math.round(current);
+      if (index >= 0 && index < count) {
+        runOnJS(onBarPress)(index);
+      }
+    },
+    [count, onBarPress],
+  );
+
+  const handleAccessibilityAction = useCallback(
+    (event) => {
+      const step = event.nativeEvent.actionName === 'increment' ? 1 : -1;
+      const base = selectedIndex == null ? count - 1 : selectedIndex;
+      const next = Math.min(count - 1, Math.max(0, base + step));
+      onBarPress(next);
+    },
+    [count, selectedIndex, onBarPress],
+  );
+
+  // Translucent column behind the selected month — replaces the old dashed RN
+  // overlay and works identically in all three layouts.
+  const renderHighlight = useCallback(
+    (points, chartBounds, slot) => {
+      const anchor = points[hasVs ? 'primary' : 'amount']?.[selectedIndex];
+      if (selectedIndex == null || !anchor) return null;
+      return (
+        <RoundedRect
+          x={anchor.x - slot / 2}
+          y={chartBounds.top}
+          width={slot}
+          height={chartBounds.bottom - chartBounds.top}
+          r={6}
+          color={colors.primary}
+          opacity={0.12}
+        />
+      );
+    },
+    [hasVs, selectedIndex, colors.primary],
+  );
+
+  const renderSeries = useCallback(
+    (points, chartBounds, slot) => {
       if (isStacked) {
-        const barW = slot * 0.6;
         return (
-          <>
-            <Bar points={points.track} chartBounds={chartBounds} color={colors.mutedText} opacity={0.12} barWidth={barW} roundedCorners={{ topLeft: CORNER, topRight: CORNER }} />
-            <Bar points={points.back} chartBounds={chartBounds} color={VS_COLOR} opacity={0.3} barWidth={barW} roundedCorners={{ topLeft: CORNER, topRight: CORNER }} />
-            <Bar points={points.front} chartBounds={chartBounds} color={colors.primary} opacity={0.3} barWidth={barW} roundedCorners={{ bottomLeft: CORNER, bottomRight: CORNER }} />
-            <Bar points={points.backSel} chartBounds={chartBounds} color={VS_COLOR} opacity={1} barWidth={barW} roundedCorners={{ topLeft: CORNER, topRight: CORNER }} />
-            <Bar points={points.frontSel} chartBounds={chartBounds} color={colors.primary} opacity={1} barWidth={barW} roundedCorners={{ bottomLeft: CORNER, bottomRight: CORNER }} />
-          </>
+          <StackedBar
+            chartBounds={chartBounds}
+            points={[points.primary, points.vs]}
+            colors={[colors.primary, VS_COLOR]}
+            barWidth={slot * 0.6}
+            animate={BAR_ANIMATION}
+            barOptions={({ isTop, isBottom }) => {
+              if (isTop) return { roundedCorners: { topLeft: CORNER, topRight: CORNER } };
+              if (isBottom) return { roundedCorners: { bottomLeft: CORNER, bottomRight: CORNER } };
+              return {};
+            }}
+          />
         );
       }
 
       if (hasVs) {
         return (
-          <>
-            <Bar points={points.primary} chartBounds={chartBounds} color={colors.primary} opacity={0.3} barWidth={wideW} roundedCorners={{ topLeft: CORNER, topRight: CORNER }} />
-            <Bar points={points.primarySel} chartBounds={chartBounds} color={colors.primary} opacity={1} barWidth={wideW} roundedCorners={{ topLeft: CORNER, topRight: CORNER }} />
-            <Bar points={points.vs} chartBounds={chartBounds} color={VS_COLOR} opacity={0.3} barWidth={narrowW} roundedCorners={{ topLeft: CORNER, topRight: CORNER }} />
-            <Bar points={points.vsSel} chartBounds={chartBounds} color={VS_COLOR} opacity={1} barWidth={narrowW} roundedCorners={{ topLeft: CORNER, topRight: CORNER }} />
-          </>
+          <BarGroup
+            chartBounds={chartBounds}
+            betweenGroupPadding={0.35}
+            withinGroupPadding={0.1}
+            roundedCorners={{ topLeft: CORNER, topRight: CORNER }}
+          >
+            <BarGroup.Bar points={points.primary} color={colors.primary} animate={BAR_ANIMATION} />
+            <BarGroup.Bar points={points.vs} color={VS_COLOR} animate={BAR_ANIMATION} />
+          </BarGroup>
         );
       }
 
       return (
+        <Bar
+          points={points.amount}
+          chartBounds={chartBounds}
+          color={colors.primary}
+          barWidth={slot * 0.5}
+          roundedCorners={{ topLeft: CORNER, topRight: CORNER }}
+          animate={BAR_ANIMATION}
+        />
+      );
+    },
+    [isStacked, hasVs, colors.primary],
+  );
+
+  const renderChart = useCallback(
+    ({ points, chartBounds }) => {
+      const slot = (chartBounds.right - chartBounds.left) / Math.max(count, 1);
+      return (
         <>
-          <Bar points={points.amount} chartBounds={chartBounds} color={colors.mutedText} opacity={0.3} barWidth={wideW} roundedCorners={{ topLeft: CORNER, topRight: CORNER }} />
-          <Bar points={points.amountSel} chartBounds={chartBounds} color={colors.primary} opacity={1} barWidth={wideW} roundedCorners={{ topLeft: CORNER, topRight: CORNER }} />
+          {renderHighlight(points, chartBounds, slot)}
+          {renderSeries(points, chartBounds, slot)}
         </>
       );
     },
-    [isStacked, hasVs, colors.primary, colors.mutedText, count],
+    [count, renderHighlight, renderSeries],
   );
 
+  const selectedMonthLabel = selectedIndex != null && data[selectedIndex]
+    ? monthAbbreviations[data[selectedIndex].month]
+    : '';
+
   return (
-    <View style={[styles.chartWrap, { width }]}>
-      <View style={styles.chartRow}>
-        {/* Y axis labels */}
-        <View style={styles.yAxis}>
-          {yTicks.map((tick) => (
-            <Text
-              key={tick.value}
-              style={[styles.yTick, { top: tick.y - 5, color: colors.mutedText }]}
-              numberOfLines={1}
-            >
-              {tick.label}
-            </Text>
-          ))}
-        </View>
-
-        {/* Bars */}
-        <View style={[styles.barsArea, { width: chartW }]}>
-          <CartesianChart
-            data={chartData}
-            xKey="x"
-            yKeys={yKeys}
-            domain={domain}
-            domainPadding={{ left: 6, right: 6, top: TOP_PADDING }}
-          >
-            {renderBars}
-          </CartesianChart>
-
-          {/* Selection reference line */}
-          {selLineTop != null && (
-            <View
-              pointerEvents="none"
-              style={[styles.selLine, { top: selLineTop, borderColor: colors.primary }]}
-            />
-          )}
-
-          {/* Transparent hit areas for bar selection */}
-          <View style={styles.touchRow} pointerEvents="box-none">
-            {data.map((d, i) => (
-              <TouchableOpacity
-                key={i}
-                style={styles.touchSlot}
-                activeOpacity={0.6}
-                onPress={() => onBarPress(i)}
-                accessibilityRole="button"
-                accessibilityLabel={`${monthAbbreviations[d.month]} ${formatYTick(d.total)}`}
-              />
-            ))}
-          </View>
-        </View>
-      </View>
-
-      {/* Month labels */}
-      <View style={styles.monthRow}>
-        {data.map((d, i) => (
-          <Text
-            key={i}
-            style={[styles.monthLabel, { color: colors.mutedText }]}
-            numberOfLines={1}
-          >
-            {monthAbbreviations[d.month]}
-          </Text>
-        ))}
+    <View
+      style={[styles.chartWrap, { width }]}
+      accessible
+      accessibilityRole="adjustable"
+      accessibilityLabel={`${selectedMonthLabel} ${formatYTick(data[selectedIndex]?.total ?? 0)}`}
+      accessibilityActions={ACCESSIBILITY_ACTIONS}
+      onAccessibilityAction={handleAccessibilityAction}
+    >
+      <View style={styles.chartCanvas}>
+        <CartesianChart
+          data={chartData}
+          xKey="x"
+          yKeys={yKeys}
+          domain={domain}
+          domainPadding={{ left: 6, right: 6, top: TOP_PADDING }}
+          chartPressState={pressState}
+          xAxis={{
+            font: axisFont,
+            lineWidth: 0,
+            labelColor: colors.mutedText,
+            tickCount: count,
+            formatXLabel: (value) => monthAbbreviations[data[Math.round(value)]?.month] ?? '',
+          }}
+          yAxis={[{
+            font: axisFont,
+            lineColor: colors.border,
+            labelColor: colors.mutedText,
+            tickCount: 5,
+            formatYLabel: isStacked ? formatPctTick : formatYTick,
+            linePathEffect: <DashPathEffect intervals={[4, 4]} />,
+          }]}
+          frame={{ lineWidth: 0 }}
+        >
+          {renderChart}
+        </CartesianChart>
       </View>
     </View>
   );
@@ -581,6 +595,9 @@ const CategorySpendingCard = ({
         </View>
       ) : (
         <SpendingBarChart
+          // Remount when the vs-series appears/disappears: the chart press state
+          // is keyed by series and cannot change shape in place.
+          key={hasVsData ? 'vs' : 'single'}
           data={monthlyData}
           vsData={hasVsData ? vsMonthlyData : null}
           stacked={showStackedBar && hasVsData}
@@ -617,10 +634,6 @@ CategorySpendingCard.propTypes = {
 };
 
 const styles = StyleSheet.create({
-  barsArea: {
-    height: CHART_HEIGHT,
-    position: 'relative',
-  },
   card: {
     borderRadius: 16,
     borderWidth: 1,
@@ -647,8 +660,7 @@ const styles = StyleSheet.create({
     fontSize: 16,
     fontWeight: '500',
   },
-  chartRow: {
-    flexDirection: 'row',
+  chartCanvas: {
     height: CHART_HEIGHT,
   },
   chartWrap: {
@@ -716,17 +728,6 @@ const styles = StyleSheet.create({
     flex: 1,
     justifyContent: 'center',
   },
-  monthLabel: {
-    flex: 1,
-    fontSize: 9.5,
-    textAlign: 'center',
-  },
-  monthRow: {
-    flexDirection: 'row',
-    height: LABEL_HEIGHT,
-    marginLeft: Y_AXIS_WIDTH,
-    paddingTop: 2,
-  },
   parentRow: {
     alignItems: 'center',
     borderBottomWidth: 1,
@@ -736,13 +737,6 @@ const styles = StyleSheet.create({
     fontSize: 11,
     fontWeight: '500',
     letterSpacing: 0.5,
-  },
-  selLine: {
-    borderStyle: 'dashed',
-    borderTopWidth: 2,
-    left: 0,
-    position: 'absolute',
-    right: 0,
   },
   stackedToggleBtn: {
     alignSelf: 'flex-end',
@@ -754,17 +748,6 @@ const styles = StyleSheet.create({
   thisMonthLabel: {
     fontSize: 11,
     marginTop: 2,
-  },
-  touchRow: {
-    bottom: 0,
-    flexDirection: 'row',
-    left: 0,
-    position: 'absolute',
-    right: 0,
-    top: 0,
-  },
-  touchSlot: {
-    flex: 1,
   },
   vsCategoryName: {
     flexShrink: 1,
@@ -785,18 +768,6 @@ const styles = StyleSheet.create({
   vsText: {
     fontSize: 12,
     fontWeight: '500',
-  },
-  yAxis: {
-    height: CHART_HEIGHT,
-    position: 'relative',
-    width: Y_AXIS_WIDTH,
-  },
-  yTick: {
-    fontSize: 8,
-    opacity: 0.7,
-    position: 'absolute',
-    right: 4,
-    textAlign: 'right',
   },
 });
 

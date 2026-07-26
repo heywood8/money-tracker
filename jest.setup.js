@@ -513,6 +513,18 @@ jest.mock(
     const Line = () => React.createElement(View, { testID: 'vn-line' });
     const Bar = () => React.createElement(View, { testID: 'vn-bar' });
     const Area = () => React.createElement(View, { testID: 'vn-area' });
+    const AreaRange = () => React.createElement(View, { testID: 'vn-area-range' });
+    const StackedArea = () => React.createElement(View, { testID: 'vn-stacked-area' });
+    const StackedBar = () => React.createElement(View, { testID: 'vn-stacked-bar' });
+    const Scatter = () => React.createElement(View, { testID: 'vn-scatter' });
+    // eslint-disable-next-line react/prop-types
+    const BarGroup = ({ children }) =>
+      React.createElement(View, { testID: 'vn-bar-group' }, children);
+    BarGroup.Bar = () => React.createElement(View, { testID: 'vn-bar-group-bar' });
+    // Gesture state stubs: components read `.value` off Reanimated shared values,
+    // so every axis slot has to be an object with a `value` field.
+    const shared = (v) => ({ value: v });
+    const pressAxis = () => ({ value: shared(0), position: shared(0) });
     const Pie = {
       // eslint-disable-next-line react/prop-types
       Chart: ({ children }) =>
@@ -531,9 +543,32 @@ jest.mock(
       PolarChart,
       Line,
       Bar,
+      BarGroup,
+      StackedBar,
       Area,
+      AreaRange,
+      StackedArea,
+      Scatter,
       Pie,
-      useChartPressState: () => ({ state: {}, isActive: false }),
+      useChartPressState: () => ({
+        state: {
+          x: pressAxis(),
+          // Charts index y by series key; a proxy keeps arbitrary keys safe.
+          y: new Proxy({}, { get: () => pressAxis() }),
+          matchedIndex: shared(-1),
+          isActive: shared(false),
+        },
+        isActive: false,
+      }),
+      useChartTransformState: () => ({
+        state: {
+          panActive: shared(false),
+          zoomActive: shared(false),
+          origin: shared({ x: 0, y: 0 }),
+          matrix: shared(null),
+          offset: shared(null),
+        },
+      }),
       useLinePath: () => ({ path: '' }),
       useAreaPath: () => ({ path: '' }),
     };
@@ -555,9 +590,44 @@ jest.mock(
     Group: 'SkGroup',
     Text: 'SkText',
     Canvas: 'SkCanvas',
+    Line: 'SkLine',
+    Rect: 'SkRect',
+    RoundedRect: 'SkRoundedRect',
+    Paint: 'SkPaint',
+    DashPathEffect: 'SkDashPathEffect',
     LinearGradient: 'SkLinearGradient',
     vec: (x, y) => ({ x, y }),
   }),
+  { virtual: true },
+);
+
+// Mock react-native-reanimated. Victory Native XL's gesture state is built on
+// shared values, so chart components read/derive them; under Jest we only need
+// the values to be plain `{ value }` boxes and the worklet helpers to be
+// synchronous no-ops. `virtual: true` because the native package is not
+// resolvable in the Jest environment.
+jest.mock(
+  'react-native-reanimated',
+  () => {
+    const shared = (v) => ({ value: v });
+    return {
+      __esModule: true,
+      default: {},
+      useSharedValue: shared,
+      useDerivedValue: (fn) => {
+        try {
+          return shared(typeof fn === 'function' ? fn() : undefined);
+        } catch {
+          return shared(undefined);
+        }
+      },
+      useAnimatedReaction: () => {},
+      useAnimatedStyle: (fn) => (typeof fn === 'function' ? fn() : {}),
+      runOnJS: (fn) => fn,
+      withTiming: (v) => v,
+      withSpring: (v) => v,
+    };
+  },
   { virtual: true },
 );
 

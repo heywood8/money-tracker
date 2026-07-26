@@ -1,6 +1,7 @@
-import React, { useMemo } from 'react';
+import React, { useMemo, useCallback } from 'react';
 import { View, StyleSheet } from 'react-native';
 import { Pie, PolarChart } from 'victory-native';
+import { LinearGradient, vec } from '@shopify/react-native-skia';
 import Icon from '@expo/vector-icons/MaterialCommunityIcons';
 import PropTypes from 'prop-types';
 
@@ -50,14 +51,61 @@ export const computeIconMarkers = (data) => {
   });
 };
 
-const DonutChart = ({ data }) => {
+// Gradient endpoints for a slice: start halfway out along its leading edge, end at
+// the outer rim of its midline. Exported for unit testing — the render function it
+// feeds runs inside the Skia canvas and is not reachable from the test tree.
+export const computeSliceGradient = (slice) => {
+  const { radius, startAngle, endAngle, center } = slice;
+  const midAngle = (startAngle + endAngle) / 2;
+  const startRad = (Math.PI / 180) * startAngle;
+  const midRad = (Math.PI / 180) * midAngle;
+  return {
+    start: {
+      x: center.x + radius * 0.5 * Math.cos(startRad),
+      y: center.y + radius * 0.5 * Math.sin(startRad),
+    },
+    end: {
+      x: center.x + radius * Math.cos(midRad),
+      y: center.y + radius * Math.sin(midRad),
+    },
+  };
+};
+
+// Slice fill fades to 50% alpha towards the rim (`80` is the hex alpha suffix).
+const SLICE_FADE_ALPHA = '80';
+const INSET_WIDTH = 2;
+
+const DonutChart = ({ data, insetColor }) => {
   const pieData = useMemo(() => mapPieData(data), [data]);
   const markers = useMemo(() => computeIconMarkers(data), [data]);
+
+  const renderSlice = useCallback(({ slice }) => {
+    const { start, end } = computeSliceGradient(slice);
+    return (
+      <>
+        <Pie.Slice>
+          <LinearGradient
+            start={vec(start.x, start.y)}
+            end={vec(end.x, end.y)}
+            colors={[slice.color, `${slice.color}${SLICE_FADE_ALPHA}`]}
+            positions={[0, 1]}
+          />
+        </Pie.Slice>
+        {insetColor ? (
+          <Pie.SliceAngularInset
+            angularInset={{ angularStrokeWidth: INSET_WIDTH, angularStrokeColor: insetColor }}
+          />
+        ) : null}
+      </>
+    );
+  }, [insetColor]);
 
   return (
     <View testID="donut-chart" style={styles.container} accessibilityRole="image">
       <PolarChart data={pieData} labelKey="label" valueKey="value" colorKey="color">
-        <Pie.Chart innerRadius={INNER_RADIUS} />
+        <Pie.Chart innerRadius={INNER_RADIUS}>
+          {renderSlice}
+        </Pie.Chart>
       </PolarChart>
       {markers
         .filter((marker) => marker.showIcon)
@@ -89,6 +137,8 @@ DonutChart.propTypes = {
       icon: PropTypes.string,
     }),
   ).isRequired,
+  // Colour of the hairline drawn between slices; omit to draw none.
+  insetColor: PropTypes.string,
 };
 
 const styles = StyleSheet.create({

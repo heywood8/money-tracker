@@ -53,7 +53,7 @@ const IncomePieChart = ({
 
   return (
     <View style={styles.row}>
-      <DonutChart data={incomeChartData} />
+      <DonutChart data={incomeChartData} insetColor={colors.surface} />
       <View style={styles.legendWrapper}>
         <CustomLegend
           data={incomeChartData}
