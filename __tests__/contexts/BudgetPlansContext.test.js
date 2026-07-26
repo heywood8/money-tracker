@@ -104,7 +104,7 @@ describe('BudgetPlansContext', () => {
       })).rejects.toThrow('A valid month (YYYY-MM) is required');
 
       expect(BudgetPlansDB.createPlan).not.toHaveBeenCalled();
-      expect(mockShowDialog).toHaveBeenCalledWith('Error', 'A valid month (YYYY-MM) is required', [{ text: 'OK' }]);
+      expect(mockShowDialog).toHaveBeenCalledWith('error', 'A valid month (YYYY-MM) is required', [{ text: 'ok' }]);
       expect(result.current.plans).toHaveLength(0);
     });
 
@@ -117,7 +117,7 @@ describe('BudgetPlansContext', () => {
       await expect(act(async () => {
         await result.current.addPlan({ month: '2026-07', currency: 'USD' });
       })).rejects.toThrow('duplicate month');
-      expect(mockShowDialog).toHaveBeenCalledWith('Error', 'duplicate month', [{ text: 'OK' }]);
+      expect(mockShowDialog).toHaveBeenCalledWith('error', 'duplicate month', [{ text: 'ok' }]);
     });
 
     // Fix 4 (adversarial review round 2): BudgetPlansDB.createPlan recovers
@@ -194,7 +194,7 @@ describe('BudgetPlansContext', () => {
       await expect(act(async () => {
         await result.current.deletePlan('p1');
       })).rejects.toThrow('boom');
-      expect(mockShowDialog).toHaveBeenCalledWith('Error', 'Failed to delete plan. Please try again.', [{ text: 'OK' }]);
+      expect(mockShowDialog).toHaveBeenCalledWith('error', 'failed_to_delete_plan', [{ text: 'ok' }]);
     });
   });
 

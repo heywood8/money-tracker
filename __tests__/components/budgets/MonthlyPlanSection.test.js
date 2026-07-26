@@ -256,6 +256,34 @@ describe('MonthlyPlanSection', () => {
       await waitFor(() => expect(getByTestId('plan-line-l1')).toBeTruthy());
       expect(flatColor(getByTestId('plan-remainder'))).toBe(COLORS.danger);
     });
+
+    // Regression: with no expected income declared the remainder degenerated to
+    // "minus everything you planned" and rendered in alarm red the moment a
+    // first-time user added their very first line.
+    it('prompts for income instead of showing a negative remainder when none is declared', async () => {
+      setPlans({
+        plans: [{ id: 'p1', month: THIS_MONTH, currency: 'USD', expectedIncome: null }],
+        lines: [{ id: 'l1', planId: 'p1', amount: '500', label: 'Big', comment: null, categoryId: 'cat1', toAccountId: null, sortOrder: 0, isBroken: false }],
+      });
+      const { getByTestId, queryByTestId } = await renderSection();
+      await waitFor(() => expect(getByTestId('plan-line-l1')).toBeTruthy());
+      expect(queryByTestId('plan-remainder')).toBeNull();
+      expect(getByTestId('plan-remainder-hint')).toBeTruthy();
+    });
+
+    it('shows the remainder again once an income line declares one', async () => {
+      setPlans({
+        plans: [{ id: 'p1', month: THIS_MONTH, currency: 'USD', expectedIncome: null }],
+        lines: [
+          { id: 'i1', planId: 'p1', amount: '900', label: null, comment: null, categoryId: null, toAccountId: null, kind: 'income', sortOrder: 0, isBroken: false },
+          { id: 'l1', planId: 'p1', amount: '500', label: 'Big', comment: null, categoryId: 'cat1', toAccountId: null, sortOrder: 0, isBroken: false },
+        ],
+      });
+      const { getByTestId, queryByTestId } = await renderSection();
+      await waitFor(() => expect(getByTestId('plan-line-l1')).toBeTruthy());
+      expect(queryByTestId('plan-remainder-hint')).toBeNull();
+      expect(getByTestId('plan-remainder')).toHaveTextContent(/400\.00/);
+    });
   });
 
   describe('Plan vs actual', () => {
@@ -289,7 +317,9 @@ describe('MonthlyPlanSection', () => {
       const { getByTestId, getByText } = await renderSection();
       await waitFor(() => expect(getByTestId('plan-line-l1')).toBeTruthy());
       // StatusProgressBar details: "actual / amount" and the remaining text.
-      expect(getByText('150.00 / 300')).toBeTruthy();
+      // Both sides are formatted — the right-hand figure used to be the raw DB
+      // string, so a row read "150.00 / 300".
+      expect(getByText('150.00 / 300.00')).toBeTruthy();
       expect(getByText('remaining_budget: 150.00')).toBeTruthy();
       expect(getByText('50%')).toBeTruthy();
       // The exceeded transfer line shows the over-budget wording.
@@ -393,12 +423,23 @@ describe('MonthlyPlanSection', () => {
     it('renders a recurring line even for a month with no plan created yet', async () => {
       setPlans({ plans: [], lines: [recurringLine] });
       const { getByTestId, getByText, queryByTestId } = await renderSection();
-      // No plan for this month, but the recurring line still shows (and so does
-      // the empty-plan CTA below it, for income/one-off allocations).
+      // No plan for this month, but the recurring line still shows (and so do
+      // the empty-plan CTAs below it, for income/one-off allocations).
       await waitFor(() => expect(getByTestId('plan-line-l-rec')).toBeTruthy());
       expect(getByTestId('plan-empty-state')).toBeTruthy();
       expect(queryByTestId('plan-line-execute-l-rec')).toBeNull(); // no template → not executable
       expect(getByText('recurring')).toBeTruthy();
+      // ...but NOT the "no plan yet" copy: it sat directly under a populated
+      // list and above a totals row, contradicting both.
+      expect(queryByTestId('plan-create-empty')).toBeTruthy();
+      expect(() => getByText('no_plan_for_month')).toThrow();
+    });
+
+    it('keeps the "no plan yet" copy for a genuinely blank month', async () => {
+      setPlans({ plans: [], lines: [] });
+      const { getByText, getByTestId } = await renderSection();
+      await waitFor(() => expect(getByTestId('plan-empty-state')).toBeTruthy());
+      expect(getByText('no_plan_for_month')).toBeTruthy();
     });
 
     it('adding a recurring allocation calls addRecurringLine, not addLine, and needs no plan', async () => {
@@ -538,7 +579,7 @@ describe('MonthlyPlanSection', () => {
       await fireEvent.press(getByTestId('mock-save-currency-only'));
 
       await waitFor(() => expect(mockShowDialog).toHaveBeenCalledWith(
-        'Error', 'exchange_rate_unavailable', expect.anything(),
+        'error', 'exchange_rate_unavailable', expect.anything(),
       ));
       // The modal stays open on error (not silently closed) so the user can retry.
       expect(getByTestId('mock-line-modal')).toBeTruthy();
@@ -832,8 +873,11 @@ describe('MonthlyPlanSection', () => {
       expect(getByTestId('plan-line-done-l-tpl')).toBeTruthy();
 
       await fireEvent.press(getByTestId('plan-line-execute-l-tpl'));
+      // The row's visible name rides along so the created operation is not blank
+      // when the line carries no explicit label.
       await waitFor(() => expect(mockPlans.executeLine).toHaveBeenCalledWith(
         expect.objectContaining({ id: 'l-tpl' }),
+        'Rent',
       ));
       // Lines are reloaded so the row picks up its new done state.
       expect(mockPlans.getLinesForMonth).toHaveBeenCalledTimes(2);
@@ -904,6 +948,24 @@ describe('MonthlyPlanSection', () => {
       const { queryByTestId, getByTestId } = await renderSection();
       await waitFor(() => expect(getByTestId('plan-line-l-tpl')).toBeTruthy());
       expect(queryByTestId('planned-summary-strip')).toBeNull();
+    });
+
+    // Regression: the row's meta line reused the `execute` button caption, so it
+    // read as a command sitting where its sibling branch prints a state ("done")
+    // — and it kept saying so on months where execution is disabled anyway.
+    it('labels a pending template with a state, not the execute command', async () => {
+      setPlans({ plans: [], lines: [TEMPLATE_LINE] });
+      const { getByText, queryByText, getByTestId } = await renderSection();
+      await waitFor(() => expect(getByTestId('plan-line-l-tpl')).toBeTruthy());
+      expect(getByText('recurring · pending_execution')).toBeTruthy();
+      expect(queryByText('recurring · execute')).toBeNull();
+    });
+
+    it('labels an executed template as done', async () => {
+      setPlans({ plans: [], lines: [{ ...TEMPLATE_LINE, lastExecutedMonth: THIS_MONTH }] });
+      const { getByText, getByTestId } = await renderSection();
+      await waitFor(() => expect(getByTestId('plan-line-l-tpl')).toBeTruthy());
+      expect(getByText('recurring · done')).toBeTruthy();
     });
   });
 

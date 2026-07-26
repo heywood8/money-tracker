@@ -19,7 +19,6 @@ import Icon from '@expo/vector-icons/MaterialCommunityIcons';
 import { useThemeColors } from '../../contexts/ThemeColorsContext';
 import { useLocalization } from '../../contexts/LocalizationContext';
 import { useDialog } from '../../contexts/DialogContext';
-import Calculator from '../Calculator';
 import FormInput from '../FormInput';
 import ModalBlurOverlay from '../ModalBlurOverlay';
 import ModalHeader from '../ModalHeader';
@@ -236,6 +235,15 @@ export default function BudgetPlanLineModal({
     setError(null);
     closeSubPanel();
   }, [closeSubPanel]);
+
+  // Normalize a locale decimal comma to a dot — Android decimal-pad keyboards
+  // emit "," in many locales and the currency parsing downstream reads a comma
+  // string as garbage (parseFloat('1,5') === 1, Decimal treats it as 0). Same
+  // treatment every other amount field in the app gives its input.
+  const handleAmountChange = useCallback((text) => {
+    setAmount(text.replace(',', '.'));
+    setError(null);
+  }, []);
 
   const amountIsValid = Currency.isValid(amount) && Currency.compare(amount, '0') > 0;
 
@@ -543,18 +551,20 @@ export default function BudgetPlanLineModal({
                     </View>
                   )}
 
-                  {/* Amount */}
+                  {/* Amount — a plain numeric field. A budget line is typed once
+                      and rarely edited, so the on-screen calculator cost half the
+                      modal's height (its bottom row sat under the button bar) and
+                      bought nothing the number pad doesn't already give. */}
                   <View style={styles.field}>
                     <Text style={[styles.fieldLabel, { color: colors.mutedText }]}>
-                      {t('amount')}
+                      {t('amount')}{effectiveCurrency ? ` · ${effectiveCurrency}` : ''}
                     </Text>
-                    <Calculator
+                    <FormInput
                       value={amount}
-                      onValueChange={setAmount}
-                      colors={colors}
+                      onChangeText={handleAmountChange}
                       placeholder="0"
-                      currencyCode={effectiveCurrency || currency}
-                      containerBackground={colors.card}
+                      keyboardType="decimal-pad"
+                      testID="plan-line-amount"
                     />
                   </View>
 
@@ -932,7 +942,13 @@ const styles = StyleSheet.create({
     fontWeight: '600',
   },
   subPanel: {
-    ...StyleSheet.absoluteFillObject,
+    // `absoluteFill`, NOT `absoluteFillObject`: RN 0.85 dropped the latter (see
+    // Libraries/StyleSheet/StyleSheetExports.js — only `absoluteFill` is
+    // exported). Spreading the removed property is a silent no-op, which left
+    // this panel with no `position: absolute` at all: it was laid out in normal
+    // flow under the still-mounted form, so the picker rendered in the modal's
+    // bottom half below a screenful of blank card.
+    ...StyleSheet.absoluteFill,
     padding: 20,
   },
   subPanelBack: {

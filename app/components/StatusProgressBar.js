@@ -5,6 +5,7 @@ import { Text } from 'react-native-paper';
 import { useThemeColors } from '../contexts/ThemeColorsContext';
 import { useLocalization } from '../contexts/LocalizationContext';
 import * as Currency from '../services/currency';
+import { SPACING } from '../styles/designTokens';
 
 /**
  * Presentational spent-vs-amount progress bar shared by budgets (v1) and
@@ -45,24 +46,40 @@ const StatusProgressBar = ({ status, compact = false, showDetails = true, style 
 
   return (
     <View style={[styles.container, style]}>
-      {/* Progress Bar */}
-      <View style={[styles.progressTrack, { backgroundColor: colors.border }]}>
-        <View
-          style={[
-            styles.progressFill,
-            {
-              width: `${progressWidth}%`,
-              backgroundColor: progressColor,
-            },
-          ]}
-        />
+      {/* Progress bar, with the compact-mode percentage beside it rather than
+          absolutely positioned over it — the old badge sat on the track's right
+          end with no space reserved, so it overlapped both the bar and the
+          details line below (worst where the right-hand detail is long). */}
+      <View style={styles.trackRow}>
+        <View style={[styles.progressTrack, { backgroundColor: colors.border }]}>
+          <View
+            style={[
+              styles.progressFill,
+              {
+                width: `${progressWidth}%`,
+                backgroundColor: progressColor,
+              },
+            ]}
+          />
+        </View>
+        {compact && (
+          <Text
+            variant="bodySmall"
+            style={[
+              styles.percentageText,
+              status.isExceeded ? styles.exceededText : { color: colors.mutedText },
+            ]}
+          >
+            {Math.round(status.percentage)}%
+          </Text>
+        )}
       </View>
 
       {/* Details */}
       {showDetails && (
         <View style={styles.details}>
           <Text variant={compact ? 'bodySmall' : 'bodyMedium'} style={[styles.detailsText, { color: colors.text }]}>
-            {formatAmount(status.spent)} / {status.amount}
+            {formatAmount(status.spent)} / {formatAmount(status.amount)}
           </Text>
           <Text
             variant={compact ? 'bodySmall' : 'bodyMedium'}
@@ -75,21 +92,6 @@ const StatusProgressBar = ({ status, compact = false, showDetails = true, style 
               ? `${t('over_budget_by')} ${formatAmount(Currency.abs(status.remaining))}`
               : `${t('remaining_budget')}: ${formatAmount(status.remaining)}`
             }
-          </Text>
-        </View>
-      )}
-
-      {/* Percentage Badge (for compact mode) */}
-      {compact && (
-        <View style={styles.percentageContainer}>
-          <Text
-            variant="bodySmall"
-            style={[
-              styles.percentageText,
-              status.isExceeded ? styles.exceededText : { color: colors.mutedText },
-            ]}
-          >
-            {Math.round(status.percentage)}%
           </Text>
         </View>
       )}
@@ -116,13 +118,10 @@ const styles = StyleSheet.create({
   exceededText: {
     color: '#F44336',
   },
-  percentageContainer: {
-    position: 'absolute',
-    right: 0,
-    top: -2,
-  },
   percentageText: {
     fontWeight: '500',
+    minWidth: 34,
+    textAlign: 'right',
     // color set dynamically
   },
   progressFill: {
@@ -131,8 +130,14 @@ const styles = StyleSheet.create({
   },
   progressTrack: {
     borderRadius: 3,
+    flex: 1,
     height: 6,
     overflow: 'hidden',
+  },
+  trackRow: {
+    alignItems: 'center',
+    columnGap: SPACING.sm,
+    flexDirection: 'row',
   },
 });
 

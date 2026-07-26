@@ -53,7 +53,7 @@ const MonthlyPlanSection = forwardRef(function MonthlyPlanSection({
   onNotify = null,
 }, ref) {
   const { colors } = useThemeColors();
-  const { t } = useLocalization();
+  const { t, language } = useLocalization();
   const { showDialog } = useDialog();
   const {
     plans,
@@ -230,18 +230,14 @@ const MonthlyPlanSection = forwardRef(function MonthlyPlanSection({
   const displayExpectedIncome = freshPlanStatus ? freshPlanStatus.totals.expectedIncome : totals.income;
   const displayRemainder = freshPlanStatus ? freshPlanStatus.totals.plannedRemainder : totals.remainder;
 
-  const remainderNegative = Currency.isNegative(displayRemainder);
-
-  // Single definition of the remainder line, rendered either inline in the
-  // totals row (no actuals yet) or on its own row below (once actuals show).
-  const remainderNode = (
-    <Text
-      style={[styles.totalsRemainder, { color: remainderNegative ? colors.danger : colors.text }]}
-      testID="plan-remainder"
-    >
-      {t('remainder')}: {Currency.formatAmount(displayRemainder, planCurrency)} {planCurrency}
-    </Text>
-  );
+  // The remainder is `expected income − allocated`. With no income declared yet
+  // there is nothing to allocate FROM, so the figure degenerates into "minus
+  // everything you planned" and renders in alarm red the moment a first-time user
+  // adds their first line — even while the month's REAL income sits in the header
+  // right above it. Gate on the very figure the income header prints, so the two
+  // can never disagree (deriving it from the lines separately would count an
+  // income line in another currency that `totals` deliberately skipped).
+  const hasIncomeBasis = !Currency.isZero(displayExpectedIncome);
 
   // Only invoked from the section's own header, which renders in uncontrolled
   // mode only; in controlled mode the host header drives month navigation.
@@ -363,7 +359,7 @@ const MonthlyPlanSection = forwardRef(function MonthlyPlanSection({
       // when a currency change has no rate to convert through — translate it
       // for display; other errors are already user-facing English strings.
       const message = error.message === 'exchange_rate_unavailable' ? t('exchange_rate_unavailable') : error.message;
-      showDialog('Error', message, [{ text: t('ok') }]);
+      showDialog(t('error'), message, [{ text: t('ok') }]);
     } finally {
       busyRef.current = false;
       setBusy(false);
@@ -380,7 +376,7 @@ const MonthlyPlanSection = forwardRef(function MonthlyPlanSection({
       closeModal();
     } catch (error) {
       console.error('Failed to delete plan line:', error);
-      showDialog('Error', error.message, [{ text: t('ok') }]);
+      showDialog(t('error'), error.message, [{ text: t('ok') }]);
     }
   }, [deleteLine, reloadLines, refreshPlanStatuses, closeModal, showDialog, t]);
 
@@ -396,6 +392,16 @@ const MonthlyPlanSection = forwardRef(function MonthlyPlanSection({
   }, [showDialog, t, handleDeleteLine]);
 
   /* ── Executable templates (former Planned tab mechanics) ─────────────────── */
+
+  // The label a row shows — a line's own `label` is optional, so it is not a
+  // usable title on its own. Hoisted above the handlers that consume it.
+  const lineDisplayName = useCallback((line) => {
+    if (line.label) return line.label;
+    if (line.categoryId != null) return categoriesById.get(line.categoryId)?.name || t('allocation_unlinked');
+    if (line.toAccountId != null) return accountsById.get(line.toAccountId)?.name || t('allocation_unlinked');
+    if (line.kind === 'income') return t('expected_income');
+    return t('allocation_unlinked');
+  }, [categoriesById, accountsById, t]);
 
   // Every execution path funnels through here so the double-tap guard, the line
   // reload and the user feedback can't drift apart between them.
@@ -415,9 +421,21 @@ const MonthlyPlanSection = forwardRef(function MonthlyPlanSection({
     }
   }, [reloadLines, refreshPlanStatuses, onNotify, t]);
 
+  // The name to persist on the created operation, so it is recognisable in the
+  // operations list instead of landing there blank whenever the line has no
+  // explicit label (the common case — the label field is optional). Deliberately
+  // NOT lineDisplayName: that falls back to translated UI strings, and writing
+  // one into the database would freeze today's language into stored data.
+  const lineOperationName = useCallback((line) => (
+    line.label
+    || (line.categoryId != null ? categoriesById.get(line.categoryId)?.name : null)
+    || (line.toAccountId != null ? accountsById.get(line.toAccountId)?.name : null)
+    || null
+  ), [categoriesById, accountsById]);
+
   const handleExecute = useCallback((line) => (
-    runExecutionAction(() => executeLine(line), 'added_to_operations')
-  ), [runExecutionAction, executeLine]);
+    runExecutionAction(() => executeLine(line, lineOperationName(line)), 'added_to_operations')
+  ), [runExecutionAction, executeLine, lineOperationName]);
 
   const handleMarkExecuted = useCallback((line) => (
     runExecutionAction(() => markLineExecuted(line), 'marked_as_executed')
@@ -432,7 +450,10 @@ const MonthlyPlanSection = forwardRef(function MonthlyPlanSection({
     const executionActions = [];
     if (line.hasTemplate && isCurrentMonth) {
       if (executed) {
-        executionActions.push({ text: t('undo'), onPress: () => handleUndoExecuted(line) });
+        // `undo_execution`, not the bare `undo`: in several languages (Russian
+        // among them) "Undo" and "Cancel" collapse into near-identical words,
+        // and this sheet shows both right next to each other.
+        executionActions.push({ text: t('undo_execution'), onPress: () => handleUndoExecuted(line) });
       } else {
         executionActions.push(
           { text: t('execute'), onPress: () => handleExecute(line) },
@@ -442,7 +463,7 @@ const MonthlyPlanSection = forwardRef(function MonthlyPlanSection({
     }
     showDialog(
       t('select_action'),
-      line.label || '',
+      lineDisplayName(line),
       [
         ...executionActions,
         { text: t('edit'), onPress: () => openEditLine(line) },
@@ -451,7 +472,7 @@ const MonthlyPlanSection = forwardRef(function MonthlyPlanSection({
       ],
     );
   }, [month, isCurrentMonth, t, showDialog, handleExecute, handleMarkExecuted, handleUndoExecuted,
-    openEditLine, confirmDeleteLine]);
+    openEditLine, confirmDeleteLine, lineDisplayName]);
 
   /* ── Reordering ──────────────────────────────────────────────────────────── */
 
@@ -506,14 +527,6 @@ const MonthlyPlanSection = forwardRef(function MonthlyPlanSection({
   );
 
   /* ── Rendering ───────────────────────────────────────────────────────────── */
-
-  const lineDisplayName = useCallback((line) => {
-    if (line.label) return line.label;
-    if (line.categoryId != null) return categoriesById.get(line.categoryId)?.name || t('allocation_unlinked');
-    if (line.toAccountId != null) return accountsById.get(line.toAccountId)?.name || t('allocation_unlinked');
-    if (line.kind === 'income') return t('expected_income');
-    return t('allocation_unlinked');
-  }, [categoriesById, accountsById, t]);
 
   const lineIcon = useCallback((line) => {
     if (line.isBroken) return 'link-off';
@@ -591,7 +604,7 @@ const MonthlyPlanSection = forwardRef(function MonthlyPlanSection({
               <Icon name="chevron-left" size={26} color={colors.text} />
             </Pressable>
             <Text style={[styles.monthTitle, { color: colors.text }]} testID="plan-month-label">
-              {formatMonthLabel(month)}
+              {formatMonthLabel(month, language)}
             </Text>
             <Pressable
               onPress={handleNext}
@@ -642,8 +655,17 @@ const MonthlyPlanSection = forwardRef(function MonthlyPlanSection({
 
         {!plan && (
           <View style={styles.emptyPlan} testID="plan-empty-state">
-            <Icon name="clipboard-text-outline" size={40} color={colors.mutedText} />
-            <Text style={[styles.emptyText, { color: colors.mutedText }]}>{t('no_plan_for_month')}</Text>
+            {/* "No plan yet" is only true when the month is genuinely blank.
+                Recurring lines render even without a plan row, so with lines
+                already on screen (and a totals row below them) the message
+                contradicted everything around it — keep just the bootstrap
+                actions in that case. */}
+            {!hasAnyLines && (
+              <>
+                <Icon name="clipboard-text-outline" size={40} color={colors.mutedText} />
+                <Text style={[styles.emptyText, { color: colors.mutedText }]}>{t('no_plan_for_month')}</Text>
+              </>
+            )}
             <View style={styles.emptyActions}>
               <Pressable
                 style={[styles.primaryAction, { backgroundColor: colors.primary }]}
@@ -675,24 +697,40 @@ const MonthlyPlanSection = forwardRef(function MonthlyPlanSection({
 
         {(plan || hasAnyLines) && (
           <>
-            {/* Totals: allocated vs actual, then the planned remainder */}
+            {/* Totals: allocated vs actual, then the planned remainder.
+                Both labels get flexShrink + a gap: in Russian they are long
+                enough that a bare space-between row let them collide into
+                "…800.00 USDФактический: …". */}
             <View style={[styles.totalsRow, { borderTopColor: colors.border }]} testID="plan-totals">
-              <Text style={[styles.totalsLabel, { color: colors.mutedText }]}>
+              <Text style={[styles.totalsLabel, { color: colors.mutedText }]} numberOfLines={1}>
                 {t('allocated')}: {Currency.formatAmount(displayAllocated, planCurrency)} {planCurrency}
               </Text>
-              {planStatus ? (
-                <Text style={[styles.totalsLabel, { color: colors.mutedText }]} testID="plan-actual-total">
+              {planStatus && (
+                <Text
+                  style={[styles.totalsLabel, styles.totalsLabelRight, { color: colors.mutedText }]}
+                  numberOfLines={1}
+                  testID="plan-actual-total"
+                >
                   {t('actual')}: {Currency.formatAmount(planStatus.totals.totalActual, planCurrency)} {planCurrency}
                 </Text>
-              ) : (
-                remainderNode
               )}
             </View>
-            {planStatus && (
-              <View style={styles.remainderRow}>
-                {remainderNode}
-              </View>
-            )}
+            <View style={styles.remainderRow}>
+              {hasIncomeBasis ? (
+                <Text
+                  style={[styles.totalsRemainder, {
+                    color: Currency.isNegative(displayRemainder) ? colors.danger : colors.text,
+                  }]}
+                  testID="plan-remainder"
+                >
+                  {t('remainder')}: {Currency.formatAmount(displayRemainder, planCurrency)} {planCurrency}
+                </Text>
+              ) : (
+                <Text style={[styles.totalsHint, { color: colors.mutedText }]} testID="plan-remainder-hint">
+                  {t('add_income_for_remainder')}
+                </Text>
+              )}
+            </View>
             {planStatus?.unconvertible?.length > 0 && (
               <View style={styles.convertWarning} testID="plan-unconverted-warning">
                 <Icon name="alert-circle-outline" size={14} color={colors.mutedText} />
@@ -847,8 +885,15 @@ const styles = StyleSheet.create({
     flexDirection: 'row',
     gap: 8,
   },
+  totalsHint: {
+    fontSize: 12,
+  },
   totalsLabel: {
+    flexShrink: 1,
     fontSize: 14,
+  },
+  totalsLabelRight: {
+    textAlign: 'right',
   },
   totalsRemainder: {
     fontSize: 14,
@@ -856,6 +901,7 @@ const styles = StyleSheet.create({
   },
   totalsRow: {
     borderTopWidth: 1,
+    columnGap: SPACING.sm,
     flexDirection: 'row',
     justifyContent: 'space-between',
     marginTop: SPACING.sm,

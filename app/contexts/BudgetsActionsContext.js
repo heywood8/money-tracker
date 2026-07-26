@@ -3,12 +3,14 @@ import PropTypes from 'prop-types';
 import uuid from 'react-native-uuid';
 import * as BudgetsDB from '../services/BudgetsDB';
 import { useDialog } from './DialogContext';
+import { useLocalization } from './LocalizationContext';
 import { useBudgetsData } from './BudgetsDataContext';
 
 const BudgetsActionsContext = createContext();
 
 export const BudgetsActionsProvider = ({ children }) => {
   const { showDialog } = useDialog();
+  const { t } = useLocalization();
   const {
     budgets,
     budgetStatuses,
@@ -60,10 +62,10 @@ export const BudgetsActionsProvider = ({ children }) => {
     } catch (error) {
       console.error('Failed to create budget:', error);
       _setSaveError(error.message);
-      showDialog('Error', error.message, [{ text: 'OK' }]);
+      showDialog(t('error'), error.message, [{ text: t('ok') }]);
       throw error;
     }
-  }, [refreshBudgetStatuses, showDialog, _setBudgets, _setSaveError]);
+  }, [refreshBudgetStatuses, showDialog, _setBudgets, _setSaveError, t]);
 
   /**
    * Update existing budget
@@ -108,10 +110,10 @@ export const BudgetsActionsProvider = ({ children }) => {
     } catch (error) {
       console.error('Failed to update budget:', error);
       _setSaveError(error.message);
-      showDialog('Error', error.message, [{ text: 'OK' }]);
+      showDialog(t('error'), error.message, [{ text: t('ok') }]);
       throw error;
     }
-  }, [budgets, refreshBudgetStatuses, showDialog, _setBudgets, _setSaveError]);
+  }, [budgets, refreshBudgetStatuses, showDialog, _setBudgets, _setSaveError, t]);
 
   /**
    * Delete budget
@@ -132,10 +134,10 @@ export const BudgetsActionsProvider = ({ children }) => {
     } catch (error) {
       console.error('Failed to delete budget:', error);
       _setSaveError(error.message);
-      showDialog('Error', 'Failed to delete budget. Please try again.', [{ text: 'OK' }]);
+      showDialog(t('error'), t('failed_to_delete_budget'), [{ text: t('ok') }]);
       throw error;
     }
-  }, [showDialog, _setBudgets, _setBudgetStatuses, _setSaveError]);
+  }, [showDialog, _setBudgets, _setBudgetStatuses, _setSaveError, t]);
 
   /**
    * Get budget for category

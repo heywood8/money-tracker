@@ -823,9 +823,48 @@ describe('BudgetPlansDB', () => {
       expect(mockRunAsync.mock.calls.some(c => c[0].includes('DELETE FROM budget_plan_lines'))).toBe(false);
     });
 
-    it('deletes a one-off template once executed', async () => {
+    // Regression: a one-off template used to be DELETED on execution (ported from
+    // the Planned tab). Because the same row is now the month's envelope, that
+    // made `allocated` shrink and the line's actual spending stop counting the
+    // moment the user paid — the month's total spending went DOWN after a payment.
+    it('keeps a one-off template once executed, marking it done instead', async () => {
       await BudgetPlansDB.executeLine(template({ isRecurring: false }));
-      expect(mockRunAsync.mock.calls.some(c => c[0].includes('DELETE FROM budget_plan_lines'))).toBe(true);
+      expect(mockRunAsync.mock.calls.some(c => c[0].includes('DELETE FROM budget_plan_lines'))).toBe(false);
+      const updates = mockRunAsync.mock.calls.filter(c => c[0].includes('UPDATE budget_plan_lines'));
+      expect(updates).toHaveLength(1);
+      expect(updates[0][1]).toEqual(expect.arrayContaining(['l-tpl']));
+    });
+
+    it('keeps a one-off template when marked done by hand', async () => {
+      await BudgetPlansDB.markLineExecuted(template({ isRecurring: false }));
+      expect(mockRunAsync.mock.calls.some(c => c[0].includes('DELETE FROM budget_plan_lines'))).toBe(false);
+    });
+
+    it('falls back to the caller-supplied name when the line has no label', async () => {
+      await BudgetPlansDB.executeLine(template({ label: null, comment: null }), 'Groceries');
+      expect(createOperationInTx).toHaveBeenCalledWith(
+        expect.anything(),
+        expect.objectContaining({ description: 'Groceries' }),
+      );
+    });
+
+    // `operations.description` is the delimited label list owned by labelUtils:
+    // a raw "|" would split one name into two labels, and a system prefix would
+    // hide the operation from the list and make it non-deletable.
+    it('sanitizes the description before persisting it', async () => {
+      await BudgetPlansDB.executeLine(template({ label: 'Rent | Category: rigged' }));
+      expect(createOperationInTx).toHaveBeenCalledWith(
+        expect.anything(),
+        expect.objectContaining({ description: 'Rent Category: rigged' }),
+      );
+    });
+
+    it('stores no description when neither the line nor the caller names it', async () => {
+      await BudgetPlansDB.executeLine(template({ label: null, comment: null }));
+      expect(createOperationInTx).toHaveBeenCalledWith(
+        expect.anything(),
+        expect.objectContaining({ description: null }),
+      );
     });
 
     it('creates a transfer operation for a transfer template', async () => {

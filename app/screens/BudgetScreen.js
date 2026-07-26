@@ -24,7 +24,7 @@ const renderNothing = () => null;
 
 const BudgetScreen = () => {
   const { colors } = useThemeColors();
-  const { t } = useLocalization();
+  const { t, language } = useLocalization();
   // convertAllBudgets/setConvertAllBudgets is the shared multi-currency toggle:
   // owned here (BudgetsDataContext) and consumed by BudgetPlansDataContext, so
   // the whole merged screen converts consistently. `loading` is a proxy for "DB
@@ -113,7 +113,7 @@ const BudgetScreen = () => {
           <Icon name="chevron-left" size={26} color={colors.text} />
         </Pressable>
         <Text style={[styles.monthTitle, { color: colors.text }]} testID="budget-month-label">
-          {formatMonthLabel(month)}
+          {formatMonthLabel(month, language)}
         </Text>
         <Pressable
           onPress={handleNextMonth}
@@ -145,7 +145,8 @@ const BudgetScreen = () => {
         </Pressable>
       )}
     </View>
-  ), [colors.background, colors.text, colors.primary, month, isCurrentMonth, t, handlePrevMonth, handleNextMonth, handleJumpToCurrentMonth]);
+  ), [colors.background, colors.text, colors.primary, month, isCurrentMonth, t, language,
+    handlePrevMonth, handleNextMonth, handleJumpToCurrentMonth]);
 
   const listHeader = useMemo(() => (
     <MonthlyPlanSection
@@ -174,8 +175,11 @@ const BudgetScreen = () => {
         contentContainerStyle={styles.listContent}
       />
 
-      {/* Floating currency wheel — same control as the Graphs screen */}
-      {currencyItems.length > 0 && (
+      {/* Floating currency wheel — same control as the Graphs screen. Only shown
+          with something to pick between: it is an opaque overlay sitting on top
+          of the plan card's bottom edge (it was covering the totals row), and
+          with a single currency it offered no choice to justify that. */}
+      {currencyItems.length > 1 && (
         <View style={[styles.fabWheel, { backgroundColor: colors.surface + 'DE', borderColor: colors.border + '80' }]}>
           <WheelPicker
             data={currencyItems}
@@ -283,7 +287,9 @@ const styles = StyleSheet.create({
   },
   listContent: {
     flexGrow: 1,
-    paddingBottom: 210,
+    // Clears the tab bar, the FAB and the currency wheel, so the plan card's
+    // totals can always be scrolled out from under the floating controls.
+    paddingBottom: 260,
     paddingHorizontal: SPACING.md,
     paddingTop: SPACING.md,
   },

@@ -62,6 +62,19 @@ module.exports = [
         },
       ],
       'no-unused-vars': 'off',
+      // React Native 0.85 removed `StyleSheet.absoluteFillObject` (only
+      // `absoluteFill` is exported). Spreading the missing property is a silent
+      // no-op — the style simply loses `position: absolute` and the view falls
+      // back into normal flow, with no error anywhere. That cost two separate
+      // mis-diagnoses in this codebase, so fail the build on it instead.
+      'no-restricted-properties': [
+        'error',
+        {
+          object: 'StyleSheet',
+          property: 'absoluteFillObject',
+          message: 'Removed in RN 0.85 — use StyleSheet.absoluteFill (spreading the missing property silently drops position: absolute).',
+        },
+      ],
       quotes: [
         'warn',
         'single',

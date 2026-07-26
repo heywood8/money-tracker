@@ -1,5 +1,4 @@
 // __tests__/components/budgets/BudgetPlanLineModal.test.js
-/* eslint-disable react/prop-types */
 import React from 'react';
 import { render, fireEvent, waitFor } from '@testing-library/react-native';
 import BudgetPlanLineModal from '../../../app/components/budgets/BudgetPlanLineModal';
@@ -31,18 +30,7 @@ jest.mock('../../../app/contexts/DialogContext', () => ({
 }));
 jest.mock('../../../app/components/ModalBlurOverlay', () => () => null);
 
-// Simple controlled stand-in for the Calculator so tests can set the amount.
-jest.mock('../../../app/components/Calculator', () => {
-  const React = require('react');
-  const { TextInput } = require('react-native');
-  return function MockCalculator({ value, onValueChange }) {
-    return React.createElement(TextInput, {
-      testID: 'calc-input',
-      value: value != null ? String(value) : '',
-      onChangeText: onValueChange,
-    });
-  };
-});
+// The amount is a plain FormInput, so no calculator mock is needed.
 
 const EXPENSE_CATEGORIES = [
   { id: 'cat1', name: 'Food', icon: 'food', categoryType: 'expense' },
@@ -71,8 +59,8 @@ describe('BudgetPlanLineModal', () => {
   it('refuses to save a line with no tracking target', async () => {
     const props = baseProps();
     const { getByTestId } = await render(<BudgetPlanLineModal {...props} />);
-    await waitFor(() => expect(getByTestId('calc-input')).toBeTruthy());
-    await fireEvent.changeText(getByTestId('calc-input'), '100');
+    await waitFor(() => expect(getByTestId('plan-line-amount')).toBeTruthy());
+    await fireEvent.changeText(getByTestId('plan-line-amount'), '100');
     await fireEvent.press(getByTestId('plan-line-save'));
     expect(props.onSaveLine).not.toHaveBeenCalled();
     await waitFor(() => expect(getByTestId('plan-line-error')).toBeTruthy());
@@ -86,7 +74,7 @@ describe('BudgetPlanLineModal', () => {
     await fireEvent.press(getByTestId('plan-target-picker'));
     await waitFor(() => expect(getByTestId('plan-target-option-cat-cat1')).toBeTruthy());
     await fireEvent.press(getByTestId('plan-target-option-cat-cat1'));
-    await fireEvent.changeText(getByTestId('calc-input'), '150');
+    await fireEvent.changeText(getByTestId('plan-line-amount'), '150');
     await fireEvent.press(getByTestId('plan-line-save'));
     expect(props.onSaveLine).toHaveBeenCalledWith(expect.objectContaining({
       amount: '150',
@@ -104,7 +92,7 @@ describe('BudgetPlanLineModal', () => {
     await fireEvent.press(getByTestId('plan-target-tab-account'));
     await waitFor(() => expect(getByTestId('plan-target-option-acc-1')).toBeTruthy());
     await fireEvent.press(getByTestId('plan-target-option-acc-1'));
-    await fireEvent.changeText(getByTestId('calc-input'), '400');
+    await fireEvent.changeText(getByTestId('plan-line-amount'), '400');
     await fireEvent.press(getByTestId('plan-line-save'));
     // Choosing a destination account settles the kind as a transfer.
     expect(props.onSaveLine).toHaveBeenCalledWith(expect.objectContaining({
@@ -119,8 +107,8 @@ describe('BudgetPlanLineModal', () => {
     it('an income line saves without requiring a target', async () => {
       const props = { ...baseProps(), initialKind: 'income' };
       const { getByTestId } = await render(<BudgetPlanLineModal {...props} />);
-      await waitFor(() => expect(getByTestId('calc-input')).toBeTruthy());
-      await fireEvent.changeText(getByTestId('calc-input'), '2500');
+      await waitFor(() => expect(getByTestId('plan-line-amount')).toBeTruthy());
+      await fireEvent.changeText(getByTestId('plan-line-amount'), '2500');
       await fireEvent.press(getByTestId('plan-line-save'));
       expect(props.onSaveLine).toHaveBeenCalledWith(expect.objectContaining({
         kind: 'income', amount: '2500', categoryId: null, toAccountId: null,
@@ -144,7 +132,7 @@ describe('BudgetPlanLineModal', () => {
       await waitFor(() => expect(getByTestId('plan-target-option-cat-cat1')).toBeTruthy());
       await fireEvent.press(getByTestId('plan-target-option-cat-cat1'));
       await fireEvent.press(getByTestId('plan-line-kind-transfer'));
-      await fireEvent.changeText(getByTestId('calc-input'), '100');
+      await fireEvent.changeText(getByTestId('plan-line-amount'), '100');
       await fireEvent.press(getByTestId('plan-line-save'));
       // No destination account chosen, so the save is refused rather than saved
       // as a transfer that still carries a category.
@@ -160,7 +148,7 @@ describe('BudgetPlanLineModal', () => {
       await fireEvent.press(getByTestId('plan-target-picker'));
       await waitFor(() => expect(getByTestId('plan-target-option-cat-cat1')).toBeTruthy());
       await fireEvent.press(getByTestId('plan-target-option-cat-cat1'));
-      await fireEvent.changeText(getByTestId('calc-input'), '150');
+      await fireEvent.changeText(getByTestId('plan-line-amount'), '150');
       await fireEvent.press(getByTestId('plan-line-save'));
       expect(props.onSaveLine).toHaveBeenCalledWith(expect.objectContaining({ accountId: null }));
     });
@@ -174,7 +162,7 @@ describe('BudgetPlanLineModal', () => {
       await fireEvent.press(getByTestId('plan-account-picker'));
       await waitFor(() => expect(getByTestId('plan-account-option-3')).toBeTruthy());
       await fireEvent.press(getByTestId('plan-account-option-3'));
-      await fireEvent.changeText(getByTestId('calc-input'), '65000');
+      await fireEvent.changeText(getByTestId('plan-line-amount'), '65000');
       await fireEvent.press(getByTestId('plan-line-save'));
       expect(props.onSaveLine).toHaveBeenCalledWith(expect.objectContaining({
         accountId: 3, currency: 'EUR',
@@ -206,7 +194,7 @@ describe('BudgetPlanLineModal', () => {
       await waitFor(() => expect(getByTestId('plan-target-picker')).toBeTruthy());
       await fireEvent.press(getByTestId('plan-target-picker'));
       await fireEvent.press(getByTestId('plan-target-option-cat-cat1'));
-      await fireEvent.changeText(getByTestId('calc-input'), '150');
+      await fireEvent.changeText(getByTestId('plan-line-amount'), '150');
       await fireEvent.press(getByTestId('plan-line-save'));
       expect(props.onSaveLine).toHaveBeenCalledWith(expect.objectContaining({ isRecurring: false, currency: null }));
     });
@@ -228,7 +216,7 @@ describe('BudgetPlanLineModal', () => {
       await fireEvent.press(getByTestId('plan-target-picker'));
       await waitFor(() => expect(getByTestId('plan-target-option-cat-cat1')).toBeTruthy());
       await fireEvent.press(getByTestId('plan-target-option-cat-cat1'));
-      await fireEvent.changeText(getByTestId('calc-input'), '65000');
+      await fireEvent.changeText(getByTestId('plan-line-amount'), '65000');
       await fireEvent.press(getByTestId('plan-line-save'));
       expect(props.onSaveLine).toHaveBeenCalledWith(expect.objectContaining({
         amount: '65000', categoryId: 'cat1', isRecurring: true, currency: 'USD',
@@ -244,7 +232,7 @@ describe('BudgetPlanLineModal', () => {
       await fireEvent.press(getByTestId('plan-line-currency-EUR'));
       await fireEvent.press(getByTestId('plan-target-picker'));
       await fireEvent.press(getByTestId('plan-target-option-cat-cat1'));
-      await fireEvent.changeText(getByTestId('calc-input'), '500');
+      await fireEvent.changeText(getByTestId('plan-line-amount'), '500');
       await fireEvent.press(getByTestId('plan-line-save'));
       expect(props.onSaveLine).toHaveBeenCalledWith(expect.objectContaining({ currency: 'EUR' }));
     });
