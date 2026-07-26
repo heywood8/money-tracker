@@ -221,6 +221,34 @@ export const isHiddenLabel = (label) => {
 };
 
 /**
+ * Sanitize a label that is about to become a NEWLY created operation's description,
+ * additionally guaranteeing it is not a hidden label. Plain {@link sanitizeLabel}
+ * only guards the delimiter and the length cap; it says nothing about the system
+ * prefixes, so a real entity name that merely looks like imported metadata — a
+ * MoneyOK-imported category literally called "Category: Groceries" — would be
+ * written through verbatim and then read back as metadata: hidden from the
+ * operation list by {@link visibleListLabels} and non-deletable per
+ * {@link isProtectedOperation}. Leading system prefixes are therefore stripped.
+ *
+ * The loop terminates because every prefix is at least 5 characters long, so each
+ * pass strictly shortens the value.
+ * @param {*} label
+ * @returns {string} '' when nothing usable (or nothing safe) is left.
+ */
+export const sanitizeNewLabel = (label) => {
+  let clean = sanitizeLabel(label);
+  while (clean) {
+    const lower = clean.toLowerCase();
+    const prefix = SYSTEM_LABEL_PREFIXES.find((p) => lower.startsWith(p.toLowerCase()));
+    if (!prefix) break;
+    clean = clean.slice(prefix.length).trim();
+  }
+  // Prefix stripping cannot catch the [MoneyOK] marker (an exact match, not a
+  // prefix), and a name equal to it would likewise mark the operation protected.
+  return isHiddenLabel(clean) ? '' : clean;
+};
+
+/**
  * Whether an operation's description marks it as a protected import — it carries
  * either a system label (Account:/Category:/Category group:) or the [MoneyOK]
  * marker. Protected operations are non-deletable.

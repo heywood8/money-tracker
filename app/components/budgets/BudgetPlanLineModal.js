@@ -98,6 +98,11 @@ export default function BudgetPlanLineModal({
   // template-less recurring line.
   const executionCurrency = accountId != null ? accountsById.get(accountId)?.currency : null;
   const effectiveCurrency = executionCurrency || (isRecurring ? lineCurrency : null);
+  // What the amount is actually denominated in. A template-less one-off line stores
+  // currency: null and is priced in the plan's currency, so the field is labelled
+  // with that rather than left bare. (May still be '' if the plan has no currency
+  // yet — no accounts exist.)
+  const displayCurrency = effectiveCurrency || currency;
 
   // Currency options for a recurring line: every currency in use across the
   // user's accounts, the plan's own currency (always offered, even if no
@@ -239,13 +244,19 @@ export default function BudgetPlanLineModal({
   // Normalize a locale decimal comma to a dot — Android decimal-pad keyboards
   // emit "," in many locales and the currency parsing downstream reads a comma
   // string as garbage (parseFloat('1,5') === 1, Decimal treats it as 0). Same
-  // treatment every other amount field in the app gives its input.
+  // treatment every other amount field in the app gives its input, except the
+  // replace is global: leaving a second comma in place would smuggle a value past
+  // this handler that only Currency.isValid can then reject.
   const handleAmountChange = useCallback((text) => {
-    setAmount(text.replace(',', '.'));
+    setAmount(text.replace(/,/g, '.'));
     setError(null);
   }, []);
 
-  const amountIsValid = Currency.isValid(amount) && Currency.compare(amount, '0') > 0;
+  // Kept apart so the error can say which of the two things is wrong: "1,234,56"
+  // normalizes to an unparseable "1.234.56", which is not the same complaint as a
+  // well-formed zero.
+  const amountIsParseable = Currency.isValid(amount);
+  const amountIsPositive = amountIsParseable && Currency.compare(amount, '0') > 0;
 
   const handleSave = useCallback(() => {
     // The host is already mid-save (e.g. the previous tap's ensurePlan()/save is
@@ -262,7 +273,11 @@ export default function BudgetPlanLineModal({
       setError(t('destination_account_required'));
       return;
     }
-    if (!amountIsValid) {
+    if (!amountIsParseable) {
+      setError(t('valid_amount_required'));
+      return;
+    }
+    if (!amountIsPositive) {
       setError(t('amount_must_be_greater_than_zero'));
       return;
     }
@@ -283,7 +298,7 @@ export default function BudgetPlanLineModal({
       // one-off line inherits the plan's (null).
       currency: effectiveCurrency,
     });
-  }, [saving, kind, amount, amountIsValid, label, comment, categoryId, toAccountId, accountId,
+  }, [saving, kind, amount, amountIsParseable, amountIsPositive, label, comment, categoryId, toAccountId, accountId,
     isRecurring, effectiveCurrency, onSaveLine, t]);
 
   const handleDelete = useCallback(() => {
@@ -557,7 +572,7 @@ export default function BudgetPlanLineModal({
                       bought nothing the number pad doesn't already give. */}
                   <View style={styles.field}>
                     <Text style={[styles.fieldLabel, { color: colors.mutedText }]}>
-                      {t('amount')}{effectiveCurrency ? ` · ${effectiveCurrency}` : ''}
+                      {t('amount')}{displayCurrency ? ` · ${displayCurrency}` : ''}
                     </Text>
                     <FormInput
                       value={amount}

@@ -76,14 +76,20 @@ const BudgetScreen = () => {
   [currencies],
   );
 
-  // Initialize default currency from first account
+  // Seed the currency from the first account, and re-seed whenever the selected
+  // one stops existing (its last account was deleted). The membership check is not
+  // cosmetic: the picker is only rendered while currencyItems.length > 1, so a
+  // stale selection could otherwise survive with no UI left to change it, and it
+  // is still handed to MonthlyPlanSection as the currency of any plan it creates.
   useEffect(() => {
-    if (accounts.length > 0 && !selectedCurrency) {
-      setSelectedCurrency(accounts[0].currency);
-    } else if (accounts.length === 0 && selectedCurrency) {
-      setSelectedCurrency('');
+    if (accounts.length === 0) {
+      if (selectedCurrency) setSelectedCurrency('');
+      return;
     }
-  }, [accounts, selectedCurrency]);
+    if (!selectedCurrency || !currencies.includes(selectedCurrency)) {
+      setSelectedCurrency(accounts[0].currency);
+    }
+  }, [accounts, currencies, selectedCurrency]);
 
   const expenseCategories = useMemo(() =>
     categories.filter(cat => cat.categoryType === 'expense'),

@@ -5,6 +5,7 @@ import {
   MAX_LABEL_LENGTH,
   normalizeLabel,
   sanitizeLabel,
+  sanitizeNewLabel,
   parseLabels,
   serializeLabels,
   hasLabel,
@@ -42,6 +43,58 @@ describe('labelUtils', () => {
 
     it('returns empty string for whitespace-only input', () => {
       expect(sanitizeLabel('   ')).toBe('');
+    });
+  });
+
+  // Regression: executeLine (Budgets v3 phase 3) writes a plan line's name straight
+  // into operations.description. sanitizeLabel alone only guards the delimiter, so a
+  // real category named "Category: Groceries" (MoneyOK imports produce exactly this
+  // shape) became a *system* label: hidden from the operation list by
+  // visibleListLabels and non-deletable per isProtectedOperation.
+  describe('sanitizeNewLabel', () => {
+    it('keeps doing everything sanitizeLabel does', () => {
+      expect(sanitizeNewLabel('  work   trip ')).toBe('work trip');
+      expect(sanitizeNewLabel('a|b')).toBe('a b');
+      expect(sanitizeNewLabel(null)).toBe('');
+      expect(sanitizeNewLabel('x'.repeat(MAX_LABEL_LENGTH + 20))).toHaveLength(MAX_LABEL_LENGTH);
+    });
+
+    it('strips a leading system prefix so the result is never a hidden label', () => {
+      expect(sanitizeNewLabel('Category: Groceries')).toBe('Groceries');
+      expect(sanitizeNewLabel('Account: Cash')).toBe('Cash');
+      expect(sanitizeNewLabel('Category group: Expenses')).toBe('Expenses');
+    });
+
+    it('matches the prefix case-insensitively, like isSystemLabel does', () => {
+      expect(sanitizeNewLabel('cATEGORY: Groceries')).toBe('Groceries');
+    });
+
+    it('keeps stripping until nothing system-looking is left', () => {
+      expect(sanitizeNewLabel('Category: Account: Cash')).toBe('Cash');
+      expect(isSystemLabel(sanitizeNewLabel('Category: '.repeat(6) + 'Groceries'))).toBe(false);
+    });
+
+    it('rejects the [MoneyOK] marker, which prefix stripping cannot catch', () => {
+      // An exact match, not a prefix — but it makes the operation protected all the same.
+      expect(sanitizeNewLabel('[MoneyOK]')).toBe('');
+      expect(sanitizeNewLabel('[moneyok]')).toBe('');
+    });
+
+    it('returns empty when a name is nothing but a prefix', () => {
+      expect(sanitizeNewLabel('Category:')).toBe('');
+    });
+
+    it('leaves an ordinary name that merely contains a prefix word alone', () => {
+      expect(sanitizeNewLabel('Groceries Category: none')).toBe('Groceries Category: none');
+    });
+
+    it('its output never reads back as protected or hidden', () => {
+      for (const raw of ['Category: Groceries', 'Amount: 500', 'Date: today', '[MoneyOK]', 'Rent']) {
+        const clean = sanitizeNewLabel(raw);
+        if (!clean) continue;
+        expect(isProtectedOperation(clean)).toBe(false);
+        expect(visibleListLabels([clean])).toEqual([clean]);
+      }
     });
   });
 
