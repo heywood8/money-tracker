@@ -49,15 +49,13 @@ jest.mock('../../app/contexts/CategoriesContext', () => {
   return { useCategories: () => categoriesValue };
 });
 
-jest.mock('../../app/contexts/AccountsDataContext', () => {
-  const accountsValue = {
-    accounts: [
-      { id: 'a1', name: 'Ameria', currency: 'AMD' },
-      { id: 'a2', name: 'Tinkoff', currency: 'RUB' },
-    ],
-  };
-  return { useAccountsData: () => accountsValue };
-});
+// Same stability contract as above, but settable: the currency-reset tests need
+// to delete an account between renders. setAccounts() installs one new stable
+// object; re-renders in between keep handing back that same identity.
+let mockAccountsValue;
+jest.mock('../../app/contexts/AccountsDataContext', () => ({
+  useAccountsData: () => mockAccountsValue,
+}));
 
 jest.mock('../../app/services/OperationsDB', () => ({
   fetchRatesToTarget: jest.fn(async () => new Map([['RUB', '5']])),
@@ -103,12 +101,23 @@ jest.mock('../../app/components/budgets/MonthlyPlanSection', () => {
   });
 });
 
+// The native wheel renders nothing under Jest, so stand in a tappable row per
+// option — that is the only way a test can drive the selection the way a user does.
 jest.mock('@quidone/react-native-wheel-picker', () => {
   const React = require('react');
+  const { View, Pressable } = require('react-native');
   return {
     __esModule: true,
-    default: function MockWheelPicker() {
-      return React.createElement('WheelPicker', null);
+    default: function MockWheelPicker({ data = [], onValueChanged }) {
+      return React.createElement(
+        View,
+        { testID: 'currency-wheel' },
+        data.map((item) => React.createElement(Pressable, {
+          key: item.value,
+          testID: `currency-option-${item.value}`,
+          onPress: () => onValueChanged?.({ item }),
+        })),
+      );
     },
   };
 });
@@ -122,12 +131,22 @@ const setBudgetsData = ({ loading = false, convertAll = true } = {}) => {
   };
 };
 
+const DEFAULT_ACCOUNTS = [
+  { id: 'a1', name: 'Ameria', currency: 'AMD' },
+  { id: 'a2', name: 'Tinkoff', currency: 'RUB' },
+];
+
+const setAccounts = (accounts = DEFAULT_ACCOUNTS) => {
+  mockAccountsValue = { accounts };
+};
+
 // ── Tests ──────────────────────────────────────────────────────────────────
 describe('BudgetScreen', () => {
   beforeEach(() => {
     jest.clearAllMocks();
     capturedSectionProps = null;
     setBudgetsData();
+    setAccounts();
   });
 
   describe('Rendering', () => {
@@ -164,6 +183,64 @@ describe('BudgetScreen', () => {
       await waitFor(() => expect(capturedSectionProps).toBeTruthy());
       expect(capturedSectionProps.expenseCategories.map(c => c.id)).toEqual(['cat1', 'cat2']);
       expect(capturedSectionProps.incomeCategories.map(c => c.id)).toEqual(['cat3']);
+    });
+  });
+
+  describe('Currency selection', () => {
+    it('seeds the selection from the first account', async () => {
+      await render(<BudgetScreen />);
+      await waitFor(() => expect(capturedSectionProps?.currency).toBe('AMD'));
+    });
+
+    it('hands the picked currency down to the list', async () => {
+      const { getByTestId } = await render(<BudgetScreen />);
+      await waitFor(() => expect(getByTestId('currency-option-RUB')).toBeTruthy());
+      fireEvent.press(getByTestId('currency-option-RUB'));
+      await waitFor(() => expect(capturedSectionProps.currency).toBe('RUB'));
+    });
+
+    // Regression: the init effect only re-seeded when accounts went empty, so a
+    // selection whose last account was deleted survived — and since the wheel is
+    // only rendered while currencyItems.length > 1, deleting down to one currency
+    // took away the only control that could have corrected it. The stale value kept
+    // flowing into MonthlyPlanSection as the currency of any plan it creates.
+    it('re-seeds when the selected currency loses its last account', async () => {
+      const { getByTestId, queryByTestId, rerender } = await render(<BudgetScreen />);
+      await waitFor(() => expect(getByTestId('currency-option-RUB')).toBeTruthy());
+      fireEvent.press(getByTestId('currency-option-RUB'));
+      await waitFor(() => expect(capturedSectionProps.currency).toBe('RUB'));
+
+      setAccounts([{ id: 'a1', name: 'Ameria', currency: 'AMD' }]);
+      await rerender(<BudgetScreen />);
+
+      await waitFor(() => expect(capturedSectionProps.currency).toBe('AMD'));
+      // And the wheel really is gone, which is what made this unrecoverable.
+      expect(queryByTestId('currency-option-RUB')).toBeNull();
+    });
+
+    it('clears the selection when the last account of any kind is deleted', async () => {
+      const { rerender } = await render(<BudgetScreen />);
+      await waitFor(() => expect(capturedSectionProps?.currency).toBe('AMD'));
+
+      setAccounts([]);
+      await rerender(<BudgetScreen />);
+
+      await waitFor(() => expect(capturedSectionProps.currency).toBe(''));
+    });
+
+    it('leaves a still-valid selection alone when an unrelated account is deleted', async () => {
+      const { getByTestId, rerender } = await render(<BudgetScreen />);
+      await waitFor(() => expect(getByTestId('currency-option-RUB')).toBeTruthy());
+      fireEvent.press(getByTestId('currency-option-RUB'));
+      await waitFor(() => expect(capturedSectionProps.currency).toBe('RUB'));
+
+      setAccounts([
+        { id: 'a2', name: 'Tinkoff', currency: 'RUB' },
+        { id: 'a3', name: 'Other', currency: 'USD' },
+      ]);
+      await rerender(<BudgetScreen />);
+
+      await waitFor(() => expect(capturedSectionProps.currency).toBe('RUB'));
     });
   });
 

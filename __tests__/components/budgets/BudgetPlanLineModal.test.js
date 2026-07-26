@@ -278,4 +278,65 @@ describe('BudgetPlanLineModal', () => {
       expect(getByTestId('plan-line-save').props.accessibilityState.disabled).toBe(false);
     });
   });
+
+  // The amount field lost the Calculator that used to police its input, leaving
+  // only the comma->dot normalization. `t` is the identity here, so the rendered
+  // error text IS the translation key.
+  describe('Amount input (regression)', () => {
+    const withTarget = async (getByTestId) => {
+      await waitFor(() => expect(getByTestId('plan-target-picker')).toBeTruthy());
+      await fireEvent.press(getByTestId('plan-target-picker'));
+      await waitFor(() => expect(getByTestId('plan-target-option-cat-cat1')).toBeTruthy());
+      await fireEvent.press(getByTestId('plan-target-option-cat-cat1'));
+    };
+
+    it('normalizes a locale decimal comma to a dot', async () => {
+      const props = baseProps();
+      const { getByTestId } = await render(<BudgetPlanLineModal {...props} />);
+      await withTarget(getByTestId);
+      await fireEvent.changeText(getByTestId('plan-line-amount'), '1,5');
+      await fireEvent.press(getByTestId('plan-line-save'));
+      expect(props.onSaveLine).toHaveBeenCalledWith(expect.objectContaining({ amount: '1.5' }));
+    });
+
+    it('normalizes EVERY comma, not just the first', async () => {
+      // A single replace() left "1.234,56" — still unparseable, but it also meant
+      // the field's own handler could no longer be trusted to produce a dot-only
+      // value, so the invalid input reached validation instead of being normalized.
+      const props = baseProps();
+      const { getByTestId } = await render(<BudgetPlanLineModal {...props} />);
+      await withTarget(getByTestId);
+      await fireEvent.changeText(getByTestId('plan-line-amount'), '1,234,56');
+      expect(getByTestId('plan-line-amount').props.value).toBe('1.234.56');
+    });
+
+    it('blames an unparseable amount on parsing, not on being non-positive', async () => {
+      const props = baseProps();
+      const { getByTestId } = await render(<BudgetPlanLineModal {...props} />);
+      await withTarget(getByTestId);
+      await fireEvent.changeText(getByTestId('plan-line-amount'), '1,234,56');
+      await fireEvent.press(getByTestId('plan-line-save'));
+      expect(props.onSaveLine).not.toHaveBeenCalled();
+      await waitFor(() => expect(getByTestId('plan-line-error')).toBeTruthy());
+      expect(getByTestId('plan-line-error').props.children).toBe('valid_amount_required');
+    });
+
+    it('still reports a well-formed zero as non-positive', async () => {
+      const props = baseProps();
+      const { getByTestId } = await render(<BudgetPlanLineModal {...props} />);
+      await withTarget(getByTestId);
+      await fireEvent.changeText(getByTestId('plan-line-amount'), '0');
+      await fireEvent.press(getByTestId('plan-line-save'));
+      expect(props.onSaveLine).not.toHaveBeenCalled();
+      await waitFor(() => expect(getByTestId('plan-line-error')).toBeTruthy());
+      expect(getByTestId('plan-line-error').props.children).toBe('amount_must_be_greater_than_zero');
+    });
+
+    it('labels the field with the plan currency when the line has no currency of its own', async () => {
+      // A template-less one-off line stores currency: null and is priced in the
+      // plan's currency; the label used to go bare in that case.
+      const { getByText } = await render(<BudgetPlanLineModal {...baseProps()} currency="EUR" />);
+      await waitFor(() => expect(getByText('amount · EUR')).toBeTruthy());
+    });
+  });
 });

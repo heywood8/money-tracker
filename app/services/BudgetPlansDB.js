@@ -14,7 +14,7 @@ import * as Currency from './currency';
 import * as CategoriesDB from './CategoriesDB';
 import { calculateSpendingForBudget, deriveSpendingStatus } from './BudgetsDB';
 import { formatDate as formatLocalDate } from './BalanceHistoryDB';
-import { sanitizeLabel } from '../utils/labelUtils';
+import { sanitizeNewLabel } from '../utils/labelUtils';
 import {
   fetchRatesToTarget,
   convertWithRateMap,
@@ -838,9 +838,10 @@ export const getPlanTotals = async (planId) => {
 };
 
 /**
- * Clone a plan (and all its lines) from one month into a new month. Used by the
- * editor's "start from last month". Fails if the source month has no plan or the
- * target month already has one.
+ * Clone a plan and its still-pending lines from one month into a new month. Used
+ * by the editor's "start from last month". Lines already executed in the source
+ * month are left behind. Fails if the source month has no plan or the target month
+ * already has one.
  * @param {string} fromMonth - YYYY-MM to copy from
  * @param {string} toMonth - YYYY-MM to copy into
  * @returns {Promise<Object>} The newly created plan (camelCase).
@@ -861,7 +862,13 @@ export const copyPlan = async (fromMonth, toMonth) => {
       throw new Error('A plan for this month already exists');
     }
 
-    const sourceLines = await getPlanLines(source.id);
+    // Already-executed lines are NOT carried over. getPlanLines only returns the
+    // month's own one-off lines (recurring ones hang off plan_id IS NULL), and a
+    // one-off that already fired is finished business — cloning it would re-add it
+    // as pending (see the last_executed_month note below), inflating the new
+    // month's allocation and offering a swipe that duplicates the operation.
+    const sourceLines = (await getPlanLines(source.id))
+      .filter((line) => !isSet(line.lastExecutedMonth));
     const now = new Date().toISOString();
     const newPlanId = uuid.v4();
 
@@ -874,9 +881,10 @@ export const copyPlan = async (fromMonth, toMonth) => {
 
         for (let i = 0; i < sourceLines.length; i++) {
           const line = sourceLines[i];
-          // `last_executed_month` is deliberately NOT copied: a template cloned
-          // into a new month starts pending, exactly like a recurring one does
-          // when the month rolls over.
+          // `last_executed_month` is written NULL: every line that reaches here is
+          // pending already (see the filter above), and a clone starts the new
+          // month pending too, exactly like a recurring line does when the month
+          // rolls over.
           await db.runAsync(
             'INSERT INTO budget_plan_lines (id, plan_id, label, amount, comment, category_id, to_account_id, sort_order, is_recurring, currency, kind, account_id, last_executed_month, created_at, updated_at) VALUES (?, ?, ?, ?, ?, ?, ?, ?, 0, ?, ?, ?, NULL, ?, ?)',
             [
@@ -1360,9 +1368,10 @@ export const executeLine = async (line, fallbackName = null) => {
     // `operations.description` is not free text — it is the delimited label list
     // owned by labelUtils. An unsanitized name containing "|" would silently
     // become two labels, and one starting with a system prefix ("Category:", …)
-    // would hide the operation from the list AND mark it non-deletable.
+    // would hide the operation from the list AND mark it non-deletable;
+    // sanitizeNewLabel handles both (plain sanitizeLabel only handles the former).
     const rawDescription = line.label || line.comment || fallbackName || null;
-    const description = rawDescription ? sanitizeLabel(rawDescription) || null : null;
+    const description = rawDescription ? sanitizeNewLabel(rawDescription) || null : null;
     const operationData = {
       type: line.kind || 'expense',
       amount: line.amount,

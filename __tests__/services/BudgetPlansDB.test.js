@@ -662,6 +662,66 @@ describe('BudgetPlansDB', () => {
           .rejects.toThrow('UNIQUE constraint failed: budget_plans.month');
       });
     });
+
+    // Regression: phase 3 stopped deleting a one-off line on execution (the line
+    // has to survive so the plan keeps measuring what it allocated). That removed
+    // the only thing keeping an executed one-off out of copyPlan, which clones with
+    // last_executed_month = NULL — i.e. re-adds finished business as PENDING,
+    // inflating the new month's allocation and offering a swipe that duplicates the
+    // operation. Executed lines are now filtered out of the copy source.
+    describe('executed lines are not carried into the new month', () => {
+      const executedFridge = {
+        id: 'l-fridge', plan_id: 'src', label: 'Buy fridge', amount: '50000', comment: null,
+        category_id: 'c9', to_account_id: null, sort_order: 1, account_id: 'a1',
+        last_executed_month: '2026-06',
+      };
+      const pendingRent = {
+        id: 'l-rent', plan_id: 'src', label: 'Rent', amount: '65000', comment: null,
+        category_id: 'c1', to_account_id: null, sort_order: 0, account_id: null,
+        last_executed_month: null,
+      };
+
+      const arrangeCopy = (lines) => {
+        queryFirst
+          .mockResolvedValueOnce({ id: 'src', month: '2026-06', currency: 'USD', expected_income: '445000' })
+          .mockResolvedValueOnce(null);
+        queryAll.mockResolvedValue(lines);
+      };
+
+      it('skips a line executed in the source month while still copying the pending ones', async () => {
+        arrangeCopy([pendingRent, executedFridge]);
+
+        await BudgetPlansDB.copyPlan('2026-06', '2026-07');
+
+        const lineInserts = mockRunAsync.mock.calls
+          .filter(([sql]) => sql.includes('INSERT INTO budget_plan_lines'));
+        expect(lineInserts).toHaveLength(1);
+        expect(lineInserts[0][1]).toContain('Rent');
+        expect(lineInserts[0][1]).not.toContain('Buy fridge');
+      });
+
+      it('skips a line stamped with a month other than the source month (executed while browsing back)', async () => {
+        // executeLine stamps currentMonthKey(), not the plan's month, so a June
+        // line can carry a July stamp. Any stamp at all means "already done".
+        arrangeCopy([{ ...executedFridge, last_executed_month: '2026-07' }]);
+
+        await BudgetPlansDB.copyPlan('2026-06', '2026-07');
+
+        expect(mockRunAsync.mock.calls.filter(([sql]) => sql.includes('INSERT INTO budget_plan_lines')))
+          .toHaveLength(0);
+      });
+
+      it('copies a line whose execution was undone (stamp cleared back to NULL)', async () => {
+        arrangeCopy([{ ...executedFridge, last_executed_month: null }]);
+
+        await BudgetPlansDB.copyPlan('2026-06', '2026-07');
+
+        const lineInserts = mockRunAsync.mock.calls
+          .filter(([sql]) => sql.includes('INSERT INTO budget_plan_lines'));
+        expect(lineInserts).toHaveLength(1);
+        expect(lineInserts[0][1]).toContain('Buy fridge');
+      });
+    });
   });
 
   describe('error propagation', () => {
@@ -856,6 +916,26 @@ describe('BudgetPlansDB', () => {
       expect(createOperationInTx).toHaveBeenCalledWith(
         expect.anything(),
         expect.objectContaining({ description: 'Rent Category: rigged' }),
+      );
+    });
+
+    // Regression: the claim above was only half true — sanitizeLabel handled the
+    // "|" but did nothing about the system prefixes, so a real category named
+    // "Category: Groceries" (the shape a MoneyOK import produces) passed straight
+    // through and the created operation became invisible AND undeletable.
+    it('strips a leading system prefix from a real entity name', async () => {
+      await BudgetPlansDB.executeLine(template({ label: null, comment: null }), 'Category: Groceries');
+      expect(createOperationInTx).toHaveBeenCalledWith(
+        expect.anything(),
+        expect.objectContaining({ description: 'Groceries' }),
+      );
+    });
+
+    it('stores no description when the name is nothing but a system prefix', async () => {
+      await BudgetPlansDB.executeLine(template({ label: 'Account:' }));
+      expect(createOperationInTx).toHaveBeenCalledWith(
+        expect.anything(),
+        expect.objectContaining({ description: null }),
       );
     });
 
