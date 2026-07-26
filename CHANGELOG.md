@@ -1,5 +1,12 @@
 # Changelog
 
+## [0.223.0](https://github.com/heywood8/money-tracker/compare/penny-v0.222.0...penny-v0.223.0) (2026-07-26)
+
+
+### Features
+
+* **budgets:** absorb planned operations into plan lines as executable templates (v3 phase 3) ([#1416](https://github.com/heywood8/money-tracker/issues/1416)) ([412bc7f](https://github.com/heywood8/money-tracker/commit/412bc7f02f37c56a0f07eff39992828e1f7cf673))
+
 ## [0.222.0](https://github.com/heywood8/money-tracker/compare/penny-v0.221.0...penny-v0.222.0) (2026-07-25)
 
 
