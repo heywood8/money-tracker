@@ -1,5 +1,12 @@
 # Changelog
 
+## [0.226.0](https://github.com/heywood8/money-tracker/compare/penny-v0.225.2...penny-v0.226.0) (2026-07-26)
+
+
+### Features
+
+* **budgets:** let a plan line track several categories ([#1431](https://github.com/heywood8/money-tracker/issues/1431)) ([fa6a9e2](https://github.com/heywood8/money-tracker/commit/fa6a9e2dd51ca2f0f55c0409edd2904e4bd8374b))
+
 ## [0.225.2](https://github.com/heywood8/money-tracker/compare/penny-v0.225.1...penny-v0.225.2) (2026-07-26)
 
 
