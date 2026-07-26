@@ -132,6 +132,49 @@ describe('BudgetPlansDB', () => {
       expect(linked.isBroken).toBe(false);
       expect(linked.categoryId).toBe('cat1');
     });
+
+    // Migration 0021: the junction column travels with every line SELECT.
+    describe('category set (migration 0021)', () => {
+      it('splits the GROUP_CONCAT column into categoryIds', () => {
+        const line = BudgetPlansDB.mapLineFields({
+          id: 'l1', amount: '100', category_id: 'cat1', category_ids: 'cat1,cat2', to_account_id: null,
+        });
+        expect(line.categoryIds).toEqual(['cat1', 'cat2']);
+        expect(line.categoryId).toBe('cat1');
+        expect(line.isBroken).toBe(false);
+      });
+
+      it('falls back to the single category_id when the row has no junction column', () => {
+        const line = BudgetPlansDB.mapLineFields({ id: 'l1', amount: '100', category_id: 'cat1' });
+        expect(line.categoryIds).toEqual(['cat1']);
+      });
+
+      it('re-heads the set when the stored primary category is gone', () => {
+        // ON DELETE SET NULL nulls category_id, but the line still tracks cat2 —
+        // reporting it as broken would silently stop counting real spending.
+        const line = BudgetPlansDB.mapLineFields({
+          id: 'l1', amount: '100', category_id: null, category_ids: 'cat2', to_account_id: null,
+        });
+        expect(line.categoryId).toBe('cat2');
+        expect(line.categoryIds).toEqual(['cat2']);
+        expect(line.isBroken).toBe(false);
+      });
+
+      it('is broken only when the junction is empty and no account is linked', () => {
+        const line = BudgetPlansDB.mapLineFields({
+          id: 'l1', amount: '100', category_id: 'stale-cat', category_ids: null, to_account_id: null,
+        });
+        expect(line.categoryIds).toEqual([]);
+        expect(line.categoryId).toBeNull();
+        expect(line.isBroken).toBe(true);
+      });
+
+      it('reads includeChildren from the column, defaulting to on', () => {
+        expect(BudgetPlansDB.mapLineFields({ id: 'l1', amount: '1' }).includeChildren).toBe(true);
+        expect(BudgetPlansDB.mapLineFields({ id: 'l1', amount: '1', include_children: 1 }).includeChildren).toBe(true);
+        expect(BudgetPlansDB.mapLineFields({ id: 'l1', amount: '1', include_children: 0 }).includeChildren).toBe(false);
+      });
+    });
   });
 
   describe('createPlan', () => {
@@ -281,38 +324,80 @@ describe('BudgetPlansDB', () => {
       ]);
       const lines = await BudgetPlansDB.getPlanLines('p1');
       expect(queryAll).toHaveBeenCalledWith(
-        expect.stringContaining('WHERE plan_id = ? ORDER BY sort_order ASC'),
+        expect.stringContaining('WHERE l.plan_id = ? ORDER BY l.sort_order ASC'),
         ['p1'],
       );
       expect(lines[0].categoryId).toBe('c1');
     });
 
-    it('getBrokenLines queries lines with both targets null', async () => {
+    it('getBrokenLines asks for lines with no linked category and no account', async () => {
       queryAll.mockResolvedValue([
-        { id: 'l1', plan_id: 'p1', amount: '100', category_id: null, to_account_id: null, sort_order: 0 },
+        { id: 'l1', plan_id: 'p1', amount: '100', category_id: null, category_ids: null, to_account_id: null, sort_order: 0 },
       ]);
       const broken = await BudgetPlansDB.getBrokenLines('p1');
-      expect(queryAll).toHaveBeenCalledWith(
-        expect.stringContaining('category_id IS NULL AND to_account_id IS NULL'),
-        ['p1'],
-      );
+      const [sql, params] = queryAll.mock.calls[0];
+      // "No category" is the absence of a junction row, not a null category_id:
+      // a line whose primary category was deleted may still track others.
+      expect(sql).toContain('NOT EXISTS');
+      expect(sql).toContain('budget_plan_line_categories');
+      expect(sql).toContain('l.to_account_id IS NULL');
+      expect(params).toEqual(['p1']);
       expect(broken[0].isBroken).toBe(true);
     });
 
     it('addLine inserts a valid line and returns it', async () => {
       const line = await BudgetPlansDB.addLine('p1', { amount: '73000', categoryId: 'c1', label: 'Rent' });
-      expect(executeQuery).toHaveBeenCalledWith(
+      // Row + category links go in one transaction (migration 0021).
+      expect(mockRunAsync).toHaveBeenNthCalledWith(
+        1,
         expect.stringContaining('INSERT INTO budget_plan_lines'),
         expect.arrayContaining(['p1', 'Rent', '73000', 'c1']),
       );
-      expect(line).toMatchObject({ planId: 'p1', amount: '73000', categoryId: 'c1', toAccountId: null, sortOrder: 0 });
+      expect(mockRunAsync).toHaveBeenCalledWith(
+        expect.stringContaining('INSERT OR IGNORE INTO budget_plan_line_categories'),
+        ['uuid-1', 'c1'],
+      );
+      expect(line).toMatchObject({
+        planId: 'p1', amount: '73000', categoryId: 'c1', categoryIds: ['c1'], toAccountId: null, sortOrder: 0,
+      });
       expect(line.id).toBe('uuid-1');
     });
 
     it('addLine rejects an invalid (dual-target) line', async () => {
       await expect(BudgetPlansDB.addLine('p1', { amount: '10', categoryId: 'c1', toAccountId: 2 }))
         .rejects.toThrow('not both');
-      expect(executeQuery).not.toHaveBeenCalled();
+      expect(mockRunAsync).not.toHaveBeenCalled();
+    });
+
+    // Migration 0021: the whole point — one line, several categories.
+    it('addLine links every category of a multi-category line', async () => {
+      const line = await BudgetPlansDB.addLine('p1', { amount: '500', categoryIds: ['groceries', 'cafes'] });
+      const links = mockRunAsync.mock.calls
+        .filter(([sql]) => sql.includes('budget_plan_line_categories'))
+        .filter(([sql]) => sql.startsWith('INSERT'));
+      expect(links.map(([, params]) => params)).toEqual([
+        ['uuid-1', 'groceries'],
+        ['uuid-1', 'cafes'],
+      ]);
+      // The row's own category_id keeps the primary (first) one.
+      const [, insertParams] = mockRunAsync.mock.calls[0];
+      expect(insertParams).toEqual(expect.arrayContaining(['groceries']));
+      expect(line).toMatchObject({ categoryId: 'groceries', categoryIds: ['groceries', 'cafes'] });
+    });
+
+    it('addLine de-duplicates repeated category IDs', async () => {
+      const line = await BudgetPlansDB.addLine('p1', { amount: '500', categoryIds: ['c1', 'c1', 'c2'] });
+      expect(line.categoryIds).toEqual(['c1', 'c2']);
+    });
+
+    it('addLine defaults includeChildren on and stores the flag', async () => {
+      const rolled = await BudgetPlansDB.addLine('p1', { amount: '10', categoryId: 'c1' });
+      expect(rolled.includeChildren).toBe(true);
+      const flat = await BudgetPlansDB.addLine('p1', { amount: '10', categoryId: 'c1', includeChildren: false });
+      expect(flat.includeChildren).toBe(false);
+      const rowInserts = mockRunAsync.mock.calls.filter(([sql]) => sql.includes('INSERT INTO budget_plan_lines'));
+      expect(rowInserts[1][0]).toContain('include_children');
+      expect(rowInserts[1][1]).toEqual(expect.arrayContaining([0]));
     });
 
     // Bug 10 (adversarial review): addLine/addRecurringLine share one insertPlanLine
@@ -321,7 +406,8 @@ describe('BudgetPlansDB', () => {
     describe('addRecurringLine (shares insertPlanLine with addLine)', () => {
       it('inserts a recurring line with plan_id NULL and is_recurring=1', async () => {
         const line = await BudgetPlansDB.addRecurringLine({ amount: '65000', categoryId: 'cat1', currency: 'EUR', label: 'Rent' });
-        expect(executeQuery).toHaveBeenCalledWith(
+        expect(mockRunAsync).toHaveBeenNthCalledWith(
+          1,
           expect.stringContaining('INSERT INTO budget_plan_lines'),
           expect.arrayContaining([null, 'Rent', '65000', 'cat1', 1, 'EUR']),
         );
@@ -331,13 +417,13 @@ describe('BudgetPlansDB', () => {
       it('requires a currency', async () => {
         await expect(BudgetPlansDB.addRecurringLine({ amount: '100', categoryId: 'c1' }))
           .rejects.toThrow('Currency is required for a recurring allocation');
-        expect(executeQuery).not.toHaveBeenCalled();
+        expect(mockRunAsync).not.toHaveBeenCalled();
       });
 
       it('still enforces the exactly-one-target invariant', async () => {
         await expect(BudgetPlansDB.addRecurringLine({ amount: '100', categoryId: 'c1', toAccountId: 2, currency: 'USD' }))
           .rejects.toThrow('not both');
-        expect(executeQuery).not.toHaveBeenCalled();
+        expect(mockRunAsync).not.toHaveBeenCalled();
       });
     });
 
@@ -346,7 +432,7 @@ describe('BudgetPlansDB', () => {
     // stores what it is given...
     it('addLine keeps a one-off line currency when one is given', async () => {
       const line = await BudgetPlansDB.addLine('p1', { amount: '10', categoryId: 'c1', currency: 'EUR' });
-      const [, params] = executeQuery.mock.calls[0];
+      const [, params] = mockRunAsync.mock.calls[0];
       expect(params).toContain('EUR');
       expect(line).toMatchObject({ isRecurring: false, currency: 'EUR' });
     });
@@ -372,19 +458,66 @@ describe('BudgetPlansDB', () => {
 
     it('updateLine clears the account link when a category is (re)assigned', async () => {
       await BudgetPlansDB.updateLine('l1', { categoryId: 'c9' });
-      const [sql, params] = executeQuery.mock.calls[0];
+      // A category change rewrites the junction, so the UPDATE runs inside the
+      // same transaction as the link rewrite rather than as a bare executeQuery.
+      const [sql, params] = mockRunAsync.mock.calls[0];
       expect(sql).toContain('category_id = ?');
       expect(sql).toContain('to_account_id = ?');
       // c9 written for category, null written for the (implicitly cleared) account.
       expect(params).toEqual(expect.arrayContaining(['c9', null, 'l1']));
+      expect(mockRunAsync).toHaveBeenCalledWith(
+        expect.stringContaining('DELETE FROM budget_plan_line_categories'),
+        ['l1'],
+      );
+      expect(mockRunAsync).toHaveBeenCalledWith(
+        expect.stringContaining('INSERT OR IGNORE INTO budget_plan_line_categories'),
+        ['l1', 'c9'],
+      );
+    });
+
+    it('updateLine replaces the whole category set when given categoryIds', async () => {
+      await BudgetPlansDB.updateLine('l1', { categoryIds: ['a', 'b'] });
+      const links = mockRunAsync.mock.calls.filter(([sql]) => sql.includes('budget_plan_line_categories'));
+      expect(links[0][0]).toContain('DELETE');
+      expect(links.slice(1).map(([, p]) => p)).toEqual([['l1', 'a'], ['l1', 'b']]);
+      // The primary column follows the head of the set.
+      expect(mockRunAsync.mock.calls[0][1]).toEqual(expect.arrayContaining(['a']));
+    });
+
+    it('updateLine unlinks every category when given an empty set', async () => {
+      await BudgetPlansDB.updateLine('l1', { categoryIds: [] });
+      const [sql, params] = mockRunAsync.mock.calls[0];
+      expect(sql).toContain('category_id = ?');
+      expect(params).toEqual(expect.arrayContaining([null, 'l1']));
+      const inserts = mockRunAsync.mock.calls
+        .filter(([s]) => s.includes('INSERT OR IGNORE INTO budget_plan_line_categories'));
+      expect(inserts).toHaveLength(0);
+    });
+
+    it('updateLine leaves the links alone when categories are not mentioned', async () => {
+      await BudgetPlansDB.updateLine('l1', { amount: '200' });
+      expect(executeQuery).toHaveBeenCalled();
+      expect(mockRunAsync).not.toHaveBeenCalled();
+    });
+
+    it('updateLine persists includeChildren', async () => {
+      await BudgetPlansDB.updateLine('l1', { includeChildren: false });
+      const [sql, params] = executeQuery.mock.calls[0];
+      expect(sql).toContain('include_children = ?');
+      expect(params).toEqual(expect.arrayContaining([0, 'l1']));
     });
 
     it('updateLine clears the category link when an account is (re)assigned', async () => {
       await BudgetPlansDB.updateLine('l1', { toAccountId: 7 });
-      const [sql, params] = executeQuery.mock.calls[0];
+      const [sql, params] = mockRunAsync.mock.calls[0];
       expect(sql).toContain('to_account_id = ?');
       expect(sql).toContain('category_id = ?');
       expect(params).toEqual(expect.arrayContaining([7, null, 'l1']));
+      // ...and drops the whole category set, not just the primary column.
+      expect(mockRunAsync).toHaveBeenCalledWith(
+        expect.stringContaining('DELETE FROM budget_plan_line_categories'),
+        ['l1'],
+      );
     });
 
     it('updateLine rejects a non-positive amount', async () => {
@@ -588,20 +721,24 @@ describe('BudgetPlansDB', () => {
         .mockResolvedValueOnce({ id: 'src', month: '2026-06', currency: 'USD', expected_income: '445000' }) // fromMonth
         .mockResolvedValueOnce(null); // toMonth free
       queryAll.mockResolvedValue([
-        { id: 'l1', plan_id: 'src', label: 'Rent', amount: '65000', comment: null, category_id: 'c1', to_account_id: null, sort_order: 0 },
-        { id: 'l2', plan_id: 'src', label: 'Savings', amount: '50000', comment: null, category_id: null, to_account_id: 4, sort_order: 1 },
+        { id: 'l1', plan_id: 'src', label: 'Rent', amount: '65000', comment: null, category_id: 'c1', category_ids: 'c1,c2', to_account_id: null, sort_order: 0 },
+        { id: 'l2', plan_id: 'src', label: 'Savings', amount: '50000', comment: null, category_id: null, category_ids: null, to_account_id: 4, sort_order: 1 },
       ]);
 
       const created = await BudgetPlansDB.copyPlan('2026-06', '2026-07');
 
       expect(created).toMatchObject({ month: '2026-07', currency: 'USD', expectedIncome: '445000' });
-      // 1 plan insert + 2 line inserts.
-      expect(mockRunAsync).toHaveBeenCalledTimes(3);
       expect(mockRunAsync).toHaveBeenNthCalledWith(
         1,
         expect.stringContaining('INSERT INTO budget_plans'),
         expect.arrayContaining(['2026-07', 'USD', '445000']),
       );
+      // A clone tracks the same SET of categories, not just the primary one the
+      // row's column carries.
+      const linkInserts = mockRunAsync.mock.calls
+        .filter(([sql]) => sql.startsWith('INSERT OR IGNORE INTO budget_plan_line_categories'))
+        .map(([, params]) => params[1]);
+      expect(linkInserts).toEqual(['c1', 'c2']);
     });
 
     it('throws when the source month has no plan', async () => {

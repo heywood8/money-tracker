@@ -636,7 +636,7 @@ describe('GoogleSheetsService', () => {
       const sheets = buildSheetsData(mockBackup);
       const lines = sheets.find(s => s.range === 'Budget Plan Lines!A1');
       const header = lines.values[0];
-      expect(header).toEqual(['id', 'plan_id', 'label', 'amount', 'comment', 'category', 'account', 'category_id', 'to_account_id', 'sort_order', 'is_recurring', 'currency', 'kind', 'execution_account', 'account_id', 'last_executed_month']);
+      expect(header).toEqual(['id', 'plan_id', 'label', 'amount', 'comment', 'category', 'account', 'category_id', 'to_account_id', 'sort_order', 'is_recurring', 'currency', 'kind', 'execution_account', 'account_id', 'last_executed_month', 'categories', 'category_ids', 'include_children']);
 
       const catRow = lines.values.find(r => r[0] === 'line-cat');
       expect(catRow[header.indexOf('category')]).toBe('Food');
@@ -656,6 +656,43 @@ describe('GoogleSheetsService', () => {
       expect(recRow[header.indexOf('plan_id')]).toBe('');
       expect(recRow[header.indexOf('is_recurring')]).toBe(1);
       expect(recRow[header.indexOf('currency')]).toBe('USD');
+
+      // No junction in this backup (pre-0021 shape), so the set falls back to
+      // the line's own category and the roll-up flag reads as on.
+      expect(catRow[header.indexOf('category_ids')]).toBe('cat-1');
+      expect(catRow[header.indexOf('categories')]).toBe('Food');
+      expect(catRow[header.indexOf('include_children')]).toBe(1);
+      expect(xferRow[header.indexOf('category_ids')]).toBe('');
+    });
+
+    // Migration 0021: the sheet carries the whole set, semicolon-joined.
+    it('writes every category of a multi-category line into the sheet', () => {
+      const backup = {
+        ...mockBackup,
+        data: {
+          ...mockBackup.data,
+          categories: [
+            { id: 'cat-1', name: 'Food', type: 'entry', category_type: 'expense' },
+            { id: 'cat-2', name: 'Cafes', type: 'entry', category_type: 'expense' },
+          ],
+          budget_plan_line_categories: [
+            { line_id: 'line-cat', category_id: 'cat-1' },
+            { line_id: 'line-cat', category_id: 'cat-2' },
+          ],
+          budget_plan_lines: [
+            { ...mockBackup.data.budget_plan_lines[0], include_children: 0 },
+          ],
+        },
+      };
+      const sheets = buildSheetsData(backup);
+      const lines = sheets.find(s => s.range === 'Budget Plan Lines!A1');
+      const header = lines.values[0];
+      const row = lines.values.find(r => r[0] === 'line-cat');
+      expect(row[header.indexOf('category_ids')]).toBe('cat-1;cat-2');
+      expect(row[header.indexOf('categories')]).toBe('Food;Cafes');
+      expect(row[header.indexOf('include_children')]).toBe(0);
+      // The single-category columns still name the primary one.
+      expect(row[header.indexOf('category_id')]).toBe('cat-1');
     });
 
     it('tolerates a backup that lacks budget plan data (empty sheets)', () => {
@@ -733,6 +770,62 @@ describe('GoogleSheetsService', () => {
       expect(rec.plan_id).toBeNull();
       expect(rec.is_recurring).toBe(1);
       expect(rec.currency).toBe('USD');
+
+      // A sheet with no category_ids column (this one) still yields one link per
+      // category-tracking line, rebuilt from the single category it names.
+      expect(backup.data.budget_plan_line_categories).toEqual([
+        { line_id: 'line-cat', category_id: 'cat-1' },
+        { line_id: 'line-rec', category_id: 'cat-1' },
+      ]);
+      // ...and include_children defaults to on for such a sheet.
+      expect(cat.include_children).toBe(1);
+    });
+
+    // Migration 0021.
+    it('reads a multi-category line from category_ids, or from the names column', async () => {
+      getPreference.mockResolvedValue('sheet-id-123');
+      mockFetch.mockResolvedValue({
+        ok: true,
+        json: async () => ({
+          valueRanges: [
+            { range: 'Accounts!A1:D2', values: [['id', 'name', 'balance', 'currency'], ['1', 'Savings', '0', 'USD']] },
+            {
+              range: 'Categories!A1:B3',
+              values: [
+                ['id', 'name', 'type', 'category_type', 'icon', 'parent_id', 'color', 'is_shadow'],
+                ['cat-1', 'Food', 'entry', 'expense', 'food', '', '', '0'],
+                ['cat-2', 'Cafes', 'entry', 'expense', 'cup', '', '', '0'],
+              ],
+            },
+            { range: 'Budget Plans!A1:D2', values: [['id', 'month', 'currency', 'expected_income'], ['plan-1', '2026-07', 'USD', '3000.00']] },
+            {
+              range: 'Budget Plan Lines!A1:S3',
+              values: [
+                ['id', 'plan_id', 'label', 'amount', 'comment', 'category', 'account', 'category_id', 'to_account_id', 'sort_order', 'is_recurring', 'currency', 'kind', 'execution_account', 'account_id', 'last_executed_month', 'categories', 'category_ids', 'include_children'],
+                ['line-ids', 'plan-1', 'Eating', '400', '', 'Food', '', 'cat-1', '', '0', '0', '', '', '', '', '', '', 'cat-1;cat-2', '0'],
+                // Hand-edited row: names typed into `categories`, no IDs.
+                ['line-names', 'plan-1', 'Eating too', '300', '', '', '', '', '', '1', '0', '', '', '', '', '', 'Food;Cafes', '', ''],
+              ],
+            },
+          ],
+        }),
+      });
+
+      const backup = await importFromSheets('token');
+
+      expect(backup.data.budget_plan_line_categories).toEqual([
+        { line_id: 'line-ids', category_id: 'cat-1' },
+        { line_id: 'line-ids', category_id: 'cat-2' },
+        { line_id: 'line-names', category_id: 'cat-1' },
+        { line_id: 'line-names', category_id: 'cat-2' },
+      ]);
+
+      const byIds = backup.data.budget_plan_lines.find(l => l.id === 'line-ids');
+      expect(byIds.include_children).toBe(0);
+      // The primary column follows the head of the set, so the two can't disagree.
+      const byNames = backup.data.budget_plan_lines.find(l => l.id === 'line-names');
+      expect(byNames.category_id).toBe('cat-1');
+      expect(byNames.include_children).toBe(1);
     });
 
     it('returns empty plan arrays when the sheets are missing (old spreadsheet)', async () => {

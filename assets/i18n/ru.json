@@ -553,6 +553,8 @@
   "no_template_account": "Нет (только учёт)",
   "edit_allocation": "Изменить статью",
   "tracking_target": "Цель отслеживания",
+  "include_subcategories": "Включая подкатегории",
+  "include_subcategories_hint": "Траты во вложенных категориях учитываются в этой строке.",
   "select_target": "Выберите цель",
   "allocation_label": "Название",
   "allocation_comment": "Комментарий",

@@ -33,12 +33,15 @@ const KINDS = ['income', 'expense', 'transfer'];
  * SAME modal — never a nested Modal.
  *
  * `kind` decides what the line means and what an execution would create:
- *   - expense  → tracks spending of ONE expense category (required),
+ *   - expense  → tracks spending across ONE OR MORE expense categories (at least
+ *     one required); the picker toggles them, and `includeChildren` says whether
+ *     their descendants roll up too (migration 0021),
  *   - transfer → tracks incoming transfers into ONE destination account (required),
- *   - income   → declares part of the month's expected income; a category is
+ *   - income   → declares part of the month's expected income; categories are
  *     optional context (income is compared against the month's real income as a
  *     whole, see BudgetPlansDB.calculateLineActual).
- * That "exactly one target" invariant is enforced here and again in BudgetPlansDB.
+ * A line links to categories OR an account, never both — enforced here and again
+ * in BudgetPlansDB.
  *
  * Picking an EXECUTION ACCOUNT turns the line into a one-tap payable (the former
  * planned operation): the account is what the created operation touches, so the
@@ -73,10 +76,14 @@ export default function BudgetPlanLineModal({
   const [amount, setAmount] = useState('');
   const [label, setLabel] = useState('');
   const [comment, setComment] = useState('');
-  // Exactly one of these is set for expense/transfer (the "exactly one target"
-  // invariant); an income line may have neither.
-  const [categoryId, setCategoryId] = useState(null);
+  // A line tracks EITHER categories OR a destination account (the "exactly one
+  // kind of target" invariant); an income line may have neither. Since migration
+  // 0021 the category side is a SET — several categories can share one budget.
+  const [categoryIds, setCategoryIds] = useState([]);
   const [toAccountId, setToAccountId] = useState(null);
+  // Whether descendants of the picked categories count too. On by default, which
+  // is what every line did before the flag existed.
+  const [includeChildren, setIncludeChildren] = useState(true);
   // Execution account — set means "this line is executable".
   const [accountId, setAccountId] = useState(null);
   const [isRecurring, setIsRecurring] = useState(false);
@@ -131,7 +138,9 @@ export default function BudgetPlanLineModal({
       setAmount(line.amount != null ? String(line.amount) : '');
       setLabel(line.label || '');
       setComment(line.comment || '');
-      setCategoryId(line.categoryId ?? null);
+      // Older callers (and stored lines read before 0021) only carry categoryId.
+      setCategoryIds(line.categoryIds ?? (line.categoryId != null ? [line.categoryId] : []));
+      setIncludeChildren(line.includeChildren !== false);
       setToAccountId(line.toAccountId ?? null);
       setAccountId(line.accountId ?? null);
       setIsRecurring(!!line.isRecurring);
@@ -141,7 +150,8 @@ export default function BudgetPlanLineModal({
       setAmount('');
       setLabel('');
       setComment('');
-      setCategoryId(null);
+      setCategoryIds([]);
+      setIncludeChildren(true);
       setToAccountId(null);
       setAccountId(null);
       setIsRecurring(false);
@@ -207,11 +217,16 @@ export default function BudgetPlanLineModal({
     setKind(next);
     setError(null);
     if (next === 'transfer') {
-      setCategoryId(null);
+      setCategoryIds([]);
     } else {
       setToAccountId(null);
-      if (next === 'income') setCategoryId(prev => (incomeCategories.some(c => c.id === prev) ? prev : null));
-      else setCategoryId(prev => (expenseCategories.some(c => c.id === prev) ? prev : null));
+      // Keep whichever of the picked categories still belong to the new kind's
+      // list — switching expense↔income shares no categories, so this usually
+      // empties the set, but it never silently keeps an income category on an
+      // expense line.
+      const allowed = next === 'income' ? incomeCategories : expenseCategories;
+      const allowedIds = new Set(allowed.map(c => c.id));
+      setCategoryIds(prev => prev.filter(id => allowedIds.has(id)));
     }
   }, [incomeCategories, expenseCategories]);
 
@@ -219,17 +234,21 @@ export default function BudgetPlanLineModal({
   // other: a line tracking a destination account IS a transfer, and one tracking
   // a category is not (income keeps its kind — an income line may carry an income
   // category for context).
-  const handleSelectCategory = useCallback((cat) => {
-    setCategoryId(cat.id);
+  // Categories toggle rather than replace, and the panel STAYS OPEN — picking a
+  // set of them is the point, and closing on the first tap would make adding a
+  // second category a four-tap round trip. "Done" (or back) closes it.
+  const handleToggleCategory = useCallback((cat) => {
     setToAccountId(null);
     setKind(prev => (prev === 'transfer' ? 'expense' : prev));
     setError(null);
-    closeSubPanel();
-  }, [closeSubPanel]);
+    setCategoryIds(prev => (
+      prev.includes(cat.id) ? prev.filter(id => id !== cat.id) : [...prev, cat.id]
+    ));
+  }, []);
 
   const handleSelectTransferTarget = useCallback((acc) => {
     setToAccountId(acc.id);
-    setCategoryId(null);
+    setCategoryIds([]);
     setKind('transfer');
     setError(null);
     closeSubPanel();
@@ -265,7 +284,7 @@ export default function BudgetPlanLineModal({
     // line of defense against a tap that lands before the disabled style commits.
     if (saving) return;
     Keyboard.dismiss();
-    if (kind === 'expense' && categoryId == null) {
+    if (kind === 'expense' && categoryIds.length === 0) {
       setError(t('allocation_needs_target'));
       return;
     }
@@ -290,16 +309,17 @@ export default function BudgetPlanLineModal({
       amount: String(amount),
       label: label.trim() || null,
       comment: comment.trim() || null,
-      categoryId: kind === 'transfer' ? null : (categoryId ?? null),
+      categoryIds: kind === 'transfer' ? [] : categoryIds,
       toAccountId: kind === 'transfer' ? (toAccountId ?? null) : null,
       accountId: accountId ?? null,
       isRecurring,
+      includeChildren,
       // An executable line is priced in its account's currency; a template-less
       // one-off line inherits the plan's (null).
       currency: effectiveCurrency,
     });
-  }, [saving, kind, amount, amountIsParseable, amountIsPositive, label, comment, categoryId, toAccountId, accountId,
-    isRecurring, effectiveCurrency, onSaveLine, t]);
+  }, [saving, kind, amount, amountIsParseable, amountIsPositive, label, comment, categoryIds, toAccountId, accountId,
+    isRecurring, includeChildren, effectiveCurrency, onSaveLine, t]);
 
   const handleDelete = useCallback(() => {
     if (!isEditingLine) return;
@@ -325,18 +345,24 @@ export default function BudgetPlanLineModal({
     }
   }, [activeSubPanel, closeSubPanel, onClose]);
 
-  // Selected-target summary for the picker row on the main form.
+  // Selected-target summary for the picker row on the main form. With several
+  // categories the row names the first and counts the rest ("Groceries +2") —
+  // spelling them all out would wrap the row for any realistic set.
   const targetSummary = useMemo(() => {
-    if (kind !== 'transfer' && categoryId != null) {
-      const cat = categoriesById.get(categoryId);
-      return { icon: cat?.icon || 'shape-outline', name: cat?.name || t('allocation_unlinked') };
+    if (kind !== 'transfer' && categoryIds.length > 0) {
+      const names = categoryIds.map(id => categoriesById.get(id)?.name || t('allocation_unlinked'));
+      const first = categoriesById.get(categoryIds[0]);
+      return {
+        icon: first?.icon || 'shape-outline',
+        name: names.length > 1 ? `${names[0]} +${names.length - 1}` : names[0],
+      };
     }
     if (kind === 'transfer' && toAccountId != null) {
       const acc = accountsById.get(toAccountId);
       return { icon: 'bank-transfer', name: acc?.name || t('allocation_unlinked') };
     }
     return null;
-  }, [kind, categoryId, toAccountId, categoriesById, accountsById, t]);
+  }, [kind, categoryIds, toAccountId, categoriesById, accountsById, t]);
 
   const executionAccount = accountId != null ? accountsById.get(accountId) : null;
 
@@ -347,25 +373,31 @@ export default function BudgetPlanLineModal({
 
   const renderTargetItem = useCallback(({ item }) => {
     const isCat = pickerKind === 'category';
-    const selected = isCat ? categoryId === item.id : toAccountId === item.id;
+    const selected = isCat ? categoryIds.includes(item.id) : toAccountId === item.id;
     return (
       <Pressable
-        onPress={() => (isCat ? handleSelectCategory(item) : handleSelectTransferTarget(item))}
+        onPress={() => (isCat ? handleToggleCategory(item) : handleSelectTransferTarget(item))}
         style={({ pressed }) => [
           styles.pickerOption,
           { borderColor: colors.border },
           pressed && { backgroundColor: colors.selected },
           selected && { backgroundColor: colors.selected },
         ]}
-        accessibilityRole="button"
+        // A category toggles in and out of the set; an account replaces the
+        // target outright, so they get different a11y roles.
+        accessibilityRole={isCat ? 'checkbox' : 'button'}
+        accessibilityState={isCat ? { checked: selected } : { selected }}
         accessibilityLabel={item.name}
         testID={`plan-target-option-${isCat ? 'cat' : 'acc'}-${item.id}`}
       >
         <Icon name={isCat ? (item.icon || 'shape-outline') : 'bank-transfer'} size={22} color={colors.text} />
         <Text style={[styles.optionText, { color: colors.text }]} numberOfLines={1}>{item.name}</Text>
+        {isCat && selected && (
+          <Icon name="check" size={20} color={colors.primary} />
+        )}
       </Pressable>
     );
-  }, [pickerKind, categoryId, toAccountId, colors, handleSelectCategory, handleSelectTransferTarget]);
+  }, [pickerKind, categoryIds, toAccountId, colors, handleToggleCategory, handleSelectTransferTarget]);
 
   const renderExecutionAccountItem = useCallback(({ item }) => (
     <Pressable
@@ -470,6 +502,46 @@ export default function BudgetPlanLineModal({
                       <Icon name="chevron-right" size={20} color={colors.mutedText} />
                     </Pressable>
                   </View>
+
+                  {/* Roll-up toggle. Only an expense line has a per-category
+                      actual to roll up: a transfer line tracks an account, and an
+                      income line is compared against the month's total income
+                      rather than per-category spending. */}
+                  {kind === 'expense' && categoryIds.length > 0 && (
+                    <View style={styles.field}>
+                      <Pressable
+                        style={[styles.recurringRow, styles.noBottomMargin, { borderColor: colors.border }]}
+                        onPress={() => setIncludeChildren(v => !v)}
+                        accessibilityRole="switch"
+                        accessibilityState={{ checked: includeChildren }}
+                        accessibilityLabel={t('include_subcategories')}
+                        testID="plan-line-include-children-toggle"
+                      >
+                        <View style={styles.recurringLabel}>
+                          <Icon name="file-tree-outline" size={20} color={colors.text} />
+                          <Text style={[styles.text16, { color: colors.text }]}>
+                            {t('include_subcategories')}
+                          </Text>
+                        </View>
+                        <View
+                          style={[
+                            styles.switchTrack,
+                            { backgroundColor: includeChildren ? colors.primary : colors.border },
+                          ]}
+                        >
+                          <View
+                            style={[
+                              styles.switchThumb,
+                              { transform: [{ translateX: includeChildren ? 18 : 2 }] },
+                            ]}
+                          />
+                        </View>
+                      </Pressable>
+                      <Text style={[styles.fieldHint, { color: colors.mutedText }]}>
+                        {t('include_subcategories_hint')}
+                      </Text>
+                    </View>
+                  )}
 
                   {/* Execution account — set one and the line becomes a one-tap
                       payable (the former planned operation). */}
@@ -676,6 +748,22 @@ export default function BudgetPlanLineModal({
                       <Icon name="arrow-left" size={24} color={colors.text} />
                     </Pressable>
                     <Text style={[styles.subPanelTitle, { color: colors.text }]}>{t('select_target')}</Text>
+                    {/* Categories toggle in place instead of closing the panel,
+                        so there has to be something that says "I'm finished
+                        picking". The account tab needs none — one tap there is
+                        the whole selection. */}
+                    {pickerKind === 'category' && (
+                      <Pressable
+                        onPress={closeSubPanel}
+                        style={styles.subPanelDone}
+                        hitSlop={8}
+                        accessibilityRole="button"
+                        accessibilityLabel={t('done')}
+                        testID="plan-target-done"
+                      >
+                        <Text style={[styles.subPanelDoneText, { color: colors.primary }]}>{t('done')}</Text>
+                      </Pressable>
+                    )}
                   </View>
 
                   {/* Two-mode toggle: category OR destination account. An income
@@ -802,6 +890,8 @@ BudgetPlanLineModal.propTypes = {
     label: PropTypes.string,
     comment: PropTypes.string,
     categoryId: PropTypes.string,
+    categoryIds: PropTypes.arrayOf(PropTypes.string),
+    includeChildren: PropTypes.bool,
     toAccountId: PropTypes.oneOfType([PropTypes.string, PropTypes.number]),
     accountId: PropTypes.oneOfType([PropTypes.string, PropTypes.number]),
     kind: PropTypes.oneOf(KINDS),
@@ -911,6 +1001,9 @@ const styles = StyleSheet.create({
     flex: 1,
     justifyContent: 'center',
   },
+  noBottomMargin: {
+    marginBottom: 0,
+  },
   optionText: {
     flex: 1,
     fontSize: 16,
@@ -969,6 +1062,14 @@ const styles = StyleSheet.create({
   subPanelBack: {
     marginRight: 8,
     padding: 4,
+  },
+  subPanelDone: {
+    marginLeft: 'auto',
+    paddingHorizontal: 4,
+  },
+  subPanelDoneText: {
+    fontSize: 16,
+    fontWeight: '600',
   },
   subPanelHeader: {
     alignItems: 'center',

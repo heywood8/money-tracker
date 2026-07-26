@@ -807,5 +807,25 @@ describe('Database Schema', () => {
         expect(planId.config.references()).toBeDefined();
       }
     });
+
+    // Migration 0021: descendants roll up unless this is switched off.
+    it('defaults includeChildren to 1', async () => {
+      expect(schema.budgetPlanLines.includeChildren.columnType).toBe('SQLiteInteger');
+      expect(schema.budgetPlanLines.includeChildren.notNull).toBe(true);
+      expect(schema.budgetPlanLines.includeChildren.default).toBe(1);
+    });
+  });
+
+  describe('budgetPlanLineCategories Table (migration 0021)', () => {
+    it('has correct table name', async () => {
+      expect(schema.budgetPlanLineCategories[Symbol.for('drizzle:Name')]).toBe('budget_plan_line_categories');
+    });
+
+    it('defines both link columns as required text/FK pair', async () => {
+      expect(schema.budgetPlanLineCategories.lineId.columnType).toBe('SQLiteText');
+      expect(schema.budgetPlanLineCategories.lineId.notNull).toBe(true);
+      expect(schema.budgetPlanLineCategories.categoryId.columnType).toBe('SQLiteText');
+      expect(schema.budgetPlanLineCategories.categoryId.notNull).toBe(true);
+    });
   });
 });

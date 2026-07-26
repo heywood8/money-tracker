@@ -11,8 +11,7 @@
 import uuid from 'react-native-uuid';
 import { executeQuery, queryAll, queryFirst, executeTransaction } from './db';
 import * as Currency from './currency';
-import * as CategoriesDB from './CategoriesDB';
-import { calculateSpendingForBudget, deriveSpendingStatus } from './BudgetsDB';
+import { calculateSpendingForCategories, expandCategoryIds, deriveSpendingStatus } from './BudgetsDB';
 import { formatDate as formatLocalDate } from './BalanceHistoryDB';
 import { sanitizeNewLabel } from '../utils/labelUtils';
 import {
@@ -30,6 +29,28 @@ const MONTH_REGEX = /^\d{4}-(0[1-9]|1[0-2])$/;
 // stored `kind` (every pre-0020 row) is a pure analytic target whose effective
 // kind is inferred from its tracking target — see {@link mapLineFields}.
 const LINE_KINDS = ['income', 'expense', 'transfer'];
+
+/**
+ * Every line SELECT goes through this, so the category set (migration 0021's
+ * budget_plan_line_categories) always travels with the row instead of costing a
+ * follow-up query per line. GROUP_CONCAT joins with ',' and category IDs are
+ * UUIDs, so splitting back is unambiguous.
+ *
+ * Deliberately a plain correlated SCALAR subquery: SQLite has no LATERAL, so a
+ * derived table in FROM cannot reference `l.id` — the tidier
+ * `GROUP_CONCAT(...) FROM (SELECT ... ORDER BY ...)` spelling that would pin the
+ * concat order fails outright with `no such column: l.id`. The set's order is
+ * not meaningful anyway (the UI sorts by name), and the line's PRIMARY category
+ * comes from its own `category_id` column, not from this list's head.
+ *
+ * Callers append their own WHERE/ORDER BY against the `l` alias.
+ */
+const LINE_SELECT = `SELECT l.*, (
+      SELECT GROUP_CONCAT(lc.category_id)
+      FROM budget_plan_line_categories lc
+      WHERE lc.line_id = l.id
+    ) AS category_ids
+    FROM budget_plan_lines l`;
 
 /** Current month as YYYY-MM (local calendar) — mirrors utils/monthUtils. */
 const currentMonthKey = () => {
@@ -80,7 +101,15 @@ export const mapPlanFields = (row) => {
  */
 export const mapLineFields = (row) => {
   if (!row) return null;
-  const categoryId = row.category_id ?? null;
+  const categoryIds = readCategoryIds(row);
+  const primary = row.category_id ?? null;
+  // The junction wins: when the row's denormalized primary category has been
+  // deleted (its FK nulled, or it simply is not linked any more) but other
+  // categories remain, the line still tracks those — reporting `categoryId: null`
+  // would render it as broken while its actual keeps counting spending.
+  const categoryId = primary !== null && categoryIds.includes(primary)
+    ? primary
+    : (categoryIds[0] ?? null);
   const toAccountId = row.to_account_id ?? null;
   const accountId = row.account_id ?? null;
   const kind = LINE_KINDS.includes(row.kind) ? row.kind : (toAccountId !== null ? 'transfer' : 'expense');
@@ -91,9 +120,15 @@ export const mapLineFields = (row) => {
     amount: row.amount,
     comment: row.comment ?? null,
     categoryId,
+    categoryIds,
+    // Legacy rows (pre-0021, and any hand-built row in a test) have no column at
+    // all — they behaved as "roll descendants up", so absent reads as enabled.
+    // Only a stored 0 turns it off; the string form is accepted because a row
+    // that reached here through a CSV round trip carries text, not integers.
+    includeChildren: row.include_children !== 0 && row.include_children !== '0',
     toAccountId,
     sortOrder: row.sort_order ?? 0,
-    isBroken: kind !== 'income' && categoryId === null && toAccountId === null,
+    isBroken: kind !== 'income' && categoryIds.length === 0 && toAccountId === null,
     isRecurring: row.is_recurring === 1,
     currency: row.currency ?? null,
     kind,
@@ -107,6 +142,74 @@ export const mapLineFields = (row) => {
 
 // True when a target reference is meaningfully set (not null/undefined/'').
 const isSet = (value) => value !== null && value !== undefined && value !== '';
+
+/**
+ * De-duplicated list of set category IDs, order preserved.
+ * @param {Array|null|undefined} ids
+ * @returns {Array<string>}
+ */
+const uniqueCategoryIds = (ids) => {
+  const out = [];
+  for (const id of ids || []) {
+    if (!isSet(id) || out.includes(id)) continue;
+    out.push(id);
+  }
+  return out;
+};
+
+/**
+ * The category set a caller means, accepting either shape: the multi-category
+ * `categoryIds` array (since migration 0021) or the single legacy `categoryId`.
+ * `categoryIds` wins when present, so a caller that passes both cannot end up
+ * writing a set that disagrees with the primary it also asked for.
+ *
+ * Returns `undefined` when the caller mentioned NEITHER field — which for an
+ * update means "leave the links alone", as distinct from `[]` ("unlink all").
+ * @param {Object} line
+ * @returns {Array<string>|undefined}
+ */
+const resolveCategoryIds = (line) => {
+  if (Array.isArray(line?.categoryIds)) return uniqueCategoryIds(line.categoryIds);
+  if (line?.categoryId !== undefined) return uniqueCategoryIds([line.categoryId]);
+  return undefined;
+};
+
+/**
+ * Parse the `category_ids` GROUP_CONCAT column produced by {@link LINE_SELECT}.
+ * A row selected without it (an insert's in-memory row, a hand-built test row, a
+ * legacy `SELECT *`) falls back to the denormalized `category_id` column, so
+ * every read path yields the same shape.
+ * @param {Object} row - Raw budget_plan_lines row
+ * @returns {Array<string>}
+ */
+const readCategoryIds = (row) => {
+  if (Object.prototype.hasOwnProperty.call(row, 'category_ids')) {
+    const raw = row.category_ids;
+    if (Array.isArray(raw)) return uniqueCategoryIds(raw);
+    return typeof raw === 'string' && raw.length > 0
+      ? uniqueCategoryIds(raw.split(','))
+      : [];
+  }
+  return uniqueCategoryIds([row.category_id]);
+};
+
+/**
+ * Rewrite a line's category links inside an open transaction: drop what's there,
+ * insert the new set. Called with the already-normalized (de-duplicated) list.
+ * @param {Object} db - Transaction-scoped database handle
+ * @param {string} lineId
+ * @param {Array<string>} categoryIds
+ * @returns {Promise<void>}
+ */
+const writeLineCategoriesInTx = async (db, lineId, categoryIds) => {
+  await db.runAsync('DELETE FROM budget_plan_line_categories WHERE line_id = ?', [lineId]);
+  for (const categoryId of categoryIds) {
+    await db.runAsync(
+      'INSERT OR IGNORE INTO budget_plan_line_categories (line_id, category_id) VALUES (?, ?)',
+      [lineId, categoryId],
+    );
+  }
+};
 
 /**
  * Validate a plan.
@@ -148,7 +251,7 @@ export const validatePlanLine = (line) => {
   if (isSet(line.kind) && !LINE_KINDS.includes(line.kind)) {
     return 'A line must be an income, expense or transfer';
   }
-  const hasCategory = isSet(line.categoryId);
+  const hasCategory = (resolveCategoryIds(line) || []).length > 0;
   const hasAccount = isSet(line.toAccountId);
   if (line.kind === 'income') {
     if (hasAccount) {
@@ -352,7 +455,7 @@ export const deletePlan = async (id) => {
 export const getPlanLines = async (planId) => {
   try {
     const rows = await queryAll(
-      'SELECT * FROM budget_plan_lines WHERE plan_id = ? ORDER BY sort_order ASC, created_at ASC',
+      `${LINE_SELECT} WHERE l.plan_id = ? ORDER BY l.sort_order ASC, l.created_at ASC`,
       [planId],
     );
     return (rows || []).map(mapLineFields);
@@ -372,8 +475,17 @@ export const getBrokenLines = async (planId) => {
   try {
     // Income lines are excluded: they legitimately have no tracking target (see
     // validatePlanLine), so a targetless income line is not "broken".
+    //
+    // Since migration 0021 "no category" means the junction holds NO row for the
+    // line — not that `category_id` is null. A line whose primary category was
+    // deleted but which still tracks others is fine, and must not be offered up
+    // for re-linking.
     const rows = await queryAll(
-      "SELECT * FROM budget_plan_lines WHERE plan_id = ? AND category_id IS NULL AND to_account_id IS NULL AND (kind IS NULL OR kind != 'income') ORDER BY sort_order ASC",
+      `${LINE_SELECT} WHERE l.plan_id = ?
+         AND NOT EXISTS (SELECT 1 FROM budget_plan_line_categories lc WHERE lc.line_id = l.id)
+         AND l.to_account_id IS NULL
+         AND (l.kind IS NULL OR l.kind != 'income')
+       ORDER BY l.sort_order ASC`,
       [planId],
     );
     return (rows || []).map(mapLineFields);
@@ -406,13 +518,16 @@ const insertPlanLine = async (planId, line) => {
     }
 
     const now = new Date().toISOString();
+    const categoryIds = resolveCategoryIds(line) || [];
     const row = {
       id: line.id || uuid.v4(),
       plan_id: planId,
       label: line.label ?? null,
       amount: String(line.amount),
       comment: line.comment ?? null,
-      category_id: isSet(line.categoryId) ? line.categoryId : null,
+      // Primary = first of the set; the full set lives in the junction below.
+      category_id: categoryIds[0] ?? null,
+      category_ids: categoryIds,
       to_account_id: isSet(line.toAccountId) ? line.toAccountId : null,
       sort_order: Number.isInteger(line.sortOrder) ? line.sortOrder : 0,
       is_recurring: isRecurring ? 1 : 0,
@@ -423,18 +538,28 @@ const insertPlanLine = async (planId, line) => {
       kind: LINE_KINDS.includes(line.kind) ? line.kind : null,
       account_id: isSet(line.accountId) ? line.accountId : null,
       last_executed_month: line.lastExecutedMonth ?? null,
+      // Absent means "roll descendants up" — the pre-0021 behaviour, and what a
+      // caller that has never heard of the flag expects.
+      include_children: line.includeChildren === false ? 0 : 1,
       created_at: now,
       updated_at: now,
     };
 
-    await executeQuery(
-      'INSERT INTO budget_plan_lines (id, plan_id, label, amount, comment, category_id, to_account_id, sort_order, is_recurring, currency, kind, account_id, last_executed_month, created_at, updated_at) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)',
-      [
-        row.id, row.plan_id, row.label, row.amount, row.comment, row.category_id,
-        row.to_account_id, row.sort_order, row.is_recurring, row.currency,
-        row.kind, row.account_id, row.last_executed_month, row.created_at, row.updated_at,
-      ],
-    );
+    // The row and its category links go in together: a line that committed
+    // without its links would read as broken (empty set, no transfer target) and
+    // silently stop tracking anything.
+    await executeTransaction(async (db) => {
+      await db.runAsync(
+        'INSERT INTO budget_plan_lines (id, plan_id, label, amount, comment, category_id, to_account_id, sort_order, is_recurring, currency, kind, account_id, last_executed_month, include_children, created_at, updated_at) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)',
+        [
+          row.id, row.plan_id, row.label, row.amount, row.comment, row.category_id,
+          row.to_account_id, row.sort_order, row.is_recurring, row.currency,
+          row.kind, row.account_id, row.last_executed_month, row.include_children,
+          row.created_at, row.updated_at,
+        ],
+      );
+      await writeLineCategoriesInTx(db, row.id, categoryIds);
+    });
 
     return mapLineFields(row);
   } catch (error) {
@@ -470,7 +595,7 @@ export const addRecurringLine = async (line) => insertPlanLine(null, line);
 export const getRecurringLines = async () => {
   try {
     const rows = await queryAll(
-      'SELECT * FROM budget_plan_lines WHERE is_recurring = 1 ORDER BY sort_order ASC, created_at ASC',
+      `${LINE_SELECT} WHERE l.is_recurring = 1 ORDER BY l.sort_order ASC, l.created_at ASC`,
     );
     return (rows || []).map(mapLineFields);
   } catch (error) {
@@ -586,8 +711,12 @@ const convertLineAmount = async (rawAmount, fromCurrency, toCurrency) => {
  */
 export const updateLine = async (id, updates) => {
   try {
+    // `categoryIds` (the whole set) or the legacy single `categoryId`; undefined
+    // when the caller mentioned neither, which leaves the existing links alone.
+    const requestedCategoryIds = resolveCategoryIds(updates);
+
     // Reject setting both targets in a single update outright.
-    if (isSet(updates.categoryId) && isSet(updates.toAccountId)) {
+    if ((requestedCategoryIds || []).length > 0 && isSet(updates.toAccountId)) {
       throw new Error('A line must link to either a category or an account, not both');
     }
     if (updates.amount !== undefined
@@ -598,12 +727,12 @@ export const updateLine = async (id, updates) => {
     // Derive the target writes. Assigning one real target clears the opposite one,
     // even when the caller didn't mention it — that's what keeps a partial update
     // from leaving both set (the row may already hold the other target).
-    let categoryId = updates.categoryId;
+    let categoryIds = requestedCategoryIds;
     let toAccountId = updates.toAccountId;
-    if (isSet(updates.categoryId)) {
+    if ((categoryIds || []).length > 0) {
       toAccountId = null;
     } else if (isSet(updates.toAccountId)) {
-      categoryId = null;
+      categoryIds = [];
     }
 
     const fields = [];
@@ -617,13 +746,18 @@ export const updateLine = async (id, updates) => {
       fields.push('comment = ?');
       values.push(updates.comment ?? null);
     }
-    if (categoryId !== undefined) {
+    if (categoryIds !== undefined) {
+      // Keep the denormalized primary in step with the set it heads.
       fields.push('category_id = ?');
-      values.push(isSet(categoryId) ? categoryId : null);
+      values.push(categoryIds[0] ?? null);
     }
     if (toAccountId !== undefined) {
       fields.push('to_account_id = ?');
       values.push(isSet(toAccountId) ? toAccountId : null);
+    }
+    if (updates.includeChildren !== undefined) {
+      fields.push('include_children = ?');
+      values.push(updates.includeChildren ? 1 : 0);
     }
     if (updates.sortOrder !== undefined) {
       fields.push('sort_order = ?');
@@ -711,7 +845,19 @@ export const updateLine = async (id, updates) => {
     values.push(new Date().toISOString());
     values.push(id);
 
-    await executeQuery(`UPDATE budget_plan_lines SET ${fields.join(', ')} WHERE id = ?`, values);
+    const sql = `UPDATE budget_plan_lines SET ${fields.join(', ')} WHERE id = ?`;
+
+    if (categoryIds === undefined) {
+      await executeQuery(sql, values);
+      return;
+    }
+
+    // Row and links move together, so a failure can't leave the primary column
+    // pointing at a category the junction no longer holds.
+    await executeTransaction(async (db) => {
+      await db.runAsync(sql, values);
+      await writeLineCategoriesInTx(db, id, categoryIds);
+    });
   } catch (error) {
     console.error('Failed to update budget plan line:', error);
     throw error;
@@ -881,18 +1027,23 @@ export const copyPlan = async (fromMonth, toMonth) => {
 
         for (let i = 0; i < sourceLines.length; i++) {
           const line = sourceLines[i];
+          const clonedId = uuid.v4();
           // `last_executed_month` is written NULL: every line that reaches here is
           // pending already (see the filter above), and a clone starts the new
           // month pending too, exactly like a recurring line does when the month
           // rolls over.
           await db.runAsync(
-            'INSERT INTO budget_plan_lines (id, plan_id, label, amount, comment, category_id, to_account_id, sort_order, is_recurring, currency, kind, account_id, last_executed_month, created_at, updated_at) VALUES (?, ?, ?, ?, ?, ?, ?, ?, 0, ?, ?, ?, NULL, ?, ?)',
+            'INSERT INTO budget_plan_lines (id, plan_id, label, amount, comment, category_id, to_account_id, sort_order, is_recurring, currency, kind, account_id, last_executed_month, include_children, created_at, updated_at) VALUES (?, ?, ?, ?, ?, ?, ?, ?, 0, ?, ?, ?, NULL, ?, ?, ?)',
             [
-              uuid.v4(), newPlanId, line.label, line.amount, line.comment,
+              clonedId, newPlanId, line.label, line.amount, line.comment,
               line.categoryId, line.toAccountId, line.sortOrder ?? i,
-              line.currency, line.kind, line.accountId, now, now,
+              line.currency, line.kind, line.accountId,
+              line.includeChildren === false ? 0 : 1, now, now,
             ],
           );
+          // The clone must track the same SET of categories, not just the primary
+          // one the column carries.
+          await writeLineCategoriesInTx(db, clonedId, line.categoryIds || []);
         }
       });
     } catch (txError) {
@@ -949,9 +1100,11 @@ export const getMonthDateRange = (month) => {
 /**
  * Compute the actual amount tracked by one plan line for a month.
  *
- * - Category-linked line: expense spending of the category including descendants,
- *   via the shared convert-all engine ({@link calculateSpendingForBudget}). With
- *   `convertAll` off, only operations in accounts of `displayCurrency` count.
+ * - Category-linked line: expense spending across every category the line tracks
+ *   (migration 0021 allows several), including their descendants unless the
+ *   line's `includeChildren` is off, via the shared convert-all engine
+ *   ({@link calculateSpendingForCategories}). With `convertAll` off, only
+ *   operations in accounts of `displayCurrency` count.
  * - Account-linked line (transfer target): incoming transfers into the account
  *   ({@link getTransferTotals}; values are in the destination account's currency),
  *   converted into `displayCurrency` regardless of the toggle — a transfer target
@@ -980,13 +1133,14 @@ export const calculateLineActual = async (line, month, displayCurrency, convertA
       return { broken: false, actual: '0', skipped: true };
     }
 
-    if (isSet(line.categoryId)) {
-      const actual = await calculateSpendingForBudget(
-        line.categoryId,
+    const categoryIds = line.categoryIds ?? (isSet(line.categoryId) ? [line.categoryId] : []);
+    if (categoryIds.length > 0) {
+      const actual = await calculateSpendingForCategories(
+        categoryIds,
         displayCurrency,
         startDate,
         endDate,
-        true, // include descendant categories
+        line.includeChildren !== false, // descendants roll up unless switched off
         convertAll,
       );
       return { broken: false, actual: String(actual) };
@@ -1083,16 +1237,27 @@ const collectPlanSourceCurrencies = async (lines, startDate, endDate, convertAll
   const currencies = new Set(transferCurrencies);
 
   if (convertAll) {
-    const categoryIds = [];
+    // A Set, not an array: since migration 0021 each line contributes a whole
+    // category set (plus descendants), and plan lines routinely overlap — a
+    // parent here, one of its children there. Repeats would only pad the IN list
+    // toward SQLite's bound-parameter ceiling without changing the DISTINCT
+    // result.
+    const categoryIdSet = new Set();
     for (const line of lines) {
       // Income lines track no spending (their category, when set, is an income
       // one) — including them here would query expenses that cannot exist.
-      if (line.kind === 'income' || !isSet(line.categoryId)) continue;
-      categoryIds.push(line.categoryId);
-      const descendants = await CategoriesDB.getAllDescendants(line.categoryId);
-      categoryIds.push(...descendants.map(cat => cat.id));
+      if (line.kind === 'income') continue;
+      const linked = line.categoryIds ?? (isSet(line.categoryId) ? [line.categoryId] : []);
+      if (linked.length === 0) continue;
+      // Same expansion the line's own actual uses, so the currencies collected
+      // here are exactly the ones that can feed it — including the descendants
+      // only when that line actually rolls them up.
+      for (const id of await expandCategoryIds(linked, line.includeChildren !== false)) {
+        categoryIdSet.add(id);
+      }
     }
 
+    const categoryIds = [...categoryIdSet];
     if (categoryIds.length > 0) {
       const placeholders = categoryIds.map(() => '?').join(',');
       const rows = await queryAll(
@@ -1444,6 +1609,42 @@ export const unmarkLineExecuted = async (id) => {
 export const BUDGETS_MIGRATION_FLAG_KEY = 'post_migration_m0019_completed';
 
 /**
+ * Whether migration 0021's junction table exists yet, on a raw db handle.
+ *
+ * The bridges below run in two very different situations. During a fresh
+ * migrate() they run right after their own DDL, BEFORE 0021 — the table does not
+ * exist, and 0021's backfill will pick their rows up from `category_id` moments
+ * later. But a RETRY (a bridge that never completed, re-attempted on a later
+ * launch) and BackupRestore's restore-time bridge both run on a schema that is
+ * already at 0021, where nothing will backfill for them — there they must write
+ * the links themselves, or every bridged line reads as broken and tracks nothing.
+ * @param {Object} db - Raw SQLite database instance (or transaction handle)
+ * @returns {Promise<boolean>}
+ */
+const hasLineCategoriesTable = async (db) => {
+  const row = await db.getFirstAsync(
+    "SELECT name FROM sqlite_master WHERE type='table' AND name='budget_plan_line_categories'",
+  ).catch(() => null);
+  return !!row;
+};
+
+/**
+ * Link a bridged line to its single category when the junction table is there.
+ * @param {Object} db - Raw SQLite database instance (or transaction handle)
+ * @param {boolean} junctionExists - Result of {@link hasLineCategoriesTable}
+ * @param {string} lineId
+ * @param {string|null} categoryId
+ * @returns {Promise<void>}
+ */
+const linkBridgedLineCategory = async (db, junctionExists, lineId, categoryId) => {
+  if (!junctionExists || !isSet(categoryId)) return;
+  await db.runAsync(
+    'INSERT OR IGNORE INTO budget_plan_line_categories (line_id, category_id) VALUES (?, ?)',
+    [lineId, categoryId],
+  );
+};
+
+/**
  * Convert a legacy `budgets` (v1) amount into an equivalent MONTHLY amount, per
  * the product owner's decision:
  *   - weekly → amount × (365 / 12 / 7) ≈ ×4.345, computed as ×365÷84 (365/84 ==
@@ -1498,14 +1699,17 @@ export const migrateLegacyBudgetsToRecurringLines = async (db) => {
 
   const budgetRows = await db.getAllAsync('SELECT * FROM budgets').catch(() => []);
   const now = new Date().toISOString();
+  const junctionExists = await hasLineCategoriesTable(db);
   let migrated = 0;
 
   for (const budget of budgetRows || []) {
     const monthlyAmount = convertBudgetAmountToMonthly(budget.amount, budget.period_type, budget.currency);
+    const lineId = uuid.v4();
     await db.runAsync(
       'INSERT INTO budget_plan_lines (id, plan_id, label, amount, comment, category_id, to_account_id, sort_order, is_recurring, currency, created_at, updated_at) VALUES (?, NULL, NULL, ?, NULL, ?, NULL, 0, 1, ?, ?, ?)',
-      [uuid.v4(), monthlyAmount, budget.category_id, budget.currency, now, now],
+      [lineId, monthlyAmount, budget.category_id, budget.currency, now, now],
     );
+    await linkBridgedLineCategory(db, junctionExists, lineId, budget.category_id);
     migrated++;
   }
 
@@ -1593,6 +1797,7 @@ export const migratePlannedOperationsToLines = async (db) => {
     'SELECT * FROM planned_operations ORDER BY display_order ASC, created_at ASC',
   ).catch(() => []);
 
+  const junctionExists = await hasLineCategoriesTable(db);
   const currencyByAccount = new Map((accountRows || []).map(a => [String(a.id), a.currency]));
   const fallbackCurrency = (plans || [])[0]?.currency || (accountRows || [])[0]?.currency || 'USD';
 
@@ -1631,15 +1836,17 @@ export const migratePlannedOperationsToLines = async (db) => {
       planId = currentPlanId;
     }
 
+    const lineId = uuid.v4();
+    const lineCategoryId = kind === 'transfer' ? null : (op.category_id ?? null);
     await db.runAsync(
       INSERT_LINE_SQL,
       [
-        uuid.v4(),
+        lineId,
         planId,
         op.name ?? null,
         String(op.amount ?? '0'),
         op.description ?? null,
-        kind === 'transfer' ? null : (op.category_id ?? null),
+        lineCategoryId,
         op.to_account_id ?? null,
         Number.isInteger(op.display_order) ? op.display_order : i,
         isRecurring ? 1 : 0,
@@ -1651,6 +1858,7 @@ export const migratePlannedOperationsToLines = async (db) => {
         now,
       ],
     );
+    await linkBridgedLineCategory(db, junctionExists, lineId, lineCategoryId);
     migratedTemplates++;
   }
 

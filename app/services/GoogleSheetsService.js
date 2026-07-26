@@ -78,11 +78,26 @@ export const signOut = async () => {
 export const buildSheetsData = (backup) => {
   const {
     accounts, categories, operations, budgets, balance_history,
-    budget_plans, budget_plan_lines,
+    budget_plans, budget_plan_lines, budget_plan_line_categories,
   } = backup.data;
 
   const accountNames = new Map(accounts.map(a => [a.id, a.name]));
   const categoryNames = new Map(categories.map(c => [c.id, c.name]));
+
+  // A line's full category set (migration 0021), keyed by line. Semicolon-joined
+  // rather than comma-joined because a category NAME may well contain a comma —
+  // and the two columns must split the same way to stay in step.
+  const categoryIdsByLine = new Map();
+  for (const link of budget_plan_line_categories || []) {
+    if (!link.line_id || !link.category_id) continue;
+    const current = categoryIdsByLine.get(link.line_id);
+    if (current) current.push(link.category_id);
+    else categoryIdsByLine.set(link.line_id, [link.category_id]);
+  }
+  // A backup taken before 0021 has no junction at all: fall back to the line's
+  // single category_id so the exported sheet still says what it tracks.
+  const lineCategoryIds = (line) => categoryIdsByLine.get(line.id)
+    || (line.category_id ? [line.category_id] : []);
 
   return [
     {
@@ -161,21 +176,30 @@ export const buildSheetsData = (backup) => {
     {
       range: 'Budget Plan Lines!A1',
       values: [
-        ['id', 'plan_id', 'label', 'amount', 'comment', 'category', 'account', 'category_id', 'to_account_id', 'sort_order', 'is_recurring', 'currency', 'kind', 'execution_account', 'account_id', 'last_executed_month'],
-        ...(budget_plan_lines || []).map(l => [
-          l.id, l.plan_id || '', l.label || '', l.amount, l.comment || '',
-          categoryNames.get(l.category_id) || '',
-          l.to_account_id ? (accountNames.get(l.to_account_id) || '') : '',
-          l.category_id || '',
-          l.to_account_id || '',
-          l.sort_order ?? 0,
-          l.is_recurring ?? 0,
-          l.currency || '',
-          l.kind || '',
-          l.account_id ? (accountNames.get(l.account_id) || '') : '',
-          l.account_id || '',
-          l.last_executed_month || '',
-        ]),
+        ['id', 'plan_id', 'label', 'amount', 'comment', 'category', 'account', 'category_id', 'to_account_id', 'sort_order', 'is_recurring', 'currency', 'kind', 'execution_account', 'account_id', 'last_executed_month', 'categories', 'category_ids', 'include_children'],
+        ...(budget_plan_lines || []).map(l => {
+          const ids = lineCategoryIds(l);
+          return [
+            l.id, l.plan_id || '', l.label || '', l.amount, l.comment || '',
+            categoryNames.get(l.category_id) || '',
+            l.to_account_id ? (accountNames.get(l.to_account_id) || '') : '',
+            l.category_id || '',
+            l.to_account_id || '',
+            l.sort_order ?? 0,
+            l.is_recurring ?? 0,
+            l.currency || '',
+            l.kind || '',
+            l.account_id ? (accountNames.get(l.account_id) || '') : '',
+            l.account_id || '',
+            l.last_executed_month || '',
+            // The whole set the line tracks: names for the reader, IDs for the
+            // round trip. `category`/`category_id` above stay as the primary one
+            // so an older sheet layout keeps working unchanged.
+            ids.map(id => categoryNames.get(id) || '').join(';'),
+            ids.join(';'),
+            l.include_children === 0 ? 0 : 1,
+          ];
+        }),
       ],
     },
   ];
@@ -278,6 +302,12 @@ export const importFromSheets = async (accessToken, onProgress) => {
     }
     return row[nameCol] ? (accountIdMap.get(row[nameCol]) ?? null) : null;
   };
+
+  // A blank/absent cell is "not stated" and reads as ON (the pre-0021
+  // behaviour); only an explicit 0 turns the descendant roll-up off.
+  const readIncludeChildren = (value) => (
+    value === '' || value == null ? 1 : (Number(value) === 0 ? 0 : 1)
+  );
 
   const resolveCategoryId = (row, idCol, nameCol) => {
     if (row[idCol] !== '' && row[idCol] != null) {
@@ -385,10 +415,44 @@ export const importFromSheets = async (accessToken, onProgress) => {
         ? resolveAccountId(l, 'account_id', 'execution_account')
         : null,
       last_executed_month: l.last_executed_month || null,
+      // Only an explicit 0 switches the roll-up off. A blank cell — every
+      // pre-0021 sheet, and any row a user added by hand — means "not stated",
+      // which is the default ON; `Number('')` is 0, so this cannot go through
+      // a plain numeric comparison.
+      include_children: readIncludeChildren(l.include_children),
       created_at: now,
       updated_at: now,
     };
   });
+
+  // Category links (migration 0021). Read from `category_ids` when the sheet has
+  // it, else from the human-facing `categories` names — someone editing the
+  // spreadsheet by hand will reach for the names column, and silently dropping
+  // what they typed there would be the worst kind of quiet. A sheet with neither
+  // (written before 0021) falls back to the single category the row already
+  // resolved, so a line never comes back from a round trip tracking nothing.
+  const budget_plan_line_categories = [];
+  const splitList = (value) => String(value || '').split(';').map(part => part.trim()).filter(Boolean);
+  for (let i = 0; i < budgetPlanLineRows.length; i++) {
+    const row = budgetPlanLineRows[i];
+    const line = budget_plan_lines[i];
+    if (!line.id) continue;
+    // Both columns go through categoryIdMap, which is keyed by ID *and* by name.
+    const listed = [...splitList(row.category_ids), ...splitList(row.categories)]
+      .map(token => categoryIdMap.get(token) ?? null)
+      .filter(Boolean);
+    const resolved = listed.length > 0 ? listed : (line.category_id ? [line.category_id] : []);
+    const seen = new Set();
+    for (const categoryId of resolved) {
+      if (seen.has(categoryId)) continue;
+      seen.add(categoryId);
+      budget_plan_line_categories.push({ line_id: line.id, category_id: categoryId });
+    }
+    // Keep the denormalized primary inside the set it heads: a sheet whose
+    // `category` cell was cleared while `categories` still lists targets would
+    // otherwise import a line whose column and junction disagree.
+    line.category_id = resolved[0] ?? null;
+  }
 
   // Preserve current app preferences (language, theme, etc.) so they survive the restore.
   // Do NOT catch DB errors here — a locked or corrupted DB must abort the import loudly
@@ -413,6 +477,7 @@ export const importFromSheets = async (accessToken, onProgress) => {
       planned_operations: [],
       budget_plans,
       budget_plan_lines,
+      budget_plan_line_categories,
     },
   };
 };

@@ -1,4 +1,4 @@
-import { sqliteTable, text, integer, index, unique } from 'drizzle-orm/sqlite-core';
+import { sqliteTable, text, integer, index, unique, primaryKey } from 'drizzle-orm/sqlite-core';
 
 /**
  * App metadata table for tracking database version and migration status
@@ -314,6 +314,12 @@ export const budgetPlanLines = sqliteTable('budget_plan_lines', {
   label: text('label'),
   amount: text('amount').notNull(),
   comment: text('comment'),
+  // The line's PRIMARY category. Since migration 0021 a line can track several
+  // categories and budget_plan_line_categories is the source of truth — this
+  // column is the denormalized first entry, kept for the CSV/backup shape and
+  // still written on every insert/update. Readers use the junction (see
+  // BudgetPlansDB.mapLineFields), which is why an ON DELETE SET NULL here cannot
+  // silently unlink a line that still tracks other categories.
   categoryId: text('category_id').references(() => categories.id, { onDelete: 'set null' }),
   toAccountId: integer('to_account_id').references(() => accounts.id, { onDelete: 'set null' }),
   sortOrder: integer('sort_order').notNull().default(0),
@@ -335,10 +341,38 @@ export const budgetPlanLines = sqliteTable('budget_plan_lines', {
   // YYYY-MM of the last execution (or manual "mark as done"), like the old
   // planned_operations.last_executed_month.
   lastExecutedMonth: text('last_executed_month'),
+  // 1 (default) = descendant categories roll up into this line's actual, which is
+  // what every pre-0021 line did implicitly; 0 = only the categories explicitly
+  // linked in budget_plan_line_categories count. Migration 0021.
+  includeChildren: integer('include_children').notNull().default(1),
   createdAt: text('created_at').notNull(),
   updatedAt: text('updated_at').notNull(),
 }, (table) => ({
   planIdx: index('idx_budget_plan_lines_plan').on(table.planId),
   recurringIdx: index('idx_budget_plan_lines_recurring').on(table.isRecurring),
   kindIdx: index('idx_budget_plan_lines_kind').on(table.kind),
+}));
+
+/**
+ * Budget Plan Line ↔ Categories junction (migration 0021)
+ *
+ * The set of expense categories a plan line tracks. Replaces the single
+ * `budget_plan_lines.category_id` as the source of truth, so a line can budget
+ * several sibling categories at once (e.g. Groceries + Cafes) instead of forcing
+ * the user to pick their common parent and swallow every other child with it.
+ *
+ * Both FKs cascade: deleting the line drops its links, and deleting a category
+ * merely SHRINKS the line's set. A line whose set becomes empty (and which has no
+ * transfer target) reads as "broken", the same state a nulled `category_id`
+ * produced before — see BudgetPlansDB.mapLineFields.
+ *
+ * Whether descendants of these categories also count is the line's
+ * `include_children` flag, not a property of the link.
+ */
+export const budgetPlanLineCategories = sqliteTable('budget_plan_line_categories', {
+  lineId: text('line_id').notNull().references(() => budgetPlanLines.id, { onDelete: 'cascade' }),
+  categoryId: text('category_id').notNull().references(() => categories.id, { onDelete: 'cascade' }),
+}, (table) => ({
+  pk: primaryKey({ columns: [table.lineId, table.categoryId] }),
+  categoryIdx: index('idx_budget_plan_line_categories_category').on(table.categoryId),
 }));
