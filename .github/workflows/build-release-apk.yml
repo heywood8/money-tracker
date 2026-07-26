@@ -4,7 +4,7 @@ on:
   workflow_dispatch:
     inputs:
       profile:
-        description: 'Primary build profile (preview = arm64 only; emulator = arm64 + x86_64). A separate x86_64-only APK always builds in parallel.'
+        description: 'Primary build profile (preview = arm64 only; emulator = arm64 + x86_64). A separate x86_64-only APK always builds in parallel and is attached to the release alongside it.'
         required: true
         default: 'preview'
         type: choice
@@ -23,26 +23,17 @@ jobs:
     runs-on: ubuntu-latest
     permissions:
       contents: write
-    # arm64 (the dispatch-selected profile, default preview) is the primary build
-    # and the only one attached to the GitHub Release. x86_64 builds in parallel
-    # but is published as a workflow artifact only — staged rollout: older installs
-    # still pick the first .apk on a release, so we keep x86_64 off the release
-    # until the arch-aware auto-updater (extractApkAsset, prefers non-x86) has
-    # propagated.
-    #
-    # NEXT RELEASE (once the arch-aware updater has propagated): flip x86_64 onto
-    # the release by dropping the "&& matrix.arch == 'arm64'" guard on the release
-    # upload step, and rename the primary asset by setting the arm64 entry's
-    # apk_suffix to '_arm64'. Result: "<tag>_arm64.apk" + "<tag>_x86_64.apk".
-    # No app-side change needed then — extractApkAsset already prefers "_arm64",
-    # falling back to the unsuffixed arm64 APK.
+    # Both ABIs are attached to the GitHub Release, each suffixed by arch
+    # ("<tag>_arm64.apk" + "<tag>_x86_64.apk"). extractApkAsset (AppUpdateService.js)
+    # already prefers "_arm64", falling back to any non-x86 .apk, so older installs
+    # keep picking the right asset without an app-side change.
     strategy:
       fail-fast: false
       matrix:
         include:
           - arch: arm64
             profile: ${{ github.event.inputs.profile || 'preview' }}
-            apk_suffix: ''
+            apk_suffix: '_arm64'
           - arch: x86_64
             profile: x86
             apk_suffix: '_x86_64'
@@ -151,10 +142,8 @@ jobs:
           retention-days: 7
           if-no-files-found: error
 
-      # Only the arm64 build is attached to the release. See the strategy comment:
-      # the x86_64 APK stays an artifact until the arch-aware updater propagates.
       - name: 📤 Upload APK and checksum to Release
-        if: github.ref_type == 'tag' && matrix.arch == 'arm64'
+        if: github.ref_type == 'tag'
         uses: softprops/action-gh-release@v3
         with:
           files: |
