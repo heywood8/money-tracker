@@ -77,22 +77,37 @@ describe('computeIconMarkers', () => {
     expect(computeIconMarkers(data)[0].showIcon).toBe(false);
   });
 
-  it('single full-circle slice midAngle=π maps to the bottom of the ring', async () => {
+  // Victory Native starts the first slice at 3 o'clock and sweeps clockwise, so
+  // the overlay must too: angle 0 → right, π/2 → bottom, π → left.
+  it('single full-circle slice midAngle=π maps to the left of the ring', async () => {
     const markers = computeIconMarkers([{ amount: 1, color: '#f00', icon: 'food' }]);
     // midAngle = (0 + 0.5) * 2π = π
-    expect(markers[0].x).toBeCloseTo(CENTER, 1); // sin(π) ≈ 0
-    expect(markers[0].y).toBeCloseTo(CENTER + ICON_RADIUS, 1); // −cos(π) = 1
+    expect(markers[0].x).toBeCloseTo(CENTER - ICON_RADIUS, 1); // cos(π) = −1
+    expect(markers[0].y).toBeCloseTo(CENTER, 1); // sin(π) ≈ 0
   });
 
-  it('a half-and-half split places markers on opposite sides (top vs bottom)', async () => {
+  it('a half-and-half split places markers on opposite sides (bottom vs top)', async () => {
     const markers = computeIconMarkers([
-      { amount: 1, color: '#f00', icon: 'food' }, // midAngle = π/2 → right
-      { amount: 1, color: '#0f0', icon: 'car' }, //  midAngle = 3π/2 → left
+      { amount: 1, color: '#f00', icon: 'food' }, // midAngle = π/2 → bottom
+      { amount: 1, color: '#0f0', icon: 'car' }, //  midAngle = 3π/2 → top
     ]);
-    expect(markers[0].x).toBeCloseTo(CENTER + ICON_RADIUS, 1); // sin(π/2) = 1
-    expect(markers[0].y).toBeCloseTo(CENTER, 1); // −cos(π/2) ≈ 0
-    expect(markers[1].x).toBeCloseTo(CENTER - ICON_RADIUS, 1); // sin(3π/2) = −1
-    expect(markers[1].y).toBeCloseTo(CENTER, 1); // −cos(3π/2) ≈ 0
+    expect(markers[0].x).toBeCloseTo(CENTER, 1); // cos(π/2) ≈ 0
+    expect(markers[0].y).toBeCloseTo(CENTER + ICON_RADIUS, 1); // sin(π/2) = 1
+    expect(markers[1].x).toBeCloseTo(CENTER, 1); // cos(3π/2) ≈ 0
+    expect(markers[1].y).toBeCloseTo(CENTER - ICON_RADIUS, 1); // sin(3π/2) = −1
+  });
+
+  it('regression: a marker lands inside its own slice (quarter turn off before)', async () => {
+    // Four equal slices sweeping clockwise from 3 o'clock: right-bottom,
+    // bottom-left, left-top, top-right quadrant midpoints at 45°/135°/225°/315°.
+    const quarter = (ICON_RADIUS * Math.SQRT2) / 2;
+    const markers = computeIconMarkers(
+      ['a', 'b', 'c', 'd'].map((icon) => ({ amount: 25, color: '#f00', icon })),
+    );
+    expect(markers[0].x).toBeCloseTo(CENTER + quarter, 1);
+    expect(markers[0].y).toBeCloseTo(CENTER + quarter, 1);
+    expect(markers[2].x).toBeCloseTo(CENTER - quarter, 1);
+    expect(markers[2].y).toBeCloseTo(CENTER - quarter, 1);
   });
 
   it('preserves color and icon from input', async () => {

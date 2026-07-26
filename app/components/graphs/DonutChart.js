@@ -28,9 +28,13 @@ export const mapPieData = (data) =>
     color: item.color,
   }));
 
-// Victory Native draws pie slices starting at 12 o'clock and sweeping clockwise
-// (d3-shape convention). We mirror that here to lay MaterialCommunityIcons
-// glyphs over each slice, since VN has no vector-icon slice label.
+// Victory Native draws pie slices in Skia's angular convention: 0° points at
+// 3 o'clock (the +x axis) and angles grow clockwise, since screen y grows
+// downwards. The slice geometry VN hands to the render function below uses that
+// same convention (see computeSliceGradient, which feeds startAngle/endAngle
+// straight into cos/sin), so the icon overlay has to share it — laying the
+// markers out from 12 o'clock instead rotates every glyph a quarter turn off
+// its slice. We mirror the sweep here because VN has no vector-icon slice label.
 export const computeIconMarkers = (data) => {
   const total = data.reduce((sum, item) => sum + item.amount, 0);
   if (total === 0) return [];
@@ -43,8 +47,8 @@ export const computeIconMarkers = (data) => {
       color: item.color,
       icon: item.icon,
       showIcon: fraction >= ICON_THRESHOLD && !!item.icon,
-      x: CENTER + ICON_RADIUS * Math.sin(midAngle),
-      y: CENTER - ICON_RADIUS * Math.cos(midAngle),
+      x: CENTER + ICON_RADIUS * Math.cos(midAngle),
+      y: CENTER + ICON_RADIUS * Math.sin(midAngle),
     };
     cumulative += fraction;
     return marker;
