@@ -1,5 +1,12 @@
 # Changelog
 
+## [0.225.2](https://github.com/heywood8/money-tracker/compare/penny-v0.225.1...penny-v0.225.2) (2026-07-26)
+
+
+### Bug Fixes
+
+* **graphs:** align donut icon markers with Victory Native slice geometry ([#1429](https://github.com/heywood8/money-tracker/issues/1429)) ([b445520](https://github.com/heywood8/money-tracker/commit/b445520ce423e0e69a8da2703d6719205587adb5))
+
 ## [0.225.1](https://github.com/heywood8/money-tracker/compare/penny-v0.225.0...penny-v0.225.1) (2026-07-26)
 
 
