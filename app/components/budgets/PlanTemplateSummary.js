@@ -10,6 +10,28 @@ const formatSummaryAmount = (amount) => {
   return String(Math.round(amount));
 };
 
+/** One of the strip's three identical value-over-label columns. */
+const SummaryItem = ({ testID, color, mutedColor, value, label }) => (
+  <View style={styles.summaryItem}>
+    <Text testID={testID} style={[styles.summaryValue, { color }]} numberOfLines={1} adjustsFontSizeToFit>
+      {value}
+    </Text>
+    {/* Translated labels run 1.5-2× the English length and wrap here, so the
+        columns are top-aligned and the text is centred within its third. */}
+    <Text style={[styles.summaryLabel, { color: mutedColor }]} numberOfLines={2}>
+      {label}
+    </Text>
+  </View>
+);
+
+SummaryItem.propTypes = {
+  testID: PropTypes.string.isRequired,
+  color: PropTypes.string.isRequired,
+  mutedColor: PropTypes.string.isRequired,
+  value: PropTypes.string.isRequired,
+  label: PropTypes.string.isRequired,
+};
+
 /**
  * Execution progress across the month's executable templates — pending money out,
  * how many are done, pending money in — ported from the former Planned tab and
@@ -60,47 +82,29 @@ export default function PlanTemplateSummary({ lines, month, colors, t }) {
       testID="planned-summary-strip"
     >
       <View style={styles.summaryRow}>
-        <View style={styles.summaryItem}>
-          <Text
-            testID="summary-pending-out"
-            style={[styles.summaryValue, { color: colors.expense }]}
-            numberOfLines={1}
-            adjustsFontSizeToFit
-          >
-            {`${formatSummaryAmount(summary.pendingOut)} / ${formatSummaryAmount(summary.totalOut)}`}
-          </Text>
-          <Text style={[styles.summaryLabel, { color: colors.mutedText }]}>
-            {t('pending_out')}
-          </Text>
-        </View>
+        <SummaryItem
+          testID="summary-pending-out"
+          color={colors.expense}
+          mutedColor={colors.mutedText}
+          value={`${formatSummaryAmount(summary.pendingOut)} / ${formatSummaryAmount(summary.totalOut)}`}
+          label={t('pending_out')}
+        />
         <View style={[styles.summaryDivider, { backgroundColor: colors.border }]} />
-        <View style={styles.summaryItem}>
-          <Text
-            testID="summary-done-count"
-            style={[styles.summaryValue, { color: colors.text }]}
-            numberOfLines={1}
-            adjustsFontSizeToFit
-          >
-            {`${summary.doneCount} / ${summary.total}`}
-          </Text>
-          <Text style={[styles.summaryLabel, { color: colors.mutedText }]}>
-            {t('done_this_month')}
-          </Text>
-        </View>
+        <SummaryItem
+          testID="summary-done-count"
+          color={colors.text}
+          mutedColor={colors.mutedText}
+          value={`${summary.doneCount} / ${summary.total}`}
+          label={t('done_this_month')}
+        />
         <View style={[styles.summaryDivider, { backgroundColor: colors.border }]} />
-        <View style={styles.summaryItem}>
-          <Text
-            testID="summary-pending-in"
-            style={[styles.summaryValue, { color: colors.income }]}
-            numberOfLines={1}
-            adjustsFontSizeToFit
-          >
-            {`${formatSummaryAmount(summary.pendingIn)} / ${formatSummaryAmount(summary.totalIn)}`}
-          </Text>
-          <Text style={[styles.summaryLabel, { color: colors.mutedText }]}>
-            {t('pending_in')}
-          </Text>
-        </View>
+        <SummaryItem
+          testID="summary-pending-in"
+          color={colors.income}
+          mutedColor={colors.mutedText}
+          value={`${formatSummaryAmount(summary.pendingIn)} / ${formatSummaryAmount(summary.totalIn)}`}
+          label={t('pending_in')}
+        />
       </View>
       <View
         testID="summary-progress-bar"
@@ -113,12 +117,15 @@ export default function PlanTemplateSummary({ lines, month, colors, t }) {
           ]}
         />
       </View>
+      {/* "<n> <word>" needs a counter form, not the button caption `done` or the
+          noun `remaining`: those produced "3 Готово" / "2 остаток" in Russian.
+          Label-first keeps every language grammatical. */}
       <View style={styles.progressLabels}>
         <Text style={[styles.progressLabel, { color: colors.mutedText }]}>
-          {`${summary.doneCount} ${t('done')}`}
+          {`${t('done_count')}: ${summary.doneCount}`}
         </Text>
         <Text style={[styles.progressLabel, { color: colors.mutedText }]}>
-          {`${summary.total - summary.doneCount} ${t('remaining')}`}
+          {`${t('remaining_count')}: ${summary.total - summary.doneCount}`}
         </Text>
       </View>
     </View>
@@ -158,13 +165,18 @@ const styles = StyleSheet.create({
   summaryItem: {
     alignItems: 'center',
     flex: 1,
+    paddingHorizontal: 2,
   },
   summaryLabel: {
     fontSize: 12,
     marginTop: 2,
+    textAlign: 'center',
   },
   summaryRow: {
-    alignItems: 'center',
+    // flex-start, not center: translated labels wrap to two lines at different
+    // points, and centring made the three columns' numbers sit at different
+    // heights.
+    alignItems: 'flex-start',
     flexDirection: 'row',
     justifyContent: 'space-between',
   },

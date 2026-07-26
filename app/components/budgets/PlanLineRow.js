@@ -1,4 +1,4 @@
-import React, { memo } from 'react';
+import React, { memo, useRef } from 'react';
 import { View, Text, Pressable, StyleSheet } from 'react-native';
 import { Swipeable } from 'react-native-gesture-handler';
 import PropTypes from 'prop-types';
@@ -52,6 +52,19 @@ const PlanLineRow = memo(function PlanLineRow({
   // execution only makes sense for the current month, and so does undoing it.
   const swipeEnabled = canExecute || canUndo;
 
+  // Acting on a row leaves the Swipeable open otherwise: the actions are replaced
+  // (execute -> undo) but the row stays dragged aside, so its name and progress
+  // figures remain clipped until the user swipes back by hand.
+  // Not memoized on purpose: RNGH's Swipeable is a plain Component, so it
+  // re-renders with its parent regardless, and `renderRightActions` is rebuilt
+  // every render anyway — a useCallback here would cost a deps compare and save
+  // no allocation.
+  const swipeableRef = useRef(null);
+  const runAndClose = (handler) => () => {
+    swipeableRef.current?.close();
+    handler?.(line);
+  };
+
   const content = (
     <Pressable
       style={[styles.lineRow, index % 2 === 1 && { backgroundColor: colors.altRow }]}
@@ -80,9 +93,11 @@ const PlanLineRow = memo(function PlanLineRow({
           >
             {name}
           </Text>
+          {/* Both halves are STATES, not commands: reusing the `execute` button
+              caption here invited a tap on months where execution is disabled. */}
           <Text style={[styles.lineMeta, { color: colors.mutedText }]} numberOfLines={1}>
             {line.isRecurring ? t('recurring') : t('one_time')}
-            {line.hasTemplate ? ` · ${executed ? t('done') : t('execute')}` : ''}
+            {line.hasTemplate ? ` · ${executed ? t('done') : t('pending_execution')}` : ''}
           </Text>
           {!!line.comment && (
             <Text style={[styles.lineComment, { color: colors.mutedText }]} numberOfLines={1}>
@@ -152,47 +167,53 @@ const PlanLineRow = memo(function PlanLineRow({
     return content;
   }
 
+  const swipeButton = ({ testID, background, icon, caption, label, handler }) => (
+    <Pressable
+      testID={testID}
+      style={[styles.swipeAction, { backgroundColor: background }]}
+      onPress={runAndClose(handler)}
+      accessibilityRole="button"
+      accessibilityLabel={label}
+    >
+      <Icon name={icon} size={20} color="white" />
+      <Text style={styles.swipeActionText} numberOfLines={1}>{caption}</Text>
+    </Pressable>
+  );
+
   const rightActions = executed
-    ? () => (
-      <Pressable
-        testID={`plan-line-undo-${line.id}`}
-        style={[styles.swipeAction, { backgroundColor: colors.mutedText }]}
-        onPress={() => onUndo(line)}
-        accessibilityRole="button"
-        accessibilityLabel={t('undo')}
-      >
-        <Icon name="undo" size={20} color="white" />
-        <Text style={styles.swipeActionText}>{t('undo')}</Text>
-      </Pressable>
-    )
+    ? () => swipeButton({
+      testID: `plan-line-undo-${line.id}`,
+      background: colors.mutedText,
+      icon: 'undo',
+      caption: t('undo'),
+      label: t('undo'),
+      handler: onUndo,
+    })
     : () => (
       <View style={styles.swipeActionsRow}>
-        <Pressable
-          testID={`plan-line-execute-${line.id}`}
-          style={[styles.swipeAction, { backgroundColor: colors.primary }]}
-          onPress={() => onExecute(line)}
-          accessibilityRole="button"
-          accessibilityLabel={t('execute')}
-        >
-          <Icon name="play" size={20} color="white" />
-          <Text style={styles.swipeActionText}>{t('execute')}</Text>
-        </Pressable>
-        <Pressable
-          testID={`plan-line-done-${line.id}`}
-          style={[styles.swipeAction, { backgroundColor: colors.income }]}
-          onPress={() => onMarkExecuted(line)}
-          accessibilityRole="button"
-          accessibilityLabel={t('mark_as_executed')}
-        >
-          <Icon name="check-bold" size={20} color="white" />
-          <Text style={styles.swipeActionText}>{t('done')}</Text>
-        </Pressable>
+        {swipeButton({
+          testID: `plan-line-execute-${line.id}`,
+          background: colors.primary,
+          icon: 'play',
+          caption: t('execute'),
+          label: t('execute'),
+          handler: onExecute,
+        })}
+        {swipeButton({
+          testID: `plan-line-done-${line.id}`,
+          background: colors.income,
+          icon: 'check-bold',
+          caption: t('done'),
+          label: t('mark_as_executed'),
+          handler: onMarkExecuted,
+        })}
       </View>
     );
 
   return (
     <View style={executed ? styles.executedWrapper : undefined}>
       <Swipeable
+        ref={swipeableRef}
         renderRightActions={rightActions}
         overshootRight={false}
         friction={2}
@@ -315,8 +336,11 @@ const styles = StyleSheet.create({
     justifyContent: 'center',
     marginBottom: SPACING.xs,
     marginLeft: SPACING.xs,
-    paddingHorizontal: SPACING.md,
-    width: 72,
+    // 72 wide minus 2×12 padding left 48dp of text box — enough for "Execute"
+    // but not for its translations ("Выполнить" wrapped mid-word). 92 minus
+    // 2×4 gives 84dp, which clears the longest caption in every shipped locale.
+    paddingHorizontal: SPACING.xs,
+    width: 92,
   },
   swipeActionText: {
     color: 'white',

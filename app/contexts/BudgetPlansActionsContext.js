@@ -4,6 +4,7 @@ import uuid from 'react-native-uuid';
 import * as BudgetPlansDB from '../services/BudgetPlansDB';
 import { appEvents, EVENTS } from '../services/eventEmitter';
 import { useDialog } from './DialogContext';
+import { useLocalization } from './LocalizationContext';
 import { useBudgetPlansData } from './BudgetPlansDataContext';
 
 const BudgetPlansActionsContext = createContext();
@@ -27,12 +28,13 @@ const prependUnlessPresent = (setPlans, plan) => {
  */
 export const BudgetPlansActionsProvider = ({ children }) => {
   const { showDialog } = useDialog();
+  const { t } = useLocalization();
   const { plans, reloadPlans, _setPlans, _setSaveError } = useBudgetPlansData();
 
   const reportError = useCallback((error, fallbackMessage) => {
     _setSaveError(error.message);
-    showDialog('Error', fallbackMessage || error.message, [{ text: 'OK' }]);
-  }, [showDialog, _setSaveError]);
+    showDialog(t('error'), fallbackMessage || error.message, [{ text: t('ok') }]);
+  }, [showDialog, _setSaveError, t]);
 
   /**
    * Create a plan for a month.
@@ -88,10 +90,10 @@ export const BudgetPlansActionsProvider = ({ children }) => {
       _setSaveError(null);
     } catch (error) {
       console.error('Failed to delete budget plan:', error);
-      reportError(error, 'Failed to delete plan. Please try again.');
+      reportError(error, t('failed_to_delete_plan'));
       throw error;
     }
-  }, [_setPlans, _setSaveError, reportError]);
+  }, [_setPlans, _setSaveError, reportError, t]);
 
   /**
    * Clone a plan from one month into another.
@@ -131,9 +133,9 @@ export const BudgetPlansActionsProvider = ({ children }) => {
   // Executable templates (Budgets v3 phase 3 — the former Planned tab's
   // mechanics, now living on the line). Errors are surfaced here because the
   // callers are row-level swipe/menu actions with nowhere else to report.
-  const executeLine = useCallback(async (line) => {
+  const executeLine = useCallback(async (line, displayName = null) => {
     try {
-      const created = await BudgetPlansDB.executeLine(line);
+      const created = await BudgetPlansDB.executeLine(line, displayName);
       // Balances, the operations list and every budget actual just changed.
       appEvents.emit(EVENTS.OPERATION_CHANGED);
       appEvents.emit(EVENTS.RELOAD_ALL);

@@ -59,6 +59,7 @@ export default function FormInput({
   secureTextEntry = false,
   style,
   inputRef,
+  testID,
 }) {
   const { colors } = useThemeColors();
 
@@ -105,6 +106,7 @@ export default function FormInput({
           returnKeyType={returnKeyType}
           onSubmitEditing={onSubmitEditing}
           secureTextEntry={secureTextEntry}
+          testID={testID}
         />
       </View>
 
@@ -233,4 +235,9 @@ FormInput.propTypes = {
     PropTypes.func,
     PropTypes.shape({ current: PropTypes.instanceOf(TextInput) }),
   ]),
+
+  /**
+   * testID forwarded to the underlying TextInput
+   */
+  testID: PropTypes.string,
 };

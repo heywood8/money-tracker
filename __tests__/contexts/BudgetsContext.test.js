@@ -227,9 +227,9 @@ describe('BudgetsContext', () => {
       expect(result.current.budgets).toHaveLength(0);
       expect(BudgetsDB.createBudget).not.toHaveBeenCalled();
       expect(mockShowDialog).toHaveBeenCalledWith(
-        'Error',
+        'error',
         'Amount must be greater than zero',
-        [{ text: 'OK' }],
+        [{ text: 'ok' }],
       );
     });
 
@@ -292,9 +292,9 @@ describe('BudgetsContext', () => {
 
       await waitFor(() => {
         expect(mockShowDialog).toHaveBeenCalledWith(
-          'Error',
+          'error',
           'Database insert failed',
-          [{ text: 'OK' }],
+          [{ text: 'ok' }],
         );
       });
     });
@@ -374,7 +374,7 @@ describe('BudgetsContext', () => {
       ).rejects.toThrow('Invalid period type');
 
       expect(BudgetsDB.updateBudget).not.toHaveBeenCalled();
-      expect(mockShowDialog).toHaveBeenCalledWith('Error', 'Invalid period type', [{ text: 'OK' }]);
+      expect(mockShowDialog).toHaveBeenCalledWith('error', 'Invalid period type', [{ text: 'ok' }]);
     });
 
     it('checks for duplicates when updating category/currency/period', async () => {
@@ -438,9 +438,9 @@ describe('BudgetsContext', () => {
       ).rejects.toThrow('Database update failed');
 
       expect(mockShowDialog).toHaveBeenCalledWith(
-        'Error',
+        'error',
         'Database update failed',
-        [{ text: 'OK' }],
+        [{ text: 'ok' }],
       );
     });
   });
@@ -517,9 +517,9 @@ describe('BudgetsContext', () => {
       ).rejects.toThrow('Foreign key constraint');
 
       expect(mockShowDialog).toHaveBeenCalledWith(
-        'Error',
-        'Failed to delete budget. Please try again.',
-        [{ text: 'OK' }],
+        'error',
+        'failed_to_delete_budget',
+        [{ text: 'ok' }],
       );
     });
   });

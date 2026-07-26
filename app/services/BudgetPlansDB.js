@@ -14,6 +14,7 @@ import * as Currency from './currency';
 import * as CategoriesDB from './CategoriesDB';
 import { calculateSpendingForBudget, deriveSpendingStatus } from './BudgetsDB';
 import { formatDate as formatLocalDate } from './BalanceHistoryDB';
+import { sanitizeLabel } from '../utils/labelUtils';
 import {
   fetchRatesToTarget,
   convertWithRateMap,
@@ -1315,9 +1316,11 @@ export const calculateAllPlanStatuses = async (convertAll = false) => {
 export const isExecutable = (line) => !!line && isSet(line.accountId);
 
 /**
- * Mark a line executed for the current month and, when it is a ONE-OFF template,
- * delete it — the two writes run in a single transaction, mirroring the
- * atomicity the old PlannedOperationsDB.markExecutedOnly guaranteed.
+ * Mark a line executed for the current month. The line SURVIVES, recurring or
+ * not: a one-off line is already scoped to its own month (it hangs off that
+ * month's plan via plan_id), and deleting it on execution — as the Planned tab
+ * did for a fired one-time operation — silently rewrote the plan the user was
+ * measuring against, dropping both its allocation and its actual spending.
  * @param {Object} db - Transaction handle
  * @param {Object} line - Plan line (camelCase)
  * @param {string} month - YYYY-MM
@@ -1327,18 +1330,12 @@ const markLineInTx = async (db, line, month) => {
     'UPDATE budget_plan_lines SET last_executed_month = ?, updated_at = ? WHERE id = ?',
     [month, new Date().toISOString(), line.id],
   );
-  // A one-off template is consumed by its execution, exactly like a one-time
-  // planned operation was. A RECURRING one stays and simply shows as done for
-  // this month.
-  if (!line.isRecurring) {
-    await db.runAsync('DELETE FROM budget_plan_lines WHERE id = ?', [line.id]);
-  }
 };
 
 /**
  * Atomically execute a line's template in a single SQLite transaction: insert the
- * real operation (dated today), adjust account balances, mark the line executed
- * for the current month, and delete it when it is one-off.
+ * real operation (dated today), adjust account balances, and mark the line
+ * executed for the current month.
  *
  * This is the phase-3 home of PlannedOperationsDB.executeAndMark and keeps its
  * guarantee: no partial-failure window where the operation exists but the line
@@ -1348,14 +1345,24 @@ const markLineInTx = async (db, line, month) => {
  * disagree with the operation's date — executing while browsing another month
  * would otherwise stamp that month while creating a today-dated operation.
  * @param {Object} line - Plan line with a template (camelCase, see mapLineFields)
+ * @param {string} [fallbackName] - Name to describe the operation with when the
+ *   line carries no label/comment of its own. Resolving the linked category or
+ *   account's name needs data this layer does not load, so the caller passes it
+ *   in; it must be a real entity name, never a translated UI placeholder.
  * @returns {Promise<Object>} The created operation (snake_case fields)
  */
-export const executeLine = async (line) => {
+export const executeLine = async (line, fallbackName = null) => {
   try {
     if (!isExecutable(line)) {
       throw new Error('This allocation has no account to execute from');
     }
     const month = currentMonthKey();
+    // `operations.description` is not free text — it is the delimited label list
+    // owned by labelUtils. An unsanitized name containing "|" would silently
+    // become two labels, and one starting with a system prefix ("Category:", …)
+    // would hide the operation from the list AND mark it non-deletable.
+    const rawDescription = line.label || line.comment || fallbackName || null;
+    const description = rawDescription ? sanitizeLabel(rawDescription) || null : null;
     const operationData = {
       type: line.kind || 'expense',
       amount: line.amount,
@@ -1363,7 +1370,7 @@ export const executeLine = async (line) => {
       categoryId: line.categoryId || null,
       toAccountId: line.toAccountId || null,
       date: formatLocalDate(new Date()),
-      description: line.label || line.comment || null,
+      description,
     };
 
     let createdOperation;
@@ -1380,8 +1387,7 @@ export const executeLine = async (line) => {
 
 /**
  * Mark a line executed for the current month WITHOUT creating an operation (the
- * user already entered it by hand). Same one-off delete semantics as
- * {@link executeLine}.
+ * user already entered it by hand). Like {@link executeLine}, the line survives.
  * @param {Object} line - Plan line (camelCase)
  * @returns {Promise<void>}
  */
