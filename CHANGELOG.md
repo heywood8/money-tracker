@@ -1,5 +1,12 @@
 # Changelog
 
+## [0.225.0](https://github.com/heywood8/money-tracker/compare/penny-v0.224.2...penny-v0.225.0) (2026-07-26)
+
+
+### Features
+
+* **graphs:** adopt Victory Native XL gestures, native axes and area fills ([#1424](https://github.com/heywood8/money-tracker/issues/1424)) ([edc2770](https://github.com/heywood8/money-tracker/commit/edc27708605b48803e91a64cbd89b4c7da65e19f))
+
 ## [0.224.2](https://github.com/heywood8/money-tracker/compare/penny-v0.224.1...penny-v0.224.2) (2026-07-26)
 
 
