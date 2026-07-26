@@ -1,5 +1,12 @@
 # Changelog
 
+## [0.224.1](https://github.com/heywood8/money-tracker/compare/penny-v0.224.0...penny-v0.224.1) (2026-07-26)
+
+
+### Bug Fixes
+
+* **budgets:** v3 ru e2e review ([#1420](https://github.com/heywood8/money-tracker/issues/1420)) ([bdc97ce](https://github.com/heywood8/money-tracker/commit/bdc97ced0abef5a819b7a400931327e073bb29e7))
+
 ## [0.224.0](https://github.com/heywood8/money-tracker/compare/penny-v0.223.0...penny-v0.224.0) (2026-07-26)
 
 
