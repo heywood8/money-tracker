@@ -821,6 +821,44 @@ describe('GraphsScreen', () => {
       expect(getByTestId('income-summary-card')).toBeTruthy();
       expect(getByTestId('expense-summary-card')).toBeTruthy();
     });
+
+    it('starts collapsed with neither chart interactive', async () => {
+      const GraphsScreen = require('../../app/screens/GraphsScreen').default;
+      const { getByTestId } = await render(<GraphsScreen />);
+
+      expect(getByTestId('income-chart-content').props.pointerEvents).toBe('none');
+      expect(getByTestId('expense-chart-content').props.pointerEvents).toBe('none');
+      expect(getByTestId('income-summary-card').props.accessibilityState.expanded).toBe(false);
+      expect(getByTestId('expense-summary-card').props.accessibilityState.expanded).toBe(false);
+    });
+
+    it('opens only the pressed tab and moves the open state when the other is pressed', async () => {
+      const GraphsScreen = require('../../app/screens/GraphsScreen').default;
+      const { getByTestId } = await render(<GraphsScreen />);
+
+      await fireEvent.press(getByTestId('income-summary-card'));
+
+      expect(getByTestId('income-chart-content').props.pointerEvents).toBe('auto');
+      expect(getByTestId('expense-chart-content').props.pointerEvents).toBe('none');
+      expect(getByTestId('income-summary-card').props.accessibilityState.expanded).toBe(true);
+
+      await fireEvent.press(getByTestId('expense-summary-card'));
+
+      expect(getByTestId('income-chart-content').props.pointerEvents).toBe('none');
+      expect(getByTestId('expense-chart-content').props.pointerEvents).toBe('auto');
+      expect(getByTestId('expense-summary-card').props.accessibilityState.expanded).toBe(true);
+    });
+
+    it('collapses the panel back to the tab strip when the open tab is pressed again', async () => {
+      const GraphsScreen = require('../../app/screens/GraphsScreen').default;
+      const { getByTestId } = await render(<GraphsScreen />);
+
+      await fireEvent.press(getByTestId('expense-summary-card'));
+      await fireEvent.press(getByTestId('expense-summary-card'));
+
+      expect(getByTestId('expense-chart-content').props.pointerEvents).toBe('none');
+      expect(getByTestId('expense-summary-card').props.accessibilityState.expanded).toBe(false);
+    });
   });
 
   describe('Balance History Empty State (QoL-11)', () => {

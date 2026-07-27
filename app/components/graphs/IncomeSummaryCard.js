@@ -32,9 +32,17 @@ const IncomeSummaryCard = ({
 }) => {
   const { hideBalances } = useDisplaySettings();
   return (
-    <View
+    <TouchableOpacity
       testID="income-summary-card"
-      style={styles.summaryCard}
+      style={[
+        styles.summaryCard,
+        expanded && { backgroundColor: colors.altRow, borderBottomColor: colors.income },
+      ]}
+      onPress={onPress}
+      activeOpacity={0.7}
+      accessibilityRole="button"
+      accessibilityState={{ expanded }}
+      accessibilityLabel={t('income_by_category')}
     >
       <View style={styles.iconBadge}>
         <Icon name="arrow-bottom-left" size={16} color={colors.income} />
@@ -61,16 +69,10 @@ const IncomeSummaryCard = ({
           </TouchableOpacity>
         </View>
       )}
-      <TouchableOpacity
-        onPress={onPress}
-        style={styles.collapseButton}
-        activeOpacity={0.7}
-        accessibilityRole="button"
-        accessibilityLabel={t('income_by_category')}
-      >
+      <View style={styles.chevron} pointerEvents="none">
         <Icon name={expanded ? 'chevron-up' : 'chevron-down'} size={16} color={colors.mutedText} />
-      </TouchableOpacity>
-    </View>
+      </View>
+    </TouchableOpacity>
   );
 };
 
@@ -102,11 +104,11 @@ const styles = StyleSheet.create({
     right: 0,
     top: 0,
   },
-  collapseButton: {
+  chevron: {
     alignItems: 'center',
     alignSelf: 'stretch',
     justifyContent: 'center',
-    width: '15%',
+    width: 20,
   },
   filterChip: {
     alignItems: 'center',
@@ -136,10 +138,14 @@ const styles = StyleSheet.create({
   },
   summaryCard: {
     alignItems: 'center',
+    // Transparent by default so activating the tab doesn't shift its height
+    borderBottomColor: 'transparent',
+    borderBottomWidth: 2,
     flex: 1,
     flexDirection: 'row',
     gap: 8,
-    padding: 10,
+    paddingHorizontal: 10,
+    paddingVertical: 8,
   },
   textContent: {
     flex: 1,
