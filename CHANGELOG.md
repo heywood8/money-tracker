@@ -1,5 +1,12 @@
 # Changelog
 
+## [0.237.0](https://github.com/heywood8/money-tracker/compare/penny-v0.236.0...penny-v0.237.0) (2026-07-27)
+
+
+### Features
+
+* **graphs:** default the yearly expense trend to all categories ([#1460](https://github.com/heywood8/money-tracker/issues/1460)) ([b3f30eb](https://github.com/heywood8/money-tracker/commit/b3f30ebd6e26686a32c2c360552df3195687beeb))
+
 ## [0.236.0](https://github.com/heywood8/money-tracker/compare/penny-v0.235.2...penny-v0.236.0) (2026-07-27)
 
 
