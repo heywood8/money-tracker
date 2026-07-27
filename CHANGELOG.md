@@ -1,5 +1,12 @@
 # Changelog
 
+## [0.241.1](https://github.com/heywood8/money-tracker/compare/penny-v0.241.0...penny-v0.241.1) (2026-07-27)
+
+
+### Bug Fixes
+
+* **notifications:** route the review alert to quick add, not settings ([#1475](https://github.com/heywood8/money-tracker/issues/1475)) ([ec1e666](https://github.com/heywood8/money-tracker/commit/ec1e66608853412a008be3c6279b673b2148b4ef))
+
 ## [0.241.0](https://github.com/heywood8/money-tracker/compare/penny-v0.240.0...penny-v0.241.0) (2026-07-27)
 
 
