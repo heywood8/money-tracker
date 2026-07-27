@@ -2,30 +2,39 @@
 /* eslint-disable react/prop-types */
 import React from 'react';
 import { render, fireEvent, waitFor } from '@testing-library/react-native';
+import { StyleSheet } from 'react-native';
 import BudgetScreen from '../../app/screens/BudgetScreen';
 
 // ── Mocks ──────────────────────────────────────────────────────────────────
+const COLORS = {
+  background: '#111318',
+  surface: '#1a1d24',
+  card: '#1a1d24',
+  text: '#e8eaf0',
+  mutedText: '#7a7f8e',
+  border: '#252830',
+  primary: '#4A90D9',
+  selected: '#2a2e38',
+  altRow: '#16191f',
+  income: '#4caf50',
+  expense: '#f44336',
+  transfer: '#2196f3',
+  overspend: '#FF6B6B',
+};
+
 jest.mock('../../app/contexts/ThemeColorsContext', () => ({
-  useThemeColors: () => ({
-    colors: {
-      background: '#111318',
-      surface: '#1a1d24',
-      card: '#1a1d24',
-      text: '#e8eaf0',
-      mutedText: '#7a7f8e',
-      border: '#252830',
-      primary: '#4A90D9',
-      selected: '#2a2e38',
-      altRow: '#16191f',
-      income: '#4caf50',
-      expense: '#f44336',
-      transfer: '#2196f3',
-    },
-  }),
+  useThemeColors: () => ({ colors: COLORS }),
 }));
 
 jest.mock('../../app/contexts/LocalizationContext', () => ({
   useLocalization: () => ({ t: (k) => k }),
+}));
+
+// The header's currency chip opens an action sheet rather than parking a wheel
+// picker over the list, so the screen now needs the dialog context.
+const mockShowDialog = jest.fn();
+jest.mock('../../app/contexts/DialogContext', () => ({
+  useDialog: () => ({ showDialog: mockShowDialog }),
 }));
 
 const mockSetConvertAll = jest.fn();
@@ -97,32 +106,38 @@ jest.mock('../../app/components/budgets/MonthlyPlanSection', () => {
       React.createElement(Pressable, {
         testID: 'mock-notify',
         onPress: () => props.onNotify?.('added_to_operations'),
-      }, React.createElement(Text, {}, 'notify')));
+      }, React.createElement(Text, {}, 'notify')),
+      // The section reports the month's remainder up so the header can print it
+      // — the figure a person acts on belongs where it is always on screen, not
+      // at the bottom of a long scrolling card.
+      React.createElement(Pressable, {
+        testID: 'mock-report-remainder',
+        onPress: () => props.onTotalsChange?.({
+          remainder: '-85745', hasIncomeBasis: true, currency: 'AMD',
+        }),
+      }, React.createElement(Text, {}, 'report')),
+      React.createElement(Pressable, {
+        testID: 'mock-report-no-income',
+        onPress: () => props.onTotalsChange?.({
+          remainder: '0', hasIncomeBasis: false, currency: 'AMD',
+        }),
+      }, React.createElement(Text, {}, 'report none')));
   });
 });
 
-// The native wheel renders nothing under Jest, so stand in a tappable row per
-// option — that is the only way a test can drive the selection the way a user does.
-jest.mock('@quidone/react-native-wheel-picker', () => {
-  const React = require('react');
-  const { View, Pressable } = require('react-native');
-  return {
-    __esModule: true,
-    default: function MockWheelPicker({ data = [], onValueChanged }) {
-      return React.createElement(
-        View,
-        { testID: 'currency-wheel' },
-        data.map((item) => React.createElement(Pressable, {
-          key: item.value,
-          testID: `currency-option-${item.value}`,
-          onPress: () => onValueChanged?.({ item }),
-        })),
-      );
-    },
-  };
-});
-
 // ── Helpers ────────────────────────────────────────────────────────────────
+
+// Currency is picked from the header chip's action sheet now, not a wheel parked
+// over the list. `t` is the identity function here, so an option's text is its
+// currency code.
+const pickCurrency = (getByTestId, code) => {
+  fireEvent.press(getByTestId('budget-currency-chip'));
+  const calls = mockShowDialog.mock.calls;
+  const option = calls[calls.length - 1][2].find(b => b.text === code);
+  if (!option) throw new Error(`No "${code}" option in the currency sheet`);
+  option.onPress();
+};
+
 const setBudgetsData = ({ loading = false, convertAll = true } = {}) => {
   mockBudgetsData = {
     loading,
@@ -194,28 +209,28 @@ describe('BudgetScreen', () => {
 
     it('hands the picked currency down to the list', async () => {
       const { getByTestId } = await render(<BudgetScreen />);
-      await waitFor(() => expect(getByTestId('currency-option-RUB')).toBeTruthy());
-      fireEvent.press(getByTestId('currency-option-RUB'));
+      await waitFor(() => expect(getByTestId('budget-currency-chip')).toBeTruthy());
+      pickCurrency(getByTestId, 'RUB');
       await waitFor(() => expect(capturedSectionProps.currency).toBe('RUB'));
     });
 
     // Regression: the init effect only re-seeded when accounts went empty, so a
-    // selection whose last account was deleted survived — and since the wheel is
-    // only rendered while currencyItems.length > 1, deleting down to one currency
+    // selection whose last account was deleted survived — and since the picker is
+    // only offered while there is more than one currency, deleting down to one
     // took away the only control that could have corrected it. The stale value kept
     // flowing into MonthlyPlanSection as the currency of any plan it creates.
     it('re-seeds when the selected currency loses its last account', async () => {
       const { getByTestId, queryByTestId, rerender } = await render(<BudgetScreen />);
-      await waitFor(() => expect(getByTestId('currency-option-RUB')).toBeTruthy());
-      fireEvent.press(getByTestId('currency-option-RUB'));
+      await waitFor(() => expect(getByTestId('budget-currency-chip')).toBeTruthy());
+      pickCurrency(getByTestId, 'RUB');
       await waitFor(() => expect(capturedSectionProps.currency).toBe('RUB'));
 
       setAccounts([{ id: 'a1', name: 'Ameria', currency: 'AMD' }]);
       await rerender(<BudgetScreen />);
 
       await waitFor(() => expect(capturedSectionProps.currency).toBe('AMD'));
-      // And the wheel really is gone, which is what made this unrecoverable.
-      expect(queryByTestId('currency-option-RUB')).toBeNull();
+      // And the picker really is gone, which is what made this unrecoverable.
+      expect(queryByTestId('budget-currency-chip')).toBeNull();
     });
 
     it('clears the selection when the last account of any kind is deleted', async () => {
@@ -230,8 +245,8 @@ describe('BudgetScreen', () => {
 
     it('leaves a still-valid selection alone when an unrelated account is deleted', async () => {
       const { getByTestId, rerender } = await render(<BudgetScreen />);
-      await waitFor(() => expect(getByTestId('currency-option-RUB')).toBeTruthy());
-      fireEvent.press(getByTestId('currency-option-RUB'));
+      await waitFor(() => expect(getByTestId('budget-currency-chip')).toBeTruthy());
+      pickCurrency(getByTestId, 'RUB');
       await waitFor(() => expect(capturedSectionProps.currency).toBe('RUB'));
 
       setAccounts([
@@ -241,6 +256,35 @@ describe('BudgetScreen', () => {
       await rerender(<BudgetScreen />);
 
       await waitFor(() => expect(capturedSectionProps.currency).toBe('RUB'));
+    });
+  });
+
+  describe('Header remainder', () => {
+    it('prints the remainder reported by the list', async () => {
+      const { getByTestId } = await render(<BudgetScreen />);
+      await waitFor(() => expect(getByTestId('mock-report-remainder')).toBeTruthy());
+      fireEvent.press(getByTestId('mock-report-remainder'));
+      // Trimmed of an all-zero decimal part, with the plan's currency beside it.
+      await waitFor(() => expect(getByTestId('budget-remainder')).toHaveTextContent('-85745 AMD'));
+    });
+
+    it('replaces a negative remainder with the overspend colour', async () => {
+      const { getByTestId } = await render(<BudgetScreen />);
+      await waitFor(() => expect(getByTestId('mock-report-remainder')).toBeTruthy());
+      fireEvent.press(getByTestId('mock-report-remainder'));
+      await waitFor(() => expect(getByTestId('budget-remainder')).toBeTruthy());
+      expect(StyleSheet.flatten(getByTestId('budget-remainder').props.style).color)
+        .toBe(COLORS.overspend);
+    });
+
+    it('shows the add-income prompt instead of a figure when no income is declared', async () => {
+      const { getByTestId, queryByTestId, getByText } = await render(<BudgetScreen />);
+      await waitFor(() => expect(getByTestId('mock-report-no-income')).toBeTruthy());
+      fireEvent.press(getByTestId('mock-report-no-income'));
+      // With nothing to allocate FROM, the remainder degenerates into "minus
+      // everything you planned" — a number in alarm red is worse than a prompt.
+      await waitFor(() => expect(getByText('add_income_for_remainder')).toBeTruthy());
+      expect(queryByTestId('budget-remainder')).toBeNull();
     });
   });
 
