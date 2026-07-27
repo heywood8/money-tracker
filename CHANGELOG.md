@@ -1,5 +1,12 @@
 # Changelog
 
+## [0.241.2](https://github.com/heywood8/money-tracker/compare/penny-v0.241.1...penny-v0.241.2) (2026-07-27)
+
+
+### Documentation
+
+* record the decision on the navigation rewrite proposal ([#861](https://github.com/heywood8/money-tracker/issues/861)) ([#1474](https://github.com/heywood8/money-tracker/issues/1474)) ([e24b2db](https://github.com/heywood8/money-tracker/commit/e24b2db8b39ab64c778b0797cd4c560fd7a18749))
+
 ## [0.241.1](https://github.com/heywood8/money-tracker/compare/penny-v0.241.0...penny-v0.241.1) (2026-07-27)
 
 
