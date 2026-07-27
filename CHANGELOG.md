@@ -1,5 +1,12 @@
 # Changelog
 
+## [0.232.0](https://github.com/heywood8/money-tracker/compare/penny-v0.231.0...penny-v0.232.0) (2026-07-27)
+
+
+### Features
+
+* **budgets:** lift the remainder into the sticky header ([#1444](https://github.com/heywood8/money-tracker/issues/1444)) ([b1b4793](https://github.com/heywood8/money-tracker/commit/b1b47937ff8ff93ba047ff813d99f770c067b9ed))
+
 ## [0.231.0](https://github.com/heywood8/money-tracker/compare/penny-v0.230.0...penny-v0.231.0) (2026-07-27)
 
 
