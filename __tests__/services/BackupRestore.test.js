@@ -173,8 +173,8 @@ describe('BackupRestore', () => {
       expect(backup.timestamp).toBeDefined();
       // accounts, categories, operations, budgets, app_metadata, balance_history,
       // planned_operations, notification_merchant_rules, budget_plans,
-      // budget_plan_lines, budget_plan_line_categories
-      expect(mockDb.queryAll).toHaveBeenCalledTimes(11);
+      // budget_plan_lines, budget_plan_line_categories, budget_plan_line_groups
+      expect(mockDb.queryAll).toHaveBeenCalledTimes(12);
     });
 
     it('includes empty arrays when tables are empty', async () => {
@@ -566,10 +566,13 @@ describe('BackupRestore', () => {
       expect(deleteCalls[3]).toContain('budget_plan_line_categories');
       expect(deleteCalls[4]).toContain('budget_plan_lines');
       expect(deleteCalls[5]).toContain('budget_plans');
-      expect(deleteCalls[6]).toContain('accounts_balance_history');
-      expect(deleteCalls[7]).toContain('operations');
-      expect(deleteCalls[8]).toContain('categories');
-      expect(deleteCalls[9]).toContain('accounts');
+      // Groups (migration 0022) are referenced BY lines (ON DELETE SET NULL), so
+      // they clear after the lines that point at them.
+      expect(deleteCalls[6]).toContain('budget_plan_line_groups');
+      expect(deleteCalls[7]).toContain('accounts_balance_history');
+      expect(deleteCalls[8]).toContain('operations');
+      expect(deleteCalls[9]).toContain('categories');
+      expect(deleteCalls[10]).toContain('accounts');
     });
 
     it('preserves db_version metadata', async () => {
@@ -1676,14 +1679,14 @@ op-2,income,20,acc-1,cat-1`;
       const catCall = lineInserts.find(c => c[1][0] === 'line-cat');
       expect(catCall[1]).toEqual([
         'line-cat', 'plan-1', 'Groceries', '400.00', NON_ASCII_COMMENT,
-        'cat-1', null, 0, 0, null, null, null, null, 1, 'x', 'y',
+        'cat-1', null, 0, 0, null, null, null, null, 1, null, 'x', 'y',
       ]);
 
       // Transfer line: category_id null, to_account_id remapped 'acc-uuid' -> 42.
       const xferCall = lineInserts.find(c => c[1][0] === 'line-xfer');
       expect(xferCall[1]).toEqual([
         'line-xfer', 'plan-1', 'To savings', '500.00', null,
-        null, REMAPPED_ACCOUNT_ID, 1, 0, null, null, null, null, 1, 'x', 'y',
+        null, REMAPPED_ACCOUNT_ID, 1, 0, null, null, null, null, 1, null, 'x', 'y',
       ]);
 
       // A pre-0021 backup carries no junction, so the category line's link is
@@ -1764,7 +1767,7 @@ op-2,income,20,acc-1,cat-1`;
       expect(lineInserts).toHaveLength(1);
       expect(lineInserts[0][1]).toEqual([
         'line-rec', null, 'Rent', '65000', null,
-        'cat-1', null, 0, 1, 'USD', null, null, null, 1, 'x', 'y',
+        'cat-1', null, 0, 1, 'USD', null, null, null, 1, null, 'x', 'y',
       ]);
     });
 
@@ -1788,6 +1791,63 @@ op-2,income,20,acc-1,cat-1`;
       const lineInserts = findInsert(dbInstance, 'budget_plan_lines');
       expect(lineInserts).toHaveLength(1);
       expect(lineInserts[0][1][0]).toBe('line-rec');
+    });
+
+    // Migration 0022: a group is restored before the lines that point at it, and
+    // a line whose group the backup doesn't carry comes back ungrouped rather
+    // than failing its foreign key and aborting the whole import.
+    describe('line groups (migration 0022)', () => {
+      const derivedGroup = {
+        id: 'grp-1', label: 'Car', amount: null, currency: null,
+        sort_order: 0, created_at: 'x', updated_at: 'y',
+      };
+
+      it('restores groups before the lines and keeps their membership', async () => {
+        const dbInstance = makeDbInstance();
+        mockDb.executeTransaction.mockImplementation(async (cb) => { await cb(dbInstance); });
+
+        const backup = backupWithPlan();
+        backup.data.budget_plan_line_groups = [derivedGroup];
+        backup.data.budget_plan_lines = [{ ...categoryLine, group_id: 'grp-1' }];
+
+        await BackupRestore.restoreBackup(backup);
+
+        const groupInserts = findInsert(dbInstance, 'budget_plan_line_groups');
+        expect(groupInserts).toHaveLength(1);
+        expect(groupInserts[0][1].slice(0, 4)).toEqual(['grp-1', 'Car', null, null]);
+
+        const lineInserts = findInsert(dbInstance, 'budget_plan_lines');
+        // ..., include_children, group_id, created_at, updated_at
+        expect(lineInserts[0][1][lineInserts[0][1].length - 3]).toBe('grp-1');
+      });
+
+      it('ungroups a line whose group is not in the backup', async () => {
+        const dbInstance = makeDbInstance();
+        mockDb.executeTransaction.mockImplementation(async (cb) => { await cb(dbInstance); });
+
+        const backup = backupWithPlan();
+        backup.data.budget_plan_lines = [{ ...categoryLine, group_id: 'grp-gone' }];
+
+        await BackupRestore.restoreBackup(backup);
+
+        const lineInserts = findInsert(dbInstance, 'budget_plan_lines');
+        expect(lineInserts[0][1][lineInserts[0][1].length - 3]).toBeNull();
+      });
+
+      it('reads a CSV-blanked amount back as a derived group, not as an empty string', async () => {
+        const dbInstance = makeDbInstance();
+        mockDb.executeTransaction.mockImplementation(async (cb) => { await cb(dbInstance); });
+
+        const backup = backupWithPlan();
+        // What a CSV round trip produces for a group with no override.
+        backup.data.budget_plan_line_groups = [{ ...derivedGroup, amount: '', currency: '' }];
+        backup.data.budget_plan_lines = [];
+
+        await BackupRestore.restoreBackup(backup);
+
+        const groupInserts = findInsert(dbInstance, 'budget_plan_line_groups');
+        expect(groupInserts[0][1].slice(2, 4)).toEqual([null, null]);
+      });
     });
 
     describe('legacy budgets -> recurring lines bridge (Budgets v3 phase 2)', () => {

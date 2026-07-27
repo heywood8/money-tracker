@@ -346,13 +346,53 @@ export const budgetPlanLines = sqliteTable('budget_plan_lines', {
   // subtree; a leaf has no subtree), so the app writes 1 and ignores a stored 0.
   // The column stays for the backup/Sheets shape — see BudgetPlansDB.mapLineFields.
   includeChildren: integer('include_children').notNull().default(1),
+  // Migration 0022. The envelope this line belongs to, or NULL for a line that
+  // stands on its own. ON DELETE SET NULL: dropping a group ungroups its lines,
+  // it never deletes the budgets inside it.
+  groupId: text('group_id').references(() => budgetPlanLineGroups.id, { onDelete: 'set null' }),
   createdAt: text('created_at').notNull(),
   updatedAt: text('updated_at').notNull(),
 }, (table) => ({
   planIdx: index('idx_budget_plan_lines_plan').on(table.planId),
   recurringIdx: index('idx_budget_plan_lines_recurring').on(table.isRecurring),
   kindIdx: index('idx_budget_plan_lines_kind').on(table.kind),
+  groupIdx: index('idx_budget_plan_lines_group').on(table.groupId),
 }));
+
+/**
+ * Budget Plan Line Groups table (migration 0022)
+ *
+ * An envelope over several lines. A group's members may mix category targets from
+ * unrelated trees with transfer targets, and recurring lines with one-off ones —
+ * membership is the only thing a group asserts.
+ *
+ * GLOBAL, like recurring lines: no `plan_id`, so a group outlives any single
+ * month and shows up in every month where at least one of its lines does. That is
+ * what lets one group hold a recurring line (which belongs to no plan) and a
+ * one-off line (which belongs to exactly one) at the same time.
+ *
+ * `amount` NULL — the default — means the group's budget is DERIVED: the sum of
+ * its children's targets, in whatever currency the screen is read in. A non-null
+ * amount overrides that and, being an override the user typed deliberately,
+ * replaces the children's sum in the month's allocated total (see
+ * BudgetPlansDB.calculatePlanStatus). `currency` accompanies an override amount
+ * (a group has no plan to inherit one from) and is NULL for a derived group.
+ *
+ * A group's ACTUAL is always the sum of its children's actuals — an override
+ * changes the target, never what was really spent.
+ */
+export const budgetPlanLineGroups = sqliteTable('budget_plan_line_groups', {
+  id: text('id').primaryKey(),
+  // Required: a group has no target to borrow a name from, unlike a line.
+  label: text('label').notNull(),
+  // NULL = derived (sum of the group's lines). Non-null = explicit override.
+  amount: text('amount'),
+  // Set only alongside an override `amount`.
+  currency: text('currency'),
+  sortOrder: integer('sort_order').notNull().default(0),
+  createdAt: text('created_at').notNull(),
+  updatedAt: text('updated_at').notNull(),
+});
 
 /**
  * Budget Plan Line ↔ Categories junction (migration 0021)

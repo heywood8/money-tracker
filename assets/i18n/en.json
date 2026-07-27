@@ -571,5 +571,18 @@
   "relink_target": "Target deleted — tap to re-link",
   "previous_month": "Previous month",
   "next_month": "Next month",
-  "recurring_allocation": "Recurring"
+  "recurring_allocation": "Recurring",
+  "group": "Group",
+  "no_group": "No group",
+  "new_group": "New group",
+  "create_group": "Create group",
+  "no_groups_yet": "No groups yet",
+  "group_name": "Group name",
+  "group_name_required": "A group name is required",
+  "edit_group": "Edit group",
+  "delete_group": "Delete group",
+  "delete_group_confirm": "Delete this group? Its allocations are kept — they simply become ungrouped.",
+  "custom_group_budget": "Custom budget",
+  "group_budget_derived_hint": "The group's budget is the sum of its allocations",
+  "group_budget_override_hint": "Counts toward the month's total instead of the sum of its allocations"
 }

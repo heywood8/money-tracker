@@ -260,12 +260,56 @@ tracking target.
   kind: TEXT,                       // 'income' | 'expense' | 'transfer' (NULL = legacy)
   account_id: INTEGER REFERENCES accounts(id) ON DELETE SET NULL,  // set = executable
   last_executed_month: TEXT,        // YYYY-MM of the last execution
+  include_children: INTEGER NOT NULL DEFAULT 1,  // migration 0021, always 1 now
+  group_id: TEXT REFERENCES budget_plan_line_groups(id) ON DELETE SET NULL,
   created_at: TEXT NOT NULL,
   updated_at: TEXT NOT NULL
 }
 ```
 
-**Indexes**: `plan_id`, `is_recurring`, `kind`
+**Indexes**: `plan_id`, `is_recurring`, `kind`, `group_id`
+
+Since **migration 0021** a line tracks a SET of categories via the
+`budget_plan_line_categories` junction (line_id, category_id), which is the
+source of truth; `category_id` above is the denormalized primary entry, kept for
+the backup/Sheets shape. `include_children` survives from that migration but no
+longer expresses a choice — descendant spending always rolls up.
+
+### 10. budget_plan_line_groups (migration 0022)
+
+An envelope over several `budget_plan_lines`. Members may mix category targets
+from unrelated trees with transfer targets, and recurring lines with one-off
+ones — membership is the only thing a group asserts.
+
+Groups are **global**, like recurring lines: no `plan_id`, so a group outlives
+any single month and renders in every month where at least one of its lines
+does. That is what lets one group hold a recurring line (which belongs to no
+plan) beside a one-off line (which belongs to exactly one).
+
+- `amount` NULL — the default — means the group's budget is **derived**: the sum
+  of its lines' targets, in whatever currency the screen is read in.
+- A non-null `amount` is an explicit override and **replaces** the children's sum
+  in the month's `allocated` total (`BudgetPlansDB.calculatePlanStatus`), so the
+  figure on the group's row and the totals printed under it always agree.
+  `currency` accompanies it (a group has no plan to inherit one from) and is
+  cleared whenever the override is.
+- A group's ACTUAL is always the sum of its children's actuals — an override
+  changes the target, never what was really spent.
+
+`budget_plan_lines.group_id` is ON DELETE SET NULL: deleting a group ungroups its
+lines, it never deletes the budgets inside it.
+
+```javascript
+{
+  id: TEXT PRIMARY KEY,
+  label: TEXT NOT NULL,        // required: a group has no target to borrow a name from
+  amount: TEXT,                // NULL = derived from the group's lines
+  currency: TEXT,              // set only alongside an override amount
+  sort_order: INTEGER NOT NULL DEFAULT 0,
+  created_at: TEXT NOT NULL,
+  updated_at: TEXT NOT NULL
+}
+```
 
 ## Design Principles
 

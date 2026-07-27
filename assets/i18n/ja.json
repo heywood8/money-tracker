@@ -568,5 +568,18 @@
   "relink_target": "対象が削除されました — タップして再リンク",
   "previous_month": "前の月",
   "next_month": "次の月",
-  "recurring_allocation": "繰り返し"
+  "recurring_allocation": "繰り返し",
+  "group": "グループ",
+  "no_group": "グループなし",
+  "new_group": "新しいグループ",
+  "create_group": "グループを作成",
+  "no_groups_yet": "グループはまだありません",
+  "group_name": "グループ名",
+  "group_name_required": "グループ名を入力してください",
+  "edit_group": "グループを編集",
+  "delete_group": "グループを削除",
+  "delete_group_confirm": "このグループを削除しますか？中の項目は残り、グループなしになります。",
+  "custom_group_budget": "予算を手動で設定",
+  "group_budget_derived_hint": "グループの予算は各項目の合計です",
+  "group_budget_override_hint": "月の合計には各項目の合計ではなくこの金額が使われます"
 }

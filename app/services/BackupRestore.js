@@ -30,7 +30,7 @@ export const createBackup = async () => {
     console.log('Creating database backup...');
 
     // Fetch all data from all tables
-    const [accounts, categories, operations, budgets, appMetadata, balanceHistory, plannedOperations, merchantRules, budgetPlans, budgetPlanLines, budgetPlanLineCategories] = await Promise.all([
+    const [accounts, categories, operations, budgets, appMetadata, balanceHistory, plannedOperations, merchantRules, budgetPlans, budgetPlanLines, budgetPlanLineCategories, budgetPlanLineGroups] = await Promise.all([
       queryAll('SELECT * FROM accounts ORDER BY created_at ASC'),
       queryAll('SELECT * FROM categories ORDER BY created_at ASC'),
       queryAll('SELECT * FROM operations ORDER BY created_at ASC'),
@@ -48,6 +48,9 @@ export const createBackup = async () => {
       // so a backup of a pre-0021 database still succeeds — restore rebuilds the
       // links from each line's category_id when this section is absent.
       queryAll('SELECT * FROM budget_plan_line_categories ORDER BY line_id ASC, category_id ASC').catch(() => []),
+      // Line groups (migration 0022). Guarded the same way; a pre-0022 backup has
+      // no groups and every line restores ungrouped.
+      queryAll('SELECT * FROM budget_plan_line_groups ORDER BY sort_order ASC, created_at ASC').catch(() => []),
     ]);
 
     // Create backup object
@@ -70,6 +73,7 @@ export const createBackup = async () => {
         budget_plans: budgetPlans || [],
         budget_plan_lines: budgetPlanLines || [],
         budget_plan_line_categories: budgetPlanLineCategories || [],
+        budget_plan_line_groups: budgetPlanLineGroups || [],
       },
     };
 
@@ -83,6 +87,7 @@ export const createBackup = async () => {
       budget_plans: backup.data.budget_plans.length,
       budget_plan_lines: backup.data.budget_plan_lines.length,
       budget_plan_line_categories: backup.data.budget_plan_line_categories.length,
+      budget_plan_line_groups: backup.data.budget_plan_line_groups.length,
     });
 
     return backup;
@@ -108,10 +113,14 @@ const TABLE_FIELDS = {
   // `is_recurring` / `currency` were added by that same migration.
   // `include_children` (migration 0021) says whether descendants of the linked
   // categories roll up into the line's actual.
-  budget_plan_lines: ['id', 'plan_id', 'label', 'amount', 'comment', 'category_id', 'to_account_id', 'sort_order', 'is_recurring', 'currency', 'kind', 'account_id', 'last_executed_month', 'include_children', 'created_at', 'updated_at'],
+  // `group_id` (migration 0022) is the envelope the line belongs to, or null.
+  budget_plan_lines: ['id', 'plan_id', 'label', 'amount', 'comment', 'category_id', 'to_account_id', 'sort_order', 'is_recurring', 'currency', 'kind', 'account_id', 'last_executed_month', 'include_children', 'group_id', 'created_at', 'updated_at'],
   // The full category set of each line (migration 0021); `category_id` above is
   // only its primary entry.
   budget_plan_line_categories: ['line_id', 'category_id'],
+  // Line groups (migration 0022). `amount`/`currency` are null for a group whose
+  // budget is derived from its lines.
+  budget_plan_line_groups: ['id', 'label', 'amount', 'currency', 'sort_order', 'created_at', 'updated_at'],
 };
 
 /**
@@ -171,6 +180,7 @@ export const exportBackupCSV = async () => {
       'budget_plans.csv': convertToCSV(backup.data.budget_plans, TABLE_FIELDS.budget_plans),
       'budget_plan_lines.csv': convertToCSV(backup.data.budget_plan_lines, TABLE_FIELDS.budget_plan_lines),
       'budget_plan_line_categories.csv': convertToCSV(backup.data.budget_plan_line_categories, TABLE_FIELDS.budget_plan_line_categories),
+      'budget_plan_line_groups.csv': convertToCSV(backup.data.budget_plan_line_groups, TABLE_FIELDS.budget_plan_line_groups),
       'backup_info.csv': `version,timestamp,platform\n${backup.version},${backup.timestamp},${backup.platform}`,
     };
 
@@ -188,7 +198,8 @@ export const exportBackupCSV = async () => {
     combinedCSV += `[PLANNED_OPERATIONS]\n${csvFiles['planned_operations.csv']}\n\n`;
     combinedCSV += `[BUDGET_PLANS]\n${csvFiles['budget_plans.csv']}\n\n`;
     combinedCSV += `[BUDGET_PLAN_LINES]\n${csvFiles['budget_plan_lines.csv']}\n\n`;
-    combinedCSV += `[BUDGET_PLAN_LINE_CATEGORIES]\n${csvFiles['budget_plan_line_categories.csv']}\n`;
+    combinedCSV += `[BUDGET_PLAN_LINE_CATEGORIES]\n${csvFiles['budget_plan_line_categories.csv']}\n\n`;
+    combinedCSV += `[BUDGET_PLAN_LINE_GROUPS]\n${csvFiles['budget_plan_line_groups.csv']}\n`;
 
     const filename = `money_tracker_backup_${timestamp}.csv`;
     const fileUri = `${FileSystem.documentDirectory}${filename}`;
@@ -522,6 +533,9 @@ export const restoreBackup = async (backup, cancelToken) => {
       await db.runAsync('DELETE FROM budget_plan_line_categories').catch(() => {});
       await db.runAsync('DELETE FROM budget_plan_lines').catch(() => {});
       await db.runAsync('DELETE FROM budget_plans').catch(() => {});
+      // Groups (migration 0022) reference nothing and are referenced by lines
+      // (ON DELETE SET NULL), so they clear after the lines that point at them.
+      await db.runAsync('DELETE FROM budget_plan_line_groups').catch(() => {});
       await db.runAsync('DELETE FROM accounts_balance_history');
       await db.runAsync('DELETE FROM operations');
       await db.runAsync('DELETE FROM categories');
@@ -839,11 +853,40 @@ export const restoreBackup = async (backup, cancelToken) => {
       {
         const plans = backup.data.budget_plans || [];
         const lines = backup.data.budget_plan_lines || [];
+        const groups = backup.data.budget_plan_line_groups || [];
         appEvents.emit(IMPORT_PROGRESS_EVENT, {
           stepId: 'budget_plans',
           status: 'in_progress',
           data: plans.length,
         });
+
+        // Groups first: a line's group_id references them. Only the ones that
+        // really landed may be assigned below, for the same reason plans are
+        // tracked — a dangling FK would abort the entire restore.
+        const restoredGroupIds = new Set();
+        for (const group of groups) {
+          if (!group.id || !group.label) {
+            console.warn('Skipping budget line group with missing required fields:', group);
+            continue;
+          }
+          // A CSV round trip turns a null amount into '', which must restore as a
+          // DERIVED group (null), not as the string '' sitting in a numeric column.
+          const amount = group.amount === '' || group.amount == null ? null : String(group.amount);
+          await db.runAsync(
+            'INSERT INTO budget_plan_line_groups (id, label, amount, currency, sort_order, created_at, updated_at) VALUES (?, ?, ?, ?, ?, ?, ?)',
+            [
+              group.id,
+              group.label,
+              amount,
+              // The currency only means anything alongside an override amount.
+              amount === null ? null : (group.currency || null),
+              Number.isInteger(group.sort_order) ? group.sort_order : Number(group.sort_order) || 0,
+              group.created_at || new Date().toISOString(),
+              group.updated_at || new Date().toISOString(),
+            ],
+          );
+          restoredGroupIds.add(group.id);
+        }
 
         // Track the plans actually inserted (not merely present in the backup):
         // a plan skipped for missing fields must NOT let its lines through, or
@@ -910,7 +953,7 @@ export const restoreBackup = async (backup, cancelToken) => {
             mappedAccountId = accountIdMapping.get(String(line.account_id)) ?? null;
           }
           await db.runAsync(
-            'INSERT INTO budget_plan_lines (id, plan_id, label, amount, comment, category_id, to_account_id, sort_order, is_recurring, currency, kind, account_id, last_executed_month, include_children, created_at, updated_at) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)',
+            'INSERT INTO budget_plan_lines (id, plan_id, label, amount, comment, category_id, to_account_id, sort_order, is_recurring, currency, kind, account_id, last_executed_month, include_children, group_id, created_at, updated_at) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)',
             [
               line.id,
               isRecurring ? null : line.plan_id,
@@ -935,6 +978,11 @@ export const restoreBackup = async (backup, cancelToken) => {
               (line.include_children === '' || line.include_children == null)
                 ? 1
                 : (Number(line.include_children) === 0 ? 0 : 1),
+              // Group membership (migration 0022). A group the backup doesn't
+              // contain drops to NULL — the line restores ungrouped rather than
+              // failing its FK and taking the whole import down with it. Absent
+              // on every pre-0022 backup, where '' likewise means "no group".
+              (line.group_id && restoredGroupIds.has(line.group_id)) ? line.group_id : null,
               line.created_at || new Date().toISOString(),
               line.updated_at || new Date().toISOString(),
             ],
@@ -1319,9 +1367,10 @@ const importBackupCSV = async (fileUri, cancelToken) => {
     budget_plans: [],
     budget_plan_lines: [],
     budget_plan_line_categories: [],
+    budget_plan_line_groups: [],
   };
 
-  // Split by section markers. The three [BUDGET_PLAN*] markers don't collide:
+  // Split by section markers. The four [BUDGET_PLAN*] markers don't collide:
   // each marker + newline (`[BUDGET_PLANS]\n`, `[BUDGET_PLAN_LINES]\n`) is not a
   // substring of any of the others.
   const accountsMatch = fileContent.match(/\[ACCOUNTS\]\n([\s\S]*?)(?=\n\[|$)/);
@@ -1334,6 +1383,7 @@ const importBackupCSV = async (fileUri, cancelToken) => {
   const budgetPlansMatch = fileContent.match(/\[BUDGET_PLANS\]\n([\s\S]*?)(?=\n\[|$)/);
   const budgetPlanLinesMatch = fileContent.match(/\[BUDGET_PLAN_LINES\]\n([\s\S]*?)(?=\n\[|$)/);
   const budgetPlanLineCategoriesMatch = fileContent.match(/\[BUDGET_PLAN_LINE_CATEGORIES\]\n([\s\S]*?)(?=\n\[|$)/);
+  const budgetPlanLineGroupsMatch = fileContent.match(/\[BUDGET_PLAN_LINE_GROUPS\]\n([\s\S]*?)(?=\n\[|$)/);
 
   if (accountsMatch) sections.accounts = parseCSV(accountsMatch[1]);
   if (categoriesMatch) sections.categories = parseCSV(categoriesMatch[1]);
@@ -1345,6 +1395,7 @@ const importBackupCSV = async (fileUri, cancelToken) => {
   if (budgetPlansMatch) sections.budget_plans = parseCSV(budgetPlansMatch[1]);
   if (budgetPlanLinesMatch) sections.budget_plan_lines = parseCSV(budgetPlanLinesMatch[1]);
   if (budgetPlanLineCategoriesMatch) sections.budget_plan_line_categories = parseCSV(budgetPlanLineCategoriesMatch[1]);
+  if (budgetPlanLineGroupsMatch) sections.budget_plan_line_groups = parseCSV(budgetPlanLineGroupsMatch[1]);
 
   // Extract version from header
   const versionMatch = fileContent.match(/# Version: (\d+)/);
@@ -1481,6 +1532,17 @@ const importBackupSQLite = async (fileUri, cancelToken) => {
       console.warn('No budget_plan_line_categories table in imported database (older format)');
     }
 
+    // Line groups (migration 0022), newer still — its own guard for the same
+    // reason: a pre-0022 database has no groups and every line imports ungrouped.
+    let budgetPlanLineGroups = [];
+    try {
+      budgetPlanLineGroups = await tempDb.getAllAsync(
+        'SELECT * FROM budget_plan_line_groups ORDER BY sort_order ASC, created_at ASC',
+      );
+    } catch (e) {
+      console.warn('No budget_plan_line_groups table in imported database (older format)');
+    }
+
     // Create backup object
     const backup = {
       version: BACKUP_VERSION,
@@ -1498,6 +1560,7 @@ const importBackupSQLite = async (fileUri, cancelToken) => {
         budget_plans: budgetPlans || [],
         budget_plan_lines: budgetPlanLines || [],
         budget_plan_line_categories: budgetPlanLineCategories || [],
+        budget_plan_line_groups: budgetPlanLineGroups || [],
       },
     };
 

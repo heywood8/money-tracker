@@ -81,7 +81,7 @@ The app follows a feature-based organization under the `app/` directory:
   - Monitoring: `sentry.js` - Privacy-protective crash/error reporting (Sentry)
 
 - **db/** (1 file) - Database schema
-  - `schema.js` - Drizzle ORM schema (tables: accounts, categories, operations, budgets, budgetPlans, budgetPlanLines, plannedOperations, balanceHistory, appMetadata; `budgets` and `plannedOperations` are legacy/append-only since Budgets v3 — see docs/DATABASE.md)
+  - `schema.js` - Drizzle ORM schema (tables: accounts, categories, operations, budgets, budgetPlans, budgetPlanLines, budgetPlanLineCategories, budgetPlanLineGroups, plannedOperations, balanceHistory, appMetadata; `budgets` and `plannedOperations` are legacy/append-only since Budgets v3 — see docs/DATABASE.md)
 
 - **defaults/** (2 files) - Default/seed data
   - `defaultAccounts.js`, `defaultOperations.js`
@@ -152,7 +152,7 @@ Bottom tab bar height is set to 80px with 24px bottom padding.
 
 **Database Layer** (SQLite via Drizzle ORM):
 - SQLite database (`penny.db`)
-- Schema defined in `app/db/schema.js` - tables: accounts, categories, operations, budgets, budgetPlans, budgetPlanLines, plannedOperations, balanceHistory, appMetadata
+- Schema defined in `app/db/schema.js` - tables: accounts, categories, operations, budgets, budgetPlans, budgetPlanLines, budgetPlanLineCategories, budgetPlanLineGroups, plannedOperations, balanceHistory, appMetadata
 - Migrations managed by Drizzle Kit in `drizzle/` directory
 - DB modules: `AccountsDB.js`, `BudgetsDB.js`, `BudgetPlansDB.js`, `CategoriesDB.js`, `OperationsDB.js`, `BalanceHistoryDB.js`, `PreferencesDB.js`
 

@@ -63,9 +63,11 @@ export default function BudgetPlanLineModal({
   expenseCategories = [],
   incomeCategories = [],
   accounts = [],
+  groups = [],
   saving = false,
   onSaveLine = () => {},
   onDeleteLine = () => {},
+  onCreateGroup = null,
   onClose = () => {},
 }) {
   const { colors } = useThemeColors();
@@ -87,6 +89,10 @@ export default function BudgetPlanLineModal({
   const [accountId, setAccountId] = useState(null);
   const [isRecurring, setIsRecurring] = useState(false);
   const [lineCurrency, setLineCurrency] = useState(currency);
+  // The envelope this line belongs to (migration 0022), or null for a line that
+  // stands on its own — which is what every line is until it is put in one.
+  const [groupId, setGroupId] = useState(null);
+  const [newGroupName, setNewGroupName] = useState('');
   const [error, setError] = useState(null);
 
   const accountsById = useMemo(
@@ -128,7 +134,7 @@ export default function BudgetPlanLineModal({
   }, [accounts, currency, line]);
 
   // Subpanel navigation for the pickers.
-  const [activeSubPanel, setActiveSubPanel] = useState(null); // null | 'target' | 'account'
+  const [activeSubPanel, setActiveSubPanel] = useState(null); // null | 'target' | 'account' | 'group'
   // Which kind of target the target picker is currently showing.
   const [pickerKind, setPickerKind] = useState('category'); // 'category' | 'account'
   const mainAnim = useRef(new Animated.Value(0)).current;
@@ -149,6 +155,7 @@ export default function BudgetPlanLineModal({
       setAccountId(line.accountId ?? null);
       setIsRecurring(!!line.isRecurring);
       setLineCurrency(line.currency || currency);
+      setGroupId(line.groupId ?? null);
     } else {
       setKind(initialKind);
       setAmount('');
@@ -159,7 +166,9 @@ export default function BudgetPlanLineModal({
       setAccountId(null);
       setIsRecurring(false);
       setLineCurrency(currency);
+      setGroupId(null);
     }
+    setNewGroupName('');
   }, [visible, line, initialKind, currency]);
 
   // Reset subpanel + animations whenever the modal is hidden.
@@ -213,6 +222,33 @@ export default function BudgetPlanLineModal({
   }, [kind, toAccountId, openSubPanel]);
 
   const openAccountPanel = useCallback(() => openSubPanel('account'), [openSubPanel]);
+  const openGroupPanel = useCallback(() => openSubPanel('group'), [openSubPanel]);
+
+  const handleSelectGroup = useCallback((id) => {
+    setGroupId(id);
+    setError(null);
+    closeSubPanel();
+  }, [closeSubPanel]);
+
+  // Creating the envelope from inside the line that is joining it: the
+  // alternative is making the user leave a half-filled form, go create a group
+  // somewhere else, and come back to it.
+  const handleCreateGroup = useCallback(async () => {
+    const name = newGroupName.trim();
+    if (!name || !onCreateGroup) return;
+    try {
+      const created = await onCreateGroup(name);
+      if (created?.id) {
+        setGroupId(created.id);
+        setNewGroupName('');
+        closeSubPanel();
+      }
+    } catch (createError) {
+      // Already surfaced by the host's error dialog; keep the panel open so the
+      // typed name isn't lost.
+      console.error('Failed to create budget line group:', createError);
+    }
+  }, [newGroupName, onCreateGroup, closeSubPanel]);
 
   // Switching kind drops a target that no longer applies, so the line can never
   // be saved as e.g. a transfer that still carries a category.
@@ -319,9 +355,12 @@ export default function BudgetPlanLineModal({
       // An executable line is priced in its account's currency; a template-less
       // one-off line inherits the plan's (null).
       currency: effectiveCurrency,
+      // An income line is never grouped — groups aggregate allocations, and the
+      // group row is not offered for one (see the picker below).
+      groupId: kind === 'income' ? null : groupId,
     });
   }, [saving, kind, amount, amountIsParseable, amountIsPositive, label, comment, categoryIds, toAccountId, accountId,
-    isRecurring, effectiveCurrency, onSaveLine, t]);
+    isRecurring, effectiveCurrency, groupId, onSaveLine, t]);
 
   const handleDelete = useCallback(() => {
     if (!isEditingLine) return;
@@ -367,6 +406,7 @@ export default function BudgetPlanLineModal({
   }, [kind, categoryIds, toAccountId, categoriesById, accountsById, t]);
 
   const executionAccount = accountId != null ? accountsById.get(accountId) : null;
+  const selectedGroup = groupId != null ? groups.find(g => g.id === groupId) : null;
 
   const panelWidth = Dimensions.get('window').width;
   const subPanelTranslateX = subPanelAnim.interpolate({ inputRange: [0, 1], outputRange: [panelWidth, 0] });
@@ -536,6 +576,38 @@ export default function BudgetPlanLineModal({
                       {t('template_account_hint')}
                     </Text>
                   </View>
+
+                  {/* Group — an envelope this line shares with others (migration
+                      0022). Offered for allocations only: an income line declares
+                      expected income and has no spending for a group to total. */}
+                  {kind !== 'income' && (
+                    <View style={styles.field}>
+                      <Text style={[styles.fieldLabel, { color: colors.mutedText }]}>
+                        {t('group')} · {t('optional')}
+                      </Text>
+                      <Pressable
+                        style={[styles.targetButton, { backgroundColor: colors.inputBackground, borderColor: colors.inputBorder }]}
+                        onPress={openGroupPanel}
+                        accessibilityRole="button"
+                        accessibilityLabel={t('group')}
+                        testID="plan-group-picker"
+                      >
+                        {selectedGroup ? (
+                          <View style={styles.targetValue}>
+                            <Icon name="folder-outline" size={20} color={colors.text} />
+                            <Text style={[styles.text16, { color: colors.text }]} numberOfLines={1}>
+                              {selectedGroup.label}
+                            </Text>
+                          </View>
+                        ) : (
+                          <Text style={[styles.text16, { color: colors.mutedText }]}>
+                            {t('no_group')}
+                          </Text>
+                        )}
+                        <Icon name="chevron-right" size={20} color={colors.mutedText} />
+                      </Pressable>
+                    </View>
+                  )}
 
                   {/* Recurring toggle: a recurring line is a global template that
                       applies to every calendar month automatically, instead of
@@ -782,6 +854,110 @@ export default function BudgetPlanLineModal({
                 </Animated.View>
               )}
 
+              {/* Group subpanel: pick an existing envelope, drop out of one, or
+                  create one without leaving the half-filled form. */}
+              {activeSubPanel === 'group' && (
+                <Animated.View
+                  testID="plan-group-subpanel"
+                  style={[
+                    styles.subPanel,
+                    { backgroundColor: colors.card },
+                    { opacity: subPanelAnim, transform: [{ translateX: subPanelTranslateX }] },
+                  ]}
+                >
+                  <View style={styles.subPanelHeader}>
+                    <Pressable
+                      onPress={closeSubPanel}
+                      style={styles.subPanelBack}
+                      hitSlop={8}
+                      accessibilityRole="button"
+                      accessibilityLabel={t('back')}
+                      testID="plan-group-back"
+                    >
+                      <Icon name="arrow-left" size={24} color={colors.text} />
+                    </Pressable>
+                    <Text style={[styles.subPanelTitle, { color: colors.text }]}>{t('group')}</Text>
+                  </View>
+
+                  {onCreateGroup && (
+                    <View style={styles.newGroupRow}>
+                      <View style={styles.newGroupInput}>
+                        <FormInput
+                          value={newGroupName}
+                          onChangeText={setNewGroupName}
+                          placeholder={t('new_group')}
+                          testID="plan-group-new-name"
+                        />
+                      </View>
+                      <Pressable
+                        onPress={handleCreateGroup}
+                        disabled={!newGroupName.trim()}
+                        style={[
+                          styles.newGroupButton,
+                          { backgroundColor: colors.primary },
+                          !newGroupName.trim() && styles.buttonDisabled,
+                        ]}
+                        accessibilityRole="button"
+                        accessibilityLabel={t('create_group')}
+                        accessibilityState={{ disabled: !newGroupName.trim() }}
+                        testID="plan-group-create"
+                      >
+                        <Icon name="plus" size={20} color={colors.text} />
+                      </Pressable>
+                    </View>
+                  )}
+
+                  <Pressable
+                    onPress={() => handleSelectGroup(null)}
+                    style={({ pressed }) => [
+                      styles.pickerOption,
+                      { borderColor: colors.border },
+                      pressed && { backgroundColor: colors.selected },
+                      groupId == null && { backgroundColor: colors.selected },
+                    ]}
+                    accessibilityRole="button"
+                    accessibilityLabel={t('no_group')}
+                    testID="plan-group-option-none"
+                  >
+                    <Icon name="close-circle-outline" size={22} color={colors.text} />
+                    <Text style={[styles.optionText, { color: colors.text }]} numberOfLines={1}>
+                      {t('no_group')}
+                    </Text>
+                  </Pressable>
+
+                  <FlatList
+                    data={groups}
+                    keyExtractor={(item) => String(item.id)}
+                    keyboardShouldPersistTaps="handled"
+                    renderItem={({ item }) => (
+                      <Pressable
+                        onPress={() => handleSelectGroup(item.id)}
+                        style={({ pressed }) => [
+                          styles.pickerOption,
+                          { borderColor: colors.border },
+                          pressed && { backgroundColor: colors.selected },
+                          groupId === item.id && { backgroundColor: colors.selected },
+                        ]}
+                        accessibilityRole="button"
+                        accessibilityState={{ selected: groupId === item.id }}
+                        accessibilityLabel={item.label}
+                        testID={`plan-group-option-${item.id}`}
+                      >
+                        <Icon name="folder-outline" size={22} color={colors.text} />
+                        <Text style={[styles.optionText, { color: colors.text }]} numberOfLines={1}>
+                          {item.label}
+                        </Text>
+                      </Pressable>
+                    )}
+                    ListEmptyComponent={(
+                      <Text style={[styles.emptyText, { color: colors.mutedText }]}>
+                        {t('no_groups_yet')}
+                      </Text>
+                    )}
+                  />
+                </Animated.View>
+              )}
+
               {/* Execution account subpanel */}
               {activeSubPanel === 'account' && (
                 <Animated.View
@@ -859,15 +1035,21 @@ BudgetPlanLineModal.propTypes = {
     kind: PropTypes.oneOf(KINDS),
     isRecurring: PropTypes.bool,
     currency: PropTypes.string,
+    groupId: PropTypes.string,
   }),
   initialKind: PropTypes.oneOf(KINDS),
   currency: PropTypes.string,
   expenseCategories: PropTypes.array,
   incomeCategories: PropTypes.array,
   accounts: PropTypes.array,
+  groups: PropTypes.arrayOf(PropTypes.shape({
+    id: PropTypes.string.isRequired,
+    label: PropTypes.string.isRequired,
+  })),
   saving: PropTypes.bool,
   onSaveLine: PropTypes.func,
   onDeleteLine: PropTypes.func,
+  onCreateGroup: PropTypes.func,
   onClose: PropTypes.func,
 };
 
@@ -962,6 +1144,22 @@ const styles = StyleSheet.create({
     alignItems: 'center',
     flex: 1,
     justifyContent: 'center',
+  },
+  newGroupButton: {
+    alignItems: 'center',
+    borderRadius: 8,
+    justifyContent: 'center',
+    paddingHorizontal: 14,
+    paddingVertical: 10,
+  },
+  newGroupInput: {
+    flex: 1,
+  },
+  newGroupRow: {
+    alignItems: 'center',
+    flexDirection: 'row',
+    gap: 8,
+    marginBottom: 12,
   },
   optionText: {
     flex: 1,

@@ -143,12 +143,12 @@ describe('GoogleSheetsService', () => {
 
     // The "Planned Operations" tab is gone as of Budgets v3 phase 3 — planned
     // operations are plan lines with a template now, exported in Budget Plan Lines.
-    it('returns 7 sheets with correct titles', async () => {
+    it('returns 8 sheets with correct titles', async () => {
       const sheets = buildSheetsData(mockBackup);
       const titles = sheets.map(s => s.range.split('!')[0]);
       expect(titles).toEqual([
         'Accounts', 'Operations', 'Categories', 'Budgets', 'Balance History',
-        'Budget Plans', 'Budget Plan Lines',
+        'Budget Plans', 'Budget Plan Lines', 'Budget Line Groups',
       ]);
     });
 
@@ -300,14 +300,20 @@ describe('GoogleSheetsService', () => {
       },
     };
 
+    // Every tab today's export writes. The metadata read happens FIRST now (it
+    // both spots the tabs a spreadsheet is missing and supplies the IDs the
+    // filters hang off), so a spreadsheet described here as complete makes the
+    // export exactly four calls: metadata, clear, write, filters.
     const mockMetadata = {
       sheets: [
         { properties: { title: 'Accounts', sheetId: 0 } },
         { properties: { title: 'Operations', sheetId: 1 } },
         { properties: { title: 'Categories', sheetId: 2 } },
         { properties: { title: 'Budgets', sheetId: 3 } },
-        { properties: { title: 'Planned Operations', sheetId: 4 } },
-        { properties: { title: 'Balance History', sheetId: 5 } },
+        { properties: { title: 'Balance History', sheetId: 4 } },
+        { properties: { title: 'Budget Plans', sheetId: 5 } },
+        { properties: { title: 'Budget Plan Lines', sheetId: 6 } },
+        { properties: { title: 'Budget Line Groups', sheetId: 7 } },
       ],
     };
 
@@ -318,10 +324,10 @@ describe('GoogleSheetsService', () => {
         ok: true,
         json: async () => ({ spreadsheetId: 'new-sheet-id' }),
       });
-      mockFetch.mockResolvedValueOnce({ ok: true, json: async () => ({}) });
-      mockFetch.mockResolvedValueOnce({ ok: true, json: async () => ({}) });
-      mockFetch.mockResolvedValueOnce({ ok: true, json: async () => mockMetadata });
-      mockFetch.mockResolvedValueOnce({ ok: true, json: async () => ({}) });
+      mockFetch.mockResolvedValueOnce({ ok: true, json: async () => mockMetadata }); // getSheetIdsByTitle
+      mockFetch.mockResolvedValueOnce({ ok: true, json: async () => ({}) }); // clearSheets
+      mockFetch.mockResolvedValueOnce({ ok: true, json: async () => ({}) }); // writeSheets
+      mockFetch.mockResolvedValueOnce({ ok: true, json: async () => ({}) }); // applyFilters
 
       const url = await exportToSheets('access-token', mockBackup);
 
@@ -331,10 +337,10 @@ describe('GoogleSheetsService', () => {
 
     it('updates existing spreadsheet without creating a new one on re-export', async () => {
       getPreference.mockResolvedValue('existing-sheet-id');
-      mockFetch.mockResolvedValueOnce({ ok: true, json: async () => ({}) });
-      mockFetch.mockResolvedValueOnce({ ok: true, json: async () => ({}) });
-      mockFetch.mockResolvedValueOnce({ ok: true, json: async () => mockMetadata });
-      mockFetch.mockResolvedValueOnce({ ok: true, json: async () => ({}) });
+      mockFetch.mockResolvedValueOnce({ ok: true, json: async () => mockMetadata }); // getSheetIdsByTitle
+      mockFetch.mockResolvedValueOnce({ ok: true, json: async () => ({}) }); // clearSheets
+      mockFetch.mockResolvedValueOnce({ ok: true, json: async () => ({}) }); // writeSheets
+      mockFetch.mockResolvedValueOnce({ ok: true, json: async () => ({}) }); // applyFilters
 
       const url = await exportToSheets('access-token', mockBackup);
 
@@ -345,24 +351,25 @@ describe('GoogleSheetsService', () => {
 
     it('applies basic filters to every exported sheet after writing data', async () => {
       getPreference.mockResolvedValue('sheet-id');
+      mockFetch.mockResolvedValueOnce({ ok: true, json: async () => mockMetadata }); // getSheetIdsByTitle
       mockFetch.mockResolvedValueOnce({ ok: true, json: async () => ({}) }); // clearSheets
       mockFetch.mockResolvedValueOnce({ ok: true, json: async () => ({}) }); // writeSheets
-      mockFetch.mockResolvedValueOnce({ ok: true, json: async () => mockMetadata }); // getSheetIds
       mockFetch.mockResolvedValueOnce({ ok: true, json: async () => ({}) }); // applyFilters
 
       await exportToSheets('access-token', mockBackup);
 
       const applyFiltersCall = mockFetch.mock.calls[3];
       const body = JSON.parse(applyFiltersCall[1].body);
-      expect(body.requests).toHaveLength(5);
+      expect(body.requests).toHaveLength(8);
       expect(body.requests[0].setBasicFilter.filter.range.sheetId).toBe(0);
-      expect(body.requests[4].setBasicFilter.filter.range.sheetId).toBe(5);
+      expect(body.requests[7].setBasicFilter.filter.range.sheetId).toBe(7);
     });
 
     it('throws refresh_failed and signs out when clearSheets returns 401', async () => {
       getPreference.mockResolvedValue('sheet-id');
       GoogleSignin.revokeAccess.mockResolvedValue(undefined);
       GoogleSignin.signOut.mockResolvedValue(undefined);
+      mockFetch.mockResolvedValueOnce({ ok: true, json: async () => mockMetadata }); // getSheetIdsByTitle
       mockFetch.mockResolvedValueOnce({
         ok: false,
         status: 401,
@@ -377,7 +384,8 @@ describe('GoogleSheetsService', () => {
       getPreference.mockResolvedValue('sheet-id');
       GoogleSignin.revokeAccess.mockResolvedValue(undefined);
       GoogleSignin.signOut.mockResolvedValue(undefined);
-      mockFetch.mockResolvedValueOnce({ ok: true, json: async () => ({}) });
+      mockFetch.mockResolvedValueOnce({ ok: true, json: async () => mockMetadata }); // getSheetIdsByTitle
+      mockFetch.mockResolvedValueOnce({ ok: true, json: async () => ({}) }); // clearSheets
       mockFetch.mockResolvedValueOnce({
         ok: false,
         status: 401,
@@ -390,7 +398,8 @@ describe('GoogleSheetsService', () => {
 
     it('throws quota_exceeded when batchUpdate returns 429', async () => {
       getPreference.mockResolvedValue('sheet-id');
-      mockFetch.mockResolvedValueOnce({ ok: true, json: async () => ({}) });
+      mockFetch.mockResolvedValueOnce({ ok: true, json: async () => mockMetadata }); // getSheetIdsByTitle
+      mockFetch.mockResolvedValueOnce({ ok: true, json: async () => ({}) }); // clearSheets
       mockFetch.mockResolvedValueOnce({
         ok: false,
         status: 429,
@@ -636,7 +645,7 @@ describe('GoogleSheetsService', () => {
       const sheets = buildSheetsData(mockBackup);
       const lines = sheets.find(s => s.range === 'Budget Plan Lines!A1');
       const header = lines.values[0];
-      expect(header).toEqual(['id', 'plan_id', 'label', 'amount', 'comment', 'category', 'account', 'category_id', 'to_account_id', 'sort_order', 'is_recurring', 'currency', 'kind', 'execution_account', 'account_id', 'last_executed_month', 'categories', 'category_ids', 'include_children']);
+      expect(header).toEqual(['id', 'plan_id', 'label', 'amount', 'comment', 'category', 'account', 'category_id', 'to_account_id', 'sort_order', 'is_recurring', 'currency', 'kind', 'execution_account', 'account_id', 'last_executed_month', 'categories', 'category_ids', 'include_children', 'group', 'group_id']);
 
       const catRow = lines.values.find(r => r[0] === 'line-cat');
       expect(catRow[header.indexOf('category')]).toBe('Food');
@@ -844,6 +853,90 @@ describe('GoogleSheetsService', () => {
       const backup = await importFromSheets('token');
       expect(backup.data.budget_plans).toEqual([]);
       expect(backup.data.budget_plan_lines).toEqual([]);
+    });
+  });
+
+  // Migration 0022: an envelope over several lines, exported on its own tab with
+  // the line's membership carried as a name/ID pair like every other reference.
+  describe('Budget line groups (migration 0022)', () => {
+    const { getPreference } = require('../../app/services/PreferencesDB');
+
+    const groupBackup = {
+      data: {
+        accounts: [{ id: 1, name: 'Savings', balance: '0', currency: 'USD' }],
+        categories: [{ id: 'cat-1', name: 'Food', type: 'entry', category_type: 'expense' }],
+        operations: [],
+        budgets: [],
+        planned_operations: [],
+        balance_history: [],
+        budget_plans: [{ id: 'plan-1', month: '2026-07', currency: 'USD', expected_income: '0' }],
+        budget_plan_lines: [
+          { id: 'line-a', plan_id: 'plan-1', label: 'Fuel', amount: '300', comment: null, category_id: 'cat-1', to_account_id: null, sort_order: 0, is_recurring: 0, currency: null, group_id: 'grp-1' },
+          { id: 'line-b', plan_id: 'plan-1', label: 'Books', amount: '50', comment: null, category_id: 'cat-1', to_account_id: null, sort_order: 1, is_recurring: 0, currency: null, group_id: null },
+        ],
+        budget_plan_line_groups: [
+          { id: 'grp-1', label: 'Car', amount: null, currency: null, sort_order: 0 },
+          { id: 'grp-2', label: 'Holiday', amount: '1200', currency: 'EUR', sort_order: 1 },
+        ],
+      },
+    };
+
+    it('writes a Budget Line Groups sheet and the membership of each line', () => {
+      const sheets = buildSheetsData(groupBackup);
+      const groups = sheets.find(s => s.range === 'Budget Line Groups!A1');
+      expect(groups.values[0]).toEqual(['id', 'label', 'amount', 'currency', 'sort_order']);
+      // A derived group writes blanks, not zeros: its budget is its lines' sum.
+      expect(groups.values[1]).toEqual(['grp-1', 'Car', '', '', 0]);
+      expect(groups.values[2]).toEqual(['grp-2', 'Holiday', '1200', 'EUR', 1]);
+
+      const lines = sheets.find(s => s.range === 'Budget Plan Lines!A1');
+      const header = lines.values[0];
+      const grouped = lines.values.find(r => r[0] === 'line-a');
+      const loose = lines.values.find(r => r[0] === 'line-b');
+      expect(grouped[header.indexOf('group')]).toBe('Car');
+      expect(grouped[header.indexOf('group_id')]).toBe('grp-1');
+      expect(loose[header.indexOf('group')]).toBe('');
+    });
+
+    it('reads groups back and resolves a line\'s group by ID or by name', async () => {
+      getPreference.mockResolvedValue('sheet-id-123');
+      mockFetch.mockResolvedValue({
+        ok: true,
+        json: async () => ({
+          valueRanges: [
+            { range: 'Accounts!A1:D2', values: [['id', 'name', 'balance', 'currency'], ['1', 'Savings', '0', 'USD']] },
+            { range: 'Categories!A1:B2', values: [['id', 'name', 'type', 'category_type'], ['cat-1', 'Food', 'entry', 'expense']] },
+            {
+              range: 'Budget Plan Lines!A1:U3',
+              values: [
+                ['id', 'plan_id', 'label', 'amount', 'category_id', 'group', 'group_id'],
+                ['line-a', 'plan-1', 'Fuel', '300', 'cat-1', '', 'grp-1'],
+                // Someone editing by hand reaches for the name column, not the ID.
+                ['line-b', 'plan-1', 'Parking', '120', 'cat-1', 'Car', ''],
+                ['line-c', 'plan-1', 'Books', '50', 'cat-1', 'Nowhere', 'grp-missing'],
+              ],
+            },
+            {
+              range: 'Budget Line Groups!A1:E2',
+              values: [
+                ['id', 'label', 'amount', 'currency', 'sort_order'],
+                ['grp-1', 'Car', '', '', '0'],
+              ],
+            },
+          ],
+        }),
+      });
+
+      const backup = await importFromSheets('token');
+
+      expect(backup.data.budget_plan_line_groups).toEqual([
+        expect.objectContaining({ id: 'grp-1', label: 'Car', amount: null, currency: null, sort_order: 0 }),
+      ]);
+      const byId = new Map(backup.data.budget_plan_lines.map(l => [l.id, l]));
+      expect(byId.get('line-a').group_id).toBe('grp-1');
+      expect(byId.get('line-b').group_id).toBe('grp-1');
+      // A group the sheet doesn't list drops to null rather than dangling.
+      expect(byId.get('line-c').group_id).toBeNull();
     });
   });
 });

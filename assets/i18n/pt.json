@@ -568,5 +568,18 @@
   "relink_target": "Destino excluído — toque para revincular",
   "previous_month": "Mês anterior",
   "next_month": "Próximo mês",
-  "recurring_allocation": "Recorrente"
+  "recurring_allocation": "Recorrente",
+  "group": "Grupo",
+  "no_group": "Sem grupo",
+  "new_group": "Novo grupo",
+  "create_group": "Criar grupo",
+  "no_groups_yet": "Ainda não há grupos",
+  "group_name": "Nome do grupo",
+  "group_name_required": "O nome do grupo é obrigatório",
+  "edit_group": "Editar grupo",
+  "delete_group": "Excluir grupo",
+  "delete_group_confirm": "Excluir este grupo? As alocações são mantidas e apenas ficam sem grupo.",
+  "custom_group_budget": "Orçamento personalizado",
+  "group_budget_derived_hint": "O orçamento do grupo é a soma das suas alocações",
+  "group_budget_override_hint": "Entra no total do mês no lugar da soma das alocações"
 }

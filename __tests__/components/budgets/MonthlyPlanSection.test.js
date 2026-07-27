@@ -121,6 +121,16 @@ jest.mock('../../../app/components/budgets/BudgetPlanLineModal', () => {
           currency: 'USD',
         }),
       }, React.createElement(Text, {}, 'currency only')),
+      // Line groups (migration 0022): the group rides on the same save payload
+      // as every other field the editor collects.
+      React.createElement(Pressable, {
+        testID: 'mock-save-grouped-line',
+        onPress: () => props.onSaveLine({
+          amount: '250', label: 'New', comment: null, kind: 'expense',
+          categoryId: 'cat1', toAccountId: null, accountId: null,
+          isRecurring: false, currency: null, groupId: 'g1',
+        }),
+      }, React.createElement(Text, {}, 'save grouped')),
       React.createElement(Pressable, {
         testID: 'mock-delete-line',
         onPress: () => props.onDeleteLine(props.line?.id),
@@ -147,7 +157,7 @@ const ACCOUNTS = [
   { id: 2, name: 'Cash', currency: 'USD' },
 ];
 
-const setPlans = ({ plans = [], lines = [], planStatuses = new Map() } = {}) => {
+const setPlans = ({ plans = [], lines = [], planStatuses = new Map(), groups = [] } = {}) => {
   mockPlans = {
     plans,
     planStatuses,
@@ -165,6 +175,12 @@ const setPlans = ({ plans = [], lines = [], planStatuses = new Map() } = {}) => 
     // The section now loads its lines (recurring UNION this month's one-off
     // lines) via getLinesForMonth rather than getPlanLines directly.
     getLinesForMonth: jest.fn(async () => lines),
+    // Line groups (migration 0022) — global, loaded alongside the month's lines.
+    getLineGroups: jest.fn(async () => groups),
+    addLineGroup: jest.fn(async (group) => ({ id: 'g-new', isDerived: group.amount == null, ...group })),
+    updateLineGroup: jest.fn(async () => {}),
+    deleteLineGroup: jest.fn(async () => {}),
+    reorderLineGroups: jest.fn(async () => {}),
     // Executable templates (Budgets v3 phase 3)
     executeLine: jest.fn(async () => ({ id: 99 })),
     markLineExecuted: jest.fn(async () => {}),
@@ -1409,6 +1425,109 @@ describe('MonthlyPlanSection', () => {
       await waitFor(() => expect(getByTestId('plan-line-i1')).toBeTruthy());
       expect(queryByText('0 / 220')).toBeNull();
       expect(getByTestId('plan-income-total')).toHaveTextContent(/150 \/ 220 USD/);
+    });
+  });
+  describe('Line groups (migration 0022)', () => {
+    const GROUP = { id: 'g1', label: 'Car', amount: null, currency: null, sortOrder: 0, isDerived: true };
+    const groupedLines = () => ([
+      {
+        id: 'l-fuel', planId: 'p1', amount: '300', label: 'Fuel', comment: null, kind: 'expense',
+        categoryId: 'cat1', categoryIds: ['cat1'], toAccountId: null, sortOrder: 0, isBroken: false,
+        isRecurring: false, currency: null, groupId: 'g1',
+      },
+      {
+        id: 'l-parking', planId: 'p1', amount: '120', label: 'Parking', comment: null, kind: 'expense',
+        categoryId: 'cat2', categoryIds: ['cat2'], toAccountId: null, sortOrder: 1, isBroken: false,
+        isRecurring: false, currency: null, groupId: 'g1',
+      },
+      {
+        id: 'l-loose', planId: 'p1', amount: '50', label: 'Books', comment: null, kind: 'expense',
+        categoryId: 'cat1', categoryIds: ['cat1'], toAccountId: null, sortOrder: 2, isBroken: false,
+        isRecurring: false, currency: null, groupId: null,
+      },
+    ]);
+
+    it('renders a group header with the sum of its lines and indents its children', async () => {
+      setPlans({
+        plans: [{ id: 'p1', month: THIS_MONTH, currency: 'USD', expectedIncome: '0' }],
+        lines: groupedLines(),
+        groups: [GROUP],
+      });
+      const { getByTestId } = await renderSection();
+      await waitFor(() => expect(getByTestId('plan-group-g1')).toBeTruthy());
+
+      // Derived budget: 300 + 120, formatted compactly like every other figure.
+      expect(getByTestId('plan-group-g1')).toHaveTextContent(/420/);
+      // Both children render, and both are indented; the ungrouped line is not.
+      const indent = (id) => StyleSheet.flatten(getByTestId(id).props.style)?.paddingLeft;
+      expect(indent('plan-line-l-fuel')).toBeGreaterThan(indent('plan-line-l-loose') ?? 0);
+      expect(indent('plan-line-l-parking')).toBe(indent('plan-line-l-fuel'));
+    });
+
+    it('counts a custom group budget in the month total instead of its children', async () => {
+      setPlans({
+        plans: [{ id: 'p1', month: THIS_MONTH, currency: 'USD', expectedIncome: '0' }],
+        lines: groupedLines(),
+        groups: [{ ...GROUP, amount: '500', currency: 'USD', isDerived: false }],
+      });
+      const { getByTestId } = await renderSection();
+      await waitFor(() => expect(getByTestId('plan-group-g1')).toBeTruthy());
+
+      // 500 (the override) + 50 (the ungrouped line) — NOT 300 + 120 + 50.
+      expect(getByTestId('plan-totals')).toHaveTextContent(/550 USD/);
+      expect(getByTestId('plan-group-g1')).toHaveTextContent(/500/);
+    });
+
+    it('leaves the month total alone for a derived group', async () => {
+      setPlans({
+        plans: [{ id: 'p1', month: THIS_MONTH, currency: 'USD', expectedIncome: '0' }],
+        lines: groupedLines(),
+        groups: [GROUP],
+      });
+      const { getByTestId } = await renderSection();
+      await waitFor(() => expect(getByTestId('plan-group-g1')).toBeTruthy());
+      expect(getByTestId('plan-totals')).toHaveTextContent(/470 USD/);
+    });
+
+    it('shows a group only in months where it has a line', async () => {
+      setPlans({
+        plans: [{ id: 'p1', month: THIS_MONTH, currency: 'USD', expectedIncome: '0' }],
+        lines: [groupedLines()[2]],
+        groups: [GROUP],
+      });
+      const { queryByTestId, getByTestId } = await renderSection();
+      await waitFor(() => expect(getByTestId('plan-line-l-loose')).toBeTruthy());
+      expect(queryByTestId('plan-group-g1')).toBeNull();
+    });
+
+    it('opens the group editor when the group row is tapped', async () => {
+      setPlans({
+        plans: [{ id: 'p1', month: THIS_MONTH, currency: 'USD', expectedIncome: '0' }],
+        lines: groupedLines(),
+        groups: [GROUP],
+      });
+      const { getByTestId } = await renderSection();
+      await waitFor(() => expect(getByTestId('plan-group-g1')).toBeTruthy());
+      await act(async () => { fireEvent.press(getByTestId('plan-group-g1')); });
+      await waitFor(() => expect(getByTestId('plan-group-modal')).toBeTruthy());
+      expect(getByTestId('plan-group-name').props.value).toBe('Car');
+    });
+
+    it('carries the picked group through to the saved line', async () => {
+      setPlans({
+        plans: [{ id: 'p1', month: THIS_MONTH, currency: 'USD', expectedIncome: '0' }],
+        lines: groupedLines(),
+        groups: [GROUP],
+      });
+      const ref = React.createRef();
+      const { getByTestId } = await renderSection(ref);
+      await waitFor(() => expect(getByTestId('plan-group-g1')).toBeTruthy());
+      // The stubbed editor is what a real pick would produce: the group travels
+      // on the same payload as every other field of the line.
+      await act(async () => { ref.current.openAddLine(); });
+      await waitFor(() => expect(getByTestId('mock-save-grouped-line')).toBeTruthy());
+      await act(async () => { fireEvent.press(getByTestId('mock-save-grouped-line')); });
+      expect(mockPlans.addLine).toHaveBeenCalledWith('p1', expect.objectContaining({ groupId: 'g1' }));
     });
   });
 });

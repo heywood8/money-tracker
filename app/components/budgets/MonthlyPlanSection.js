@@ -12,11 +12,19 @@ import * as Currency from '../../services/currency';
 import usePlanLineAmounts from '../../hooks/usePlanLineAmounts';
 import { SPACING } from '../../styles/layout';
 import BudgetPlanLineModal from './BudgetPlanLineModal';
+import BudgetLineGroupModal from './BudgetLineGroupModal';
 import PlanLineRow from './PlanLineRow';
+import PlanGroupRow from './PlanGroupRow';
 import PlanTemplateSummary from './PlanTemplateSummary';
 import { currentMonthKey, addMonths, formatMonthLabel, monthProgressFraction } from '../../utils/monthUtils';
 
 const CLOSED_MODAL = { visible: false, line: null, kind: 'expense' };
+const CLOSED_GROUP_MODAL = { visible: false, group: null };
+
+// Key under which a group's own (override) amount rides along in the shared
+// conversion map — see the `amountSources` memo. Groups and lines have separate
+// ID spaces, so the prefix is what keeps a group from ever shadowing a line.
+const groupAmountKey = (groupId) => `group:${groupId}`;
 
 /**
  * MonthlyPlanSection — the unified Budgets list: one month-scoped envelope view
@@ -70,6 +78,11 @@ const MonthlyPlanSection = forwardRef(function MonthlyPlanSection({
     reorderLines,
     reorderRecurringLines,
     getLinesForMonth,
+    getLineGroups,
+    addLineGroup,
+    updateLineGroup,
+    deleteLineGroup,
+    reorderLineGroups,
     executeLine,
     markLineExecuted,
     unmarkLineExecuted,
@@ -81,7 +94,13 @@ const MonthlyPlanSection = forwardRef(function MonthlyPlanSection({
   const [internalMonth, setInternalMonth] = useState(currentMonthKey);
   const month = controlledMonth ? monthProp : internalMonth;
   const [lines, setLines] = useState([]);
+  // Groups are global (not month-scoped), but they are loaded alongside the
+  // month's lines: the two are read together on every render below, and fetching
+  // them from separate effects would let the list render a group's children under
+  // a header that has not arrived yet.
+  const [groups, setGroups] = useState([]);
   const [modal, setModal] = useState(CLOSED_MODAL);
+  const [groupModal, setGroupModal] = useState(CLOSED_GROUP_MODAL);
   const [busy, setBusy] = useState(false);
   // Synchronous double-tap guard (Fix 3, adversarial review round 2): `busy`
   // (React state) only reflects reality AFTER a re-render commits, so two taps
@@ -171,6 +190,16 @@ const MonthlyPlanSection = forwardRef(function MonthlyPlanSection({
     return map;
   }, [planStatus]);
 
+  // Group statuses arrive on the same object and go stale the same way, so they
+  // read off `planStatus` exactly as the line ones do.
+  const groupStatusById = useMemo(() => {
+    const map = new Map();
+    for (const groupStatus of planStatus?.groups || []) {
+      map.set(groupStatus.groupId, groupStatus);
+    }
+    return map;
+  }, [planStatus]);
+
   const categoriesById = useMemo(
     () => new Map([...expenseCategories, ...incomeCategories].map(c => [c.id, c])),
     [expenseCategories, incomeCategories],
@@ -185,28 +214,36 @@ const MonthlyPlanSection = forwardRef(function MonthlyPlanSection({
   // no plan created yet (see BudgetPlansDB.getLinesForMonth).
   const reloadLines = useCallback(async () => {
     try {
-      const data = await getLinesForMonth(month);
+      const [data, groupData] = await Promise.all([getLinesForMonth(month), getLineGroups()]);
       setLines(data);
+      setGroups(groupData);
     } catch (error) {
       console.error('Failed to load plan lines:', error);
       setLines([]);
+      setGroups([]);
     }
-  }, [getLinesForMonth, month]);
+  }, [getLinesForMonth, getLineGroups, month]);
 
   // Load lines whenever the shown month changes (navigation, plan create/copy).
   useEffect(() => {
     let cancelled = false;
     (async () => {
       try {
-        const data = await getLinesForMonth(month);
-        if (!cancelled) setLines(data);
+        const [data, groupData] = await Promise.all([getLinesForMonth(month), getLineGroups()]);
+        if (!cancelled) {
+          setLines(data);
+          setGroups(groupData);
+        }
       } catch (error) {
         console.error('Failed to load plan lines:', error);
-        if (!cancelled) setLines([]);
+        if (!cancelled) {
+          setLines([]);
+          setGroups([]);
+        }
       }
     })();
     return () => { cancelled = true; };
-  }, [month, getLinesForMonth]);
+  }, [month, getLinesForMonth, getLineGroups]);
 
   // Income lines declare the expected income; the rest allocate it. Recurring
   // (global template) lines and this month's one-off lines are edited and
@@ -214,13 +251,37 @@ const MonthlyPlanSection = forwardRef(function MonthlyPlanSection({
   // layer (see BudgetPlansDB) — so allocations are split for move actions.
   const incomeLines = useMemo(() => lines.filter(l => l.kind === 'income'), [lines]);
   const allocationLines = useMemo(() => lines.filter(l => l.kind !== 'income'), [lines]);
-  const recurringLines = useMemo(() => allocationLines.filter(l => l.isRecurring), [allocationLines]);
-  const oneOffLines = useMemo(() => allocationLines.filter(l => !l.isRecurring), [allocationLines]);
 
-  // Every line's target amount expressed in the screen's single currency. Rows,
-  // the live totals below and the template summary strip all read from this one
-  // map, so no two of them can print the same line in different units.
-  const { amountById, converting } = usePlanLineAmounts(lines, planCurrency);
+  // Group membership (migration 0022). A line pointing at a group this screen
+  // doesn't know about is treated as ungrouped rather than vanishing into a
+  // header that never renders.
+  const groupIdSet = useMemo(() => new Set(groups.map(g => g.id)), [groups]);
+  const isGrouped = useCallback(
+    (line) => line.groupId != null && groupIdSet.has(line.groupId),
+    [groupIdSet],
+  );
+  const recurringLines = useMemo(
+    () => allocationLines.filter(l => l.isRecurring && !isGrouped(l)),
+    [allocationLines, isGrouped],
+  );
+  const oneOffLines = useMemo(
+    () => allocationLines.filter(l => !l.isRecurring && !isGrouped(l)),
+    [allocationLines, isGrouped],
+  );
+
+  // Every line's target amount expressed in the screen's single currency — plus
+  // each OVERRIDE group's own figure, which is priced in a currency of its own
+  // for the same reason a recurring line is (a group belongs to no plan). Sharing
+  // one conversion pass is what keeps a group's row and its children in the same
+  // units. The array keeps `lines`' identity when no group overrides exist, so
+  // the common case adds no work and no extra render.
+  const amountSources = useMemo(() => {
+    const overrides = groups
+      .filter(g => !g.isDerived && g.amount != null)
+      .map(g => ({ id: groupAmountKey(g.id), amount: g.amount, currency: g.currency }));
+    return overrides.length > 0 ? [...lines, ...overrides] : lines;
+  }, [lines, groups]);
+  const { amountById, converting } = usePlanLineAmounts(amountSources, planCurrency);
 
   // Live totals: allocated = Σ allocation amounts, expected = Σ income lines,
   // remainder = expected − allocated. Same precise decimal math as
@@ -233,6 +294,9 @@ const MonthlyPlanSection = forwardRef(function MonthlyPlanSection({
     let allocated = '0';
     let income = '0';
     let hasIncomeLine = false;
+    // Per-group child sums, so an override group can swap its own figure in for
+    // them below — the same correction calculatePlanStatus makes server-side.
+    const childSumByGroup = new Map();
     for (const line of lines) {
       const amount = amountById.get(line.id);
       if (amount == null) continue;
@@ -242,6 +306,26 @@ const MonthlyPlanSection = forwardRef(function MonthlyPlanSection({
         continue;
       }
       allocated = Currency.add(allocated, amount, planCurrency);
+      if (line.groupId != null) {
+        childSumByGroup.set(
+          line.groupId,
+          Currency.add(childSumByGroup.get(line.groupId) ?? '0', amount, planCurrency),
+        );
+      }
+    }
+    // An override REPLACES its children's sum: the user said the envelope is
+    // worth this much whatever its parts add up to (see the migration's note).
+    // A group with no line in this month contributes nothing either way.
+    for (const group of groups) {
+      if (group.isDerived) continue;
+      const childSum = childSumByGroup.get(group.id);
+      const groupAmount = amountById.get(groupAmountKey(group.id));
+      if (childSum == null || groupAmount == null) continue;
+      allocated = Currency.add(
+        Currency.subtract(allocated, childSum, planCurrency),
+        groupAmount,
+        planCurrency,
+      );
     }
     // Fallback for a plan whose expected income was never bridged into lines
     // (migration 0020 only skips that when income templates already exist).
@@ -250,7 +334,7 @@ const MonthlyPlanSection = forwardRef(function MonthlyPlanSection({
     }
     const remainder = Currency.subtract(income, allocated, planCurrency);
     return { income, allocated, remainder };
-  }, [plan, lines, amountById, planCurrency]);
+  }, [plan, lines, groups, amountById, planCurrency]);
 
   // Once the plan status has resolved (and is not stale — see freshPlanStatus
   // above), prefer its totals: those are computed with correct cross-currency
@@ -594,6 +678,156 @@ const MonthlyPlanSection = forwardRef(function MonthlyPlanSection({
     [moveInBlock, oneOffLines],
   );
 
+  /* ── Groups (migration 0022) ─────────────────────────────────────────────── */
+
+  // The groups that have something to show THIS month, each with its children
+  // split by scope — recurring and one-off lines keep separate sort_order
+  // sequences at the DB layer, so they also move within separate blocks here.
+  const groupViews = useMemo(() => {
+    const childrenByGroup = new Map();
+    for (const line of allocationLines) {
+      if (!isGrouped(line)) continue;
+      const current = childrenByGroup.get(line.groupId);
+      if (current) current.push(line);
+      else childrenByGroup.set(line.groupId, [line]);
+    }
+    return groups
+      .filter(group => childrenByGroup.has(group.id))
+      .map((group) => {
+        const children = childrenByGroup.get(group.id);
+        // The derived figure the group shows until (and unless) the async status
+        // lands: the same sum, from the same converted amounts the rows print.
+        let derived = '0';
+        for (const child of children) {
+          const amount = amountById.get(child.id);
+          if (amount != null) derived = Currency.add(derived, amount, planCurrency);
+        }
+        const override = amountById.get(groupAmountKey(group.id));
+        return {
+          group,
+          children,
+          recurring: children.filter(l => l.isRecurring),
+          oneOff: children.filter(l => !l.isRecurring),
+          displayAmount: group.isDerived ? derived : (override ?? null),
+          derived,
+        };
+      });
+  }, [groups, allocationLines, isGrouped, amountById, planCurrency]);
+
+  // One stable pair of movers per group, rebuilt only when the blocks themselves
+  // change — building them inline in the render would hand every child row a new
+  // `onMove` on each pass and defeat PlanLineRow's memo.
+  const groupMovers = useMemo(() => {
+    const map = new Map();
+    for (const view of groupViews) {
+      map.set(`${view.group.id}|r`, (index, direction) => moveInBlock(view.recurring, index, direction, true));
+      map.set(`${view.group.id}|o`, (index, direction) => moveInBlock(view.oneOff, index, direction, false));
+    }
+    return map;
+  }, [groupViews, moveInBlock]);
+
+  const moveGroup = useCallback(async (index, direction) => {
+    if (moveGuardRef.current) return;
+    const target = index + direction;
+    const ordered = groupViews.map(v => v.group);
+    if (target < 0 || target >= ordered.length) return;
+    moveGuardRef.current = true;
+    const reordered = ordered.slice();
+    const [moved] = reordered.splice(index, 1);
+    reordered.splice(target, 0, moved);
+    // Optimistic, then reconciled from the DB either way — same contract as
+    // moveInBlock. Groups not shown this month keep their stored order: only the
+    // visible ones are renumbered, and their relative order is all that shows.
+    const movedIds = new Set(reordered.map(g => g.id));
+    setGroups(prev => [...reordered, ...prev.filter(g => !movedIds.has(g.id))]);
+    try {
+      await reorderLineGroups(reordered.map(g => g.id));
+      await reloadLines();
+    } catch (error) {
+      console.error('Failed to reorder budget line groups:', error);
+      await reloadLines();
+    } finally {
+      moveGuardRef.current = false;
+    }
+  }, [groupViews, reorderLineGroups, reloadLines]);
+
+  const openEditGroup = useCallback((group) => setGroupModal({ visible: true, group }), []);
+  const closeGroupModal = useCallback(() => setGroupModal(CLOSED_GROUP_MODAL), []);
+
+  const handleSaveGroup = useCallback(async (groupData) => {
+    if (busyRef.current) return;
+    busyRef.current = true;
+    setBusy(true);
+    try {
+      if (groupModal.group) {
+        await updateLineGroup(groupModal.group.id, groupData);
+      } else {
+        await addLineGroup(groupData);
+      }
+      await reloadLines();
+      setStatusStale(true);
+      refreshPlanStatuses?.();
+      closeGroupModal();
+    } catch (error) {
+      // Error dialog already shown by the context.
+      console.error('Failed to save budget line group:', error);
+    } finally {
+      busyRef.current = false;
+      setBusy(false);
+    }
+  }, [groupModal.group, updateLineGroup, addLineGroup, reloadLines, refreshPlanStatuses, closeGroupModal]);
+
+  const handleDeleteGroup = useCallback(async (groupId) => {
+    try {
+      await deleteLineGroup(groupId);
+      // The lines inside are ungrouped, not deleted (ON DELETE SET NULL), so they
+      // reappear in the ungrouped blocks after this reload.
+      await reloadLines();
+      setStatusStale(true);
+      refreshPlanStatuses?.();
+      closeGroupModal();
+    } catch (error) {
+      console.error('Failed to delete budget line group:', error);
+    }
+  }, [deleteLineGroup, reloadLines, refreshPlanStatuses, closeGroupModal]);
+
+  // Creating a group from inside the line editor, so a line can join an envelope
+  // that doesn't exist yet without the form being abandoned.
+  const handleCreateGroupInline = useCallback(async (label) => {
+    const created = await addLineGroup({ label, sortOrder: groups.length });
+    if (created) setGroups(prev => [...prev, created]);
+    return created;
+  }, [addLineGroup, groups.length]);
+
+  const handleLongPressGroup = useCallback((group, index, listLength, onMove) => {
+    const moveActions = [];
+    if (onMove) {
+      if (index > 0) moveActions.push({ text: t('move_up'), onPress: () => onMove(index, -1) });
+      if (index < listLength - 1) moveActions.push({ text: t('move_down'), onPress: () => onMove(index, 1) });
+    }
+    showDialog(
+      t('select_action'),
+      group.label,
+      [
+        { text: t('edit_group'), onPress: () => openEditGroup(group) },
+        ...moveActions,
+        {
+          text: t('delete_group'),
+          style: 'destructive',
+          onPress: () => showDialog(
+            t('delete_group'),
+            t('delete_group_confirm'),
+            [
+              { text: t('cancel'), style: 'cancel' },
+              { text: t('delete'), style: 'destructive', onPress: () => handleDeleteGroup(group.id) },
+            ],
+          ),
+        },
+        { text: t('cancel'), style: 'cancel' },
+      ],
+    );
+  }, [t, showDialog, openEditGroup, handleDeleteGroup]);
+
   /* ── Rendering ───────────────────────────────────────────────────────────── */
 
   const lineIcon = useCallback((line) => {
@@ -606,13 +840,14 @@ const MonthlyPlanSection = forwardRef(function MonthlyPlanSection({
 
   // Shared row renderer for every block — each list moves independently (own
   // sort_order sequence), so `list` and `onMove` are passed in per block.
-  const renderLine = useCallback((line, index, list, onMove) => {
+  const renderLine = useCallback((line, index, list, onMove, indented = false) => {
     const executed = line.lastExecutedMonth === month;
     return (
       <PlanLineRow
         key={line.id}
         line={line}
         index={index}
+        indented={indented}
         name={lineDisplayName(line)}
         icon={lineIcon(line)}
         status={lineStatusById.get(line.id) || null}
@@ -640,6 +875,22 @@ const MonthlyPlanSection = forwardRef(function MonthlyPlanSection({
     handleMarkExecuted, handleUndoExecuted]);
 
   const hasAnyLines = lines.length > 0;
+
+  // Currencies the group editor may price an override in: the same set the line
+  // editor offers, for the same reason (a group belongs to no plan, so it needs
+  // to name its own).
+  const currencyOptions = useMemo(() => {
+    const set = new Set(accounts.map(a => a.currency));
+    if (planCurrency) set.add(planCurrency);
+    return [...set];
+  }, [accounts, planCurrency]);
+
+  // What the group being edited adds up to right now, shown next to the
+  // custom-budget toggle so an override is typed with the number it replaces in
+  // view.
+  const editedGroupDerivedTotal = groupModal.group
+    ? (groupViews.find(v => v.group.id === groupModal.group.id)?.derived ?? null)
+    : null;
 
   return (
     <>
@@ -712,6 +963,37 @@ const MonthlyPlanSection = forwardRef(function MonthlyPlanSection({
             <Text style={[styles.sectionTitle, { color: colors.text }]}>{t('allocations')}</Text>
           </View>
         </View>
+
+        {/* Groups first, each followed by its own lines one indent deeper. A
+            group is an envelope over allocations that need share nothing
+            structurally — categories from unrelated trees, a transfer target, a
+            recurring line next to a one-off one — so it sits above the loose
+            ones rather than among them. */}
+        {groupViews.map((view, groupIndex) => (
+          <React.Fragment key={view.group.id}>
+            <PlanGroupRow
+              group={view.group}
+              index={groupIndex}
+              listLength={groupViews.length}
+              status={groupStatusById.get(view.group.id) || null}
+              displayAmount={view.displayAmount}
+              converting={converting}
+              childCount={view.children.length}
+              colors={colors}
+              t={t}
+              pace={pace}
+              onMove={moveGroup}
+              onPress={openEditGroup}
+              onLongPress={handleLongPressGroup}
+            />
+            {view.recurring.map((line, index) => renderLine(
+              line, index, view.recurring, groupMovers.get(`${view.group.id}|r`), true,
+            ))}
+            {view.oneOff.map((line, index) => renderLine(
+              line, index, view.oneOff, groupMovers.get(`${view.group.id}|o`), true,
+            ))}
+          </React.Fragment>
+        ))}
 
         {recurringLines.map((line, index) => renderLine(line, index, recurringLines, handleMoveRecurring))}
         {oneOffLines.map((line, index) => renderLine(line, index, oneOffLines, handleMoveOneOff))}
@@ -829,10 +1111,24 @@ const MonthlyPlanSection = forwardRef(function MonthlyPlanSection({
           expenseCategories={expenseCategories}
           incomeCategories={incomeCategories}
           accounts={accounts}
+          groups={groups}
           saving={busy}
           onSaveLine={handleSaveLine}
           onDeleteLine={handleDeleteLine}
+          onCreateGroup={handleCreateGroupInline}
           onClose={closeModal}
+        />
+
+        <BudgetLineGroupModal
+          visible={groupModal.visible}
+          group={groupModal.group}
+          currency={planCurrency}
+          currencyOptions={currencyOptions}
+          derivedTotal={editedGroupDerivedTotal}
+          saving={busy}
+          onSave={handleSaveGroup}
+          onDelete={handleDeleteGroup}
+          onClose={closeGroupModal}
         />
       </View>
     </>
