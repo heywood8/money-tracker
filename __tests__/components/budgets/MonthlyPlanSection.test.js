@@ -368,20 +368,18 @@ describe('MonthlyPlanSection', () => {
       const { getByTestId, getByText, queryByText } = await renderSection();
       await waitFor(() => expect(getByTestId('plan-line-l1')).toBeTruthy());
       // The amount column carries the pair — actual against target, the two
-      // figures a person compares. Insignificant ".00" is trimmed so the pair
-      // fits beside the row's name; a real fractional part is kept.
+      // figures a person compares, as compact magnitudes: a row is scanned, not
+      // audited, and the pair shares one line with the category name.
       expect(getByText('150 / 300')).toBeTruthy();
-      // "remaining: 150" is gone with the bar: it is target minus actual, both
-      // of which are right there. So is the "50%" badge — the fill encodes the
-      // ratio, and a fourth encoding of one number is what made a row four text
-      // lines tall.
+      // "remaining: 150" is gone with the bar (target minus actual, both right
+      // there), so is the "50%" badge (the fill encodes the ratio), and so is
+      // "over budget by 50" — it made an overspent row two lines tall while
+      // every other row was one, restating a subtraction the pair already shows.
       expect(queryByText('remaining_budget: 150.00')).toBeNull();
       expect(queryByText('50%')).toBeNull();
-      // Overspend does keep its own words: a negative remainder is not something
-      // you subtract in your head while looking at a red row.
-      expect(getByText('over_budget_by 50')).toBeTruthy();
-      // ...and the row's fill is drawn in the overspend tone, with a "today"
-      // marker across it (the shown month is the current one).
+      expect(queryByText('over_budget_by 50')).toBeNull();
+      // The overspent row says so with its tone instead, and carries a "today"
+      // marker across the fill (the shown month is the current one).
       expect(getByTestId('plan-line-fill-l2')).toBeTruthy();
       expect(getByTestId('plan-line-fill-l2-pace')).toBeTruthy();
     });
@@ -977,7 +975,7 @@ describe('MonthlyPlanSection', () => {
       // a row stops being worth reading.
       expect(getByText('420 / 300')).toBeTruthy();
       expect(getByTestId('plan-line-fill-l-done')).toBeTruthy();
-      expect(getByTestId('plan-line-overspend-l-done')).toBeTruthy();
+      expect(fillTone(getByTestId, 'l-done')).toContain(COLORS.overspend);
     });
 
     // The row's fill IS its progress bar, and the hairline across it is today.
@@ -1034,12 +1032,17 @@ describe('MonthlyPlanSection', () => {
     // Three signals, replacing four fixed spent-percentage bands. The old scale
     // graded how much of the envelope was gone without knowing the date, so 99%
     // on the 27th and 76% on the 3rd came out the same shade of "fine".
-    it('tints a line that is behind the month pace with the calm tone', async () => {
-      // 1% spent — behind any pace, on any day.
+    it('leaves a line that is behind the month pace untinted', async () => {
+      // 1% spent — behind any pace, on any day. Colour is spent only where there
+      // is something to say: with every row tinted, ten coloured blocks sat side
+      // by side and none of them stood out.
       setPlans(pacedLine('l-calm', '1', '100'));
       const { getByTestId } = await renderSection();
       await waitFor(() => expect(getByTestId('plan-line-fill-l-calm')).toBeTruthy());
-      expect(fillTone(getByTestId, 'l-calm')).toContain(COLORS.primary);
+      const tone = fillTone(getByTestId, 'l-calm');
+      expect(tone).toContain(COLORS.mutedText);
+      expect(tone).not.toContain(COLORS.warning);
+      expect(tone).not.toContain(COLORS.overspend);
     });
 
     it('tints a line that is ahead of the month pace with the warning tone', async () => {
@@ -1055,6 +1058,23 @@ describe('MonthlyPlanSection', () => {
       const { getByTestId } = await renderSection();
       await waitFor(() => expect(getByTestId('plan-line-fill-l-over')).toBeTruthy());
       expect(fillTone(getByTestId, 'l-over')).toContain(COLORS.overspend);
+    });
+
+    it('states the ratio once in the template strip', async () => {
+      setPlans({
+        plans: [],
+        lines: [
+          TEMPLATE_LINE,
+          { ...TEMPLATE_LINE, id: 'l-tpl2', lastExecutedMonth: THIS_MONTH },
+        ],
+      });
+      const { getByTestId, queryByText } = await renderSection();
+      await waitFor(() => expect(getByTestId('summary-done-count')).toHaveTextContent('1 / 2'));
+      // The bar under it draws the same ratio; a "done: 1 / remaining: 1" line
+      // below that was a third and fourth statement of one fact.
+      expect(getByTestId('summary-progress-bar')).toBeTruthy();
+      expect(queryByText('done_count: 1')).toBeNull();
+      expect(queryByText('remaining_count: 1')).toBeNull();
     });
 
     it('has no add rows — the screen FAB owns adding', async () => {
@@ -1084,8 +1104,9 @@ describe('MonthlyPlanSection', () => {
     it('converts a foreign-currency line into the plan currency and prints no foreign code', async () => {
       rubPlanWithAmdLine();
       const { getByTestId } = await renderSection(undefined, { currency: 'RUB' });
-      await waitFor(() => expect(getByTestId('plan-line-l-amd')).toHaveTextContent(/69000/));
-      expect(getByTestId('plan-line-l-amd')).not.toHaveTextContent(/300000/);
+      // 69000 RUB, as the compact magnitude a row prints.
+      await waitFor(() => expect(getByTestId('plan-line-l-amd')).toHaveTextContent(/69K/));
+      expect(getByTestId('plan-line-l-amd')).not.toHaveTextContent(/300/);
       expect(getByTestId('plan-line-l-amd')).not.toHaveTextContent(/AMD/);
     });
 
