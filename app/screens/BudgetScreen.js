@@ -206,8 +206,13 @@ const BudgetScreen = () => {
               numberOfLines={1}
               testID="budget-remainder"
             >
+              {/* The code hangs off the hero only when there is no chip beside
+                  it to carry it — with a chip, printing it here says "RUB" twice
+                  a centimetre apart. With a single account currency there is no
+                  chip, and then this is the only place the screen names its
+                  unit at all. */}
               {planTotals
-                ? `${Currency.formatAmountTrimmed(planTotals.remainder, planTotals.currency)} ${planTotals.currency}`
+                ? `${Currency.formatAmountTrimmed(planTotals.remainder, planTotals.currency)}${currencies.length > 1 ? '' : ` ${planTotals.currency}`}`
                 : PENDING_PLACEHOLDER}
             </Text>
           )}
@@ -225,10 +230,14 @@ const BudgetScreen = () => {
               <Text style={[styles.currencyChipText, { color: colors.text }]}>{selectedCurrency}</Text>
               <Icon name="chevron-down" size={14} color={colors.mutedText} />
             </Pressable>
+            {/* Outlined, not a solid accent disc. Filled, it was the most
+                saturated thing on the screen — a secondary toggle outweighing
+                the month's headline figure right beside it. On state is carried
+                by the icon's colour and the border, which is as much weight as
+                a toggle needs. */}
             <Pressable
               onPress={handleToggleConvert}
               style={[styles.convertToggle, {
-                backgroundColor: convertAllBudgets ? colors.primary : colors.background,
                 borderColor: convertAllBudgets ? colors.primary : colors.border,
               }]}
               hitSlop={6}
@@ -237,7 +246,7 @@ const BudgetScreen = () => {
               accessibilityLabel={t('graphs_convert_currencies')}
               testID="budget-convert-toggle"
             >
-              <Icon name="cash-sync" size={16} color={convertAllBudgets ? colors.surface : colors.mutedText} />
+              <Icon name="cash-sync" size={16} color={convertAllBudgets ? colors.primary : colors.mutedText} />
             </Pressable>
           </View>
         )}

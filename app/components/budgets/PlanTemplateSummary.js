@@ -39,7 +39,9 @@ SummaryItem.propTypes = {
  * month. Precise decimal math and one labelled currency now, matching the totals
  * row below exactly.
  */
-export default function PlanTemplateSummary({ lines, month, amountById, planCurrency, colors, t }) {
+export default function PlanTemplateSummary({
+  lines, month, amountById, planCurrency, currencySuffix = '', colors, t,
+}) {
   const summary = useMemo(() => {
     let pendingOut = '0';
     let pendingIn = '0';
@@ -87,7 +89,7 @@ export default function PlanTemplateSummary({ lines, month, amountById, planCurr
           testID="summary-pending-out"
           color={colors.expense}
           mutedColor={colors.mutedText}
-          value={`${Currency.formatCompact(summary.pendingOut)} / ${Currency.formatCompact(summary.totalOut)} ${planCurrency}`}
+          value={`${Currency.formatCompact(summary.pendingOut)} / ${Currency.formatCompact(summary.totalOut)}${currencySuffix}`}
           label={t('pending_out')}
         />
         <View style={[styles.summaryDivider, { backgroundColor: colors.border }]} />
@@ -103,7 +105,7 @@ export default function PlanTemplateSummary({ lines, month, amountById, planCurr
           testID="summary-pending-in"
           color={colors.income}
           mutedColor={colors.mutedText}
-          value={`${Currency.formatCompact(summary.pendingIn)} / ${Currency.formatCompact(summary.totalIn)} ${planCurrency}`}
+          value={`${Currency.formatCompact(summary.pendingIn)} / ${Currency.formatCompact(summary.totalIn)}${currencySuffix}`}
           label={t('pending_in')}
         />
       </View>
@@ -118,17 +120,10 @@ export default function PlanTemplateSummary({ lines, month, amountById, planCurr
           ]}
         />
       </View>
-      {/* "<n> <word>" needs a counter form, not the button caption `done` or the
-          noun `remaining`: those produced "3 Готово" / "2 остаток" in Russian.
-          Label-first keeps every language grammatical. */}
-      <View style={styles.progressLabels}>
-        <Text style={[styles.progressLabel, { color: colors.mutedText }]}>
-          {`${t('done_count')}: ${summary.doneCount}`}
-        </Text>
-        <Text style={[styles.progressLabel, { color: colors.mutedText }]}>
-          {`${t('remaining_count')}: ${summary.total - summary.doneCount}`}
-        </Text>
-      </View>
+      {/* No "done: 2 / remaining: 1" line under the bar. The middle column
+          already reads "2 / 3" and the bar already draws the same ratio — a
+          third and fourth statement of one fact, in a strip whose whole job is
+          to state it once. */}
     </View>
   );
 }
@@ -138,6 +133,7 @@ PlanTemplateSummary.propTypes = {
   month: PropTypes.string.isRequired,
   amountById: PropTypes.instanceOf(Map).isRequired,
   planCurrency: PropTypes.string.isRequired,
+  currencySuffix: PropTypes.string,
   colors: PropTypes.object.isRequired,
   t: PropTypes.func.isRequired,
 };
@@ -146,14 +142,6 @@ const styles = StyleSheet.create({
   progressFill: {
     borderRadius: 2,
     height: 3,
-  },
-  progressLabel: {
-    fontSize: 11,
-  },
-  progressLabels: {
-    flexDirection: 'row',
-    justifyContent: 'space-between',
-    marginTop: 3,
   },
   progressTrack: {
     borderRadius: 2,

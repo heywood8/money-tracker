@@ -115,6 +115,13 @@ const MonthlyPlanSection = forwardRef(function MonthlyPlanSection({
   const planId = plan?.id ?? null;
   const planCurrency = plan?.currency || currency;
 
+  // The screen shows one currency and the host header names it, next to the
+  // control that changes it. Repeating the code on the summary strip, the income
+  // header and both totals printed "RUB" five times on one screen for a fact
+  // that cannot vary within it. Uncontrolled mode has no host header, so there
+  // the code stays — it would otherwise appear nowhere at all.
+  const currencySuffix = controlledMonth ? '' : ` ${planCurrency}`;
+
   // Plan-vs-actual status for the shown month (may be null while computing).
   const planStatus = (planId && planStatuses && planStatuses.get(planId)) || null;
 
@@ -624,6 +631,7 @@ const MonthlyPlanSection = forwardRef(function MonthlyPlanSection({
         month={month}
         amountById={amountById}
         planCurrency={planCurrency}
+        currencySuffix={currencySuffix}
         colors={colors}
         t={t}
       />
@@ -672,8 +680,8 @@ const MonthlyPlanSection = forwardRef(function MonthlyPlanSection({
               exact income is one tap away on the lines themselves. */}
           <Text style={[styles.sectionAmount, { color: colors.text }]} testID="plan-income-total">
             {planStatus
-              ? `${Currency.formatCompact(planStatus.totals.actualIncome)} / ${Currency.formatCompact(displayExpectedIncome)} ${planCurrency}`
-              : `${Currency.formatCompact(displayExpectedIncome)} ${planCurrency}`}
+              ? `${Currency.formatCompact(planStatus.totals.actualIncome)} / ${Currency.formatCompact(displayExpectedIncome)}${currencySuffix}`
+              : `${Currency.formatCompact(displayExpectedIncome)}${currencySuffix}`}
           </Text>
         </View>
 
@@ -751,7 +759,7 @@ const MonthlyPlanSection = forwardRef(function MonthlyPlanSection({
                 stays exact. */}
             <View style={[styles.totalsRow, { borderTopColor: colors.border }]} testID="plan-totals">
               <Text style={[styles.totalsLabel, { color: colors.mutedText }]} numberOfLines={1}>
-                {t('allocated')}: {Currency.formatCompact(displayAllocated)} {planCurrency}
+                {t('allocated')}: {Currency.formatCompact(displayAllocated)}{currencySuffix}
               </Text>
               {planStatus && (
                 <Text
@@ -759,7 +767,7 @@ const MonthlyPlanSection = forwardRef(function MonthlyPlanSection({
                   numberOfLines={1}
                   testID="plan-actual-total"
                 >
-                  {t('actual')}: {Currency.formatCompact(planStatus.totals.totalActual)} {planCurrency}
+                  {t('actual')}: {Currency.formatCompact(planStatus.totals.totalActual)}{currencySuffix}
                 </Text>
               )}
             </View>

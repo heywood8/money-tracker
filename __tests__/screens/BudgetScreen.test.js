@@ -264,8 +264,21 @@ describe('BudgetScreen', () => {
       const { getByTestId } = await render(<BudgetScreen />);
       await waitFor(() => expect(getByTestId('mock-report-remainder')).toBeTruthy());
       fireEvent.press(getByTestId('mock-report-remainder'));
-      // Trimmed of an all-zero decimal part, with the plan's currency beside it.
+      // Trimmed of an all-zero decimal part, and with no currency code: the chip
+      // sits a centimetre to its right and already names the unit.
+      await waitFor(() => expect(getByTestId('budget-remainder')).toHaveTextContent('-85745'));
+      expect(getByTestId('budget-remainder')).not.toHaveTextContent('AMD');
+    });
+
+    it('keeps the currency code on the hero when there is no chip to carry it', async () => {
+      // One account currency means no picker — and then the hero is the only
+      // place the screen names its unit at all.
+      setAccounts([{ id: 'a1', name: 'Ameria', currency: 'AMD' }]);
+      const { getByTestId, queryByTestId } = await render(<BudgetScreen />);
+      await waitFor(() => expect(getByTestId('mock-report-remainder')).toBeTruthy());
+      fireEvent.press(getByTestId('mock-report-remainder'));
       await waitFor(() => expect(getByTestId('budget-remainder')).toHaveTextContent('-85745 AMD'));
+      expect(queryByTestId('budget-currency-chip')).toBeNull();
     });
 
     it('replaces a negative remainder with the overspend colour', async () => {

@@ -78,14 +78,14 @@ const PlanLineRow = memo(function PlanLineRow({
   const tracked = showProgress && !!status && !isBroken && !isUnconvertible;
   const showFill = tracked && (!executed || status.isExceeded);
 
-  // Three signals, not four spent-percentage bands. The old scale (green /
-  // amber / orange / red at fixed thresholds) graded how much of the envelope
-  // was gone without knowing what day it was, so 99% on the 27th and 76% on the
-  // 3rd came out the same shade of "fine". Over target is over target; short of
-  // it, the only thing worth flagging is spending faster than the month passes.
+  // Tone is spent only on a row with something to say — over target, or ahead of
+  // the month's pace. A row that is simply on track gets no colour at all: with
+  // every row tinted, ten coloured blocks sat side by side and none of them
+  // stood out, which is the hierarchy problem the fill was supposed to solve.
+  // A null tone tells EnvelopeFill to wash the row in neutral grey instead.
   const paceFraction = tracked ? pace : null;
   const spentFraction = tracked ? status.percentage / 100 : 0;
-  let tone = colors.primary;
+  let tone = null;
   if (tracked && status.isExceeded) {
     tone = colors.overspend;
   } else if (tracked && paceFraction != null && spentFraction > paceFraction) {
@@ -95,17 +95,24 @@ const PlanLineRow = memo(function PlanLineRow({
   // The amount column carries the PAIR when the line is tracked — actual against
   // target, the two figures a person compares. The target alone appears only
   // where there is no actual to compare it with (income lines, a status still
-  // computing, an unconvertible line). It used to print the target here and the
-  // pair again on the line below, which is the same number twice.
+  // computing, an unconvertible line).
+  //
+  // Compact magnitudes (10.1K / 8.5K), not exact figures: a row is scanned, not
+  // audited, and the pair has to share one line with the category name in every
+  // shipped locale. The exact amounts are one tap away in the editor. No
+  // currency code either — the screen shows one currency, and the header states
+  // which. An unconvertible line is the exception on both counts: with no rate
+  // there is nothing to convert, so it keeps its stored figure in full and says
+  // what unit that is.
   let amountText;
   if (isUnconvertible) {
     amountText = `${Currency.formatAmount(line.amount, lineCurrency)} ${lineCurrency}`;
   } else if (displayAmount == null) {
     amountText = CONVERTING_PLACEHOLDER;
   } else if (tracked) {
-    amountText = `${Currency.formatAmountTrimmed(status.actual, planCurrency)} / ${Currency.formatAmountTrimmed(displayAmount, planCurrency)}`;
+    amountText = `${Currency.formatCompact(status.actual)} / ${Currency.formatCompact(displayAmount)}`;
   } else {
-    amountText = Currency.formatAmount(displayAmount, planCurrency);
+    amountText = Currency.formatCompact(displayAmount);
   }
 
   // Acting on a row leaves the Swipeable open otherwise: the actions are replaced
@@ -229,20 +236,13 @@ const PlanLineRow = memo(function PlanLineRow({
             {t('graphs_currencies_not_converted')}
           </Text>
         </View>
-      ) : tracked && status.isExceeded ? (
-        // The only figure that still earns a second line. "Remaining: 1355" was
-        // dropped with the bar: it is target minus actual, both of which sit an
-        // inch above it on the same row. A negative remainder is not something
-        // you subtract in your head while looking at a red row, so overspend
-        // keeps its own words.
-        <Text
-          style={[styles.overspendText, { color: colors.overspend }]}
-          numberOfLines={1}
-          testID={`plan-line-overspend-${line.id}`}
-        >
-          {t('over_budget_by')} {Currency.formatAmountTrimmed(Currency.abs(status.remaining), planCurrency)}
-        </Text>
       ) : null}
+      {/* No "over budget by 1575" line. It made an overspent row two lines tall
+          while every other row was one, so the list came out ragged, and it
+          restated a subtraction the reader can already see: the pair above it
+          reads 10.1K / 8.5K, left larger than right, on a red row. The two
+          remaining second lines are both errors — a broken link and a missing
+          exchange rate — which is what a second line should be for. */}
     </Pressable>
   );
 
@@ -400,12 +400,6 @@ const styles = StyleSheet.create({
   lineTop: {
     alignItems: 'center',
     flexDirection: 'row',
-  },
-  overspendText: {
-    fontSize: 12,
-    fontWeight: '600',
-    marginTop: 3,
-    textAlign: 'right',
   },
   swipeAction: {
     alignItems: 'center',
