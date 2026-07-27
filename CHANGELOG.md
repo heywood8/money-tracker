@@ -1,5 +1,12 @@
 # Changelog
 
+## [0.234.0](https://github.com/heywood8/money-tracker/compare/penny-v0.233.0...penny-v0.234.0) (2026-07-27)
+
+
+### Features
+
+* **graphs:** anchor the donut and animate the panel's tab transitions ([#1449](https://github.com/heywood8/money-tracker/issues/1449)) ([e49a97f](https://github.com/heywood8/money-tracker/commit/e49a97f38d5a4b0668f934e075b32c9b077f8903))
+
 ## [0.233.0](https://github.com/heywood8/money-tracker/compare/penny-v0.232.0...penny-v0.233.0) (2026-07-27)
 
 
