@@ -20,6 +20,12 @@ const lightTheme = {
     inputBorder: '#cccccc',
     calcButtonBackground: '#ffffff',
     danger: 'red',
+    // Budget-row signal colours. Real hex (unlike `danger`, a bare CSS keyword)
+    // because a plan row tints its background with these at a low alpha, which
+    // needs an appendable hex channel. `warning` means "ahead of the month's
+    // pace", `overspend` means "past the target".
+    warning: '#C77700',
+    overspend: '#C62828',
     delete: '#d9534f',
     selected: '#a8d0f5',
     altRow: '#ffffff', // Added for alternating rows
@@ -55,6 +61,10 @@ const darkTheme = {
     inputBorder: '#555555',
     calcButtonBackground: '#1e1e1e',
     danger: 'red',
+    // See lightTheme note. Lifted for legibility as a tint on a near-black
+    // surface.
+    warning: '#F2A93B',
+    overspend: '#FF6B6B',
     delete: '#ff6b6b',
     selected: '#003a7a',
     altRow: '#1a1a1a', // Added for alternating rows
