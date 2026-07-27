@@ -92,6 +92,24 @@ export const formatAmount = (amount, currencyOrDecimals = 2) => {
   return formatted;
 };
 
+/**
+ * Format an amount for a currency, then drop a decimal part that is all zeros:
+ * 98645.00 → "98645", 98645.50 → "98645.50".
+ *
+ * For places that print a PAIR of exact figures in tight space — a plan row's
+ * "98645 / 100000" — where ".00 / .00" is four characters of nothing, twice, and
+ * the difference decides whether the pair fits beside the row's name. Nothing is
+ * rounded away: a real fractional part is kept in full.
+ *
+ * @param {Decimal|string|number} amount
+ * @param {string|number} [currencyOrDecimals]
+ * @returns {string}
+ */
+export const formatAmountTrimmed = (amount, currencyOrDecimals = 2) => {
+  const formatted = formatAmount(amount, currencyOrDecimals);
+  return formatted.replace(/\.0+$/, '');
+};
+
 // Thresholds for formatCompact, largest first, so the loop below picks the first
 // unit whose magnitude the amount reaches.
 const COMPACT_UNITS = [

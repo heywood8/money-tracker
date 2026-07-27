@@ -14,7 +14,7 @@ import { SPACING } from '../../styles/layout';
 import BudgetPlanLineModal from './BudgetPlanLineModal';
 import PlanLineRow from './PlanLineRow';
 import PlanTemplateSummary from './PlanTemplateSummary';
-import { currentMonthKey, addMonths, formatMonthLabel } from '../../utils/monthUtils';
+import { currentMonthKey, addMonths, formatMonthLabel, monthProgressFraction } from '../../utils/monthUtils';
 
 const CLOSED_MODAL = { visible: false, line: null, kind: 'expense' };
 
@@ -106,6 +106,10 @@ const MonthlyPlanSection = forwardRef(function MonthlyPlanSection({
   // shown month IS the current one; other months still show the templates and
   // their (historical) done state.
   const isCurrentMonth = month === currentMonthKey();
+  // Where "today" sits within the shown month, for the marker each row draws
+  // across its fill. Null for any month but the current one, where being ahead
+  // of pace is not a thing that can be true.
+  const pace = useMemo(() => monthProgressFraction(month), [month]);
 
   const planId = plan?.id ?? null;
   const planCurrency = plan?.currency || currency;
@@ -587,6 +591,7 @@ const MonthlyPlanSection = forwardRef(function MonthlyPlanSection({
         canExecute={line.hasTemplate && isCurrentMonth && !executed}
         canUndo={line.hasTemplate && isCurrentMonth && executed}
         showProgress={line.kind !== 'income'}
+        pace={pace}
         listLength={list.length}
         onMove={onMove}
         onPress={openEditLine}
@@ -596,7 +601,7 @@ const MonthlyPlanSection = forwardRef(function MonthlyPlanSection({
         onUndo={handleUndoExecuted}
       />
     );
-  }, [colors, t, month, isCurrentMonth, lineStatusById, planCurrency, amountById, converting,
+  }, [colors, t, month, isCurrentMonth, pace, lineStatusById, planCurrency, amountById, converting,
     openEditLine, handleLongPressLine, lineDisplayName, lineIcon, handleExecute,
     handleMarkExecuted, handleUndoExecuted]);
 

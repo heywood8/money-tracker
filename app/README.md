@@ -136,7 +136,6 @@ SimpleTabs was moved here from `components/` to resolve a circular dependency. N
 
 **Root files:**
 - `AddFAB.js` - Floating action button for adding items
-- `StatusProgressBar.js` - Shared spent-vs-amount progress bar (budgets and monthly-plan lines)
 - `Calculator.js` - Calculator widget for amount entry
 - `EmptyState.js` - Empty list placeholder
 - `ErrorBoundary.js` - React error boundary wrapper

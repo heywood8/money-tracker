@@ -4,7 +4,7 @@ import { Swipeable } from 'react-native-gesture-handler';
 import PropTypes from 'prop-types';
 import Icon from '@expo/vector-icons/MaterialCommunityIcons';
 import * as Currency from '../../services/currency';
-import StatusProgressBar from '../StatusProgressBar';
+import EnvelopeFill from './EnvelopeFill';
 import { SPACING } from '../../styles/layout';
 
 // Stands in for a foreign-currency amount while its exchange rate resolves — an
@@ -44,6 +44,7 @@ const PlanLineRow = memo(function PlanLineRow({
   canExecute = false,
   canUndo = false,
   showProgress = true,
+  pace = null,
   listLength,
   onMove = null,
   onPress,
@@ -66,23 +67,46 @@ const PlanLineRow = memo(function PlanLineRow({
   // honest and an unlabelled one is not.
   const isUnconvertible = status?.status === 'unconvertible'
     || (displayAmount == null && lineCurrency !== planCurrency && !converting);
-  let amountText;
-  if (isUnconvertible) {
-    amountText = `${Currency.formatAmount(line.amount, lineCurrency)} ${lineCurrency}`;
-  } else if (displayAmount != null) {
-    amountText = Currency.formatAmount(displayAmount, planCurrency);
-  } else {
-    amountText = CONVERTING_PLACEHOLDER;
-  }
   // Both gates are decided by the host (they depend on the month being shown):
   // execution only makes sense for the current month, and so does undoing it.
   const swipeEnabled = canExecute || canUndo;
 
-  // A done row collapses to a single line: its bar would read 100% by
-  // construction of "executed", which is what the check badge already says. The
-  // exception is real overspend — actual above target is news, and burying it
-  // under a state the user set by hand is how a row stops being worth reading.
-  const showBar = showProgress && !!status && (!executed || status.isExceeded);
+  // A done row shows no fill: it would read 100% by construction of "executed",
+  // which is what the check badge already says. The exception is real overspend —
+  // actual above target is news, and burying it under a state the user set by
+  // hand is how a row stops being worth reading.
+  const tracked = showProgress && !!status && !isBroken && !isUnconvertible;
+  const showFill = tracked && (!executed || status.isExceeded);
+
+  // Three signals, not four spent-percentage bands. The old scale (green /
+  // amber / orange / red at fixed thresholds) graded how much of the envelope
+  // was gone without knowing what day it was, so 99% on the 27th and 76% on the
+  // 3rd came out the same shade of "fine". Over target is over target; short of
+  // it, the only thing worth flagging is spending faster than the month passes.
+  const paceFraction = tracked ? pace : null;
+  const spentFraction = tracked ? status.percentage / 100 : 0;
+  let tone = colors.primary;
+  if (tracked && status.isExceeded) {
+    tone = colors.overspend;
+  } else if (tracked && paceFraction != null && spentFraction > paceFraction) {
+    tone = colors.warning;
+  }
+
+  // The amount column carries the PAIR when the line is tracked — actual against
+  // target, the two figures a person compares. The target alone appears only
+  // where there is no actual to compare it with (income lines, a status still
+  // computing, an unconvertible line). It used to print the target here and the
+  // pair again on the line below, which is the same number twice.
+  let amountText;
+  if (isUnconvertible) {
+    amountText = `${Currency.formatAmount(line.amount, lineCurrency)} ${lineCurrency}`;
+  } else if (displayAmount == null) {
+    amountText = CONVERTING_PLACEHOLDER;
+  } else if (tracked) {
+    amountText = `${Currency.formatAmountTrimmed(status.actual, planCurrency)} / ${Currency.formatAmountTrimmed(displayAmount, planCurrency)}`;
+  } else {
+    amountText = Currency.formatAmount(displayAmount, planCurrency);
+  }
 
   // Acting on a row leaves the Swipeable open otherwise: the actions are replaced
   // (execute -> undo) but the row stays dragged aside, so its name and progress
@@ -120,6 +144,15 @@ const PlanLineRow = memo(function PlanLineRow({
       accessibilityLabel={`${t('edit_allocation')}: ${name}, ${amountText}, ${stateWords}`}
       testID={`plan-line-${line.id}`}
     >
+      {showFill && (
+        <EnvelopeFill
+          fraction={spentFraction}
+          paceFraction={paceFraction}
+          tone={tone}
+          mutedColor={colors.mutedText}
+          testID={`plan-line-fill-${line.id}`}
+        />
+      )}
       <View style={styles.lineTop}>
         <View>
           <Icon name={icon} size={20} color={executed ? colors.mutedText : colors.text} />
@@ -196,13 +229,19 @@ const PlanLineRow = memo(function PlanLineRow({
             {t('graphs_currencies_not_converted')}
           </Text>
         </View>
-      ) : showBar ? (
-        <StatusProgressBar
-          status={{ ...status, spent: status.actual, currency: planCurrency }}
-          compact
-          showDetails
-          style={styles.lineProgress}
-        />
+      ) : tracked && status.isExceeded ? (
+        // The only figure that still earns a second line. "Remaining: 1355" was
+        // dropped with the bar: it is target minus actual, both of which sit an
+        // inch above it on the same row. A negative remainder is not something
+        // you subtract in your head while looking at a red row, so overspend
+        // keeps its own words.
+        <Text
+          style={[styles.overspendText, { color: colors.overspend }]}
+          numberOfLines={1}
+          testID={`plan-line-overspend-${line.id}`}
+        >
+          {t('over_budget_by')} {Currency.formatAmountTrimmed(Currency.abs(status.remaining), planCurrency)}
+        </Text>
       ) : null}
     </Pressable>
   );
@@ -296,6 +335,7 @@ PlanLineRow.propTypes = {
   canExecute: PropTypes.bool,
   canUndo: PropTypes.bool,
   showProgress: PropTypes.bool,
+  pace: PropTypes.number,
   onMove: PropTypes.func,
   onPress: PropTypes.func.isRequired,
   onLongPress: PropTypes.func.isRequired,
@@ -350,18 +390,22 @@ const styles = StyleSheet.create({
     flexDirection: 'row',
     gap: 5,
   },
-  lineProgress: {
-    marginBottom: 0,
-    marginTop: 6,
-  },
   lineRow: {
     borderRadius: 8,
-    paddingHorizontal: 4,
+    // Clips the background fill to the row's rounded corners.
+    overflow: 'hidden',
+    paddingHorizontal: SPACING.sm,
     paddingVertical: SPACING.sm,
   },
   lineTop: {
     alignItems: 'center',
     flexDirection: 'row',
+  },
+  overspendText: {
+    fontSize: 12,
+    fontWeight: '600',
+    marginTop: 3,
+    textAlign: 'right',
   },
   swipeAction: {
     alignItems: 'center',

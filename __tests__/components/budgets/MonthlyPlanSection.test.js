@@ -17,6 +17,8 @@ const COLORS = {
   delete: '#ff6b6b',
   selected: '#2a2e38',
   altRow: '#16191f',
+  warning: '#F2A93B',
+  overspend: '#FF6B6B',
 };
 
 jest.mock('../../../app/contexts/ThemeColorsContext', () => ({
@@ -365,17 +367,23 @@ describe('MonthlyPlanSection', () => {
       setPlanWithStatus();
       const { getByTestId, getByText, queryByText } = await renderSection();
       await waitFor(() => expect(getByTestId('plan-line-l1')).toBeTruthy());
-      // StatusProgressBar details: "actual / amount" and the remaining text.
-      // Both sides are formatted — the right-hand figure used to be the raw DB
-      // string, so a row read "150.00 / 300".
-      expect(getByText('150.00 / 300.00')).toBeTruthy();
-      expect(getByText('remaining_budget: 150.00')).toBeTruthy();
-      // No percentage label: the fill encodes the ratio and the two figures
-      // above spell it out twice more. A fourth encoding of one number is what
-      // made a row four text lines tall.
+      // The amount column carries the pair — actual against target, the two
+      // figures a person compares. Insignificant ".00" is trimmed so the pair
+      // fits beside the row's name; a real fractional part is kept.
+      expect(getByText('150 / 300')).toBeTruthy();
+      // "remaining: 150" is gone with the bar: it is target minus actual, both
+      // of which are right there. So is the "50%" badge — the fill encodes the
+      // ratio, and a fourth encoding of one number is what made a row four text
+      // lines tall.
+      expect(queryByText('remaining_budget: 150.00')).toBeNull();
       expect(queryByText('50%')).toBeNull();
-      // The exceeded transfer line shows the over-budget wording.
-      expect(getByText('over_budget_by 50.00')).toBeTruthy();
+      // Overspend does keep its own words: a negative remainder is not something
+      // you subtract in your head while looking at a red row.
+      expect(getByText('over_budget_by 50')).toBeTruthy();
+      // ...and the row's fill is drawn in the overspend tone, with a "today"
+      // marker across it (the shown month is the current one).
+      expect(getByTestId('plan-line-fill-l2')).toBeTruthy();
+      expect(getByTestId('plan-line-fill-l2-pace')).toBeTruthy();
     });
 
     it('shows actual income against expected income in the header', async () => {
@@ -942,22 +950,22 @@ describe('MonthlyPlanSection', () => {
       unconvertible: [],
     }]]);
 
-    it('collapses a done row to a single line — no bar, no comment', async () => {
+    it('collapses a done row to a single line — no fill, no comment', async () => {
       setPlans({
         plans: [{ id: 'p1', month: THIS_MONTH, currency: 'USD', expectedIncome: '1000' }],
         lines: [doneLine],
         planStatuses: statusFor('300', '300', false),
       });
-      const { getByTestId, queryByText } = await renderSection();
+      const { getByTestId, queryByTestId, queryByText } = await renderSection();
       await waitFor(() => expect(getByTestId('plan-line-l-done')).toBeTruthy());
-      // A done line's bar reads 100% by construction of "executed" — which is
+      // A done line's fill reads 100% by construction of "executed" — which is
       // what the check badge already says.
-      expect(queryByText('300.00 / 300.00')).toBeNull();
+      expect(queryByTestId('plan-line-fill-l-done')).toBeNull();
       expect(queryByText('monthly')).toBeNull();
       expect(getByTestId('plan-line-check-l-done')).toBeTruthy();
     });
 
-    it('still shows the bar on a done row that went over target', async () => {
+    it('still shows the fill on a done row that went over target', async () => {
       setPlans({
         plans: [{ id: 'p1', month: THIS_MONTH, currency: 'USD', expectedIncome: '1000' }],
         lines: [doneLine],
@@ -967,7 +975,86 @@ describe('MonthlyPlanSection', () => {
       await waitFor(() => expect(getByTestId('plan-line-l-done')).toBeTruthy());
       // Overspend is news; burying it under a state the user set by hand is how
       // a row stops being worth reading.
-      expect(getByText('420.00 / 300.00')).toBeTruthy();
+      expect(getByText('420 / 300')).toBeTruthy();
+      expect(getByTestId('plan-line-fill-l-done')).toBeTruthy();
+      expect(getByTestId('plan-line-overspend-l-done')).toBeTruthy();
+    });
+
+    // The row's fill IS its progress bar, and the hairline across it is today.
+    // Without that marker a percentage is not a judgement: 99% of an envelope
+    // spent is unremarkable on the 27th and alarming on the 3rd, and the old
+    // four-band colour scale could not tell those apart because it never knew
+    // the date.
+    const pacedLine = (id, actual, amount, isExceeded = false) => ({
+      plans: [{ id: 'p1', month: THIS_MONTH, currency: 'USD', expectedIncome: '1000' }],
+      lines: [{
+        id, planId: 'p1', amount, label: 'Food', comment: null, kind: 'expense',
+        categoryId: 'cat1', toAccountId: null, sortOrder: 0, isBroken: false,
+      }],
+      planStatuses: new Map([['p1', {
+        planId: 'p1', month: THIS_MONTH, currency: 'USD', convertAll: false,
+        lines: [{
+          lineId: id, broken: false, amount, actual,
+          remaining: String(Number(amount) - Number(actual)),
+          percentage: (Number(actual) / Number(amount)) * 100,
+          isExceeded, status: isExceeded ? 'exceeded' : 'safe',
+        }],
+        totals: {
+          expectedIncome: '1000.00', actualIncome: '0.00', allocated: amount,
+          totalActual: actual, plannedRemainder: '0.00', actualRemainder: '0.00',
+        },
+        unconvertible: [],
+      }]]),
+    });
+
+    const fillTone = (getByTestId, id) =>
+      StyleSheet.flatten(getByTestId(`plan-line-fill-${id}-bar`).props.style).backgroundColor;
+
+    it('draws the today marker on the current month', async () => {
+      setPlans(pacedLine('l-pace', '10', '100'));
+      const { getByTestId } = await renderSection();
+      await waitFor(() => expect(getByTestId('plan-line-fill-l-pace')).toBeTruthy());
+      expect(getByTestId('plan-line-fill-l-pace-pace')).toBeTruthy();
+    });
+
+    it('omits the today marker on a month that is not the current one', async () => {
+      const previous = pacedLine('l-pace', '10', '100');
+      previous.plans[0].month = PREV_MONTH;
+      previous.planStatuses = new Map([['p1', {
+        ...previous.planStatuses.get('p1'), month: PREV_MONTH,
+      }]]);
+      setPlans(previous);
+      const { getByTestId, queryByTestId } = await renderSection(undefined, { month: PREV_MONTH });
+      await waitFor(() => expect(getByTestId('plan-line-fill-l-pace')).toBeTruthy());
+      // A past month is fully spent and a future one hasn't started; in neither
+      // case does "are you ahead of pace" mean anything.
+      expect(queryByTestId('plan-line-fill-l-pace-pace')).toBeNull();
+    });
+
+    // Three signals, replacing four fixed spent-percentage bands. The old scale
+    // graded how much of the envelope was gone without knowing the date, so 99%
+    // on the 27th and 76% on the 3rd came out the same shade of "fine".
+    it('tints a line that is behind the month pace with the calm tone', async () => {
+      // 1% spent — behind any pace, on any day.
+      setPlans(pacedLine('l-calm', '1', '100'));
+      const { getByTestId } = await renderSection();
+      await waitFor(() => expect(getByTestId('plan-line-fill-l-calm')).toBeTruthy());
+      expect(fillTone(getByTestId, 'l-calm')).toContain(COLORS.primary);
+    });
+
+    it('tints a line that is ahead of the month pace with the warning tone', async () => {
+      // 99% spent — ahead of the month's pace on any day of it.
+      setPlans(pacedLine('l-ahead', '99', '100'));
+      const { getByTestId } = await renderSection();
+      await waitFor(() => expect(getByTestId('plan-line-fill-l-ahead')).toBeTruthy());
+      expect(fillTone(getByTestId, 'l-ahead')).toContain(COLORS.warning);
+    });
+
+    it('tints a line past its target with the overspend tone', async () => {
+      setPlans(pacedLine('l-over', '140', '100', true));
+      const { getByTestId } = await renderSection();
+      await waitFor(() => expect(getByTestId('plan-line-fill-l-over')).toBeTruthy());
+      expect(fillTone(getByTestId, 'l-over')).toContain(COLORS.overspend);
     });
 
     it('has no add rows — the screen FAB owns adding', async () => {

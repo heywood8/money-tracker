@@ -95,6 +95,29 @@ describe('Currency Service', () => {
     });
   });
 
+  describe('formatAmountTrimmed', () => {
+    it('drops an all-zero decimal part', async () => {
+      expect(Currency.formatAmountTrimmed('98645', 'USD')).toBe('98645');
+      expect(Currency.formatAmountTrimmed('98645.00', 'USD')).toBe('98645');
+      expect(Currency.formatAmountTrimmed('0', 'USD')).toBe('0');
+    });
+
+    it('keeps a real fractional part in full', async () => {
+      // Nothing is rounded away — this trims padding, it does not lose precision.
+      expect(Currency.formatAmountTrimmed('98645.50', 'USD')).toBe('98645.50');
+      expect(Currency.formatAmountTrimmed('0.01', 'USD')).toBe('0.01');
+      expect(Currency.formatAmountTrimmed('12.30', 'USD')).toBe('12.30');
+    });
+
+    it('leaves a zero-decimal currency alone', async () => {
+      expect(Currency.formatAmountTrimmed('10000', 'JPY')).toBe('10000');
+    });
+
+    it('keeps negatives signed', async () => {
+      expect(Currency.formatAmountTrimmed('-300.00', 'USD')).toBe('-300');
+    });
+  });
+
   describe('formatCompact', () => {
     it('leaves amounts below a thousand exact and integral', async () => {
       expect(Currency.formatCompact('0')).toBe('0');
