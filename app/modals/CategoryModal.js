@@ -8,8 +8,11 @@ import {
   TouchableOpacity,
   Keyboard,
   Animated,
+  Easing,
   Dimensions,
 } from 'react-native';
+import { DURATION_ENTER, DURATION_EXIT } from '../utils/motion';
+import { motionDuration } from '../utils/reducedMotion';
 import { TextInput as PaperTextInput, TouchableRipple } from 'react-native-paper';
 import Icon from '@expo/vector-icons/MaterialCommunityIcons';
 import { useThemeColors } from '../contexts/ThemeColorsContext';
@@ -105,15 +108,29 @@ export default function CategoryModal({ visible, onClose, category, isNew }) {
     );
   }, [category, deleteCategory, onClose, t, showDialog]);
 
+  // Both directions state their easing. An `Animated.timing` without one gets
+  // React Native's `Easing.inOut(Easing.ease)` default — symmetric, slow off the
+  // mark in both directions — which is why this picker used to feel heavier than
+  // the identical picker in SplitOperationModal. Decelerate in, accelerate out,
+  // per the subpanel convention in CLAUDE.md.
   const handleOpenPicker = useCallback((pickerKey) => {
     pickerSlideAnim.setValue(Dimensions.get('window').width);
     setActivePicker(pickerKey);
-    Animated.timing(pickerSlideAnim, { toValue: 0, duration: 260, useNativeDriver: true }).start();
+    Animated.timing(pickerSlideAnim, {
+      toValue: 0,
+      duration: motionDuration(DURATION_ENTER),
+      easing: Easing.out(Easing.cubic),
+      useNativeDriver: true,
+    }).start();
   }, [pickerSlideAnim]);
 
   const handleClosePicker = useCallback(() => {
-    Animated.timing(pickerSlideAnim, { toValue: Dimensions.get('window').width, duration: 260, useNativeDriver: true })
-      .start(() => setActivePicker(null));
+    Animated.timing(pickerSlideAnim, {
+      toValue: Dimensions.get('window').width,
+      duration: motionDuration(DURATION_EXIT),
+      easing: Easing.in(Easing.quad),
+      useNativeDriver: true,
+    }).start(() => setActivePicker(null));
   }, [pickerSlideAnim]);
 
   const potentialParents = useMemo(() => {

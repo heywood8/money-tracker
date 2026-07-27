@@ -18,6 +18,8 @@ import { useAccountsData } from '../contexts/AccountsDataContext';
 import { useAccountsActions } from '../contexts/AccountsActionsContext';
 import { useLocalization } from '../contexts/LocalizationContext';
 import { getDefaultAccountId, setDefaultAccountId } from '../services/PreferencesDB';
+import { DURATION_ENTER, DURATION_EXIT } from '../utils/motion';
+import { motionDuration } from '../utils/reducedMotion';
 import { computeNetWorthSummary, getOperationsByDateRange } from '../services/OperationsDB';
 import { appEvents, EVENTS } from '../services/eventEmitter';
 import { parseCardMasks, serializeCardMasks, cardMaskLast4 } from '../utils/cardMask';
@@ -565,7 +567,7 @@ export default function AccountsScreen({ onBackStateChange }) {
     setNewCardMask('');
     Animated.timing(formPanelAnim, {
       toValue: 1,
-      duration: 260,
+      duration: motionDuration(DURATION_ENTER),
       easing: Easing.out(Easing.cubic),
       useNativeDriver: true,
     }).start();
@@ -574,7 +576,7 @@ export default function AccountsScreen({ onBackStateChange }) {
   const closeFormPanel = useCallback(() => {
     Animated.timing(formPanelAnim, {
       toValue: 0,
-      duration: 200,
+      duration: motionDuration(DURATION_EXIT),
       easing: Easing.in(Easing.quad),
       useNativeDriver: true,
     }).start(() => {
@@ -675,16 +677,21 @@ export default function AccountsScreen({ onBackStateChange }) {
     setCurrencyPanelVisible(true);
     Animated.timing(currencySlideAnim, {
       toValue: 0,
-      duration: 260,
+      duration: motionDuration(DURATION_ENTER),
       easing: Easing.out(Easing.cubic),
       useNativeDriver: true,
     }).start();
   }, [currencySlideAnim]);
 
   const handleClosePicker = useCallback(() => {
+    // Accelerating and shorter than the entry, like closeFormPanel above it and
+    // every other subpanel in the app. Left without an `easing` this inherited
+    // React Native's symmetric `inOut(ease)` default, so the currency picker was
+    // the one panel that took as long to leave as it did to arrive.
     Animated.timing(currencySlideAnim, {
       toValue: Dimensions.get('window').width,
-      duration: 260,
+      duration: motionDuration(DURATION_EXIT),
+      easing: Easing.in(Easing.quad),
       useNativeDriver: true,
     }).start(() => setCurrencyPanelVisible(false));
   }, [currencySlideAnim]);

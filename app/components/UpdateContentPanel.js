@@ -6,6 +6,7 @@ import Ionicons from '@expo/vector-icons/Ionicons';
 import { useThemeColors } from '../contexts/ThemeColorsContext';
 import { useLocalization } from '../contexts/LocalizationContext';
 import { HORIZONTAL_PADDING, SPACING, BORDER_RADIUS } from '../styles/layout';
+import { motionDuration } from '../utils/reducedMotion';
 
 const DATE_RE = /(\d{4}-\d{2}-\d{2})/;
 const PR_RE = /#(\d+)/g;
@@ -385,7 +386,7 @@ export default function UpdateContentPanel({ isChecking = false, updateResult = 
     if (!isChecking && updateResult) {
       Animated.timing(contentAnim, {
         toValue: 1,
-        duration: 280,
+        duration: motionDuration(280),
         easing: Easing.out(Easing.quad),
         useNativeDriver: true,
       }).start();

@@ -17,6 +17,8 @@ import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import Icon from '@expo/vector-icons/MaterialCommunityIcons';
 import { useThemeColors } from '../contexts/ThemeColorsContext';
 import { TOP_CONTENT_SPACING, SPACING, BORDER_RADIUS } from '../styles/designTokens';
+import { DURATION_ENTER, DURATION_EXIT } from '../utils/motion';
+import { motionDuration } from '../utils/reducedMotion';
 import AddFAB from '../components/AddFAB';
 import EmptyState from '../components/EmptyState';
 import LoadingView from '../components/LoadingView';
@@ -102,16 +104,16 @@ const CategoriesScreen = ({ onBackStateChange }) => {
     setFormErrors({});
     setActivePanel('form');
     Animated.parallel([
-      Animated.timing(listAnim, { toValue: 1, duration: 200, easing: Easing.in(Easing.quad), useNativeDriver: true }),
-      Animated.timing(formAnim, { toValue: 1, duration: 260, easing: Easing.out(Easing.cubic), useNativeDriver: true }),
+      Animated.timing(listAnim, { toValue: 1, duration: motionDuration(DURATION_EXIT), easing: Easing.in(Easing.quad), useNativeDriver: true }),
+      Animated.timing(formAnim, { toValue: 1, duration: motionDuration(DURATION_ENTER), easing: Easing.out(Easing.cubic), useNativeDriver: true }),
     ]).start();
   }, [listAnim, formAnim, gridParentId, categories]);
 
   const closeForm = useCallback(() => {
     Keyboard.dismiss();
     Animated.parallel([
-      Animated.timing(formAnim, { toValue: 0, duration: 180, easing: Easing.in(Easing.quad), useNativeDriver: true }),
-      Animated.timing(listAnim, { toValue: 0, duration: 240, easing: Easing.out(Easing.cubic), useNativeDriver: true }),
+      Animated.timing(formAnim, { toValue: 0, duration: motionDuration(180), easing: Easing.in(Easing.quad), useNativeDriver: true }),
+      Animated.timing(listAnim, { toValue: 0, duration: motionDuration(240), easing: Easing.out(Easing.cubic), useNativeDriver: true }),
     ]).start(() => {
       setActivePanel(null);
       setFormErrors({});
@@ -158,7 +160,7 @@ const CategoriesScreen = ({ onBackStateChange }) => {
     setActivePicker(pickerKey);
     Animated.timing(pickerSlideAnim, {
       toValue: 0,
-      duration: 220,
+      duration: motionDuration(220),
       easing: Easing.out(Easing.cubic),
       useNativeDriver: true,
     }).start();
@@ -167,7 +169,7 @@ const CategoriesScreen = ({ onBackStateChange }) => {
   const handleClosePicker = useCallback(() => {
     Animated.timing(pickerSlideAnim, {
       toValue: Dimensions.get('window').width,
-      duration: 180,
+      duration: motionDuration(180),
       easing: Easing.in(Easing.quad),
       useNativeDriver: true,
     }).start(() => setActivePicker(null));

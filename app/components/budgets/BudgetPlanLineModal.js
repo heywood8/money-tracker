@@ -18,6 +18,8 @@ import PropTypes from 'prop-types';
 import Icon from '@expo/vector-icons/MaterialCommunityIcons';
 import { useThemeColors } from '../../contexts/ThemeColorsContext';
 import { useLocalization } from '../../contexts/LocalizationContext';
+import { DURATION_ENTER, DURATION_EXIT } from '../../utils/motion';
+import { motionDuration } from '../../utils/reducedMotion';
 import { useDialog } from '../../contexts/DialogContext';
 import FormInput from '../FormInput';
 import ModalBlurOverlay from '../ModalBlurOverlay';
@@ -181,10 +183,10 @@ export default function BudgetPlanLineModal({
     setActiveSubPanel(panel);
     Animated.parallel([
       Animated.timing(mainAnim, {
-        toValue: 1, duration: 200, easing: Easing.in(Easing.quad), useNativeDriver: true,
+        toValue: 1, duration: motionDuration(DURATION_EXIT), easing: Easing.in(Easing.quad), useNativeDriver: true,
       }),
       Animated.timing(subPanelAnim, {
-        toValue: 1, duration: 260, easing: Easing.out(Easing.cubic), useNativeDriver: true,
+        toValue: 1, duration: motionDuration(DURATION_ENTER), easing: Easing.out(Easing.cubic), useNativeDriver: true,
       }),
     ]).start();
   }, [mainAnim, subPanelAnim]);
@@ -193,10 +195,10 @@ export default function BudgetPlanLineModal({
     const token = ++subPanelTokenRef.current;
     Animated.parallel([
       Animated.timing(subPanelAnim, {
-        toValue: 0, duration: 180, easing: Easing.in(Easing.quad), useNativeDriver: true,
+        toValue: 0, duration: motionDuration(180), easing: Easing.in(Easing.quad), useNativeDriver: true,
       }),
       Animated.timing(mainAnim, {
-        toValue: 0, duration: 240, easing: Easing.out(Easing.cubic), useNativeDriver: true,
+        toValue: 0, duration: motionDuration(240), easing: Easing.out(Easing.cubic), useNativeDriver: true,
       }),
     ]).start(() => {
       if (subPanelTokenRef.current === token) setActiveSubPanel(null);

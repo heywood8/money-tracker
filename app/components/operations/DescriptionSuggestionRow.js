@@ -5,6 +5,7 @@ import { GestureDetector, Gesture } from 'react-native-gesture-handler';
 import { SPACING, FONT_SIZE, BORDER_RADIUS, DURATION } from '../../styles/designTokens';
 import { useSwipeNavigationGesture } from '../../contexts/SwipeNavigationContext';
 import { displayLabel } from '../../utils/labelUtils';
+import { motionDuration } from '../../utils/reducedMotion';
 
 const DescriptionSuggestionRow = ({ chips, colors, onApply, onDismiss }) => {
   // Entry polish only (rise into place). Like UndoSnackbar, this row is
@@ -25,7 +26,7 @@ const DescriptionSuggestionRow = ({ chips, colors, onApply, onDismiss }) => {
   useEffect(() => {
     Animated.timing(entryAnim, {
       toValue: 1,
-      duration: DURATION.fast,
+      duration: motionDuration(DURATION.fast),
       useNativeDriver: true,
     }).start();
   }, []);

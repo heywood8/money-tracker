@@ -1,6 +1,6 @@
 import React, { useState, useMemo, useCallback, useEffect, useRef } from 'react';
 import { View, StyleSheet, FlatList, TouchableOpacity, TextInput, Pressable, Modal, Keyboard, BackHandler } from 'react-native';
-import Animated, { useSharedValue, useAnimatedStyle, withTiming, Easing } from 'react-native-reanimated';
+import Animated, { useSharedValue, useAnimatedStyle, withTiming } from 'react-native-reanimated';
 import Icon from '@expo/vector-icons/MaterialCommunityIcons';
 import DateTimePicker from '@react-native-community/datetimepicker';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
@@ -38,8 +38,16 @@ import useQuickAddLocation from '../hooks/useQuickAddLocation';
 import usePendingOperationSuggestions from '../hooks/usePendingOperationSuggestions';
 import { useSearch } from '../contexts/SearchContext';
 import { useDisplaySettings } from '../contexts/DisplaySettingsContext';
+import { TIMING_ENTER, TIMING_EXIT, DURATION_ENTER, DURATION_EXIT } from '../utils/motion';
 
 // Note: dynamic createStyles removed to keep linting stable.
+
+// Ceiling for the quick-add clip, not a size: at rest the clip must not
+// constrain the form, because the form's height changes underneath it (transfer
+// fields appear, a suggestion deck stacks over it) and pinning it to whatever it
+// measured last would slice those off. The collapse animation never travels from
+// here — it starts at the block's measured height (see the searchMode effect).
+const QUICK_ADD_UNCLIPPED = 1000;
 
 // Map a QuickAdd validation failure to the form field that should flash red,
 // so single-field omissions get the same lightweight inline treatment the
@@ -123,20 +131,44 @@ const OperationsScreen = () => {
   const scrollOffsetRef = useRef(0);
   const prevFiltersExpandedRef = useRef(false);
   const prevSearchModeRef = useRef(searchMode);
-  const quickAddMaxHeight = useSharedValue(1000); // Large enough to not clip
+  const quickAddMaxHeight = useSharedValue(QUICK_ADD_UNCLIPPED);
   const quickAddTranslateY = useSharedValue(0);
+  // Live height of the block being clipped, measured on the slide container.
+  // A ref, not state: nothing renders from it, and onLayout fires often enough
+  // that a state write here would re-render the whole screen for nothing.
+  const quickAddClipHeightRef = useRef(0);
+  const handleQuickAddClipLayout = useCallback((event) => {
+    quickAddClipHeightRef.current = Math.round(event.nativeEvent.layout.height);
+  }, []);
 
   // Animate when searchMode changes
   useEffect(() => {
+    // Collapse from the block's REAL height rather than from the 1000 ceiling.
+    // Animating 1000 → 0 spends ~93% of its time above the form's ~200dp, where
+    // the clip touches nothing: the list below sat still for 300ms and then
+    // jumped as the last 20ms cut through the actual content. Starting at the
+    // measured height makes every frame of the collapse a frame the eye can see.
+    const measured = quickAddClipHeightRef.current || QUICK_ADD_UNCLIPPED;
     if (searchMode === 'open') {
-      // Outer clip collapses (easeIn so it accelerates into zero),
-      // inner content slides upward within the fixed clip boundary.
-      quickAddMaxHeight.value = withTiming(0, { duration: 320, easing: Easing.in(Easing.cubic) });
-      quickAddTranslateY.value = withTiming(-120, { duration: 320, easing: Easing.in(Easing.cubic) });
+      // Outer clip collapses; inner content slides upward within it, travelling
+      // exactly its own height so it clears the boundary as the boundary closes.
+      quickAddMaxHeight.value = measured;
+      quickAddMaxHeight.value = withTiming(0, { ...TIMING_EXIT, duration: DURATION_EXIT });
+      quickAddTranslateY.value = withTiming(-measured, { ...TIMING_EXIT, duration: DURATION_EXIT });
     } else {
-      // Slide back down — content descends into view as height expands.
-      quickAddTranslateY.value = withTiming(0, { duration: 300, easing: Easing.out(Easing.cubic) });
-      quickAddMaxHeight.value = withTiming(1000, { duration: 300, easing: Easing.out(Easing.cubic) });
+      // Slide back down — content descends into view as the clip opens.
+      quickAddTranslateY.value = withTiming(0, { ...TIMING_ENTER, duration: DURATION_ENTER });
+      quickAddMaxHeight.value = withTiming(
+        measured,
+        { ...TIMING_ENTER, duration: DURATION_ENTER },
+        (finished) => {
+          'worklet';
+          // Hand the ceiling back once the form is fully open, so it can grow
+          // (transfer fields, suggestion deck) without being clipped at the
+          // height it happened to have when search closed.
+          if (finished) quickAddMaxHeight.value = QUICK_ADD_UNCLIPPED;
+        },
+      );
     }
   }, [searchMode]);
 
@@ -1007,7 +1039,7 @@ const OperationsScreen = () => {
   const quickAddFormComponent = useMemo(() => (
     <>
       <Animated.View style={animatedQuickAddClipStyle}>
-        <Animated.View style={animatedQuickAddSlideStyle}>
+        <Animated.View style={animatedQuickAddSlideStyle} onLayout={handleQuickAddClipLayout}>
           {/* Deck container: the binding cards overlay the quick-add form
               (absolute, sized to the measured wrapper below), with top padding
               for the peeking edges of the cards behind the front one. The
@@ -1075,7 +1107,7 @@ const OperationsScreen = () => {
       </Animated.View>
       {filtersExpanded && filterPanelHeight > 0 && <View style={{ height: filterPanelHeight }} />}
     </>
-  ), [animatedQuickAddClipStyle, animatedQuickAddSlideStyle, colors, t, quickAddValues, visibleAccounts, filteredCategories, topCategoriesForType, getCategoryInfo, getAccountName, getAccountBalance, getCategoryName, openPicker, handleQuickAdd, handleAmountChange, handleExchangeRateChange, handleDestinationAmountChange, handleAutoAddWithCategory, topTransferAccountsForForm, handleAutoAddWithAccount, TYPES, rateSource, handleOperationCurrencyChange, foreignRateSource, foreignExchangeRate, filterPanelHeight, filtersExpanded, quickAddFlash, operationSuggestions, hasSuggestions, quickAddHeight, handleQuickAddLayout, accounts, categories, suggestionSaveErrors, suggestionChoices, setSuggestionChoice, acceptSuggestion, dismissSuggestion]);
+  ), [animatedQuickAddClipStyle, animatedQuickAddSlideStyle, handleQuickAddClipLayout, colors, t, quickAddValues, visibleAccounts, filteredCategories, topCategoriesForType, getCategoryInfo, getAccountName, getAccountBalance, getCategoryName, openPicker, handleQuickAdd, handleAmountChange, handleExchangeRateChange, handleDestinationAmountChange, handleAutoAddWithCategory, topTransferAccountsForForm, handleAutoAddWithAccount, TYPES, rateSource, handleOperationCurrencyChange, foreignRateSource, foreignExchangeRate, filterPanelHeight, filtersExpanded, quickAddFlash, operationSuggestions, hasSuggestions, quickAddHeight, handleQuickAddLayout, accounts, categories, suggestionSaveErrors, suggestionChoices, setSuggestionChoice, acceptSuggestion, dismissSuggestion]);
 
   // Auto-scroll to top when filter panel closes, but only if the user is still
   // near the top (hasn't scrolled into past dates). The threshold is filterPanelHeight:

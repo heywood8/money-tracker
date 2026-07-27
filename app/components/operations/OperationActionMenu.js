@@ -5,6 +5,7 @@ import Icon from '@expo/vector-icons/MaterialCommunityIcons';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import ModalBlurOverlay from '../ModalBlurOverlay';
 import { SPACING, BORDER_RADIUS, FONT_SIZE, ICON_SIZE } from '../../styles/designTokens';
+import { isReduceMotionEnabled } from '../../utils/reducedMotion';
 
 // Height reserved for the floating action bar; used to decide whether it fits
 // above the pressed row or has to sit below it.
@@ -30,6 +31,13 @@ export default function OperationActionMenu({ menu, colors, t, onClose, onEdit, 
 
   useEffect(() => {
     if (menu) {
+      // Under the OS "Remove animations" setting the menu is simply present: the
+      // lift is what carries the meaning here, and there is no fade left to keep
+      // once it is gone (`progress` drives the backdrop and the clone together).
+      if (isReduceMotionEnabled()) {
+        progress.setValue(1);
+        return;
+      }
       progress.setValue(0);
       Animated.spring(progress, {
         toValue: 1,

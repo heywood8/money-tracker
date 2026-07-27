@@ -7,6 +7,7 @@ import { useThemeColors } from '../contexts/ThemeColorsContext';
 import { useLocalization } from '../contexts/LocalizationContext';
 import { parseBankNotification } from '../services/notifications/parseBankNotification';
 import { HORIZONTAL_PADDING, SPACING, BORDER_RADIUS } from '../styles/layout';
+import { motionDuration } from '../utils/reducedMotion';
 
 // Renders the "date · time" label for a notification's post time. Mirrors the
 // update panel's timestamp treatment so the two subpanels read alike.
@@ -38,7 +39,7 @@ export function NotificationCard({ notification, colors, t, onReAdd = null, reAd
     if (!animateIn) return;
     Animated.timing(enterAnim, {
       toValue: 1,
-      duration: 320,
+      duration: motionDuration(320),
       easing: Easing.out(Easing.cubic),
       useNativeDriver: true,
     }).start();
@@ -156,7 +157,7 @@ export default function NotificationsContentPanel({ isLoading = false, notificat
     }
     Animated.timing(contentAnim, {
       toValue: 1,
-      duration: 280,
+      duration: motionDuration(280),
       easing: Easing.out(Easing.quad),
       useNativeDriver: true,
     }).start();

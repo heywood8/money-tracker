@@ -3,6 +3,7 @@ import PropTypes from 'prop-types';
 import { View, Text, StyleSheet, Animated, Easing } from 'react-native';
 import NotificationBindingCard from './NotificationBindingCard';
 import { SPACING, BORDER_RADIUS } from '../../styles/designTokens';
+import { motionDuration } from '../../utils/reducedMotion';
 
 // At most this many cards render as deck layers; the rest are summed up in the
 // "+N" badge and surface as the front cards drain.
@@ -48,7 +49,7 @@ const DeckSlot = memo(function DeckSlot({
   useEffect(() => {
     Animated.timing(enterAnim, {
       toValue: 1,
-      duration: 320,
+      duration: motionDuration(320),
       easing: Easing.out(Easing.cubic),
       useNativeDriver: true,
     }).start();
