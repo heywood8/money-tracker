@@ -46,10 +46,10 @@ const StatusProgressBar = ({ status, compact = false, showDetails = true, style 
 
   return (
     <View style={[styles.container, style]}>
-      {/* Progress bar, with the compact-mode percentage beside it rather than
-          absolutely positioned over it — the old badge sat on the track's right
-          end with no space reserved, so it overlapped both the bar and the
-          details line below (worst where the right-hand detail is long). */}
+      {/* Progress bar. No percentage label: the fill already encodes the ratio,
+          and the details line below spells out the same fact twice more
+          ("98645 / 100000" and "remaining: 1355") — a fourth encoding of one
+          number is what made a plan row four text lines tall. */}
       <View style={styles.trackRow}>
         <View style={[styles.progressTrack, { backgroundColor: colors.border }]}>
           <View
@@ -62,17 +62,6 @@ const StatusProgressBar = ({ status, compact = false, showDetails = true, style 
             ]}
           />
         </View>
-        {compact && (
-          <Text
-            variant="bodySmall"
-            style={[
-              styles.percentageText,
-              status.isExceeded ? styles.exceededText : { color: colors.mutedText },
-            ]}
-          >
-            {Math.round(status.percentage)}%
-          </Text>
-        )}
       </View>
 
       {/* Details */}
@@ -117,12 +106,6 @@ const styles = StyleSheet.create({
   },
   exceededText: {
     color: '#F44336',
-  },
-  percentageText: {
-    fontWeight: '500',
-    minWidth: 34,
-    textAlign: 'right',
-    // color set dynamically
   },
   progressFill: {
     borderRadius: 3,

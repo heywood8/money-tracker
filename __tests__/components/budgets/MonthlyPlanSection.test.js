@@ -196,6 +196,55 @@ const renderSection = (ref, extraProps = {}) => render(
 
 const flatColor = (node) => StyleSheet.flatten(node.props.style)?.color;
 
+// The dashed "+ Add income" / "+ Add allocation" rows are gone: the screen's
+// single FAB opens the same editor through the section's imperative handle, and
+// the editor's own kind segment picks income vs expense. Tests drive it the way
+// the host does.
+const openEditor = async (ref, kind = 'expense') => {
+  await act(async () => {
+    if (kind === 'income') {
+      ref.current.openAddIncome();
+    } else {
+      ref.current.openAddLine();
+    }
+  });
+};
+
+// Reordering moved off the rows (a chevron pair on every one) and into the
+// long-press action sheet. `t` is the identity function here, so an action's
+// text is its translation key.
+const lastDialogAction = (key) => {
+  const calls = mockShowDialog.mock.calls;
+  const buttons = calls[calls.length - 1][2];
+  const action = buttons.find(b => b.text === key);
+  if (!action) {
+    throw new Error(`No "${key}" action in the last dialog: ${buttons.map(b => b.text).join(', ')}`);
+  }
+  return action;
+};
+
+const hasDialogAction = (key) => {
+  const calls = mockShowDialog.mock.calls;
+  return calls[calls.length - 1][2].some(b => b.text === key);
+};
+
+// Always act()-wrapped: several tests here long-press a row while its own
+// reorder/save round trip is still in flight, and firing an event outside act()
+// in that state leaves React work half-committed — which showed up not as a
+// failure here but as the NEXT test rendering an empty tree.
+const longPressLine = async (getByTestId, lineId) => {
+  await act(async () => {
+    fireEvent(getByTestId(`plan-line-${lineId}`), 'longPress');
+  });
+};
+
+const moveLine = async (getByTestId, lineId, direction) => {
+  await longPressLine(getByTestId, lineId);
+  await act(async () => {
+    lastDialogAction(direction === -1 ? 'move_up' : 'move_down').onPress();
+  });
+};
+
 describe('MonthlyPlanSection', () => {
   beforeEach(() => {
     jest.clearAllMocks();
@@ -314,14 +363,17 @@ describe('MonthlyPlanSection', () => {
 
     it('renders per-line progress with actuals and status details', async () => {
       setPlanWithStatus();
-      const { getByTestId, getByText } = await renderSection();
+      const { getByTestId, getByText, queryByText } = await renderSection();
       await waitFor(() => expect(getByTestId('plan-line-l1')).toBeTruthy());
       // StatusProgressBar details: "actual / amount" and the remaining text.
       // Both sides are formatted — the right-hand figure used to be the raw DB
       // string, so a row read "150.00 / 300".
       expect(getByText('150.00 / 300.00')).toBeTruthy();
       expect(getByText('remaining_budget: 150.00')).toBeTruthy();
-      expect(getByText('50%')).toBeTruthy();
+      // No percentage label: the fill encodes the ratio and the two figures
+      // above spell it out twice more. A fourth encoding of one number is what
+      // made a row four text lines tall.
+      expect(queryByText('50%')).toBeNull();
       // The exceeded transfer line shows the over-budget wording.
       expect(getByText('over_budget_by 50.00')).toBeTruthy();
     });
@@ -373,8 +425,9 @@ describe('MonthlyPlanSection', () => {
 
     it('triggers a status refresh after saving a line', async () => {
       setPlanWithStatus();
-      const { getByTestId } = await renderSection();
-      await fireEvent.press(getByTestId('plan-add-line'));
+      const ref = React.createRef();
+      const { getByTestId } = await renderSection(ref);
+      await openEditor(ref);
       await waitFor(() => expect(getByTestId('mock-line-modal')).toBeTruthy());
       await fireEvent.press(getByTestId('mock-save-line'));
       await waitFor(() => expect(mockPlans.addLine).toHaveBeenCalled());
@@ -385,8 +438,9 @@ describe('MonthlyPlanSection', () => {
   describe('Interactions', () => {
     it('adds a line and reloads', async () => {
       setPlans({ plans: [{ id: 'p1', month: THIS_MONTH, currency: 'USD', expectedIncome: '1000' }], lines: [] });
-      const { getByTestId } = await renderSection();
-      await fireEvent.press(getByTestId('plan-add-line'));
+      const ref = React.createRef();
+      const { getByTestId } = await renderSection(ref);
+      await openEditor(ref);
       await waitFor(() => expect(getByTestId('mock-line-modal')).toBeTruthy());
       await fireEvent.press(getByTestId('mock-save-line'));
       await waitFor(() => expect(mockPlans.addLine).toHaveBeenCalled());
@@ -395,8 +449,9 @@ describe('MonthlyPlanSection', () => {
 
     it('adds an income line from the income section (Budgets v3 phase 3)', async () => {
       setPlans({ plans: [{ id: 'p1', month: THIS_MONTH, currency: 'USD', expectedIncome: '0' }], lines: [] });
-      const { getByTestId } = await renderSection();
-      await fireEvent.press(getByTestId('plan-add-income'));
+      const ref = React.createRef();
+      const { getByTestId } = await renderSection(ref);
+      await openEditor(ref, 'income');
       await waitFor(() => expect(getByTestId('mock-line-modal')).toBeTruthy());
       // The editor opens pre-set to the income kind.
       expect(capturedModalProps.initialKind).toBe('income');
@@ -432,7 +487,8 @@ describe('MonthlyPlanSection', () => {
       await waitFor(() => expect(getByTestId('plan-line-l-rec')).toBeTruthy());
       expect(getByTestId('plan-empty-state')).toBeTruthy();
       expect(queryByTestId('plan-line-execute-l-rec')).toBeNull(); // no template → not executable
-      expect(getByText('recurring')).toBeTruthy();
+      // Scope is a glyph beside the name now, not an uppercase text line.
+      expect(getByTestId('plan-line-recurring-l-rec')).toBeTruthy();
       // ...but NOT the "no plan yet" copy: it sat directly under a populated
       // list and above a totals row, contradicting both.
       expect(queryByTestId('plan-create-empty')).toBeTruthy();
@@ -448,8 +504,9 @@ describe('MonthlyPlanSection', () => {
 
     it('adding a recurring allocation calls addRecurringLine, not addLine, and needs no plan', async () => {
       setPlans({ plans: [], lines: [] });
-      const { getByTestId } = await renderSection();
-      await fireEvent.press(getByTestId('plan-add-line'));
+      const ref = React.createRef();
+      const { getByTestId } = await renderSection(ref);
+      await openEditor(ref);
       await waitFor(() => expect(getByTestId('mock-line-modal')).toBeTruthy());
       await fireEvent.press(getByTestId('mock-save-recurring-line'));
       await waitFor(() => expect(mockPlans.addRecurringLine).toHaveBeenCalled());
@@ -461,8 +518,9 @@ describe('MonthlyPlanSection', () => {
 
     it('saving a one-off allocation for a plan-less month lazily creates the plan first', async () => {
       setPlans({ plans: [], lines: [recurringLine] });
-      const { getByTestId } = await renderSection();
-      await fireEvent.press(getByTestId('plan-add-line'));
+      const ref = React.createRef();
+      const { getByTestId } = await renderSection(ref);
+      await openEditor(ref);
       await waitFor(() => expect(getByTestId('mock-line-modal')).toBeTruthy());
       await fireEvent.press(getByTestId('mock-save-line'));
       await waitFor(() => expect(mockPlans.addPlan).toHaveBeenCalledWith({ month: THIS_MONTH, currency: 'USD' }));
@@ -651,12 +709,13 @@ describe('MonthlyPlanSection', () => {
         .mockResolvedValue([
           { id: 'l1', planId: 'p1', amount: '300', label: 'New', comment: null, categoryId: 'cat1', toAccountId: null, sortOrder: 0, isBroken: false },
         ]);
-      const { getByTestId } = await renderSection();
+      const ref = React.createRef();
+      const { getByTestId } = await renderSection(ref);
 
       // Before any mutation: the (not-yet-stale) planStatus totals show as-is.
       await waitFor(() => expect(getByTestId('plan-totals')).toHaveTextContent(/999 USD/));
 
-      await fireEvent.press(getByTestId('plan-add-line'));
+      await openEditor(ref);
       await waitFor(() => expect(getByTestId('mock-line-modal')).toBeTruthy());
       await fireEvent.press(getByTestId('mock-save-line'));
       await waitFor(() => expect(mockPlans.addLine).toHaveBeenCalled());
@@ -708,8 +767,9 @@ describe('MonthlyPlanSection', () => {
       setPlans({ plans: [], lines: [] });
       let resolveAddPlan;
       mockPlans.addPlan = jest.fn(() => new Promise((resolve) => { resolveAddPlan = resolve; }));
-      const { getByTestId } = await renderSection();
-      await fireEvent.press(getByTestId('plan-add-line'));
+      const ref = React.createRef();
+      const { getByTestId } = await renderSection(ref);
+      await openEditor(ref);
       await waitFor(() => expect(getByTestId('mock-line-modal')).toBeTruthy());
 
       // First tap: starts handleSaveLine, which sets the busy flag synchronously
@@ -760,25 +820,35 @@ describe('MonthlyPlanSection', () => {
           { id: 'l-b', planId: null, amount: '20', label: 'B', comment: null, categoryId: 'cat2', toAccountId: null, sortOrder: 1, isBroken: false, isRecurring: true, currency: 'USD' },
         ],
       });
-      // Never resolves during this test — proves the visible order change comes
-      // from the optimistic setLines(), not from awaiting this call + reloadLines().
-      mockPlans.reorderRecurringLines = jest.fn(() => new Promise(() => {}));
+      // Held open across the assertions below — proves the visible order change
+      // comes from the optimistic setLines(), not from awaiting this call +
+      // reloadLines(). Released at the end of the test rather than left dangling:
+      // a promise that never settles leaves React work in flight past teardown,
+      // which corrupted every test that ran after this one.
+      let releaseReorder;
+      mockPlans.reorderRecurringLines = jest.fn(
+        () => new Promise((resolve) => { releaseReorder = resolve; }),
+      );
       const { getByTestId } = await renderSection();
       await waitFor(() => expect(getByTestId('plan-line-l-a')).toBeTruthy());
-      // Before the move: l-a is first (its up-arrow is disabled), l-b is second.
-      expect(getByTestId('plan-line-up-l-a').props.accessibilityState.disabled).toBe(true);
-      expect(getByTestId('plan-line-up-l-b').props.accessibilityState.disabled).toBe(false);
+      // Before the move: l-a is first, so its action sheet offers only "down".
+      // (The sheet omits a move that has nowhere to land — it used to be a pair
+      // of chevrons whose disabled state said the same thing.)
+      await longPressLine(getByTestId, 'l-a');
+      expect(hasDialogAction('move_up')).toBe(false);
+      expect(hasDialogAction('move_down')).toBe(true);
 
-      fireEvent.press(getByTestId('plan-line-down-l-a'));
+      await moveLine(getByTestId, 'l-a', 1);
 
       // reorderRecurringLines never resolves in this test, so reloadLines()
-      // (which runs AFTER awaiting it) never runs either — the only way this
-      // assertion can pass at all is the optimistic setLines() call that
-      // happens BEFORE that await. Without it, this would time out.
-      await waitFor(() => {
-        expect(getByTestId('plan-line-up-l-a').props.accessibilityState.disabled).toBe(false);
-        expect(getByTestId('plan-line-up-l-b').props.accessibilityState.disabled).toBe(true);
-      });
+      // (which runs AFTER awaiting it) never runs either — the only way the
+      // order below can have changed is the optimistic setLines() call that
+      // happens BEFORE that await.
+      await longPressLine(getByTestId, 'l-a');
+      expect(hasDialogAction('move_up')).toBe(true);
+      expect(hasDialogAction('move_down')).toBe(false);
+
+      await act(async () => { releaseReorder(); });
     });
   });
 
@@ -806,9 +876,19 @@ describe('MonthlyPlanSection', () => {
 
       // Two taps in immediate succession (same JS task, before either resolves)
       // — a state-only guard would not catch this; only a synchronous ref does.
+      // The action is grabbed once and fired twice, which is what a real double
+      // tap on one sheet button does; re-opening the sheet in between would
+      // instead exercise the sheet's own bounds check.
+      // Two taps in immediate succession (same JS task, before either resolves)
+      // — a state-only guard would not catch this; only a synchronous ref does.
+      // The action is grabbed once and fired twice, which is what a real double
+      // tap on one sheet button does; re-opening the sheet in between would
+      // instead exercise the sheet's own bounds check.
+      await longPressLine(getByTestId, 'l-a');
+      const moveDown = lastDialogAction('move_down');
       await act(async () => {
-        fireEvent.press(getByTestId('plan-line-down-l-a'));
-        fireEvent.press(getByTestId('plan-line-down-l-a'));
+        moveDown.onPress();
+        moveDown.onPress();
       });
 
       await waitFor(() => expect(mockPlans.getLinesForMonth).toHaveBeenCalledTimes(2)); // mount + one reconcile
@@ -828,14 +908,73 @@ describe('MonthlyPlanSection', () => {
       const { getByTestId } = await renderSection();
       await waitFor(() => expect(getByTestId('plan-line-l1')).toBeTruthy());
 
+      await longPressLine(getByTestId, 'l1');
+      const moveDown = lastDialogAction('move_down');
       await act(async () => {
-        fireEvent.press(getByTestId('plan-line-down-l1'));
-        fireEvent.press(getByTestId('plan-line-down-l1'));
+        moveDown.onPress();
+        moveDown.onPress();
       });
 
       await waitFor(() => expect(mockPlans.getLinesForMonth).toHaveBeenCalledTimes(2));
 
       expect(mockPlans.reorderLines).toHaveBeenCalledTimes(1);
+    });
+  });
+
+  describe('Row density', () => {
+    const doneLine = {
+      id: 'l-done', planId: null, amount: '300', label: 'Rent', comment: 'monthly',
+      kind: 'expense', categoryId: 'cat1', toAccountId: null, accountId: 1, sortOrder: 0,
+      isBroken: false, isRecurring: true, currency: 'USD',
+      hasTemplate: true, lastExecutedMonth: THIS_MONTH,
+    };
+    const statusFor = (actual, amount, isExceeded) => new Map([['p1', {
+      planId: 'p1', month: THIS_MONTH, currency: 'USD', convertAll: false,
+      lines: [{
+        lineId: 'l-done', broken: false, amount, actual,
+        remaining: String(Number(amount) - Number(actual)), percentage: (actual / amount) * 100,
+        isExceeded, status: isExceeded ? 'exceeded' : 'safe',
+      }],
+      totals: {
+        expectedIncome: '1000.00', actualIncome: '0.00', allocated: amount,
+        totalActual: actual, plannedRemainder: '700.00', actualRemainder: '1000.00',
+      },
+      unconvertible: [],
+    }]]);
+
+    it('collapses a done row to a single line — no bar, no comment', async () => {
+      setPlans({
+        plans: [{ id: 'p1', month: THIS_MONTH, currency: 'USD', expectedIncome: '1000' }],
+        lines: [doneLine],
+        planStatuses: statusFor('300', '300', false),
+      });
+      const { getByTestId, queryByText } = await renderSection();
+      await waitFor(() => expect(getByTestId('plan-line-l-done')).toBeTruthy());
+      // A done line's bar reads 100% by construction of "executed" — which is
+      // what the check badge already says.
+      expect(queryByText('300.00 / 300.00')).toBeNull();
+      expect(queryByText('monthly')).toBeNull();
+      expect(getByTestId('plan-line-check-l-done')).toBeTruthy();
+    });
+
+    it('still shows the bar on a done row that went over target', async () => {
+      setPlans({
+        plans: [{ id: 'p1', month: THIS_MONTH, currency: 'USD', expectedIncome: '1000' }],
+        lines: [doneLine],
+        planStatuses: statusFor('420', '300', true),
+      });
+      const { getByTestId, getByText } = await renderSection();
+      await waitFor(() => expect(getByTestId('plan-line-l-done')).toBeTruthy());
+      // Overspend is news; burying it under a state the user set by hand is how
+      // a row stops being worth reading.
+      expect(getByText('420.00 / 300.00')).toBeTruthy();
+    });
+
+    it('has no add rows — the screen FAB owns adding', async () => {
+      setPlans({ plans: [{ id: 'p1', month: THIS_MONTH, currency: 'USD', expectedIncome: '1000' }], lines: [] });
+      const { queryByTestId } = await renderSection();
+      expect(queryByTestId('plan-add-line')).toBeNull();
+      expect(queryByTestId('plan-add-income')).toBeNull();
     });
   });
 
@@ -1016,19 +1155,29 @@ describe('MonthlyPlanSection', () => {
     // Regression: the row's meta line reused the `execute` button caption, so it
     // read as a command sitting where its sibling branch prints a state ("done")
     // — and it kept saying so on months where execution is disabled anyway.
-    it('labels a pending template with a state, not the execute command', async () => {
+    // The uppercase "RECURRING · PENDING_EXECUTION" line under every row is gone
+    // — it repeated the default on nearly all of them while being the loudest
+    // thing after the amount. Scope is a glyph beside the name, template state is
+    // a badge on the category icon, and both are spelled out in the row's
+    // accessibility label, which a screen reader reads and a glyph cannot say.
+    it('marks a pending template with a badge and names the state for a screen reader', async () => {
       setPlans({ plans: [], lines: [TEMPLATE_LINE] });
-      const { getByText, queryByText, getByTestId } = await renderSection();
+      const { queryByText, getByTestId } = await renderSection();
       await waitFor(() => expect(getByTestId('plan-line-l-tpl')).toBeTruthy());
-      expect(getByText('recurring · pending_execution')).toBeTruthy();
-      expect(queryByText('recurring · execute')).toBeNull();
+      expect(getByTestId('plan-line-pending-l-tpl')).toBeTruthy();
+      expect(getByTestId('plan-line-recurring-l-tpl')).toBeTruthy();
+      expect(getByTestId('plan-line-l-tpl').props.accessibilityLabel)
+        .toContain('recurring, pending_execution');
+      expect(queryByText('recurring · pending_execution')).toBeNull();
     });
 
-    it('labels an executed template as done', async () => {
+    it('marks an executed template as done and drops the pending badge', async () => {
       setPlans({ plans: [], lines: [{ ...TEMPLATE_LINE, lastExecutedMonth: THIS_MONTH }] });
-      const { getByText, getByTestId } = await renderSection();
+      const { queryByTestId, getByTestId } = await renderSection();
       await waitFor(() => expect(getByTestId('plan-line-l-tpl')).toBeTruthy());
-      expect(getByText('recurring · done')).toBeTruthy();
+      expect(getByTestId('plan-line-check-l-tpl')).toBeTruthy();
+      expect(queryByTestId('plan-line-pending-l-tpl')).toBeNull();
+      expect(getByTestId('plan-line-l-tpl').props.accessibilityLabel).toContain('recurring, done');
     });
   });
 
