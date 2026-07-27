@@ -34,8 +34,8 @@ const KINDS = ['income', 'expense', 'transfer'];
  *
  * `kind` decides what the line means and what an execution would create:
  *   - expense  → tracks spending across ONE OR MORE expense categories (at least
- *     one required); the picker toggles them, and `includeChildren` says whether
- *     their descendants roll up too (migration 0021),
+ *     one required); the picker toggles them, and spending in their descendants
+ *     always rolls up (a parent category IS its subtree — nothing to configure),
  *   - transfer → tracks incoming transfers into ONE destination account (required),
  *   - income   → declares part of the month's expected income; categories are
  *     optional context (income is compared against the month's real income as a
@@ -81,9 +81,6 @@ export default function BudgetPlanLineModal({
   // 0021 the category side is a SET — several categories can share one budget.
   const [categoryIds, setCategoryIds] = useState([]);
   const [toAccountId, setToAccountId] = useState(null);
-  // Whether descendants of the picked categories count too. On by default, which
-  // is what every line did before the flag existed.
-  const [includeChildren, setIncludeChildren] = useState(true);
   // Execution account — set means "this line is executable".
   const [accountId, setAccountId] = useState(null);
   const [isRecurring, setIsRecurring] = useState(false);
@@ -140,7 +137,6 @@ export default function BudgetPlanLineModal({
       setComment(line.comment || '');
       // Older callers (and stored lines read before 0021) only carry categoryId.
       setCategoryIds(line.categoryIds ?? (line.categoryId != null ? [line.categoryId] : []));
-      setIncludeChildren(line.includeChildren !== false);
       setToAccountId(line.toAccountId ?? null);
       setAccountId(line.accountId ?? null);
       setIsRecurring(!!line.isRecurring);
@@ -151,7 +147,6 @@ export default function BudgetPlanLineModal({
       setLabel('');
       setComment('');
       setCategoryIds([]);
-      setIncludeChildren(true);
       setToAccountId(null);
       setAccountId(null);
       setIsRecurring(false);
@@ -313,13 +308,12 @@ export default function BudgetPlanLineModal({
       toAccountId: kind === 'transfer' ? (toAccountId ?? null) : null,
       accountId: accountId ?? null,
       isRecurring,
-      includeChildren,
       // An executable line is priced in its account's currency; a template-less
       // one-off line inherits the plan's (null).
       currency: effectiveCurrency,
     });
   }, [saving, kind, amount, amountIsParseable, amountIsPositive, label, comment, categoryIds, toAccountId, accountId,
-    isRecurring, includeChildren, effectiveCurrency, onSaveLine, t]);
+    isRecurring, effectiveCurrency, onSaveLine, t]);
 
   const handleDelete = useCallback(() => {
     if (!isEditingLine) return;
@@ -502,46 +496,6 @@ export default function BudgetPlanLineModal({
                       <Icon name="chevron-right" size={20} color={colors.mutedText} />
                     </Pressable>
                   </View>
-
-                  {/* Roll-up toggle. Only an expense line has a per-category
-                      actual to roll up: a transfer line tracks an account, and an
-                      income line is compared against the month's total income
-                      rather than per-category spending. */}
-                  {kind === 'expense' && categoryIds.length > 0 && (
-                    <View style={styles.field}>
-                      <Pressable
-                        style={[styles.recurringRow, styles.noBottomMargin, { borderColor: colors.border }]}
-                        onPress={() => setIncludeChildren(v => !v)}
-                        accessibilityRole="switch"
-                        accessibilityState={{ checked: includeChildren }}
-                        accessibilityLabel={t('include_subcategories')}
-                        testID="plan-line-include-children-toggle"
-                      >
-                        <View style={styles.recurringLabel}>
-                          <Icon name="file-tree-outline" size={20} color={colors.text} />
-                          <Text style={[styles.text16, { color: colors.text }]}>
-                            {t('include_subcategories')}
-                          </Text>
-                        </View>
-                        <View
-                          style={[
-                            styles.switchTrack,
-                            { backgroundColor: includeChildren ? colors.primary : colors.border },
-                          ]}
-                        >
-                          <View
-                            style={[
-                              styles.switchThumb,
-                              { transform: [{ translateX: includeChildren ? 18 : 2 }] },
-                            ]}
-                          />
-                        </View>
-                      </Pressable>
-                      <Text style={[styles.fieldHint, { color: colors.mutedText }]}>
-                        {t('include_subcategories_hint')}
-                      </Text>
-                    </View>
-                  )}
 
                   {/* Execution account — set one and the line becomes a one-tap
                       payable (the former planned operation). */}
@@ -891,7 +845,6 @@ BudgetPlanLineModal.propTypes = {
     comment: PropTypes.string,
     categoryId: PropTypes.string,
     categoryIds: PropTypes.arrayOf(PropTypes.string),
-    includeChildren: PropTypes.bool,
     toAccountId: PropTypes.oneOfType([PropTypes.string, PropTypes.number]),
     accountId: PropTypes.oneOfType([PropTypes.string, PropTypes.number]),
     kind: PropTypes.oneOf(KINDS),
@@ -1000,9 +953,6 @@ const styles = StyleSheet.create({
     alignItems: 'center',
     flex: 1,
     justifyContent: 'center',
-  },
-  noBottomMargin: {
-    marginBottom: 0,
   },
   optionText: {
     flex: 1,

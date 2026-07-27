@@ -169,10 +169,10 @@ describe('BudgetPlansDB', () => {
         expect(line.isBroken).toBe(true);
       });
 
-      it('reads includeChildren from the column, defaulting to on', () => {
-        expect(BudgetPlansDB.mapLineFields({ id: 'l1', amount: '1' }).includeChildren).toBe(true);
-        expect(BudgetPlansDB.mapLineFields({ id: 'l1', amount: '1', include_children: 1 }).includeChildren).toBe(true);
-        expect(BudgetPlansDB.mapLineFields({ id: 'l1', amount: '1', include_children: 0 }).includeChildren).toBe(false);
+      it('does not surface include_children — descendants always roll up', () => {
+        expect(BudgetPlansDB.mapLineFields({ id: 'l1', amount: '1' })).not.toHaveProperty('includeChildren');
+        expect(BudgetPlansDB.mapLineFields({ id: 'l1', amount: '1', include_children: 0 }))
+          .not.toHaveProperty('includeChildren');
       });
     });
   });
@@ -390,14 +390,12 @@ describe('BudgetPlansDB', () => {
       expect(line.categoryIds).toEqual(['c1', 'c2']);
     });
 
-    it('addLine defaults includeChildren on and stores the flag', async () => {
-      const rolled = await BudgetPlansDB.addLine('p1', { amount: '10', categoryId: 'c1' });
-      expect(rolled.includeChildren).toBe(true);
-      const flat = await BudgetPlansDB.addLine('p1', { amount: '10', categoryId: 'c1', includeChildren: false });
-      expect(flat.includeChildren).toBe(false);
-      const rowInserts = mockRunAsync.mock.calls.filter(([sql]) => sql.includes('INSERT INTO budget_plan_lines'));
-      expect(rowInserts[1][0]).toContain('include_children');
-      expect(rowInserts[1][1]).toEqual(expect.arrayContaining([0]));
+    it('addLine always stores include_children on, even when a caller asks for off', async () => {
+      await BudgetPlansDB.addLine('p1', { amount: '10', categoryId: 'c1', includeChildren: false });
+      const [sql, params] = mockRunAsync.mock.calls.find(([s]) => s.includes('INSERT INTO budget_plan_lines'));
+      expect(sql).toContain('include_children');
+      // Column order: ..., last_executed_month, include_children, created_at, updated_at
+      expect(params[params.length - 3]).toBe(1);
     });
 
     // Bug 10 (adversarial review): addLine/addRecurringLine share one insertPlanLine
@@ -500,11 +498,10 @@ describe('BudgetPlansDB', () => {
       expect(mockRunAsync).not.toHaveBeenCalled();
     });
 
-    it('updateLine persists includeChildren', async () => {
-      await BudgetPlansDB.updateLine('l1', { includeChildren: false });
-      const [sql, params] = executeQuery.mock.calls[0];
-      expect(sql).toContain('include_children = ?');
-      expect(params).toEqual(expect.arrayContaining([0, 'l1']));
+    it('updateLine ignores an includeChildren update — the flag is gone', async () => {
+      await BudgetPlansDB.updateLine('l1', { amount: '200', includeChildren: false });
+      const [sql] = executeQuery.mock.calls[0];
+      expect(sql).not.toContain('include_children');
     });
 
     it('updateLine clears the category link when an account is (re)assigned', async () => {

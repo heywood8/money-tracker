@@ -136,13 +136,13 @@ describe('BudgetPlansDB plan-vs-actual', () => {
       );
     });
 
-    it('passes includeChildren=false through so only the picked categories count', async () => {
+    it('always rolls descendants up, even for a line stored with the old flag off', async () => {
       await BudgetPlansDB.calculateLineActual(
         categoryLine({ categoryIds: ['cat1'], includeChildren: false }), '2026-07', 'USD', false,
       );
 
       expect(calculateSpendingForCategories).toHaveBeenCalledWith(
-        ['cat1'], 'USD', '2026-07-01', '2026-07-31', false, false,
+        ['cat1'], 'USD', '2026-07-01', '2026-07-31', true, false,
       );
     });
 

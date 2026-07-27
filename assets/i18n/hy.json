@@ -550,8 +550,6 @@
   "no_template_account": "Չկա (միայն հաշվառում)",
   "edit_allocation": "Խմբագրել բաշխումը",
   "tracking_target": "Հետևման նպատակ",
-  "include_subcategories": "Ներառել ենթակատեգորիաները",
-  "include_subcategories_hint": "Ընտրված կատեգորիաների ենթակատեգորիաների ծախսերը հաշվվում են այս տողում։",
   "select_target": "Ընտրել նպատակը",
   "allocation_label": "Պիտակ",
   "allocation_comment": "Մեկնաբանություն",

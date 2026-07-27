@@ -550,8 +550,6 @@
   "no_template_account": "Aucun (suivi uniquement)",
   "edit_allocation": "Modifier la ligne",
   "tracking_target": "Cible de suivi",
-  "include_subcategories": "Inclure les sous-catégories",
-  "include_subcategories_hint": "Les dépenses des catégories imbriquées sous celles sélectionnées comptent dans cette ligne.",
   "select_target": "Sélectionner la cible",
   "allocation_label": "Libellé",
   "allocation_comment": "Commentaire",

@@ -341,9 +341,10 @@ export const budgetPlanLines = sqliteTable('budget_plan_lines', {
   // YYYY-MM of the last execution (or manual "mark as done"), like the old
   // planned_operations.last_executed_month.
   lastExecutedMonth: text('last_executed_month'),
-  // 1 (default) = descendant categories roll up into this line's actual, which is
-  // what every pre-0021 line did implicitly; 0 = only the categories explicitly
-  // linked in budget_plan_line_categories count. Migration 0021.
+  // Migration 0021. Legacy since the toggle was dropped: descendant categories
+  // ALWAYS roll up into a line's actual (picking a parent category means its
+  // subtree; a leaf has no subtree), so the app writes 1 and ignores a stored 0.
+  // The column stays for the backup/Sheets shape — see BudgetPlansDB.mapLineFields.
   includeChildren: integer('include_children').notNull().default(1),
   createdAt: text('created_at').notNull(),
   updatedAt: text('updated_at').notNull(),
