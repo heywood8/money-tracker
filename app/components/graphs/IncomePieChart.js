@@ -16,6 +16,7 @@ const IncomePieChart = ({
   isLeafCategory = false,
   operations = [],
   loadingOperations = false,
+  introKey = 0,
 }) => {
   // A leaf category has no sub-categories left to break down — show its actual
   // operations for the period instead of a pointless single-slice donut.
@@ -53,7 +54,7 @@ const IncomePieChart = ({
 
   return (
     <View style={styles.row}>
-      <DonutChart data={incomeChartData} insetColor={colors.surface} />
+      <DonutChart data={incomeChartData} insetColor={colors.surface} introKey={introKey} />
       <View style={styles.legendWrapper}>
         <CustomLegend
           data={incomeChartData}
@@ -78,6 +79,8 @@ IncomePieChart.propTypes = {
   isLeafCategory: PropTypes.bool,
   operations: PropTypes.array,
   loadingOperations: PropTypes.bool,
+  // Bump to replay the donut intro when this chart's tab is opened.
+  introKey: PropTypes.number,
 };
 
 const styles = StyleSheet.create({
@@ -98,7 +101,10 @@ const styles = StyleSheet.create({
     textAlign: 'center',
   },
   row: {
-    alignItems: 'center',
+    // Top-aligned, not centred: the legend's height follows the category count,
+    // so centring made the donut sit at a different offset on each tab and jump
+    // as you switched between them.
+    alignItems: 'flex-start',
     flex: 1,
     flexDirection: 'row',
     gap: 10,

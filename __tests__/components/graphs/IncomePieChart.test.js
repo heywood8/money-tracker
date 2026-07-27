@@ -56,6 +56,19 @@ describe('IncomePieChart', () => {
     expect(getByTestId('donut-chart')).toBeTruthy();
   });
 
+  // Regression: the row used to centre its children, so the donut's vertical
+  // offset followed the legend's height and it jumped whenever the category
+  // count changed — most visibly when switching between the income and expense
+  // tabs of the same panel.
+  it('anchors the donut to the top of the row so it does not move with the legend', async () => {
+    const { getByTestId } = await render(<IncomePieChart {...defaultProps} />);
+
+    const row = getByTestId('donut-chart').parent;
+    const rowStyle = Object.assign({}, ...[].concat(row.props.style));
+
+    expect(rowStyle.alignItems).toBe('flex-start');
+  });
+
   it('renders legend category names', async () => {
     const { getByText } = await render(<IncomePieChart {...defaultProps} />);
     expect(getByText('Salary')).toBeTruthy();
