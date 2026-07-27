@@ -1,6 +1,8 @@
 import React from 'react';
-import { render } from '@testing-library/react-native';
+import { Text } from 'react-native';
+import { render, within } from '@testing-library/react-native';
 import ExpensePieChart from '../../../app/components/graphs/ExpensePieChart';
+import { CHART_SIZE } from '../../../app/components/graphs/DonutChart';
 
 jest.mock('../../../app/contexts/DisplaySettingsContext', () => ({
   useDisplaySettings: jest.fn(() => ({ hideBalances: false })),
@@ -63,7 +65,8 @@ describe('ExpensePieChart', () => {
   it('anchors the donut to the top of the row so it does not move with the legend', async () => {
     const { getByTestId } = await render(<ExpensePieChart {...defaultProps} />);
 
-    const row = getByTestId('donut-chart').parent;
+    // donut → its own column (which also holds the drill-down chip) → the row
+    const row = getByTestId('donut-chart').parent.parent;
     const rowStyle = Object.assign({}, ...[].concat(row.props.style));
 
     expect(rowStyle.alignItems).toBe('flex-start');
@@ -86,6 +89,50 @@ describe('ExpensePieChart', () => {
     // Other 4.5% — below 10%
     const { queryAllByTestId } = await render(<ExpensePieChart {...defaultProps} />);
     expect(queryAllByTestId('icon-dots-horizontal').length).toBe(0);
+  });
+
+  // The drill-down chip used to be an overlay on the tab strip, where it covered
+  // the tab's own title. It now travels with the chart body.
+  describe('drill-down chip', () => {
+    const chip = <Text testID="category-chip">Food</Text>;
+
+    it('places the chip under the donut rather than beside the legend', async () => {
+      const { getByTestId } = await render(
+        <ExpensePieChart {...defaultProps} categoryChip={chip} />,
+      );
+
+      const column = getByTestId('donut-chart').parent;
+      const columnStyle = Object.assign({}, ...[].concat(column.props.style));
+
+      // Same column as the donut, capped at the donut's width, and after it
+      expect(within(column).getByTestId('category-chip')).toBeTruthy();
+      expect(columnStyle.width).toBe(CHART_SIZE);
+      expect(column.children.indexOf(getByTestId('donut-chart'))).toBe(0);
+    });
+
+    it('keeps the chip reachable when the drill-down bottoms out in a list', async () => {
+      const { getByTestId } = await render(
+        <ExpensePieChart {...defaultProps} isLeafCategory={true} operations={[]} categoryChip={chip} />,
+      );
+
+      expect(getByTestId('category-chip')).toBeTruthy();
+    });
+
+    it('keeps the chip reachable while the category loads', async () => {
+      const { getByTestId } = await render(
+        <ExpensePieChart {...defaultProps} loading={true} categoryChip={chip} />,
+      );
+
+      expect(getByTestId('category-chip')).toBeTruthy();
+    });
+
+    it('keeps the chip reachable when the category has no data', async () => {
+      const { getByTestId } = await render(
+        <ExpensePieChart {...defaultProps} chartData={[]} categoryChip={chip} />,
+      );
+
+      expect(getByTestId('category-chip')).toBeTruthy();
+    });
   });
 
   describe('leaf category (operations list)', () => {

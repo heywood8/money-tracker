@@ -622,6 +622,30 @@ const GraphsScreen = () => {
     }
   }, [expandedCard, panelHeight]);
 
+  // The drill-down chips live inside their chart (under the donut), not over the
+  // tab strip where they used to cover the tab's own title. They stay outside the
+  // tab button regardless — a button nested in a button reads as two controls to
+  // a screen reader. Each chart decides where to place the node it is handed.
+  const incomeCategoryChip = selectedIncomeCategoryName ? (
+    <CategoryBackChip
+      testID="income-category-chip"
+      colors={colors}
+      label={selectedIncomeCategoryName}
+      backLabel={t('back')}
+      onPress={handleBackToIncomeParent}
+    />
+  ) : null;
+
+  const expenseCategoryChip = selectedCategoryName ? (
+    <CategoryBackChip
+      testID="expense-category-chip"
+      colors={colors}
+      label={selectedCategoryName}
+      backLabel={t('back')}
+      onPress={handleBackToExpenseParent}
+    />
+  ) : null;
+
   return (
     <View style={[styles.container, { backgroundColor: colors.background }]}>
       <ScrollView style={styles.scrollView} contentContainerStyle={styles.scrollContent}>
@@ -665,29 +689,6 @@ const GraphsScreen = () => {
                 onPress={handleToggleExpense}
                 expanded={expandedCard === 'expense'}
               />
-
-              {/* Drill-down chips sit above the strip, not inside a tab — a button
-                  nested in a button reads as two controls to a screen reader. */}
-              {selectedIncomeCategoryName && (
-                <CategoryBackChip
-                  testID="income-category-chip"
-                  colors={colors}
-                  side="left"
-                  label={selectedIncomeCategoryName}
-                  backLabel={t('back')}
-                  onPress={handleBackToIncomeParent}
-                />
-              )}
-              {selectedCategoryName && (
-                <CategoryBackChip
-                  testID="expense-category-chip"
-                  colors={colors}
-                  side="right"
-                  label={selectedCategoryName}
-                  backLabel={t('back')}
-                  onPress={handleBackToExpenseParent}
-                />
-              )}
             </View>
 
             {/* Both charts stay mounted and overlap, so they stay measured and
@@ -726,6 +727,7 @@ const GraphsScreen = () => {
                     loadingOperations={loadingIncomeOperations}
                     introKey={chartIntro.key}
                     introDelay={chartIntro.delay}
+                    categoryChip={incomeCategoryChip}
                   />
                 </Animated.View>
               </ScrollView>
@@ -763,6 +765,7 @@ const GraphsScreen = () => {
                     loadingOperations={loadingExpenseOperations}
                     introKey={chartIntro.key}
                     introDelay={chartIntro.delay}
+                    categoryChip={expenseCategoryChip}
                   />
                 </Animated.View>
               </ScrollView>
