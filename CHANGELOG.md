@@ -1,5 +1,12 @@
 # Changelog
 
+## [0.238.0](https://github.com/heywood8/money-tracker/compare/penny-v0.237.1...penny-v0.238.0) (2026-07-27)
+
+
+### Features
+
+* **motion:** give the budgets month, plan rows and dialogs a spatial story ([#1463](https://github.com/heywood8/money-tracker/issues/1463)) ([eab6c02](https://github.com/heywood8/money-tracker/commit/eab6c02b79661141f93e1a00534b1f8755e445bd))
+
 ## [0.237.1](https://github.com/heywood8/money-tracker/compare/penny-v0.237.0...penny-v0.237.1) (2026-07-27)
 
 
