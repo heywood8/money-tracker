@@ -1,5 +1,17 @@
 # Changelog
 
+## [0.233.0](https://github.com/heywood8/money-tracker/compare/penny-v0.232.0...penny-v0.233.0) (2026-07-27)
+
+
+### Features
+
+* **graphs:** toggle the balance chart comparison line ([#1446](https://github.com/heywood8/money-tracker/issues/1446)) ([8c83102](https://github.com/heywood8/money-tracker/commit/8c8310240bf42b2a3876f8ce6e359a478bf5b4d0))
+
+
+### Bug Fixes
+
+* **graphs:** unnest the drill-down chip and hide the closed chart from a11y ([#1447](https://github.com/heywood8/money-tracker/issues/1447)) ([141861c](https://github.com/heywood8/money-tracker/commit/141861ccc4c129e236fed4d135b0a43ef9c0ac8f))
+
 ## [0.232.0](https://github.com/heywood8/money-tracker/compare/penny-v0.231.0...penny-v0.232.0) (2026-07-27)
 
 
