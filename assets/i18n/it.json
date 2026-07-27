@@ -414,6 +414,8 @@
   "burndown": "Esaurimento",
   "forecast": "Previsione",
   "prev_month": "Mese prec.",
+  "year_avg": "Media anno",
+  "comparison_none": "Nessun confronto",
   "no_balance_history": "Nessuno storico saldo disponibile per questo mese",
   "balance_history_details": "Dettagli storico saldo",
   "actions": "Azioni",

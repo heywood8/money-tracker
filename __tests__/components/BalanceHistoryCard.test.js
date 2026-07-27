@@ -4,8 +4,8 @@
  */
 
 import React from 'react';
-import { render, fireEvent } from '@testing-library/react-native';
-import BalanceHistoryCard, { computeBalanceChart, formatYAxisLabel, toRgba } from '../../app/components/graphs/BalanceHistoryCard';
+import { render, fireEvent, waitFor } from '@testing-library/react-native';
+import BalanceHistoryCard, { computeBalanceChart, formatYAxisLabel, nextThirdLineMode, toRgba } from '../../app/components/graphs/BalanceHistoryCard';
 
 // Mock DisplaySettingsContext
 jest.mock('../../app/contexts/DisplaySettingsContext', () => ({
@@ -49,6 +49,8 @@ const mockT = (key) => {
     burndown: 'Burndown',
     forecast: 'Forecast',
     prev_month: 'Prev Month',
+    year_avg: 'Year avg',
+    comparison_none: 'No comparison',
     no_balance_history: 'No balance history available for this month',
     plain_avg: 'Plain avg',
     max: 'Max',
@@ -2115,6 +2117,163 @@ describe('BalanceHistoryCard', () => {
       // Pressing again (back to chart) should NOT call onShowCalendar again
       await fireEvent.press(getByTestId('calendar-toggle-btn'));
       expect(onShowCalendar).toHaveBeenCalledTimes(1);
+    });
+  });
+  describe('Third Line Toggle (prev month / year avg / none)', () => {
+    const thirdLineData = {
+      labels: [1, 2, 3, 4, 5, 6, 7],
+      actual: [
+        { x: 1, y: 1000 },
+        { x: 4, y: 900 },
+        { x: 7, y: 800 },
+      ],
+      actualForChart: [1000, 1000, 1000, 900, 900, 900, 800],
+      burndown: [],
+      prevMonth: [950, 940, 930, 920, 910, 900, 890],
+      yearAvg: [700, 690, 680, 670, 660, 650, 640],
+      yearAvgDailyAvg: -12.5,
+    };
+
+    const renderCard = () => render(
+      <BalanceHistoryCard
+        colors={mockColors}
+        t={mockT}
+        selectedAccount="acc1"
+        onAccountChange={jest.fn()}
+        accountItems={mockAccountItems}
+        loadingBalanceHistory={false}
+        balanceHistoryData={thirdLineData}
+        selectedYear={2024}
+        selectedMonth={0}
+        accounts={mockAccounts}
+        isCurrentMonth={false}
+        spendingPrediction={null}
+        balanceHistoryTableData={[]}
+        editingBalanceValue=""
+        onEditingBalanceValueChange={jest.fn()}
+        onEditBalance={jest.fn()}
+        onCancelEdit={jest.fn()}
+        onSaveBalance={jest.fn()}
+        onDeleteBalance={jest.fn()}
+        onShowCalendar={jest.fn()}
+      />,
+    );
+
+    it('cycles prevMonth → yearAvg → none → prevMonth', () => {
+      expect(nextThirdLineMode('prevMonth')).toBe('yearAvg');
+      expect(nextThirdLineMode('yearAvg')).toBe('none');
+      expect(nextThirdLineMode('none')).toBe('prevMonth');
+    });
+
+    it('starts on the prev-month line and swaps it for the year average on press', async () => {
+      const { getByTestId, getByText, queryByText } = await renderCard();
+
+      expect(getByText('Prev Month')).toBeTruthy();
+      expect(queryByText('Year avg')).toBeNull();
+
+      await fireEvent.press(getByTestId('third-line-toggle-btn'));
+
+      await waitFor(() => expect(getByText('Year avg')).toBeTruthy());
+      expect(queryByText('Prev Month')).toBeNull();
+    });
+
+    it('drops the third line and its legend row on the second press', async () => {
+      const { container, getByTestId, queryByText } = await renderCard();
+
+      await fireEvent.press(getByTestId('third-line-toggle-btn'));
+      await fireEvent.press(getByTestId('third-line-toggle-btn'));
+
+      await waitFor(() => expect(queryByText('Year avg')).toBeNull());
+      expect(queryByText('Prev Month')).toBeNull();
+      // actual + plain avg + zero baseline only
+      expect(container.queryAll(n => n.props.testID === 'vn-line')).toHaveLength(3);
+    });
+
+    it('hides the toggle while the calendar view is open', async () => {
+      const { getByTestId, queryByTestId } = await renderCard();
+
+      await fireEvent.press(getByTestId('calendar-toggle-btn'));
+
+      await waitFor(() => expect(queryByTestId('third-line-toggle-btn')).toBeNull());
+    });
+
+    it('builds a yearAvg series and legend values in yearAvg mode', () => {
+      const { computed, data, series } = computeBalanceChart({
+        balanceHistoryData: thirdLineData,
+        spendingPrediction: null,
+        isCurrentMonth: false,
+        selectedYear: 2024,
+        selectedMonth: 0,
+        primaryColor: mockColors.primary,
+        thirdLine: 'yearAvg',
+      });
+
+      expect(series.map(s => s.yKey)).toEqual(['actual', 'plainAvg', 'yearAvg', 'zero']);
+      expect(data.map(d => d.yearAvg)).toEqual([700, 690, 680, 670, 660, 650, 640]);
+      expect(computed.hasYearAvgData).toBe(true);
+      expect(computed.hasPrevMonthData).toBe(false);
+      expect(computed.yearAvgMax).toBe(700);
+      expect(computed.yearAvgEnd).toBe(640);
+      expect(computed.yearAvgDailyAvg).toBe(-12.5);
+    });
+
+    it('renders neither comparison series in none mode', () => {
+      const { computed, series } = computeBalanceChart({
+        balanceHistoryData: thirdLineData,
+        spendingPrediction: null,
+        isCurrentMonth: false,
+        selectedYear: 2024,
+        selectedMonth: 0,
+        primaryColor: mockColors.primary,
+        thirdLine: 'none',
+      });
+
+      expect(series.map(s => s.yKey)).toEqual(['actual', 'plainAvg', 'zero']);
+      expect(computed.hasYearAvgData).toBe(false);
+      expect(computed.hasPrevMonthData).toBe(false);
+    });
+
+    it('keeps the y-axis off a hidden comparison series', () => {
+      // The year median sits far below the actual balance: with the line hidden it
+      // must not stretch the axis, and with it shown it must be inside the domain.
+      const lowYearAvg = { ...thirdLineData, yearAvg: thirdLineData.yearAvg.map(() => 10) };
+      const hidden = computeBalanceChart({
+        balanceHistoryData: lowYearAvg,
+        spendingPrediction: null,
+        isCurrentMonth: false,
+        selectedYear: 2024,
+        selectedMonth: 0,
+        primaryColor: mockColors.primary,
+        thirdLine: 'none',
+      });
+      const shown = computeBalanceChart({
+        balanceHistoryData: lowYearAvg,
+        spendingPrediction: null,
+        isCurrentMonth: false,
+        selectedYear: 2024,
+        selectedMonth: 0,
+        primaryColor: mockColors.primary,
+        thirdLine: 'yearAvg',
+      });
+
+      expect(hidden.computed.hasYearAvgData).toBe(false);
+      expect(shown.computed.hasYearAvgData).toBe(true);
+      expect(shown.computed.yearAvgCurrent).toBe(10);
+    });
+
+    it('omits the year row when the median series has no values', () => {
+      const { computed, series } = computeBalanceChart({
+        balanceHistoryData: { ...thirdLineData, yearAvg: [undefined, undefined, undefined] },
+        spendingPrediction: null,
+        isCurrentMonth: false,
+        selectedYear: 2024,
+        selectedMonth: 0,
+        primaryColor: mockColors.primary,
+        thirdLine: 'yearAvg',
+      });
+
+      expect(computed.hasYearAvgData).toBe(false);
+      expect(series.find(s => s.yKey === 'yearAvg')).toBeFalsy();
     });
   });
 });

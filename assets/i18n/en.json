@@ -417,6 +417,8 @@
   "burndown": "Burndown",
   "forecast": "Forecast",
   "prev_month": "Prev Month",
+  "year_avg": "Year avg",
+  "comparison_none": "No comparison",
   "no_balance_history": "No balance history available for this month",
   "balance_history_details": "Balance History Details",
   "actions": "Actions",

@@ -1,7 +1,95 @@
 import { useState, useCallback, useEffect } from 'react';
 import { getBalanceHistory, getAccountBalanceOnOrBeforeDate, upsertBalanceHistory, deleteBalanceHistory, formatDate } from '../services/BalanceHistoryDB';
-import { getTotalExpenses, getTotalIncome, getTransferTotals } from '../services/OperationsDB';
+import { getTotalExpenses, getTotalIncome, getTransferTotals, getMonthlyExpenseTotals } from '../services/OperationsDB';
 import { appEvents, EVENTS } from '../services/eventEmitter';
+
+// Median of a numeric list; even counts average the two middle values.
+// Exported for unit testing.
+export const median = (values) => {
+  if (!values || values.length === 0) return null;
+  const sorted = [...values].sort((a, b) => a - b);
+  const mid = Math.floor(sorted.length / 2);
+  return sorted.length % 2 === 0 ? (sorted[mid - 1] + sorted[mid]) / 2 : sorted[mid];
+};
+
+/**
+ * Build the "year average" comparison series: for every day of the selected
+ * month, the median balance on that same day across the previous 12 months.
+ *
+ * Twelve, not eleven — the window starts at the same month one year back and
+ * ends at the month right before the selected one, so a full seasonal cycle is
+ * represented exactly once.
+ *
+ * Each month is forward-filled the same way the prev-month line is (a day with
+ * no recorded balance inherits the last known one, and short months hold their
+ * final value for the tail days), so the median compares like with like.
+ *
+ * Exported for unit testing.
+ */
+export const buildYearAverageSeries = ({
+  historyRows,
+  monthlyExpenses,
+  selectedYear,
+  selectedMonth,
+  daysInMonth,
+}) => {
+  const months = [];
+  for (let i = 12; i >= 1; i--) {
+    const d = new Date(selectedYear, selectedMonth - i, 1);
+    months.push({ year: d.getFullYear(), month: d.getMonth() });
+  }
+
+  // Bucket the flat history rows by 'YYYY-MM' → day → balance.
+  const byMonth = {};
+  (historyRows || []).forEach((row) => {
+    if (!row || typeof row.date !== 'string') return;
+    const [year, month, day] = row.date.split('-');
+    if (!year || !month || !day) return;
+    const balance = parseFloat(row.balance);
+    if (!Number.isFinite(balance)) return;
+    const key = `${year}-${month}`;
+    if (!byMonth[key]) byMonth[key] = {};
+    byMonth[key][parseInt(day, 10)] = balance;
+  });
+
+  const monthSeries = months.map(({ year, month }) => {
+    const key = `${year}-${String(month + 1).padStart(2, '0')}`;
+    const balances = byMonth[key];
+    if (!balances) return null;
+    const monthDays = new Date(year, month + 1, 0).getDate();
+    const series = [];
+    let lastKnown;
+    for (let day = 1; day <= daysInMonth; day++) {
+      if (day <= monthDays && balances[day] !== undefined) lastKnown = balances[day];
+      series.push(lastKnown);
+    }
+    return { key, monthDays, series };
+  }).filter(Boolean);
+
+  const yearAvg = [];
+  for (let i = 0; i < daysInMonth; i++) {
+    const values = monthSeries
+      .map(m => m.series[i])
+      .filter(v => v !== undefined && Number.isFinite(v));
+    yearAvg.push(values.length > 0 ? median(values) : undefined);
+  }
+
+  // Daily-average column: the median of the per-month spending rates, so it is
+  // directly comparable with the prev-month row (which is that month's expenses
+  // divided by its length). Only months the account actually has history for
+  // take part — the same months that shape the median line.
+  const dailyRates = monthSeries.map(({ key, monthDays }) => {
+    const total = parseFloat(monthlyExpenses?.[key] ?? '0');
+    if (!Number.isFinite(total) || monthDays <= 0) return null;
+    return -total / monthDays;
+  }).filter(v => v !== null);
+
+  return {
+    yearAvg,
+    yearAvgDailyAvg: dailyRates.length > 0 ? median(dailyRates) : null,
+    yearAvgMonthCount: monthSeries.length,
+  };
+};
 
 /**
  * Custom hook for loading and managing balance history data
@@ -83,25 +171,38 @@ const useBalanceHistory = (selectedAccount, selectedYear, selectedMonth) => {
       // that anchor, so the post-day-1 window starts on the 2nd (see plainAvgMax).
       const secondDayStr = formatDate(new Date(selectedYear, selectedMonth, 2));
 
+      // 12-month comparison window for the "year average" line: from the same
+      // month one year back through the end of the previous month.
+      const yearWindowStartStr = formatDate(new Date(selectedYear, selectedMonth - 12, 1));
+
       // These reads are mutually independent — only the date strings above gate
       // them — so issue them concurrently instead of awaiting in series.
       const [
         history,
-        prevHistory,
+        yearHistory,
         prevMonthTotalExpenses,
         currentMonthTotalExpenses,
         firstDayBalance,
         transferTotals,
         incomeAfterDay1,
+        yearMonthlyExpenses,
       ] = await Promise.all([
         getBalanceHistory(selectedAccount, startDateStr, endDateStr),
-        getBalanceHistory(selectedAccount, prevStartDateStr, prevEndDateStr),
+        // One read covers both comparison lines: the previous month is just the
+        // tail of the 12-month window, sliced out below instead of re-queried.
+        getBalanceHistory(selectedAccount, yearWindowStartStr, prevEndDateStr),
         getTotalExpenses(selectedAccount, prevStartDateStr, prevEndDateStr),
         getTotalExpenses(selectedAccount, startDateStr, expenseEndStr),
         getAccountBalanceOnOrBeforeDate(selectedAccount, startDateStr),
         getTransferTotals(selectedAccount, secondDayStr, endDateStr),
         getTotalIncome(selectedAccount, secondDayStr, endDateStr),
+        getMonthlyExpenseTotals(selectedAccount, yearWindowStartStr, prevEndDateStr),
       ]);
+
+      const prevMonthKey = `${prevYear}-${String(prevMonth + 1).padStart(2, '0')}`;
+      const prevHistory = (yearHistory || []).filter(
+        item => typeof item?.date === 'string' && item.date.startsWith(prevMonthKey),
+      );
 
       // Burndown line anchor (a.k.a. "plain avg" max): the ceiling of money
       // available to spend across the month. Start from the balance at end of day 1,
@@ -239,12 +340,22 @@ const useBalanceHistory = (selectedAccount, selectedYear, selectedMonth) => {
         return undefined;
       });
 
+      const yearAverage = buildYearAverageSeries({
+        historyRows: yearHistory,
+        monthlyExpenses: yearMonthlyExpenses,
+        selectedYear,
+        selectedMonth,
+        daysInMonth,
+      });
+
       setBalanceHistoryData({
         actual: actualData,
         actualForChart: actualForChart,
         trend: trendData,
         burndown: burndownData,
         prevMonth: prevMonthData,
+        yearAvg: yearAverage.yearAvg,
+        yearAvgDailyAvg: yearAverage.yearAvgDailyAvg,
         prevMonthTotalExpenses,
         prevMonthDaysCount: prevMonthDays,
         currentMonthTotalExpenses,

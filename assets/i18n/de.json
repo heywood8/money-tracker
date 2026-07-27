@@ -410,6 +410,8 @@
   "burndown": "Abbau",
   "forecast": "Prognose",
   "prev_month": "Vorh. Monat",
+  "year_avg": "Jahresmittel",
+  "comparison_none": "Kein Vergleich",
   "no_balance_history": "Keine Saldohistorie für diesen Monat verfügbar",
   "balance_history_details": "Saldohistorie Details",
   "actions": "Aktionen",

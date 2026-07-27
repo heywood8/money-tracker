@@ -410,6 +410,8 @@
   "burndown": "消耗",
   "forecast": "预测",
   "prev_month": "上月",
+  "year_avg": "年均值",
+  "comparison_none": "无对比",
   "no_balance_history": "本月没有可用的余额历史",
   "balance_history_details": "余额历史详情",
   "actions": "操作",

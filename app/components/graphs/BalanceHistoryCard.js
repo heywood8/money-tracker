@@ -122,6 +122,24 @@ const formatXAxisLabel = (value, lastDay) => {
   return '';
 };
 
+// Comparison line the user cycles through with the header toggle. 'none' drops
+// the third line and its legend row entirely.
+export const THIRD_LINE_MODES = ['prevMonth', 'yearAvg', 'none'];
+
+export const nextThirdLineMode = (mode) => {
+  const index = THIRD_LINE_MODES.indexOf(mode);
+  return THIRD_LINE_MODES[(index + 1) % THIRD_LINE_MODES.length];
+};
+
+const PREV_MONTH_COLOR = 'rgba(156, 39, 176, 0.5)';
+const YEAR_AVG_COLOR = 'rgba(0, 150, 136, 0.6)';
+
+const THIRD_LINE_ICONS = {
+  prevMonth: 'calendar-arrow-left',
+  yearAvg: 'chart-bell-curve',
+  none: 'eye-off-outline',
+};
+
 // Pure builder for the balance-history chart. Returns the derived legend data
 // (`computed`), the Victory Native XL record array (`data`, xKey = day, one
 // numeric field per series) and the per-series descriptors (`series`). Kept as a
@@ -134,6 +152,7 @@ export const computeBalanceChart = ({
   selectedYear,
   selectedMonth,
   primaryColor,
+  thirdLine = 'prevMonth',
 }) => {
   if (!balanceHistoryData.actual || balanceHistoryData.actual.length === 0) {
     return { computed: null, data: [], series: [] };
@@ -186,8 +205,13 @@ export const computeBalanceChart = ({
   );
 
   const forecastValues = combinedActualForecast.filter(v => v !== undefined);
-  const prevMonthValues = (balanceHistoryData.prevMonth || []).filter(v => v !== undefined);
-  const allValues = [...actualValues, ...forecastValues, ...prevMonthValues, ...plainAvgData];
+  // Only the comparison line actually on screen may stretch the y-axis — a
+  // hidden series must not leave the chart zoomed out around it.
+  const comparisonSource = thirdLine === 'yearAvg'
+    ? balanceHistoryData.yearAvg
+    : (thirdLine === 'prevMonth' ? balanceHistoryData.prevMonth : []);
+  const comparisonValues = (comparisonSource || []).filter(v => v !== undefined && v !== null);
+  const allValues = [...actualValues, ...forecastValues, ...comparisonValues, ...plainAvgData];
   const maxValue = allValues.length > 0 ? Math.max(...allValues) : 0;
   const minValue = allValues.length > 0 ? Math.min(...allValues) : 0;
   const hasNegativeValues = minValue < 0;
@@ -243,7 +267,9 @@ export const computeBalanceChart = ({
     forecastDailyAvg = -spendingPrediction.dailyAverage;
   }
 
-  const hasPrevMonthData = balanceHistoryData.prevMonth && balanceHistoryData.prevMonth.some(v => v !== undefined);
+  const hasPrevMonthData = thirdLine === 'prevMonth'
+    && !!balanceHistoryData.prevMonth
+    && balanceHistoryData.prevMonth.some(v => v !== undefined);
   let prevMonthMax = null;
   let prevMonthCurrent = null;
   let prevMonthEnd = null;
@@ -272,7 +298,44 @@ export const computeBalanceChart = ({
     }
   }
 
+  // Year-average row: the median-of-12-months line built in useBalanceHistory.
+  // Values mirror the prev-month row so the legend columns stay comparable.
+  const yearAvgSeries = balanceHistoryData.yearAvg || [];
+  const hasYearAvgData = thirdLine === 'yearAvg'
+    && yearAvgSeries.some(v => v !== undefined && v !== null);
+  let yearAvgMax = null;
+  let yearAvgCurrent = null;
+  let yearAvgEnd = null;
+  let yearAvgDailyAvg = null;
+  if (hasYearAvgData) {
+    const definedValues = yearAvgSeries.filter(v => v !== undefined && v !== null);
+    yearAvgMax = definedValues.length > 0 ? Math.max(...definedValues) : null;
+
+    const yearAvgAtDay = (day) => {
+      if (!day) return null;
+      const idx = Math.min(day - 1, yearAvgSeries.length - 1);
+      for (let i = idx; i >= 0; i--) {
+        const value = yearAvgSeries[i];
+        if (value !== undefined && value !== null) return value;
+      }
+      return null;
+    };
+
+    yearAvgCurrent = yearAvgAtDay(displayDay);
+    yearAvgEnd = yearAvgAtDay(daysInMonth);
+    const rawYearDailyAvg = balanceHistoryData.yearAvgDailyAvg;
+    yearAvgDailyAvg = (rawYearDailyAvg != null && Number.isFinite(rawYearDailyAvg))
+      ? rawYearDailyAvg
+      : null;
+  }
+
   const computed = {
+    thirdLine,
+    hasYearAvgData,
+    yearAvgMax,
+    yearAvgCurrent,
+    yearAvgEnd,
+    yearAvgDailyAvg,
     currentDay,
     hasForecast,
     forecastData,
@@ -321,6 +384,7 @@ export const computeBalanceChart = ({
       forecast: (isForecastDay || isBoundaryDay) ? value : null,
       plainAvg: plainAvgData[i] ?? null,
       prevMonth: prevMonth[i] ?? null,
+      yearAvg: yearAvgSeries[i] ?? null,
       zero: 0,
     };
   });
@@ -333,7 +397,10 @@ export const computeBalanceChart = ({
   }
   series.push({ yKey: 'plainAvg', color: 'rgba(128, 128, 128, 0.4)', strokeWidth: 2, curveType: 'linear', dashed: false });
   if (hasPrevMonthData) {
-    series.push({ yKey: 'prevMonth', color: 'rgba(156, 39, 176, 0.5)', strokeWidth: 2, curveType: 'monotoneX', dashed: false });
+    series.push({ yKey: 'prevMonth', color: PREV_MONTH_COLOR, strokeWidth: 2, curveType: 'monotoneX', dashed: false });
+  }
+  if (hasYearAvgData) {
+    series.push({ yKey: 'yearAvg', color: YEAR_AVG_COLOR, strokeWidth: 2, curveType: 'monotoneX', dashed: false });
   }
   series.push({ yKey: 'zero', color: 'rgba(128, 128, 128, 0.5)', strokeWidth: 1, curveType: 'linear', dashed: false });
 
@@ -583,6 +650,9 @@ const BalanceHistoryCard = ({
 }) => {
   const { hideBalances } = useDisplaySettings();
   const [showCalendar, setShowCalendar] = useState(false);
+  // Which comparison line rides along with the actual balance: last month, the
+  // 12-month median, or nothing at all.
+  const [thirdLine, setThirdLine] = useState('prevMonth');
   const [contentHeight, setContentHeight] = useState(340);
   // Day currently under the finger while scrubbing the chart (null when idle).
   const [scrubDay, setScrubDay] = useState(null);
@@ -605,8 +675,9 @@ const BalanceHistoryCard = ({
       selectedYear,
       selectedMonth,
       primaryColor: colors.primary,
+      thirdLine,
     }),
-    [balanceHistoryData, spendingPrediction, isCurrentMonth, selectedYear, selectedMonth, colors.primary],
+    [balanceHistoryData, spendingPrediction, isCurrentMonth, selectedYear, selectedMonth, colors.primary, thirdLine],
   );
 
   // yKeys drive Victory's shared y-domain (the always-present "zero" key keeps the
@@ -649,6 +720,12 @@ const BalanceHistoryCard = ({
   // Series composition drives the press-state shape; remount the canvas when it changes.
   const chartKey = chartYKeys.join('|');
 
+  const thirdLineLabel = thirdLine === 'prevMonth'
+    ? (t('prev_month') || 'Prev Month')
+    : thirdLine === 'yearAvg'
+      ? (t('year_avg') || 'Year avg')
+      : (t('comparison_none') || 'No comparison');
+
   return (
     <View style={[styles.balanceHistoryCard, { backgroundColor: colors.surface, borderColor: colors.border }]}>
       <View style={styles.balanceHistoryHeader}>
@@ -669,6 +746,23 @@ const BalanceHistoryCard = ({
             </View>
           )}
         </View>
+        {/* Comparison line toggle: prev month → year average → off */}
+        {!showCalendar && balanceHistoryData.actual && balanceHistoryData.actual.length > 0 && (
+          <TouchableOpacity
+            testID="third-line-toggle-btn"
+            style={[styles.calendarToggleBtn, { backgroundColor: colors.surface }]}
+            onPress={() => setThirdLine(nextThirdLineMode(thirdLine))}
+            activeOpacity={0.7}
+            accessibilityRole="button"
+            accessibilityLabel={thirdLineLabel}
+          >
+            <Icon
+              name={THIRD_LINE_ICONS[thirdLine]}
+              size={18}
+              color={thirdLine === 'none' ? colors.mutedText : colors.primary}
+            />
+          </TouchableOpacity>
+        )}
         {/* Calendar / Chart toggle */}
         {balanceHistoryData.actual && balanceHistoryData.actual.length > 0 && (
           <TouchableOpacity
@@ -798,6 +892,20 @@ const BalanceHistoryCard = ({
                       <Text style={[styles.legendTableValue, { color: colors.text }]}>{formatCompact(chartComputed.prevMonthEnd, currency)}</Text>
                     </View>
                   )}
+
+                  {/* Year average row (median across the previous 12 months) */}
+                  {chartComputed.hasYearAvgData && (
+                    <View style={styles.legendTableRow}>
+                      <View style={styles.legendTableLabelCell}>
+                        <View style={[styles.legendDot, styles.legendDotYearAvg]} />
+                        <Text style={[styles.legendTableLabel, { color: colors.text }]}>{t('year_avg') || 'Year avg'}</Text>
+                      </View>
+                      <Text style={[styles.legendTableValue, { color: colors.text }]}>{formatCompact(chartComputed.yearAvgMax, currency)}</Text>
+                      <Text style={[styles.legendTableValue, { color: colors.text }]}>{formatCompact(chartComputed.yearAvgCurrent, currency)}</Text>
+                      <Text style={[styles.legendTableValue, { color: colors.text }]}>{formatCompact(chartComputed.yearAvgDailyAvg, currency)}</Text>
+                      <Text style={[styles.legendTableValue, { color: colors.text }]}>{formatCompact(chartComputed.yearAvgEnd, currency)}</Text>
+                    </View>
+                  )}
                 </View>
               )}
             </View>
@@ -830,6 +938,8 @@ BalanceHistoryCard.propTypes = {
     prevMonthTotalExpenses: PropTypes.oneOfType([PropTypes.number, PropTypes.string]),
     prevMonthDaysCount: PropTypes.number,
     plainAvgMax: PropTypes.number,
+    yearAvg: PropTypes.array,
+    yearAvgDailyAvg: PropTypes.number,
   }).isRequired,
   selectedYear: PropTypes.number.isRequired,
   selectedMonth: PropTypes.number,
@@ -950,7 +1060,10 @@ const styles = StyleSheet.create({
     backgroundColor: 'rgba(128, 128, 128, 0.4)',
   },
   legendDotPrevMonth: {
-    backgroundColor: 'rgba(156, 39, 176, 0.5)',
+    backgroundColor: PREV_MONTH_COLOR,
+  },
+  legendDotYearAvg: {
+    backgroundColor: YEAR_AVG_COLOR,
   },
   legendTableContainer: {
     marginTop: 16,
