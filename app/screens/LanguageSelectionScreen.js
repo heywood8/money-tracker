@@ -8,6 +8,7 @@ import {
   StatusBar,
   Platform,
 } from 'react-native';
+import Animated, { FadeInDown, Easing, ReduceMotion } from 'react-native-reanimated';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import enTranslations from '../../assets/i18n/en.json';
 import itTranslations from '../../assets/i18n/it.json';
@@ -18,6 +19,27 @@ import zhTranslations from '../../assets/i18n/zh.json';
 import deTranslations from '../../assets/i18n/de.json';
 import hyTranslations from '../../assets/i18n/hy.json';
 import { TOP_CONTENT_SPACING, HORIZONTAL_PADDING } from '../styles/layout';
+
+// This is the only screen in the app a user sees exactly once, and it is where
+// the whole motion budget for first-run lives: everywhere else in Penny is a
+// screen people open every day, which argues for less movement, not more.
+//
+// The gap between cards. Seven of them at 45ms trails ~570ms behind the title,
+// which is longer than anything else in the app is allowed to take — permissible
+// only because nothing waits on it: the buttons are laid out and pressable from
+// the first frame, the animation is purely how they arrive.
+const ENTRY_STAGGER = 45;
+const ENTRY_DURATION = 260;
+// Rise distance. Small enough that a card never starts outside its own row, so
+// the stagger reads as one list settling rather than as seven things flying in.
+const ENTRY_RISE = 12;
+
+const entry = (index) => FadeInDown
+  .delay(index * ENTRY_STAGGER)
+  .duration(ENTRY_DURATION)
+  .easing(Easing.out(Easing.cubic))
+  .withInitialValues({ transform: [{ translateY: ENTRY_RISE }] })
+  .reduceMotion(ReduceMotion.System);
 
 // Map language codes to their translation data
 const i18nData = {
@@ -65,47 +87,50 @@ const LanguageSelectionScreen = ({ onLanguageSelected }) => {
       <StatusBar barStyle="dark-content" backgroundColor="#ffffff" />
       <View style={styles.container}>
         <View style={styles.content}>
-          <Text style={styles.title}>{t('welcome_title')}</Text>
-          <Text style={styles.subtitle}>{t('welcome_subtitle')}</Text>
+          {/* Title and subtitle lead the stagger at slots 0 and 1, so the cards
+              below them read as continuing a movement rather than starting one. */}
+          <Animated.Text entering={entry(0)} style={styles.title}>{t('welcome_title')}</Animated.Text>
+          <Animated.Text entering={entry(1)} style={styles.subtitle}>{t('welcome_subtitle')}</Animated.Text>
 
           <View style={styles.languagesContainer}>
-            {languages.map((language) => (
-              <TouchableOpacity
-                key={language.code}
-                style={[
-                  styles.languageButton,
-                  selectedLanguage === language.code && styles.languageButtonSelected,
-                ]}
-                onPress={() => handleLanguageSelect(language.code)}
-                accessibilityRole="button"
-                accessibilityLabel={`Select ${language.name}`}
-                accessibilityState={{ selected: selectedLanguage === language.code }}
-              >
-                <Text style={styles.flag}>{language.flag}</Text>
-                <View style={styles.languageTextContainer}>
-                  <Text
-                    style={[
-                      styles.languageName,
-                      selectedLanguage === language.code && styles.languageNameSelected,
-                    ]}
-                  >
-                    {language.nativeName}
-                  </Text>
-                  <Text
-                    style={[
-                      styles.languageEnglishName,
-                      selectedLanguage === language.code && styles.languageEnglishNameSelected,
-                    ]}
-                  >
-                    {language.name}
-                  </Text>
-                </View>
-                {selectedLanguage === language.code && (
-                  <View style={styles.checkmark}>
-                    <Text style={styles.checkmarkText}>✓</Text>
+            {languages.map((language, index) => (
+              <Animated.View key={language.code} entering={entry(index + 2)}>
+                <TouchableOpacity
+                  style={[
+                    styles.languageButton,
+                    selectedLanguage === language.code && styles.languageButtonSelected,
+                  ]}
+                  onPress={() => handleLanguageSelect(language.code)}
+                  accessibilityRole="button"
+                  accessibilityLabel={`Select ${language.name}`}
+                  accessibilityState={{ selected: selectedLanguage === language.code }}
+                >
+                  <Text style={styles.flag}>{language.flag}</Text>
+                  <View style={styles.languageTextContainer}>
+                    <Text
+                      style={[
+                        styles.languageName,
+                        selectedLanguage === language.code && styles.languageNameSelected,
+                      ]}
+                    >
+                      {language.nativeName}
+                    </Text>
+                    <Text
+                      style={[
+                        styles.languageEnglishName,
+                        selectedLanguage === language.code && styles.languageEnglishNameSelected,
+                      ]}
+                    >
+                      {language.name}
+                    </Text>
                   </View>
-                )}
-              </TouchableOpacity>
+                  {selectedLanguage === language.code && (
+                    <View style={styles.checkmark}>
+                      <Text style={styles.checkmarkText}>✓</Text>
+                    </View>
+                  )}
+                </TouchableOpacity>
+              </Animated.View>
             ))}
           </View>
         </View>

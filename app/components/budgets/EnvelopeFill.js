@@ -1,6 +1,8 @@
-import React from 'react';
+import React, { useEffect } from 'react';
 import { View, StyleSheet } from 'react-native';
+import Animated, { useSharedValue, useAnimatedStyle, withTiming } from 'react-native-reanimated';
 import PropTypes from 'prop-types';
+import { TIMING_ENTER } from '../../utils/motion';
 
 // Tint strength as a hex alpha channel appended to a 6-digit colour.
 //
@@ -12,6 +14,11 @@ import PropTypes from 'prop-types';
 // spent only where there is something to say.
 const CALM_ALPHA = '14'; // ~8%, neutral grey
 const SIGNAL_ALPHA = '2E'; // ~18%, warning / overspend
+
+// How long the wash takes to travel to a new fraction. The curve comes from
+// TIMING_ENTER, so a row settling reads as the same material as the graph panel
+// opening or the quick-add sliding back.
+const FILL_DURATION = 300;
 
 /**
  * A plan row's progress, drawn as the row's own background rather than as a
@@ -33,17 +40,30 @@ const SIGNAL_ALPHA = '2E'; // ~18%, warning / overspend
  *   nothing to flag, which is washed in neutral grey instead
  */
 const EnvelopeFill = ({ fraction, tone = null, mutedColor, testID }) => {
-  const fillPercent = Math.min(Math.max(fraction, 0), 1) * 100;
+  const clamped = Math.min(Math.max(fraction, 0), 1);
   const fillColor = tone ? `${tone}${SIGNAL_ALPHA}` : `${mutedColor}${CALM_ALPHA}`;
+
+  // Drawn as a full-width bar scaled from its left edge rather than as a
+  // percentage width, for two reasons. A `width` in percent is a layout prop, so
+  // animating it re-lays-out the row on the JS thread every frame; `scaleX` is a
+  // transform and runs on the UI thread. And the row is what changes when the
+  // user executes a line right above it — the wash sliding to its new length is
+  // the visible result of that action, where a jump is just a different picture.
+  const fill = useSharedValue(clamped);
+  useEffect(() => {
+    // Seeded with `clamped`, so a row that mounts already at 60% renders there:
+    // this only animates a fraction that changes while the row is on screen.
+    fill.value = withTiming(clamped, { ...TIMING_ENTER, duration: FILL_DURATION });
+  }, [clamped, fill]);
+
+  const fillStyle = useAnimatedStyle(() => ({ transform: [{ scaleX: fill.value }] }));
 
   return (
     <View style={StyleSheet.absoluteFill} pointerEvents="none" testID={testID}>
-      {fillPercent > 0 && (
-        <View
-          testID={testID ? `${testID}-bar` : undefined}
-          style={[styles.fill, { width: `${fillPercent}%`, backgroundColor: fillColor }]}
-        />
-      )}
+      <Animated.View
+        testID={testID ? `${testID}-bar` : undefined}
+        style={[styles.fill, { backgroundColor: fillColor }, fillStyle]}
+      />
     </View>
   );
 };
@@ -64,6 +84,10 @@ const styles = StyleSheet.create({
     bottom: 0,
     left: 0,
     position: 'absolute',
+    right: 0,
     top: 0,
+    // Without this the bar would grow from its centre and the wash would detach
+    // from the row's left edge.
+    transformOrigin: 'left',
   },
 });

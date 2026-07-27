@@ -21,6 +21,8 @@
  * mid-flight (i.e. when the user grabs a moving surface again).
  */
 
+import { Easing } from 'react-native-reanimated';
+
 /**
  * Critically damped spring for releasing a gesture (Reanimated).
  *
@@ -47,6 +49,44 @@ export const SPRING_SETTLE = {
   duration: 350,
   dampingRatio: 1,
   overshootClamping: true,
+  reduceMotion: 'system',
+};
+
+/**
+ * The app's entry curve, for the surfaces that arrive on a timing rather than
+ * off a gesture: decelerating, so a thing slows into place instead of stopping.
+ *
+ * Carries no duration — arrival distances differ (a dialog is not a month of
+ * plan), so each caller states its own and spreads this in for the rest:
+ *   withTiming(1, { ...TIMING_ENTER, duration: 280 })
+ *
+ * `reduceMotion` is the point of having this at all. It is the one property that
+ * is easy to leave off and impossible to see missing, and omitting it means the
+ * surface ignores the OS "Remove animations" setting. Spreading this makes the
+ * accessible behaviour the default rather than something each call site
+ * remembers.
+ */
+export const TIMING_ENTER = {
+  easing: Easing.out(Easing.cubic),
+  reduceMotion: 'system',
+};
+
+/**
+ * Spring for a small badge or glyph confirming that an action landed.
+ *
+ * The deliberate opposite of SPRING_SETTLE on the one point that matters:
+ * overshoot is welcome here. SPRING_SETTLE clamps it because every surface it
+ * drives is a full-bleed layer, and travelling past the resting place would
+ * expose empty background behind it. A 13dp badge sitting on top of a row has
+ * nothing behind it to expose, and the small bounce is what makes the moment
+ * read as "done" rather than as a re-render.
+ *
+ * `dampingRatio: 0.55` is under-damped enough to see once and not enough to
+ * wobble; `duration` is the response, as in SPRING_SETTLE.
+ */
+export const SPRING_BADGE_POP = {
+  duration: 320,
+  dampingRatio: 0.55,
   reduceMotion: 'system',
 };
 

@@ -1,9 +1,23 @@
-import React from 'react';
+import React, { useEffect } from 'react';
 import PropTypes from 'prop-types';
 import { Modal, View, Text, StyleSheet, Pressable } from 'react-native';
+import Animated, { useSharedValue, useAnimatedStyle, withTiming } from 'react-native-reanimated';
 import { HORIZONTAL_PADDING } from '../styles/layout';
 import { useThemeColors } from '../contexts/ThemeColorsContext';
 import ModalBlurOverlay from './ModalBlurOverlay';
+import { TIMING_ENTER } from '../utils/motion';
+
+// The card grows a hair as it fades in. 4%, not 10%: this dialog interrupts,
+// which is a reason to arrive quickly and stop, not to make an entrance.
+const OPEN_SCALE_FROM = 0.96;
+const OPEN_DURATION = 200;
+
+// The card is a Pressable (it swallows taps so they don't reach the dismissing
+// overlay behind it) AND the thing that scales. Animating the Pressable itself
+// rather than wrapping it in an Animated.View keeps `styles.dialog` — which sizes
+// the card at 80% of the overlay — on a single node; a bare wrapper would have
+// had to size itself from its own child's percentage width.
+const AnimatedPressable = Animated.createAnimatedComponent(Pressable);
 
 /**
  * Material Design Dialog Component
@@ -24,6 +38,27 @@ export default function MaterialDialog({
   onDismiss,
 }) {
   const { colors } = useThemeColors();
+
+  // Every other surface in the app arrives from somewhere — panels slide, sheets
+  // rise, the graph panel grows out of its header. This dialog was the one that
+  // simply existed at full size the moment it was there.
+  //
+  // Only the entry is scripted. The exit stays with `animationType="fade"`,
+  // which unmounts the children as it runs: a scripted exit would need the card
+  // to outlive `visible`, and buying a 150ms shrink with a second copy of the
+  // dialog's visibility state is the wrong trade for the app's most-used modal.
+  //
+  // Scale only. The Modal's own fade already carries the opacity, and animating
+  // it here too would double it into a slower-looking arrival — so the shared
+  // value is the scale itself rather than a 0..1 progress to interpolate off.
+  const scale = useSharedValue(1);
+  useEffect(() => {
+    if (!visible) return;
+    scale.value = OPEN_SCALE_FROM;
+    scale.value = withTiming(1, { ...TIMING_ENTER, duration: OPEN_DURATION });
+  }, [visible, scale]);
+
+  const dialogStyle = useAnimatedStyle(() => ({ transform: [{ scale: scale.value }] }));
 
   const handleButtonPress = (button) => {
     if (button.onPress) {
@@ -59,9 +94,9 @@ export default function MaterialDialog({
           style={styles.overlay}
           onPress={onDismiss}
         >
-          <Pressable
+          <AnimatedPressable
             testID="material-dialog-content"
-            style={[styles.dialog, { backgroundColor: colors.card }]}
+            style={[styles.dialog, { backgroundColor: colors.card }, dialogStyle]}
             onPress={() => {}}
           >
             {/* Title */}
@@ -101,7 +136,7 @@ export default function MaterialDialog({
                 </Pressable>
               ))}
             </View>
-          </Pressable>
+          </AnimatedPressable>
         </Pressable>
       </Modal>
     </>

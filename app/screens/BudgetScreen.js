@@ -1,5 +1,6 @@
 import React, { useState, useEffect, useMemo, useCallback, useRef } from 'react';
 import { View, StyleSheet, FlatList, Pressable } from 'react-native';
+import Animated, { useSharedValue, useAnimatedStyle, withTiming } from 'react-native-reanimated';
 import { Text, Snackbar } from 'react-native-paper';
 import Icon from '@expo/vector-icons/MaterialCommunityIcons';
 import { useThemeColors } from '../contexts/ThemeColorsContext';
@@ -14,6 +15,7 @@ import LoadingView from '../components/LoadingView';
 import * as Currency from '../services/currency';
 import { SPACING } from '../styles/layout';
 import { currentMonthKey, addMonths, formatMonthLabel } from '../utils/monthUtils';
+import { TIMING_ENTER } from '../utils/motion';
 
 // The Budgets screen is a single month-scoped list rendered by
 // MonthlyPlanSection (Budgets v3: the per-category budgets list, the monthly plan
@@ -26,6 +28,20 @@ const renderNothing = () => null;
 // Stands in for the header's remainder until the plan section has computed and
 // reported one.
 const PENDING_PLACEHOLDER = '—';
+
+// How far the plan travels when the month changes, and for how long.
+//
+// 20dp, not a screen width. The tab strip already owns full-bleed horizontal
+// travel (SimpleTabs swipes between tabs), so a plan that slid the whole way
+// would claim to be a second pager on the same axis. This is a directional hint:
+// enough to say "later" or "earlier", not enough to be mistaken for navigation.
+//
+// Nothing animates out. The two months would have to be mounted at once for
+// that, and they stack vertically inside the FlatList header — the exiting copy
+// would push the incoming one down the screen. The graph panel resolved the same
+// problem the same way (chartTransitions.js): a fade through, not a cross-fade.
+const MONTH_SHIFT = 20;
+const MONTH_TRANSITION_DURATION = 280;
 
 const BudgetScreen = () => {
   const { colors } = useThemeColors();
@@ -48,7 +64,14 @@ const BudgetScreen = () => {
 
   // The whole screen is scoped to one month via a single shared ‹ Month › header;
   // MonthlyPlanSection is controlled from here.
-  const [month, setMonth] = useState(currentMonthKey);
+  //
+  // The direction of travel rides along with the key rather than living in its
+  // own state: it is only ever meaningful for the render that the new month
+  // causes, and two separate setState calls could be batched into an order where
+  // the plan animates the wrong way. `dir` is null on the first render, which is
+  // what keeps the screen from animating on mount.
+  const [monthState, setMonthState] = useState(() => ({ key: currentMonthKey(), dir: null }));
+  const month = monthState.key;
   const isCurrentMonth = month === currentMonthKey();
 
   const [snackbarVisible, setSnackbarVisible] = useState(false);
@@ -83,15 +106,49 @@ const BudgetScreen = () => {
     ));
   }, []);
 
-  const handlePrevMonth = useCallback(() => setMonth(m => addMonths(m, -1)), []);
-  const handleNextMonth = useCallback(() => setMonth(m => addMonths(m, 1)), []);
+  const handlePrevMonth = useCallback(() => setMonthState(s => ({ key: addMonths(s.key, -1), dir: -1 })), []);
+  const handleNextMonth = useCallback(() => setMonthState(s => ({ key: addMonths(s.key, 1), dir: 1 })), []);
   // Explicit affordance for Fix 4: the screen stays mounted across tab
   // switches, so a user who navigates away from the current month and comes
   // back later would otherwise land on a stale month with the executable
   // templates non-executable (isCurrentMonth === false) and no obvious way
   // back. Surface a visible "jump to current month" control instead of
   // silently auto-resetting the month on focus.
-  const handleJumpToCurrentMonth = useCallback(() => setMonth(currentMonthKey()), []);
+  //
+  // The jump can go either way, so the direction is read off the keys. They are
+  // 'YYYY-MM', so a plain string compare orders them. Returning the same object
+  // when the user is already on the current month keeps the plan from re-rendering
+  // (and from animating) for a tap that changes nothing.
+  const handleJumpToCurrentMonth = useCallback(() => setMonthState(s => {
+    const key = currentMonthKey();
+    return key === s.key ? s : { key, dir: key > s.key ? 1 : -1 };
+  }), []);
+
+  // Month navigation is the Budgets tab's primary axis, and it was the only
+  // navigation in the app with no spatial story: the sticky header said a new
+  // month and the entire plan under it was simply replaced, mid-scroll, with no
+  // indication of which way through the year the user had moved.
+  //
+  // Driven by a shared value rather than by Reanimated's `entering` on a keyed
+  // view, because remounting the FlatList's header on every month would reset the
+  // scroll position — the plan would jump to the top as well as change.
+  // One value drives both the fade and the travel: they are the same 0→1
+  // arrival, so a second animation with an identical config would only be a
+  // second thing that can fall out of sync. `monthDir` is set, never animated —
+  // it is which way this particular arrival comes from.
+  const monthProgress = useSharedValue(1);
+  const monthDir = useSharedValue(0);
+  useEffect(() => {
+    if (monthState.dir === null) return;
+    monthDir.value = monthState.dir;
+    monthProgress.value = 0;
+    monthProgress.value = withTiming(1, { ...TIMING_ENTER, duration: MONTH_TRANSITION_DURATION });
+  }, [monthState, monthProgress, monthDir]);
+
+  const monthTransitionStyle = useAnimatedStyle(() => ({
+    opacity: monthProgress.value,
+    transform: [{ translateX: (1 - monthProgress.value) * monthDir.value * MONTH_SHIFT }],
+  }));
 
   // Memoize unique currencies from accounts
   const currencies = useMemo(() =>
@@ -285,13 +342,20 @@ const BudgetScreen = () => {
   return (
     <View style={[styles.container, { backgroundColor: colors.background }]} testID="budget-screen">
       {monthHeader}
-      <FlatList
-        data={EMPTY_LIST}
-        keyExtractor={(item) => item.id}
-        renderItem={renderNothing}
-        ListHeaderComponent={listHeader}
-        contentContainerStyle={styles.listContent}
-      />
+      {/* The scrolling layer as a whole is what belongs to the month, so it is
+          what moves — wrapping the memoized header instead would have put an
+          animated style into that memo's dependencies, and a style object that
+          ever stopped being referentially stable would rebuild the entire plan
+          on every render of this screen. */}
+      <Animated.View style={[styles.planLayer, monthTransitionStyle]} testID="budget-plan-transition">
+        <FlatList
+          data={EMPTY_LIST}
+          keyExtractor={(item) => item.id}
+          renderItem={renderNothing}
+          ListHeaderComponent={listHeader}
+          contentContainerStyle={styles.listContent}
+        />
+      </Animated.View>
 
       <AddFAB
         onPress={handleOpenAddAllocation}
@@ -395,6 +459,11 @@ const styles = StyleSheet.create({
   },
   navButton: {
     padding: 4,
+  },
+  // The animated wrapper sits between the screen's column and the FlatList, so
+  // it has to pass the remaining height through or the list collapses to nothing.
+  planLayer: {
+    flex: 1,
   },
   snackbar: {
     marginBottom: 100,

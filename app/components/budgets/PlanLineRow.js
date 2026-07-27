@@ -1,11 +1,18 @@
-import React, { memo, useRef } from 'react';
+import React, { memo, useRef, useEffect } from 'react';
 import { View, Text, Pressable, StyleSheet } from 'react-native';
+import Animated, { useSharedValue, useAnimatedStyle, withSpring } from 'react-native-reanimated';
 import { Swipeable } from 'react-native-gesture-handler';
 import PropTypes from 'prop-types';
 import Icon from '@expo/vector-icons/MaterialCommunityIcons';
 import * as Currency from '../../services/currency';
 import EnvelopeFill from './EnvelopeFill';
 import { SPACING } from '../../styles/layout';
+import { SPRING_BADGE_POP } from '../../utils/motion';
+
+// Where the badge springs from when its state flips. Not 0: a glyph growing out
+// of nothing reads as an element arriving, and this one was already there — it
+// changed what it says.
+const BADGE_POP_FROM = 0.4;
 
 // Stands in for a foreign-currency amount while its exchange rate resolves — an
 // em dash rather than the stored figure, which would read as a number in the
@@ -130,6 +137,27 @@ const PlanLineRow = memo(function PlanLineRow({
     handler?.(line);
   };
 
+  // Executing a line is a swipe, a row that slides back, and then a 13dp glyph
+  // that silently becomes a different glyph — the only evidence on the row that
+  // anything happened at all (the amount pair moves too, but by an amount the
+  // user cannot predict, so it does not read as a confirmation). The pop is that
+  // confirmation.
+  //
+  // Skipped on the first render: rows arrive already done or already pending
+  // when the month loads, and a card full of popping badges on every mount would
+  // announce nothing.
+  const badgeScale = useSharedValue(1);
+  const badgeSettled = useRef(false);
+  useEffect(() => {
+    if (!badgeSettled.current) {
+      badgeSettled.current = true;
+      return;
+    }
+    badgeScale.value = BADGE_POP_FROM;
+    badgeScale.value = withSpring(1, SPRING_BADGE_POP);
+  }, [executed, badgeScale]);
+  const badgeStyle = useAnimatedStyle(() => ({ transform: [{ scale: badgeScale.value }] }));
+
   // The scope and template state moved from a text line into a glyph and an icon
   // badge, which a screen reader cannot announce — so they are spelled out here
   // instead. Sighted density and non-visual completeness are not the same
@@ -169,19 +197,19 @@ const PlanLineRow = memo(function PlanLineRow({
               occupy the same 13dp corner, so the row height doesn't move
               between states. */}
           {executed ? (
-            <View
+            <Animated.View
               testID={`plan-line-check-${line.id}`}
-              style={[styles.checkBadge, { borderColor: colors.surface, backgroundColor: colors.income }]}
+              style={[styles.checkBadge, { borderColor: colors.surface, backgroundColor: colors.income }, badgeStyle]}
             >
               <Icon name="check" size={7} color="white" />
-            </View>
+            </Animated.View>
           ) : line.hasTemplate ? (
-            <View
+            <Animated.View
               testID={`plan-line-pending-${line.id}`}
-              style={[styles.checkBadge, { borderColor: colors.surface, backgroundColor: colors.primary }]}
+              style={[styles.checkBadge, { borderColor: colors.surface, backgroundColor: colors.primary }, badgeStyle]}
             >
               <Icon name="play" size={7} color="white" />
-            </View>
+            </Animated.View>
           ) : null}
         </View>
         <View style={styles.lineBody}>
