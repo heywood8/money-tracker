@@ -1,6 +1,6 @@
 import React, { useMemo, useCallback, useEffect } from 'react';
 import { View, StyleSheet } from 'react-native';
-import Animated, { useSharedValue, useAnimatedStyle, withTiming, interpolate, Easing } from 'react-native-reanimated';
+import Animated, { useSharedValue, useAnimatedStyle, withTiming, withDelay, interpolate, Easing } from 'react-native-reanimated';
 import { Pie, PolarChart } from 'victory-native';
 import { LinearGradient, vec } from '@shopify/react-native-skia';
 import Icon from '@expo/vector-icons/MaterialCommunityIcons';
@@ -88,18 +88,22 @@ export const INTRO_DURATION = 460;
 export const INTRO_SCALE_FROM = 0.86;
 export const INTRO_ROTATION_FROM = -14;
 
-const DonutChart = ({ data, insetColor, introKey = 0 }) => {
+const DonutChart = ({ data, insetColor, introKey = 0, introDelay = 0 }) => {
   const pieData = useMemo(() => mapPieData(data), [data]);
   const markers = useMemo(() => computeIconMarkers(data), [data]);
   const intro = useSharedValue(0);
 
   // Replays whenever introKey changes — the screen bumps it as a tab opens, so
   // the donut animates when it becomes visible, not when it silently mounts
-  // behind a collapsed panel.
+  // behind a collapsed panel. introDelay holds it back until the chart it is
+  // replacing has faded out, so the spin-up is never played to an empty seat.
   useEffect(() => {
     intro.value = 0;
-    intro.value = withTiming(1, { duration: INTRO_DURATION, easing: Easing.out(Easing.cubic) });
-  }, [introKey, intro]);
+    intro.value = withDelay(
+      introDelay,
+      withTiming(1, { duration: INTRO_DURATION, easing: Easing.out(Easing.cubic) }),
+    );
+  }, [introKey, introDelay, intro]);
 
   const introStyle = useAnimatedStyle(() => ({
     opacity: intro.value,
@@ -171,6 +175,9 @@ DonutChart.propTypes = {
   insetColor: PropTypes.string,
   // Bump to replay the intro animation (e.g. when the owning tab is opened).
   introKey: PropTypes.number,
+  // Milliseconds to hold the intro back, so it starts once the outgoing chart
+  // has left rather than on top of it.
+  introDelay: PropTypes.number,
 };
 
 const styles = StyleSheet.create({

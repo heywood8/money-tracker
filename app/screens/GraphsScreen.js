@@ -1,6 +1,6 @@
 import React, { useState, useEffect, useLayoutEffect, useCallback, useMemo, useRef } from 'react';
 import { View, Text, StyleSheet, ScrollView, TouchableOpacity } from 'react-native';
-import Animated, { useSharedValue, useAnimatedStyle, withTiming, interpolate, runOnJS, Easing, SlideInLeft, SlideInRight, SlideOutLeft, SlideOutRight } from 'react-native-reanimated';
+import Animated, { useSharedValue, useAnimatedStyle, withTiming, withDelay, interpolate, runOnJS, Easing, SlideInLeft, SlideInRight, SlideOutLeft, SlideOutRight } from 'react-native-reanimated';
 import Icon from '@expo/vector-icons/MaterialCommunityIcons';
 import WheelPicker from '@quidone/react-native-wheel-picker';
 import { useThemeColors } from '../contexts/ThemeColorsContext';
@@ -15,7 +15,7 @@ import currenciesJson from '../../assets/currencies.json';
 import EmptyState from '../components/EmptyState';
 import BalanceHistoryCard from '../components/graphs/BalanceHistoryCard';
 import CategoryBackChip from '../components/graphs/CategoryBackChip';
-import { chartTransitionOffsets, CHART_DROP } from '../components/graphs/chartTransitions';
+import { chartTransition, CHART_DROP } from '../components/graphs/chartTransitions';
 import CategorySpendingCard from '../components/graphs/CategorySpendingCard';
 import ExpenseSummaryCard from '../components/graphs/ExpenseSummaryCard';
 import IncomeSummaryCard from '../components/graphs/IncomeSummaryCard';
@@ -28,11 +28,8 @@ import useBalanceHistory from '../hooks/useBalanceHistory';
 
 const CARD_HEADER_HEIGHT = 56;
 const MAX_CHART_HEIGHT = 500;
-// How far a chart travels while fading: straight down when its tab opens,
-// sideways when you move between tabs.
-// Entry outlasts exit so the two overlap instead of leaving a blank frame.
-const CHART_IN_DURATION = 320;
-const CHART_OUT_DURATION = 200;
+// Chart-level timings live in chartTransitions.js — these two are the panel's
+// own height animation, which runs regardless of which chart is moving.
 const PANEL_OPEN_DURATION = 280;
 const PANEL_CLOSE_DURATION = 220;
 
@@ -77,18 +74,20 @@ const GraphsScreen = () => {
   // Reanimated shared values — all run on UI thread, immune to JS contention
   // Panel height: header only when collapsed, header + chart when open
   const panelHeight = useSharedValue(CARD_HEADER_HEIGHT);
-  // 0=hidden, 1=visible; drives each chart's opacity + slide. Both charts stay
-  // mounted and overlap absolutely, so switching tabs is a cross-fade.
+  // 0=hidden, 1=visible; drives each chart's opacity, drop and scale. Both
+  // charts stay mounted and overlap absolutely, so switching tabs is a fade
+  // through: one progress runs to 0 before the other starts climbing to 1.
   const incomeChartProgress = useSharedValue(0);
   const expenseChartProgress = useSharedValue(0);
-  // Where each chart travels from at progress 0. Opening drops the chart down
-  // from under the strip; switching tabs slides it in from the side you moved
-  // towards, so the panel reads as a pager rather than a blink.
-  const incomeChartOffset = useSharedValue({ x: 0, y: CHART_DROP });
-  const expenseChartOffset = useSharedValue({ x: 0, y: CHART_DROP });
+  // Where each chart sits at progress 0. Opening drops it down from under the
+  // strip at full size; switching tabs holds it in place and scales it instead.
+  const incomeChartOffset = useSharedValue({ y: CHART_DROP, scale: 1 });
+  const expenseChartOffset = useSharedValue({ y: CHART_DROP, scale: 1 });
   // Bumped every time a tab is opened so the donut replays its intro — the
   // charts are always mounted, so mounting alone can't drive that animation.
-  const [chartIntroKey, setChartIntroKey] = useState(0);
+  // The delay travels with it: on a fade through the donut must not spin up
+  // while the chart it is replacing is still on screen.
+  const [chartIntro, setChartIntro] = useState({ key: 0, delay: 0 });
   // Measured chart heights, kept in refs so the expand handler can read them
   // synchronously (they are written from the JS-side onContentSizeChange).
   const expenseChartHeightRef = useRef(0);
@@ -520,7 +519,7 @@ const GraphsScreen = () => {
 
     const closing = expandedCard === card;
     const nextTab = closing ? null : card;
-    const { enter, exit } = chartTransitionOffsets(expandedCard, nextTab);
+    const { enter, exit } = chartTransition(expandedCard, nextTab);
 
     // Leaving a tab always drops its drill-down so it reopens at the top level
     if (expandedCard) {
@@ -529,8 +528,8 @@ const GraphsScreen = () => {
       } else {
         resetIncomeCategory();
       }
-      offsetOf(expandedCard).value = exit;
-      progressOf(expandedCard).value = withTiming(0, { duration: CHART_OUT_DURATION, easing: Easing.in(Easing.quad) });
+      offsetOf(expandedCard).value = { y: exit.y, scale: exit.scale };
+      progressOf(expandedCard).value = withTiming(0, { duration: exit.duration, easing: Easing.in(Easing.quad) });
     }
 
     setExpandedCard(nextTab);
@@ -540,13 +539,18 @@ const GraphsScreen = () => {
       return;
     }
 
-    offsetOf(card).value = enter;
-    setChartIntroKey(key => key + 1);
+    offsetOf(card).value = { y: enter.y, scale: enter.scale };
+    setChartIntro(prev => ({ key: prev.key + 1, delay: enter.delay }));
     const chartHeight = card === 'income'
       ? incomeChartHeightRef.current
       : expenseChartHeightRef.current;
     panelHeight.value = withTiming(CARD_HEADER_HEIGHT + chartHeight, { duration: PANEL_OPEN_DURATION, easing: Easing.out(Easing.cubic) });
-    progressOf(card).value = withTiming(1, { duration: CHART_IN_DURATION, easing: Easing.out(Easing.cubic) });
+    // withDelay, not Animated.delay: this is a reanimated shared value, so the
+    // whole chain stays on the UI thread.
+    progressOf(card).value = withDelay(
+      enter.delay,
+      withTiming(1, { duration: enter.duration, easing: Easing.out(Easing.cubic) }),
+    );
   }, [expandedCard, panelHeight, incomeChartProgress, expenseChartProgress,
     incomeChartOffset, expenseChartOffset, resetExpenseCategory, resetIncomeCategory]);
 
@@ -584,24 +588,24 @@ const GraphsScreen = () => {
 
   const incomeChartAnimStyle = useAnimatedStyle(() => {
     const p = incomeChartProgress.value;
-    const { x, y } = incomeChartOffset.value;
+    const { y, scale } = incomeChartOffset.value;
     return {
       opacity: p,
       transform: [
-        { translateX: interpolate(p, [0, 1], [x, 0]) },
         { translateY: interpolate(p, [0, 1], [y, 0]) },
+        { scale: interpolate(p, [0, 1], [scale, 1]) },
       ],
     };
   });
 
   const expenseChartAnimStyle = useAnimatedStyle(() => {
     const p = expenseChartProgress.value;
-    const { x, y } = expenseChartOffset.value;
+    const { y, scale } = expenseChartOffset.value;
     return {
       opacity: p,
       transform: [
-        { translateX: interpolate(p, [0, 1], [x, 0]) },
         { translateY: interpolate(p, [0, 1], [y, 0]) },
+        { scale: interpolate(p, [0, 1], [scale, 1]) },
       ],
     };
   });
@@ -687,7 +691,7 @@ const GraphsScreen = () => {
             </View>
 
             {/* Both charts stay mounted and overlap, so they stay measured and
-                switching tabs cross-fades instead of remounting. The closed one is
+                switching tabs fades through instead of remounting. The closed one is
                 pulled out of the accessibility tree too — opacity 0 alone still
                 lets TalkBack read its legend. */}
             <Animated.View
@@ -720,7 +724,8 @@ const GraphsScreen = () => {
                     isLeafCategory={incomeCategoryIsLeaf}
                     operations={incomeOperations}
                     loadingOperations={loadingIncomeOperations}
-                    introKey={chartIntroKey}
+                    introKey={chartIntro.key}
+                    introDelay={chartIntro.delay}
                   />
                 </Animated.View>
               </ScrollView>
@@ -756,7 +761,8 @@ const GraphsScreen = () => {
                     isLeafCategory={expenseCategoryIsLeaf}
                     operations={expenseOperations}
                     loadingOperations={loadingExpenseOperations}
-                    introKey={chartIntroKey}
+                    introKey={chartIntro.key}
+                    introDelay={chartIntro.delay}
                   />
                 </Animated.View>
               </ScrollView>
