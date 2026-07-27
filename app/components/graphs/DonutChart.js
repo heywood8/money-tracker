@@ -1,5 +1,6 @@
-import React, { useMemo, useCallback } from 'react';
+import React, { useMemo, useCallback, useEffect } from 'react';
 import { View, StyleSheet } from 'react-native';
+import Animated, { useSharedValue, useAnimatedStyle, withTiming, interpolate, Easing } from 'react-native-reanimated';
 import { Pie, PolarChart } from 'victory-native';
 import { LinearGradient, vec } from '@shopify/react-native-skia';
 import Icon from '@expo/vector-icons/MaterialCommunityIcons';
@@ -79,9 +80,34 @@ export const computeSliceGradient = (slice) => {
 const SLICE_FADE_ALPHA = '80';
 const INSET_WIDTH = 2;
 
-const DonutChart = ({ data, insetColor }) => {
+// The donut spins up into place rather than snapping in. Victory Native has no
+// entering animation for Pie.Chart, and its `startAngle` is a plain prop — driving
+// it per frame would re-render the chart on the JS thread. Animating the container
+// instead keeps the whole thing on the UI thread for the cost of one transform.
+export const INTRO_DURATION = 460;
+export const INTRO_SCALE_FROM = 0.86;
+export const INTRO_ROTATION_FROM = -14;
+
+const DonutChart = ({ data, insetColor, introKey = 0 }) => {
   const pieData = useMemo(() => mapPieData(data), [data]);
   const markers = useMemo(() => computeIconMarkers(data), [data]);
+  const intro = useSharedValue(0);
+
+  // Replays whenever introKey changes — the screen bumps it as a tab opens, so
+  // the donut animates when it becomes visible, not when it silently mounts
+  // behind a collapsed panel.
+  useEffect(() => {
+    intro.value = 0;
+    intro.value = withTiming(1, { duration: INTRO_DURATION, easing: Easing.out(Easing.cubic) });
+  }, [introKey, intro]);
+
+  const introStyle = useAnimatedStyle(() => ({
+    opacity: intro.value,
+    transform: [
+      { scale: interpolate(intro.value, [0, 1], [INTRO_SCALE_FROM, 1]) },
+      { rotate: `${interpolate(intro.value, [0, 1], [INTRO_ROTATION_FROM, 0])}deg` },
+    ],
+  }));
 
   const renderSlice = useCallback(({ slice }) => {
     const { start, end } = computeSliceGradient(slice);
@@ -105,7 +131,7 @@ const DonutChart = ({ data, insetColor }) => {
   }, [insetColor]);
 
   return (
-    <View testID="donut-chart" style={styles.container} accessibilityRole="image">
+    <Animated.View testID="donut-chart" style={[styles.container, introStyle]} accessibilityRole="image">
       <PolarChart data={pieData} labelKey="label" valueKey="value" colorKey="color">
         <Pie.Chart innerRadius={INNER_RADIUS}>
           {renderSlice}
@@ -129,7 +155,7 @@ const DonutChart = ({ data, insetColor }) => {
             <Icon name={marker.icon} size={ICON_SIZE} color="#fff" />
           </View>
         ))}
-    </View>
+    </Animated.View>
   );
 };
 
@@ -143,6 +169,8 @@ DonutChart.propTypes = {
   ).isRequired,
   // Colour of the hairline drawn between slices; omit to draw none.
   insetColor: PropTypes.string,
+  // Bump to replay the intro animation (e.g. when the owning tab is opened).
+  introKey: PropTypes.number,
 };
 
 const styles = StyleSheet.create({

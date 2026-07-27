@@ -7,6 +7,9 @@ import DonutChart, {
   CENTER,
   ICON_RADIUS,
   ICON_THRESHOLD,
+  INTRO_DURATION,
+  INTRO_SCALE_FROM,
+  INTRO_ROTATION_FROM,
 } from '../../../app/components/graphs/DonutChart';
 
 describe('mapPieData', () => {
@@ -203,5 +206,36 @@ describe('DonutChart', () => {
     const { getByTestId } = await render(<DonutChart data={mockData} insetColor="#ffffff" />);
     expect(getByTestId('donut-chart')).toBeTruthy();
     expect(getByTestId('vn-pie')).toBeTruthy();
+  });
+
+  describe('intro animation', () => {
+    it('renders without an introKey', async () => {
+      const { getByTestId } = await render(<DonutChart data={mockData} />);
+
+      expect(getByTestId('donut-chart')).toBeTruthy();
+    });
+
+    // The charts are mounted for both tabs at all times, so the animation cannot
+    // key off mounting — the screen bumps introKey when a tab actually opens.
+    // Replaying it must not disturb the rendered donut.
+    it('keeps the donut and its icons intact when introKey changes', async () => {
+      const { getByTestId, queryAllByTestId, rerender } = await render(
+        <DonutChart data={mockData} introKey={0} />,
+      );
+
+      await rerender(<DonutChart data={mockData} introKey={1} />);
+
+      expect(getByTestId('donut-chart')).toBeTruthy();
+      expect(getByTestId('vn-pie')).toBeTruthy();
+      expect(queryAllByTestId('icon-food').length).toBeGreaterThan(0);
+      expect(queryAllByTestId('icon-car').length).toBeGreaterThan(0);
+    });
+
+    it('starts from a scaled-down, rotated state so the donut spins up into place', () => {
+      expect(INTRO_SCALE_FROM).toBeGreaterThan(0);
+      expect(INTRO_SCALE_FROM).toBeLessThan(1);
+      expect(INTRO_ROTATION_FROM).not.toBe(0);
+      expect(INTRO_DURATION).toBeGreaterThan(0);
+    });
   });
 });

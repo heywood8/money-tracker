@@ -15,6 +15,7 @@ import currenciesJson from '../../assets/currencies.json';
 import EmptyState from '../components/EmptyState';
 import BalanceHistoryCard from '../components/graphs/BalanceHistoryCard';
 import CategoryBackChip from '../components/graphs/CategoryBackChip';
+import { chartTransitionOffsets, CHART_DROP } from '../components/graphs/chartTransitions';
 import CategorySpendingCard from '../components/graphs/CategorySpendingCard';
 import ExpenseSummaryCard from '../components/graphs/ExpenseSummaryCard';
 import IncomeSummaryCard from '../components/graphs/IncomeSummaryCard';
@@ -27,6 +28,13 @@ import useBalanceHistory from '../hooks/useBalanceHistory';
 
 const CARD_HEADER_HEIGHT = 56;
 const MAX_CHART_HEIGHT = 500;
+// How far a chart travels while fading: straight down when its tab opens,
+// sideways when you move between tabs.
+// Entry outlasts exit so the two overlap instead of leaving a blank frame.
+const CHART_IN_DURATION = 320;
+const CHART_OUT_DURATION = 200;
+const PANEL_OPEN_DURATION = 280;
+const PANEL_CLOSE_DURATION = 220;
 
 const GraphsScreen = () => {
   const { colors } = useThemeColors();
@@ -73,6 +81,14 @@ const GraphsScreen = () => {
   // mounted and overlap absolutely, so switching tabs is a cross-fade.
   const incomeChartProgress = useSharedValue(0);
   const expenseChartProgress = useSharedValue(0);
+  // Where each chart travels from at progress 0. Opening drops the chart down
+  // from under the strip; switching tabs slides it in from the side you moved
+  // towards, so the panel reads as a pager rather than a blink.
+  const incomeChartOffset = useSharedValue({ x: 0, y: CHART_DROP });
+  const expenseChartOffset = useSharedValue({ x: 0, y: CHART_DROP });
+  // Bumped every time a tab is opened so the donut replays its intro — the
+  // charts are always mounted, so mounting alone can't drive that animation.
+  const [chartIntroKey, setChartIntroKey] = useState(0);
   // Measured chart heights, kept in refs so the expand handler can read them
   // synchronously (they are written from the JS-side onContentSizeChange).
   const expenseChartHeightRef = useRef(0);
@@ -499,36 +515,40 @@ const GraphsScreen = () => {
   const resetIncomeCategory = useCallback(() => setIncomeDrillReq({ dir: 'none', target: 'all' }), []);
 
   const toggleCard = useCallback((card) => {
+    const progressOf = (tab) => (tab === 'income' ? incomeChartProgress : expenseChartProgress);
+    const offsetOf = (tab) => (tab === 'income' ? incomeChartOffset : expenseChartOffset);
+
+    const closing = expandedCard === card;
+    const nextTab = closing ? null : card;
+    const { enter, exit } = chartTransitionOffsets(expandedCard, nextTab);
+
     // Leaving a tab always drops its drill-down so it reopens at the top level
-    const closeTab = (tab) => {
-      if (tab === 'expense') {
+    if (expandedCard) {
+      if (expandedCard === 'expense') {
         resetExpenseCategory();
-        expenseChartProgress.value = withTiming(0, { duration: 150, easing: Easing.in(Easing.quad) });
       } else {
         resetIncomeCategory();
-        incomeChartProgress.value = withTiming(0, { duration: 150, easing: Easing.in(Easing.quad) });
       }
-    };
+      offsetOf(expandedCard).value = exit;
+      progressOf(expandedCard).value = withTiming(0, { duration: CHART_OUT_DURATION, easing: Easing.in(Easing.quad) });
+    }
 
-    if (expandedCard === card) {
-      closeTab(card);
-      setExpandedCard(null);
-      panelHeight.value = withTiming(CARD_HEADER_HEIGHT, { duration: 220, easing: Easing.in(Easing.quad) });
+    setExpandedCard(nextTab);
+
+    if (closing) {
+      panelHeight.value = withTiming(CARD_HEADER_HEIGHT, { duration: PANEL_CLOSE_DURATION, easing: Easing.in(Easing.quad) });
       return;
     }
 
-    if (expandedCard) {
-      closeTab(expandedCard);
-    }
-    setExpandedCard(card);
+    offsetOf(card).value = enter;
+    setChartIntroKey(key => key + 1);
     const chartHeight = card === 'income'
       ? incomeChartHeightRef.current
       : expenseChartHeightRef.current;
-    panelHeight.value = withTiming(CARD_HEADER_HEIGHT + chartHeight, { duration: 280, easing: Easing.out(Easing.cubic) });
-    const progress = card === 'income' ? incomeChartProgress : expenseChartProgress;
-    progress.value = withTiming(1, { duration: 260, easing: Easing.out(Easing.cubic) });
+    panelHeight.value = withTiming(CARD_HEADER_HEIGHT + chartHeight, { duration: PANEL_OPEN_DURATION, easing: Easing.out(Easing.cubic) });
+    progressOf(card).value = withTiming(1, { duration: CHART_IN_DURATION, easing: Easing.out(Easing.cubic) });
   }, [expandedCard, panelHeight, incomeChartProgress, expenseChartProgress,
-    resetExpenseCategory, resetIncomeCategory]);
+    incomeChartOffset, expenseChartOffset, resetExpenseCategory, resetIncomeCategory]);
 
   const handleToggleIncome = useCallback(() => toggleCard('income'), [toggleCard]);
   const handleToggleExpense = useCallback(() => toggleCard('expense'), [toggleCard]);
@@ -562,15 +582,29 @@ const GraphsScreen = () => {
   // the available width changes, so rotation needs no special handling here.
   const panelAnimStyle = useAnimatedStyle(() => ({ height: panelHeight.value }));
 
-  const incomeChartAnimStyle = useAnimatedStyle(() => ({
-    opacity: incomeChartProgress.value,
-    transform: [{ translateY: interpolate(incomeChartProgress.value, [0, 1], [16, 0]) }],
-  }));
+  const incomeChartAnimStyle = useAnimatedStyle(() => {
+    const p = incomeChartProgress.value;
+    const { x, y } = incomeChartOffset.value;
+    return {
+      opacity: p,
+      transform: [
+        { translateX: interpolate(p, [0, 1], [x, 0]) },
+        { translateY: interpolate(p, [0, 1], [y, 0]) },
+      ],
+    };
+  });
 
-  const expenseChartAnimStyle = useAnimatedStyle(() => ({
-    opacity: expenseChartProgress.value,
-    transform: [{ translateY: interpolate(expenseChartProgress.value, [0, 1], [16, 0]) }],
-  }));
+  const expenseChartAnimStyle = useAnimatedStyle(() => {
+    const p = expenseChartProgress.value;
+    const { x, y } = expenseChartOffset.value;
+    return {
+      opacity: p,
+      transform: [
+        { translateX: interpolate(p, [0, 1], [x, 0]) },
+        { translateY: interpolate(p, [0, 1], [y, 0]) },
+      ],
+    };
+  });
 
   // Keeps the panel sized to whatever the visible chart currently measures —
   // covers the first measurement and every drill-down that changes its height.
@@ -686,6 +720,7 @@ const GraphsScreen = () => {
                     isLeafCategory={incomeCategoryIsLeaf}
                     operations={incomeOperations}
                     loadingOperations={loadingIncomeOperations}
+                    introKey={chartIntroKey}
                   />
                 </Animated.View>
               </ScrollView>
@@ -721,6 +756,7 @@ const GraphsScreen = () => {
                     isLeafCategory={expenseCategoryIsLeaf}
                     operations={expenseOperations}
                     loadingOperations={loadingExpenseOperations}
+                    introKey={chartIntroKey}
                   />
                 </Animated.View>
               </ScrollView>
