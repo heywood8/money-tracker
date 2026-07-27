@@ -528,5 +528,30 @@ describe('BudgetPlansDB plan-vs-actual', () => {
       expect(map.get('p1').currency).toBe('USD');
       expect(map.get('p2').currency).toBe('EUR');
     });
+
+    // Regression: the Budgets tab's currency chip converted the rows but not the
+    // statuses, so the totals under them stayed in each plan's stored currency.
+    it('computes every status in the display currency when one is given', async () => {
+      const planRows = [
+        { id: 'p1', month: '2026-07', currency: 'USD', expected_income: '100', created_at: 't', updated_at: 't' },
+        { id: 'p2', month: '2026-06', currency: 'EUR', expected_income: '200', created_at: 't', updated_at: 't' },
+      ];
+      queryAll.mockImplementation(async (sql) => {
+        if (sql.includes('FROM budget_plans ORDER BY')) return planRows;
+        return [];
+      });
+      queryFirst.mockImplementation(async (sql, params) => {
+        if (sql.includes('FROM budget_plans WHERE id')) {
+          return planRows.find(p => p.id === params[0]) || null;
+        }
+        if (sql.includes("o.type = 'income'")) return { total: 0 };
+        return null;
+      });
+
+      const map = await BudgetPlansDB.calculateAllPlanStatuses(false, 'AMD');
+
+      expect(map.get('p1').currency).toBe('AMD');
+      expect(map.get('p2').currency).toBe('AMD');
+    });
   });
 });

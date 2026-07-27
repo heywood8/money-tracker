@@ -113,7 +113,14 @@ const MonthlyPlanSection = forwardRef(function MonthlyPlanSection({
   const pace = useMemo(() => monthProgressFraction(month), [month]);
 
   const planId = plan?.id ?? null;
-  const planCurrency = plan?.currency || currency;
+  // The currency the section READS in, which is the one the host's chip names —
+  // not the one the plan happens to be stored in. Those are different things: a
+  // plan created back when the only account was in RUB stays a RUB row forever,
+  // while the person looking at it today wants the month in AMD. Reading the
+  // stored currency first made the chip decorative — every figure kept coming out
+  // in the plan's currency however the chip was set. `plan?.currency` survives
+  // only as the fallback for a host that names no currency at all.
+  const planCurrency = currency || plan?.currency || '';
 
   // The screen shows one currency and the host header names it, next to the
   // control that changes it. Repeating the code on the summary strip, the income
@@ -123,7 +130,17 @@ const MonthlyPlanSection = forwardRef(function MonthlyPlanSection({
   const currencySuffix = controlledMonth ? '' : ` ${planCurrency}`;
 
   // Plan-vs-actual status for the shown month (may be null while computing).
-  const planStatus = (planId && planStatuses && planStatuses.get(planId)) || null;
+  const storedPlanStatus = (planId && planStatuses && planStatuses.get(planId)) || null;
+  // A status computed in another currency is not this section's status. The
+  // context recomputes them whenever the display currency changes, but that is
+  // async: for a render or two after the chip is switched the map still holds the
+  // previous currency's figures, and printing those under rows already converted
+  // to the new one is the mixed-units bug the conversion exists to prevent. Treat
+  // a currency mismatch exactly like "not computed yet" — the local same-currency
+  // estimate below covers the gap.
+  const planStatus = storedPlanStatus && storedPlanStatus.currency === planCurrency
+    ? storedPlanStatus
+    : null;
 
   // Freshness tracking (Fix 2, adversarial review round 2 — mirrors Bug 3):
   // refreshPlanStatuses() is fired-and-forgotten by the mutation handlers below
@@ -669,7 +686,7 @@ const MonthlyPlanSection = forwardRef(function MonthlyPlanSection({
 
         {/* Income: the month's expected income is the sum of these lines, shown
             against the income actually received. */}
-        <View style={[styles.sectionHeader, { borderBottomColor: colors.border }]} testID="plan-income-header">
+        <View style={styles.sectionHeader} testID="plan-income-header">
           <View style={styles.sectionTitleGroup}>
             <Icon name="cash-plus" size={20} color={colors.text} />
             <Text style={[styles.sectionTitle, { color: colors.text }]}>{t('income')}</Text>
@@ -689,7 +706,7 @@ const MonthlyPlanSection = forwardRef(function MonthlyPlanSection({
 
         {/* Allocations: recurring (global) ones apply to every month, one-off ones
             belong to this month's plan. */}
-        <View style={[styles.sectionHeader, styles.sectionHeaderSpaced, { borderBottomColor: colors.border }]} testID="plan-allocations-header">
+        <View style={[styles.sectionHeader, styles.sectionHeaderSpaced]} testID="plan-allocations-header">
           <View style={styles.sectionTitleGroup}>
             <Icon name="chart-donut" size={20} color={colors.text} />
             <Text style={[styles.sectionTitle, { color: colors.text }]}>{t('allocations')}</Text>
@@ -913,8 +930,10 @@ const styles = StyleSheet.create({
     fontWeight: '700',
   },
   sectionHeader: {
+    // No rule under the title. At the card's border colour it was barely visible
+    // — enough to register as a stray line, not enough to separate anything the
+    // uppercase title and the spacing above it don't already separate.
     alignItems: 'center',
-    borderBottomWidth: 1,
     flexDirection: 'row',
     justifyContent: 'space-between',
     paddingBottom: SPACING.xs,

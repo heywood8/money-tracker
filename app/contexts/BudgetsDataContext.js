@@ -23,6 +23,15 @@ export const BudgetsDataProvider = ({ children }) => {
   // stable identity (its consumers subscribe to events with it as a dep).
   const convertAllRef = useRef(true);
   const [convertAllBudgets, setConvertAllBudgetsState] = useState(true);
+  // The currency the Budgets tab is READ in. Empty until the screen seeds it from
+  // the accounts. It is a display setting, not data: picking AMD converts every
+  // figure on the tab into AMD at the current rate, it does not rewrite the
+  // currency the plan (or any line) is stored in. Lives here, next to the
+  // convert-all toggle, because BudgetPlansDataContext has to recompute its plan
+  // statuses in the same unit the screen prints — a status computed in the plan's
+  // stored currency while the rows convert to the chosen one is how the tab ended
+  // up showing RUB totals under an AMD chip.
+  const [displayCurrency, setDisplayCurrency] = useState('');
   // Reference date the budget statuses are computed for. `undefined` means
   // "today" (default). The merged Budgets screen sets this to a mid-month date
   // when the user navigates to another month, so per-category spent/exceeded
@@ -148,6 +157,8 @@ export const BudgetsDataProvider = ({ children }) => {
     saveError,
     convertAllBudgets,
     setConvertAllBudgets,
+    displayCurrency,
+    setDisplayCurrency,
     setBudgetStatusMonth,
     reloadBudgets,
     refreshBudgetStatuses,
@@ -162,6 +173,7 @@ export const BudgetsDataProvider = ({ children }) => {
     saveError,
     convertAllBudgets,
     setConvertAllBudgets,
+    displayCurrency,
     setBudgetStatusMonth,
     reloadBudgets,
     refreshBudgetStatuses,

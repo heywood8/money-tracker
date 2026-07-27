@@ -83,6 +83,8 @@ const PlanLineRow = memo(function PlanLineRow({
   // every row tinted, ten coloured blocks sat side by side and none of them
   // stood out, which is the hierarchy problem the fill was supposed to solve.
   // A null tone tells EnvelopeFill to wash the row in neutral grey instead.
+  // Pace is only read here now — the fill itself no longer draws a "today"
+  // marker (see EnvelopeFill), so being ahead of the month shows as tone alone.
   const paceFraction = tracked ? pace : null;
   const spentFraction = tracked ? status.percentage / 100 : 0;
   let tone = null;
@@ -154,7 +156,6 @@ const PlanLineRow = memo(function PlanLineRow({
       {showFill && (
         <EnvelopeFill
           fraction={spentFraction}
-          paceFraction={paceFraction}
           tone={tone}
           mutedColor={colors.mutedText}
           testID={`plan-line-fill-${line.id}`}

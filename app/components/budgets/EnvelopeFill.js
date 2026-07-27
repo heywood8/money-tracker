@@ -12,7 +12,6 @@ import PropTypes from 'prop-types';
 // spent only where there is something to say.
 const CALM_ALPHA = '14'; // ~8%, neutral grey
 const SIGNAL_ALPHA = '2E'; // ~18%, warning / overspend
-const PACE_ALPHA = '59'; // ~35%
 
 /**
  * A plan row's progress, drawn as the row's own background rather than as a
@@ -22,22 +21,19 @@ const PACE_ALPHA = '59'; // ~35%
  * already four lines tall; as a background wash the same information costs no
  * vertical space at all.
  *
- * The dashed vertical line is TODAY. Without it a percentage is not a judgement:
- * 99% of an envelope spent is unremarkable on the 27th and alarming on the 3rd.
- * Fill short of the marker means on pace; fill past it means spending faster
- * than the month is passing.
+ * There is no "today" marker on the fill anymore. It was meant to read as a
+ * dashed annotation, but Android draws a 1dp dashed border solid, so every row
+ * carried a full-height hairline at the same x — which stacked into one
+ * unbroken grey line down the whole card and read as a rendering artefact
+ * rather than as a date. Being ahead of the month's pace still shows: the row
+ * takes the warning tone (see PlanLineRow), which needs no extra geometry.
  *
  * @param {number} fraction - Spent / target, 0..1+ (clamped when drawn)
- * @param {?number} paceFraction - How far through the month today is, or null
- *   when the shown month is not the current one and pace means nothing
  * @param {?string} tone - 6-digit hex signal colour, or null for a row with
  *   nothing to flag, which is washed in neutral grey instead
  */
-const EnvelopeFill = ({ fraction, paceFraction, tone = null, mutedColor, testID }) => {
+const EnvelopeFill = ({ fraction, tone = null, mutedColor, testID }) => {
   const fillPercent = Math.min(Math.max(fraction, 0), 1) * 100;
-  // Hidden at the very edges: a marker pinned to either end of the row reads as
-  // a border, not as a date.
-  const showPace = paceFraction != null && paceFraction > 0.02 && paceFraction < 0.98;
   const fillColor = tone ? `${tone}${SIGNAL_ALPHA}` : `${mutedColor}${CALM_ALPHA}`;
 
   return (
@@ -48,22 +44,12 @@ const EnvelopeFill = ({ fraction, paceFraction, tone = null, mutedColor, testID 
           style={[styles.fill, { width: `${fillPercent}%`, backgroundColor: fillColor }]}
         />
       )}
-      {showPace && (
-        <View
-          testID={testID ? `${testID}-pace` : undefined}
-          style={[
-            styles.pace,
-            { left: `${paceFraction * 100}%`, borderLeftColor: `${mutedColor}${PACE_ALPHA}` },
-          ]}
-        />
-      )}
     </View>
   );
 };
 
 EnvelopeFill.propTypes = {
   fraction: PropTypes.number.isRequired,
-  paceFraction: PropTypes.number,
   tone: PropTypes.string,
   mutedColor: PropTypes.string.isRequired,
   testID: PropTypes.string,
@@ -73,22 +59,10 @@ export default EnvelopeFill;
 
 const styles = StyleSheet.create({
   fill: {
-    // No hard leading edge. A 2dp bar at full strength sat right next to the
-    // pace marker on every row — two unexplained vertical lines a few
-    // millimetres apart, competing for the reading the marker exists to give.
-    // The wash boundary is the boundary.
+    // No hard leading edge: the wash boundary is the boundary. A 2dp bar at full
+    // strength was one more vertical line on a row that already had too many.
     bottom: 0,
     left: 0,
-    position: 'absolute',
-    top: 0,
-  },
-  pace: {
-    // Dashed, so it reads as an annotation on the bar rather than as a divider
-    // or a rendering artefact — which is exactly what a solid full-height
-    // hairline looked like when every row had one at the same x.
-    borderLeftWidth: 1,
-    borderStyle: 'dashed',
-    bottom: 0,
     position: 'absolute',
     top: 0,
   },

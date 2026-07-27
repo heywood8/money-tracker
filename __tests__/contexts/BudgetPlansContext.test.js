@@ -21,6 +21,15 @@ jest.mock('../../app/contexts/DialogContext', () => ({
   useDialog: () => ({ showDialog: mockShowDialog, hideDialog: jest.fn() }),
 }));
 
+// The plans context reads the shared convert-all toggle AND the Budgets tab's
+// display currency from BudgetsDataContext. Undefined by default (rendered
+// standalone, as in the app's own fallback path); individual tests install a
+// host value.
+let mockBudgetsData;
+jest.mock('../../app/contexts/BudgetsDataContext', () => ({
+  useBudgetsData: () => mockBudgetsData,
+}));
+
 let mockUuidCounter = 0;
 jest.mock('react-native-uuid', () => ({
   v4: jest.fn(() => `plan-uuid-${++mockUuidCounter}`),
@@ -33,6 +42,7 @@ describe('BudgetPlansContext', () => {
     jest.clearAllMocks();
     mockShowDialog.mockClear();
     mockUuidCounter = 0;
+    mockBudgetsData = undefined;
 
     appEvents.on.mockReturnValue(jest.fn());
     BudgetPlansDB.getAllPlans.mockResolvedValue([]);
@@ -299,7 +309,26 @@ describe('BudgetPlansContext', () => {
       const { result } = await renderHook(() => useBudgetPlans(), { wrapper });
 
       await waitFor(() => expect(result.current.planStatuses.get('p1')).toEqual(STATUS));
-      expect(BudgetPlansDB.calculateAllPlanStatuses).toHaveBeenCalledWith(true);
+      // No display currency chosen (no BudgetsData host here): every plan keeps
+      // its own stored currency, which `null` selects.
+      expect(BudgetPlansDB.calculateAllPlanStatuses).toHaveBeenCalledWith(true, null);
+    });
+
+    // Regression: the Budgets tab's currency chip was decorative. It converted
+    // the rows but not the statuses, which stayed in each plan's stored
+    // currency — so picking AMD over a plan created in RUB left every total,
+    // and the header's remainder, reading in RUB under an AMD chip.
+    it('computes statuses in the display currency chosen on the Budgets tab', async () => {
+      mockBudgetsData = { convertAllBudgets: true, displayCurrency: 'AMD' };
+      BudgetPlansDB.getAllPlans.mockResolvedValue([
+        { id: 'p1', month: '2026-07', currency: 'RUB', expectedIncome: '0' },
+      ]);
+      BudgetPlansDB.calculateAllPlanStatuses.mockResolvedValue(new Map());
+
+      const { result } = await renderHook(() => useBudgetPlans(), { wrapper });
+
+      await waitFor(() => expect(result.current.loading).toBe(false));
+      expect(BudgetPlansDB.calculateAllPlanStatuses).toHaveBeenCalledWith(true, 'AMD');
     });
 
     it('refreshes statuses when an operation changes (integration-style)', async () => {

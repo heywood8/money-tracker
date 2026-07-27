@@ -39,9 +39,19 @@ jest.mock('../../app/contexts/DialogContext', () => ({
 
 const mockSetConvertAll = jest.fn();
 let mockBudgetsData;
-jest.mock('../../app/contexts/BudgetsDataContext', () => ({
-  useBudgetsData: () => mockBudgetsData,
-}));
+// The display currency lives in BudgetsDataContext now (the plan statuses have
+// to be recomputed in it), so the mock has to behave like real state rather than
+// a frozen value — the screen seeds it from the accounts and the header chip
+// writes to it, and both have to re-render the screen.
+jest.mock('../../app/contexts/BudgetsDataContext', () => {
+  const ReactModule = require('react');
+  return {
+    useBudgetsData: () => {
+      const [displayCurrency, setDisplayCurrency] = ReactModule.useState('');
+      return { ...mockBudgetsData, displayCurrency, setDisplayCurrency };
+    },
+  };
+});
 
 // Context values must be referentially stable across renders (the real
 // providers memoize them): a fresh accounts array on every render gives the
