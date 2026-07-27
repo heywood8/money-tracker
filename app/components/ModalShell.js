@@ -21,9 +21,21 @@ import { useLocalization } from '../contexts/LocalizationContext';
 import { SPACING, BORDER_RADIUS } from '../styles/designTokens';
 import { useBackShrink } from '../hooks/useBackShrink';
 import ModalBlurOverlay from './ModalBlurOverlay';
+import {
+  ANIMATED_SPRING_SETTLE,
+  PAN_VELOCITY_TO_PER_SECOND,
+  rubberband,
+} from '../utils/motion';
 
 // Pressable that can animate layout props (paddingBottom) for keyboard avoidance.
 const AnimatedPressable = Animated.createAnimatedComponent(Pressable);
+
+// How far the sheet may be lifted above its resting place, in px. The card is
+// glued to the bottom of the screen, so every pixel of lift opens a gap beneath
+// it — the give here is token by design: enough that an upward drag registers as
+// a boundary rather than a dead touch, not enough to show a visible strip of
+// background. (Downward has no such limit; that direction is the dismiss.)
+const UPWARD_GIVE = 32;
 
 /**
  * ModalShell — shared bottom-sheet wrapper for all modals.
@@ -108,6 +120,25 @@ export default function ModalShell({
   // Use a ref so the PanResponder closure always calls the latest onDismiss
   const onDismissRef = useRef(onDismiss);
   useEffect(() => { onDismissRef.current = onDismiss; }, [onDismiss]);
+  // Same reason: the PanResponder is built once, so it must not close over a
+  // screen height captured at mount (it would go stale on rotation).
+  const screenHeightRef = useRef(screenHeight);
+  useEffect(() => { screenHeightRef.current = screenHeight; }, [screenHeight]);
+
+  // Live copy of translateY. The open/close animations run on the native driver,
+  // where the JS-side value is never updated and `stopAnimation`'s callback comes
+  // back asynchronously over the bridge — too late for the first frames of a drag.
+  // A listener keeps a ~1-frame-fresh value the drag can rebase onto
+  // synchronously. Gated on `visible` because every ModalShell stays mounted for
+  // the whole session and an idle sheet has nothing worth subscribing to; it is
+  // declared before the open effect so the subscription is live for that first
+  // animation too.
+  const currentY = useRef(screenHeight);
+  useEffect(() => {
+    if (!visible) return undefined;
+    const id = translateY.addListener(({ value }) => { currentY.current = value; });
+    return () => translateY.removeListener(id);
+  }, [translateY, visible]);
 
   // Telegram-style predictive "back" shrink — played when the Android back
   // button/gesture closes the sheet (onRequestClose). The card keeps its
@@ -145,41 +176,74 @@ export default function ModalShell({
       useNativeDriver: true,
       // Leave translateY at screenHeight after close so the next open
       // renders offscreen immediately (no reset-to-0 flicker)
-    }).start(() => {
-      callback?.();
+    }).start(({ finished }) => {
+      // Only dismiss if the slide actually completed. A drag started while the
+      // sheet is sliding away cancels this animation (see onPanResponderGrant),
+      // and the sheet is now following the finger — closing it here would yank
+      // it out from under them.
+      if (finished) callback?.();
     });
   }, [translateY, screenHeight]);
+
+  // translateY at the instant the drag began. The sheet is grabbable while it is
+  // still animating (opening, or sliding away after an overlay tap), so the drag
+  // has to continue from wherever the card actually sits on screen — feeding the
+  // raw gesture `dy` would teleport it to `dy` measured from zero.
+  const dragStartY = useRef(0);
 
   const panResponder = useRef(
     PanResponder.create({
       onMoveShouldSetPanResponder: (_, gs) =>
-        gs.dy > 8 && Math.abs(gs.dy) > Math.abs(gs.dx),
+        Math.abs(gs.dy) > 8 && Math.abs(gs.dy) > Math.abs(gs.dx),
+      onPanResponderGrant: () => {
+        // Cancel whatever is in flight so it can't keep writing to translateY
+        // behind the finger, then rebase the drag onto where the card actually
+        // is right now (no callback — see the currentY listener above).
+        translateY.stopAnimation();
+        dragStartY.current = currentY.current;
+      },
       onPanResponderMove: (_, gs) => {
-        if (gs.dy > 0) translateY.setValue(gs.dy);
+        const next = dragStartY.current + gs.dy;
+        // Downward is free. Upward resists progressively instead of not moving
+        // at all — a sheet that ignores the finger reads as frozen, one that
+        // resists reads as "this is as far as it goes".
+        translateY.setValue(next >= 0 ? next : rubberband(next, UPWARD_GIVE));
       },
       onPanResponderRelease: (_, gs) => {
-        if (gs.dy > 80 || gs.vy > 0.3) {
-          Animated.timing(translateY, {
-            toValue: Dimensions.get('window').height,
-            duration: 200,
-            useNativeDriver: true,
-          }).start(() => {
+        const offset = dragStartY.current + gs.dy;
+        // PanResponder velocity is px/ms; Animated.spring wants px/s.
+        const velocity = gs.vy * PAN_VELOCITY_TO_PER_SECOND;
+        // Direction of travel outranks distance travelled: someone who has
+        // dragged the sheet well past the threshold but is now pulling it back
+        // up has changed their mind, and dismissing there fights the finger.
+        const pullingBack = gs.vy < -0.3;
+        if (!pullingBack && (offset > 80 || gs.vy > 0.3)) {
+          Animated.spring(translateY, {
+            ...ANIMATED_SPRING_SETTLE,
+            toValue: screenHeightRef.current,
+            // Carry the throw through: a hard flick now leaves fast and a gentle
+            // drag-past-threshold leaves gently, instead of both taking 200ms.
+            velocity,
+            // The card is out of sight long before the spring mathematically
+            // settles, so finish on "off-screen" rather than on the tail.
+            restDisplacementThreshold: 40,
+            restSpeedThreshold: 100,
+          }).start(({ finished }) => {
             // Leave translateY at screen height — no reset to avoid close flicker
-            onDismissRef.current?.();
+            if (finished) onDismissRef.current?.();
           });
         } else {
           Animated.spring(translateY, {
+            ...ANIMATED_SPRING_SETTLE,
             toValue: 0,
-            useNativeDriver: true,
-            bounciness: 0,
+            velocity,
           }).start();
         }
       },
       onPanResponderTerminate: () => {
         Animated.spring(translateY, {
+          ...ANIMATED_SPRING_SETTLE,
           toValue: 0,
-          useNativeDriver: true,
-          bounciness: 0,
         }).start();
       },
     }),

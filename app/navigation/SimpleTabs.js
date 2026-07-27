@@ -8,12 +8,14 @@ import Animated, {
   useSharedValue,
   useAnimatedStyle,
   withTiming,
+  withSpring,
   withRepeat,
   cancelAnimation,
   Easing,
   runOnJS,
 } from 'react-native-reanimated';
 import { Svg, Circle } from 'react-native-svg';
+import { SPRING_SETTLE, clampWithRubberband } from '../utils/motion';
 
 const SCREEN_TIMING = { duration: 300, easing: Easing.out(Easing.cubic) };
 const PILL_TIMING = { duration: 200, easing: Easing.out(Easing.quad) };
@@ -454,8 +456,23 @@ export default function SimpleTabs() {
         const newTranslateX = startTranslateX.value + event.translationX;
         const maxTranslateX = 0;
         const minTranslateX = -(TABS.length - 1) * SCREEN_WIDTH;
-        translateX.value = Math.max(minTranslateX, Math.min(maxTranslateX, newTranslateX));
-        pillPosition.value = -translateX.value / SCREEN_WIDTH;
+        // Past the first / last tab the strip keeps following the finger with
+        // progressive resistance rather than freezing against the clamp — a hard
+        // stop at the edge reads as a broken touch, resistance reads as "this is
+        // the end". The spring in onEnd pulls it home either way.
+        translateX.value = clampWithRubberband(
+          newTranslateX,
+          minTranslateX,
+          maxTranslateX,
+          SCREEN_WIDTH,
+        );
+        // The pill has no rubber-band zone of its own (there is no tab slot past
+        // either end to slide into), so keep it pinned to the real index range
+        // while the strip overshoots.
+        pillPosition.value = Math.min(
+          TABS.length - 1,
+          Math.max(0, -translateX.value / SCREEN_WIDTH),
+        );
       })
       .onEnd((event) => {
         'worklet';
@@ -473,18 +490,26 @@ export default function SimpleTabs() {
           newIndex = Math.max(currentIndex - 1, 0);
         }
 
-        if (newIndex !== currentIndex) {
-          activeIndex.value = newIndex;
-          pillPosition.value = withTiming(newIndex, PILL_TIMING);
-          translateX.value = withTiming(-newIndex * SCREEN_WIDTH, SCREEN_TIMING, (isFinished) => {
-            if (isFinished) {
+        // Hand the finger's release speed to the spring so the strip keeps the
+        // momentum of the flick instead of restarting from a standstill on a
+        // fixed 300ms curve. The pill rides the same velocity, expressed in tab
+        // indices (it moves opposite to the strip), so the two stay in step.
+        // newIndex === currentIndex when the swipe fell short (or ran into a rubber-
+        // banded edge), so the same two springs cover both "commit" and "snap back".
+        activeIndex.value = newIndex;
+        pillPosition.value = withSpring(newIndex, {
+          ...SPRING_SETTLE,
+          velocity: -velocityX / SCREEN_WIDTH,
+        });
+        translateX.value = withSpring(
+          -newIndex * SCREEN_WIDTH,
+          { ...SPRING_SETTLE, velocity: velocityX },
+          (isFinished) => {
+            if (isFinished && newIndex !== currentIndex) {
               runOnJS(setActive)(TABS[newIndex].key);
             }
-          });
-        } else {
-          pillPosition.value = withTiming(currentIndex, PILL_TIMING);
-          translateX.value = withTiming(-currentIndex * SCREEN_WIDTH, SCREEN_TIMING);
-        }
+          },
+        );
       });
   }, [translateX, activeIndex, startTranslateX, TABS, setActive, subPanelActive, pillPosition, isTransitioningShared]);
 
