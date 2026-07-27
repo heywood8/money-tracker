@@ -1,5 +1,12 @@
 # Changelog
 
+## [0.241.0](https://github.com/heywood8/money-tracker/compare/penny-v0.240.0...penny-v0.241.0) (2026-07-27)
+
+
+### Features
+
+* **budgets:** group several allocations under one envelope ([#1471](https://github.com/heywood8/money-tracker/issues/1471)) ([f5f2038](https://github.com/heywood8/money-tracker/commit/f5f2038a578b14c9d728e88b56aaf88948d4b735))
+
 ## [0.240.0](https://github.com/heywood8/money-tracker/compare/penny-v0.239.0...penny-v0.240.0) (2026-07-27)
 
 
