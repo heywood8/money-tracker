@@ -9,6 +9,7 @@ import { useLocalization } from '../../contexts/LocalizationContext';
 import { useDialog } from '../../contexts/DialogContext';
 import { useBudgetPlans } from '../../contexts/BudgetPlansContext';
 import * as Currency from '../../services/currency';
+import usePlanLineAmounts from '../../hooks/usePlanLineAmounts';
 import { SPACING } from '../../styles/layout';
 import BudgetPlanLineModal from './BudgetPlanLineModal';
 import PlanLineRow from './PlanLineRow';
@@ -187,26 +188,31 @@ const MonthlyPlanSection = forwardRef(function MonthlyPlanSection({
   const recurringLines = useMemo(() => allocationLines.filter(l => l.isRecurring), [allocationLines]);
   const oneOffLines = useMemo(() => allocationLines.filter(l => !l.isRecurring), [allocationLines]);
 
+  // Every line's target amount expressed in the screen's single currency. Rows,
+  // the live totals below and the template summary strip all read from this one
+  // map, so no two of them can print the same line in different units.
+  const { amountById, converting } = usePlanLineAmounts(lines, planCurrency);
+
   // Live totals: allocated = Σ allocation amounts, expected = Σ income lines,
   // remainder = expected − allocated. Same precise decimal math as
   // BudgetPlansDB.getPlanTotals, computed locally so the numbers update
-  // immediately as lines change, BEFORE the async plan status lands. A line in
-  // another currency is skipped in this local estimate (converting it needs an
-  // exchange-rate lookup, which is exactly what planStatus already did
-  // asynchronously) — the render below prefers planStatus.totals once available.
+  // immediately as lines change, BEFORE the async plan status lands. A line
+  // whose currency has no rate is absent from `amountById` and drops out of the
+  // estimate — the render below prefers planStatus.totals once available, and
+  // those flag the currency via the unconvertible warning.
   const totals = useMemo(() => {
     let allocated = '0';
     let income = '0';
     let hasIncomeLine = false;
     for (const line of lines) {
-      const lineCurrency = line.currency || planCurrency;
-      if (lineCurrency !== planCurrency) continue;
+      const amount = amountById.get(line.id);
+      if (amount == null) continue;
       if (line.kind === 'income') {
         hasIncomeLine = true;
-        income = Currency.add(income, line.amount, planCurrency);
+        income = Currency.add(income, amount, planCurrency);
         continue;
       }
-      allocated = Currency.add(allocated, line.amount, planCurrency);
+      allocated = Currency.add(allocated, amount, planCurrency);
     }
     // Fallback for a plan whose expected income was never bridged into lines
     // (migration 0020 only skips that when income templates already exist).
@@ -215,7 +221,7 @@ const MonthlyPlanSection = forwardRef(function MonthlyPlanSection({
     }
     const remainder = Currency.subtract(income, allocated, planCurrency);
     return { income, allocated, remainder };
-  }, [plan, lines, planCurrency]);
+  }, [plan, lines, amountById, planCurrency]);
 
   // Once the plan status has resolved (and is not stale — see freshPlanStatus
   // above), prefer its totals: those are computed with correct cross-currency
@@ -557,6 +563,8 @@ const MonthlyPlanSection = forwardRef(function MonthlyPlanSection({
         icon={lineIcon(line)}
         status={lineStatusById.get(line.id) || null}
         planCurrency={planCurrency}
+        displayAmount={amountById.get(line.id) ?? null}
+        converting={converting}
         colors={colors}
         t={t}
         executed={executed}
@@ -572,9 +580,9 @@ const MonthlyPlanSection = forwardRef(function MonthlyPlanSection({
         onUndo={handleUndoExecuted}
       />
     );
-  }, [colors, t, month, isCurrentMonth, lineStatusById, planCurrency, openEditLine,
-    handleLongPressLine, lineDisplayName, lineIcon, handleExecute, handleMarkExecuted,
-    handleUndoExecuted]);
+  }, [colors, t, month, isCurrentMonth, lineStatusById, planCurrency, amountById, converting,
+    openEditLine, handleLongPressLine, lineDisplayName, lineIcon, handleExecute,
+    handleMarkExecuted, handleUndoExecuted]);
 
   const hasAnyLines = lines.length > 0;
 
@@ -593,7 +601,14 @@ const MonthlyPlanSection = forwardRef(function MonthlyPlanSection({
 
   return (
     <>
-      <PlanTemplateSummary lines={lines} month={month} colors={colors} t={t} />
+      <PlanTemplateSummary
+        lines={lines}
+        month={month}
+        amountById={amountById}
+        planCurrency={planCurrency}
+        colors={colors}
+        t={t}
+      />
 
       <View style={[styles.card, { backgroundColor: colors.surface, borderColor: colors.border }]} testID="monthly-plan-section">
         {/* Month header with ‹ › navigation — rendered only when the section owns
@@ -633,10 +648,14 @@ const MonthlyPlanSection = forwardRef(function MonthlyPlanSection({
             <Icon name="cash-plus" size={20} color={colors.text} />
             <Text style={[styles.sectionTitle, { color: colors.text }]}>{t('income')}</Text>
           </View>
+          {/* Compact magnitudes, not exact figures: this is a context number
+              ("am I roughly on track for the month"), and two 6-digit amounts
+              plus a currency code did not fit beside the section title. The
+              exact income is one tap away on the lines themselves. */}
           <Text style={[styles.sectionAmount, { color: colors.text }]} testID="plan-income-total">
             {planStatus
-              ? `${Currency.formatAmount(planStatus.totals.actualIncome, planCurrency)} / ${Currency.formatAmount(displayExpectedIncome, planCurrency)} ${planCurrency}`
-              : `${Currency.formatAmount(displayExpectedIncome, planCurrency)} ${planCurrency}`}
+              ? `${Currency.formatCompact(planStatus.totals.actualIncome)} / ${Currency.formatCompact(displayExpectedIncome)} ${planCurrency}`
+              : `${Currency.formatCompact(displayExpectedIncome)} ${planCurrency}`}
           </Text>
         </View>
 
@@ -707,10 +726,13 @@ const MonthlyPlanSection = forwardRef(function MonthlyPlanSection({
             {/* Totals: allocated vs actual, then the planned remainder.
                 Both labels get flexShrink + a gap: in Russian they are long
                 enough that a bare space-between row let them collide into
-                "…800.00 USDФактический: …". */}
+                "…800.00 USDФактический: …". Compact magnitudes here for the
+                same reason as the income header — these two are orientation,
+                and the remainder below is the figure to act on, so that one
+                stays exact. */}
             <View style={[styles.totalsRow, { borderTopColor: colors.border }]} testID="plan-totals">
               <Text style={[styles.totalsLabel, { color: colors.mutedText }]} numberOfLines={1}>
-                {t('allocated')}: {Currency.formatAmount(displayAllocated, planCurrency)} {planCurrency}
+                {t('allocated')}: {Currency.formatCompact(displayAllocated)} {planCurrency}
               </Text>
               {planStatus && (
                 <Text
@@ -718,7 +740,7 @@ const MonthlyPlanSection = forwardRef(function MonthlyPlanSection({
                   numberOfLines={1}
                   testID="plan-actual-total"
                 >
-                  {t('actual')}: {Currency.formatAmount(planStatus.totals.totalActual, planCurrency)} {planCurrency}
+                  {t('actual')}: {Currency.formatCompact(planStatus.totals.totalActual)} {planCurrency}
                 </Text>
               )}
             </View>

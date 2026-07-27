@@ -95,6 +95,52 @@ describe('Currency Service', () => {
     });
   });
 
+  describe('formatCompact', () => {
+    it('leaves amounts below a thousand exact and integral', async () => {
+      expect(Currency.formatCompact('0')).toBe('0');
+      expect(Currency.formatCompact('842')).toBe('842');
+      expect(Currency.formatCompact('842.60')).toBe('843');
+      expect(Currency.formatCompact('999')).toBe('999');
+    });
+
+    it('abbreviates thousands and millions', async () => {
+      expect(Currency.formatCompact('1000')).toBe('1K');
+      expect(Currency.formatCompact('1575')).toBe('1.58K');
+      expect(Currency.formatCompact('69000')).toBe('69K');
+      expect(Currency.formatCompact('535745')).toBe('536K');
+      expect(Currency.formatCompact('1240000')).toBe('1.24M');
+      expect(Currency.formatCompact('12400000')).toBe('12.4M');
+      expect(Currency.formatCompact('2500000000')).toBe('2.5B');
+    });
+
+    it('keeps three significant characters across magnitudes', async () => {
+      // Precision follows the leading digit, so outputs stay the same width and
+      // the column of figures they form stays readable.
+      expect(Currency.formatCompact('9990')).toBe('9.99K');
+      expect(Currency.formatCompact('99900')).toBe('99.9K');
+      expect(Currency.formatCompact('999000')).toBe('999K');
+    });
+
+    it('strips trailing zeros only after a decimal point', async () => {
+      expect(Currency.formatCompact('1200000')).toBe('1.2M');
+      expect(Currency.formatCompact('10000')).toBe('10K');
+      // Past the largest unit the value is a bare integer: its zeros are
+      // significant digits, not padding.
+      expect(Currency.formatCompact('12000000000000')).toBe('12000B');
+    });
+
+    it('keeps the sign on negative amounts', async () => {
+      expect(Currency.formatCompact('-85745')).toBe('-85.7K');
+      expect(Currency.formatCompact('-42')).toBe('-42');
+    });
+
+    it('handles invalid amounts gracefully', async () => {
+      expect(Currency.formatCompact(null)).toBe('0');
+      expect(Currency.formatCompact('invalid')).toBe('0');
+      expect(Currency.formatCompact(NaN)).toBe('0');
+    });
+  });
+
   describe('toCents', () => {
     it('converts string amounts to cents correctly', async () => {
       expect(Currency.toCents('10.50')).toBe(1050);

@@ -7,6 +7,11 @@ import * as Currency from '../../services/currency';
 import StatusProgressBar from '../StatusProgressBar';
 import { SPACING } from '../../styles/layout';
 
+// Stands in for a foreign-currency amount while its exchange rate resolves — an
+// em dash rather than the stored figure, which would read as a number in the
+// screen's currency for the frame or two before the real one replaces it.
+const CONVERTING_PLACEHOLDER = '—';
+
 /**
  * One row of the unified Budgets list (Budgets v3 phase 3).
  *
@@ -32,6 +37,8 @@ const PlanLineRow = memo(function PlanLineRow({
   icon,
   status = null,
   planCurrency,
+  displayAmount = null,
+  converting = false,
   colors,
   t,
   executed = false,
@@ -48,6 +55,26 @@ const PlanLineRow = memo(function PlanLineRow({
 }) {
   const lineCurrency = line.currency || planCurrency;
   const isBroken = line.isBroken || status?.broken;
+  // The screen shows exactly one currency, so a row prints a bare number in it —
+  // no per-row code to read, and never the stored figure of a line that keeps its
+  // own currency (a 300000 AMD target rendered next to a RUB progress bar was two
+  // different units stacked with nothing saying so).
+  //
+  // `displayAmount` is the converted figure supplied by the host; it is absent
+  // only while rates are still resolving or when no rate exists at all. Those two
+  // are NOT the same: converting shows a placeholder, unconvertible falls back to
+  // the stored amount WITH its own code, because a labelled foreign number is
+  // honest and an unlabelled one is not.
+  const isUnconvertible = status?.status === 'unconvertible'
+    || (displayAmount == null && lineCurrency !== planCurrency && !converting);
+  let amountText;
+  if (isUnconvertible) {
+    amountText = `${Currency.formatAmount(line.amount, lineCurrency)} ${lineCurrency}`;
+  } else if (displayAmount != null) {
+    amountText = Currency.formatAmount(displayAmount, planCurrency);
+  } else {
+    amountText = CONVERTING_PLACEHOLDER;
+  }
   // Both gates are decided by the host (they depend on the month being shown):
   // execution only makes sense for the current month, and so does undoing it.
   const swipeEnabled = canExecute || canUndo;
@@ -106,7 +133,7 @@ const PlanLineRow = memo(function PlanLineRow({
           )}
         </View>
         <Text style={[styles.lineAmount, { color: executed ? colors.mutedText : colors.text }]}>
-          {Currency.formatAmount(line.amount, lineCurrency)} {line.currency ? lineCurrency : ''}
+          {amountText}
         </Text>
         {showMove && onMove && (
           <View style={styles.moveButtons}>
@@ -142,14 +169,16 @@ const PlanLineRow = memo(function PlanLineRow({
             {t('relink_target')}
           </Text>
         </View>
-      ) : status?.status === 'unconvertible' ? (
-        // calculatePlanStatus found no rate to express this line's own currency in
-        // the plan's currency — showing its amount labeled as planCurrency (like
-        // the progress bar below does) would silently mislabel the real value.
+      ) : isUnconvertible ? (
+        // No rate to express this line's own currency in the screen's — so the
+        // amount column above kept the stored figure and its own code, and this
+        // row explains why it is the one number on screen in a foreign unit.
+        // There is deliberately no progress bar: comparing it against actuals in
+        // another currency is exactly the mismatch this branch exists to avoid.
         <View style={styles.brokenRow} testID={`plan-line-unconvertible-${line.id}`}>
           <Icon name="alert-circle-outline" size={14} color={colors.mutedText} />
           <Text style={[styles.brokenText, { color: colors.mutedText }]} numberOfLines={1}>
-            {t('graphs_currencies_not_converted')}: {Currency.formatAmount(status.amount, lineCurrency)} {lineCurrency}
+            {t('graphs_currencies_not_converted')}
           </Text>
         </View>
       ) : showProgress && status ? (
@@ -246,6 +275,8 @@ PlanLineRow.propTypes = {
   icon: PropTypes.string.isRequired,
   status: PropTypes.object,
   planCurrency: PropTypes.string.isRequired,
+  displayAmount: PropTypes.oneOfType([PropTypes.string, PropTypes.number]),
+  converting: PropTypes.bool,
   colors: PropTypes.object.isRequired,
   t: PropTypes.func.isRequired,
   executed: PropTypes.bool,

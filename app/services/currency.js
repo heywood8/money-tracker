@@ -92,6 +92,55 @@ export const formatAmount = (amount, currencyOrDecimals = 2) => {
   return formatted;
 };
 
+// Thresholds for formatCompact, largest first, so the loop below picks the first
+// unit whose magnitude the amount reaches.
+const COMPACT_UNITS = [
+  { suffix: 'B', divisor: 1e9 },
+  { suffix: 'M', divisor: 1e6 },
+  { suffix: 'K', divisor: 1e3 },
+];
+
+/**
+ * Format an amount as a short magnitude for AGGREGATE figures — summary strips,
+ * headers, totals — where space is tight and the minor units carry no decision
+ * value: 842 → "842", 1575 → "1.58K", 98645 → "98.6K", 1240000 → "1.24M".
+ *
+ * Deliberately NOT for per-line amounts: an envelope's "98 645 / 100 000" is a
+ * number the user compares against their own spending, and "99K / 100K" throws
+ * away exactly the digits that make the comparison possible.
+ *
+ * Precision follows the leading digit rather than a fixed decimal count, so
+ * every output is 3-4 significant characters wide regardless of magnitude
+ * (a fixed 1 decimal would render 1.6K next to 986.5K, which don't align).
+ *
+ * @param {Decimal|string|number} amount - Amount to format
+ * @returns {string} Compact representation, with a leading '-' for negatives
+ */
+export const formatCompact = (amount) => {
+  const decimal = toDecimal(amount);
+  const sign = decimal.isNegative() ? '-' : '';
+  const magnitude = decimal.abs();
+  const value = magnitude.toNumber();
+
+  for (const { suffix, divisor } of COMPACT_UNITS) {
+    if (value < divisor) continue;
+    // Scaled with Decimal, not native division: 1575/1000 is a hair under 1.575
+    // in binary, so Number#toFixed(2) rounds it DOWN to "1.57" while the
+    // arbitrary-precision path gives the "1.58" a reader expects.
+    const scaled = magnitude.div(divisor);
+    const scaledValue = scaled.toNumber();
+    // Keep roughly three significant digits: 1.24M, 12.4M, 124M.
+    const decimals = scaledValue < 10 ? 2 : scaledValue < 100 ? 1 : 0;
+    // Strip trailing zeros so 1.00M reads "1M" and 1.20M reads "1.2M". Anchored
+    // on the decimal point: a bare integer (12000B, past the largest unit) must
+    // keep its zeros.
+    const text = scaled.toFixed(decimals).replace(/\.(\d*?)0+$/, (_, keep) => (keep ? `.${keep}` : ''));
+    return `${sign}${text}${suffix}`;
+  }
+
+  return `${sign}${magnitude.toFixed(0)}`;
+};
+
 // Maps a rounding-mode name to the decimal.js rounding constant applied when
 // dividing the amount by the step. Amounts are non-negative magnitudes here, so
 // ROUND_UP/ROUND_DOWN (away from / toward zero) behave as ceil/floor.

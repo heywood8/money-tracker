@@ -330,14 +330,18 @@ describe('MonthlyPlanSection', () => {
       setPlanWithStatus();
       const { getByTestId } = await renderSection();
       await waitFor(() => expect(getByTestId('plan-line-l1')).toBeTruthy());
-      expect(getByTestId('plan-income-total')).toHaveTextContent(/800\.00 \/ 1000\.00 USD/);
+      // Compact magnitudes: the income header is a context figure, and two exact
+      // 6-digit amounts plus a currency code did not fit beside the section title.
+      expect(getByTestId('plan-income-total')).toHaveTextContent(/800 \/ 1K USD/);
     });
 
     it('renders the totals row with allocated, actual, and planned remainder', async () => {
       setPlanWithStatus();
       const { getByTestId } = await renderSection();
       await waitFor(() => expect(getByTestId('plan-actual-total')).toBeTruthy());
-      expect(getByTestId('plan-actual-total')).toHaveTextContent(/400\.00/);
+      // Allocated/actual are compact (orientation), the remainder stays exact —
+      // it is the number the user acts on.
+      expect(getByTestId('plan-actual-total')).toHaveTextContent(/400 USD/);
       expect(getByTestId('plan-remainder')).toHaveTextContent(/500\.00/);
     });
 
@@ -611,8 +615,8 @@ describe('MonthlyPlanSection', () => {
       const { getByTestId } = await renderSection();
       await waitFor(() => expect(getByTestId('plan-line-l1')).toBeTruthy());
 
-      expect(getByTestId('plan-totals')).toHaveTextContent(/410\.00/);
-      expect(getByTestId('plan-totals')).not.toHaveTextContent(/300\.00 USD/);
+      expect(getByTestId('plan-totals')).toHaveTextContent(/410 USD/);
+      expect(getByTestId('plan-totals')).not.toHaveTextContent(/300 USD/);
       expect(getByTestId('plan-remainder')).toHaveTextContent(/590\.00/);
     });
   });
@@ -650,7 +654,7 @@ describe('MonthlyPlanSection', () => {
       const { getByTestId } = await renderSection();
 
       // Before any mutation: the (not-yet-stale) planStatus totals show as-is.
-      await waitFor(() => expect(getByTestId('plan-totals')).toHaveTextContent(/999\.00/));
+      await waitFor(() => expect(getByTestId('plan-totals')).toHaveTextContent(/999 USD/));
 
       await fireEvent.press(getByTestId('plan-add-line'));
       await waitFor(() => expect(getByTestId('mock-line-modal')).toBeTruthy());
@@ -659,8 +663,8 @@ describe('MonthlyPlanSection', () => {
 
       // allocated = 300 (the new line), remainder = 1000 - 300 = 700 — the
       // fresh LOCAL estimate, not the stale planStatus's 999.00 / 1.00.
-      await waitFor(() => expect(getByTestId('plan-totals')).toHaveTextContent(/300\.00/));
-      expect(getByTestId('plan-totals')).not.toHaveTextContent(/999\.00/);
+      await waitFor(() => expect(getByTestId('plan-totals')).toHaveTextContent(/300 USD/));
+      expect(getByTestId('plan-totals')).not.toHaveTextContent(/999 USD/);
       expect(getByTestId('plan-remainder')).toHaveTextContent(/700\.00/);
     });
 
@@ -695,7 +699,7 @@ describe('MonthlyPlanSection', () => {
 
       // allocated = 0, remainder = 1000 — fresh, not the stale 300.00 / 700.00.
       await waitFor(() => expect(getByTestId('plan-remainder')).toHaveTextContent(/1000\.00/));
-      expect(getByTestId('plan-totals')).not.toHaveTextContent(/300\.00 USD/);
+      expect(getByTestId('plan-totals')).not.toHaveTextContent(/300 USD/);
     });
   });
 
@@ -835,6 +839,56 @@ describe('MonthlyPlanSection', () => {
     });
   });
 
+  describe('Single-currency display', () => {
+    // The screen is scoped to one selected currency, so no amount on it may be
+    // printed in another. A recurring line that stores its own currency used to
+    // render the STORED figure ("300000 AMD") directly above a progress bar built
+    // from the converted one ("69000 / 69000" in RUB) — two units stacked with
+    // nothing saying which was which. AMD→RUB is 0.23 in the bundled offline rate
+    // table, so 300000 AMD is exactly the 69000 RUB the bar was already showing.
+    const rubPlanWithAmdLine = () => setPlans({
+      plans: [{ id: 'p1', month: THIS_MONTH, currency: 'RUB', expectedIncome: '450000' }],
+      lines: [{
+        id: 'l-amd', planId: null, amount: '300000', label: 'Rent', comment: null,
+        kind: 'expense', categoryId: 'cat1', toAccountId: null, sortOrder: 0,
+        isBroken: false, isRecurring: true, currency: 'AMD',
+      }],
+    });
+
+    it('converts a foreign-currency line into the plan currency and prints no foreign code', async () => {
+      rubPlanWithAmdLine();
+      const { getByTestId } = await renderSection(undefined, { currency: 'RUB' });
+      await waitFor(() => expect(getByTestId('plan-line-l-amd')).toHaveTextContent(/69000/));
+      expect(getByTestId('plan-line-l-amd')).not.toHaveTextContent(/300000/);
+      expect(getByTestId('plan-line-l-amd')).not.toHaveTextContent(/AMD/);
+    });
+
+    it('counts a converted line in the local allocated total instead of skipping it', async () => {
+      rubPlanWithAmdLine();
+      const { getByTestId } = await renderSection(undefined, { currency: 'RUB' });
+      // The local estimate used to skip any line whose currency differed from the
+      // plan's, so this row contributed 0 and the remainder read the full 450000.
+      await waitFor(() => expect(getByTestId('plan-totals')).toHaveTextContent(/69K RUB/));
+      expect(getByTestId('plan-remainder')).toHaveTextContent(/381000/);
+    });
+
+    it('sums the template summary strip in the plan currency, not raw stored amounts', async () => {
+      setPlans({
+        plans: [{ id: 'p1', month: THIS_MONTH, currency: 'RUB', expectedIncome: '450000' }],
+        lines: [{
+          id: 'l-amd', planId: null, amount: '300000', label: 'Rent', comment: null,
+          kind: 'expense', categoryId: 'cat1', toAccountId: null, accountId: 1,
+          sortOrder: 0, isBroken: false, isRecurring: true, currency: 'AMD',
+          hasTemplate: true, lastExecutedMonth: null,
+        }],
+      });
+      const { getByTestId } = await renderSection(undefined, { currency: 'RUB' });
+      // 300000 AMD = 69000 RUB. The strip used to add the bare stored number and
+      // print "300K" with no unit at all, contradicting every other figure here.
+      await waitFor(() => expect(getByTestId('summary-pending-out')).toHaveTextContent(/69K \/ 69K RUB/));
+    });
+  });
+
   describe('Unconvertible recurring line (Bug 5, adversarial review)', () => {
     it('shows the line\'s own currency/amount instead of mislabeling it as the plan currency', async () => {
       setPlans({
@@ -859,8 +913,14 @@ describe('MonthlyPlanSection', () => {
       });
       const { getByTestId, queryByTestId } = await renderSection();
       await waitFor(() => expect(getByTestId('plan-line-unconvertible-l-jpy')).toBeTruthy());
-      expect(getByTestId('plan-line-unconvertible-l-jpy')).toHaveTextContent(/10000/);
-      expect(getByTestId('plan-line-unconvertible-l-jpy')).toHaveTextContent(/JPY/);
+      // The screen is single-currency, so the amount column normally prints a
+      // bare number in the plan currency. This is the one exception: with no rate
+      // there is nothing to convert, so the row keeps the stored figure AND its
+      // own code — a labelled foreign number is honest, an unlabelled one is not.
+      // The warning sub-row just explains it, without repeating the amount.
+      expect(getByTestId('plan-line-l-jpy')).toHaveTextContent(/10000 JPY/);
+      expect(getByTestId('plan-line-unconvertible-l-jpy'))
+        .toHaveTextContent(/graphs_currencies_not_converted/);
       // Not rendered as a normal progress bar (which would mislabel it as USD).
       expect(queryByTestId('plan-line-broken-l-jpy')).toBeNull();
     });
@@ -935,9 +995,12 @@ describe('MonthlyPlanSection', () => {
       const { getByTestId } = await renderSection();
       await waitFor(() => expect(getByTestId('planned-summary-strip')).toBeTruthy());
       expect(getByTestId('summary-done-count')).toHaveTextContent('1 / 2');
-      expect(getByTestId('summary-pending-out')).toHaveTextContent('65K / 65K');
+      // The strip now labels its currency, and sums with the same precise decimal
+      // math as the totals row — it used to add bare parseFloat values across
+      // whatever currencies the templates stored and print them with no unit.
+      expect(getByTestId('summary-pending-out')).toHaveTextContent(/65K \/ 65K USD/);
       // The income template is already done, so nothing is pending in.
-      expect(getByTestId('summary-pending-in')).toHaveTextContent('0 / 220K');
+      expect(getByTestId('summary-pending-in')).toHaveTextContent(/0 \/ 220K USD/);
     });
 
     it('has no summary strip when no line carries a template', async () => {
@@ -983,8 +1046,8 @@ describe('MonthlyPlanSection', () => {
       await waitFor(() => expect(getByTestId('plan-line-i1')).toBeTruthy());
       // Expected income = 220 + 180 = 400; income lines are NOT allocations, so
       // allocated stays 300 and the remainder is 100.
-      expect(getByTestId('plan-income-total')).toHaveTextContent(/400\.00 USD/);
-      expect(getByTestId('plan-totals')).toHaveTextContent(/300\.00/);
+      expect(getByTestId('plan-income-total')).toHaveTextContent(/400 USD/);
+      expect(getByTestId('plan-totals')).toHaveTextContent(/300 USD/);
       expect(getByTestId('plan-remainder')).toHaveTextContent(/100\.00/);
     });
 
@@ -995,7 +1058,7 @@ describe('MonthlyPlanSection', () => {
       });
       const { getByTestId } = await renderSection();
       await waitFor(() => expect(getByTestId('plan-income-total')).toBeTruthy());
-      expect(getByTestId('plan-income-total')).toHaveTextContent(/1000\.00 USD/);
+      expect(getByTestId('plan-income-total')).toHaveTextContent(/1K USD/);
     });
 
     it('renders no progress bar for an income line', async () => {
@@ -1017,7 +1080,7 @@ describe('MonthlyPlanSection', () => {
       const { getByTestId, queryByText } = await renderSection();
       await waitFor(() => expect(getByTestId('plan-line-i1')).toBeTruthy());
       expect(queryByText('0 / 220')).toBeNull();
-      expect(getByTestId('plan-income-total')).toHaveTextContent(/150\.00 \/ 220\.00 USD/);
+      expect(getByTestId('plan-income-total')).toHaveTextContent(/150 \/ 220 USD/);
     });
   });
 });
