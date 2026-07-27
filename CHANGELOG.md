@@ -1,5 +1,13 @@
 # Changelog
 
+## [0.230.0](https://github.com/heywood8/money-tracker/compare/penny-v0.229.0...penny-v0.230.0) (2026-07-27)
+
+
+### Features
+
+* **budgets:** compact the plan rows ([#1440](https://github.com/heywood8/money-tracker/issues/1440)) ([473cd6c](https://github.com/heywood8/money-tracker/commit/473cd6c96efac973bf2e9ea60ce16a6232a57e1b))
+* **graphs:** merge income and expense cards into one tabbed panel ([#1439](https://github.com/heywood8/money-tracker/issues/1439)) ([2dcde23](https://github.com/heywood8/money-tracker/commit/2dcde23839fed9529dcf499652104cf35823c6d7))
+
 ## [0.229.0](https://github.com/heywood8/money-tracker/compare/penny-v0.228.0...penny-v0.229.0) (2026-07-27)
 
 
