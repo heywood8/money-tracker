@@ -1,16 +1,17 @@
 import React, { useState, useEffect, useMemo, useCallback, useRef } from 'react';
-import { View, StyleSheet, FlatList, Pressable, TouchableOpacity } from 'react-native';
+import { View, StyleSheet, FlatList, Pressable } from 'react-native';
 import { Text, Snackbar } from 'react-native-paper';
-import WheelPicker from '@quidone/react-native-wheel-picker';
 import Icon from '@expo/vector-icons/MaterialCommunityIcons';
 import { useThemeColors } from '../contexts/ThemeColorsContext';
 import { useLocalization } from '../contexts/LocalizationContext';
+import { useDialog } from '../contexts/DialogContext';
 import { useBudgetsData } from '../contexts/BudgetsDataContext';
 import { useCategories } from '../contexts/CategoriesContext';
 import { useAccountsData } from '../contexts/AccountsDataContext';
 import MonthlyPlanSection from '../components/budgets/MonthlyPlanSection';
 import AddFAB from '../components/AddFAB';
 import LoadingView from '../components/LoadingView';
+import * as Currency from '../services/currency';
 import { SPACING } from '../styles/layout';
 import { currentMonthKey, addMonths, formatMonthLabel } from '../utils/monthUtils';
 
@@ -22,6 +23,10 @@ import { currentMonthKey, addMonths, formatMonthLabel } from '../utils/monthUtil
 const EMPTY_LIST = [];
 const renderNothing = () => null;
 
+// Stands in for the header's remainder until the plan section has computed and
+// reported one.
+const PENDING_PLACEHOLDER = '—';
+
 const BudgetScreen = () => {
   const { colors } = useThemeColors();
   const { t, language } = useLocalization();
@@ -32,6 +37,7 @@ const BudgetScreen = () => {
   const { loading, convertAllBudgets, setConvertAllBudgets } = useBudgetsData();
   const { categories } = useCategories();
   const { accounts } = useAccountsData();
+  const { showDialog } = useDialog();
 
   // The whole screen is scoped to one month via a single shared ‹ Month › header;
   // MonthlyPlanSection is controlled from here.
@@ -55,6 +61,22 @@ const BudgetScreen = () => {
   }, []);
   const handleDismissSnackbar = useCallback(() => setSnackbarVisible(false), []);
 
+  // The month's remainder, reported up from the plan section so the header can
+  // print it. Replaced only when a field actually differs: the section re-reports
+  // on every recompute, and swapping in an equal-but-new object each time would
+  // re-render this screen (and the whole plan below it) for nothing.
+  const [planTotals, setPlanTotals] = useState(null);
+  const handleTotalsChange = useCallback((next) => {
+    setPlanTotals(prev => (
+      prev
+        && prev.remainder === next.remainder
+        && prev.hasIncomeBasis === next.hasIncomeBasis
+        && prev.currency === next.currency
+        ? prev
+        : next
+    ));
+  }, []);
+
   const handlePrevMonth = useCallback(() => setMonth(m => addMonths(m, -1)), []);
   const handleNextMonth = useCallback(() => setMonth(m => addMonths(m, 1)), []);
   // Explicit affordance for Fix 4: the screen stays mounted across tab
@@ -71,10 +93,22 @@ const BudgetScreen = () => {
   [accounts],
   );
 
-  const currencyItems = useMemo(() =>
-    currencies.map(cur => ({ label: cur, value: cur })),
-  [currencies],
-  );
+  // Picking the display currency used to be a floating wheel parked over the
+  // plan card's bottom rows, with a convert-all badge tucked into its corner —
+  // an always-on overlay for a setting changed once in a while, which also
+  // forced 260dp of dead scroll padding so the card's own totals could be
+  // scrolled out from under it. It is a header control now: an action sheet,
+  // like every other whole-screen choice in the app.
+  const handleOpenCurrencyPicker = useCallback(() => {
+    showDialog(
+      t('currency'),
+      null,
+      [
+        ...currencies.map(cur => ({ text: cur, onPress: () => setSelectedCurrency(cur) })),
+        { text: t('cancel'), style: 'cancel' },
+      ],
+    );
+  }, [showDialog, t, currencies]);
 
   // Seed the currency from the first account, and re-seed whenever the selected
   // one stops existing (its last account was deleted). The membership check is not
@@ -150,9 +184,69 @@ const BudgetScreen = () => {
           </Text>
         </Pressable>
       )}
+      {/* The month's headline figure. It used to sit at the very bottom of the
+          plan card in 14px muted text, below every row and the allocated/actual
+          totals — the one number a person acts on, placed where they would reach
+          it last. Here it is always on screen, whatever the list is scrolled to. */}
+      <View style={styles.heroRow}>
+        <View style={styles.heroFigure}>
+          <Text style={[styles.heroLabel, { color: colors.mutedText }]} numberOfLines={1}>
+            {planTotals?.hasIncomeBasis === false ? t('add_income_for_remainder') : t('remainder')}
+          </Text>
+          {/* An em dash until the section has reported: the label alone would
+              read as a value that failed to load, and reserving the line keeps
+              the header from jumping a row taller once the figure arrives. */}
+          {planTotals?.hasIncomeBasis !== false && (
+            <Text
+              style={[styles.heroValue, {
+                color: planTotals && Currency.isNegative(planTotals.remainder)
+                  ? colors.overspend
+                  : colors.text,
+              }]}
+              numberOfLines={1}
+              testID="budget-remainder"
+            >
+              {planTotals
+                ? `${Currency.formatAmountTrimmed(planTotals.remainder, planTotals.currency)} ${planTotals.currency}`
+                : PENDING_PLACEHOLDER}
+            </Text>
+          )}
+        </View>
+        {currencies.length > 1 && (
+          <View style={styles.heroControls}>
+            <Pressable
+              onPress={handleOpenCurrencyPicker}
+              style={[styles.currencyChip, { borderColor: colors.border }]}
+              hitSlop={6}
+              accessibilityRole="button"
+              accessibilityLabel={`${t('currency')}: ${selectedCurrency}`}
+              testID="budget-currency-chip"
+            >
+              <Text style={[styles.currencyChipText, { color: colors.text }]}>{selectedCurrency}</Text>
+              <Icon name="chevron-down" size={14} color={colors.mutedText} />
+            </Pressable>
+            <Pressable
+              onPress={handleToggleConvert}
+              style={[styles.convertToggle, {
+                backgroundColor: convertAllBudgets ? colors.primary : colors.background,
+                borderColor: convertAllBudgets ? colors.primary : colors.border,
+              }]}
+              hitSlop={6}
+              accessibilityRole="switch"
+              accessibilityState={{ checked: convertAllBudgets }}
+              accessibilityLabel={t('graphs_convert_currencies')}
+              testID="budget-convert-toggle"
+            >
+              <Icon name="cash-sync" size={16} color={convertAllBudgets ? colors.surface : colors.mutedText} />
+            </Pressable>
+          </View>
+        )}
+      </View>
     </View>
-  ), [colors.background, colors.text, colors.primary, month, isCurrentMonth, t, language,
-    handlePrevMonth, handleNextMonth, handleJumpToCurrentMonth]);
+  ), [colors.background, colors.text, colors.primary, colors.mutedText, colors.border,
+    colors.overspend, colors.surface, month, isCurrentMonth, t, language, planTotals,
+    currencies.length, selectedCurrency, convertAllBudgets, handleOpenCurrencyPicker,
+    handleToggleConvert, handlePrevMonth, handleNextMonth, handleJumpToCurrentMonth]);
 
   const listHeader = useMemo(() => (
     <MonthlyPlanSection
@@ -163,8 +257,10 @@ const BudgetScreen = () => {
       accounts={accounts}
       month={month}
       onNotify={handleNotify}
+      onTotalsChange={handleTotalsChange}
     />
-  ), [selectedCurrency, expenseCategories, incomeCategories, accounts, month, handleNotify]);
+  ), [selectedCurrency, expenseCategories, incomeCategories, accounts, month, handleNotify,
+    handleTotalsChange]);
 
   if (loading) {
     return <LoadingView testID="budget-screen-loading" />;
@@ -180,51 +276,6 @@ const BudgetScreen = () => {
         ListHeaderComponent={listHeader}
         contentContainerStyle={styles.listContent}
       />
-
-      {/* Floating currency wheel — same control as the Graphs screen. Only shown
-          with something to pick between: it is an opaque overlay sitting on top
-          of the plan card's bottom edge (it was covering the totals row), and
-          with a single currency it offered no choice to justify that. */}
-      {currencyItems.length > 1 && (
-        <View style={[styles.fabWheel, { backgroundColor: colors.surface + 'DE', borderColor: colors.border + '80' }]}>
-          <WheelPicker
-            data={currencyItems}
-            value={selectedCurrency}
-            onValueChanged={({ item }) => item && setSelectedCurrency(item.value)}
-            itemHeight={28}
-            visibleItemCount={3}
-            itemTextStyle={[styles.wheelItemText, { color: colors.text }]}
-            overlayItemStyle={[styles.wheelOverlayItem, { backgroundColor: colors.selected }]}
-            enableScrollByTapOnItem
-            keyExtractor={(item, index) => `currency-${index}`}
-          />
-        </View>
-      )}
-
-      {/* Convert-other-currencies toggle — badge tucked into the wheel's corner */}
-      {currencyItems.length > 1 && (
-        <TouchableOpacity
-          style={[
-            styles.fabToggle,
-            {
-              backgroundColor: convertAllBudgets ? colors.primary : colors.surface,
-              borderColor: convertAllBudgets ? colors.primary : colors.border,
-            },
-          ]}
-          onPress={handleToggleConvert}
-          activeOpacity={0.7}
-          accessibilityRole="switch"
-          accessibilityState={{ checked: convertAllBudgets }}
-          accessibilityLabel={t('graphs_convert_currencies')}
-          testID="budget-convert-toggle"
-        >
-          <Icon
-            name="cash-sync"
-            size={18}
-            color={convertAllBudgets ? colors.surface : colors.mutedText}
-          />
-        </TouchableOpacity>
-      )}
 
       <AddFAB
         onPress={handleOpenAddAllocation}
@@ -248,36 +299,48 @@ const styles = StyleSheet.create({
   container: {
     flex: 1,
   },
-  fabToggle: {
+  convertToggle: {
     alignItems: 'center',
-    borderRadius: 16,
+    borderRadius: 14,
     borderWidth: 1,
-    bottom: 104,
-    elevation: 12,
-    height: 32,
+    height: 28,
     justifyContent: 'center',
-    left: 82,
-    position: 'absolute',
-    shadowColor: '#000',
-    shadowOffset: { width: 0, height: 2 },
-    shadowOpacity: 0.35,
-    shadowRadius: 4,
-    width: 32,
-    zIndex: 2,
+    width: 28,
   },
-  fabWheel: {
-    borderRadius: 40,
+  currencyChip: {
+    alignItems: 'center',
+    borderRadius: 14,
     borderWidth: 1,
-    bottom: 116,
-    elevation: 8,
-    left: 16,
-    overflow: 'hidden',
-    position: 'absolute',
-    shadowColor: '#000',
-    shadowOffset: { width: 0, height: 4 },
-    shadowOpacity: 0.3,
-    shadowRadius: 8,
-    width: 80,
+    flexDirection: 'row',
+    gap: 2,
+    height: 28,
+    paddingHorizontal: SPACING.sm,
+  },
+  currencyChipText: {
+    fontSize: 13,
+    fontWeight: '600',
+  },
+  heroControls: {
+    alignItems: 'center',
+    flexDirection: 'row',
+    gap: SPACING.sm,
+  },
+  heroFigure: {
+    flexShrink: 1,
+  },
+  heroLabel: {
+    fontSize: 12,
+  },
+  heroRow: {
+    alignItems: 'flex-end',
+    flexDirection: 'row',
+    justifyContent: 'space-between',
+    marginTop: SPACING.sm,
+  },
+  heroValue: {
+    fontSize: 24,
+    fontWeight: '700',
+    letterSpacing: -0.5,
   },
   jumpToCurrentButton: {
     alignItems: 'center',
@@ -293,13 +356,15 @@ const styles = StyleSheet.create({
   },
   listContent: {
     flexGrow: 1,
-    // Clears the tab bar, the FAB and the currency wheel, so the plan card's
-    // totals can always be scrolled out from under the floating controls.
-    paddingBottom: 260,
+    // Clears the tab bar and the FAB. It was 260 to also clear the floating
+    // currency wheel, which left roughly a quarter of the screen as dead space
+    // at the end of the list; the wheel moved into the header.
+    paddingBottom: 180,
     paddingHorizontal: SPACING.md,
     paddingTop: SPACING.md,
   },
   monthHeaderContainer: {
+    paddingBottom: SPACING.sm,
     paddingHorizontal: SPACING.md,
     paddingTop: SPACING.md,
   },
@@ -317,12 +382,6 @@ const styles = StyleSheet.create({
   },
   snackbar: {
     marginBottom: 100,
-  },
-  wheelItemText: {
-    fontSize: 14,
-  },
-  wheelOverlayItem: {
-    borderRadius: 8,
   },
 });
 

@@ -52,6 +52,7 @@ const MonthlyPlanSection = forwardRef(function MonthlyPlanSection({
   accounts = [],
   month: monthProp = null,
   onNotify = null,
+  onTotalsChange = null,
 }, ref) {
   const { colors } = useThemeColors();
   const { t, language } = useLocalization();
@@ -248,6 +249,15 @@ const MonthlyPlanSection = forwardRef(function MonthlyPlanSection({
   // can never disagree (deriving it from the lines separately would count an
   // income line in another currency that `totals` deliberately skipped).
   const hasIncomeBasis = !Currency.isZero(displayExpectedIncome);
+
+  // The remainder is the one figure on this screen a person acts on — "what can
+  // I still commit this month" — so the host lifts it into the sticky header
+  // rather than leaving it in muted 14px at the bottom of a long scrolling card.
+  // Reported rather than lifted wholesale: computing it needs the lines, the
+  // plan status and the staleness gate above, all of which live here.
+  useEffect(() => {
+    onTotalsChange?.({ remainder: displayRemainder, hasIncomeBasis, currency: planCurrency });
+  }, [onTotalsChange, displayRemainder, hasIncomeBasis, planCurrency]);
 
   // Only invoked from the section's own header, which renders in uncontrolled
   // mode only; in controlled mode the host header drives month navigation.
@@ -753,22 +763,28 @@ const MonthlyPlanSection = forwardRef(function MonthlyPlanSection({
                 </Text>
               )}
             </View>
-            <View style={styles.remainderRow}>
-              {hasIncomeBasis ? (
-                <Text
-                  style={[styles.totalsRemainder, {
-                    color: Currency.isNegative(displayRemainder) ? colors.danger : colors.text,
-                  }]}
-                  testID="plan-remainder"
-                >
-                  {t('remainder')}: {Currency.formatAmount(displayRemainder, planCurrency)} {planCurrency}
-                </Text>
-              ) : (
-                <Text style={[styles.totalsHint, { color: colors.mutedText }]} testID="plan-remainder-hint">
-                  {t('add_income_for_remainder')}
-                </Text>
-              )}
-            </View>
+            {/* The remainder is reported to the host, which prints it in the
+                sticky header where the figure you act on belongs. Rendered here
+                only in uncontrolled mode (no host header to carry it), so the
+                two never appear at once. */}
+            {!controlledMonth && (
+              <View style={styles.remainderRow}>
+                {hasIncomeBasis ? (
+                  <Text
+                    style={[styles.totalsRemainder, {
+                      color: Currency.isNegative(displayRemainder) ? colors.danger : colors.text,
+                    }]}
+                    testID="plan-remainder"
+                  >
+                    {t('remainder')}: {Currency.formatAmount(displayRemainder, planCurrency)} {planCurrency}
+                  </Text>
+                ) : (
+                  <Text style={[styles.totalsHint, { color: colors.mutedText }]} testID="plan-remainder-hint">
+                    {t('add_income_for_remainder')}
+                  </Text>
+                )}
+              </View>
+            )}
             {planStatus?.unconvertible?.length > 0 && (
               <View style={styles.convertWarning} testID="plan-unconverted-warning">
                 <Icon name="alert-circle-outline" size={14} color={colors.mutedText} />
@@ -806,6 +822,7 @@ MonthlyPlanSection.propTypes = {
   accounts: PropTypes.array,
   month: PropTypes.string,
   onNotify: PropTypes.func,
+  onTotalsChange: PropTypes.func,
 };
 
 export default MonthlyPlanSection;
