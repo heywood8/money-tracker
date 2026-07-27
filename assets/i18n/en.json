@@ -223,6 +223,7 @@
   "adjustment_expense": "Adjustment",
   "adjustment_income": "Adjustment",
   "balance_adjustments": "Balance Adjustments",
+  "other_categories": "Other",
   "add_operation": "Add Operation",
   "edit_operation": "Edit Operation",
   "exclude_from_average": "Exclude from spending average",

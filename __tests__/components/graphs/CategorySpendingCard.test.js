@@ -470,6 +470,25 @@ describe('CategorySpendingCard', () => {
       expect(getByText('Transport')).toBeTruthy();
     });
 
+    it('keeps both figures in text ink and lets the dots carry the series', async () => {
+      // Regression: the two totals used to be painted in their series colours,
+      // which made the number itself the colour-only cue.
+      const { getByText, getAllByText, queryAllByText } = await render(
+        <CategorySpendingCard {...defaultProps} />,
+      );
+
+      await fireEvent.press(getByText('vs'));
+      const transportItems = getAllByText('Transport');
+      await fireEvent.press(transportItems[transportItems.length - 1]);
+
+      const amounts = queryAllByText('$200.00');
+      expect(amounts.length).toBe(2);
+      amounts.forEach((node) => {
+        const style = Array.isArray(node.props.style) ? Object.assign({}, ...node.props.style) : node.props.style;
+        expect(style.color).toBe(defaultColors.text);
+      });
+    });
+
     it('shows X button to clear vs category after selection', async () => {
       const { getByText, getAllByText, container } = await render(
         <CategorySpendingCard {...defaultProps} />,

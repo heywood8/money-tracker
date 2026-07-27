@@ -223,6 +223,7 @@
   "adjustment_expense": "調整",
   "adjustment_income": "調整",
   "balance_adjustments": "残高調整",
+  "other_categories": "その他",
   "add_operation": "取引を追加",
   "edit_operation": "取引を編集",
   "exclude_from_average": "支出平均から除外",

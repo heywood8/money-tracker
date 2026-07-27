@@ -533,12 +533,16 @@ describe('BalanceHistoryCard', () => {
         selectedYear: 2024,
         selectedMonth: 0,
         primaryColor: mockColors.primary,
+        lineColors: { norm: '#norm', prevMonth: '#prev', yearAvg: '#year' },
+        baselineColor: '#baseline',
       });
       const plainAvgSeries = series.find(s => s.yKey === 'plainAvg');
       expect(plainAvgSeries.dashed).toBe(false);
       expect(plainAvgSeries.strokeWidth).toBe(2);
-      // Plain avg should be gray color
-      expect(plainAvgSeries.color).toBe('rgba(128, 128, 128, 0.4)');
+      // The norm line takes its own palette step — it used to share a grey with
+      // the zero baseline, which made the two indistinguishable on the canvas.
+      expect(plainAvgSeries.color).toBe('#norm');
+      expect(series.find(s => s.yKey === 'zero').color).toBe('#baseline');
     });
 
     it('combines actual and forecast data when isCurrentMonth with spendingPrediction', async () => {

@@ -223,6 +223,7 @@
   "adjustment_expense": "조정",
   "adjustment_income": "조정",
   "balance_adjustments": "잔액 조정",
+  "other_categories": "기타",
   "add_operation": "거래 추가",
   "edit_operation": "거래 편집",
   "exclude_from_average": "지출 평균에서 제외",

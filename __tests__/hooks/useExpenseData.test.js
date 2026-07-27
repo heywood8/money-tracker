@@ -626,4 +626,101 @@ describe('useExpenseData', () => {
       expect(transportItem?.amount).toBe(999);
     });
   });
+
+  describe('Slice colours', () => {
+    const loadWith = async (spending) => {
+      OperationsDB.getSpendingByCategoryAndCurrency.mockResolvedValue(spending);
+      const { result } = await renderHook(() =>
+        useExpenseData(mockYear, mockMonth, mockCurrency, 'all', mockCategories, mockColors, mockT),
+      );
+      await act(async () => {
+        await result.current.loadExpenseData();
+      });
+      await waitFor(() => expect(result.current.loading).toBe(false));
+      return result;
+    };
+
+    it('keeps a category on its colour when the set of spending categories changes', async () => {
+      // Regression: colours used to be handed out by position in the query
+      // result, so a month where Food had no spending repainted Transport.
+      const both = await loadWith([
+        { category_id: 'cat-1', total: '500' },
+        { category_id: 'cat-3', total: '100' },
+      ]);
+      const transportColor = both.current.chartData.find(i => i.name === 'Transport').color;
+
+      const transportOnly = await loadWith([{ category_id: 'cat-3', total: '100' }]);
+      expect(transportOnly.current.chartData[0].name).toBe('Transport');
+      expect(transportOnly.current.chartData[0].color).toBe(transportColor);
+    });
+
+    it('keeps a category on its colour regardless of how it ranks by amount', async () => {
+      const foodBigger = await loadWith([
+        { category_id: 'cat-1', total: '500' },
+        { category_id: 'cat-3', total: '100' },
+      ]);
+      const byName = (data, name) => data.find(i => i.name === name).color;
+
+      const transportBigger = await loadWith([
+        { category_id: 'cat-1', total: '100' },
+        { category_id: 'cat-3', total: '500' },
+      ]);
+
+      expect(byName(transportBigger.current.chartData, 'Food'))
+        .toBe(byName(foodBigger.current.chartData, 'Food'));
+      expect(byName(transportBigger.current.chartData, 'Transport'))
+        .toBe(byName(foodBigger.current.chartData, 'Transport'));
+    });
+
+    it('gives every slice in one chart a colour of its own', async () => {
+      const result = await loadWith([
+        { category_id: 'cat-1', total: '500' },
+        { category_id: 'cat-3', total: '100' },
+        { category_id: 'cat-5', total: '50' },
+      ]);
+      const used = result.current.chartData.map(i => i.color);
+      expect(new Set(used).size).toBe(used.length);
+    });
+
+    it('folds the tail into one Other slice past the palette capacity', async () => {
+      const many = Array.from({ length: 12 }, (_, i) => ({
+        id: `many-${i}`,
+        name: `Cat ${i}`,
+        parentId: null,
+        icon: null,
+        categoryType: 'expense',
+        isShadow: false,
+        createdAt: `2024-01-${String(i + 1).padStart(2, '0')}`,
+      }));
+      OperationsDB.getSpendingByCategoryAndCurrency.mockResolvedValue(
+        many.map((cat, i) => ({ category_id: cat.id, total: String(120 - i * 10) })),
+      );
+
+      const { result } = await renderHook(() =>
+        useExpenseData(mockYear, mockMonth, mockCurrency, 'all', many, mockColors, mockT),
+      );
+      await act(async () => {
+        await result.current.loadExpenseData();
+      });
+      await waitFor(() => expect(result.current.loading).toBe(false));
+
+      expect(result.current.chartData).toHaveLength(8);
+      expect(result.current.chartData[7].name).toBe('other_categories');
+      // Folding must not lose money.
+      const total = 12 * 120 - 10 * (0 + 1 + 2 + 3 + 4 + 5 + 6 + 7 + 8 + 9 + 10 + 11);
+      expect(result.current.totalExpenses).toBe(total);
+    });
+
+    it('marks balance adjustments with a neutral, non-category colour', async () => {
+      const result = await loadWith([
+        { category_id: 'cat-1', total: '500' },
+        { category_id: 'cat-4', total: '25' },
+      ]);
+      const adjustments = result.current.chartData.find(i => i.name === 'balance_adjustments');
+      const food = result.current.chartData.find(i => i.name === 'Food');
+      expect(adjustments).toBeTruthy();
+      expect(adjustments.color).not.toBe(food.color);
+      expect(adjustments.categoryId).toBeUndefined();
+    });
+  });
 });

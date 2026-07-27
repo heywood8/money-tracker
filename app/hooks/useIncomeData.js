@@ -3,12 +3,9 @@ import { getIncomeByCategoryAndCurrency } from '../services/OperationsDB';
 import { formatDate } from '../services/BalanceHistoryDB';
 import { appEvents, EVENTS } from '../services/eventEmitter';
 import * as Currency from '../services/currency';
-
-const CHART_COLORS = [
-  '#4BC0C0', '#36A2EB', '#9966FF', '#FF9F40', '#FFCE56',
-  '#FF6384', '#C9CBCF', '#4BC0C0', '#FF9F40', '#FFCE56',
-  '#36A2EB', '#9966FF', '#FF6384', '#4BC0C0', '#FF9F40',
-];
+import { seriesColorForSlot } from '../styles/chartPalette';
+import { getCategoryColorSlot } from '../utils/categoryUtils';
+import { foldSliceTail } from '../utils/chartSlices';
 
 /**
  * Custom hook for loading and managing income data for GraphsScreen.
@@ -115,12 +112,14 @@ const useIncomeData = (selectedYear, selectedMonth, selectedCurrency, selectedIn
       });
     }
 
-    const data = Object.values(aggregatedIncome).map((item, index) => {
+    // See useExpenseData: the slot belongs to the category, so switching months
+    // never repaints a series the reader has already learned.
+    const data = Object.values(aggregatedIncome).map((item) => {
       const hasChildren = categories.some(cat => cat.parentId === item.category.id);
       return {
         name: item.category.name,
         amount: parseFloat(item.total),
-        color: CHART_COLORS[index % CHART_COLORS.length],
+        color: seriesColorForSlot(getCategoryColorSlot(item.category, categories), colors),
         legendFontColor: colors.text,
         legendFontSize: 13,
         icon: item.category.icon || null,
@@ -131,8 +130,8 @@ const useIncomeData = (selectedYear, selectedMonth, selectedCurrency, selectedIn
 
     data.sort((a, b) => b.amount - a.amount);
 
-    return data;
-  }, [rawIncome, selectedIncomeCategory, categories, colors.text, selectedCurrency]);
+    return foldSliceTail(data, colors, t('other_categories'));
+  }, [rawIncome, selectedIncomeCategory, categories, colors, t, selectedCurrency]);
 
   const totalIncome = useMemo(
     () => parseFloat(incomeChartData.reduce((sum, item) => Currency.add(sum, item.amount), '0')),

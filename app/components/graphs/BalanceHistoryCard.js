@@ -22,6 +22,7 @@ import Icon from '@expo/vector-icons/MaterialCommunityIcons';
 import SimplePicker from '../SimplePicker';
 import currencies from '../../../assets/currencies.json';
 import { useDisplaySettings } from '../../contexts/DisplaySettingsContext';
+import { balanceLineColors } from '../../styles/chartPalette';
 import BalanceHistoryCalendarView from './BalanceHistoryCalendarView';
 
 // Helper to format numbers compactly (e.g., 10K, 1.5M)
@@ -131,8 +132,14 @@ export const nextThirdLineMode = (mode) => {
   return THIRD_LINE_MODES[(index + 1) % THIRD_LINE_MODES.length];
 };
 
-const PREV_MONTH_COLOR = 'rgba(156, 39, 176, 0.5)';
-const YEAR_AVG_COLOR = 'rgba(0, 150, 136, 0.6)';
+// Line colours come from the chart palette, which steps them per mode: the old
+// half-transparent hexes composited to near-identical greys against both
+// surfaces (plain-avg vs the zero baseline measured ΔE 4 — indistinguishable).
+// The default here is the light set, for the pure-builder unit tests.
+const DEFAULT_LINE_COLORS = balanceLineColors({ surface: '#ffffff' });
+// The zero rule is chrome, not a series: it takes the grid's colour so it never
+// competes with a real line for the reader's attention.
+const DEFAULT_BASELINE_COLOR = '#e6e6e6';
 
 const THIRD_LINE_ICONS = {
   prevMonth: 'calendar-arrow-left',
@@ -152,6 +159,8 @@ export const computeBalanceChart = ({
   selectedYear,
   selectedMonth,
   primaryColor,
+  lineColors = DEFAULT_LINE_COLORS,
+  baselineColor = DEFAULT_BASELINE_COLOR,
   thirdLine = 'prevMonth',
 }) => {
   if (!balanceHistoryData.actual || balanceHistoryData.actual.length === 0) {
@@ -395,14 +404,14 @@ export const computeBalanceChart = ({
   if (showForecast) {
     series.push({ yKey: 'forecast', color: primaryColor, strokeWidth: 2, curveType: 'monotoneX', dashed: true });
   }
-  series.push({ yKey: 'plainAvg', color: 'rgba(128, 128, 128, 0.4)', strokeWidth: 2, curveType: 'linear', dashed: false });
+  series.push({ yKey: 'plainAvg', color: lineColors.norm, strokeWidth: 2, curveType: 'linear', dashed: false });
   if (hasPrevMonthData) {
-    series.push({ yKey: 'prevMonth', color: PREV_MONTH_COLOR, strokeWidth: 2, curveType: 'monotoneX', dashed: false });
+    series.push({ yKey: 'prevMonth', color: lineColors.prevMonth, strokeWidth: 2, curveType: 'monotoneX', dashed: false });
   }
   if (hasYearAvgData) {
-    series.push({ yKey: 'yearAvg', color: YEAR_AVG_COLOR, strokeWidth: 2, curveType: 'monotoneX', dashed: false });
+    series.push({ yKey: 'yearAvg', color: lineColors.yearAvg, strokeWidth: 2, curveType: 'monotoneX', dashed: false });
   }
-  series.push({ yKey: 'zero', color: 'rgba(128, 128, 128, 0.5)', strokeWidth: 1, curveType: 'linear', dashed: false });
+  series.push({ yKey: 'zero', color: baselineColor, strokeWidth: 1, curveType: 'linear', dashed: false });
 
   return { computed, data, series };
 };
@@ -542,7 +551,7 @@ const BalanceChart = ({
     lineColor: colors.border,
     labelColor: colors.mutedText,
     formatYLabel: (value) => formatYAxisLabel(value, hideBalances),
-    linePathEffect: <DashPathEffect intervals={[4, 4]} />,
+    // Solid hairline grid: dashes read as a threshold line, and this is a grid.
     enableRescaling: true,
   }]), [axisFont, colors.border, colors.mutedText, hideBalances]);
 
@@ -656,6 +665,9 @@ const BalanceHistoryCard = ({
   const [contentHeight, setContentHeight] = useState(340);
   // Day currently under the finger while scrubbing the chart (null when idle).
   const [scrubDay, setScrubDay] = useState(null);
+  // Comparison-line steps for the current mode — the legend dots below read from
+  // the same object, so a swatch can never drift from the line it stands for.
+  const chartLineColors = useMemo(() => balanceLineColors(colors), [colors]);
 
   const selectedAccountData = accounts.find(acc => acc.id === selectedAccount);
   const currency = selectedAccountData?.currency || 'USD';
@@ -675,9 +687,11 @@ const BalanceHistoryCard = ({
       selectedYear,
       selectedMonth,
       primaryColor: colors.primary,
+      lineColors: chartLineColors,
+      baselineColor: colors.border,
       thirdLine,
     }),
-    [balanceHistoryData, spendingPrediction, isCurrentMonth, selectedYear, selectedMonth, colors.primary, thirdLine],
+    [balanceHistoryData, spendingPrediction, isCurrentMonth, selectedYear, selectedMonth, colors.primary, colors.border, chartLineColors, thirdLine],
   );
 
   // yKeys drive Victory's shared y-domain (the always-present "zero" key keeps the
@@ -870,7 +884,7 @@ const BalanceHistoryCard = ({
                   {/* Plain avg row */}
                   <View style={styles.legendTableRow}>
                     <View style={styles.legendTableLabelCell}>
-                      <View style={[styles.legendDot, styles.legendDotPlainAvg]} />
+                      <View style={[styles.legendDot, { backgroundColor: chartLineColors.norm }]} />
                       <Text style={[styles.legendTableLabel, { color: colors.text }]}>{t('plain_avg') || 'Plain avg'}</Text>
                     </View>
                     <Text style={[styles.legendTableValue, { color: colors.text }]}>{formatCompact(chartComputed.plainAvgMax, currency)}</Text>
@@ -883,7 +897,7 @@ const BalanceHistoryCard = ({
                   {chartComputed.hasPrevMonthData && (
                     <View style={styles.legendTableRow}>
                       <View style={styles.legendTableLabelCell}>
-                        <View style={[styles.legendDot, styles.legendDotPrevMonth]} />
+                        <View style={[styles.legendDot, { backgroundColor: chartLineColors.prevMonth }]} />
                         <Text style={[styles.legendTableLabel, { color: colors.text }]}>{t('prev_month') || 'Prev Month'}</Text>
                       </View>
                       <Text style={[styles.legendTableValue, { color: colors.text }]}>{formatCompact(chartComputed.prevMonthMax, currency)}</Text>
@@ -897,7 +911,7 @@ const BalanceHistoryCard = ({
                   {chartComputed.hasYearAvgData && (
                     <View style={styles.legendTableRow}>
                       <View style={styles.legendTableLabelCell}>
-                        <View style={[styles.legendDot, styles.legendDotYearAvg]} />
+                        <View style={[styles.legendDot, { backgroundColor: chartLineColors.yearAvg }]} />
                         <Text style={[styles.legendTableLabel, { color: colors.text }]}>{t('year_avg') || 'Year avg'}</Text>
                       </View>
                       <Text style={[styles.legendTableValue, { color: colors.text }]}>{formatCompact(chartComputed.yearAvgMax, currency)}</Text>
@@ -1055,15 +1069,6 @@ const styles = StyleSheet.create({
     height: 12,
     marginRight: 6,
     width: 12,
-  },
-  legendDotPlainAvg: {
-    backgroundColor: 'rgba(128, 128, 128, 0.4)',
-  },
-  legendDotPrevMonth: {
-    backgroundColor: PREV_MONTH_COLOR,
-  },
-  legendDotYearAvg: {
-    backgroundColor: YEAR_AVG_COLOR,
   },
   legendTableContainer: {
     marginTop: 16,

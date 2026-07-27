@@ -2,12 +2,13 @@ import React, { useMemo, useState, useCallback } from 'react';
 import { View, Text, StyleSheet, ActivityIndicator, Dimensions, TouchableOpacity, Modal, ScrollView } from 'react-native';
 import PropTypes from 'prop-types';
 import { CartesianChart, Bar, BarGroup, StackedBar, useChartPressState } from 'victory-native';
-import { matchFont, DashPathEffect, RoundedRect } from '@shopify/react-native-skia';
+import { matchFont, Paint, RoundedRect } from '@shopify/react-native-skia';
 import { runOnJS, useAnimatedReaction } from 'react-native-reanimated';
 import Icon from '@expo/vector-icons/MaterialCommunityIcons';
 import currencies from '../../../assets/currencies.json';
 import useCategoryMonthlySpending from '../../hooks/useCategoryMonthlySpending';
 import { HORIZONTAL_PADDING } from '../../styles/layout';
+import { comparisonSeriesColor } from '../../styles/chartPalette';
 import ModalBlurOverlay from '../ModalBlurOverlay';
 import { useDisplaySettings } from '../../contexts/DisplaySettingsContext';
 
@@ -26,8 +27,11 @@ const TOP_PADDING = 8;
 // The x-axis labels now live on the Skia canvas, so the canvas owns their height too.
 const CHART_HEIGHT = TOP_PADDING + BAR_HEIGHT + LABEL_HEIGHT;
 const CORNER = 4;
-const VS_COLOR = '#FF7043';
 const BAR_ANIMATION = { type: 'spring' };
+// Stacked segments are separated by a gap in the card's own colour, not by a
+// border: a stroke in the surface colour reads as breathing room, an outline
+// reads as one more piece of chrome. 2px total (1px either side of the seam).
+const STACK_GAP = 2;
 // Press state key sets must match the chart's yKeys, so the canvas remounts
 // (via `key`) whenever the vs-series is added or removed.
 const PRESS_INIT_SINGLE = { x: 0, y: { amount: 0 } };
@@ -82,6 +86,7 @@ const SpendingBarChart = ({
   const count = data.length;
   const hasVs = vsData != null && vsData.length === count;
   const isStacked = stacked && hasVs;
+  const vsColor = comparisonSeriesColor(colors);
 
   const axisMax = useMemo(() => {
     if (isStacked) return 100;
@@ -184,13 +189,21 @@ const SpendingBarChart = ({
           <StackedBar
             chartBounds={chartBounds}
             points={[points.primary, points.vs]}
-            colors={[colors.primary, VS_COLOR]}
+            colors={[colors.primary, vsColor]}
             barWidth={slot * 0.6}
             animate={BAR_ANIMATION}
             barOptions={({ isTop, isBottom }) => {
-              if (isTop) return { roundedCorners: { topLeft: CORNER, topRight: CORNER } };
-              if (isBottom) return { roundedCorners: { bottomLeft: CORNER, bottomRight: CORNER } };
-              return {};
+              const gap = (
+                <Paint
+                  key="stack-gap"
+                  style="stroke"
+                  strokeWidth={STACK_GAP}
+                  color={colors.altRow}
+                />
+              );
+              if (isTop) return { roundedCorners: { topLeft: CORNER, topRight: CORNER }, children: gap };
+              if (isBottom) return { roundedCorners: { bottomLeft: CORNER, bottomRight: CORNER }, children: gap };
+              return { children: gap };
             }}
           />
         );
@@ -205,7 +218,7 @@ const SpendingBarChart = ({
             roundedCorners={{ topLeft: CORNER, topRight: CORNER }}
           >
             <BarGroup.Bar points={points.primary} color={colors.primary} animate={BAR_ANIMATION} />
-            <BarGroup.Bar points={points.vs} color={VS_COLOR} animate={BAR_ANIMATION} />
+            <BarGroup.Bar points={points.vs} color={vsColor} animate={BAR_ANIMATION} />
           </BarGroup>
         );
       }
@@ -221,7 +234,7 @@ const SpendingBarChart = ({
         />
       );
     },
-    [isStacked, hasVs, colors.primary],
+    [isStacked, hasVs, colors.primary, colors.altRow, vsColor],
   );
 
   const renderChart = useCallback(
@@ -271,7 +284,8 @@ const SpendingBarChart = ({
             labelColor: colors.mutedText,
             tickCount: 5,
             formatYLabel: isStacked ? formatPctTick : formatYTick,
-            linePathEffect: <DashPathEffect intervals={[4, 4]} />,
+            // Solid hairline: a dashed grid reads as a threshold or a projection
+            // when all it is is the grid.
           }]}
           frame={{ lineWidth: 0 }}
         >
@@ -297,6 +311,7 @@ const CategorySpendingCard = ({
   const [expandedParents, setExpandedParents] = useState(new Set());
   const [selectedBarIndex, setSelectedBarIndex] = useState(null);
   const [showStackedBar, setShowStackedBar] = useState(false);
+  const vsColor = comparisonSeriesColor(colors);
 
   const allExpenseCategories = useMemo(() => {
     return categories.filter(cat =>
@@ -501,10 +516,13 @@ const CategorySpendingCard = ({
               {effectiveVsCategory ? (
                 <>
                   <Text style={[styles.vsText, { color: colors.mutedText }]}>vs</Text>
+                  {/* The mark beside the label carries the series identity; the
+                      label itself stays in ink, so it is never a colour-only cue. */}
+                  <View style={[styles.seriesDot, { backgroundColor: vsColor }]} />
                   {vsCategoryIcon && (
-                    <Icon name={vsCategoryIcon} size={14} color={VS_COLOR} />
+                    <Icon name={vsCategoryIcon} size={14} color={colors.text} />
                   )}
-                  <Text style={[styles.vsCategoryName, { color: VS_COLOR }]} numberOfLines={1}>
+                  <Text style={[styles.vsCategoryName, { color: colors.text }]} numberOfLines={1}>
                     {vsCategoryName}
                   </Text>
                 </>
@@ -544,13 +562,23 @@ const CategorySpendingCard = ({
           )}
           {!hideBalances && (
             <>
-              <Text style={[styles.currentAmount, { color: effectiveVsCategory ? colors.primary : colors.text }]}>
-                {formatCurrency(displayedTotal, selectedCurrency)}
-              </Text>
-              {effectiveVsCategory && (
-                <Text style={[styles.currentAmount, { color: VS_COLOR }]}>
-                  {vsLoading ? '...' : formatCurrency(vsDisplayedTotal, selectedCurrency)}
+              {/* In vs mode the two figures need telling apart, so each gets the
+                  dot of its series — the number itself stays in text ink. */}
+              <View style={styles.amountRow}>
+                {effectiveVsCategory && (
+                  <View style={[styles.seriesDot, { backgroundColor: colors.primary }]} />
+                )}
+                <Text style={[styles.currentAmount, { color: colors.text }]}>
+                  {formatCurrency(displayedTotal, selectedCurrency)}
                 </Text>
+              </View>
+              {effectiveVsCategory && (
+                <View style={styles.amountRow}>
+                  <View style={[styles.seriesDot, { backgroundColor: vsColor }]} />
+                  <Text style={[styles.currentAmount, { color: colors.text }]}>
+                    {vsLoading ? '...' : formatCurrency(vsDisplayedTotal, selectedCurrency)}
+                  </Text>
+                </View>
               )}
             </>
           )}
@@ -634,6 +662,11 @@ CategorySpendingCard.propTypes = {
 };
 
 const styles = StyleSheet.create({
+  amountRow: {
+    alignItems: 'center',
+    flexDirection: 'row',
+    gap: 5,
+  },
   card: {
     borderRadius: 16,
     borderWidth: 1,
@@ -737,6 +770,11 @@ const styles = StyleSheet.create({
     fontSize: 11,
     fontWeight: '500',
     letterSpacing: 0.5,
+  },
+  seriesDot: {
+    borderRadius: 4,
+    height: 8,
+    width: 8,
   },
   stackedToggleBtn: {
     alignSelf: 'flex-end',

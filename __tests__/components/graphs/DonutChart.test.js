@@ -11,6 +11,7 @@ import DonutChart, {
   INTRO_SCALE_FROM,
   INTRO_ROTATION_FROM,
 } from '../../../app/components/graphs/DonutChart';
+import { inkOn } from '../../../app/styles/chartPalette';
 
 describe('mapPieData', () => {
   it('maps amount/color onto Victory Native value/color keys', async () => {
@@ -261,6 +262,29 @@ describe('DonutChart', () => {
       expect(INTRO_SCALE_FROM).toBeLessThan(1);
       expect(INTRO_ROTATION_FROM).not.toBe(0);
       expect(INTRO_DURATION).toBeGreaterThan(0);
+    });
+  });
+
+  // The glyph used to be hardcoded white, which is unreadable on the lighter
+  // slots (~1.4:1 on yellow).
+  describe('icon ink', () => {
+    it('inks the glyph dark on a light slice and white on a dark one', async () => {
+      const { queryAllByTestId } = await render(
+        <DonutChart
+          data={[
+            { amount: 50, color: '#eda100', icon: 'food' },
+            { amount: 50, color: '#4a3aa7', icon: 'car' },
+          ]}
+        />,
+      );
+
+      // The wrapper View and the glyph inside it share the testID; the glyph is
+      // the one carrying a colour.
+      const inkOf = (testID) =>
+        queryAllByTestId(testID).map((node) => node.props.color).find(Boolean);
+
+      expect(inkOf('icon-food')).toBe(inkOn('#eda100'));
+      expect(inkOf('icon-car')).toBe(inkOn('#4a3aa7'));
     });
   });
 });

@@ -5,6 +5,7 @@ import { Pie, PolarChart } from 'victory-native';
 import { LinearGradient, vec } from '@shopify/react-native-skia';
 import Icon from '@expo/vector-icons/MaterialCommunityIcons';
 import PropTypes from 'prop-types';
+import { inkOn } from '../../styles/chartPalette';
 
 // Victory Native fills its container, so the container size doubles as the
 // donut diameter and as the coordinate space for the icon overlay below.
@@ -76,8 +77,11 @@ export const computeSliceGradient = (slice) => {
   };
 };
 
-// Slice fill fades to 50% alpha towards the rim (`80` is the hex alpha suffix).
-const SLICE_FADE_ALPHA = '80';
+// Slice fill fades towards the rim (`CC` is the hex alpha suffix, 80%). Kept
+// shallow on purpose: a deeper fade drifts the slice away from the solid swatch
+// the legend shows for the same category, which is the one thing tying a slice
+// to its name.
+const SLICE_FADE_ALPHA = 'CC';
 const INSET_WIDTH = 2;
 
 // The donut spins up into place rather than snapping in. Victory Native has no
@@ -156,7 +160,9 @@ const DonutChart = ({ data, insetColor, introKey = 0, introDelay = 0 }) => {
               },
             ]}
           >
-            <Icon name={marker.icon} size={ICON_SIZE} color="#fff" />
+            {/* Ink follows the slice: white on the yellow slot measures ~1.4:1,
+                which is not a readable glyph. */}
+            <Icon name={marker.icon} size={ICON_SIZE} color={inkOn(marker.color)} />
           </View>
         ))}
     </Animated.View>
