@@ -1,5 +1,12 @@
 # Changelog
 
+## [0.227.0](https://github.com/heywood8/money-tracker/compare/penny-v0.226.0...penny-v0.227.0) (2026-07-27)
+
+
+### Features
+
+* allow currency picker for one-off budget plan lines ([#1433](https://github.com/heywood8/money-tracker/issues/1433)) ([376f819](https://github.com/heywood8/money-tracker/commit/376f819a7d52d75209f0950e2735031faf916c00))
+
 ## [0.226.0](https://github.com/heywood8/money-tracker/compare/penny-v0.225.2...penny-v0.226.0) (2026-07-26)
 
 
