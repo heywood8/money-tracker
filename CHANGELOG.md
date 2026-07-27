@@ -1,5 +1,12 @@
 # Changelog
 
+## [0.228.0](https://github.com/heywood8/money-tracker/compare/penny-v0.227.0...penny-v0.228.0) (2026-07-27)
+
+
+### Features
+
+* **budgets:** show every plan amount in the selected currency ([#1435](https://github.com/heywood8/money-tracker/issues/1435)) ([7a5bc58](https://github.com/heywood8/money-tracker/commit/7a5bc58846ffc26ebef5fcb7ade2101b971eb793))
+
 ## [0.227.0](https://github.com/heywood8/money-tracker/compare/penny-v0.226.0...penny-v0.227.0) (2026-07-27)
 
 
