@@ -141,6 +141,22 @@ describe('IncomeSummaryCard', () => {
 
       expect(onPress).toHaveBeenCalledTimes(1);
     });
+
+    // The tab is the whole card, not just the chevron — pressing anywhere on it
+    // (icon, amount, empty space) must toggle the panel.
+    it('makes the entire tab the press target', async () => {
+      const onPress = jest.fn();
+      const { getByTestId, getByText } = await render(
+        <IncomeSummaryCard {...defaultProps} onPress={onPress} />,
+      );
+
+      await fireEvent.press(getByTestId('income-summary-card'));
+      expect(onPress).toHaveBeenCalledTimes(1);
+
+      // Pressing the amount text bubbles to the same tab handler
+      await fireEvent.press(getByText(/\$3\.5K/));
+      expect(onPress).toHaveBeenCalledTimes(2);
+    });
   });
 
   describe('Accessibility', () => {
@@ -148,6 +164,18 @@ describe('IncomeSummaryCard', () => {
       const { getByRole } = await render(<IncomeSummaryCard {...defaultProps} />);
 
       expect(getByRole('button')).toBeTruthy();
+    });
+
+    it('exposes the expanded state of the tab', async () => {
+      const { getByTestId, rerender } = await render(<IncomeSummaryCard {...defaultProps} />);
+
+      expect(getByTestId('income-summary-card').props.accessibilityState)
+        .toEqual(expect.objectContaining({ expanded: false }));
+
+      await rerender(<IncomeSummaryCard {...defaultProps} expanded />);
+
+      expect(getByTestId('income-summary-card').props.accessibilityState)
+        .toEqual(expect.objectContaining({ expanded: true }));
     });
 
     it('has accessibility label', async () => {

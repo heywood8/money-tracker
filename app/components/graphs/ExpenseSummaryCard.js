@@ -5,6 +5,9 @@ import PropTypes from 'prop-types';
 import currencies from '../../../assets/currencies.json';
 import { useDisplaySettings } from '../../contexts/DisplaySettingsContext';
 
+// Expense red is intentionally theme-independent — it matches the arrow badge.
+const EXPENSE_ACCENT = '#d93025';
+
 const formatCurrency = (amount, currency) => {
   const currencyInfo = currencies[currency];
   const symbol = currencyInfo?.symbol ?? currency;
@@ -32,12 +35,20 @@ const ExpenseSummaryCard = ({
 }) => {
   const { hideBalances } = useDisplaySettings();
   return (
-    <View
+    <TouchableOpacity
       testID="expense-summary-card"
-      style={styles.summaryCard}
+      style={[
+        styles.summaryCard,
+        expanded && { backgroundColor: colors.altRow, borderBottomColor: EXPENSE_ACCENT },
+      ]}
+      onPress={onPress}
+      activeOpacity={0.7}
+      accessibilityRole="button"
+      accessibilityState={{ expanded }}
+      accessibilityLabel={t('expenses_by_category')}
     >
       <View style={styles.iconBadge}>
-        <Icon name="arrow-top-right" size={16} color="#d93025" />
+        <Icon name="arrow-top-right" size={16} color={EXPENSE_ACCENT} />
       </View>
       <View style={styles.textContent}>
         <Text style={[styles.label, { color: colors.mutedText }]}>{t('expense').toUpperCase()}</Text>
@@ -61,16 +72,10 @@ const ExpenseSummaryCard = ({
           </TouchableOpacity>
         </View>
       )}
-      <TouchableOpacity
-        onPress={onPress}
-        style={styles.collapseButton}
-        activeOpacity={0.7}
-        accessibilityRole="button"
-        accessibilityLabel={t('expenses_by_category')}
-      >
+      <View style={styles.chevron} pointerEvents="none">
         <Icon name={expanded ? 'chevron-up' : 'chevron-down'} size={16} color={colors.mutedText} />
-      </TouchableOpacity>
-    </View>
+      </View>
+    </TouchableOpacity>
   );
 };
 
@@ -102,11 +107,11 @@ const styles = StyleSheet.create({
     right: 0,
     top: 0,
   },
-  collapseButton: {
+  chevron: {
     alignItems: 'center',
     alignSelf: 'stretch',
     justifyContent: 'center',
-    width: '15%',
+    width: 20,
   },
   filterChip: {
     alignItems: 'center',
@@ -136,10 +141,14 @@ const styles = StyleSheet.create({
   },
   summaryCard: {
     alignItems: 'center',
+    // Transparent by default so activating the tab doesn't shift its height
+    borderBottomColor: 'transparent',
+    borderBottomWidth: 2,
     flex: 1,
     flexDirection: 'row',
     gap: 8,
-    padding: 10,
+    paddingHorizontal: 10,
+    paddingVertical: 8,
   },
   textContent: {
     flex: 1,
