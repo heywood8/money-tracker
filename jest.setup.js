@@ -918,6 +918,16 @@ jest.mock('react-native-reanimated', () => {
   const React = require('react');
   const { View, Text, Image, ScrollView } = require('react-native');
 
+  // Layout animation builders are chainable and every method returns the
+  // builder, so one self-returning object stands in for the whole family.
+  const layoutAnimationMock = () => {
+    const o = {};
+    for (const method of ['duration', 'easing', 'delay', 'springify', 'withInitialValues', 'reduceMotion', 'withCallback']) {
+      o[method] = jest.fn(() => o);
+    }
+    return o;
+  };
+
   return {
     __esModule: true,
     default: {
@@ -967,15 +977,25 @@ jest.mock('react-native-reanimated', () => {
       delay(ms) { return this; }
       withCallback(callback) { return this; }
     },
-    FadeIn: (() => { const o = {}; o.duration = jest.fn(() => o); o.easing = jest.fn(() => o); return o; })(),
-    FadeOut: (() => { const o = {}; o.duration = jest.fn(() => o); o.easing = jest.fn(() => o); return o; })(),
-    FadeInRight: (() => { const o = {}; o.duration = jest.fn(() => o); o.easing = jest.fn(() => o); return o; })(),
-    FadeInLeft: (() => { const o = {}; o.duration = jest.fn(() => o); o.easing = jest.fn(() => o); return o; })(),
-    SlideInRight: (() => { const o = {}; o.duration = jest.fn(() => o); o.easing = jest.fn(() => o); return o; })(),
-    SlideInLeft: (() => { const o = {}; o.duration = jest.fn(() => o); o.easing = jest.fn(() => o); return o; })(),
-    SlideOutLeft: (() => { const o = {}; o.duration = jest.fn(() => o); o.easing = jest.fn(() => o); return o; })(),
-    SlideOutRight: (() => { const o = {}; o.duration = jest.fn(() => o); o.easing = jest.fn(() => o); return o; })(),
-    LinearTransition: (() => { const o = {}; o.duration = jest.fn(() => o); o.easing = jest.fn(() => o); o.springify = jest.fn(() => o); return o; })(),
+    FadeIn: layoutAnimationMock(),
+    FadeOut: layoutAnimationMock(),
+    FadeInDown: layoutAnimationMock(),
+    FadeInUp: layoutAnimationMock(),
+    FadeInRight: layoutAnimationMock(),
+    FadeInLeft: layoutAnimationMock(),
+    SlideInRight: layoutAnimationMock(),
+    SlideInLeft: layoutAnimationMock(),
+    SlideOutLeft: layoutAnimationMock(),
+    SlideOutRight: layoutAnimationMock(),
+    LinearTransition: layoutAnimationMock(),
+    // Reanimated resolves 'system' against the OS accessibility setting at
+    // runtime; under test there is no such setting, so the enum just needs to
+    // carry stable values for the components that pass it through.
+    ReduceMotion: {
+      System: 'system',
+      Always: 'always',
+      Never: 'never',
+    },
     SharedValue: class SharedValue {
       constructor(value) { this.value = value; }
     },
