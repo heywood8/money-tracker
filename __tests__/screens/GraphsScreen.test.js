@@ -822,12 +822,16 @@ describe('GraphsScreen', () => {
       expect(getByTestId('expense-summary-card')).toBeTruthy();
     });
 
+    // A closed chart is hidden from the accessibility tree, and RNTL honours that
+    // by excluding it from queries — so these lookups opt hidden elements back in.
+    const HIDDEN = { includeHiddenElements: true };
+
     it('starts collapsed with neither chart interactive', async () => {
       const GraphsScreen = require('../../app/screens/GraphsScreen').default;
       const { getByTestId } = await render(<GraphsScreen />);
 
-      expect(getByTestId('income-chart-content').props.pointerEvents).toBe('none');
-      expect(getByTestId('expense-chart-content').props.pointerEvents).toBe('none');
+      expect(getByTestId('income-chart-content', HIDDEN).props.pointerEvents).toBe('none');
+      expect(getByTestId('expense-chart-content', HIDDEN).props.pointerEvents).toBe('none');
       expect(getByTestId('income-summary-card').props.accessibilityState.expanded).toBe(false);
       expect(getByTestId('expense-summary-card').props.accessibilityState.expanded).toBe(false);
     });
@@ -838,14 +842,14 @@ describe('GraphsScreen', () => {
 
       await fireEvent.press(getByTestId('income-summary-card'));
 
-      expect(getByTestId('income-chart-content').props.pointerEvents).toBe('auto');
-      expect(getByTestId('expense-chart-content').props.pointerEvents).toBe('none');
+      expect(getByTestId('income-chart-content', HIDDEN).props.pointerEvents).toBe('auto');
+      expect(getByTestId('expense-chart-content', HIDDEN).props.pointerEvents).toBe('none');
       expect(getByTestId('income-summary-card').props.accessibilityState.expanded).toBe(true);
 
       await fireEvent.press(getByTestId('expense-summary-card'));
 
-      expect(getByTestId('income-chart-content').props.pointerEvents).toBe('none');
-      expect(getByTestId('expense-chart-content').props.pointerEvents).toBe('auto');
+      expect(getByTestId('income-chart-content', HIDDEN).props.pointerEvents).toBe('none');
+      expect(getByTestId('expense-chart-content', HIDDEN).props.pointerEvents).toBe('auto');
       expect(getByTestId('expense-summary-card').props.accessibilityState.expanded).toBe(true);
     });
 
@@ -856,8 +860,23 @@ describe('GraphsScreen', () => {
       await fireEvent.press(getByTestId('expense-summary-card'));
       await fireEvent.press(getByTestId('expense-summary-card'));
 
-      expect(getByTestId('expense-chart-content').props.pointerEvents).toBe('none');
+      expect(getByTestId('expense-chart-content', HIDDEN).props.pointerEvents).toBe('none');
       expect(getByTestId('expense-summary-card').props.accessibilityState.expanded).toBe(false);
+    });
+
+    // A screen reader must not read the legend of a chart the user has closed.
+    it('keeps the closed chart out of the accessibility tree', async () => {
+      const GraphsScreen = require('../../app/screens/GraphsScreen').default;
+      const { getByTestId, queryByTestId } = await render(<GraphsScreen />);
+
+      expect(queryByTestId('income-chart-content')).toBeNull();
+      expect(queryByTestId('expense-chart-content')).toBeNull();
+
+      await fireEvent.press(getByTestId('income-summary-card'));
+
+      // The open one is exposed again, the closed one stays hidden
+      expect(queryByTestId('income-chart-content')).toBeTruthy();
+      expect(queryByTestId('expense-chart-content')).toBeNull();
     });
   });
 

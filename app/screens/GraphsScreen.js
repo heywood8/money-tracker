@@ -14,6 +14,7 @@ import { formatAmount } from '../services/currency';
 import currenciesJson from '../../assets/currencies.json';
 import EmptyState from '../components/EmptyState';
 import BalanceHistoryCard from '../components/graphs/BalanceHistoryCard';
+import CategoryBackChip from '../components/graphs/CategoryBackChip';
 import CategorySpendingCard from '../components/graphs/CategorySpendingCard';
 import ExpenseSummaryCard from '../components/graphs/ExpenseSummaryCard';
 import IncomeSummaryCard from '../components/graphs/IncomeSummaryCard';
@@ -615,8 +616,6 @@ const GraphsScreen = () => {
                 selectedCurrency={selectedCurrency}
                 onPress={handleToggleIncome}
                 expanded={expandedCard === 'income'}
-                categoryName={selectedIncomeCategoryName}
-                onBack={handleBackToIncomeParent}
               />
               <View style={[styles.tabDivider, { backgroundColor: colors.border }]} />
               <ExpenseSummaryCard
@@ -627,16 +626,41 @@ const GraphsScreen = () => {
                 selectedCurrency={selectedCurrency}
                 onPress={handleToggleExpense}
                 expanded={expandedCard === 'expense'}
-                categoryName={selectedCategoryName}
-                onBack={handleBackToExpenseParent}
               />
+
+              {/* Drill-down chips sit above the strip, not inside a tab — a button
+                  nested in a button reads as two controls to a screen reader. */}
+              {selectedIncomeCategoryName && (
+                <CategoryBackChip
+                  testID="income-category-chip"
+                  colors={colors}
+                  side="left"
+                  label={selectedIncomeCategoryName}
+                  backLabel={t('back')}
+                  onPress={handleBackToIncomeParent}
+                />
+              )}
+              {selectedCategoryName && (
+                <CategoryBackChip
+                  testID="expense-category-chip"
+                  colors={colors}
+                  side="right"
+                  label={selectedCategoryName}
+                  backLabel={t('back')}
+                  onPress={handleBackToExpenseParent}
+                />
+              )}
             </View>
 
             {/* Both charts stay mounted and overlap, so they stay measured and
-                switching tabs cross-fades instead of remounting. */}
+                switching tabs cross-fades instead of remounting. The closed one is
+                pulled out of the accessibility tree too — opacity 0 alone still
+                lets TalkBack read its legend. */}
             <Animated.View
               testID="income-chart-content"
               pointerEvents={expandedCard === 'income' ? 'auto' : 'none'}
+              accessibilityElementsHidden={expandedCard !== 'income'}
+              importantForAccessibility={expandedCard === 'income' ? 'auto' : 'no-hide-descendants'}
               style={[styles.chartContent, incomeChartAnimStyle]}
             >
               <ScrollView
@@ -670,6 +694,8 @@ const GraphsScreen = () => {
             <Animated.View
               testID="expense-chart-content"
               pointerEvents={expandedCard === 'expense' ? 'auto' : 'none'}
+              accessibilityElementsHidden={expandedCard !== 'expense'}
+              importantForAccessibility={expandedCard === 'expense' ? 'auto' : 'no-hide-descendants'}
               style={[styles.chartContent, expenseChartAnimStyle]}
             >
               <ScrollView

@@ -235,20 +235,14 @@ describe('IncomeSummaryCard', () => {
     });
   });
 
-  describe('categoryName / onBack overlay', () => {
-    it('shows category chip when both categoryName and onBack are provided', async () => {
-      const onBack = jest.fn();
-      const { getByText } = await render(
-        <IncomeSummaryCard {...defaultProps} categoryName="Salary" onBack={onBack} />,
-      );
-      expect(getByText('Salary')).toBeTruthy();
-    });
+  // The drill-down chip used to be an overlay inside this card. It now lives in
+  // CategoryBackChip, rendered by GraphsScreen above the tab strip, so that a
+  // button is never nested inside the tab button — see CategoryBackChip.test.js.
+  describe('nested controls', () => {
+    it('renders no button other than the tab itself', async () => {
+      const { getAllByRole } = await render(<IncomeSummaryCard {...defaultProps} />);
 
-    it('does not show category chip when categoryName provided but onBack is null', async () => {
-      const { queryByText } = await render(
-        <IncomeSummaryCard {...defaultProps} categoryName="Salary" onBack={null} />,
-      );
-      expect(queryByText('Salary')).toBeNull();
+      expect(getAllByRole('button')).toHaveLength(1);
     });
   });
 });
