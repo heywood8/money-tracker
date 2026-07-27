@@ -1,5 +1,12 @@
 # Changelog
 
+## [0.236.0](https://github.com/heywood8/money-tracker/compare/penny-v0.235.2...penny-v0.236.0) (2026-07-27)
+
+
+### Features
+
+* **motion:** carry gesture velocity into releases and soften edges ([#1459](https://github.com/heywood8/money-tracker/issues/1459)) ([5d193a6](https://github.com/heywood8/money-tracker/commit/5d193a6713758cb6691abb1a4109cae38a77f75b))
+
 ## [0.235.2](https://github.com/heywood8/money-tracker/compare/penny-v0.235.1...penny-v0.235.2) (2026-07-27)
 
 
