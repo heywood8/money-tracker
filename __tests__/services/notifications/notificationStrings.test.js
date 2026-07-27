@@ -64,4 +64,113 @@ describe('notificationStrings.getPendingAlertCopy', () => {
     const copy = await getPendingAlertCopy(2);
     expect(copy.title).toBe(enJson.bank_notifications_bg_notification_title);
   });
+
+  describe('with item details', () => {
+    const detail = (overrides = {}) => ({
+      type: 'expense',
+      amount: '1299.00',
+      currency: 'AMD',
+      merchant: 'SAS SUPERMARKET',
+      cardMask: '4083***7027',
+      date: '2026-07-20',
+      accountName: 'Main card',
+      categoryName: 'Groceries',
+      categoryNameKey: null,
+      missing: 'category',
+      ...overrides,
+    });
+
+    it('puts the amount and payee of a single item in the title', async () => {
+      const copy = await getPendingAlertCopy(1, [detail()]);
+
+      expect(copy.title).toBe('1299 AMD · SAS SUPERMARKET');
+    });
+
+    it('lists what was recognized and what is missing for a single item', async () => {
+      const copy = await getPendingAlertCopy(1, [detail({ categoryName: null })]);
+      const [recognized, needs] = copy.body.split('\n');
+
+      expect(recognized).toContain('4083***7027');
+      expect(recognized).toContain('Account: Main card');
+      expect(recognized).not.toContain('Category:');
+      expect(needs).toBe(enJson.bank_notifications_bg_needs_category);
+    });
+
+    it('shows the resolved category and asks only for confirmation', async () => {
+      const copy = await getPendingAlertCopy(1, [detail({ missing: null })]);
+
+      expect(copy.body).toContain('Category: Groceries');
+      expect(copy.body).toContain(enJson.bank_notifications_bg_needs_confirm);
+    });
+
+    it('translates a built-in category name key', async () => {
+      const copy = await getPendingAlertCopy(1, [
+        detail({ categoryName: null, categoryNameKey: 'food' }),
+      ]);
+
+      expect(copy.body).toContain(`Category: ${enJson.food}`);
+    });
+
+    it('names an unknown payee', async () => {
+      const copy = await getPendingAlertCopy(1, [detail({ merchant: null })]);
+
+      expect(copy.title).toBe(`1299 AMD · ${enJson.bank_notifications_bg_unknown_merchant}`);
+    });
+
+    it('gives each item a line when several are described', async () => {
+      const copy = await getPendingAlertCopy(2, [
+        detail(),
+        detail({ merchant: 'ATM', missing: 'account_target', amount: '20000.00' }),
+      ]);
+      const lines = copy.body.split('\n');
+
+      expect(copy.title).toBe(
+        enJson.bank_notifications_bg_notification_body_other.replace('{count}', '2'),
+      );
+      expect(lines).toHaveLength(2);
+      expect(lines[0]).toBe(
+        `1299 AMD · SAS SUPERMARKET — ${enJson.bank_notifications_bg_needs_category}`,
+      );
+      expect(lines[1]).toBe(
+        `20000 AMD · ATM — ${enJson.bank_notifications_bg_needs_account_target}`,
+      );
+    });
+
+    it('collapses the undescribed remainder into a "+N more" line', async () => {
+      const copy = await getPendingAlertCopy(5, [detail(), detail(), detail()]);
+      const lines = copy.body.split('\n');
+
+      expect(lines).toHaveLength(4);
+      expect(lines[3]).toBe(
+        enJson.bank_notifications_bg_notification_more.replace('{count}', '2'),
+      );
+    });
+
+    it('keeps the count-only copy when no details are available', async () => {
+      const copy = await getPendingAlertCopy(3, []);
+
+      expect(copy.title).toBe(enJson.bank_notifications_bg_notification_title);
+      expect(copy.body).toBe(
+        enJson.bank_notifications_bg_notification_body_other.replace('{count}', '3'),
+      );
+    });
+
+    it('localizes the detail lines', async () => {
+      PreferencesDB.getPreference.mockResolvedValue('ru');
+
+      const copy = await getPendingAlertCopy(1, [detail()]);
+
+      expect(copy.body).toContain(ruJson.bank_notifications_bg_needs_category);
+      expect(copy.body).toContain('Счёт: Main card');
+    });
+
+    it('does not stack a stale detail list against a larger queue count', async () => {
+      // One described item but three waiting: the title must stay the count line.
+      const copy = await getPendingAlertCopy(3, [detail()]);
+
+      expect(copy.title).toBe(
+        enJson.bank_notifications_bg_notification_body_other.replace('{count}', '3'),
+      );
+    });
+  });
 });
