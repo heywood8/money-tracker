@@ -427,11 +427,11 @@ export default function SimpleTabs() {
   }, [showAccountsTab, showBudgetTab]);
 
   // A tapped "transactions to review" notification routes here: jump to the
-  // Settings tab. SettingsScreen listens for the same event and opens the
-  // notification-processing subpanel, so the two land together.
+  // Operations tab. OperationsScreen listens for the same event and surfaces the
+  // suggestion deck over the quick-add form, so the two land together.
   React.useEffect(() => {
-    const unsubscribe = appEvents.on(EVENTS.OPEN_NOTIFICATION_PROCESSING, () => {
-      handleTabPress('Settings');
+    const unsubscribe = appEvents.on(EVENTS.OPEN_PENDING_OPERATIONS, () => {
+      handleTabPress('Operations');
     });
     return unsubscribe;
   }, [handleTabPress]);

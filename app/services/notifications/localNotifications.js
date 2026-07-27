@@ -3,8 +3,9 @@
  *
  * Only local, immediately-presented notifications are used — no push tokens and
  * no FCM setup. The single alert this app posts tells the user that new bank
- * transactions have landed in the review queue; tapping it deep-links into the
- * notification-processing screen (see useNotificationResponseRouter).
+ * transactions have landed in the review queue; tapping it deep-links to the
+ * quick-add surface on the operations page, where the queue is stacked as
+ * binding cards over the form (see useNotificationResponseRouter).
  */
 
 import { Platform } from 'react-native';
@@ -13,9 +14,14 @@ import * as Notifications from 'expo-notifications';
 /** Android channel the pending-operations alert is posted on. */
 export const BANK_ALERTS_CHANNEL_ID = 'bank-operations';
 
-/** Data key + value used to route a tapped notification to the review screen. */
+/**
+ * Data key + value used to route a tapped notification to the review surface.
+ * The value keeps its original 'notificationProcessing' wording so an alert
+ * posted by an older build (still sitting in the tray across an update) keeps
+ * routing after the destination moved to the operations page.
+ */
 export const NOTIFICATION_ROUTE_KEY = 'route';
-export const ROUTE_NOTIFICATION_PROCESSING = 'notificationProcessing';
+export const ROUTE_PENDING_OPERATIONS = 'notificationProcessing';
 
 // A fixed identifier so a fresh alert replaces the previous one instead of
 // stacking a new row every background run.
@@ -97,7 +103,7 @@ export const presentPendingOperationsAlert = async ({ title, body, channelName }
       content: {
         title,
         body,
-        data: { [NOTIFICATION_ROUTE_KEY]: ROUTE_NOTIFICATION_PROCESSING },
+        data: { [NOTIFICATION_ROUTE_KEY]: ROUTE_PENDING_OPERATIONS },
       },
       // `null` presents the notification immediately, but assigns it to the
       // Android channel above (channelId is read from the content on 8.0+).
@@ -115,7 +121,7 @@ export const presentPendingOperationsAlert = async ({ title, body, channelName }
  * @param {object|null} response - a Notifications.NotificationResponse
  * @returns {boolean}
  */
-export const isNotificationProcessingResponse = (response) => {
+export const isPendingOperationsResponse = (response) => {
   const data = response?.notification?.request?.content?.data;
-  return !!data && data[NOTIFICATION_ROUTE_KEY] === ROUTE_NOTIFICATION_PROCESSING;
+  return !!data && data[NOTIFICATION_ROUTE_KEY] === ROUTE_PENDING_OPERATIONS;
 };

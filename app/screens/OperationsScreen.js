@@ -13,6 +13,7 @@ import { useOperationsActions } from '../contexts/OperationsActionsContext';
 import { useAccountsData } from '../contexts/AccountsDataContext';
 import { useCategories } from '../contexts/CategoriesContext';
 import { setLastAccessedAccount } from '../services/LastAccount';
+import { appEvents, EVENTS } from '../services/eventEmitter';
 import { formatDate as toDateString } from '../services/BalanceHistoryDB';
 import { getDistinctLabels } from '../services/OperationsDB';
 import { parseLabels, serializeLabels, addLabel, hasLabel } from '../utils/labelUtils';
@@ -1154,6 +1155,24 @@ const OperationsScreen = () => {
   const scrollToTop = useCallback(() => {
     flatListRef.current?.scrollToOffset({ offset: 0, animated: true });
   }, []);
+
+  // A tapped "transactions to review" notification lands here (SimpleTabs switches
+  // to this tab on the same event): put the suggestion deck in front of the user
+  // instead of sending them to settings. Search is closed first — the quick-add
+  // block, and the deck laid over it, is collapsed while search is open — and its
+  // close effect already scrolls the list to the top, so only the non-search case
+  // scrolls here. The queue is refreshed so a notification that arrived while the
+  // app was backgrounded is ingested rather than showing a stale (or empty) deck.
+  const handleOpenPendingSuggestions = useCallback(() => {
+    if (isSearchOpen) handleCloseSearch();
+    else scrollToTop();
+    refreshSuggestions();
+  }, [isSearchOpen, handleCloseSearch, scrollToTop, refreshSuggestions]);
+
+  useEffect(
+    () => appEvents.on(EVENTS.OPEN_PENDING_OPERATIONS, handleOpenPendingSuggestions),
+    [handleOpenPendingSuggestions],
+  );
 
   // Safety net for scrollToIndex failures. The list now provides getItemLayout,
   // so scrollToLocation resolves offsets directly and this should not fire in

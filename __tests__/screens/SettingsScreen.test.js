@@ -483,6 +483,24 @@ describe('SettingsScreen', () => {
 
       expect(mockSetSubPanelActive).toHaveBeenCalledWith(true);
     });
+
+    // A tapped "transactions to review" notification navigates to the Operations
+    // tab, so an open subpanel here must not stay active behind the user's back
+    // (it would keep swipe navigation disabled and hijack hardware back).
+    it('closes an open subpanel when the pending-operations deep link fires', async () => {
+      const { appEvents, EVENTS } = require('../../app/services/eventEmitter');
+      const { getByTestId } = await render(
+        <SettingsScreen setSubPanelActive={mockSetSubPanelActive} />,
+      );
+      await fireEvent.press(getByTestId('settings-language-row'));
+      mockSetSubPanelActive.mockClear();
+
+      await act(async () => {
+        appEvents.emit(EVENTS.OPEN_PENDING_OPERATIONS);
+      });
+
+      expect(mockSetSubPanelActive).toHaveBeenCalledWith(false);
+    });
   });
 
   describe('Language Selection', () => {

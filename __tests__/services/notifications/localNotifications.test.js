@@ -32,24 +32,24 @@ describe('localNotifications', () => {
     expect(handlerInstalledAtLoad).toBeGreaterThan(0);
   });
 
-  describe('isNotificationProcessingResponse', () => {
+  describe('isPendingOperationsResponse', () => {
     it('matches a review-queue deep-link response', () => {
       const response = {
         notification: { request: { content: { data: { route: 'notificationProcessing' } } } },
       };
-      expect(localNotifications.isNotificationProcessingResponse(response)).toBe(true);
+      expect(localNotifications.isPendingOperationsResponse(response)).toBe(true);
     });
 
     it('rejects null / unrelated responses', () => {
-      expect(localNotifications.isNotificationProcessingResponse(null)).toBe(false);
-      expect(localNotifications.isNotificationProcessingResponse({})).toBe(false);
+      expect(localNotifications.isPendingOperationsResponse(null)).toBe(false);
+      expect(localNotifications.isPendingOperationsResponse({})).toBe(false);
       expect(
-        localNotifications.isNotificationProcessingResponse({
+        localNotifications.isPendingOperationsResponse({
           notification: { request: { content: { data: { route: 'somethingElse' } } } },
         }),
       ).toBe(false);
       expect(
-        localNotifications.isNotificationProcessingResponse({
+        localNotifications.isPendingOperationsResponse({
           notification: { request: { content: { data: {} } } },
         }),
       ).toBe(false);
