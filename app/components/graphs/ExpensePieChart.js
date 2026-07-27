@@ -17,6 +17,7 @@ const ExpensePieChart = ({
   operations = [],
   loadingOperations = false,
   introKey = 0,
+  introDelay = 0,
 }) => {
   // A leaf category has no sub-categories left to break down — show its actual
   // operations for the period instead of a pointless single-slice donut.
@@ -54,7 +55,12 @@ const ExpensePieChart = ({
 
   return (
     <View style={styles.row}>
-      <DonutChart data={chartData} insetColor={colors.surface} introKey={introKey} />
+      <DonutChart
+        data={chartData}
+        insetColor={colors.surface}
+        introKey={introKey}
+        introDelay={introDelay}
+      />
       <View style={styles.legendWrapper}>
         <CustomLegend
           data={chartData}
@@ -81,6 +87,8 @@ ExpensePieChart.propTypes = {
   loadingOperations: PropTypes.bool,
   // Bump to replay the donut intro when this chart's tab is opened.
   introKey: PropTypes.number,
+  // Holds that replay back until the outgoing chart has faded out.
+  introDelay: PropTypes.number,
 };
 
 const styles = StyleSheet.create({

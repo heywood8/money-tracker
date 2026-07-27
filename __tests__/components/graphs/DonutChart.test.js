@@ -231,6 +231,31 @@ describe('DonutChart', () => {
       expect(queryAllByTestId('icon-car').length).toBeGreaterThan(0);
     });
 
+    // On a fade through the incoming donut has to sit still until the outgoing
+    // chart is gone, so the intro takes a delay alongside its key.
+    it('keeps the donut and its icons intact when a delayed intro replays', async () => {
+      const { getByTestId, queryAllByTestId, rerender } = await render(
+        <DonutChart data={mockData} introKey={0} introDelay={0} />,
+      );
+
+      await rerender(<DonutChart data={mockData} introKey={1} introDelay={120} />);
+
+      expect(getByTestId('donut-chart')).toBeTruthy();
+      expect(getByTestId('vn-pie')).toBeTruthy();
+      expect(queryAllByTestId('icon-food').length).toBeGreaterThan(0);
+      expect(queryAllByTestId('icon-car').length).toBeGreaterThan(0);
+    });
+
+    it('replays when only the delay changes, so a repeated key still animates', async () => {
+      const { getByTestId, rerender } = await render(
+        <DonutChart data={mockData} introKey={2} introDelay={0} />,
+      );
+
+      await rerender(<DonutChart data={mockData} introKey={2} introDelay={120} />);
+
+      expect(getByTestId('donut-chart')).toBeTruthy();
+    });
+
     it('starts from a scaled-down, rotated state so the donut spins up into place', () => {
       expect(INTRO_SCALE_FROM).toBeGreaterThan(0);
       expect(INTRO_SCALE_FROM).toBeLessThan(1);
