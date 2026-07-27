@@ -32,7 +32,6 @@ const CONVERTING_PLACEHOLDER = '—';
 const PlanLineRow = memo(function PlanLineRow({
   line,
   index,
-  listLength,
   name,
   icon,
   status = null,
@@ -45,10 +44,10 @@ const PlanLineRow = memo(function PlanLineRow({
   canExecute = false,
   canUndo = false,
   showProgress = true,
-  showMove = true,
+  listLength,
+  onMove = null,
   onPress,
   onLongPress,
-  onMove = null,
   onExecute = null,
   onMarkExecuted = null,
   onUndo = null,
@@ -79,6 +78,12 @@ const PlanLineRow = memo(function PlanLineRow({
   // execution only makes sense for the current month, and so does undoing it.
   const swipeEnabled = canExecute || canUndo;
 
+  // A done row collapses to a single line: its bar would read 100% by
+  // construction of "executed", which is what the check badge already says. The
+  // exception is real overspend — actual above target is news, and burying it
+  // under a state the user set by hand is how a row stops being worth reading.
+  const showBar = showProgress && !!status && (!executed || status.isExceeded);
+
   // Acting on a row leaves the Swipeable open otherwise: the actions are replaced
   // (execute -> undo) but the row stays dragged aside, so its name and progress
   // figures remain clipped until the user swipes back by hand.
@@ -92,41 +97,77 @@ const PlanLineRow = memo(function PlanLineRow({
     handler?.(line);
   };
 
+  // The scope and template state moved from a text line into a glyph and an icon
+  // badge, which a screen reader cannot announce — so they are spelled out here
+  // instead. Sighted density and non-visual completeness are not the same
+  // problem and don't get the same answer.
+  const stateWords = [
+    line.isRecurring ? t('recurring') : t('one_time'),
+    line.hasTemplate ? (executed ? t('done') : t('pending_execution')) : null,
+  ].filter(Boolean).join(', ');
+
   const content = (
     <Pressable
       style={[styles.lineRow, index % 2 === 1 && { backgroundColor: colors.altRow }]}
       onPress={() => onPress(line)}
-      onLongPress={() => onLongPress(line)}
+      // The row renders nothing from `listLength`/`onMove` — it forwards them so
+      // the host can build the move actions. Keeping them as props (rather than
+      // having the host close over them in an inline callback) is what lets
+      // `onLongPress` stay a stable reference, and therefore what keeps this
+      // component's memo() from being defeated on every parent render.
+      onLongPress={() => onLongPress(line, index, listLength, onMove)}
       accessibilityRole="button"
-      accessibilityLabel={`${t('edit_allocation')}: ${name}`}
+      accessibilityLabel={`${t('edit_allocation')}: ${name}, ${amountText}, ${stateWords}`}
       testID={`plan-line-${line.id}`}
     >
       <View style={styles.lineTop}>
         <View>
           <Icon name={icon} size={20} color={executed ? colors.mutedText : colors.text} />
-          {executed && (
+          {/* Template state rides on the category icon instead of a text line:
+              done is a check, still-to-run is a dot in the accent colour. Both
+              occupy the same 13dp corner, so the row height doesn't move
+              between states. */}
+          {executed ? (
             <View
               testID={`plan-line-check-${line.id}`}
               style={[styles.checkBadge, { borderColor: colors.surface, backgroundColor: colors.income }]}
             >
               <Icon name="check" size={7} color="white" />
             </View>
-          )}
+          ) : line.hasTemplate ? (
+            <View
+              testID={`plan-line-pending-${line.id}`}
+              style={[styles.checkBadge, { borderColor: colors.surface, backgroundColor: colors.primary }]}
+            >
+              <Icon name="play" size={7} color="white" />
+            </View>
+          ) : null}
         </View>
         <View style={styles.lineBody}>
-          <Text
-            style={[styles.lineName, { color: executed ? colors.mutedText : colors.text }]}
-            numberOfLines={1}
-          >
-            {name}
-          </Text>
-          {/* Both halves are STATES, not commands: reusing the `execute` button
-              caption here invited a tap on months where execution is disabled. */}
-          <Text style={[styles.lineMeta, { color: colors.mutedText }]} numberOfLines={1}>
-            {line.isRecurring ? t('recurring') : t('one_time')}
-            {line.hasTemplate ? ` · ${executed ? t('done') : t('pending_execution')}` : ''}
-          </Text>
-          {!!line.comment && (
+          <View style={styles.lineNameRow}>
+            <Text
+              style={[styles.lineName, { color: colors.text }]}
+              numberOfLines={1}
+            >
+              {name}
+            </Text>
+            {/* Replaces a full uppercase "RECURRING" line that sat on nearly
+                every row, saying the same thing each time while being the
+                loudest thing after the amount. A one-off line gets no marker:
+                the glyph is the exception, not the label. */}
+            {line.isRecurring && (
+              <Icon
+                name="repeat"
+                size={13}
+                color={colors.mutedText}
+                testID={`plan-line-recurring-${line.id}`}
+              />
+            )}
+          </View>
+          {/* User-authored, so it never repeats what the row already says —
+              unlike the scope/state line it now sits alone under. Hidden on a
+              done row, which collapses to a single line. */}
+          {!!line.comment && !executed && (
             <Text style={[styles.lineComment, { color: colors.mutedText }]} numberOfLines={1}>
               {line.comment}
             </Text>
@@ -135,32 +176,6 @@ const PlanLineRow = memo(function PlanLineRow({
         <Text style={[styles.lineAmount, { color: executed ? colors.mutedText : colors.text }]}>
           {amountText}
         </Text>
-        {showMove && onMove && (
-          <View style={styles.moveButtons}>
-            <Pressable
-              onPress={() => onMove(index, -1)}
-              disabled={index === 0}
-              hitSlop={6}
-              style={styles.moveButton}
-              accessibilityRole="button"
-              accessibilityLabel={t('move_up')}
-              testID={`plan-line-up-${line.id}`}
-            >
-              <Icon name="chevron-up" size={20} color={index === 0 ? colors.border : colors.mutedText} />
-            </Pressable>
-            <Pressable
-              onPress={() => onMove(index, 1)}
-              disabled={index === listLength - 1}
-              hitSlop={6}
-              style={styles.moveButton}
-              accessibilityRole="button"
-              accessibilityLabel={t('move_down')}
-              testID={`plan-line-down-${line.id}`}
-            >
-              <Icon name="chevron-down" size={20} color={index === listLength - 1 ? colors.border : colors.mutedText} />
-            </Pressable>
-          </View>
-        )}
       </View>
       {isBroken ? (
         <View style={styles.brokenRow} testID={`plan-line-broken-${line.id}`}>
@@ -181,7 +196,7 @@ const PlanLineRow = memo(function PlanLineRow({
             {t('graphs_currencies_not_converted')}
           </Text>
         </View>
-      ) : showProgress && status ? (
+      ) : showBar ? (
         <StatusProgressBar
           status={{ ...status, spent: status.actual, currency: planCurrency }}
           compact
@@ -240,22 +255,20 @@ const PlanLineRow = memo(function PlanLineRow({
     );
 
   return (
-    <View style={executed ? styles.executedWrapper : undefined}>
-      <Swipeable
-        ref={swipeableRef}
-        renderRightActions={rightActions}
-        overshootRight={false}
-        friction={2}
-        rightThreshold={60}
-        // Only leftward drags reveal actions; leave rightward unrecognized so a
-        // rightward swipe passes through to the tab-strip swipe navigation.
-        dragOffsetFromLeftEdge={Number.MAX_SAFE_INTEGER}
-      >
-        <View style={[styles.swipeRowCover, { backgroundColor: colors.surface }]}>
-          {content}
-        </View>
-      </Swipeable>
-    </View>
+    <Swipeable
+      ref={swipeableRef}
+      renderRightActions={rightActions}
+      overshootRight={false}
+      friction={2}
+      rightThreshold={60}
+      // Only leftward drags reveal actions; leave rightward unrecognized so a
+      // rightward swipe passes through to the tab-strip swipe navigation.
+      dragOffsetFromLeftEdge={Number.MAX_SAFE_INTEGER}
+    >
+      <View style={[styles.swipeRowCover, { backgroundColor: colors.surface }]}>
+        {content}
+      </View>
+    </Swipeable>
   );
 });
 
@@ -283,10 +296,9 @@ PlanLineRow.propTypes = {
   canExecute: PropTypes.bool,
   canUndo: PropTypes.bool,
   showProgress: PropTypes.bool,
-  showMove: PropTypes.bool,
+  onMove: PropTypes.func,
   onPress: PropTypes.func.isRequired,
   onLongPress: PropTypes.func.isRequired,
-  onMove: PropTypes.func,
   onExecute: PropTypes.func,
   onMarkExecuted: PropTypes.func,
   onUndo: PropTypes.func,
@@ -316,9 +328,6 @@ const styles = StyleSheet.create({
     right: -6,
     width: 13,
   },
-  executedWrapper: {
-    opacity: 0.5,
-  },
   lineAmount: {
     fontSize: 15,
     fontWeight: '600',
@@ -332,14 +341,14 @@ const styles = StyleSheet.create({
     fontSize: 12,
     marginTop: 1,
   },
-  lineMeta: {
-    fontSize: 11,
-    fontWeight: '600',
-    marginTop: 1,
-    textTransform: 'uppercase',
-  },
   lineName: {
+    flexShrink: 1,
     fontSize: 15,
+  },
+  lineNameRow: {
+    alignItems: 'center',
+    flexDirection: 'row',
+    gap: 5,
   },
   lineProgress: {
     marginBottom: 0,
@@ -353,13 +362,6 @@ const styles = StyleSheet.create({
   lineTop: {
     alignItems: 'center',
     flexDirection: 'row',
-  },
-  moveButton: {
-    paddingHorizontal: 2,
-  },
-  moveButtons: {
-    flexDirection: 'row',
-    marginLeft: 6,
   },
   swipeAction: {
     alignItems: 'center',

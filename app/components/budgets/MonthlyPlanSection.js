@@ -458,7 +458,12 @@ const MonthlyPlanSection = forwardRef(function MonthlyPlanSection({
     runExecutionAction(() => unmarkLineExecuted(line.id), 'marked_as_pending')
   ), [runExecutionAction, unmarkLineExecuted]);
 
-  const handleLongPressLine = useCallback((line) => {
+  // `context` carries the line's position in its own block plus that block's move
+  // handler — reordering used to be a pair of chevrons on every row, which cost
+  // 40dp of horizontal space next to the amount on all of them and took one tap
+  // per position moved. It lives here now, where it is out of the way until asked
+  // for and sits next to the other whole-row actions.
+  const handleLongPressLine = useCallback((line, index, listLength, onMove) => {
     const executed = line.lastExecutedMonth === month;
     const executionActions = [];
     if (line.hasTemplate && isCurrentMonth) {
@@ -474,12 +479,24 @@ const MonthlyPlanSection = forwardRef(function MonthlyPlanSection({
         );
       }
     }
+    const moveActions = [];
+    if (onMove) {
+      // Offered only where the move can actually land, so the sheet never shows
+      // an action that silently does nothing.
+      if (index > 0) {
+        moveActions.push({ text: t('move_up'), onPress: () => onMove(index, -1) });
+      }
+      if (index < listLength - 1) {
+        moveActions.push({ text: t('move_down'), onPress: () => onMove(index, 1) });
+      }
+    }
     showDialog(
       t('select_action'),
       lineDisplayName(line),
       [
         ...executionActions,
         { text: t('edit'), onPress: () => openEditLine(line) },
+        ...moveActions,
         { text: t('delete'), style: 'destructive', onPress: () => confirmDeleteLine(line) },
         { text: t('cancel'), style: 'cancel' },
       ],
@@ -558,7 +575,6 @@ const MonthlyPlanSection = forwardRef(function MonthlyPlanSection({
         key={line.id}
         line={line}
         index={index}
-        listLength={list.length}
         name={lineDisplayName(line)}
         icon={lineIcon(line)}
         status={lineStatusById.get(line.id) || null}
@@ -571,10 +587,10 @@ const MonthlyPlanSection = forwardRef(function MonthlyPlanSection({
         canExecute={line.hasTemplate && isCurrentMonth && !executed}
         canUndo={line.hasTemplate && isCurrentMonth && executed}
         showProgress={line.kind !== 'income'}
-        showMove={!!onMove}
+        listLength={list.length}
+        onMove={onMove}
         onPress={openEditLine}
         onLongPress={handleLongPressLine}
-        onMove={onMove}
         onExecute={handleExecute}
         onMarkExecuted={handleMarkExecuted}
         onUndo={handleUndoExecuted}
@@ -585,19 +601,6 @@ const MonthlyPlanSection = forwardRef(function MonthlyPlanSection({
     handleMarkExecuted, handleUndoExecuted]);
 
   const hasAnyLines = lines.length > 0;
-
-  const renderAddRow = (label, onPress, testID) => (
-    <Pressable
-      style={[styles.addRow, { borderColor: colors.border }]}
-      onPress={onPress}
-      accessibilityRole="button"
-      accessibilityLabel={label}
-      testID={testID}
-    >
-      <Icon name="plus" size={20} color={colors.primary} />
-      <Text style={[styles.addText, { color: colors.primary }]}>{label}</Text>
-    </Pressable>
-  );
 
   return (
     <>
@@ -661,8 +664,6 @@ const MonthlyPlanSection = forwardRef(function MonthlyPlanSection({
 
         {incomeLines.map((line, index) => renderLine(line, index, incomeLines, null))}
 
-        {renderAddRow(t('add_income'), openAddIncome, 'plan-add-income')}
-
         {/* Allocations: recurring (global) ones apply to every month, one-off ones
             belong to this month's plan. */}
         <View style={[styles.sectionHeader, styles.sectionHeaderSpaced, { borderBottomColor: colors.border }]} testID="plan-allocations-header">
@@ -675,9 +676,12 @@ const MonthlyPlanSection = forwardRef(function MonthlyPlanSection({
         {recurringLines.map((line, index) => renderLine(line, index, recurringLines, handleMoveRecurring))}
         {oneOffLines.map((line, index) => renderLine(line, index, oneOffLines, handleMoveOneOff))}
 
-        {/* Add allocation — always available: a recurring line needs no plan, a
-            one-off one lazily creates the month's plan on save. */}
-        {renderAddRow(t('add_allocation'), openAddLine, 'plan-add-line')}
+        {/* No add rows here: the screen's single FAB opens this same editor, and
+            the editor's own income/expense/transfer segment picks the kind — two
+            dashed "+ Add …" buttons inside a card that already sits under a FAB
+            were a third way to do one thing. Adding a line is always available:
+            a recurring one needs no plan, a one-off one lazily creates the
+            month's plan on save. */}
 
         {!plan && (
           <View style={styles.emptyPlan} testID="plan-empty-state">
@@ -802,21 +806,6 @@ MonthlyPlanSection.propTypes = {
 export default MonthlyPlanSection;
 
 const styles = StyleSheet.create({
-  addRow: {
-    alignItems: 'center',
-    borderRadius: 8,
-    borderStyle: 'dashed',
-    borderWidth: 1,
-    flexDirection: 'row',
-    gap: 8,
-    justifyContent: 'center',
-    marginTop: SPACING.sm,
-    paddingVertical: SPACING.sm,
-  },
-  addText: {
-    fontSize: 15,
-    fontWeight: '600',
-  },
   card: {
     borderRadius: 16,
     borderWidth: 1,
