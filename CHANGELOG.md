@@ -1,5 +1,12 @@
 # Changelog
 
+## [0.240.0](https://github.com/heywood8/money-tracker/compare/penny-v0.239.0...penny-v0.240.0) (2026-07-27)
+
+
+### Features
+
+* **motion:** unify tab, sheet and panel motion and honour reduced motion ([#1468](https://github.com/heywood8/money-tracker/issues/1468)) ([f297f80](https://github.com/heywood8/money-tracker/commit/f297f80455d1c43b82781059f6da38be6f5f16ed))
+
 ## [0.239.0](https://github.com/heywood8/money-tracker/compare/penny-v0.238.0...penny-v0.239.0) (2026-07-27)
 
 
