@@ -5,14 +5,14 @@ import {
   useSharedValue,
   useAnimatedStyle,
   withTiming,
+  withSpring,
   runOnJS,
   Easing,
 } from 'react-native-reanimated';
+import { SPRING_SETTLE } from '../utils/motion';
 
 const ENTER_DURATION = 260;
-const EXIT_DURATION = 220;
 const ENTER_EASING = Easing.out(Easing.cubic);
-const EXIT_EASING = Easing.in(Easing.cubic);
 const ACTIVE_OFFSET_X = 16;
 
 /**
@@ -80,12 +80,17 @@ export function useSwipeDismiss({ onDismiss, onStepBack, canStepBack = false, en
     translateX.value = withTiming(0, { duration: ENTER_DURATION, easing: ENTER_EASING });
   }, [translateX, dismissing, width]);
 
-  const dismiss = useCallback(() => {
+  // A worklet so the swipe can call it straight from the gesture's onEnd (on the
+  // UI thread, carrying the release velocity) while the back arrow / hardware
+  // back still calls it from JS with no velocity. Both paths then share the
+  // re-entrancy guard and the completion callback.
+  const dismiss = useCallback((velocity = 0) => {
+    'worklet';
     if (dismissing.value) return;
     dismissing.value = true;
-    translateX.value = withTiming(
+    translateX.value = withSpring(
       width,
-      { duration: EXIT_DURATION, easing: EXIT_EASING },
+      { ...SPRING_SETTLE, velocity },
       (finished) => {
         if (finished && onDismiss) {
           runOnJS(onDismiss)();
@@ -127,16 +132,25 @@ export function useSwipeDismiss({ onDismiss, onStepBack, canStepBack = false, en
         'worklet';
         if (!valid.value) return;
         const dx = event.translationX - dragStart.value;
-        const past = dx > DISTANCE_THRESHOLD || event.velocityX > VELOCITY_THRESHOLD;
+        // Direction of travel outranks distance travelled: a panel dragged past
+        // the threshold but released while heading back left has been recalled,
+        // and dismissing it there fights the finger.
+        const pullingBack = event.velocityX < -VELOCITY_THRESHOLD;
+        const past =
+          !pullingBack && (dx > DISTANCE_THRESHOLD || event.velocityX > VELOCITY_THRESHOLD);
         if (past && canStepBack) {
           // Go one level up within the panel; the overlay never moved, so there is
           // nothing to spring back — the inner level animates itself.
           if (onStepBack) runOnJS(onStepBack)();
         } else if (past) {
-          // Reuse dismiss() so the completion + re-entrancy guard live in one place.
-          runOnJS(dismiss)();
+          // Reuse dismiss() so the completion + re-entrancy guard live in one
+          // place. It's a worklet, so it runs here on the UI thread and the
+          // finger's speed carries straight into the slide-off — a panel flicked
+          // away leaves fast, and one dragged 90% of the way no longer brakes to
+          // spend a fixed 220ms on the last sliver.
+          dismiss(event.velocityX);
         } else {
-          translateX.value = withTiming(0, { duration: EXIT_DURATION, easing: ENTER_EASING });
+          translateX.value = withSpring(0, { ...SPRING_SETTLE, velocity: event.velocityX });
         }
       });
   }, [translateX, dragStart, valid, dismissing, enabledShared, width, edgeWidth, dismiss, canStepBack, onStepBack]);
