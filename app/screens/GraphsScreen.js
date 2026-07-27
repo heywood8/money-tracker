@@ -520,7 +520,7 @@ const GraphsScreen = () => {
 
     const closing = expandedCard === card;
     const nextTab = closing ? null : card;
-    const { enter, exit } = chartTransitionOffsets(expandedCard, nextTab);
+    const { enter, exit } = chartTransition(expandedCard, nextTab);
 
     // Leaving a tab always drops its drill-down so it reopens at the top level
     if (expandedCard) {
@@ -529,8 +529,8 @@ const GraphsScreen = () => {
       } else {
         resetIncomeCategory();
       }
-      offsetOf(expandedCard).value = exit;
-      progressOf(expandedCard).value = withTiming(0, { duration: CHART_OUT_DURATION, easing: Easing.in(Easing.quad) });
+      offsetOf(expandedCard).value = { y: exit.y, scale: exit.scale };
+      progressOf(expandedCard).value = withTiming(0, { duration: exit.duration, easing: Easing.in(Easing.quad) });
     }
 
     setExpandedCard(nextTab);
@@ -540,13 +540,18 @@ const GraphsScreen = () => {
       return;
     }
 
-    offsetOf(card).value = enter;
-    setChartIntroKey(key => key + 1);
+    offsetOf(card).value = { y: enter.y, scale: enter.scale };
+    // The donut's intro waits with the chart it lives in, so it doesn't spin up
+    // behind an outgoing chart during a fade through.
+    setChartIntro(prev => ({ key: prev.key + 1, delay: enter.delay }));
     const chartHeight = card === 'income'
       ? incomeChartHeightRef.current
       : expenseChartHeightRef.current;
     panelHeight.value = withTiming(CARD_HEADER_HEIGHT + chartHeight, { duration: PANEL_OPEN_DURATION, easing: Easing.out(Easing.cubic) });
-    progressOf(card).value = withTiming(1, { duration: CHART_IN_DURATION, easing: Easing.out(Easing.cubic) });
+    progressOf(card).value = withDelay(
+      enter.delay,
+      withTiming(1, { duration: enter.duration, easing: Easing.out(Easing.cubic) }),
+    );
   }, [expandedCard, panelHeight, incomeChartProgress, expenseChartProgress,
     incomeChartOffset, expenseChartOffset, resetExpenseCategory, resetIncomeCategory]);
 
