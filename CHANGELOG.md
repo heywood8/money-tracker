@@ -1,5 +1,12 @@
 # Changelog
 
+## [0.235.2](https://github.com/heywood8/money-tracker/compare/penny-v0.235.1...penny-v0.235.2) (2026-07-27)
+
+
+### Bug Fixes
+
+* **graphs:** validated chart palette with stable per-category colours ([#1457](https://github.com/heywood8/money-tracker/issues/1457)) ([71f7131](https://github.com/heywood8/money-tracker/commit/71f71315044e8e4d4a3c0b0970f952c07dc74bc0))
+
 ## [0.235.1](https://github.com/heywood8/money-tracker/compare/penny-v0.235.0...penny-v0.235.1) (2026-07-27)
 
 
