@@ -1,5 +1,12 @@
 # Changelog
 
+## [0.229.0](https://github.com/heywood8/money-tracker/compare/penny-v0.228.0...penny-v0.229.0) (2026-07-27)
+
+
+### Features
+
+* **budgets:** always roll subcategory spending into a plan line ([#1434](https://github.com/heywood8/money-tracker/issues/1434)) ([41e222c](https://github.com/heywood8/money-tracker/commit/41e222c78ddd2d3f4c9a07e5160ec78cac964283))
+
 ## [0.228.0](https://github.com/heywood8/money-tracker/compare/penny-v0.227.0...penny-v0.228.0) (2026-07-27)
 
 
