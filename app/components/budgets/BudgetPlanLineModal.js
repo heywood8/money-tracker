@@ -102,16 +102,22 @@ export default function BudgetPlanLineModal({
 
   // An executable line's amount lives in its account's currency (that is the
   // currency the created operation is in), so the picker only applies to a
-  // template-less recurring line.
+  // template-less line — recurring or not (both may be priced in a currency of
+  // their own since migration 0020).
   const executionCurrency = accountId != null ? accountsById.get(accountId)?.currency : null;
-  const effectiveCurrency = executionCurrency || (isRecurring ? lineCurrency : null);
+  // A one-off line stores currency: null to mean "inherit the plan's", which is
+  // what it did before it had a picker — so only a chip that differs from the
+  // plan's currency is written out. A recurring line has no plan to inherit
+  // from and always carries its own.
+  const oneOffCurrency = lineCurrency && lineCurrency !== currency ? lineCurrency : null;
+  const effectiveCurrency = executionCurrency || (isRecurring ? lineCurrency : oneOffCurrency);
   // What the amount is actually denominated in. A template-less one-off line stores
   // currency: null and is priced in the plan's currency, so the field is labelled
   // with that rather than left bare. (May still be '' if the plan has no currency
   // yet — no accounts exist.)
   const displayCurrency = effectiveCurrency || currency;
 
-  // Currency options for a recurring line: every currency in use across the
+  // Currency options for a template-less line: every currency in use across the
   // user's accounts, the plan's own currency (always offered, even if no
   // account currently uses it), and — when editing — the line's existing
   // currency (it may no longer match any account, e.g. the account was closed).
@@ -607,11 +613,12 @@ export default function BudgetPlanLineModal({
                     </View>
                   </Pressable>
 
-                  {/* Currency picker — only a recurring line without an execution
-                      account needs one: with an account the amount is by
-                      definition in that account's currency, and a one-off line
-                      inherits the plan's. */}
-                  {isRecurring && executionCurrency == null && currencyOptions.length > 0 && (
+                  {/* Currency picker — shown for any line without an execution
+                      account: with an account the amount is by definition in that
+                      account's currency and there is nothing to pick. A one-off
+                      line defaults to the plan's currency (and stores null, i.e.
+                      "inherit", while it stays on it). */}
+                  {executionCurrency == null && currencyOptions.length > 0 && (
                     <View style={styles.field}>
                       <Text style={[styles.fieldLabel, { color: colors.mutedText }]}>
                         {t('currency')}
