@@ -9,6 +9,7 @@ import {
   ICON_SIZE,
   BORDER_RADIUS,
 } from '../../styles/designTokens';
+import { motionDuration } from '../../utils/reducedMotion';
 
 /**
  * UndoSnackbar
@@ -75,10 +76,13 @@ const UndoSnackbar = ({
   }, [exitAnim, onClosed, operationId]);
 
   useEffect(() => {
-    // Entry: gentle rise into the row's reserved slot.
+    // Entry: gentle rise into the row's reserved slot. The rise is the only part
+    // the OS "Remove animations" setting silences — the countdown below it keeps
+    // running, because a depleting bar is information about how long the undo
+    // stays available, not decoration.
     Animated.timing(entryAnim, {
       toValue: 1,
-      duration: DURATION.normal,
+      duration: motionDuration(DURATION.normal),
       useNativeDriver: true,
     }).start();
 

@@ -16,6 +16,8 @@ import {
 import { SafeAreaView } from 'react-native-safe-area-context';
 import Icon from '@expo/vector-icons/MaterialCommunityIcons';
 import { SPACING, BORDER_RADIUS, HEIGHTS, FONT_SIZE } from '../../styles/designTokens';
+import { DURATION_ENTER } from '../../utils/motion';
+import { motionDuration } from '../../utils/reducedMotion';
 import ModalBlurOverlay from '../ModalBlurOverlay';
 
 const SCREEN_WIDTH = Dimensions.get('window').width;
@@ -110,7 +112,7 @@ export default function SplitOperationModal({
     setShowCategoryPicker(true);
     Animated.timing(pickerAnim, {
       toValue: 1,
-      duration: 260,
+      duration: motionDuration(DURATION_ENTER),
       easing: Easing.out(Easing.cubic),
       useNativeDriver: true,
     }).start();
@@ -120,7 +122,7 @@ export default function SplitOperationModal({
   const closeCategoryPicker = useCallback(() => {
     Animated.timing(pickerAnim, {
       toValue: 0,
-      duration: 180,
+      duration: motionDuration(180),
       easing: Easing.in(Easing.quad),
       useNativeDriver: true,
     }).start(() => setShowCategoryPicker(false));

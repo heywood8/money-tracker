@@ -60,16 +60,46 @@ export const SPRING_SETTLE = {
  * plan), so each caller states its own and spreads this in for the rest:
  *   withTiming(1, { ...TIMING_ENTER, duration: 280 })
  *
- * `reduceMotion` is the point of having this at all. It is the one property that
- * is easy to leave off and impossible to see missing, and omitting it means the
- * surface ignores the OS "Remove animations" setting. Spreading this makes the
- * accessible behaviour the default rather than something each call site
- * remembers.
+ * `reduceMotion: 'system'` is Reanimated's own default, so spreading this does
+ * not switch the behaviour on. What it does is state it: a call site that opts
+ * out (`reduceMotion: 'never'`) then reads as a deliberate exception rather than
+ * as the norm. The legacy `Animated` API has no equivalent at all — surfaces on
+ * that API need the `useReducedMotion` hook to honour the OS setting.
  */
 export const TIMING_ENTER = {
   easing: Easing.out(Easing.cubic),
   reduceMotion: 'system',
 };
+
+/**
+ * The mirror of TIMING_ENTER, for a surface leaving on a timing.
+ *
+ * Accelerating, not decelerating: a thing on its way out has nothing to settle
+ * into, and easing *into* the exit gets it off the screen while the eye is still
+ * on it. This is the curve CLAUDE.md's subpanel convention already names; having
+ * it here is what stops the next panel from silently inheriting React Native's
+ * `Easing.inOut(Easing.ease)` default, which is what an `Animated.timing` with no
+ * `easing` key gets — a symmetric curve that reads as slow at both ends.
+ */
+export const TIMING_EXIT = {
+  easing: Easing.in(Easing.quad),
+  reduceMotion: 'system',
+};
+
+/**
+ * The two durations the app's panels travel on.
+ *
+ * Asymmetric on purpose: arriving is the part the user waits for and watches, so
+ * it gets room to decelerate; leaving is a thing they have already decided on, so
+ * it gets out of the way. Both sit inside the 300ms budget UI motion has before
+ * it starts reading as latency.
+ *
+ * Surfaces with their own travel distance (a full-screen sheet, a dialog that
+ * barely moves) still state their own duration — these are the default for the
+ * ordinary case of a panel sliding over another panel.
+ */
+export const DURATION_ENTER = 260;
+export const DURATION_EXIT = 200;
 
 /**
  * Spring for a small badge or glyph confirming that an action landed.

@@ -26,6 +26,7 @@ import {
   PAN_VELOCITY_TO_PER_SECOND,
   rubberband,
 } from '../utils/motion';
+import { isReduceMotionEnabled } from '../utils/reducedMotion';
 
 // Pressable that can animate layout props (paddingBottom) for keyboard avoidance.
 const AnimatedPressable = Animated.createAnimatedComponent(Pressable);
@@ -154,11 +155,24 @@ export default function ModalShell({
       translateY.setValue(screenHeight);
       keyboardOffset.setValue(0);
       resetShrink();
+      // A sheet rising from the bottom edge is travel, which is what the OS
+      // "Remove animations" setting is about — so under it the sheet is simply
+      // there. `Animated` has no reduceMotion of its own (Reanimated does, which
+      // is why the shrink above needs no equivalent branch).
+      if (isReduceMotionEnabled()) {
+        translateY.setValue(0);
+        return;
+      }
+      // The same spring the drag release and the snap-back use. It used to be a
+      // `bounciness: 2 / speed: 14` spring of its own, which put two problems in
+      // one line: the sheet arrived on a different physics than the one that
+      // takes it away (so opening and dismissing read as different objects), and
+      // the bounce overshot a card pinned to `justifyContent: 'flex-end'` — the
+      // overshoot travels the card past the bottom edge and briefly opens a strip
+      // of the screen behind it. ANIMATED_SPRING_SETTLE clamps exactly that.
       Animated.spring(translateY, {
+        ...ANIMATED_SPRING_SETTLE,
         toValue: 0,
-        useNativeDriver: true,
-        bounciness: 2,
-        speed: 14,
       }).start();
     }
   }, [visible, translateY, screenHeight, resetShrink, keyboardOffset]);
@@ -170,10 +184,23 @@ export default function ModalShell({
 
   // Animate out then call callback — used for overlay tap and cancel button
   const animateOut = useCallback((callback) => {
-    Animated.timing(translateY, {
+    if (isReduceMotionEnabled()) {
+      translateY.setValue(screenHeight);
+      callback?.();
+      return;
+    }
+    // A spring, not a 200ms timing with React Native's default `inOut(ease)`.
+    // Tapping the overlay and flicking the sheet down are the same act — getting
+    // rid of this sheet — and they were leaving on visibly different curves. The
+    // tap simply has no velocity to hand over, so it starts from rest.
+    Animated.spring(translateY, {
+      ...ANIMATED_SPRING_SETTLE,
       toValue: screenHeight,
-      duration: 200,
-      useNativeDriver: true,
+      // The card is out of sight long before the spring mathematically settles,
+      // so finish on "off-screen" rather than on the tail — same thresholds the
+      // drag dismissal uses.
+      restDisplacementThreshold: 40,
+      restSpeedThreshold: 100,
       // Leave translateY at screenHeight after close so the next open
       // renders offscreen immediately (no reset-to-0 flicker)
     }).start(({ finished }) => {

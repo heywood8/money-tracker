@@ -17,8 +17,20 @@ import Animated, {
 import { Svg, Circle } from 'react-native-svg';
 import { SPRING_SETTLE, clampWithRubberband } from '../utils/motion';
 
-const SCREEN_TIMING = { duration: 300, easing: Easing.out(Easing.cubic) };
-const PILL_TIMING = { duration: 200, easing: Easing.out(Easing.quad) };
+// One physics for a tab change, whichever way it was asked for.
+//
+// A tap used to animate the strip on a 300ms timing curve and the pill on a
+// 200ms one, while a swipe released both into SPRING_SETTLE with the finger's
+// velocity. Three consequences, all of them visible: the pill arrived a tenth of
+// a second before the screen it belongs to, the same journey felt different
+// depending on how it was started, and a tap landing on a still-settling swipe
+// switched curves mid-flight. A spring is also the only form that re-targets
+// cleanly when that happens — a timing restarts from its own zero.
+//
+// The response is shortened from SPRING_SETTLE's 350ms because switching tabs is
+// something a user does dozens of times a day, and the ceiling for motion at
+// that frequency is lower than for a sheet they open occasionally.
+const TAB_SPRING = { ...SPRING_SETTLE, duration: 280 };
 import MaterialCommunityIcons from '@expo/vector-icons/MaterialCommunityIcons';
 import OperationsScreen from '../screens/OperationsScreen';
 import AccountsScreen from '../screens/AccountsScreen';
@@ -344,10 +356,10 @@ export default function SimpleTabs() {
     // UI thread and does not depend on a React render, so it starts on the very
     // next frame instead of waiting for React to commit the tab-highlight change.
     activeIndex.value = newIndex;
-    pillPosition.value = withTiming(newIndex, PILL_TIMING);
+    pillPosition.value = withSpring(newIndex, TAB_SPRING);
 
     if (distance === 1) {
-      translateX.value = withTiming(-newIndex * SCREEN_WIDTH, SCREEN_TIMING);
+      translateX.value = withSpring(-newIndex * SCREEN_WIDTH, TAB_SPRING);
     } else {
       // ---- Non-adjacent tab ----
       // Reposition the target screen to sit immediately adjacent to the source
@@ -372,7 +384,7 @@ export default function SimpleTabs() {
       }
 
       targetAdjust.value = adjacentOffset; // instant reposition on worklet thread
-      translateX.value = withTiming(-(oldIndex + direction) * SCREEN_WIDTH, SCREEN_TIMING, (finished) => {
+      translateX.value = withSpring(-(oldIndex + direction) * SCREEN_WIDTH, TAB_SPRING, (finished) => {
         'worklet';
         if (!finished) return;
         // Snap strip, zero offset, restore opacities — all on worklet thread, no flash.
@@ -498,12 +510,12 @@ export default function SimpleTabs() {
         // banded edge), so the same two springs cover both "commit" and "snap back".
         activeIndex.value = newIndex;
         pillPosition.value = withSpring(newIndex, {
-          ...SPRING_SETTLE,
+          ...TAB_SPRING,
           velocity: -velocityX / SCREEN_WIDTH,
         });
         translateX.value = withSpring(
           -newIndex * SCREEN_WIDTH,
-          { ...SPRING_SETTLE, velocity: velocityX },
+          { ...TAB_SPRING, velocity: velocityX },
           (isFinished) => {
             if (isFinished && newIndex !== currentIndex) {
               runOnJS(setActive)(TABS[newIndex].key);
