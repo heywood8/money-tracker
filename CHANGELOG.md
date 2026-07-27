@@ -1,5 +1,12 @@
 # Changelog
 
+## [0.241.3](https://github.com/heywood8/money-tracker/compare/penny-v0.241.2...penny-v0.241.3) (2026-07-27)
+
+
+### Bug Fixes
+
+* **budgets:** stop the line and group editors juddering with the keyboard open ([#1477](https://github.com/heywood8/money-tracker/issues/1477)) ([da52c39](https://github.com/heywood8/money-tracker/commit/da52c3942f00487a92f21bc090e4c6fec1f8680a))
+
 ## [0.241.2](https://github.com/heywood8/money-tracker/compare/penny-v0.241.1...penny-v0.241.2) (2026-07-27)
 
 
