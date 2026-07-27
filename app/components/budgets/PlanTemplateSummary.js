@@ -1,14 +1,8 @@
 import React, { useMemo } from 'react';
 import { View, Text, StyleSheet } from 'react-native';
 import PropTypes from 'prop-types';
+import * as Currency from '../../services/currency';
 import { SPACING } from '../../styles/layout';
-
-const formatSummaryAmount = (amount) => {
-  if (amount === 0) return '0';
-  if (amount >= 1000000) return `${(amount / 1000000).toFixed(1)}M`;
-  if (amount >= 1000) return `${Math.round(amount / 1000)}K`;
-  return String(Math.round(amount));
-};
 
 /** One of the strip's three identical value-over-label columns. */
 const SummaryItem = ({ testID, color, mutedColor, value, label }) => (
@@ -37,42 +31,49 @@ SummaryItem.propTypes = {
  * how many are done, pending money in — ported from the former Planned tab and
  * now computed from the plan lines that carry a template (Budgets v3 phase 3).
  *
- * Amounts are summed as plain numbers, matching the strip's original behaviour:
- * it is a coarse "how much is still to pay this month" gauge, not an accounting
- * figure (the per-line amounts and the totals row below are). With templates in
- * several currencies the sum mixes them — the same caveat the Planned tab had.
+ * Amounts come from `amountById`, already converted into the screen's single
+ * currency by the host. They used to be summed as bare `parseFloat` values across
+ * whatever currencies the templates happened to store, and printed with no unit
+ * at all — so a 300000 AMD rent showed up as "300K" one row above an income
+ * header reading "535745 / 450000 RUB", two panels disagreeing about the same
+ * month. Precise decimal math and one labelled currency now, matching the totals
+ * row below exactly.
  */
-export default function PlanTemplateSummary({ lines, month, colors, t }) {
+export default function PlanTemplateSummary({ lines, month, amountById, planCurrency, colors, t }) {
   const summary = useMemo(() => {
-    let pendingOut = 0;
-    let pendingIn = 0;
-    let totalOut = 0;
-    let totalIn = 0;
+    let pendingOut = '0';
+    let pendingIn = '0';
+    let totalOut = '0';
+    let totalIn = '0';
     let doneCount = 0;
     let total = 0;
     for (const line of lines) {
       if (!line.hasTemplate) continue;
       total++;
-      const amount = parseFloat(line.amount || '0');
-      const isIn = line.kind === 'income';
-      if (isIn) {
-        totalIn += amount;
-      } else {
-        totalOut += amount;
-      }
       if (line.lastExecutedMonth === month) {
         doneCount++;
-      } else if (isIn) {
-        pendingIn += amount;
+      }
+      // A line with no rate into the screen's currency has no figure that can be
+      // added here; it drops out of the money columns (the row itself carries the
+      // "not converted" warning) but still counts toward the execution tally,
+      // which is currency-free.
+      const amount = amountById.get(line.id);
+      if (amount == null) continue;
+      const isIn = line.kind === 'income';
+      const pending = line.lastExecutedMonth !== month;
+      if (isIn) {
+        totalIn = Currency.add(totalIn, amount, planCurrency);
+        if (pending) pendingIn = Currency.add(pendingIn, amount, planCurrency);
       } else {
-        pendingOut += amount;
+        totalOut = Currency.add(totalOut, amount, planCurrency);
+        if (pending) pendingOut = Currency.add(pendingOut, amount, planCurrency);
       }
     }
     return {
       pendingOut, pendingIn, totalOut, totalIn, doneCount, total,
       progressFraction: total > 0 ? doneCount / total : 0,
     };
-  }, [lines, month]);
+  }, [lines, month, amountById, planCurrency]);
 
   if (summary.total === 0) return null;
 
@@ -86,7 +87,7 @@ export default function PlanTemplateSummary({ lines, month, colors, t }) {
           testID="summary-pending-out"
           color={colors.expense}
           mutedColor={colors.mutedText}
-          value={`${formatSummaryAmount(summary.pendingOut)} / ${formatSummaryAmount(summary.totalOut)}`}
+          value={`${Currency.formatCompact(summary.pendingOut)} / ${Currency.formatCompact(summary.totalOut)} ${planCurrency}`}
           label={t('pending_out')}
         />
         <View style={[styles.summaryDivider, { backgroundColor: colors.border }]} />
@@ -102,7 +103,7 @@ export default function PlanTemplateSummary({ lines, month, colors, t }) {
           testID="summary-pending-in"
           color={colors.income}
           mutedColor={colors.mutedText}
-          value={`${formatSummaryAmount(summary.pendingIn)} / ${formatSummaryAmount(summary.totalIn)}`}
+          value={`${Currency.formatCompact(summary.pendingIn)} / ${Currency.formatCompact(summary.totalIn)} ${planCurrency}`}
           label={t('pending_in')}
         />
       </View>
@@ -135,6 +136,8 @@ export default function PlanTemplateSummary({ lines, month, colors, t }) {
 PlanTemplateSummary.propTypes = {
   lines: PropTypes.array.isRequired,
   month: PropTypes.string.isRequired,
+  amountById: PropTypes.instanceOf(Map).isRequired,
+  planCurrency: PropTypes.string.isRequired,
   colors: PropTypes.object.isRequired,
   t: PropTypes.func.isRequired,
 };
