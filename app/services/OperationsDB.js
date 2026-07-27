@@ -2140,7 +2140,9 @@ export const getMonthlySpendingByCategories = async (currency, year, categoryIds
 /**
  * Get spending by categories for the last 12 months (rolling)
  * @param {string} currency - Currency code
- * @param {Array<string>} categoryIds - Category IDs to include
+ * @param {Array<string>|null} categoryIds - Category IDs to include, or `null`
+ *   for every expense (uncategorised operations included). An empty array still
+ *   means "nothing to sum" and returns [].
  * @param {boolean} [convertAll=false] - When true, include operations from every
  *   currency and convert amounts to `currency` at the current exchange rate.
  *   Past months are converted at today's rate too (a single "current rate" view).
@@ -2148,11 +2150,13 @@ export const getMonthlySpendingByCategories = async (currency, year, categoryIds
  */
 export const getLast12MonthsSpendingByCategories = async (currency, categoryIds, convertAll = false) => {
   try {
-    if (!categoryIds || categoryIds.length === 0) {
+    const allCategories = categoryIds === null;
+
+    if (!allCategories && (!categoryIds || categoryIds.length === 0)) {
       return [];
     }
 
-    const placeholders = categoryIds.map(() => '?').join(',');
+    const placeholders = allCategories ? '' : categoryIds.map(() => '?').join(',');
 
     // Calculate date 12 months ago from today
     const now = new Date();
@@ -2163,9 +2167,11 @@ export const getLast12MonthsSpendingByCategories = async (currency, categoryIds,
     // When converting, keep the account currency per row so each amount can be
     // converted to the target currency before being summed into its month.
     const currencyFilter = convertAll ? '' : 'AND a.currency = ?';
+    const categoryFilter = allCategories ? '' : `AND o.category_id IN (${placeholders})`;
+    const categoryParams = allCategories ? [] : categoryIds;
     const params = convertAll
-      ? [startDateStr, endDateStr, ...categoryIds]
-      : [currency, startDateStr, endDateStr, ...categoryIds];
+      ? [startDateStr, endDateStr, ...categoryParams]
+      : [currency, startDateStr, endDateStr, ...categoryParams];
 
     const results = await queryAll(
       `SELECT
@@ -2178,7 +2184,7 @@ export const getLast12MonthsSpendingByCategories = async (currency, categoryIds,
          ${currencyFilter}
          AND o.date >= ?
          AND o.date <= ?
-         AND o.category_id IN (${placeholders})
+         ${categoryFilter}
        ORDER BY year_month ASC`,
       params,
     );
