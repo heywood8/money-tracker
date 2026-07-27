@@ -1,5 +1,12 @@
 # Changelog
 
+## [0.237.1](https://github.com/heywood8/money-tracker/compare/penny-v0.237.0...penny-v0.237.1) (2026-07-27)
+
+
+### Bug Fixes
+
+* **graphs:** move the drill-down category chip under the donut ([#1464](https://github.com/heywood8/money-tracker/issues/1464)) ([385986b](https://github.com/heywood8/money-tracker/commit/385986b58638856cef1c4dac3fad398e20a7b607))
+
 ## [0.237.0](https://github.com/heywood8/money-tracker/compare/penny-v0.236.0...penny-v0.237.0) (2026-07-27)
 
 
