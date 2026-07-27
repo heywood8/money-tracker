@@ -1,26 +1,9 @@
 import React from 'react';
-import { View, Text, StyleSheet, TouchableOpacity } from 'react-native';
-import Icon from '@expo/vector-icons/MaterialCommunityIcons';
 import PropTypes from 'prop-types';
-import currencies from '../../../assets/currencies.json';
-import { useDisplaySettings } from '../../contexts/DisplaySettingsContext';
+import SummaryTab from './SummaryTab';
 
 // Expense red is intentionally theme-independent — it matches the arrow badge.
-const EXPENSE_ACCENT = '#d93025';
-
-const formatCurrency = (amount, currency) => {
-  const currencyInfo = currencies[currency];
-  const symbol = currencyInfo?.symbol ?? currency;
-  const value = parseFloat(amount);
-  if (value >= 1000000) {
-    return `${symbol}${(value / 1000000).toFixed(1)}M`;
-  }
-  if (value >= 1000) {
-    return `${symbol}${(value / 1000).toFixed(1)}K`;
-  }
-  const decimals = currencyInfo?.decimal_digits ?? 2;
-  return `${symbol}${value.toFixed(decimals)}`;
-};
+export const EXPENSE_ACCENT = '#d93025';
 
 const ExpenseSummaryCard = ({
   colors,
@@ -30,54 +13,21 @@ const ExpenseSummaryCard = ({
   selectedCurrency,
   onPress,
   expanded = false,
-  categoryName = null,
-  onBack = null,
-}) => {
-  const { hideBalances } = useDisplaySettings();
-  return (
-    <TouchableOpacity
-      testID="expense-summary-card"
-      style={[
-        styles.summaryCard,
-        expanded && { backgroundColor: colors.altRow, borderBottomColor: EXPENSE_ACCENT },
-      ]}
-      onPress={onPress}
-      activeOpacity={0.7}
-      accessibilityRole="button"
-      accessibilityState={{ expanded }}
-      accessibilityLabel={t('expenses_by_category')}
-    >
-      <View style={styles.iconBadge}>
-        <Icon name="arrow-top-right" size={16} color={EXPENSE_ACCENT} />
-      </View>
-      <View style={styles.textContent}>
-        <Text style={[styles.label, { color: colors.mutedText }]}>{t('expense').toUpperCase()}</Text>
-        <Text style={[styles.amount, { color: colors.text }]}>
-          {hideBalances ? '••••' : (loading ? '...' : formatCurrency(totalExpenses, selectedCurrency))}
-        </Text>
-      </View>
-      {categoryName && onBack && (
-        <View style={styles.categoryBackOverlay} pointerEvents="box-none">
-          <TouchableOpacity
-            onPress={onBack}
-            style={[styles.filterChip, { backgroundColor: colors.altRow, borderColor: colors.border }]}
-            activeOpacity={0.7}
-            accessibilityRole="button"
-            accessibilityLabel={t('back')}
-          >
-            <Text style={[styles.filterChipText, { color: colors.text }]} numberOfLines={1}>
-              {categoryName}
-            </Text>
-            <Icon name="close-circle" size={14} color={colors.mutedText} />
-          </TouchableOpacity>
-        </View>
-      )}
-      <View style={styles.chevron} pointerEvents="none">
-        <Icon name={expanded ? 'chevron-up' : 'chevron-down'} size={16} color={colors.mutedText} />
-      </View>
-    </TouchableOpacity>
-  );
-};
+}) => (
+  <SummaryTab
+    testID="expense-summary-card"
+    colors={colors}
+    icon="arrow-top-right"
+    accent={EXPENSE_ACCENT}
+    label={t('expense').toUpperCase()}
+    accessibilityLabel={t('expenses_by_category')}
+    amount={totalExpenses}
+    loading={loading}
+    selectedCurrency={selectedCurrency}
+    onPress={onPress}
+    expanded={expanded}
+  />
+);
 
 ExpenseSummaryCard.propTypes = {
   colors: PropTypes.object.isRequired,
@@ -87,73 +37,6 @@ ExpenseSummaryCard.propTypes = {
   selectedCurrency: PropTypes.string.isRequired,
   onPress: PropTypes.func.isRequired,
   expanded: PropTypes.bool,
-  categoryName: PropTypes.string,
-  onBack: PropTypes.func,
 };
-
-const styles = StyleSheet.create({
-  amount: {
-    fontSize: 16,
-    fontWeight: '700',
-    letterSpacing: -0.3,
-    marginTop: 1,
-  },
-  categoryBackOverlay: {
-    alignItems: 'center',
-    bottom: 0,
-    justifyContent: 'center',
-    left: 0,
-    position: 'absolute',
-    right: 0,
-    top: 0,
-  },
-  chevron: {
-    alignItems: 'center',
-    alignSelf: 'stretch',
-    justifyContent: 'center',
-    width: 20,
-  },
-  filterChip: {
-    alignItems: 'center',
-    borderRadius: 20,
-    borderWidth: 1,
-    flexDirection: 'row',
-    gap: 4,
-    maxWidth: '75%',
-    paddingHorizontal: 10,
-    paddingVertical: 4,
-  },
-  filterChipText: {
-    flexShrink: 1,
-    fontSize: 13,
-    fontWeight: '600',
-  },
-  iconBadge: {
-    alignItems: 'center',
-    height: 26,
-    justifyContent: 'center',
-    width: 26,
-  },
-  label: {
-    fontSize: 10,
-    fontWeight: '500',
-    letterSpacing: 0.3,
-  },
-  summaryCard: {
-    alignItems: 'center',
-    // Transparent by default so activating the tab doesn't shift its height
-    borderBottomColor: 'transparent',
-    borderBottomWidth: 2,
-    flex: 1,
-    flexDirection: 'row',
-    gap: 8,
-    paddingHorizontal: 10,
-    paddingVertical: 8,
-  },
-  textContent: {
-    flex: 1,
-    minWidth: 0,
-  },
-});
 
 export default ExpenseSummaryCard;
