@@ -8,7 +8,6 @@ import {
   Pressable,
   StyleSheet,
   FlatList,
-  KeyboardAvoidingView,
   Animated,
   Easing,
   Dimensions,
@@ -19,6 +18,7 @@ import { SPACING, BORDER_RADIUS, HEIGHTS, FONT_SIZE } from '../../styles/designT
 import { DURATION_ENTER } from '../../utils/motion';
 import { motionDuration } from '../../utils/reducedMotion';
 import ModalBlurOverlay from '../ModalBlurOverlay';
+import useKeyboardOffset from '../../hooks/useKeyboardOffset';
 
 const SCREEN_WIDTH = Dimensions.get('window').width;
 
@@ -44,6 +44,7 @@ export default function SplitOperationModal({
   colors,
   t,
 }) {
+  const keyboardOffset = useKeyboardOffset(visible);
   const [splitAmount, setSplitAmount] = useState('');
   const [selectedCategoryId, setSelectedCategoryId] = useState('');
   const [showCategoryPicker, setShowCategoryPicker] = useState(false);
@@ -195,10 +196,10 @@ export default function SplitOperationModal({
         onRequestClose={onClose}
       >
         <SafeAreaView style={styles.fullFlex} edges={['top', 'bottom']}>
-          <KeyboardAvoidingView
-            behavior="height"
-            style={styles.fullFlex}
-          >
+          {/* Keyboard avoidance as an explicit inset — a KeyboardAvoidingView
+              here shrinks itself in a loop under edge-to-edge (see
+              useKeyboardOffset). */}
+          <Animated.View style={[styles.fullFlex, { paddingBottom: keyboardOffset }]}>
             <Pressable style={styles.modalOverlay} onPress={onClose}>
               <Pressable
                 style={[styles.modalContent, { backgroundColor: colors.card }]}
@@ -317,7 +318,7 @@ export default function SplitOperationModal({
                 </Animated.View>
               </Animated.View>
             )}
-          </KeyboardAvoidingView>
+          </Animated.View>
         </SafeAreaView>
       </Modal>
     </>

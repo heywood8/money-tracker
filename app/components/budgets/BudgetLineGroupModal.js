@@ -6,8 +6,7 @@ import {
   Pressable,
   StyleSheet,
   ScrollView,
-  KeyboardAvoidingView,
-  Platform,
+  Animated,
   Keyboard,
 } from 'react-native';
 import PropTypes from 'prop-types';
@@ -15,10 +14,14 @@ import Icon from '@expo/vector-icons/MaterialCommunityIcons';
 import { useThemeColors } from '../../contexts/ThemeColorsContext';
 import { useLocalization } from '../../contexts/LocalizationContext';
 import { useDialog } from '../../contexts/DialogContext';
+import useKeyboardOffset from '../../hooks/useKeyboardOffset';
 import FormInput from '../FormInput';
 import ModalBlurOverlay from '../ModalBlurOverlay';
 import ModalHeader from '../ModalHeader';
 import * as Currency from '../../services/currency';
+
+// The overlay carries the keyboard inset, so it has to be animatable.
+const AnimatedPressable = Animated.createAnimatedComponent(Pressable);
 
 /**
  * BudgetLineGroupModal — editor for a GROUP of budget lines (migration 0022).
@@ -48,6 +51,9 @@ export default function BudgetLineGroupModal({
   const { colors } = useThemeColors();
   const { t } = useLocalization();
   const { showDialog } = useDialog();
+  // Lifts the card above the keyboard. NOT a KeyboardAvoidingView — see the
+  // hook's own note for what that one does inside a Modal under edge-to-edge.
+  const keyboardOffset = useKeyboardOffset(visible);
 
   const isEditing = group != null;
 
@@ -138,146 +144,144 @@ export default function BudgetLineGroupModal({
         onRequestClose={onClose}
         testID="plan-group-modal"
       >
-        <KeyboardAvoidingView
-          behavior={Platform.OS === 'ios' ? 'padding' : 'height'}
-          style={styles.flex1}
+        <AnimatedPressable
+          style={[styles.modalOverlay, { paddingBottom: keyboardOffset }]}
+          onPress={onClose}
         >
-          <Pressable style={styles.modalOverlay} onPress={onClose}>
-            <Pressable style={[styles.modalContent, { backgroundColor: colors.card }]} onPress={() => {}}>
-              <ScrollView contentContainerStyle={styles.scrollContent} keyboardShouldPersistTaps="handled">
-                <ModalHeader title={isEditing ? t('edit_group') : t('new_group')} />
+          <Pressable style={[styles.modalContent, { backgroundColor: colors.card }]} onPress={() => {}}>
+            <ScrollView contentContainerStyle={styles.scrollContent} keyboardShouldPersistTaps="handled">
+              <ModalHeader title={isEditing ? t('edit_group') : t('new_group')} />
 
-                <View style={styles.field}>
-                  <Text style={[styles.fieldLabel, { color: colors.mutedText }]}>
-                    {t('group_name')}
-                  </Text>
-                  <FormInput
-                    value={label}
-                    onChangeText={(text) => { setLabel(text); setError(null); }}
-                    placeholder={t('group_name')}
-                    testID="plan-group-name"
-                  />
-                </View>
-
-                {/* Derived by default: the group is worth what its lines are
-                    worth, and that figure keeps itself up to date. The toggle is
-                    for the case where the envelope has a size of its own. */}
-                <Pressable
-                  style={[styles.toggleRow, { borderColor: colors.border }]}
-                  onPress={() => { setCustomBudget(v => !v); setError(null); }}
-                  accessibilityRole="switch"
-                  accessibilityState={{ checked: customBudget }}
-                  accessibilityLabel={t('custom_group_budget')}
-                  testID="plan-group-custom-toggle"
-                >
-                  <View style={styles.toggleLabel}>
-                    <Icon name="pencil-outline" size={20} color={colors.text} />
-                    <Text style={[styles.text16, { color: colors.text }]}>
-                      {t('custom_group_budget')}
-                    </Text>
-                  </View>
-                  <View style={[styles.switchTrack, { backgroundColor: customBudget ? colors.primary : colors.border }]}>
-                    <View style={[styles.switchThumb, { transform: [{ translateX: customBudget ? 18 : 2 }] }]} />
-                  </View>
-                </Pressable>
-
-                {!customBudget && (
-                  <Text style={[styles.fieldHint, { color: colors.mutedText }]} testID="plan-group-derived-hint">
-                    {t('group_budget_derived_hint')}
-                    {derivedTotal != null ? ` · ${Currency.formatAmount(derivedTotal, currency)} ${currency}` : ''}
-                  </Text>
-                )}
-
-                {customBudget && (
-                  <>
-                    {currencies.length > 0 && (
-                      <View style={styles.field}>
-                        <Text style={[styles.fieldLabel, { color: colors.mutedText }]}>{t('currency')}</Text>
-                        <View style={styles.currencyRow}>
-                          {currencies.map((code) => (
-                            <Pressable
-                              key={code}
-                              style={[
-                                styles.currencyChip,
-                                { borderColor: colors.border },
-                                groupCurrency === code && { backgroundColor: colors.primary, borderColor: colors.primary },
-                              ]}
-                              onPress={() => setGroupCurrency(code)}
-                              accessibilityRole="button"
-                              accessibilityState={{ selected: groupCurrency === code }}
-                              accessibilityLabel={code}
-                              testID={`plan-group-currency-${code}`}
-                            >
-                              <Text style={[styles.currencyChipText, { color: colors.text }]}>{code}</Text>
-                            </Pressable>
-                          ))}
-                        </View>
-                      </View>
-                    )}
-                    <View style={styles.field}>
-                      <Text style={[styles.fieldLabel, { color: colors.mutedText }]}>
-                        {t('amount')}{groupCurrency ? ` · ${groupCurrency}` : ''}
-                      </Text>
-                      <FormInput
-                        value={amount}
-                        onChangeText={handleAmountChange}
-                        placeholder={derivedTotal != null ? String(derivedTotal) : '0'}
-                        keyboardType="decimal-pad"
-                        testID="plan-group-amount"
-                      />
-                      <Text style={[styles.fieldHint, { color: colors.mutedText }]}>
-                        {t('group_budget_override_hint')}
-                      </Text>
-                    </View>
-                  </>
-                )}
-
-                {error && (
-                  <Text style={[styles.error, { color: colors.danger }]} testID="plan-group-error">
-                    {error}
-                  </Text>
-                )}
-
-                {isEditing && (
-                  <Pressable
-                    style={[styles.deleteRow, { borderTopColor: colors.border }]}
-                    onPress={handleDelete}
-                    accessibilityRole="button"
-                    accessibilityLabel={t('delete_group')}
-                    testID="plan-group-delete"
-                  >
-                    <Icon name="delete-outline" size={20} color={colors.delete || colors.danger} />
-                    <Text style={[styles.deleteText, { color: colors.delete || colors.danger }]}>
-                      {t('delete_group')}
-                    </Text>
-                  </Pressable>
-                )}
-              </ScrollView>
-
-              <View style={[styles.buttonRow, { backgroundColor: colors.card }]}>
-                <Pressable
-                  style={[styles.button, { backgroundColor: colors.secondary }]}
-                  onPress={onClose}
-                  accessibilityRole="button"
-                  accessibilityLabel={t('cancel')}
-                >
-                  <Text style={[styles.buttonText, { color: colors.text }]}>{t('cancel')}</Text>
-                </Pressable>
-                <Pressable
-                  style={[styles.button, { backgroundColor: colors.primary }, saving && styles.buttonDisabled]}
-                  onPress={handleSave}
-                  disabled={saving}
-                  accessibilityRole="button"
-                  accessibilityLabel={t('save')}
-                  accessibilityState={{ disabled: saving, busy: saving }}
-                  testID="plan-group-save"
-                >
-                  <Text style={[styles.buttonText, { color: colors.text }]}>{t('save')}</Text>
-                </Pressable>
+              <View style={styles.field}>
+                <Text style={[styles.fieldLabel, { color: colors.mutedText }]}>
+                  {t('group_name')}
+                </Text>
+                <FormInput
+                  value={label}
+                  onChangeText={(text) => { setLabel(text); setError(null); }}
+                  placeholder={t('group_name')}
+                  testID="plan-group-name"
+                />
               </View>
-            </Pressable>
+
+              {/* Derived by default: the group is worth what its lines are
+                  worth, and that figure keeps itself up to date. The toggle is
+                  for the case where the envelope has a size of its own. */}
+              <Pressable
+                style={[styles.toggleRow, { borderColor: colors.border }]}
+                onPress={() => { setCustomBudget(v => !v); setError(null); }}
+                accessibilityRole="switch"
+                accessibilityState={{ checked: customBudget }}
+                accessibilityLabel={t('custom_group_budget')}
+                testID="plan-group-custom-toggle"
+              >
+                <View style={styles.toggleLabel}>
+                  <Icon name="pencil-outline" size={20} color={colors.text} />
+                  <Text style={[styles.text16, { color: colors.text }]}>
+                    {t('custom_group_budget')}
+                  </Text>
+                </View>
+                <View style={[styles.switchTrack, { backgroundColor: customBudget ? colors.primary : colors.border }]}>
+                  <View style={[styles.switchThumb, { transform: [{ translateX: customBudget ? 18 : 2 }] }]} />
+                </View>
+              </Pressable>
+
+              {!customBudget && (
+                <Text style={[styles.fieldHint, { color: colors.mutedText }]} testID="plan-group-derived-hint">
+                  {t('group_budget_derived_hint')}
+                  {derivedTotal != null ? ` · ${Currency.formatAmount(derivedTotal, currency)} ${currency}` : ''}
+                </Text>
+              )}
+
+              {customBudget && (
+                <>
+                  {currencies.length > 0 && (
+                    <View style={styles.field}>
+                      <Text style={[styles.fieldLabel, { color: colors.mutedText }]}>{t('currency')}</Text>
+                      <View style={styles.currencyRow}>
+                        {currencies.map((code) => (
+                          <Pressable
+                            key={code}
+                            style={[
+                              styles.currencyChip,
+                              { borderColor: colors.border },
+                              groupCurrency === code && { backgroundColor: colors.primary, borderColor: colors.primary },
+                            ]}
+                            onPress={() => setGroupCurrency(code)}
+                            accessibilityRole="button"
+                            accessibilityState={{ selected: groupCurrency === code }}
+                            accessibilityLabel={code}
+                            testID={`plan-group-currency-${code}`}
+                          >
+                            <Text style={[styles.currencyChipText, { color: colors.text }]}>{code}</Text>
+                          </Pressable>
+                        ))}
+                      </View>
+                    </View>
+                  )}
+                  <View style={styles.field}>
+                    <Text style={[styles.fieldLabel, { color: colors.mutedText }]}>
+                      {t('amount')}{groupCurrency ? ` · ${groupCurrency}` : ''}
+                    </Text>
+                    <FormInput
+                      value={amount}
+                      onChangeText={handleAmountChange}
+                      placeholder={derivedTotal != null ? String(derivedTotal) : '0'}
+                      keyboardType="decimal-pad"
+                      testID="plan-group-amount"
+                    />
+                    <Text style={[styles.fieldHint, { color: colors.mutedText }]}>
+                      {t('group_budget_override_hint')}
+                    </Text>
+                  </View>
+                </>
+              )}
+
+              {error && (
+                <Text style={[styles.error, { color: colors.danger }]} testID="plan-group-error">
+                  {error}
+                </Text>
+              )}
+
+              {isEditing && (
+                <Pressable
+                  style={[styles.deleteRow, { borderTopColor: colors.border }]}
+                  onPress={handleDelete}
+                  accessibilityRole="button"
+                  accessibilityLabel={t('delete_group')}
+                  testID="plan-group-delete"
+                >
+                  <Icon name="delete-outline" size={20} color={colors.delete || colors.danger} />
+                  <Text style={[styles.deleteText, { color: colors.delete || colors.danger }]}>
+                    {t('delete_group')}
+                  </Text>
+                </Pressable>
+              )}
+            </ScrollView>
+
+            <View style={[styles.buttonRow, { backgroundColor: colors.card }]}>
+              <Pressable
+                style={[styles.button, { backgroundColor: colors.secondary }]}
+                onPress={onClose}
+                accessibilityRole="button"
+                accessibilityLabel={t('cancel')}
+              >
+                <Text style={[styles.buttonText, { color: colors.text }]}>{t('cancel')}</Text>
+              </Pressable>
+              <Pressable
+                style={[styles.button, { backgroundColor: colors.primary }, saving && styles.buttonDisabled]}
+                onPress={handleSave}
+                disabled={saving}
+                accessibilityRole="button"
+                accessibilityLabel={t('save')}
+                accessibilityState={{ disabled: saving, busy: saving }}
+                testID="plan-group-save"
+              >
+                <Text style={[styles.buttonText, { color: colors.text }]}>{t('save')}</Text>
+              </Pressable>
+            </View>
           </Pressable>
-        </KeyboardAvoidingView>
+        </AnimatedPressable>
       </Modal>
     </>
   );
@@ -366,9 +370,6 @@ const styles = StyleSheet.create({
   fieldLabel: {
     fontSize: 12,
     marginBottom: 6,
-  },
-  flex1: {
-    flex: 1,
   },
   modalContent: {
     borderRadius: 12,

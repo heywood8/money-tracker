@@ -7,8 +7,6 @@ import {
   StyleSheet,
   FlatList,
   ScrollView,
-  KeyboardAvoidingView,
-  Platform,
   Keyboard,
   Animated,
   Easing,
@@ -21,10 +19,14 @@ import { useLocalization } from '../../contexts/LocalizationContext';
 import { DURATION_ENTER, DURATION_EXIT } from '../../utils/motion';
 import { motionDuration } from '../../utils/reducedMotion';
 import { useDialog } from '../../contexts/DialogContext';
+import useKeyboardOffset from '../../hooks/useKeyboardOffset';
 import FormInput from '../FormInput';
 import ModalBlurOverlay from '../ModalBlurOverlay';
 import ModalHeader from '../ModalHeader';
 import * as Currency from '../../services/currency';
+
+// The overlay carries the keyboard inset, so it has to be animatable.
+const AnimatedPressable = Animated.createAnimatedComponent(Pressable);
 
 const KINDS = ['income', 'expense', 'transfer'];
 
@@ -73,6 +75,9 @@ export default function BudgetPlanLineModal({
   const { colors } = useThemeColors();
   const { t } = useLocalization();
   const { showDialog } = useDialog();
+  // Lifts the card above the keyboard. NOT a KeyboardAvoidingView — see the
+  // hook's own note for what that one does inside a Modal under edge-to-edge.
+  const keyboardOffset = useKeyboardOffset(visible);
 
   const isEditingLine = line != null;
 
@@ -473,549 +478,547 @@ export default function BudgetPlanLineModal({
         onRequestClose={handleRequestClose}
         testID="plan-line-modal"
       >
-        <KeyboardAvoidingView
-          behavior={Platform.OS === 'ios' ? 'padding' : 'height'}
-          style={styles.flex1}
+        <AnimatedPressable
+          style={[styles.modalOverlay, { paddingBottom: keyboardOffset }]}
+          onPress={onClose}
         >
-          <Pressable style={styles.modalOverlay} onPress={onClose}>
-            <Pressable style={[styles.modalContent, { backgroundColor: colors.card }]} onPress={() => {}}>
-              <Animated.View
-                style={[styles.mainContent, { opacity: mainOpacity, transform: [{ translateX: mainTranslateX }] }]}
+          <Pressable style={[styles.modalContent, { backgroundColor: colors.card }]} onPress={() => {}}>
+            <Animated.View
+              style={[styles.mainContent, { opacity: mainOpacity, transform: [{ translateX: mainTranslateX }] }]}
+            >
+              <ScrollView
+                contentContainerStyle={styles.scrollContent}
+                keyboardShouldPersistTaps="handled"
               >
-                <ScrollView
-                  contentContainerStyle={styles.scrollContent}
-                  keyboardShouldPersistTaps="handled"
-                >
-                  <ModalHeader title={title} />
+                <ModalHeader title={title} />
 
-                  {/* What this line is: income declares expected income, expense
-                      and transfer allocate it. */}
+                {/* What this line is: income declares expected income, expense
+                    and transfer allocate it. */}
+                <View style={styles.field}>
+                  <Text style={[styles.fieldLabel, { color: colors.mutedText }]}>
+                    {t('allocation_type')}
+                  </Text>
+                  <View style={styles.segment}>
+                    {KINDS.map((option) => (
+                      <Pressable
+                        key={option}
+                        style={[
+                          styles.segmentButton,
+                          { borderColor: colors.border },
+                          kind === option && { backgroundColor: colors.primary, borderColor: colors.primary },
+                        ]}
+                        onPress={() => handleSelectKind(option)}
+                        accessibilityRole="button"
+                        accessibilityState={{ selected: kind === option }}
+                        accessibilityLabel={t(option)}
+                        testID={`plan-line-kind-${option}`}
+                      >
+                        <Text style={[styles.segmentText, { color: kind === option ? colors.text : colors.mutedText }]}>
+                          {t(option)}
+                        </Text>
+                      </Pressable>
+                    ))}
+                  </View>
+                </View>
+
+                {/* Tracking target */}
+                <View style={styles.field}>
+                  <Text style={[styles.fieldLabel, { color: colors.mutedText }]}>
+                    {kind === 'income' ? `${t('income_target')} · ${t('optional')}` : t('tracking_target')}
+                  </Text>
+                  <Pressable
+                    style={[styles.targetButton, { backgroundColor: colors.inputBackground, borderColor: colors.inputBorder }]}
+                    onPress={openTargetPanel}
+                    accessibilityRole="button"
+                    accessibilityLabel={t('select_target')}
+                    testID="plan-target-picker"
+                  >
+                    {targetSummary ? (
+                      <View style={styles.targetValue}>
+                        <Icon name={targetSummary.icon} size={20} color={colors.text} />
+                        <Text style={[styles.text16, { color: colors.text }]} numberOfLines={1}>
+                          {targetSummary.name}
+                        </Text>
+                      </View>
+                    ) : (
+                      <Text style={[styles.text16, { color: colors.mutedText }]}>
+                        {t('select_target')}
+                      </Text>
+                    )}
+                    <Icon name="chevron-right" size={20} color={colors.mutedText} />
+                  </Pressable>
+                </View>
+
+                {/* Execution account — set one and the line becomes a one-tap
+                    payable (the former planned operation). */}
+                <View style={styles.field}>
+                  <Text style={[styles.fieldLabel, { color: colors.mutedText }]}>
+                    {t('template_account')} · {t('optional')}
+                  </Text>
+                  <Pressable
+                    style={[styles.targetButton, { backgroundColor: colors.inputBackground, borderColor: colors.inputBorder }]}
+                    onPress={openAccountPanel}
+                    accessibilityRole="button"
+                    accessibilityLabel={t('template_account')}
+                    testID="plan-account-picker"
+                  >
+                    {executionAccount ? (
+                      <View style={styles.targetValue}>
+                        <Icon name="wallet-outline" size={20} color={colors.text} />
+                        <Text style={[styles.text16, { color: colors.text }]} numberOfLines={1}>
+                          {executionAccount.name} · {executionAccount.currency}
+                        </Text>
+                      </View>
+                    ) : (
+                      <Text style={[styles.text16, { color: colors.mutedText }]}>
+                        {t('no_template_account')}
+                      </Text>
+                    )}
+                    <Icon name="chevron-right" size={20} color={colors.mutedText} />
+                  </Pressable>
+                  <Text style={[styles.fieldHint, { color: colors.mutedText }]}>
+                    {t('template_account_hint')}
+                  </Text>
+                </View>
+
+                {/* Group — an envelope this line shares with others (migration
+                    0022). Offered for allocations only: an income line declares
+                    expected income and has no spending for a group to total. */}
+                {kind !== 'income' && (
                   <View style={styles.field}>
                     <Text style={[styles.fieldLabel, { color: colors.mutedText }]}>
-                      {t('allocation_type')}
+                      {t('group')} · {t('optional')}
                     </Text>
-                    <View style={styles.segment}>
-                      {KINDS.map((option) => (
-                        <Pressable
-                          key={option}
-                          style={[
-                            styles.segmentButton,
-                            { borderColor: colors.border },
-                            kind === option && { backgroundColor: colors.primary, borderColor: colors.primary },
-                          ]}
-                          onPress={() => handleSelectKind(option)}
-                          accessibilityRole="button"
-                          accessibilityState={{ selected: kind === option }}
-                          accessibilityLabel={t(option)}
-                          testID={`plan-line-kind-${option}`}
-                        >
-                          <Text style={[styles.segmentText, { color: kind === option ? colors.text : colors.mutedText }]}>
-                            {t(option)}
+                    <Pressable
+                      style={[styles.targetButton, { backgroundColor: colors.inputBackground, borderColor: colors.inputBorder }]}
+                      onPress={openGroupPanel}
+                      accessibilityRole="button"
+                      accessibilityLabel={t('group')}
+                      testID="plan-group-picker"
+                    >
+                      {selectedGroup ? (
+                        <View style={styles.targetValue}>
+                          <Icon name="folder-outline" size={20} color={colors.text} />
+                          <Text style={[styles.text16, { color: colors.text }]} numberOfLines={1}>
+                            {selectedGroup.label}
                           </Text>
+                        </View>
+                      ) : (
+                        <Text style={[styles.text16, { color: colors.mutedText }]}>
+                          {t('no_group')}
+                        </Text>
+                      )}
+                      <Icon name="chevron-right" size={20} color={colors.mutedText} />
+                    </Pressable>
+                  </View>
+                )}
+
+                {/* Recurring toggle: a recurring line is a global template that
+                    applies to every calendar month automatically, instead of
+                    being scoped to this one month. */}
+                <Pressable
+                  style={[styles.recurringRow, { borderColor: colors.border }]}
+                  onPress={() => setIsRecurring(v => !v)}
+                  accessibilityRole="switch"
+                  accessibilityState={{ checked: isRecurring }}
+                  accessibilityLabel={t('recurring_allocation')}
+                  testID="plan-line-recurring-toggle"
+                >
+                  <View style={styles.recurringLabel}>
+                    <Icon name="repeat" size={20} color={colors.text} />
+                    <Text style={[styles.text16, { color: colors.text }]}>
+                      {t('recurring_allocation')}
+                    </Text>
+                  </View>
+                  <View
+                    style={[
+                      styles.switchTrack,
+                      { backgroundColor: isRecurring ? colors.primary : colors.border },
+                    ]}
+                  >
+                    <View
+                      style={[
+                        styles.switchThumb,
+                        { transform: [{ translateX: isRecurring ? 18 : 2 }] },
+                      ]}
+                    />
+                  </View>
+                </Pressable>
+
+                {/* Currency picker — shown for any line without an execution
+                    account: with an account the amount is by definition in that
+                    account's currency and there is nothing to pick. A one-off
+                    line defaults to the plan's currency (and stores null, i.e.
+                    "inherit", while it stays on it). */}
+                {executionCurrency == null && currencyOptions.length > 0 && (
+                  <View style={styles.field}>
+                    <Text style={[styles.fieldLabel, { color: colors.mutedText }]}>
+                      {t('currency')}
+                    </Text>
+                    <View style={styles.currencyRow}>
+                      {currencyOptions.map((code) => (
+                        <Pressable
+                          key={code}
+                          style={[
+                            styles.currencyChip,
+                            { borderColor: colors.border },
+                            lineCurrency === code && { backgroundColor: colors.primary, borderColor: colors.primary },
+                          ]}
+                          onPress={() => setLineCurrency(code)}
+                          accessibilityRole="button"
+                          accessibilityState={{ selected: lineCurrency === code }}
+                          accessibilityLabel={code}
+                          testID={`plan-line-currency-${code}`}
+                        >
+                          <Text style={[styles.currencyChipText, { color: colors.text }]}>{code}</Text>
                         </Pressable>
                       ))}
                     </View>
                   </View>
+                )}
 
-                  {/* Tracking target */}
-                  <View style={styles.field}>
-                    <Text style={[styles.fieldLabel, { color: colors.mutedText }]}>
-                      {kind === 'income' ? `${t('income_target')} · ${t('optional')}` : t('tracking_target')}
-                    </Text>
-                    <Pressable
-                      style={[styles.targetButton, { backgroundColor: colors.inputBackground, borderColor: colors.inputBorder }]}
-                      onPress={openTargetPanel}
-                      accessibilityRole="button"
-                      accessibilityLabel={t('select_target')}
-                      testID="plan-target-picker"
-                    >
-                      {targetSummary ? (
-                        <View style={styles.targetValue}>
-                          <Icon name={targetSummary.icon} size={20} color={colors.text} />
-                          <Text style={[styles.text16, { color: colors.text }]} numberOfLines={1}>
-                            {targetSummary.name}
-                          </Text>
-                        </View>
-                      ) : (
-                        <Text style={[styles.text16, { color: colors.mutedText }]}>
-                          {t('select_target')}
-                        </Text>
-                      )}
-                      <Icon name="chevron-right" size={20} color={colors.mutedText} />
-                    </Pressable>
-                  </View>
+                {/* Amount — a plain numeric field. A budget line is typed once
+                    and rarely edited, so the on-screen calculator cost half the
+                    modal's height (its bottom row sat under the button bar) and
+                    bought nothing the number pad doesn't already give. */}
+                <View style={styles.field}>
+                  <Text style={[styles.fieldLabel, { color: colors.mutedText }]}>
+                    {t('amount')}{displayCurrency ? ` · ${displayCurrency}` : ''}
+                  </Text>
+                  <FormInput
+                    value={amount}
+                    onChangeText={handleAmountChange}
+                    placeholder="0"
+                    keyboardType="decimal-pad"
+                    testID="plan-line-amount"
+                  />
+                </View>
 
-                  {/* Execution account — set one and the line becomes a one-tap
-                      payable (the former planned operation). */}
-                  <View style={styles.field}>
-                    <Text style={[styles.fieldLabel, { color: colors.mutedText }]}>
-                      {t('template_account')} · {t('optional')}
-                    </Text>
-                    <Pressable
-                      style={[styles.targetButton, { backgroundColor: colors.inputBackground, borderColor: colors.inputBorder }]}
-                      onPress={openAccountPanel}
-                      accessibilityRole="button"
-                      accessibilityLabel={t('template_account')}
-                      testID="plan-account-picker"
-                    >
-                      {executionAccount ? (
-                        <View style={styles.targetValue}>
-                          <Icon name="wallet-outline" size={20} color={colors.text} />
-                          <Text style={[styles.text16, { color: colors.text }]} numberOfLines={1}>
-                            {executionAccount.name} · {executionAccount.currency}
-                          </Text>
-                        </View>
-                      ) : (
-                        <Text style={[styles.text16, { color: colors.mutedText }]}>
-                          {t('no_template_account')}
-                        </Text>
-                      )}
-                      <Icon name="chevron-right" size={20} color={colors.mutedText} />
-                    </Pressable>
-                    <Text style={[styles.fieldHint, { color: colors.mutedText }]}>
-                      {t('template_account_hint')}
-                    </Text>
-                  </View>
+                {/* Label + comment */}
+                <View style={styles.field}>
+                  <Text style={[styles.fieldLabel, { color: colors.mutedText }]}>
+                    {t('allocation_label')} · {t('optional')}
+                  </Text>
+                  <FormInput
+                    value={label}
+                    onChangeText={setLabel}
+                    placeholder={targetSummary?.name || t('allocation_label')}
+                    testID="plan-line-label"
+                  />
+                </View>
+                <View style={styles.field}>
+                  <Text style={[styles.fieldLabel, { color: colors.mutedText }]}>
+                    {t('allocation_comment')} · {t('optional')}
+                  </Text>
+                  <FormInput
+                    value={comment}
+                    onChangeText={setComment}
+                    placeholder={t('allocation_comment')}
+                    multiline
+                    numberOfLines={2}
+                    testID="plan-line-comment"
+                  />
+                </View>
 
-                  {/* Group — an envelope this line shares with others (migration
-                      0022). Offered for allocations only: an income line declares
-                      expected income and has no spending for a group to total. */}
-                  {kind !== 'income' && (
-                    <View style={styles.field}>
-                      <Text style={[styles.fieldLabel, { color: colors.mutedText }]}>
-                        {t('group')} · {t('optional')}
-                      </Text>
-                      <Pressable
-                        style={[styles.targetButton, { backgroundColor: colors.inputBackground, borderColor: colors.inputBorder }]}
-                        onPress={openGroupPanel}
-                        accessibilityRole="button"
-                        accessibilityLabel={t('group')}
-                        testID="plan-group-picker"
-                      >
-                        {selectedGroup ? (
-                          <View style={styles.targetValue}>
-                            <Icon name="folder-outline" size={20} color={colors.text} />
-                            <Text style={[styles.text16, { color: colors.text }]} numberOfLines={1}>
-                              {selectedGroup.label}
-                            </Text>
-                          </View>
-                        ) : (
-                          <Text style={[styles.text16, { color: colors.mutedText }]}>
-                            {t('no_group')}
-                          </Text>
-                        )}
-                        <Icon name="chevron-right" size={20} color={colors.mutedText} />
-                      </Pressable>
-                    </View>
-                  )}
+                {error && (
+                  <Text style={[styles.error, { color: colors.danger }]} testID="plan-line-error">
+                    {error}
+                  </Text>
+                )}
 
-                  {/* Recurring toggle: a recurring line is a global template that
-                      applies to every calendar month automatically, instead of
-                      being scoped to this one month. */}
+                {isEditingLine && (
                   <Pressable
-                    style={[styles.recurringRow, { borderColor: colors.border }]}
-                    onPress={() => setIsRecurring(v => !v)}
-                    accessibilityRole="switch"
-                    accessibilityState={{ checked: isRecurring }}
-                    accessibilityLabel={t('recurring_allocation')}
-                    testID="plan-line-recurring-toggle"
+                    style={[styles.deleteRow, { borderTopColor: colors.border }]}
+                    onPress={handleDelete}
+                    accessibilityRole="button"
+                    accessibilityLabel={t('delete_allocation')}
+                    testID="plan-line-delete"
                   >
-                    <View style={styles.recurringLabel}>
-                      <Icon name="repeat" size={20} color={colors.text} />
-                      <Text style={[styles.text16, { color: colors.text }]}>
-                        {t('recurring_allocation')}
-                      </Text>
-                    </View>
-                    <View
-                      style={[
-                        styles.switchTrack,
-                        { backgroundColor: isRecurring ? colors.primary : colors.border },
-                      ]}
+                    <Icon name="delete-outline" size={20} color={colors.delete || colors.danger} />
+                    <Text style={[styles.deleteText, { color: colors.delete || colors.danger }]}>
+                      {t('delete_allocation')}
+                    </Text>
+                  </Pressable>
+                )}
+              </ScrollView>
+
+              <View style={[styles.buttonRow, { backgroundColor: colors.card }]}>
+                <Pressable
+                  style={[styles.button, { backgroundColor: colors.secondary }]}
+                  onPress={onClose}
+                  accessibilityRole="button"
+                  accessibilityLabel={t('cancel')}
+                >
+                  <Text style={[styles.buttonText, { color: colors.text }]}>{t('cancel')}</Text>
+                </Pressable>
+                <Pressable
+                  style={[styles.button, { backgroundColor: colors.primary }, saving && styles.buttonDisabled]}
+                  onPress={handleSave}
+                  disabled={saving}
+                  accessibilityRole="button"
+                  accessibilityLabel={t('save')}
+                  accessibilityState={{ disabled: saving, busy: saving }}
+                  testID="plan-line-save"
+                >
+                  <Text style={[styles.buttonText, { color: colors.text }]}>{t('save')}</Text>
+                </Pressable>
+              </View>
+            </Animated.View>
+
+            {/* Target picker subpanel (slides in over the form) */}
+            {activeSubPanel === 'target' && (
+              <Animated.View
+                testID="plan-target-subpanel"
+                style={[
+                  styles.subPanel,
+                  { backgroundColor: colors.card },
+                  { opacity: subPanelAnim, transform: [{ translateX: subPanelTranslateX }] },
+                ]}
+              >
+                <View style={styles.subPanelHeader}>
+                  <Pressable
+                    onPress={closeSubPanel}
+                    style={styles.subPanelBack}
+                    hitSlop={8}
+                    accessibilityRole="button"
+                    accessibilityLabel={t('back')}
+                    testID="plan-target-back"
+                  >
+                    <Icon name="arrow-left" size={24} color={colors.text} />
+                  </Pressable>
+                  <Text style={[styles.subPanelTitle, { color: colors.text }]}>{t('select_target')}</Text>
+                  {/* Categories toggle in place instead of closing the panel,
+                      so there has to be something that says "I'm finished
+                      picking". The account tab needs none — one tap there is
+                      the whole selection. */}
+                  {pickerKind === 'category' && (
+                    <Pressable
+                      onPress={closeSubPanel}
+                      style={styles.subPanelDone}
+                      hitSlop={8}
+                      accessibilityRole="button"
+                      accessibilityLabel={t('done')}
+                      testID="plan-target-done"
                     >
-                      <View
-                        style={[
-                          styles.switchThumb,
-                          { transform: [{ translateX: isRecurring ? 18 : 2 }] },
-                        ]}
+                      <Text style={[styles.subPanelDoneText, { color: colors.primary }]}>{t('done')}</Text>
+                    </Pressable>
+                  )}
+                </View>
+
+                {/* Two-mode toggle: category OR destination account. An income
+                    line tracks no transfer target, so it skips the toggle. */}
+                {kind !== 'income' && (
+                  <View style={styles.segment}>
+                    <Pressable
+                      style={[
+                        styles.segmentButton,
+                        { borderColor: colors.border },
+                        pickerKind === 'category' && { backgroundColor: colors.primary },
+                      ]}
+                      onPress={() => setPickerKind('category')}
+                      accessibilityRole="button"
+                      accessibilityState={{ selected: pickerKind === 'category' }}
+                      accessibilityLabel={t('category_target')}
+                      testID="plan-target-tab-category"
+                    >
+                      <Text style={[styles.segmentText, { color: pickerKind === 'category' ? colors.text : colors.mutedText }]}>
+                        {t('category_target')}
+                      </Text>
+                    </Pressable>
+                    <Pressable
+                      style={[
+                        styles.segmentButton,
+                        { borderColor: colors.border },
+                        pickerKind === 'account' && { backgroundColor: colors.primary },
+                      ]}
+                      onPress={() => setPickerKind('account')}
+                      accessibilityRole="button"
+                      accessibilityState={{ selected: pickerKind === 'account' }}
+                      accessibilityLabel={t('transfer_target')}
+                      testID="plan-target-tab-account"
+                    >
+                      <Text style={[styles.segmentText, { color: pickerKind === 'account' ? colors.text : colors.mutedText }]}>
+                        {t('transfer_target')}
+                      </Text>
+                    </Pressable>
+                  </View>
+                )}
+
+                <FlatList
+                  data={kind !== 'income' && pickerKind === 'account' ? accounts : targetCategories}
+                  keyExtractor={(item) => String(item.id)}
+                  renderItem={renderTargetItem}
+                  keyboardShouldPersistTaps="handled"
+                  ListEmptyComponent={(
+                    <Text style={[styles.emptyText, { color: colors.mutedText }]}>
+                      {pickerKind === 'category' ? t('no_categories') : t('no_accounts')}
+                    </Text>
+                  )}
+                />
+              </Animated.View>
+            )}
+
+            {/* Group subpanel: pick an existing envelope, drop out of one, or
+                create one without leaving the half-filled form. */}
+            {activeSubPanel === 'group' && (
+              <Animated.View
+                testID="plan-group-subpanel"
+                style={[
+                  styles.subPanel,
+                  { backgroundColor: colors.card },
+                  { opacity: subPanelAnim, transform: [{ translateX: subPanelTranslateX }] },
+                ]}
+              >
+                <View style={styles.subPanelHeader}>
+                  <Pressable
+                    onPress={closeSubPanel}
+                    style={styles.subPanelBack}
+                    hitSlop={8}
+                    accessibilityRole="button"
+                    accessibilityLabel={t('back')}
+                    testID="plan-group-back"
+                  >
+                    <Icon name="arrow-left" size={24} color={colors.text} />
+                  </Pressable>
+                  <Text style={[styles.subPanelTitle, { color: colors.text }]}>{t('group')}</Text>
+                </View>
+
+                {onCreateGroup && (
+                  <View style={styles.newGroupRow}>
+                    <View style={styles.newGroupInput}>
+                      <FormInput
+                        value={newGroupName}
+                        onChangeText={setNewGroupName}
+                        placeholder={t('new_group')}
+                        testID="plan-group-new-name"
                       />
                     </View>
-                  </Pressable>
-
-                  {/* Currency picker — shown for any line without an execution
-                      account: with an account the amount is by definition in that
-                      account's currency and there is nothing to pick. A one-off
-                      line defaults to the plan's currency (and stores null, i.e.
-                      "inherit", while it stays on it). */}
-                  {executionCurrency == null && currencyOptions.length > 0 && (
-                    <View style={styles.field}>
-                      <Text style={[styles.fieldLabel, { color: colors.mutedText }]}>
-                        {t('currency')}
-                      </Text>
-                      <View style={styles.currencyRow}>
-                        {currencyOptions.map((code) => (
-                          <Pressable
-                            key={code}
-                            style={[
-                              styles.currencyChip,
-                              { borderColor: colors.border },
-                              lineCurrency === code && { backgroundColor: colors.primary, borderColor: colors.primary },
-                            ]}
-                            onPress={() => setLineCurrency(code)}
-                            accessibilityRole="button"
-                            accessibilityState={{ selected: lineCurrency === code }}
-                            accessibilityLabel={code}
-                            testID={`plan-line-currency-${code}`}
-                          >
-                            <Text style={[styles.currencyChipText, { color: colors.text }]}>{code}</Text>
-                          </Pressable>
-                        ))}
-                      </View>
-                    </View>
-                  )}
-
-                  {/* Amount — a plain numeric field. A budget line is typed once
-                      and rarely edited, so the on-screen calculator cost half the
-                      modal's height (its bottom row sat under the button bar) and
-                      bought nothing the number pad doesn't already give. */}
-                  <View style={styles.field}>
-                    <Text style={[styles.fieldLabel, { color: colors.mutedText }]}>
-                      {t('amount')}{displayCurrency ? ` · ${displayCurrency}` : ''}
-                    </Text>
-                    <FormInput
-                      value={amount}
-                      onChangeText={handleAmountChange}
-                      placeholder="0"
-                      keyboardType="decimal-pad"
-                      testID="plan-line-amount"
-                    />
-                  </View>
-
-                  {/* Label + comment */}
-                  <View style={styles.field}>
-                    <Text style={[styles.fieldLabel, { color: colors.mutedText }]}>
-                      {t('allocation_label')} · {t('optional')}
-                    </Text>
-                    <FormInput
-                      value={label}
-                      onChangeText={setLabel}
-                      placeholder={targetSummary?.name || t('allocation_label')}
-                      testID="plan-line-label"
-                    />
-                  </View>
-                  <View style={styles.field}>
-                    <Text style={[styles.fieldLabel, { color: colors.mutedText }]}>
-                      {t('allocation_comment')} · {t('optional')}
-                    </Text>
-                    <FormInput
-                      value={comment}
-                      onChangeText={setComment}
-                      placeholder={t('allocation_comment')}
-                      multiline
-                      numberOfLines={2}
-                      testID="plan-line-comment"
-                    />
-                  </View>
-
-                  {error && (
-                    <Text style={[styles.error, { color: colors.danger }]} testID="plan-line-error">
-                      {error}
-                    </Text>
-                  )}
-
-                  {isEditingLine && (
                     <Pressable
-                      style={[styles.deleteRow, { borderTopColor: colors.border }]}
-                      onPress={handleDelete}
+                      onPress={handleCreateGroup}
+                      disabled={!newGroupName.trim()}
+                      style={[
+                        styles.newGroupButton,
+                        { backgroundColor: colors.primary },
+                        !newGroupName.trim() && styles.buttonDisabled,
+                      ]}
                       accessibilityRole="button"
-                      accessibilityLabel={t('delete_allocation')}
-                      testID="plan-line-delete"
+                      accessibilityLabel={t('create_group')}
+                      accessibilityState={{ disabled: !newGroupName.trim() }}
+                      testID="plan-group-create"
                     >
-                      <Icon name="delete-outline" size={20} color={colors.delete || colors.danger} />
-                      <Text style={[styles.deleteText, { color: colors.delete || colors.danger }]}>
-                        {t('delete_allocation')}
+                      <Icon name="plus" size={20} color={colors.text} />
+                    </Pressable>
+                  </View>
+                )}
+
+                <Pressable
+                  onPress={() => handleSelectGroup(null)}
+                  style={({ pressed }) => [
+                    styles.pickerOption,
+                    { borderColor: colors.border },
+                    pressed && { backgroundColor: colors.selected },
+                    groupId == null && { backgroundColor: colors.selected },
+                  ]}
+                  accessibilityRole="button"
+                  accessibilityLabel={t('no_group')}
+                  testID="plan-group-option-none"
+                >
+                  <Icon name="close-circle-outline" size={22} color={colors.text} />
+                  <Text style={[styles.optionText, { color: colors.text }]} numberOfLines={1}>
+                    {t('no_group')}
+                  </Text>
+                </Pressable>
+
+                <FlatList
+                  data={groups}
+                  keyExtractor={(item) => String(item.id)}
+                  keyboardShouldPersistTaps="handled"
+                  renderItem={({ item }) => (
+                    <Pressable
+                      onPress={() => handleSelectGroup(item.id)}
+                      style={({ pressed }) => [
+                        styles.pickerOption,
+                        { borderColor: colors.border },
+                        pressed && { backgroundColor: colors.selected },
+                        groupId === item.id && { backgroundColor: colors.selected },
+                      ]}
+                      accessibilityRole="button"
+                      accessibilityState={{ selected: groupId === item.id }}
+                      accessibilityLabel={item.label}
+                      testID={`plan-group-option-${item.id}`}
+                    >
+                      <Icon name="folder-outline" size={22} color={colors.text} />
+                      <Text style={[styles.optionText, { color: colors.text }]} numberOfLines={1}>
+                        {item.label}
                       </Text>
                     </Pressable>
                   )}
-                </ScrollView>
-
-                <View style={[styles.buttonRow, { backgroundColor: colors.card }]}>
-                  <Pressable
-                    style={[styles.button, { backgroundColor: colors.secondary }]}
-                    onPress={onClose}
-                    accessibilityRole="button"
-                    accessibilityLabel={t('cancel')}
-                  >
-                    <Text style={[styles.buttonText, { color: colors.text }]}>{t('cancel')}</Text>
-                  </Pressable>
-                  <Pressable
-                    style={[styles.button, { backgroundColor: colors.primary }, saving && styles.buttonDisabled]}
-                    onPress={handleSave}
-                    disabled={saving}
-                    accessibilityRole="button"
-                    accessibilityLabel={t('save')}
-                    accessibilityState={{ disabled: saving, busy: saving }}
-                    testID="plan-line-save"
-                  >
-                    <Text style={[styles.buttonText, { color: colors.text }]}>{t('save')}</Text>
-                  </Pressable>
-                </View>
+                  ListEmptyComponent={(
+                    <Text style={[styles.emptyText, { color: colors.mutedText }]}>
+                      {t('no_groups_yet')}
+                    </Text>
+                  )}
+                />
               </Animated.View>
+            )}
 
-              {/* Target picker subpanel (slides in over the form) */}
-              {activeSubPanel === 'target' && (
-                <Animated.View
-                  testID="plan-target-subpanel"
-                  style={[
-                    styles.subPanel,
-                    { backgroundColor: colors.card },
-                    { opacity: subPanelAnim, transform: [{ translateX: subPanelTranslateX }] },
-                  ]}
-                >
-                  <View style={styles.subPanelHeader}>
-                    <Pressable
-                      onPress={closeSubPanel}
-                      style={styles.subPanelBack}
-                      hitSlop={8}
-                      accessibilityRole="button"
-                      accessibilityLabel={t('back')}
-                      testID="plan-target-back"
-                    >
-                      <Icon name="arrow-left" size={24} color={colors.text} />
-                    </Pressable>
-                    <Text style={[styles.subPanelTitle, { color: colors.text }]}>{t('select_target')}</Text>
-                    {/* Categories toggle in place instead of closing the panel,
-                        so there has to be something that says "I'm finished
-                        picking". The account tab needs none — one tap there is
-                        the whole selection. */}
-                    {pickerKind === 'category' && (
-                      <Pressable
-                        onPress={closeSubPanel}
-                        style={styles.subPanelDone}
-                        hitSlop={8}
-                        accessibilityRole="button"
-                        accessibilityLabel={t('done')}
-                        testID="plan-target-done"
-                      >
-                        <Text style={[styles.subPanelDoneText, { color: colors.primary }]}>{t('done')}</Text>
-                      </Pressable>
-                    )}
-                  </View>
-
-                  {/* Two-mode toggle: category OR destination account. An income
-                      line tracks no transfer target, so it skips the toggle. */}
-                  {kind !== 'income' && (
-                    <View style={styles.segment}>
-                      <Pressable
-                        style={[
-                          styles.segmentButton,
-                          { borderColor: colors.border },
-                          pickerKind === 'category' && { backgroundColor: colors.primary },
-                        ]}
-                        onPress={() => setPickerKind('category')}
-                        accessibilityRole="button"
-                        accessibilityState={{ selected: pickerKind === 'category' }}
-                        accessibilityLabel={t('category_target')}
-                        testID="plan-target-tab-category"
-                      >
-                        <Text style={[styles.segmentText, { color: pickerKind === 'category' ? colors.text : colors.mutedText }]}>
-                          {t('category_target')}
-                        </Text>
-                      </Pressable>
-                      <Pressable
-                        style={[
-                          styles.segmentButton,
-                          { borderColor: colors.border },
-                          pickerKind === 'account' && { backgroundColor: colors.primary },
-                        ]}
-                        onPress={() => setPickerKind('account')}
-                        accessibilityRole="button"
-                        accessibilityState={{ selected: pickerKind === 'account' }}
-                        accessibilityLabel={t('transfer_target')}
-                        testID="plan-target-tab-account"
-                      >
-                        <Text style={[styles.segmentText, { color: pickerKind === 'account' ? colors.text : colors.mutedText }]}>
-                          {t('transfer_target')}
-                        </Text>
-                      </Pressable>
-                    </View>
-                  )}
-
-                  <FlatList
-                    data={kind !== 'income' && pickerKind === 'account' ? accounts : targetCategories}
-                    keyExtractor={(item) => String(item.id)}
-                    renderItem={renderTargetItem}
-                    keyboardShouldPersistTaps="handled"
-                    ListEmptyComponent={(
-                      <Text style={[styles.emptyText, { color: colors.mutedText }]}>
-                        {pickerKind === 'category' ? t('no_categories') : t('no_accounts')}
-                      </Text>
-                    )}
-                  />
-                </Animated.View>
-              )}
-
-              {/* Group subpanel: pick an existing envelope, drop out of one, or
-                  create one without leaving the half-filled form. */}
-              {activeSubPanel === 'group' && (
-                <Animated.View
-                  testID="plan-group-subpanel"
-                  style={[
-                    styles.subPanel,
-                    { backgroundColor: colors.card },
-                    { opacity: subPanelAnim, transform: [{ translateX: subPanelTranslateX }] },
-                  ]}
-                >
-                  <View style={styles.subPanelHeader}>
-                    <Pressable
-                      onPress={closeSubPanel}
-                      style={styles.subPanelBack}
-                      hitSlop={8}
-                      accessibilityRole="button"
-                      accessibilityLabel={t('back')}
-                      testID="plan-group-back"
-                    >
-                      <Icon name="arrow-left" size={24} color={colors.text} />
-                    </Pressable>
-                    <Text style={[styles.subPanelTitle, { color: colors.text }]}>{t('group')}</Text>
-                  </View>
-
-                  {onCreateGroup && (
-                    <View style={styles.newGroupRow}>
-                      <View style={styles.newGroupInput}>
-                        <FormInput
-                          value={newGroupName}
-                          onChangeText={setNewGroupName}
-                          placeholder={t('new_group')}
-                          testID="plan-group-new-name"
-                        />
-                      </View>
-                      <Pressable
-                        onPress={handleCreateGroup}
-                        disabled={!newGroupName.trim()}
-                        style={[
-                          styles.newGroupButton,
-                          { backgroundColor: colors.primary },
-                          !newGroupName.trim() && styles.buttonDisabled,
-                        ]}
-                        accessibilityRole="button"
-                        accessibilityLabel={t('create_group')}
-                        accessibilityState={{ disabled: !newGroupName.trim() }}
-                        testID="plan-group-create"
-                      >
-                        <Icon name="plus" size={20} color={colors.text} />
-                      </Pressable>
-                    </View>
-                  )}
-
+            {/* Execution account subpanel */}
+            {activeSubPanel === 'account' && (
+              <Animated.View
+                testID="plan-account-subpanel"
+                style={[
+                  styles.subPanel,
+                  { backgroundColor: colors.card },
+                  { opacity: subPanelAnim, transform: [{ translateX: subPanelTranslateX }] },
+                ]}
+              >
+                <View style={styles.subPanelHeader}>
                   <Pressable
-                    onPress={() => handleSelectGroup(null)}
-                    style={({ pressed }) => [
-                      styles.pickerOption,
-                      { borderColor: colors.border },
-                      pressed && { backgroundColor: colors.selected },
-                      groupId == null && { backgroundColor: colors.selected },
-                    ]}
+                    onPress={closeSubPanel}
+                    style={styles.subPanelBack}
+                    hitSlop={8}
                     accessibilityRole="button"
-                    accessibilityLabel={t('no_group')}
-                    testID="plan-group-option-none"
+                    accessibilityLabel={t('back')}
+                    testID="plan-account-back"
                   >
-                    <Icon name="close-circle-outline" size={22} color={colors.text} />
-                    <Text style={[styles.optionText, { color: colors.text }]} numberOfLines={1}>
-                      {t('no_group')}
-                    </Text>
+                    <Icon name="arrow-left" size={24} color={colors.text} />
                   </Pressable>
+                  <Text style={[styles.subPanelTitle, { color: colors.text }]}>{t('template_account')}</Text>
+                </View>
 
-                  <FlatList
-                    data={groups}
-                    keyExtractor={(item) => String(item.id)}
-                    keyboardShouldPersistTaps="handled"
-                    renderItem={({ item }) => (
-                      <Pressable
-                        onPress={() => handleSelectGroup(item.id)}
-                        style={({ pressed }) => [
-                          styles.pickerOption,
-                          { borderColor: colors.border },
-                          pressed && { backgroundColor: colors.selected },
-                          groupId === item.id && { backgroundColor: colors.selected },
-                        ]}
-                        accessibilityRole="button"
-                        accessibilityState={{ selected: groupId === item.id }}
-                        accessibilityLabel={item.label}
-                        testID={`plan-group-option-${item.id}`}
-                      >
-                        <Icon name="folder-outline" size={22} color={colors.text} />
-                        <Text style={[styles.optionText, { color: colors.text }]} numberOfLines={1}>
-                          {item.label}
-                        </Text>
-                      </Pressable>
-                    )}
-                    ListEmptyComponent={(
-                      <Text style={[styles.emptyText, { color: colors.mutedText }]}>
-                        {t('no_groups_yet')}
-                      </Text>
-                    )}
-                  />
-                </Animated.View>
-              )}
-
-              {/* Execution account subpanel */}
-              {activeSubPanel === 'account' && (
-                <Animated.View
-                  testID="plan-account-subpanel"
-                  style={[
-                    styles.subPanel,
-                    { backgroundColor: colors.card },
-                    { opacity: subPanelAnim, transform: [{ translateX: subPanelTranslateX }] },
+                <Pressable
+                  onPress={() => handleSelectExecutionAccount(null)}
+                  style={({ pressed }) => [
+                    styles.pickerOption,
+                    { borderColor: colors.border },
+                    pressed && { backgroundColor: colors.selected },
+                    accountId == null && { backgroundColor: colors.selected },
                   ]}
+                  accessibilityRole="button"
+                  accessibilityLabel={t('no_template_account')}
+                  testID="plan-account-option-none"
                 >
-                  <View style={styles.subPanelHeader}>
-                    <Pressable
-                      onPress={closeSubPanel}
-                      style={styles.subPanelBack}
-                      hitSlop={8}
-                      accessibilityRole="button"
-                      accessibilityLabel={t('back')}
-                      testID="plan-account-back"
-                    >
-                      <Icon name="arrow-left" size={24} color={colors.text} />
-                    </Pressable>
-                    <Text style={[styles.subPanelTitle, { color: colors.text }]}>{t('template_account')}</Text>
-                  </View>
+                  <Icon name="close-circle-outline" size={22} color={colors.text} />
+                  <Text style={[styles.optionText, { color: colors.text }]} numberOfLines={1}>
+                    {t('no_template_account')}
+                  </Text>
+                </Pressable>
 
-                  <Pressable
-                    onPress={() => handleSelectExecutionAccount(null)}
-                    style={({ pressed }) => [
-                      styles.pickerOption,
-                      { borderColor: colors.border },
-                      pressed && { backgroundColor: colors.selected },
-                      accountId == null && { backgroundColor: colors.selected },
-                    ]}
-                    accessibilityRole="button"
-                    accessibilityLabel={t('no_template_account')}
-                    testID="plan-account-option-none"
-                  >
-                    <Icon name="close-circle-outline" size={22} color={colors.text} />
-                    <Text style={[styles.optionText, { color: colors.text }]} numberOfLines={1}>
-                      {t('no_template_account')}
+                <FlatList
+                  data={accounts}
+                  keyExtractor={(item) => String(item.id)}
+                  renderItem={renderExecutionAccountItem}
+                  keyboardShouldPersistTaps="handled"
+                  ListEmptyComponent={(
+                    <Text style={[styles.emptyText, { color: colors.mutedText }]}>
+                      {t('no_accounts')}
                     </Text>
-                  </Pressable>
-
-                  <FlatList
-                    data={accounts}
-                    keyExtractor={(item) => String(item.id)}
-                    renderItem={renderExecutionAccountItem}
-                    keyboardShouldPersistTaps="handled"
-                    ListEmptyComponent={(
-                      <Text style={[styles.emptyText, { color: colors.mutedText }]}>
-                        {t('no_accounts')}
-                      </Text>
-                    )}
-                  />
-                </Animated.View>
-              )}
-            </Pressable>
+                  )}
+                />
+              </Animated.View>
+            )}
           </Pressable>
-        </KeyboardAvoidingView>
+        </AnimatedPressable>
       </Modal>
     </>
   );
@@ -1119,9 +1122,6 @@ const styles = StyleSheet.create({
   fieldLabel: {
     fontSize: 12,
     marginBottom: 6,
-  },
-  flex1: {
-    flex: 1,
   },
   mainContent: {
     flexShrink: 1,
