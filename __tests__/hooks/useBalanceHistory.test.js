@@ -1,5 +1,5 @@
 import { renderHook, act, waitFor } from '@testing-library/react-native';
-import useBalanceHistory from '../../app/hooks/useBalanceHistory';
+import useBalanceHistory, { buildYearAverageSeries, median } from '../../app/hooks/useBalanceHistory';
 import * as BalanceHistoryDB from '../../app/services/BalanceHistoryDB';
 import * as OperationsDB from '../../app/services/OperationsDB';
 
@@ -22,6 +22,7 @@ jest.mock('../../app/services/OperationsDB', () => ({
   getTotalExpenses: jest.fn(),
   getTotalIncome: jest.fn(),
   getTransferTotals: jest.fn(),
+  getMonthlyExpenseTotals: jest.fn(),
 }));
 
 describe('useBalanceHistory', () => {
@@ -37,6 +38,8 @@ describe('useBalanceHistory', () => {
     // and no known day-1 balance unless a test overrides them.
     OperationsDB.getTotalIncome.mockResolvedValue('0');
     OperationsDB.getTransferTotals.mockResolvedValue({ incoming: '0', outgoing: '0' });
+    // "Year average" line inputs: no spending history unless a test says otherwise.
+    OperationsDB.getMonthlyExpenseTotals.mockResolvedValue({});
     BalanceHistoryDB.getAccountBalanceOnOrBeforeDate.mockResolvedValue(null);
     // Mock console.error to suppress error logs in tests
     jest.spyOn(console, 'error').mockImplementation(() => {});
@@ -124,6 +127,7 @@ describe('useBalanceHistory', () => {
         expect(result.current.loadingBalanceHistory).toBe(false);
       });
 
+      // current month + one 12-month window that covers the prev-month line too
       expect(BalanceHistoryDB.getBalanceHistory).toHaveBeenCalledTimes(2);
       expect(result.current.balanceHistoryData).toHaveProperty('actual');
       expect(result.current.balanceHistoryData).toHaveProperty('actualForChart');
@@ -545,14 +549,16 @@ describe('useBalanceHistory', () => {
         expect(result.current.loadingBalanceHistory).toBe(false);
       });
 
-      // getBalanceHistory is called twice: once for Jan 2024, once for the prev month.
-      // The second call must use Dec 2023 boundaries, not Dec 2024.
-      const prevMonthCall = BalanceHistoryDB.getBalanceHistory.mock.calls[1];
-      const prevStartDate = prevMonthCall[1]; // '2023-12-01'
-      const prevEndDate = prevMonthCall[2];   // '2023-12-31'
+      // getBalanceHistory is called twice: once for Jan 2024, once for the 12-month
+      // comparison window, which ends at the previous month — Dec 2023, not Dec 2024.
+      const windowCall = BalanceHistoryDB.getBalanceHistory.mock.calls[1];
+      expect(windowCall[1]).toBe('2023-01-01'); // 12 months back, same month
+      expect(windowCall[2]).toBe('2023-12-31'); // end of the previous month
 
-      expect(prevStartDate).toBe('2023-12-01');
-      expect(prevEndDate).toBe('2023-12-31');
+      // The prev-month expense total keeps its own Dec 2023 boundaries.
+      const prevExpensesCall = OperationsDB.getTotalExpenses.mock.calls[0];
+      expect(prevExpensesCall[1]).toBe('2023-12-01');
+      expect(prevExpensesCall[2]).toBe('2023-12-31');
     });
   });
 
@@ -647,6 +653,167 @@ describe('useBalanceHistory', () => {
         expect(result.current.balanceHistoryData.prevMonthTotalExpenses).toBe(620);
         // January is month index 0, previous month is December (31 days)
         expect(result.current.balanceHistoryData.prevMonthDaysCount).toBe(31);
+      });
+    });
+  });
+  describe('Year average line', () => {
+    it('median averages the two middle values on even counts', () => {
+      expect(median([3, 1, 2])).toBe(2);
+      expect(median([4, 1, 3, 2])).toBe(2.5);
+      expect(median([])).toBeNull();
+    });
+
+    it('takes the median across the 12 previous months, per day', () => {
+      const { yearAvg } = buildYearAverageSeries({
+        historyRows: [
+          { date: '2023-01-01', balance: '100' },
+          { date: '2023-06-01', balance: '200' },
+          { date: '2023-07-01', balance: '400' },
+          { date: '2023-12-01', balance: '300' },
+        ],
+        monthlyExpenses: {},
+        selectedYear: 2024,
+        selectedMonth: 0, // January 2024
+        daysInMonth: 31,
+      });
+
+      // Four contributing months → median of [100, 200, 300, 400]
+      expect(yearAvg[0]).toBe(250);
+      // Forward-filled: every later day inherits the same balances
+      expect(yearAvg[30]).toBe(250);
+    });
+
+    it('includes the same month one year back (12 months, not 11)', () => {
+      const withJan2023 = buildYearAverageSeries({
+        historyRows: [
+          { date: '2023-01-05', balance: '100' },
+          { date: '2023-12-05', balance: '300' },
+        ],
+        monthlyExpenses: {},
+        selectedYear: 2024,
+        selectedMonth: 0,
+        daysInMonth: 31,
+      });
+      // Jan 2023 is inside the window → median of [100, 300] on day 5
+      expect(withJan2023.yearAvg[4]).toBe(200);
+      expect(withJan2023.yearAvgMonthCount).toBe(2);
+
+      const tooOld = buildYearAverageSeries({
+        historyRows: [
+          { date: '2022-12-05', balance: '100' },
+          { date: '2023-12-05', balance: '300' },
+        ],
+        monthlyExpenses: {},
+        selectedYear: 2024,
+        selectedMonth: 0,
+        daysInMonth: 31,
+      });
+      // Dec 2022 is 13 months back → out of the window, only Dec 2023 counts
+      expect(tooOld.yearAvg[4]).toBe(300);
+      expect(tooOld.yearAvgMonthCount).toBe(1);
+    });
+
+    it('holds a short month final value for the tail days', () => {
+      const { yearAvg } = buildYearAverageSeries({
+        historyRows: [
+          { date: '2023-02-28', balance: '500' }, // February — 28 days
+          { date: '2023-03-31', balance: '700' },
+        ],
+        monthlyExpenses: {},
+        selectedYear: 2024,
+        selectedMonth: 0,
+        daysInMonth: 31,
+      });
+
+      // Day 29-31 have no February data: Feb holds 500, March reports 700
+      expect(yearAvg[30]).toBe(600);
+    });
+
+    it('leaves days before any recorded balance empty', () => {
+      const { yearAvg } = buildYearAverageSeries({
+        historyRows: [{ date: '2023-12-20', balance: '300' }],
+        monthlyExpenses: {},
+        selectedYear: 2024,
+        selectedMonth: 0,
+        daysInMonth: 31,
+      });
+
+      expect(yearAvg[0]).toBeUndefined();
+      expect(yearAvg[19]).toBe(300);
+    });
+
+    it('reports the median of the per-month spending rates', () => {
+      const { yearAvgDailyAvg } = buildYearAverageSeries({
+        historyRows: [
+          { date: '2023-01-10', balance: '100' },
+          { date: '2023-06-10', balance: '200' },
+          { date: '2023-12-10', balance: '300' },
+        ],
+        monthlyExpenses: { '2023-01': '310', '2023-06': '600' },
+        selectedYear: 2024,
+        selectedMonth: 0,
+        daysInMonth: 31,
+      });
+
+      // Rates: Jan -310/31 = -10, Jun -600/30 = -20, Dec (no expenses) 0 → median -10
+      expect(yearAvgDailyAvg).toBe(-10);
+    });
+
+    it('survives an empty window', () => {
+      const result = buildYearAverageSeries({
+        historyRows: undefined,
+        monthlyExpenses: undefined,
+        selectedYear: 2024,
+        selectedMonth: 0,
+        daysInMonth: 31,
+      });
+
+      expect(result.yearAvg).toHaveLength(31);
+      expect(result.yearAvg.every(v => v === undefined)).toBe(true);
+      expect(result.yearAvgDailyAvg).toBeNull();
+      expect(result.yearAvgMonthCount).toBe(0);
+    });
+
+    it('exposes the year average on the loaded balance history data', async () => {
+      BalanceHistoryDB.getBalanceHistory
+        .mockResolvedValueOnce([{ date: '2024-01-05', balance: '1000' }])
+        .mockResolvedValueOnce([
+          { date: '2023-01-05', balance: '100' },
+          { date: '2023-12-05', balance: '300' },
+        ]);
+      OperationsDB.getMonthlyExpenseTotals.mockResolvedValue({ '2023-12': '620' });
+
+      const { result } = await renderHook(() => useBalanceHistory(mockAccountId, mockYear, mockMonth));
+
+      await act(async () => {
+        await result.current.loadBalanceHistory();
+      });
+
+      await waitFor(() => {
+        expect(result.current.balanceHistoryData.yearAvg[4]).toBe(200);
+        // Rates: Jan 2023 (no expenses) 0, Dec 2023 -620/31 = -20 → median -10
+        expect(result.current.balanceHistoryData.yearAvgDailyAvg).toBe(-10);
+      });
+    });
+
+    it('slices the prev-month line out of the same 12-month read', async () => {
+      BalanceHistoryDB.getBalanceHistory
+        .mockResolvedValueOnce([{ date: '2024-01-05', balance: '1000' }])
+        .mockResolvedValueOnce([
+          { date: '2023-06-05', balance: '100' },
+          { date: '2023-12-05', balance: '900' },
+        ]);
+
+      const { result } = await renderHook(() => useBalanceHistory(mockAccountId, mockYear, mockMonth));
+
+      await act(async () => {
+        await result.current.loadBalanceHistory();
+      });
+
+      await waitFor(() => {
+        // Only the December rows feed the prev-month line, June must not leak in
+        expect(result.current.balanceHistoryData.prevMonth[4]).toBe(900);
+        expect(result.current.balanceHistoryData.prevMonth[3]).toBeUndefined();
       });
     });
   });

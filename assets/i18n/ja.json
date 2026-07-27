@@ -414,6 +414,8 @@
   "burndown": "消費",
   "forecast": "予測",
   "prev_month": "前月",
+  "year_avg": "年間平均",
+  "comparison_none": "比較なし",
   "no_balance_history": "今月の残高履歴がありません",
   "balance_history_details": "残高履歴の詳細",
   "actions": "アクション",

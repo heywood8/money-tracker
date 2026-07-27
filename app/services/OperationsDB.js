@@ -978,6 +978,42 @@ export const getTotalExpenses = async (accountId, startDate, endDate) => {
 };
 
 /**
+ * Get expense totals for an account bucketed by calendar month.
+ *
+ * Same filters as getTotalExpenses (shadow categories and exclude_from_avg
+ * one-offs are left out), but grouped so a 12-month window costs one query
+ * instead of twelve. Consumed by the balance chart's "year median" line, whose
+ * daily-average column is the median of the per-month spending rates.
+ *
+ * @param {string} accountId
+ * @param {string} startDate - YYYY-MM-DD
+ * @param {string} endDate - YYYY-MM-DD
+ * @returns {Promise<Object>} map of 'YYYY-MM' → decimal-safe total string
+ */
+export const getMonthlyExpenseTotals = async (accountId, startDate, endDate) => {
+  try {
+    const results = await queryAll(
+      `SELECT strftime('%Y-%m', date(o.date)) AS month, o.amount FROM operations o
+       LEFT JOIN categories c ON o.category_id = c.id
+       WHERE o.account_id = ? AND o.type = 'expense'
+         AND date(o.date) >= date(?) AND date(o.date) <= date(?)
+         AND (c.is_shadow IS NULL OR c.is_shadow = 0)
+         AND (o.exclude_from_avg IS NULL OR o.exclude_from_avg = 0)`,
+      [accountId, startDate, endDate],
+    );
+    const totals = {};
+    for (const row of results || []) {
+      if (!row || !row.month) continue;
+      totals[row.month] = Currency.add(totals[row.month] || '0', String(row.amount || '0'));
+    }
+    return totals;
+  } catch (error) {
+    console.error('Failed to get monthly expense totals:', error);
+    throw error;
+  }
+};
+
+/**
  * Get total income for account in date range
  * @param {string} accountId
  * @param {string} startDate

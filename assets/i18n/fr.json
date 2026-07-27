@@ -414,6 +414,8 @@
   "burndown": "Diminution",
   "forecast": "Prévision",
   "prev_month": "Mois préc.",
+  "year_avg": "Moy. année",
+  "comparison_none": "Aucune comparaison",
   "no_balance_history": "Aucun historique de solde disponible pour ce mois",
   "balance_history_details": "Détails de l'historique du solde",
   "actions": "Actions",

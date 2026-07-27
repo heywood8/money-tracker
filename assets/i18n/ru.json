@@ -417,6 +417,8 @@
   "burndown": "Среднее",
   "forecast": "Прогноз",
   "prev_month": "Пред. месяц",
+  "year_avg": "Средн. за год",
+  "comparison_none": "Без сравнения",
   "no_balance_history": "Нет истории баланса за этот месяц",
   "balance_history_details": "Детали истории баланса",
   "actions": "Действия",
