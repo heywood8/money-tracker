@@ -121,11 +121,11 @@ export const mapLineFields = (row) => {
     comment: row.comment ?? null,
     categoryId,
     categoryIds,
-    // Legacy rows (pre-0021, and any hand-built row in a test) have no column at
-    // all — they behaved as "roll descendants up", so absent reads as enabled.
-    // Only a stored 0 turns it off; the string form is accepted because a row
-    // that reached here through a CSV round trip carries text, not integers.
-    includeChildren: row.include_children !== 0 && row.include_children !== '0',
+    // NOTE: `include_children` is deliberately NOT surfaced. Descendant spending
+    // always rolls up now — picking a parent category means its subtree, and a
+    // leaf category has no subtree, so the flag never expressed a real choice.
+    // The column stays (append-only, still round-tripped by backups/Sheets) but
+    // a stored 0 no longer changes how a line counts.
     toAccountId,
     sortOrder: row.sort_order ?? 0,
     isBroken: kind !== 'income' && categoryIds.length === 0 && toAccountId === null,
@@ -538,9 +538,9 @@ const insertPlanLine = async (planId, line) => {
       kind: LINE_KINDS.includes(line.kind) ? line.kind : null,
       account_id: isSet(line.accountId) ? line.accountId : null,
       last_executed_month: line.lastExecutedMonth ?? null,
-      // Absent means "roll descendants up" — the pre-0021 behaviour, and what a
-      // caller that has never heard of the flag expects.
-      include_children: line.includeChildren === false ? 0 : 1,
+      // Always 1: descendant spending always rolls up (see mapLineFields). The
+      // column is kept written so the backup/Sheets shape stays stable.
+      include_children: 1,
       created_at: now,
       updated_at: now,
     };
@@ -754,10 +754,6 @@ export const updateLine = async (id, updates) => {
     if (toAccountId !== undefined) {
       fields.push('to_account_id = ?');
       values.push(isSet(toAccountId) ? toAccountId : null);
-    }
-    if (updates.includeChildren !== undefined) {
-      fields.push('include_children = ?');
-      values.push(updates.includeChildren ? 1 : 0);
     }
     if (updates.sortOrder !== undefined) {
       fields.push('sort_order = ?');
@@ -1038,7 +1034,7 @@ export const copyPlan = async (fromMonth, toMonth) => {
               clonedId, newPlanId, line.label, line.amount, line.comment,
               line.categoryId, line.toAccountId, line.sortOrder ?? i,
               line.currency, line.kind, line.accountId,
-              line.includeChildren === false ? 0 : 1, now, now,
+              1, now, now, // include_children: always on, see mapLineFields
             ],
           );
           // The clone must track the same SET of categories, not just the primary
@@ -1101,8 +1097,8 @@ export const getMonthDateRange = (month) => {
  * Compute the actual amount tracked by one plan line for a month.
  *
  * - Category-linked line: expense spending across every category the line tracks
- *   (migration 0021 allows several), including their descendants unless the
- *   line's `includeChildren` is off, via the shared convert-all engine
+ *   (migration 0021 allows several), always including their descendants, via the
+ *   shared convert-all engine
  *   ({@link calculateSpendingForCategories}). With `convertAll` off, only
  *   operations in accounts of `displayCurrency` count.
  * - Account-linked line (transfer target): incoming transfers into the account
@@ -1140,7 +1136,7 @@ export const calculateLineActual = async (line, month, displayCurrency, convertA
         displayCurrency,
         startDate,
         endDate,
-        line.includeChildren !== false, // descendants roll up unless switched off
+        true, // descendants always roll up into the categories a line tracks
         convertAll,
       );
       return { broken: false, actual: String(actual) };
@@ -1250,9 +1246,8 @@ const collectPlanSourceCurrencies = async (lines, startDate, endDate, convertAll
       const linked = line.categoryIds ?? (isSet(line.categoryId) ? [line.categoryId] : []);
       if (linked.length === 0) continue;
       // Same expansion the line's own actual uses, so the currencies collected
-      // here are exactly the ones that can feed it — including the descendants
-      // only when that line actually rolls them up.
-      for (const id of await expandCategoryIds(linked, line.includeChildren !== false)) {
+      // here are exactly the ones that can feed it — descendants included.
+      for (const id of await expandCategoryIds(linked, true)) {
         categoryIdSet.add(id);
       }
     }

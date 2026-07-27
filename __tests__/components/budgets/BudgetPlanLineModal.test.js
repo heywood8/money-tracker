@@ -111,22 +111,21 @@ describe('BudgetPlanLineModal', () => {
     }));
   });
 
-  it('defaults includeChildren on and lets it be switched off', async () => {
+  it('offers no roll-up toggle — descendants always count', async () => {
     const props = baseProps();
     const { getByTestId, queryByTestId } = await render(<BudgetPlanLineModal {...props} />);
-    // The roll-up toggle only exists once the line tracks a category.
     expect(queryByTestId('plan-line-include-children-toggle')).toBeNull();
     await fireEvent.press(getByTestId('plan-target-picker'));
     await waitFor(() => expect(getByTestId('plan-target-option-cat-cat1')).toBeTruthy());
     await fireEvent.press(getByTestId('plan-target-option-cat-cat1'));
     await fireEvent.press(getByTestId('plan-target-done'));
     await fireEvent.changeText(getByTestId('plan-line-amount'), '150');
-    await waitFor(() => expect(getByTestId('plan-line-include-children-toggle')).toBeTruthy());
-    await fireEvent.press(getByTestId('plan-line-include-children-toggle'));
+    // Still absent with a category picked — the flag is gone from the UI entirely.
+    expect(queryByTestId('plan-line-include-children-toggle')).toBeNull();
     await fireEvent.press(getByTestId('plan-line-save'));
-    expect(props.onSaveLine).toHaveBeenCalledWith(expect.objectContaining({
-      includeChildren: false,
-    }));
+    expect(props.onSaveLine).toHaveBeenCalledWith(
+      expect.not.objectContaining({ includeChildren: expect.anything() }),
+    );
   });
 
   it('seeds the picker from an edited line\'s stored category set', async () => {
@@ -138,7 +137,7 @@ describe('BudgetPlanLineModal', () => {
       ],
       line: {
         id: 'l1', amount: '150', kind: 'expense',
-        categoryId: 'cat1', categoryIds: ['cat1', 'cat2'], includeChildren: false,
+        categoryId: 'cat1', categoryIds: ['cat1', 'cat2'],
       },
     };
     const { getByTestId } = await render(<BudgetPlanLineModal {...props} />);
@@ -146,7 +145,6 @@ describe('BudgetPlanLineModal', () => {
     await fireEvent.press(getByTestId('plan-line-save'));
     expect(props.onSaveLine).toHaveBeenCalledWith(expect.objectContaining({
       categoryIds: ['cat1', 'cat2'],
-      includeChildren: false,
     }));
   });
 

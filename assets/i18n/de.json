@@ -550,8 +550,6 @@
   "no_template_account": "Keines (nur Nachverfolgung)",
   "edit_allocation": "Zuweisung bearbeiten",
   "tracking_target": "Tracking-Ziel",
-  "include_subcategories": "Unterkategorien einbeziehen",
-  "include_subcategories_hint": "Ausgaben in Kategorien unterhalb der ausgewählten zählen zu dieser Zeile.",
   "select_target": "Ziel auswählen",
   "allocation_label": "Bezeichnung",
   "allocation_comment": "Kommentar",

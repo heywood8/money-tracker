@@ -550,8 +550,6 @@
   "no_template_account": "Ninguna (solo seguimiento)",
   "edit_allocation": "Editar asignación",
   "tracking_target": "Objetivo de seguimiento",
-  "include_subcategories": "Incluir subcategorías",
-  "include_subcategories_hint": "Los gastos en categorías anidadas bajo las seleccionadas cuentan para esta línea.",
   "select_target": "Seleccionar objetivo",
   "allocation_label": "Etiqueta",
   "allocation_comment": "Comentario",
