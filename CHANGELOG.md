@@ -1,5 +1,12 @@
 # Changelog
 
+## [0.231.0](https://github.com/heywood8/money-tracker/compare/penny-v0.230.0...penny-v0.231.0) (2026-07-27)
+
+
+### Features
+
+* **budgets:** make the plan row its own progress bar ([#1442](https://github.com/heywood8/money-tracker/issues/1442)) ([95d65ca](https://github.com/heywood8/money-tracker/commit/95d65ca5505672421f6f3a4b618e88c4dfb2e39c))
+
 ## [0.230.0](https://github.com/heywood8/money-tracker/compare/penny-v0.229.0...penny-v0.230.0) (2026-07-27)
 
 
