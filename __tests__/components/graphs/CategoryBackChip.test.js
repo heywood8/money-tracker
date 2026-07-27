@@ -2,9 +2,9 @@
  * CategoryBackChip Component Tests
  *
  * The chip shows which category a summary tab is drilled into and pops back to
- * its parent. It is rendered as an overlay above the tab strip rather than
- * inside a tab, so it must stay tappable without swallowing taps meant for the
- * tab underneath it.
+ * its parent. It renders inside the open chart (under the donut) rather than
+ * over the tab strip, where it used to cover the tab's own title — placement is
+ * the chart's job, so this component is just a self-sizing button.
  */
 
 import React from 'react';
@@ -22,7 +22,6 @@ describe('CategoryBackChip', () => {
     label: 'Food',
     backLabel: 'back',
     onPress: jest.fn(),
-    side: 'left',
   };
 
   beforeEach(() => {
@@ -58,34 +57,17 @@ describe('CategoryBackChip', () => {
     });
   });
 
-  describe('Overlay behaviour', () => {
-    // Without box-none the wrapper would blanket half the tab strip and eat
-    // every tap aimed at the tab beneath it.
-    it('lets taps that miss the chip fall through to the tab underneath', async () => {
+  describe('Sizing', () => {
+    // Under the donut the chip's slot is only as wide as the donut, so it has to
+    // cap itself there and ellipsise rather than stretch the row.
+    it('never grows past the slot it is placed in', async () => {
       const { getByTestId } = await render(
         <CategoryBackChip {...defaultProps} testID="chip" />,
       );
 
-      const wrapper = getByTestId('chip').parent;
+      const style = Object.assign({}, ...[].concat(getByTestId('chip').props.style));
 
-      expect(wrapper.props.pointerEvents).toBe('box-none');
-    });
-
-    it('sits over the half of the strip that owns it', async () => {
-      const { getByTestId, rerender } = await render(
-        <CategoryBackChip {...defaultProps} side="left" testID="chip" />,
-      );
-
-      const styleOf = () => {
-        const style = getByTestId('chip').parent.props.style;
-        return Object.assign({}, ...[].concat(style));
-      };
-
-      expect(styleOf()).toEqual(expect.objectContaining({ left: 0, width: '50%' }));
-
-      await rerender(<CategoryBackChip {...defaultProps} side="right" testID="chip" />);
-
-      expect(styleOf()).toEqual(expect.objectContaining({ right: 0, width: '50%' }));
+      expect(style.maxWidth).toBe('100%');
     });
   });
 

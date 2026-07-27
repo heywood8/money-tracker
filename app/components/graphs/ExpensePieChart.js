@@ -1,7 +1,7 @@
 import React from 'react';
 import { View, Text, StyleSheet, ActivityIndicator } from 'react-native';
 import PropTypes from 'prop-types';
-import DonutChart from './DonutChart';
+import DonutChart, { CHART_SIZE } from './DonutChart';
 import CustomLegend from './CustomLegend';
 import CategoryOperationsList from './CategoryOperationsList';
 
@@ -18,49 +18,71 @@ const ExpensePieChart = ({
   loadingOperations = false,
   introKey = 0,
   introDelay = 0,
+  categoryChip = null,
 }) => {
+  // The drill-down chip rides along with whatever this chart is showing: under
+  // the donut when there is one, above the body otherwise. Anywhere it can be
+  // reached, so a drilled-in category is never a dead end.
+  const chipHeader = categoryChip ? (
+    <View style={styles.chipHeader}>{categoryChip}</View>
+  ) : null;
+
   // A leaf category has no sub-categories left to break down — show its actual
   // operations for the period instead of a pointless single-slice donut.
   if (isLeafCategory) {
     return (
-      <CategoryOperationsList
-        operations={operations}
-        loading={loadingOperations}
-        currency={selectedCurrency}
-        colors={colors}
-        language={language}
-        emptyText={t('no_expense_data')}
-      />
+      <View>
+        {chipHeader}
+        <CategoryOperationsList
+          operations={operations}
+          loading={loadingOperations}
+          currency={selectedCurrency}
+          colors={colors}
+          language={language}
+          emptyText={t('no_expense_data')}
+        />
+      </View>
     );
   }
 
   if (loading) {
     return (
-      <View style={styles.loadingContainer}>
-        <ActivityIndicator size="large" color={colors.primary} />
-        <Text style={[styles.loadingText, { color: colors.mutedText }]}>
-          {t('loading_operations')}
-        </Text>
+      <View>
+        {chipHeader}
+        <View style={styles.loadingContainer}>
+          <ActivityIndicator size="large" color={colors.primary} />
+          <Text style={[styles.loadingText, { color: colors.mutedText }]}>
+            {t('loading_operations')}
+          </Text>
+        </View>
       </View>
     );
   }
 
   if (chartData.length === 0) {
     return (
-      <Text style={[styles.noData, { color: colors.mutedText }]}>
-        {t('no_expense_data')}
-      </Text>
+      <View>
+        {chipHeader}
+        <Text style={[styles.noData, { color: colors.mutedText }]}>
+          {t('no_expense_data')}
+        </Text>
+      </View>
     );
   }
 
   return (
     <View style={styles.row}>
-      <DonutChart
-        data={chartData}
-        insetColor={colors.surface}
-        introKey={introKey}
-        introDelay={introDelay}
-      />
+      <View style={styles.donutColumn}>
+        <DonutChart
+          data={chartData}
+          insetColor={colors.surface}
+          introKey={introKey}
+          introDelay={introDelay}
+        />
+        {categoryChip ? (
+          <View style={styles.donutChip}>{categoryChip}</View>
+        ) : null}
+      </View>
       <View style={styles.legendWrapper}>
         <CustomLegend
           data={chartData}
@@ -89,9 +111,23 @@ ExpensePieChart.propTypes = {
   introKey: PropTypes.number,
   // Holds that replay back until the outgoing chart has faded out.
   introDelay: PropTypes.number,
+  // Drill-down chip owned by the screen; placed under the donut by this chart.
+  categoryChip: PropTypes.node,
 };
 
 const styles = StyleSheet.create({
+  chipHeader: {
+    alignItems: 'flex-start',
+    marginBottom: 10,
+  },
+  donutChip: {
+    marginTop: 10,
+    maxWidth: '100%',
+  },
+  donutColumn: {
+    alignItems: 'center',
+    width: CHART_SIZE,
+  },
   legendWrapper: {
     flex: 1,
   },

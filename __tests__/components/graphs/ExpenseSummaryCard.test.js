@@ -244,8 +244,9 @@ describe('ExpenseSummaryCard', () => {
   });
 
   // The drill-down chip used to be an overlay inside this card. It now lives in
-  // CategoryBackChip, rendered by GraphsScreen above the tab strip, so that a
-  // button is never nested inside the tab button — see CategoryBackChip.test.js.
+  // CategoryBackChip, which GraphsScreen hands to the open chart to render under
+  // the donut, so a button is never nested inside the tab button — see
+  // CategoryBackChip.test.js.
   describe('nested controls', () => {
     it('renders no button other than the tab itself', async () => {
       const { getAllByRole } = await render(<ExpenseSummaryCard {...defaultProps} />);
