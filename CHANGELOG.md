@@ -1,5 +1,12 @@
 # Changelog
 
+## [0.235.0](https://github.com/heywood8/money-tracker/compare/penny-v0.234.1...penny-v0.235.0) (2026-07-27)
+
+
+### Features
+
+* **graphs:** fade the chart tabs through instead of sliding them ([#1453](https://github.com/heywood8/money-tracker/issues/1453)) ([8fe74e0](https://github.com/heywood8/money-tracker/commit/8fe74e0785b27501e22582a549b37dd124f79ab6))
+
 ## [0.234.1](https://github.com/heywood8/money-tracker/compare/penny-v0.234.0...penny-v0.234.1) (2026-07-27)
 
 
