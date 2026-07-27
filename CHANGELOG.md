@@ -1,5 +1,12 @@
 # Changelog
 
+## [0.235.1](https://github.com/heywood8/money-tracker/compare/penny-v0.235.0...penny-v0.235.1) (2026-07-27)
+
+
+### Bug Fixes
+
+* **budgets:** read the whole tab in the currency the chip names ([#1455](https://github.com/heywood8/money-tracker/issues/1455)) ([e3d6276](https://github.com/heywood8/money-tracker/commit/e3d6276edd20a63d5f21b3a3fa105ceea9c8b4c9))
+
 ## [0.235.0](https://github.com/heywood8/money-tracker/compare/penny-v0.234.1...penny-v0.235.0) (2026-07-27)
 
 
