@@ -5,11 +5,19 @@ import { getAllDescendants } from '../services/CategoriesDB';
 import { appEvents, EVENTS } from '../services/eventEmitter';
 
 /**
+ * Sentinel category id meaning "every expense", not a single category.
+ * Kept distinct from `null` (which means "no series at all", used by the
+ * comparison series when nothing is picked to compare against).
+ */
+export const ALL_EXPENSE_CATEGORIES = 'all';
+
+/**
  * Custom hook for loading monthly spending data for a specific category
  * Shows the last 12 months (rolling window)
  * Includes all descendant categories in the totals
  * @param {string} selectedCurrency - Currency code
- * @param {string|null} selectedCategoryId - Category ID to show spending for
+ * @param {string|null} selectedCategoryId - Category ID to show spending for,
+ *   or ALL_EXPENSE_CATEGORIES for the total across every expense
  * @param {Array} categories - Array of all categories
  */
 const useCategoryMonthlySpending = (selectedCurrency, selectedCategoryId, categories, convertAllCurrencies = false) => {
@@ -46,9 +54,14 @@ const useCategoryMonthlySpending = (selectedCurrency, selectedCategoryId, catego
     try {
       setLoading(true);
 
-      // Get all descendant category IDs including the selected category itself
-      const descendants = await getAllDescendants(selectedCategoryId);
-      const categoryIds = [selectedCategoryId, ...descendants.map(d => d.id)];
+      // Get all descendant category IDs including the selected category itself.
+      // `null` tells the DB layer to skip the category filter entirely, which
+      // also picks up expenses left uncategorised.
+      let categoryIds = null;
+      if (selectedCategoryId !== ALL_EXPENSE_CATEGORIES) {
+        const descendants = await getAllDescendants(selectedCategoryId);
+        categoryIds = [selectedCategoryId, ...descendants.map(d => d.id)];
+      }
 
       // Get last 12 months spending data
       const spending = await getLast12MonthsSpendingByCategories(

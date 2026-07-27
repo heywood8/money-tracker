@@ -3514,4 +3514,50 @@ describe('OperationsDB Service', () => {
       expect(result).toHaveLength(3);
     });
   });
+
+  describe('getLast12MonthsSpendingByCategories', () => {
+    it('filters by the given category ids', async () => {
+      queryAll.mockResolvedValue([]);
+
+      await OperationsDB.getLast12MonthsSpendingByCategories('USD', ['cat-food', 'cat-groceries']);
+
+      const [sql, params] = queryAll.mock.calls[0];
+      expect(sql).toContain('o.category_id IN (?,?)');
+      expect(params).toEqual(['USD', expect.any(String), expect.any(String), 'cat-food', 'cat-groceries']);
+    });
+
+    it('drops the category filter entirely when categoryIds is null', async () => {
+      queryAll.mockResolvedValue([]);
+
+      await OperationsDB.getLast12MonthsSpendingByCategories('USD', null);
+
+      const [sql, params] = queryAll.mock.calls[0];
+      expect(sql).not.toContain('category_id');
+      expect(params).toEqual(['USD', expect.any(String), expect.any(String)]);
+    });
+
+    it('sums every expense, including uncategorised ones, when categoryIds is null', async () => {
+      queryAll.mockResolvedValue([
+        { year_month: '2026-07', amount: '10', currency: 'USD' },
+        { year_month: '2026-07', amount: '5.50', currency: 'USD' },
+        { year_month: '2026-06', amount: '3', currency: 'USD' },
+      ]);
+
+      const result = await OperationsDB.getLast12MonthsSpendingByCategories('USD', null);
+
+      expect(result).toEqual([
+        { yearMonth: '2026-06', total: '3' },
+        { yearMonth: '2026-07', total: '15.5' },
+      ]);
+    });
+
+    it('returns an empty result for an empty category list without querying', async () => {
+      queryAll.mockResolvedValue([]);
+
+      const result = await OperationsDB.getLast12MonthsSpendingByCategories('USD', []);
+
+      expect(result).toEqual([]);
+      expect(queryAll).not.toHaveBeenCalled();
+    });
+  });
 });

@@ -1,5 +1,5 @@
 import { renderHook, act, waitFor } from '@testing-library/react-native';
-import useCategoryMonthlySpending from '../../app/hooks/useCategoryMonthlySpending';
+import useCategoryMonthlySpending, { ALL_EXPENSE_CATEGORIES } from '../../app/hooks/useCategoryMonthlySpending';
 import * as OperationsDB from '../../app/services/OperationsDB';
 import * as CategoriesDB from '../../app/services/CategoriesDB';
 import { appEvents, EVENTS } from '../../app/services/eventEmitter';
@@ -131,6 +131,26 @@ describe('useCategoryMonthlySpending', () => {
         [mockCategoryId, 'cat-groceries', 'cat-restaurants'],
         false,
       );
+    });
+
+    it('should query every expense without a category filter for ALL_EXPENSE_CATEGORIES', async () => {
+      OperationsDB.getLast12MonthsSpendingByCategories.mockResolvedValue([]);
+
+      const { result } = await renderHook(() =>
+        useCategoryMonthlySpending(mockCurrency, ALL_EXPENSE_CATEGORIES, mockCategories),
+      );
+
+      await waitFor(() => {
+        expect(result.current.loading).toBe(false);
+      });
+
+      // null = no category filter at all, so uncategorised expenses count too
+      expect(OperationsDB.getLast12MonthsSpendingByCategories).toHaveBeenCalledWith(
+        mockCurrency,
+        null,
+        false,
+      );
+      expect(CategoriesDB.getAllDescendants).not.toHaveBeenCalled();
     });
 
     it('should filter by selected currency', async () => {

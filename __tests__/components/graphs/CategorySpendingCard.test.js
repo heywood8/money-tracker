@@ -194,7 +194,7 @@ describe('CategorySpendingCard', () => {
       expect(onCategoryChange).toHaveBeenCalledWith('cat-transport');
     });
 
-    it('defaults to first parent category if none selected', async () => {
+    it('defaults to all categories if none selected', async () => {
       const { getByText } = await render(
         <CategorySpendingCard
           {...defaultProps}
@@ -202,8 +202,36 @@ describe('CategorySpendingCard', () => {
         />,
       );
 
-      // Should show Food as the default selection (first parent expense category)
-      expect(getByText('Food')).toBeTruthy();
+      // No pick means the whole expense trend, not the first parent category
+      expect(getByText('all_categories')).toBeTruthy();
+    });
+
+    it('offers an "all categories" row in the primary picker', async () => {
+      const onCategoryChange = jest.fn();
+
+      const { getByText, getAllByText } = await render(
+        <CategorySpendingCard
+          {...defaultProps}
+          onCategoryChange={onCategoryChange}
+        />,
+      );
+
+      await fireEvent.press(getByText('Food'));
+
+      const allRows = getAllByText('all_categories');
+      await fireEvent.press(allRows[allRows.length - 1]);
+
+      expect(onCategoryChange).toHaveBeenCalledWith('all');
+    });
+
+    it('does not offer "all categories" in the vs picker', async () => {
+      const { getByText, queryByText } = await render(
+        <CategorySpendingCard {...defaultProps} />,
+      );
+
+      await fireEvent.press(getByText('vs'));
+
+      expect(queryByText('all_categories')).toBeFalsy();
     });
 
     it('shows expand icon for categories with children', async () => {
@@ -391,7 +419,7 @@ describe('CategorySpendingCard', () => {
       );
     });
 
-    it('uses first category when selectedCategory is invalid', async () => {
+    it('falls back to all categories when selectedCategory is invalid', async () => {
       await render(
         <CategorySpendingCard
           {...defaultProps}
@@ -401,7 +429,7 @@ describe('CategorySpendingCard', () => {
 
       expect(useCategoryMonthlySpending).toHaveBeenCalledWith(
         'USD',
-        'cat-food', // Falls back to first parent expense category
+        'all', // Falls back to the whole expense trend
         defaultCategories,
         false,
       );

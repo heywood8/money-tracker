@@ -6,7 +6,7 @@ import { matchFont, Paint, RoundedRect } from '@shopify/react-native-skia';
 import { runOnJS, useAnimatedReaction } from 'react-native-reanimated';
 import Icon from '@expo/vector-icons/MaterialCommunityIcons';
 import currencies from '../../../assets/currencies.json';
-import useCategoryMonthlySpending from '../../hooks/useCategoryMonthlySpending';
+import useCategoryMonthlySpending, { ALL_EXPENSE_CATEGORIES } from '../../hooks/useCategoryMonthlySpending';
 import { HORIZONTAL_PADDING } from '../../styles/layout';
 import { comparisonSeriesColor } from '../../styles/chartPalette';
 import ModalBlurOverlay from '../ModalBlurOverlay';
@@ -333,27 +333,33 @@ const CategorySpendingCard = ({
     return map;
   }, [parentExpenseCategories, allExpenseCategories]);
 
+  // No pick (or a stale one) means the whole expense trend, not an arbitrary
+  // first category — the default view should describe all spending.
   const effectiveCategory = useMemo(() => {
     if (selectedCategory && allExpenseCategories.some(c => c.id === selectedCategory)) {
       return selectedCategory;
     }
-    return parentExpenseCategories.length > 0 ? parentExpenseCategories[0].id : null;
-  }, [selectedCategory, allExpenseCategories, parentExpenseCategories]);
+    return ALL_EXPENSE_CATEGORIES;
+  }, [selectedCategory, allExpenseCategories]);
 
   const effectiveVsCategory = useMemo(() => {
     if (!vsCategory) return null;
     return allExpenseCategories.some(c => c.id === vsCategory) ? vsCategory : null;
   }, [vsCategory, allExpenseCategories]);
 
+  const isAllCategories = effectiveCategory === ALL_EXPENSE_CATEGORIES;
+
   const selectedCategoryName = useMemo(() => {
+    if (isAllCategories) return t('all_categories');
     const cat = allExpenseCategories.find(c => c.id === effectiveCategory);
     return cat ? cat.name : '';
-  }, [allExpenseCategories, effectiveCategory]);
+  }, [allExpenseCategories, effectiveCategory, isAllCategories, t]);
 
   const selectedCategoryIcon = useMemo(() => {
+    if (isAllCategories) return 'shape-outline';
     const cat = allExpenseCategories.find(c => c.id === effectiveCategory);
     return cat?.icon ?? null;
-  }, [allExpenseCategories, effectiveCategory]);
+  }, [allExpenseCategories, effectiveCategory, isAllCategories]);
 
   const vsCategoryName = useMemo(() => {
     if (!effectiveVsCategory) return '';
@@ -422,6 +428,24 @@ const CategorySpendingCard = ({
 
   const pickerContent = (
     <ScrollView>
+      {/* "All categories" is only offered for the primary series — comparing a
+          category against the total it is part of is not a meaningful vs. */}
+      {pickerMode === 'primary' && (
+        <View style={[styles.parentRow, { borderBottomColor: colors.border }]}>
+          <View style={styles.expandPlaceholder} />
+          <TouchableOpacity
+            style={[
+              styles.categoryItem,
+              isAllCategories && { backgroundColor: colors.selected },
+            ]}
+            onPress={() => handleSelectCategory(ALL_EXPENSE_CATEGORIES)}
+          >
+            <Text style={[styles.categoryText, { color: colors.text }]}>
+              {t('all_categories')}
+            </Text>
+          </TouchableOpacity>
+        </View>
+      )}
       {parentExpenseCategories.map(parent => {
         const children = childrenByParent.get(parent.id) || [];
         const hasChildren = children.length > 0;
