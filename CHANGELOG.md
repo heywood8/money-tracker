@@ -1,5 +1,12 @@
 # Changelog
 
+## [0.239.0](https://github.com/heywood8/money-tracker/compare/penny-v0.238.0...penny-v0.239.0) (2026-07-27)
+
+
+### Features
+
+* **graphs:** rework the category drill-down operations list ([#1467](https://github.com/heywood8/money-tracker/issues/1467)) ([8fcc324](https://github.com/heywood8/money-tracker/commit/8fcc324c7d5e9565462e4ef6d935782e69aa7d9b))
+
 ## [0.238.0](https://github.com/heywood8/money-tracker/compare/penny-v0.237.1...penny-v0.238.0) (2026-07-27)
 
 
