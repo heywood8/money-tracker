@@ -266,13 +266,53 @@ describe('BudgetPlanLineModal', () => {
       expect(props.onSaveLine).toHaveBeenCalledWith(expect.objectContaining({ isRecurring: false, currency: null }));
     });
 
-    it('the currency picker is hidden until the recurring toggle is on', async () => {
+    it('the currency picker is offered on a one-off line too, not only a recurring one', async () => {
       const props = baseProps();
-      const { getByTestId, queryByTestId } = await render(<BudgetPlanLineModal {...props} />);
+      const { getByTestId } = await render(<BudgetPlanLineModal {...props} />);
       await waitFor(() => expect(getByTestId('plan-line-recurring-toggle')).toBeTruthy());
-      expect(queryByTestId('plan-line-currency-USD')).toBeNull();
+      expect(getByTestId('plan-line-currency-USD')).toBeTruthy();
       await fireEvent.press(getByTestId('plan-line-recurring-toggle'));
       await waitFor(() => expect(getByTestId('plan-line-currency-USD')).toBeTruthy());
+    });
+
+    it('a one-off line on a currency other than the plan\'s saves that currency', async () => {
+      const props = { ...baseProps(), accounts: [...ACCOUNTS, { id: 2, name: 'Foreign', currency: 'EUR' }] };
+      const { getByTestId } = await render(<BudgetPlanLineModal {...props} />);
+      await waitFor(() => expect(getByTestId('plan-line-currency-EUR')).toBeTruthy());
+      await fireEvent.press(getByTestId('plan-line-currency-EUR'));
+      await fireEvent.press(getByTestId('plan-target-picker'));
+      await fireEvent.press(getByTestId('plan-target-option-cat-cat1'));
+      await fireEvent.changeText(getByTestId('plan-line-amount'), '500');
+      await fireEvent.press(getByTestId('plan-line-save'));
+      expect(props.onSaveLine).toHaveBeenCalledWith(expect.objectContaining({
+        isRecurring: false, currency: 'EUR',
+      }));
+    });
+
+    it('a one-off line left on the plan currency still saves currency: null (inherit)', async () => {
+      const props = { ...baseProps(), accounts: [...ACCOUNTS, { id: 2, name: 'Foreign', currency: 'EUR' }] };
+      const { getByTestId } = await render(<BudgetPlanLineModal {...props} />);
+      await waitFor(() => expect(getByTestId('plan-line-currency-EUR')).toBeTruthy());
+      // Away and back: the picker must not pin the plan's own currency onto the row.
+      await fireEvent.press(getByTestId('plan-line-currency-EUR'));
+      await fireEvent.press(getByTestId('plan-line-currency-USD'));
+      await fireEvent.press(getByTestId('plan-target-picker'));
+      await fireEvent.press(getByTestId('plan-target-option-cat-cat1'));
+      await fireEvent.changeText(getByTestId('plan-line-amount'), '500');
+      await fireEvent.press(getByTestId('plan-line-save'));
+      expect(props.onSaveLine).toHaveBeenCalledWith(expect.objectContaining({
+        isRecurring: false, currency: null,
+      }));
+    });
+
+    it('hides the currency picker once an execution account fixes the currency', async () => {
+      const props = baseProps();
+      const { getByTestId, queryByTestId } = await render(<BudgetPlanLineModal {...props} />);
+      await waitFor(() => expect(getByTestId('plan-account-picker')).toBeTruthy());
+      await fireEvent.press(getByTestId('plan-account-picker'));
+      await waitFor(() => expect(getByTestId('plan-account-option-1')).toBeTruthy());
+      await fireEvent.press(getByTestId('plan-account-option-1'));
+      await waitFor(() => expect(queryByTestId('plan-line-currency-USD')).toBeNull());
     });
 
     it('saves a recurring line with the chosen currency and no plan-specific target requirement change', async () => {
