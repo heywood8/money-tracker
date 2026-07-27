@@ -568,5 +568,18 @@
   "relink_target": "Ziel gelöscht — zum erneuten Verknüpfen tippen",
   "previous_month": "Voriger Monat",
   "next_month": "Nächster Monat",
-  "recurring_allocation": "Wiederkehrend"
+  "recurring_allocation": "Wiederkehrend",
+  "group": "Gruppe",
+  "no_group": "Keine Gruppe",
+  "new_group": "Neue Gruppe",
+  "create_group": "Gruppe erstellen",
+  "no_groups_yet": "Noch keine Gruppen",
+  "group_name": "Gruppenname",
+  "group_name_required": "Ein Gruppenname ist erforderlich",
+  "edit_group": "Gruppe bearbeiten",
+  "delete_group": "Gruppe löschen",
+  "delete_group_confirm": "Diese Gruppe löschen? Ihre Posten bleiben erhalten und sind danach einfach ohne Gruppe.",
+  "custom_group_budget": "Eigenes Budget",
+  "group_budget_derived_hint": "Das Budget der Gruppe ist die Summe ihrer Posten",
+  "group_budget_override_hint": "Zählt im Monatstotal anstelle der Summe der Posten"
 }

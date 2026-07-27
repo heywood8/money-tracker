@@ -568,5 +568,18 @@
   "relink_target": "目标已删除 — 点击重新关联",
   "previous_month": "上个月",
   "next_month": "下个月",
-  "recurring_allocation": "重复"
+  "recurring_allocation": "重复",
+  "group": "分组",
+  "no_group": "不分组",
+  "new_group": "新建分组",
+  "create_group": "创建分组",
+  "no_groups_yet": "还没有分组",
+  "group_name": "分组名称",
+  "group_name_required": "请填写分组名称",
+  "edit_group": "编辑分组",
+  "delete_group": "删除分组",
+  "delete_group_confirm": "删除该分组？其中的预算条目会保留，只是不再属于任何分组。",
+  "custom_group_budget": "自定义预算",
+  "group_budget_derived_hint": "分组预算等于其条目之和",
+  "group_budget_override_hint": "月度合计将按此金额计算，而不是条目之和"
 }

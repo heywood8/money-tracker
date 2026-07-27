@@ -171,6 +171,7 @@ const isSchemaComplete = async (rawDb) => {
       'app_metadata', 'accounts_balance_history', 'planned_operations',
       'notification_merchant_rules', 'pending_notifications',
       'budget_plans', 'budget_plan_lines', 'budget_plan_line_categories',
+      'budget_plan_line_groups',
     ];
     const existingTables = await rawDb.getAllAsync(
       "SELECT name FROM sqlite_master WHERE type='table'",
@@ -294,6 +295,14 @@ const isSchemaComplete = async (rawDb) => {
     // created the table and failed the ALTER must not read as complete, or every
     // line query would throw `no such column: include_children`.
     if (!planLineCols.some(c => c.name === 'include_children')) return false;
+
+    // Check budget_plan_lines has group_id (migration 0022). The accompanying
+    // budget_plan_line_groups table is covered by the expectedTables check above,
+    // but the column is a separate ADD COLUMN statement and
+    // applyPendingMigrations continues on failure — so a 0022 that created the
+    // table and failed the ALTER must not read as complete, or every line query
+    // would throw `no such column: group_id`.
+    if (!planLineCols.some(c => c.name === 'group_id')) return false;
 
     return true;
   } catch (error) {
@@ -625,6 +634,16 @@ const detectAppliedMigrations = async (rawDb) => {
     if ((await tableExists('budget_plan_line_categories'))
       && planLineCols.some(c => c.name === 'include_children')) {
       applied.push(21);
+    }
+
+    // Migration 0022: creates budget_plan_line_groups AND adds
+    // budget_plan_lines.group_id. Require both — a half-applied 0022 must re-run.
+    // Re-running is safe: the CREATE and the index are IF NOT EXISTS, and the
+    // ALTER only fails (harmlessly, applyPendingMigrations continues) when the
+    // column is already there.
+    if ((await tableExists('budget_plan_line_groups'))
+      && planLineCols.some(c => c.name === 'group_id')) {
+      applied.push(22);
     }
   }
 

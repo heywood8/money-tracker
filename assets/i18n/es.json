@@ -568,5 +568,18 @@
   "relink_target": "Objetivo eliminado — toca para volver a vincular",
   "previous_month": "Mes anterior",
   "next_month": "Mes siguiente",
-  "recurring_allocation": "Recurrente"
+  "recurring_allocation": "Recurrente",
+  "group": "Grupo",
+  "no_group": "Sin grupo",
+  "new_group": "Nuevo grupo",
+  "create_group": "Crear grupo",
+  "no_groups_yet": "Aún no hay grupos",
+  "group_name": "Nombre del grupo",
+  "group_name_required": "El nombre del grupo es obligatorio",
+  "edit_group": "Editar grupo",
+  "delete_group": "Eliminar grupo",
+  "delete_group_confirm": "¿Eliminar este grupo? Sus asignaciones se conservan y quedan sin grupo.",
+  "custom_group_budget": "Presupuesto propio",
+  "group_budget_derived_hint": "El presupuesto del grupo es la suma de sus asignaciones",
+  "group_budget_override_hint": "Cuenta en el total del mes en lugar de la suma de las asignaciones"
 }

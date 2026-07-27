@@ -394,8 +394,8 @@ describe('BudgetPlansDB', () => {
       await BudgetPlansDB.addLine('p1', { amount: '10', categoryId: 'c1', includeChildren: false });
       const [sql, params] = mockRunAsync.mock.calls.find(([s]) => s.includes('INSERT INTO budget_plan_lines'));
       expect(sql).toContain('include_children');
-      // Column order: ..., last_executed_month, include_children, created_at, updated_at
-      expect(params[params.length - 3]).toBe(1);
+      // Column order: ..., last_executed_month, include_children, group_id, created_at, updated_at
+      expect(params[params.length - 4]).toBe(1);
     });
 
     // Bug 10 (adversarial review): addLine/addRecurringLine share one insertPlanLine

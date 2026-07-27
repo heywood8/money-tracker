@@ -128,6 +128,10 @@ export const mapLineFields = (row) => {
     // a stored 0 no longer changes how a line counts.
     toAccountId,
     sortOrder: row.sort_order ?? 0,
+    // The envelope this line belongs to (migration 0022), or null when it stands
+    // on its own. An income line is never grouped — groups sit in the allocations
+    // section and aggregate spending, which income lines have none of.
+    groupId: kind === 'income' ? null : (row.group_id ?? null),
     isBroken: kind !== 'income' && categoryIds.length === 0 && toAccountId === null,
     isRecurring: row.is_recurring === 1,
     currency: row.currency ?? null,
@@ -541,6 +545,9 @@ const insertPlanLine = async (planId, line) => {
       // Always 1: descendant spending always rolls up (see mapLineFields). The
       // column is kept written so the backup/Sheets shape stays stable.
       include_children: 1,
+      // An income line is never grouped (see mapLineFields), so the column is
+      // written NULL for one however the caller asked.
+      group_id: (line.kind !== 'income' && isSet(line.groupId)) ? line.groupId : null,
       created_at: now,
       updated_at: now,
     };
@@ -550,12 +557,12 @@ const insertPlanLine = async (planId, line) => {
     // silently stop tracking anything.
     await executeTransaction(async (db) => {
       await db.runAsync(
-        'INSERT INTO budget_plan_lines (id, plan_id, label, amount, comment, category_id, to_account_id, sort_order, is_recurring, currency, kind, account_id, last_executed_month, include_children, created_at, updated_at) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)',
+        'INSERT INTO budget_plan_lines (id, plan_id, label, amount, comment, category_id, to_account_id, sort_order, is_recurring, currency, kind, account_id, last_executed_month, include_children, group_id, created_at, updated_at) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)',
         [
           row.id, row.plan_id, row.label, row.amount, row.comment, row.category_id,
           row.to_account_id, row.sort_order, row.is_recurring, row.currency,
           row.kind, row.account_id, row.last_executed_month, row.include_children,
-          row.created_at, row.updated_at,
+          row.group_id, row.created_at, row.updated_at,
         ],
       );
       await writeLineCategoriesInTx(db, row.id, categoryIds);
@@ -776,6 +783,17 @@ export const updateLine = async (id, updates) => {
       fields.push('last_executed_month = ?');
       values.push(updates.lastExecutedMonth ?? null);
     }
+    // Group membership (migration 0022). Turning a line into an income line drops
+    // it out of its group even when the caller said nothing about groups: income
+    // lines are not part of the allocations the groups aggregate (see
+    // mapLineFields), and a stale group_id there would make the group's derived
+    // total count a figure its own children's sum cannot explain.
+    if (updates.groupId !== undefined || updates.kind === 'income') {
+      fields.push('group_id = ?');
+      values.push(
+        updates.kind === 'income' || !isSet(updates.groupId) ? null : updates.groupId,
+      );
+    }
 
     // Amount, possibly re-derived below when the effective currency changes.
     let amount = updates.amount;
@@ -933,6 +951,258 @@ export const reorderLines = async (planId, orderedIds) => reorderPlanLines(planI
 export const reorderRecurringLines = async (orderedIds) => reorderPlanLines(null, orderedIds);
 
 /* -------------------------------------------------------------------------- */
+/* Groups (migration 0022)                                                     */
+/* -------------------------------------------------------------------------- */
+
+/**
+ * Map a budget_plan_line_groups row to camelCase. `isDerived` is the computed
+ * "this group has no override" flag every consumer keys off — a null `amount`
+ * means the group's budget is the sum of its lines, recomputed as they change.
+ * @param {Object|null} row
+ * @returns {Object|null}
+ */
+export const mapGroupFields = (row) => {
+  if (!row) return null;
+  const amount = isSet(row.amount) ? String(row.amount) : null;
+  return {
+    id: row.id,
+    label: row.label,
+    amount,
+    // Only meaningful alongside an override amount; a derived group's total is
+    // expressed in whatever currency the screen is being read in.
+    currency: amount === null ? null : (row.currency ?? null),
+    sortOrder: row.sort_order ?? 0,
+    isDerived: amount === null,
+    createdAt: row.created_at,
+    updatedAt: row.updated_at,
+  };
+};
+
+/**
+ * Validate a group. An override amount must be a positive number AND name its
+ * currency — a bare number would be read in whichever currency the screen
+ * happened to be showing when it was typed.
+ * @param {Object} group
+ * @returns {string|null} Error message or null if valid.
+ */
+export const validateLineGroup = (group) => {
+  if (!group || !isSet(group.label) || !String(group.label).trim()) {
+    return 'A group name is required';
+  }
+  if (isSet(group.amount)) {
+    if (!Currency.isValid(group.amount) || Currency.compare(group.amount, '0') <= 0) {
+      return 'Amount must be greater than zero';
+    }
+    if (!isSet(group.currency)) {
+      return 'Currency is required for a custom group budget';
+    }
+  }
+  return null;
+};
+
+/**
+ * Create a group.
+ * @param {Object} group - { id?, label, amount?, currency?, sortOrder? }
+ * @returns {Promise<Object>} The created group (camelCase).
+ */
+export const createLineGroup = async (group) => {
+  try {
+    const validationError = validateLineGroup(group);
+    if (validationError) {
+      throw new Error(validationError);
+    }
+    const now = new Date().toISOString();
+    const hasAmount = isSet(group.amount);
+    const row = {
+      id: group.id || uuid.v4(),
+      // Trimmed, NOT sanitizeNewLabel'd: that strips the system-label prefixes
+      // that mark a protected imported operation, and a group's name never
+      // becomes an operation description — running it through would silently
+      // empty a group a user legitimately called "Category: fun".
+      label: String(group.label).trim(),
+      amount: hasAmount ? String(group.amount) : null,
+      // Currency is stored only with an override; a derived group carrying one
+      // would suggest its computed total is fixed to that currency, which it is not.
+      currency: hasAmount ? group.currency : null,
+      sort_order: Number.isInteger(group.sortOrder) ? group.sortOrder : 0,
+      created_at: now,
+      updated_at: now,
+    };
+    await executeQuery(
+      'INSERT INTO budget_plan_line_groups (id, label, amount, currency, sort_order, created_at, updated_at) VALUES (?, ?, ?, ?, ?, ?, ?)',
+      [row.id, row.label, row.amount, row.currency, row.sort_order, row.created_at, row.updated_at],
+    );
+    return mapGroupFields(row);
+  } catch (error) {
+    console.error('Failed to create budget line group:', error);
+    throw error;
+  }
+};
+
+/**
+ * Every group, in display order. Groups are global (not month-scoped), so this is
+ * the whole list — the UI shows the ones that have a line in the month it renders.
+ * @returns {Promise<Array>}
+ */
+export const getLineGroups = async () => {
+  try {
+    const rows = await queryAll(
+      'SELECT * FROM budget_plan_line_groups ORDER BY sort_order ASC, created_at ASC',
+    );
+    return (rows || []).map(mapGroupFields);
+  } catch (error) {
+    console.error('Failed to get budget line groups:', error);
+    throw error;
+  }
+};
+
+/**
+ * A single group by ID.
+ * @param {string} id
+ * @returns {Promise<Object|null>}
+ */
+export const getLineGroupById = async (id) => {
+  try {
+    const row = await queryFirst('SELECT * FROM budget_plan_line_groups WHERE id = ?', [id]);
+    return mapGroupFields(row);
+  } catch (error) {
+    console.error('Failed to get budget line group:', error);
+    throw error;
+  }
+};
+
+/**
+ * Update a group. Partial updates.
+ *
+ * Passing `amount: null` clears the override and returns the group to a DERIVED
+ * total — and clears the stored currency with it, so a later override cannot
+ * inherit a currency the user last picked months ago. Passing an amount requires
+ * a currency (either in this call or already stored), for the reason
+ * {@link validateLineGroup} gives.
+ * @param {string} id
+ * @param {Object} updates - Partial { label, amount, currency, sortOrder }
+ * @returns {Promise<void>}
+ */
+export const updateLineGroup = async (id, updates) => {
+  try {
+    const fields = [];
+    const values = [];
+
+    if (updates.label !== undefined) {
+      if (!isSet(updates.label) || !String(updates.label).trim()) {
+        throw new Error('A group name is required');
+      }
+      fields.push('label = ?');
+      values.push(String(updates.label).trim());
+    }
+
+    if (updates.amount !== undefined) {
+      if (isSet(updates.amount)) {
+        if (!Currency.isValid(updates.amount) || Currency.compare(updates.amount, '0') <= 0) {
+          throw new Error('Amount must be greater than zero');
+        }
+        // The currency may come with this update or already be on the row; one of
+        // the two must hold, or the stored number means nothing.
+        let currency = updates.currency;
+        if (!isSet(currency)) {
+          const existing = await queryFirst('SELECT currency FROM budget_plan_line_groups WHERE id = ?', [id]);
+          currency = existing?.currency;
+        }
+        if (!isSet(currency)) {
+          throw new Error('Currency is required for a custom group budget');
+        }
+        fields.push('amount = ?', 'currency = ?');
+        values.push(String(updates.amount), currency);
+      } else {
+        // Back to a derived total: the currency goes with the amount it described.
+        fields.push('amount = ?', 'currency = ?');
+        values.push(null, null);
+      }
+    } else if (updates.currency !== undefined) {
+      // A currency edit on its own only makes sense for a group that HAS an
+      // override; for a derived one there is no amount for it to describe.
+      const existing = await queryFirst('SELECT amount FROM budget_plan_line_groups WHERE id = ?', [id]);
+      if (isSet(existing?.amount)) {
+        if (!isSet(updates.currency)) {
+          throw new Error('Currency is required for a custom group budget');
+        }
+        fields.push('currency = ?');
+        values.push(updates.currency);
+      }
+    }
+
+    if (updates.sortOrder !== undefined) {
+      fields.push('sort_order = ?');
+      values.push(Number.isInteger(updates.sortOrder) ? updates.sortOrder : 0);
+    }
+
+    if (fields.length === 0) {
+      return; // Nothing to update
+    }
+
+    fields.push('updated_at = ?');
+    values.push(new Date().toISOString());
+    values.push(id);
+
+    await executeQuery(
+      `UPDATE budget_plan_line_groups SET ${fields.join(', ')} WHERE id = ?`,
+      values,
+    );
+  } catch (error) {
+    console.error('Failed to update budget line group:', error);
+    throw error;
+  }
+};
+
+/**
+ * Delete a group. Its lines are UNGROUPED, not deleted (group_id is ON DELETE SET
+ * NULL) — the budgets inside an envelope outlive the envelope.
+ * @param {string} id
+ * @returns {Promise<void>}
+ */
+export const deleteLineGroup = async (id) => {
+  try {
+    await executeQuery('DELETE FROM budget_plan_line_groups WHERE id = ?', [id]);
+  } catch (error) {
+    console.error('Failed to delete budget line group:', error);
+    throw error;
+  }
+};
+
+/**
+ * Persist a new group order. `orderedIds` is the full list of group IDs in the
+ * desired order; each group's sort_order is set to its index.
+ * @param {Array<string>} orderedIds
+ * @returns {Promise<void>}
+ */
+export const reorderLineGroups = async (orderedIds) => {
+  try {
+    const seen = new Set();
+    for (const id of orderedIds) {
+      if (!id) {
+        throw new Error('Invalid group data: missing id');
+      }
+      if (seen.has(id)) {
+        throw new Error(`Duplicate group ID in reorder: ${id}`);
+      }
+      seen.add(id);
+    }
+    const now = new Date().toISOString();
+    await executeTransaction(async (db) => {
+      for (let i = 0; i < orderedIds.length; i++) {
+        await db.runAsync(
+          'UPDATE budget_plan_line_groups SET sort_order = ?, updated_at = ? WHERE id = ?',
+          [i, now, orderedIds[i]],
+        );
+      }
+    });
+  } catch (error) {
+    console.error('Failed to reorder budget line groups:', error);
+    throw error;
+  }
+};
+
+/* -------------------------------------------------------------------------- */
 /* Derived                                                                     */
 /* -------------------------------------------------------------------------- */
 
@@ -945,6 +1215,10 @@ export const reorderRecurringLines = async (orderedIds) => reorderPlanLines(null
  * column is bridged into lines by migration 0020 and only survives as a fallback
  * for a plan that has no income line at all. Income lines are, of course, not
  * part of `allocated`.
+ *
+ * A raw same-currency sum of THIS plan's own lines: it counts no recurring line
+ * (those hang off no plan) and applies no group override (migration 0022). The
+ * screen's figures come from {@link calculatePlanStatus}, which does both.
  * @param {string} planId
  * @returns {Promise<{ expectedIncome: string, allocated: string, remainder: string }>}
  */
@@ -1029,12 +1303,16 @@ export const copyPlan = async (fromMonth, toMonth) => {
           // month pending too, exactly like a recurring line does when the month
           // rolls over.
           await db.runAsync(
-            'INSERT INTO budget_plan_lines (id, plan_id, label, amount, comment, category_id, to_account_id, sort_order, is_recurring, currency, kind, account_id, last_executed_month, include_children, created_at, updated_at) VALUES (?, ?, ?, ?, ?, ?, ?, ?, 0, ?, ?, ?, NULL, ?, ?, ?)',
+            'INSERT INTO budget_plan_lines (id, plan_id, label, amount, comment, category_id, to_account_id, sort_order, is_recurring, currency, kind, account_id, last_executed_month, include_children, group_id, created_at, updated_at) VALUES (?, ?, ?, ?, ?, ?, ?, ?, 0, ?, ?, ?, NULL, ?, ?, ?, ?)',
             [
               clonedId, newPlanId, line.label, line.amount, line.comment,
               line.categoryId, line.toAccountId, line.sortOrder ?? i,
               line.currency, line.kind, line.accountId,
-              1, now, now, // include_children: always on, see mapLineFields
+              1, // include_children: always on, see mapLineFields
+              // Groups are global, so the clone joins the very same envelope its
+              // source belongs to — copying a month must not scatter its groups.
+              line.groupId ?? null,
+              now, now,
             ],
           );
           // The clone must track the same SET of categories, not just the primary
@@ -1299,6 +1577,10 @@ const collectPlanSourceCurrencies = async (lines, startDate, endDate, convertAll
  * @returns {Promise<Object>} {
  *   planId, month, currency, convertAll,
  *   lines: Array<{ lineId, broken, amount, actual, remaining, percentage, isExceeded, status }>,
+ *   groups: Array<{ groupId, amount, childAmount, actual, remaining, percentage, isExceeded,
+ *     status, overrideApplied, lineCount }> — one per group with at least one line in
+ *     this month (migration 0022). `amount` is the group's override when it has one
+ *     (and it is convertible), else its children's sum; `overrideApplied` says which.
  *   totals: { expectedIncome, actualIncome, allocated, totalActual, plannedRemainder, actualRemainder },
  *   unconvertible: string[],
  * }
@@ -1310,9 +1592,25 @@ export const calculatePlanStatus = async (planId, displayCurrency = null, conver
       throw new Error(`Budget plan ${planId} not found`);
     }
     const target = displayCurrency || plan.currency;
-    const [oneOffLines, recurringLines] = await Promise.all([getPlanLines(planId), getRecurringLines()]);
+    const [oneOffLines, recurringLines, allGroups] = await Promise.all([
+      getPlanLines(planId), getRecurringLines(), getLineGroups(),
+    ]);
     const lines = [...recurringLines, ...oneOffLines];
     const { startDate, endDate } = getMonthDateRange(plan.month);
+
+    const groupsById = new Map(allGroups.map(g => [g.id, g]));
+    // What each group's own children contribute, accumulated as the lines are
+    // walked below. Only lines that actually reached `allocated` are counted, so
+    // a derived group's total can never claim a figure the month's own does not hold.
+    const groupTallies = new Map();
+    const tallyFor = (groupId) => {
+      let tally = groupTallies.get(groupId);
+      if (!tally) {
+        tally = { childAmount: '0', actual: '0', lineCount: 0 };
+        groupTallies.set(groupId, tally);
+      }
+      return tally;
+    };
 
     const lineStatuses = [];
     const transferCurrencies = new Set();
@@ -1328,8 +1626,14 @@ export const calculatePlanStatus = async (planId, displayCurrency = null, conver
     // pattern as calculateActualIncome below) instead of a per-line fetch inside
     // the loop — with N recurring lines in foreign currencies, that used to mean
     // N sequential network/offline-table round trips instead of one.
+    // Group override amounts carry their own currency too (a group is global, so
+    // it has no plan to inherit one from) — collected here so they share the one
+    // lookup rather than adding a round trip per group.
     const distinctLineCurrencies = [...new Set(
-      lines.map(line => line.currency || target).filter(c => c !== target),
+      [
+        ...lines.map(line => line.currency || target),
+        ...allGroups.map(group => group.currency || target),
+      ].filter(c => c !== target),
     )];
     const lineRateByCurrency = distinctLineCurrencies.length > 0
       ? await fetchRatesToTarget(distinctLineCurrencies, target)
@@ -1382,6 +1686,15 @@ export const calculatePlanStatus = async (planId, displayCurrency = null, conver
       }
 
       allocated = Currency.add(allocated, amount, target);
+      // A line only counts toward its group once its amount is known in the
+      // target currency — which is exactly the point it counts toward `allocated`.
+      const groupTally = isSet(line.groupId) && groupsById.has(line.groupId)
+        ? tallyFor(line.groupId)
+        : null;
+      if (groupTally) {
+        groupTally.childAmount = Currency.add(groupTally.childAmount, amount, target);
+        groupTally.lineCount += 1;
+      }
       const { broken, actual, sourceCurrency } = await calculateLineActual(line, plan.month, target, convertAll);
 
       if (broken) {
@@ -1402,6 +1715,9 @@ export const calculatePlanStatus = async (planId, displayCurrency = null, conver
         transferCurrencies.add(sourceCurrency);
       }
       totalActual = Currency.add(totalActual, actual, target);
+      if (groupTally) {
+        groupTally.actual = Currency.add(groupTally.actual, actual, target);
+      }
       const remaining = Currency.subtract(amount, actual, target);
       const { isExceeded, percentage, status } = deriveSpendingStatus(actual, amount);
       lineStatuses.push({
@@ -1413,6 +1729,66 @@ export const calculatePlanStatus = async (planId, displayCurrency = null, conver
         percentage,
         isExceeded,
         status,
+      });
+    }
+
+    // Group statuses, and the correction an OVERRIDE group makes to `allocated`.
+    //
+    // A derived group (the default) is pure presentation: its target is the sum
+    // of the very lines already counted, so the month's total is untouched. An
+    // override is the opposite — the user said the envelope is worth X whatever
+    // its parts add up to, so X REPLACES the children's sum in `allocated`
+    // (otherwise the number in the group's own row would disagree with the total
+    // printed under it, and the override would be decorative).
+    //
+    // Only groups with at least one line in this month appear: a group whose
+    // members are all one-off lines of another month is not part of this one.
+    const groupStatuses = [];
+    for (const group of allGroups) {
+      const tally = groupTallies.get(group.id);
+      if (!tally || tally.lineCount === 0) continue;
+
+      let amount = tally.childAmount;
+      let overrideApplied = false;
+      let unconvertibleOverride = false;
+      if (!group.isDerived) {
+        const groupCurrency = group.currency || target;
+        const converted = groupCurrency === target
+          ? group.amount
+          : convertWithRateMap(group.amount, groupCurrency, target, lineRateByCurrency);
+        if (converted === null) {
+          // No rate for the override's currency. Falling back to the derived sum
+          // keeps the row and the totals in one currency and honest about it;
+          // the currency is flagged through the same unconvertible plumbing a
+          // line uses.
+          transferCurrencies.add(groupCurrency);
+          unconvertibleOverride = true;
+        } else {
+          amount = converted;
+          overrideApplied = true;
+          allocated = Currency.add(
+            Currency.subtract(allocated, tally.childAmount, target),
+            amount,
+            target,
+          );
+        }
+      }
+
+      const { isExceeded, percentage, status } = deriveSpendingStatus(tally.actual, amount);
+      groupStatuses.push({
+        groupId: group.id,
+        amount,
+        childAmount: tally.childAmount,
+        actual: tally.actual,
+        remaining: Currency.subtract(amount, tally.actual, target),
+        percentage,
+        isExceeded,
+        status: unconvertibleOverride ? 'unconvertible' : status,
+        // True when the printed target is the group's own figure rather than its
+        // children's sum — the row says so, since the two disagreeing is the
+        // whole point of an override.
+        overrideApplied,
+        lineCount: tally.lineCount,
       });
     }
 
@@ -1436,6 +1812,7 @@ export const calculatePlanStatus = async (planId, displayCurrency = null, conver
       currency: target,
       convertAll,
       lines: lineStatuses,
+      groups: groupStatuses,
       totals: { expectedIncome, actualIncome, allocated, totalActual, plannedRemainder, actualRemainder },
       unconvertible,
     };

@@ -568,5 +568,18 @@
   "relink_target": "대상이 삭제됨 — 눌러서 다시 연결",
   "previous_month": "이전 달",
   "next_month": "다음 달",
-  "recurring_allocation": "반복"
+  "recurring_allocation": "반복",
+  "group": "그룹",
+  "no_group": "그룹 없음",
+  "new_group": "새 그룹",
+  "create_group": "그룹 만들기",
+  "no_groups_yet": "아직 그룹이 없습니다",
+  "group_name": "그룹 이름",
+  "group_name_required": "그룹 이름을 입력하세요",
+  "edit_group": "그룹 편집",
+  "delete_group": "그룹 삭제",
+  "delete_group_confirm": "이 그룹을 삭제할까요? 안의 항목은 유지되며 그룹만 해제됩니다.",
+  "custom_group_budget": "예산 직접 설정",
+  "group_budget_derived_hint": "그룹 예산은 항목 합계입니다",
+  "group_budget_override_hint": "이 금액이 항목 합계 대신 월 합계에 반영됩니다"
 }

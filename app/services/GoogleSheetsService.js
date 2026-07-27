@@ -66,7 +66,7 @@ export const signOut = async () => {
 };
 
 /**
- * Build the 7-sheet data structure from a backup object.
+ * Build the 8-sheet data structure from a backup object.
  *
  * The "Planned Operations" sheet is gone as of Budgets v3 phase 3: planned
  * operations are now plan lines carrying an executable template, exported in
@@ -79,10 +79,14 @@ export const buildSheetsData = (backup) => {
   const {
     accounts, categories, operations, budgets, balance_history,
     budget_plans, budget_plan_lines, budget_plan_line_categories,
+    budget_plan_line_groups,
   } = backup.data;
 
   const accountNames = new Map(accounts.map(a => [a.id, a.name]));
   const categoryNames = new Map(categories.map(c => [c.id, c.name]));
+  // Line groups (migration 0022) — the name is for the reader, the ID is what
+  // makes the round trip; a line carries both, like every other reference here.
+  const groupNames = new Map((budget_plan_line_groups || []).map(g => [g.id, g.label]));
 
   // A line's full category set (migration 0021), keyed by line. Semicolon-joined
   // rather than comma-joined because a category NAME may well contain a comma —
@@ -176,7 +180,7 @@ export const buildSheetsData = (backup) => {
     {
       range: 'Budget Plan Lines!A1',
       values: [
-        ['id', 'plan_id', 'label', 'amount', 'comment', 'category', 'account', 'category_id', 'to_account_id', 'sort_order', 'is_recurring', 'currency', 'kind', 'execution_account', 'account_id', 'last_executed_month', 'categories', 'category_ids', 'include_children'],
+        ['id', 'plan_id', 'label', 'amount', 'comment', 'category', 'account', 'category_id', 'to_account_id', 'sort_order', 'is_recurring', 'currency', 'kind', 'execution_account', 'account_id', 'last_executed_month', 'categories', 'category_ids', 'include_children', 'group', 'group_id'],
         ...(budget_plan_lines || []).map(l => {
           const ids = lineCategoryIds(l);
           return [
@@ -198,8 +202,22 @@ export const buildSheetsData = (backup) => {
             ids.map(id => categoryNames.get(id) || '').join(';'),
             ids.join(';'),
             l.include_children === 0 ? 0 : 1,
+            l.group_id ? (groupNames.get(l.group_id) || '') : '',
+            l.group_id || '',
           ];
         }),
+      ],
+    },
+    {
+      // Line groups (migration 0022). A blank `amount` is the normal state: the
+      // group's budget is then the sum of the lines pointing at it, so there is
+      // nothing to write down — and `currency` only accompanies an override.
+      range: 'Budget Line Groups!A1',
+      values: [
+        ['id', 'label', 'amount', 'currency', 'sort_order'],
+        ...(budget_plan_line_groups || []).map(g => [
+          g.id, g.label, g.amount ?? '', g.currency ?? '', g.sort_order ?? 0,
+        ]),
       ],
     },
   ];
@@ -224,7 +242,7 @@ const parseSheet = (valueRange) => {
 
 /**
  * Import all app data from the saved Google Sheets spreadsheet.
- * Fetches all 7 sheets in one batchGet call, resolves foreign keys
+ * Fetches all 8 sheets in one batchGet call, resolves foreign keys
  * (ID-first, name fallback), and returns a backup object compatible
  * with restoreBackup(). Does NOT call restoreBackup itself.
  *
@@ -244,15 +262,34 @@ export const importFromSheets = async (accessToken, onProgress) => {
     throw new Error('no_spreadsheet_configured');
   }
 
-  const sheetNames = ['Accounts', 'Operations', 'Categories', 'Budgets', 'Balance History', 'Budget Plans', 'Budget Plan Lines'];
-  const rangesParam = sheetNames.map(n => `ranges=${encodeURIComponent(n)}`).join('&');
-  const response = await fetch(
-    `${SHEETS_API}/${spreadsheetId}/values:batchGet?${rangesParam}`,
+  const sheetNames = ['Accounts', 'Operations', 'Categories', 'Budgets', 'Balance History', 'Budget Plans', 'Budget Plan Lines', 'Budget Line Groups'];
+  const batchGet = (names) => fetch(
+    `${SHEETS_API}/${spreadsheetId}/values:batchGet?${names.map(n => `ranges=${encodeURIComponent(n)}`).join('&')}`,
     { headers: { Authorization: `Bearer ${accessToken}` } },
   );
 
+  let response = await batchGet(sheetNames);
+
+  // A range naming a tab the spreadsheet doesn't have fails the WHOLE call with
+  // a 400 — which is what every spreadsheet written by an older build would do
+  // the moment a tab is added to the list above. Rather than paying for a
+  // metadata read on every import, ask for the titles only once that happens and
+  // retry with the ones that are actually there; the absent ones then parse as
+  // empty (see findSheet below).
+  if (!response.ok && response.status === 400) {
+    const existingTitles = await getSheetTitles(accessToken, spreadsheetId);
+    const presentSheetNames = sheetNames.filter(name => existingTitles.has(name));
+    if (presentSheetNames.length === 0) {
+      // Not one recognizable tab — this is some other spreadsheet, not a Penny
+      // export. Say so instead of "successfully importing" nothing over the
+      // user's whole database.
+      throw new Error('fetch_sheets_failed');
+    }
+    response = await batchGet(presentSheetNames);
+  }
+
   if (!response.ok) {
-    const data = await response.json();
+    const data = await response.json().catch(() => ({}));
     if (response.status === 401) {
       await signOut();
       throw new Error('refresh_failed');
@@ -280,6 +317,9 @@ export const importFromSheets = async (accessToken, onProgress) => {
   const historyRows = findSheet('Balance History');
   const budgetPlanRows = findSheet('Budget Plans');
   const budgetPlanLineRows = findSheet('Budget Plan Lines');
+  // Absent from any spreadsheet written before migration 0022 — findSheet then
+  // yields [], and every line imports ungrouped.
+  const budgetLineGroupRows = findSheet('Budget Line Groups');
 
   // Build lookup maps: id->id (direct) and name->id (fallback)
   const accountIdMap = new Map();
@@ -391,6 +431,28 @@ export const importFromSheets = async (accessToken, onProgress) => {
     updated_at: now,
   }));
 
+  // Groups first: a line's group reference resolves against them. Same ID-first,
+  // name-fallback shape as every other reference on this sheet, so a group the
+  // user renamed by hand still lands on the right row.
+  const budget_plan_line_groups = budgetLineGroupRows
+    .filter(g => g.id && g.label)
+    .map(g => ({
+      id: g.id,
+      label: g.label,
+      // A blank amount is a DERIVED group; its currency goes with it.
+      amount: g.amount === '' || g.amount == null ? null : String(g.amount),
+      currency: (g.amount === '' || g.amount == null) ? null : (g.currency || null),
+      sort_order: (g.sort_order !== '' && g.sort_order != null) ? Number(g.sort_order) : 0,
+      created_at: now,
+      updated_at: now,
+    }));
+
+  const groupIdMap = new Map();
+  budget_plan_line_groups.forEach(g => {
+    groupIdMap.set(String(g.id), String(g.id));
+    if (g.label) groupIdMap.set(g.label, String(g.id));
+  });
+
   const budget_plan_lines = budgetPlanLineRows.map(l => {
     const isRecurring = l.is_recurring !== '' && l.is_recurring != null ? Number(l.is_recurring) : 0;
     return {
@@ -420,6 +482,11 @@ export const importFromSheets = async (accessToken, onProgress) => {
       // which is the default ON; `Number('')` is 0, so this cannot go through
       // a plain numeric comparison.
       include_children: readIncludeChildren(l.include_children),
+      // Group membership. A reference to a group the sheet doesn't list drops to
+      // null (the line imports ungrouped) rather than dangling into a failed FK.
+      group_id: (l.group_id || l.group)
+        ? (groupIdMap.get(String(l.group_id)) ?? groupIdMap.get(String(l.group)) ?? null)
+        : null,
       created_at: now,
       updated_at: now,
     };
@@ -478,6 +545,7 @@ export const importFromSheets = async (accessToken, onProgress) => {
       budget_plans,
       budget_plan_lines,
       budget_plan_line_categories,
+      budget_plan_line_groups,
     },
   };
 };
@@ -499,6 +567,7 @@ const createSpreadsheet = async (accessToken) => {
         { properties: { title: 'Balance History' } },
         { properties: { title: 'Budget Plans' } },
         { properties: { title: 'Budget Plan Lines' } },
+        { properties: { title: 'Budget Line Groups' } },
       ],
     }),
   });
@@ -509,18 +578,100 @@ const createSpreadsheet = async (accessToken) => {
   return data.spreadsheetId;
 };
 
-const getSheetIds = async (accessToken, spreadsheetId, sheetNames) => {
+/**
+ * Titles of the tabs a spreadsheet actually has.
+ *
+ * Both the export and the import name their tabs by hand, and the Sheets API
+ * rejects the WHOLE request (400, "Unable to parse range") when any range names
+ * a tab that doesn't exist. A spreadsheet created by an older build of the app
+ * has fewer tabs than today's list — so every call that spans them has to ask
+ * first, or one added tab breaks every existing user's export.
+ * @param {string} accessToken
+ * @param {string} spreadsheetId
+ * @returns {Promise<Set<string>>}
+ */
+const getSheetTitles = async (accessToken, spreadsheetId) => {
+  const response = await fetch(
+    `${SHEETS_API}/${spreadsheetId}?fields=sheets.properties.title`,
+    { headers: { Authorization: `Bearer ${accessToken}` } },
+  );
+  if (!response.ok) {
+    const data = await response.json().catch(() => ({}));
+    if (response.status === 401) {
+      await signOut();
+      throw new Error('refresh_failed');
+    }
+    if (response.status === 404) throw new Error('spreadsheet_not_found');
+    throw new Error(data.error?.message || 'get_sheet_ids_failed');
+  }
+  const data = await response.json();
+  return new Set((data.sheets || []).map(s => s.properties?.title).filter(Boolean));
+};
+
+/**
+ * Every tab's title → sheetId. One metadata read serves both jobs the export
+ * needs it for: knowing which tabs are missing, and knowing the IDs to hang the
+ * basic filters on.
+ * @param {string} accessToken
+ * @param {string} spreadsheetId
+ * @returns {Promise<Map<string, number>>}
+ */
+const getSheetIdsByTitle = async (accessToken, spreadsheetId) => {
   const response = await fetch(
     `${SHEETS_API}/${spreadsheetId}?fields=sheets.properties`,
     { headers: { Authorization: `Bearer ${accessToken}` } },
   );
   if (!response.ok) {
-    const data = await response.json();
+    const data = await response.json().catch(() => ({}));
+    if (response.status === 401) {
+      await signOut();
+      throw new Error('refresh_failed');
+    }
     throw new Error(data.error?.message || 'get_sheet_ids_failed');
   }
   const data = await response.json();
-  const nameToId = new Map(data.sheets.map(s => [s.properties.title, s.properties.sheetId]));
-  return sheetNames.map(name => nameToId.get(name)).filter(id => id !== undefined);
+  return new Map((data.sheets || []).map(s => [s.properties?.title, s.properties?.sheetId]));
+};
+
+/**
+ * Create any of `sheetNames` the spreadsheet is missing, returning the IDs of the
+ * ones created. A no-op when it already has them all, which is the usual case —
+ * this exists for the spreadsheet a user has been exporting into since before the
+ * newest tab was added, where naming an absent tab in a batchClear range fails
+ * the whole call with a 400.
+ * @param {string} accessToken
+ * @param {string} spreadsheetId
+ * @param {Array<string>} missing
+ * @returns {Promise<Map<string, number>>}
+ */
+const addSheets = async (accessToken, spreadsheetId, missing) => {
+  const response = await fetch(`${SHEETS_API}/${spreadsheetId}:batchUpdate`, {
+    method: 'POST',
+    headers: {
+      Authorization: `Bearer ${accessToken}`,
+      'Content-Type': 'application/json',
+    },
+    body: JSON.stringify({
+      requests: missing.map(title => ({ addSheet: { properties: { title } } })),
+    }),
+  });
+  if (!response.ok) {
+    const data = await response.json().catch(() => ({}));
+    if (response.status === 401) {
+      await signOut();
+      throw new Error('refresh_failed');
+    }
+    throw new Error(data.error?.message || 'create_spreadsheet_failed');
+  }
+  // Each addSheet reply carries the new tab's properties, so the filters below
+  // can be applied to a tab created moments ago without a second metadata read.
+  const data = await response.json().catch(() => ({}));
+  const added = new Map();
+  for (const reply of data.replies || []) {
+    const properties = reply.addSheet?.properties;
+    if (properties?.title != null) added.set(properties.title, properties.sheetId);
+  }
+  return added;
 };
 
 const applyFilters = async (accessToken, spreadsheetId, sheetIds) => {
@@ -615,12 +766,25 @@ export const exportToSheets = async (accessToken, backup, onProgress) => {
   const sheetNames = sheets.map(s => s.range.split('!')[0]);
 
   report('clear', 'in_progress');
+  // One metadata read up front, before anything names a range: a spreadsheet
+  // from an older build lacks the newest tabs, and naming an absent one in a
+  // batchClear range fails the entire call. The same read supplies the sheet IDs
+  // the filters need at the end, so this costs no extra request in the common
+  // case — it just moved from after the write to before the clear.
+  const sheetIdByTitle = await getSheetIdsByTitle(accessToken, spreadsheetId);
+  const missing = sheetNames.filter(name => !sheetIdByTitle.has(name));
+  if (missing.length > 0) {
+    const added = await addSheets(accessToken, spreadsheetId, missing);
+    for (const [title, id] of added) sheetIdByTitle.set(title, id);
+  }
   await clearSheets(accessToken, spreadsheetId, sheetNames);
   report('clear', 'completed');
 
   report('write', 'in_progress');
   await writeSheets(accessToken, spreadsheetId, sheets);
-  const sheetIds = await getSheetIds(accessToken, spreadsheetId, sheetNames);
+  const sheetIds = sheetNames
+    .map(name => sheetIdByTitle.get(name))
+    .filter(id => id !== undefined);
   await applyFilters(accessToken, spreadsheetId, sheetIds);
   report('write', 'completed');
 

@@ -568,5 +568,18 @@
   "relink_target": "Destinazione eliminata — tocca per ricollegare",
   "previous_month": "Mese precedente",
   "next_month": "Mese successivo",
-  "recurring_allocation": "Ricorrente"
+  "recurring_allocation": "Ricorrente",
+  "group": "Gruppo",
+  "no_group": "Nessun gruppo",
+  "new_group": "Nuovo gruppo",
+  "create_group": "Crea gruppo",
+  "no_groups_yet": "Ancora nessun gruppo",
+  "group_name": "Nome del gruppo",
+  "group_name_required": "Il nome del gruppo è obbligatorio",
+  "edit_group": "Modifica gruppo",
+  "delete_group": "Elimina gruppo",
+  "delete_group_confirm": "Eliminare questo gruppo? Le sue voci restano e tornano semplicemente senza gruppo.",
+  "custom_group_budget": "Budget personalizzato",
+  "group_budget_derived_hint": "Il budget del gruppo è la somma delle sue voci",
+  "group_budget_override_hint": "Viene conteggiato nel totale del mese al posto della somma delle voci"
 }

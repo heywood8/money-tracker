@@ -568,5 +568,18 @@
   "relink_target": "Թիրախը ջնջված է — հպեք՝ նորից կապելու համար",
   "previous_month": "Նախորդ ամիս",
   "next_month": "Հաջորդ ամիս",
-  "recurring_allocation": "Կրկնվող"
+  "recurring_allocation": "Կրկնվող",
+  "group": "Խումբ",
+  "no_group": "Առանց խմբի",
+  "new_group": "Նոր խումբ",
+  "create_group": "Ստեղծել խումբ",
+  "no_groups_yet": "Դեռ խմբեր չկան",
+  "group_name": "Խմբի անվանումը",
+  "group_name_required": "Խմբի անվանումը պարտադիր է",
+  "edit_group": "Խմբագրել խումբը",
+  "delete_group": "Ջնջել խումբը",
+  "delete_group_confirm": "Ջնջե՞լ այս խումբը։ Դրա հոդվածները կմնան և պարզապես դուրս կգան խմբից։",
+  "custom_group_budget": "Սեփական բյուջե",
+  "group_budget_derived_hint": "Խմբի բյուջեն նրա հոդվածների գումարն է",
+  "group_budget_override_hint": "Ամսվա հաշվարկում կգնա այս գումարը, ոչ թե հոդվածների գումարը"
 }

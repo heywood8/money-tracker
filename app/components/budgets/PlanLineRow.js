@@ -51,6 +51,7 @@ const PlanLineRow = memo(function PlanLineRow({
   canExecute = false,
   canUndo = false,
   showProgress = true,
+  indented = false,
   pace = null,
   listLength,
   onMove = null,
@@ -169,7 +170,15 @@ const PlanLineRow = memo(function PlanLineRow({
 
   const content = (
     <Pressable
-      style={[styles.lineRow, index % 2 === 1 && { backgroundColor: colors.altRow }]}
+      style={[
+        styles.lineRow,
+        index % 2 === 1 && { backgroundColor: colors.altRow },
+        // A line inside a group is one of that group's parts, and the indent is
+        // the only thing that says so — the group header above it carries the
+        // name and the total, and repeating either on every child would make the
+        // group's own row the least readable thing on the screen.
+        indented && styles.lineRowIndented,
+      ]}
       onPress={() => onPress(line)}
       // The row renders nothing from `listLength`/`onMove` — it forwards them so
       // the host can build the move actions. Keeping them as props (rather than
@@ -364,6 +373,7 @@ PlanLineRow.propTypes = {
   canExecute: PropTypes.bool,
   canUndo: PropTypes.bool,
   showProgress: PropTypes.bool,
+  indented: PropTypes.bool,
   pace: PropTypes.number,
   onMove: PropTypes.func,
   onPress: PropTypes.func.isRequired,
@@ -425,6 +435,12 @@ const styles = StyleSheet.create({
     overflow: 'hidden',
     paddingHorizontal: SPACING.sm,
     paddingVertical: SPACING.sm,
+  },
+  lineRowIndented: {
+    // Deep enough to read as a level of nesting at a glance, shallow enough that
+    // the child's own icon still lines up under the group's text rather than
+    // drifting into the middle of the row.
+    paddingLeft: SPACING.md + SPACING.sm,
   },
   lineTop: {
     alignItems: 'center',
