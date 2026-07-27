@@ -1,5 +1,12 @@
 # Changelog
 
+## [0.234.1](https://github.com/heywood8/money-tracker/compare/penny-v0.234.0...penny-v0.234.1) (2026-07-27)
+
+
+### Bug Fixes
+
+* **budgets:** quiet the plan rows down ([#1450](https://github.com/heywood8/money-tracker/issues/1450)) ([459d5ff](https://github.com/heywood8/money-tracker/commit/459d5ffb6bed25ce9be671e538702e71b62a399d))
+
 ## [0.234.0](https://github.com/heywood8/money-tracker/compare/penny-v0.233.0...penny-v0.234.0) (2026-07-27)
 
 
