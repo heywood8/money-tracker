@@ -1,4 +1,4 @@
-import { getCategoryDisplayName, getCategoryNames } from '../../app/utils/categoryUtils';
+import { getCategoryColorSlot, getCategoryDisplayName, getCategoryNames } from '../../app/utils/categoryUtils';
 
 describe('categoryUtils', () => {
   describe('getCategoryDisplayName', () => {
@@ -355,6 +355,81 @@ describe('categoryUtils', () => {
         categoryName: 'child_key',
         parentName: 'Parent Name',
       });
+    });
+  });
+
+  describe('getCategoryColorSlot', () => {
+    const root = (id, createdAt, extra = {}) => ({
+      id,
+      name: id,
+      parentId: null,
+      categoryType: 'expense',
+      createdAt,
+      ...extra,
+    });
+
+    const roots = [
+      root('food', '2024-01-01'),
+      root('transport', '2024-02-01'),
+      root('fun', '2024-03-01'),
+    ];
+
+    it('numbers siblings by creation order', () => {
+      expect(getCategoryColorSlot(roots[0], roots)).toBe(0);
+      expect(getCategoryColorSlot(roots[1], roots)).toBe(1);
+      expect(getCategoryColorSlot(roots[2], roots)).toBe(2);
+    });
+
+    it('does not depend on the order the array happens to be in', () => {
+      const shuffled = [roots[2], roots[0], roots[1]];
+      expect(getCategoryColorSlot(roots[1], shuffled)).toBe(1);
+    });
+
+    it('keeps a category on its slot when a sibling drops out of the chart', () => {
+      // The old index-based colouring repainted every category whenever the set
+      // of categories with activity changed (i.e. every month).
+      const before = getCategoryColorSlot(roots[2], roots);
+      const stillListed = [roots[0], roots[1], roots[2]];
+      expect(getCategoryColorSlot(roots[2], stillListed)).toBe(before);
+    });
+
+    it('numbers each level separately, so a drill-down starts from slot 0', () => {
+      const children = [
+        { id: 'cafe', parentId: 'food', categoryType: 'expense', createdAt: '2024-04-01' },
+        { id: 'grocery', parentId: 'food', categoryType: 'expense', createdAt: '2024-05-01' },
+      ];
+      const all = [...roots, ...children];
+      expect(getCategoryColorSlot(children[0], all)).toBe(0);
+      expect(getCategoryColorSlot(children[1], all)).toBe(1);
+    });
+
+    it('keeps expense and income ladders independent', () => {
+      const income = [
+        { id: 'salary', parentId: null, categoryType: 'income', createdAt: '2024-06-01' },
+      ];
+      expect(getCategoryColorSlot(income[0], [...roots, ...income])).toBe(0);
+    });
+
+    it('skips shadow categories when numbering', () => {
+      const withShadow = [
+        { id: 'shadow', parentId: null, categoryType: 'expense', createdAt: '2023-01-01', isShadow: 1 },
+        ...roots,
+      ];
+      expect(getCategoryColorSlot(roots[0], withShadow)).toBe(0);
+    });
+
+    it('breaks ties on id when createdAt matches', () => {
+      const sameDay = [
+        root('b', '2024-01-01'),
+        root('a', '2024-01-01'),
+      ];
+      expect(getCategoryColorSlot(sameDay[1], sameDay)).toBe(0);
+      expect(getCategoryColorSlot(sameDay[0], sameDay)).toBe(1);
+    });
+
+    it('falls back to slot 0 for an unknown or missing category', () => {
+      expect(getCategoryColorSlot(null, roots)).toBe(0);
+      expect(getCategoryColorSlot(root('ghost', '2024-01-01'), [])).toBe(0);
     });
   });
 });

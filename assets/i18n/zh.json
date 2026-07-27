@@ -223,6 +223,7 @@
   "adjustment_expense": "调整",
   "adjustment_income": "调整",
   "balance_adjustments": "余额调整",
+  "other_categories": "其他",
   "add_operation": "添加操作",
   "edit_operation": "编辑操作",
   "exclude_from_average": "从支出平均值中排除",

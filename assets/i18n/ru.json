@@ -223,6 +223,7 @@
   "adjustment_expense": "Корректировка",
   "adjustment_income": "Корректировка",
   "balance_adjustments": "Корректировка баланса",
+  "other_categories": "Прочее",
   "add_operation": "Добавить операцию",
   "edit_operation": "Редактировать операцию",
   "exclude_from_average": "Исключить из средних расходов",

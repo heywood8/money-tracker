@@ -3,12 +3,9 @@ import { getSpendingByCategoryAndCurrency } from '../services/OperationsDB';
 import { formatDate } from '../services/BalanceHistoryDB';
 import { appEvents, EVENTS } from '../services/eventEmitter';
 import * as Currency from '../services/currency';
-
-const CHART_COLORS = [
-  '#FF6384', '#36A2EB', '#FFCE56', '#4BC0C0', '#9966FF',
-  '#FF9F40', '#FF6384', '#C9CBCF', '#4BC0C0', '#FF9F40',
-  '#FFCE56', '#36A2EB', '#9966FF', '#FF6384', '#4BC0C0',
-];
+import { adjustmentSliceColor, seriesColorForSlot } from '../styles/chartPalette';
+import { getCategoryColorSlot } from '../utils/categoryUtils';
+import { foldSliceTail } from '../utils/chartSlices';
 
 /**
  * Custom hook for loading and managing expense data for GraphsScreen.
@@ -131,12 +128,15 @@ const useExpenseData = (selectedYear, selectedMonth, selectedCurrency, selectedC
       });
     }
 
-    const data = Object.values(aggregatedSpending).map((item, index) => {
+    // Colour comes from the category's own palette slot, never from its position
+    // in this result set: the set changes with the period, so an index-based
+    // colour would repaint every category whenever the month changed.
+    const data = Object.values(aggregatedSpending).map((item) => {
       const hasChildren = categories.some(cat => cat.parentId === item.category.id);
       return {
         name: item.category.name,
         amount: parseFloat(item.total),
-        color: CHART_COLORS[index % CHART_COLORS.length],
+        color: seriesColorForSlot(getCategoryColorSlot(item.category, categories), colors),
         legendFontColor: colors.text,
         legendFontSize: 13,
         icon: item.category.icon || null,
@@ -145,21 +145,23 @@ const useExpenseData = (selectedYear, selectedMonth, selectedCurrency, selectedC
       };
     });
 
-    data.sort((a, b) => b.amount - a.amount);
-
     if (parseFloat(shadowCategoryTotal) > 0 && selectedCategory === 'all') {
       data.push({
         name: t('balance_adjustments'),
         amount: parseFloat(shadowCategoryTotal),
-        color: CHART_COLORS[data.length % CHART_COLORS.length],
+        // Neutral, not a categorical slot: adjustments are bookkeeping, not one
+        // more spending category competing for identity.
+        color: adjustmentSliceColor(colors),
         legendFontColor: colors.text,
         legendFontSize: 13,
         icon: null,
       });
     }
 
-    return data;
-  }, [rawSpending, selectedCategory, categories, colors.text, t, selectedCurrency]);
+    data.sort((a, b) => b.amount - a.amount);
+
+    return foldSliceTail(data, colors, t('other_categories'));
+  }, [rawSpending, selectedCategory, categories, colors, t, selectedCurrency]);
 
   const totalExpenses = useMemo(
     () => parseFloat(chartData.reduce((sum, item) => Currency.add(sum, item.amount), '0')),

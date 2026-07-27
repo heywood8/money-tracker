@@ -66,3 +66,44 @@ export const getCategoryNames = (categoryId, categories, t) => {
 
   return { categoryName, parentName };
 };
+
+/**
+ * Stable colour slot for a category.
+ *
+ * A chart never mixes levels — it shows one set of siblings at a time (the root
+ * categories, or the children of whatever you drilled into) — so numbering a
+ * category by its position among its siblings gives two things at once:
+ *
+ *  - the slice colours of a given chart come out as consecutive palette slots,
+ *    which is the ordering the palette's adjacent-pair separation was validated
+ *    on, and
+ *  - the slot depends only on the category, never on the period, the amounts,
+ *    or which siblings happen to have activity — so a category does not change
+ *    colour when you switch months. Colour follows the entity, not its rank.
+ *
+ * Ordering key is `createdAt` with the id as tie-breaker: both are immutable, so
+ * renaming or re-parenting nothing else keeps every sibling's colour put.
+ *
+ * @param {Object} category - The category to place
+ * @param {Array} categories - Array of all categories
+ * @returns {number} Zero-based slot index (callers wrap it into their palette)
+ */
+export const getCategoryColorSlot = (category, categories) => {
+  if (!category) return 0;
+
+  const siblings = (categories || []).filter(cat =>
+    cat.parentId === category.parentId &&
+    cat.categoryType === category.categoryType &&
+    !cat.isShadow,
+  );
+
+  siblings.sort((a, b) => {
+    const createdA = a.createdAt || '';
+    const createdB = b.createdAt || '';
+    if (createdA !== createdB) return createdA < createdB ? -1 : 1;
+    return String(a.id) < String(b.id) ? -1 : 1;
+  });
+
+  const index = siblings.findIndex(cat => cat.id === category.id);
+  return index === -1 ? 0 : index;
+};
