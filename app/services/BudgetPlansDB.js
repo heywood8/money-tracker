@@ -1446,19 +1446,24 @@ export const calculatePlanStatus = async (planId, displayCurrency = null, conver
 };
 
 /**
- * Compute plan-vs-actual statuses for all plans, keyed by plan ID. Each plan's
- * status is expressed in its own currency. A single failing plan is logged and
- * skipped so the rest still refresh (same contract as calculateAllBudgetStatuses).
+ * Compute plan-vs-actual statuses for all plans, keyed by plan ID. A single
+ * failing plan is logged and skipped so the rest still refresh (same contract as
+ * calculateAllBudgetStatuses).
  * @param {boolean} [convertAll=false]
+ * @param {?string} [displayCurrency=null] - Currency to express every status in.
+ *   Null (the default) keeps each plan in its own stored currency. The Budgets
+ *   screen passes the currency it is being read in: its rows convert to that
+ *   currency, so its totals have to be computed in it too, or the card prints
+ *   converted rows above unconverted totals.
  * @returns {Promise<Map<string, Object>>}
  */
-export const calculateAllPlanStatuses = async (convertAll = false) => {
+export const calculateAllPlanStatuses = async (convertAll = false, displayCurrency = null) => {
   try {
     const plans = await getAllPlans();
     const statusMap = new Map();
     for (const plan of plans) {
       try {
-        const status = await calculatePlanStatus(plan.id, plan.currency, convertAll);
+        const status = await calculatePlanStatus(plan.id, displayCurrency || plan.currency, convertAll);
         statusMap.set(plan.id, status);
       } catch (error) {
         console.error(`Failed to calculate status for plan ${plan.id}:`, error);

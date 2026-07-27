@@ -27,6 +27,12 @@ export const BudgetPlansDataProvider = ({ children }) => {
   const budgetsData = useBudgetsData();
   const convertAllPlans = budgetsData?.convertAllBudgets ?? true;
   const convertAllRef = useRef(convertAllPlans);
+  // The currency the Budgets tab is being read in (see BudgetsDataContext). Every
+  // status is computed in it rather than in each plan's stored currency, so the
+  // totals the screen prints are in the same unit as the rows above them. Empty
+  // (screen hasn't seeded it yet) falls back to the plan's own currency.
+  const displayCurrency = budgetsData?.displayCurrency || null;
+  const displayCurrencyRef = useRef(displayCurrency);
 
   // Monotonic token guarding against out-of-order status refreshes. Two
   // independent triggers race here — the convert-all toggle and OPERATION_CHANGED
@@ -36,13 +42,17 @@ export const BudgetPlansDataProvider = ({ children }) => {
   const refreshTokenRef = useRef(0);
 
   /**
-   * Recompute plan-vs-actual statuses for all plans (each in its own currency).
+   * Recompute plan-vs-actual statuses for all plans, in the tab's display
+   * currency (falling back to each plan's own currency when none is chosen).
    * Only the newest in-flight refresh is allowed to commit its result.
    */
   const refreshPlanStatuses = useCallback(async () => {
     const token = ++refreshTokenRef.current;
     try {
-      const statusMap = await BudgetPlansDB.calculateAllPlanStatuses(convertAllRef.current);
+      const statusMap = await BudgetPlansDB.calculateAllPlanStatuses(
+        convertAllRef.current,
+        displayCurrencyRef.current,
+      );
       if (token === refreshTokenRef.current) {
         setPlanStatuses(statusMap);
       }
@@ -73,13 +83,14 @@ export const BudgetPlansDataProvider = ({ children }) => {
     reloadPlans();
   }, [reloadPlans]);
 
-  // Recompute statuses whenever the plans list or the convert toggle changes.
-  // The ref is synced first so the event-driven refresh below always uses the
-  // latest toggle value.
+  // Recompute statuses whenever the plans list, the convert toggle or the tab's
+  // display currency changes. The refs are synced first so the event-driven
+  // refresh below always uses the latest values.
   useEffect(() => {
     convertAllRef.current = convertAllPlans;
+    displayCurrencyRef.current = displayCurrency;
     refreshPlanStatuses();
-  }, [plans, convertAllPlans, refreshPlanStatuses]);
+  }, [plans, convertAllPlans, displayCurrency, refreshPlanStatuses]);
 
   // Refresh statuses when operations change, so actuals track reality live.
   useEffect(() => {

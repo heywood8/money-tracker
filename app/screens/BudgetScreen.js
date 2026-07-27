@@ -34,7 +34,14 @@ const BudgetScreen = () => {
   // owned here (BudgetsDataContext) and consumed by BudgetPlansDataContext, so
   // the whole merged screen converts consistently. `loading` is a proxy for "DB
   // ready" (BudgetsDataContext still loads the legacy `budgets` table on mount).
-  const { loading, convertAllBudgets, setConvertAllBudgets } = useBudgetsData();
+  // selectedCurrency lives in the context rather than in this screen's state:
+  // BudgetPlansDataContext has to recompute its plan statuses in the very
+  // currency the chip names, or the card prints converted rows above totals
+  // still computed in each plan's stored currency.
+  const {
+    loading, convertAllBudgets, setConvertAllBudgets,
+    displayCurrency: selectedCurrency, setDisplayCurrency: setSelectedCurrency,
+  } = useBudgetsData();
   const { categories } = useCategories();
   const { accounts } = useAccountsData();
   const { showDialog } = useDialog();
@@ -44,7 +51,6 @@ const BudgetScreen = () => {
   const [month, setMonth] = useState(currentMonthKey);
   const isCurrentMonth = month === currentMonthKey();
 
-  const [selectedCurrency, setSelectedCurrency] = useState('');
   const [snackbarVisible, setSnackbarVisible] = useState(false);
   const [snackbarMessage, setSnackbarMessage] = useState('');
 
@@ -114,7 +120,8 @@ const BudgetScreen = () => {
   // one stops existing (its last account was deleted). The membership check is not
   // cosmetic: the picker is only rendered while currencyItems.length > 1, so a
   // stale selection could otherwise survive with no UI left to change it, and it
-  // is still handed to MonthlyPlanSection as the currency of any plan it creates.
+  // is the currency the whole tab is read in (and the one any plan it creates is
+  // stored in).
   useEffect(() => {
     if (accounts.length === 0) {
       if (selectedCurrency) setSelectedCurrency('');

@@ -378,10 +378,8 @@ describe('MonthlyPlanSection', () => {
       expect(queryByText('remaining_budget: 150.00')).toBeNull();
       expect(queryByText('50%')).toBeNull();
       expect(queryByText('over_budget_by 50')).toBeNull();
-      // The overspent row says so with its tone instead, and carries a "today"
-      // marker across the fill (the shown month is the current one).
+      // The overspent row says so with its tone instead.
       expect(getByTestId('plan-line-fill-l2')).toBeTruthy();
-      expect(getByTestId('plan-line-fill-l2-pace')).toBeTruthy();
     });
 
     it('shows actual income against expected income in the header', async () => {
@@ -685,6 +683,81 @@ describe('MonthlyPlanSection', () => {
     });
   });
 
+  // Regression: switching the header's currency chip to AMD left the whole tab
+  // reading in the plan's stored currency. The section resolved its unit as
+  // `plan.currency || currency`, so a plan created back when the only account
+  // was in RUB pinned every figure to RUB whatever the chip said.
+  describe('Display currency (host chip) wins over the plan\'s stored currency', () => {
+    const planInRub = (extra = {}) => setPlans({
+      plans: [{ id: 'p1', month: THIS_MONTH, currency: 'RUB', expectedIncome: '1000' }],
+      lines: [{
+        id: 'l1', planId: 'p1', amount: '300', label: 'Groceries', comment: null,
+        categoryId: 'cat1', toAccountId: null, sortOrder: 0, isBroken: false,
+      }],
+      ...extra,
+    });
+
+    it('reports the chip currency, not the plan\'s, to the host header', async () => {
+      planInRub();
+      const onTotalsChange = jest.fn();
+      const { getByTestId } = await renderSection(undefined, {
+        currency: 'AMD', month: THIS_MONTH, onTotalsChange,
+      });
+      await waitFor(() => expect(getByTestId('plan-line-l1')).toBeTruthy());
+      await waitFor(() => expect(onTotalsChange).toHaveBeenCalledWith(
+        expect.objectContaining({ currency: 'AMD' }),
+      ));
+    });
+
+    it('ignores a plan status still computed in the previous currency', async () => {
+      // The context recomputes statuses in the newly picked currency, but that
+      // is async: for a render or two the map still holds RUB figures. Printing
+      // those beside rows already converted to AMD is exactly the mixed-units
+      // bug the conversion exists to prevent — so the section falls back to its
+      // own same-currency estimate (300) and hides the actual column entirely.
+      planInRub({
+        planStatuses: new Map([['p1', {
+          planId: 'p1', month: THIS_MONTH, currency: 'RUB', convertAll: false,
+          lines: [],
+          totals: {
+            expectedIncome: '1000.00', actualIncome: '0.00', allocated: '99999.00',
+            totalActual: '88888.00', plannedRemainder: '-98999.00', actualRemainder: '0.00',
+          },
+          unconvertible: [],
+        }]]),
+      });
+      const { getByTestId, queryByTestId } = await renderSection(undefined, {
+        currency: 'AMD', month: THIS_MONTH,
+      });
+      await waitFor(() => expect(getByTestId('plan-line-l1')).toBeTruthy());
+
+      expect(getByTestId('plan-totals')).toHaveTextContent(/300/);
+      expect(getByTestId('plan-totals')).not.toHaveTextContent(/99999|100K/);
+      expect(queryByTestId('plan-actual-total')).toBeNull();
+    });
+
+    it('uses a status once it arrives in the chip currency', async () => {
+      planInRub({
+        planStatuses: new Map([['p1', {
+          planId: 'p1', month: THIS_MONTH, currency: 'AMD', convertAll: false,
+          lines: [],
+          totals: {
+            expectedIncome: '1000.00', actualIncome: '0.00', allocated: '410.00',
+            totalActual: '250.00', plannedRemainder: '590.00', actualRemainder: '750.00',
+          },
+          unconvertible: [],
+        }]]),
+      });
+      const { getByTestId } = await renderSection(undefined, {
+        currency: 'AMD', month: THIS_MONTH,
+      });
+      await waitFor(() => expect(getByTestId('plan-line-l1')).toBeTruthy());
+
+      expect(getByTestId('plan-totals')).toHaveTextContent(/410/);
+      expect(getByTestId('plan-actual-total')).toHaveTextContent(/250/);
+    });
+  });
+
   describe('Totals freshness after a mutation (Fix 2, adversarial review round 2)', () => {
     // Mirrors Bug 3 above but from the OTHER direction: refreshPlanStatuses()
     // is fired-and-forgotten by the save/delete handlers (never awaited), so a
@@ -978,11 +1051,11 @@ describe('MonthlyPlanSection', () => {
       expect(fillTone(getByTestId, 'l-done')).toContain(COLORS.overspend);
     });
 
-    // The row's fill IS its progress bar, and the hairline across it is today.
-    // Without that marker a percentage is not a judgement: 99% of an envelope
-    // spent is unremarkable on the 27th and alarming on the 3rd, and the old
-    // four-band colour scale could not tell those apart because it never knew
-    // the date.
+    // The row's fill IS its progress bar. Whether the spend is ahead of the
+    // month's pace is said in the fill's TONE — there is no vertical "today"
+    // marker anymore: Android draws a 1dp dashed border solid, so one per row at
+    // the same x stacked into an unbroken grey line down the card that read as a
+    // rendering artefact rather than as a date.
     const pacedLine = (id, actual, amount, isExceeded = false) => ({
       plans: [{ id: 'p1', month: THIS_MONTH, currency: 'USD', expectedIncome: '1000' }],
       lines: [{
@@ -1008,14 +1081,14 @@ describe('MonthlyPlanSection', () => {
     const fillTone = (getByTestId, id) =>
       StyleSheet.flatten(getByTestId(`plan-line-fill-${id}-bar`).props.style).backgroundColor;
 
-    it('draws the today marker on the current month', async () => {
+    it('draws no vertical today marker across the fill on the current month', async () => {
       setPlans(pacedLine('l-pace', '10', '100'));
-      const { getByTestId } = await renderSection();
+      const { getByTestId, queryByTestId } = await renderSection();
       await waitFor(() => expect(getByTestId('plan-line-fill-l-pace')).toBeTruthy());
-      expect(getByTestId('plan-line-fill-l-pace-pace')).toBeTruthy();
+      expect(queryByTestId('plan-line-fill-l-pace-pace')).toBeNull();
     });
 
-    it('omits the today marker on a month that is not the current one', async () => {
+    it('draws no vertical today marker on a month that is not the current one either', async () => {
       const previous = pacedLine('l-pace', '10', '100');
       previous.plans[0].month = PREV_MONTH;
       previous.planStatuses = new Map([['p1', {
@@ -1024,8 +1097,6 @@ describe('MonthlyPlanSection', () => {
       setPlans(previous);
       const { getByTestId, queryByTestId } = await renderSection(undefined, { month: PREV_MONTH });
       await waitFor(() => expect(getByTestId('plan-line-fill-l-pace')).toBeTruthy());
-      // A past month is fully spent and a future one hasn't started; in neither
-      // case does "are you ahead of pace" mean anything.
       expect(queryByTestId('plan-line-fill-l-pace-pace')).toBeNull();
     });
 
