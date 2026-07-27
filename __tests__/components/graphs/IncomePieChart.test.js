@@ -146,7 +146,7 @@ describe('IncomePieChart', () => {
       );
       expect(queryByTestId('donut-chart')).toBeNull();
       expect(getByText('Payday')).toBeTruthy();
-      expect(getByText('$3000.00')).toBeTruthy();
+      expect(getByText('$3,000.00')).toBeTruthy();
     });
 
     it('shows the empty state when the leaf has no operations', async () => {

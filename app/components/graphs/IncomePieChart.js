@@ -21,27 +21,26 @@ const IncomePieChart = ({
   categoryChip = null,
 }) => {
   // The drill-down chip rides along with whatever this chart is showing: under
-  // the donut when there is one, above the body otherwise. Anywhere it can be
+  // the donut when there is one, heading the body otherwise. Anywhere it can be
   // reached, so a drilled-in category is never a dead end.
   const chipHeader = categoryChip ? (
     <View style={styles.chipHeader}>{categoryChip}</View>
   ) : null;
 
   // A leaf category has no sub-categories left to break down — show its actual
-  // operations for the period instead of a pointless single-slice donut.
+  // operations for the period instead of a pointless single-slice donut. The
+  // list heads itself with the chip so it can pair it with the category total.
   if (isLeafCategory) {
     return (
-      <View>
-        {chipHeader}
-        <CategoryOperationsList
-          operations={operations}
-          loading={loadingOperations}
-          currency={selectedCurrency}
-          colors={colors}
-          language={language}
-          emptyText={t('no_income_data')}
-        />
-      </View>
+      <CategoryOperationsList
+        operations={operations}
+        loading={loadingOperations}
+        currency={selectedCurrency}
+        colors={colors}
+        language={language}
+        emptyText={t('no_income_data')}
+        headerChip={categoryChip}
+      />
     );
   }
 
