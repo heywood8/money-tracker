@@ -52,7 +52,7 @@ export const EVENTS = {
   BUDGETS_NEED_REFRESH: 'budgets:refresh',
   ACCOUNTS_INITIALIZED: 'accounts:initialized',
   // Emitted when the user taps a background "transactions to review" notification.
-  // Handled by SimpleTabs (switch to the Settings tab) and SettingsScreen (open
-  // the notification-processing subpanel).
-  OPEN_NOTIFICATION_PROCESSING: 'navigate:notificationProcessing',
+  // Handled by SimpleTabs (switch to the Operations tab) and OperationsScreen
+  // (surface the suggestion deck over the quick-add form).
+  OPEN_PENDING_OPERATIONS: 'navigate:pendingOperations',
 };

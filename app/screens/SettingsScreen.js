@@ -379,16 +379,6 @@ export default function SettingsScreen({ setSubPanelActive }) {
     setSubPanelActive(activeSubPanel !== null);
   }, [activeSubPanel, setSubPanelActive]);
 
-  // A tapped "transactions to review" notification opens the notification-
-  // processing subpanel directly. SimpleTabs handles switching to the Settings
-  // tab on the same event; this screen is pre-mounted, so the listener is live.
-  useEffect(() => {
-    const unsubscribe = appEvents.on(EVENTS.OPEN_NOTIFICATION_PROCESSING, () => {
-      openSubPanel('notificationProcessing');
-    });
-    return unsubscribe;
-  }, [openSubPanel]);
-
   // Android hardware back: step one level up when possible (nested step / embedded
   // screen), otherwise close the panel — mirroring the swipe and the back arrow.
   useEffect(() => {
@@ -418,6 +408,19 @@ export default function SettingsScreen({ setSubPanelActive }) {
       closeSubPanelRef.current();
     });
     return () => subscription.remove();
+  }, []);
+
+  // A tapped "transactions to review" notification now routes to the operations
+  // page, so a subpanel left open here would stay "active" behind the user's back:
+  // it keeps swipe navigation disabled and its hardware-back handler mounted while
+  // they are on another tab. Close it on the same event (with the in-flight-async
+  // guard the backgrounding reset uses), leaving Settings on its root list.
+  useEffect(() => {
+    const unsubscribe = appEvents.on(EVENTS.OPEN_PENDING_OPERATIONS, () => {
+      if (!activeSubPanelRef.current || isBackDisabledRef.current) return;
+      closeSubPanelRef.current();
+    });
+    return unsubscribe;
   }, []);
 
   const handleLanguageSelect = useCallback((lng) => {

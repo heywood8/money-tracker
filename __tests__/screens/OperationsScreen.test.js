@@ -2515,4 +2515,83 @@ describe('OperationsScreen', () => {
       expect(mockShowDialog).toHaveBeenCalled();
     });
   });
+
+  // A tapped "transactions to review" notification routes to this screen (not to
+  // settings): SimpleTabs switches tabs, and the screen brings the suggestion deck
+  // over the quick-add form into view.
+  describe('Pending-operations deep link', () => {
+    const { act } = require('@testing-library/react-native');
+    const { appEvents, EVENTS } = require('../../app/services/eventEmitter');
+
+    const mockSuggestionsHook = (overrides = {}) => {
+      const usePendingOperationSuggestions =
+        require('../../app/hooks/usePendingOperationSuggestions').default;
+      const hookValue = {
+        suggestions: [],
+        committingIds: {},
+        saveErrors: {},
+        choices: {},
+        setChoice: jest.fn(),
+        reload: jest.fn(),
+        refresh: jest.fn(),
+        accept: jest.fn(),
+        dismiss: jest.fn(),
+        ...overrides,
+      };
+      usePendingOperationSuggestions.mockReturnValue(hookValue);
+      return hookValue;
+    };
+
+    beforeEach(() => {
+      jest.clearAllMocks();
+    });
+
+    it('refreshes the suggestion queue on the deep-link event', async () => {
+      const OperationsScreen = require('../../app/screens/OperationsScreen').default;
+      const { refresh } = mockSuggestionsHook();
+
+      await render(<OperationsScreen />);
+      await act(async () => {
+        appEvents.emit(EVENTS.OPEN_PENDING_OPERATIONS);
+      });
+
+      expect(refresh).toHaveBeenCalled();
+    });
+
+    it('closes search first — the deck is collapsed with the quick-add block while search is open', async () => {
+      const OperationsScreen = require('../../app/screens/OperationsScreen').default;
+      const { useSearch } = require('../../app/contexts/SearchContext');
+      const closeSearch = jest.fn();
+      useSearch.mockReturnValue({
+        searchMode: 'open',
+        filtersExpanded: false,
+        openSearch: jest.fn(),
+        closeSearch,
+        reopenSearch: jest.fn(),
+        toggleFilters: jest.fn(),
+        registerSearchHandler: jest.fn(),
+      });
+      mockSuggestionsHook();
+
+      await render(<OperationsScreen />);
+      await act(async () => {
+        appEvents.emit(EVENTS.OPEN_PENDING_OPERATIONS);
+      });
+
+      expect(closeSearch).toHaveBeenCalled();
+    });
+
+    it('drops its subscription on unmount', async () => {
+      const OperationsScreen = require('../../app/screens/OperationsScreen').default;
+      const { refresh } = mockSuggestionsHook();
+
+      const { unmount } = await render(<OperationsScreen />);
+      await unmount();
+      await act(async () => {
+        appEvents.emit(EVENTS.OPEN_PENDING_OPERATIONS);
+      });
+
+      expect(refresh).not.toHaveBeenCalled();
+    });
+  });
 });

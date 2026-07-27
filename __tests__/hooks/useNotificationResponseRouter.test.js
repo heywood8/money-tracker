@@ -1,6 +1,6 @@
 /**
  * Tests for the notification deep-link router hook: it emits
- * OPEN_NOTIFICATION_PROCESSING for a matching tapped notification (cold start and
+ * OPEN_PENDING_OPERATIONS for a matching tapped notification (cold start and
  * while running), ignores unrelated responses, and cleans up its subscription.
  */
 
@@ -37,7 +37,7 @@ describe('useNotificationResponseRouter', () => {
     const { unmount } = await renderHook(() => useNotificationResponseRouter());
 
     await waitFor(() =>
-      expect(emitSpy).toHaveBeenCalledWith(EVENTS.OPEN_NOTIFICATION_PROCESSING),
+      expect(emitSpy).toHaveBeenCalledWith(EVENTS.OPEN_PENDING_OPERATIONS),
     );
     await unmount();
   });
@@ -54,7 +54,7 @@ describe('useNotificationResponseRouter', () => {
     // (no React state update), so it needs no act() wrapper.
     listener(matchResponse);
 
-    expect(emitSpy).toHaveBeenCalledWith(EVENTS.OPEN_NOTIFICATION_PROCESSING);
+    expect(emitSpy).toHaveBeenCalledWith(EVENTS.OPEN_PENDING_OPERATIONS);
     await unmount();
   });
 
