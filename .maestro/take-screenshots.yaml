@@ -12,6 +12,20 @@ appId: com.heywood8.monkeep
 - tapOn: "English"
 - tapOn: "Continue"
 
+# The release build checks for updates on launch, and on CI there is always a newer
+# release than the one just built — the prompt then covers the app and takes
+# everything under it out of the accessibility tree, so every later step fails to
+# find its target. Give it a moment to appear, then dismiss it if it did.
+- waitForAnimationToEnd:
+    timeout: 5000
+- runFlow:
+    when:
+      visible: "Update available"
+    commands:
+      - tapOn: "Later"
+      - waitForAnimationToEnd:
+          timeout: 1000
+
 # Wait for main app to load (Operations tab is the default)
 - extendedWaitUntil:
     visible: "Operations"
