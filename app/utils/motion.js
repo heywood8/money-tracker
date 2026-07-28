@@ -146,6 +146,10 @@ export const PAN_VELOCITY_TO_PER_SECOND = 1000;
  * at the very start of the over-drag (movement/drag → `constant` as the
  * overshoot approaches zero); lower is stiffer. The travel is bounded by
  * `dimension` regardless of the constant.
+ *
+ * NEVER put this (or any other module-level binding) in a DEFAULT PARAMETER of a
+ * worklet — see the note on `rubberband` below. It cost the app every horizontal
+ * swipe it has.
  */
 export const RUBBERBAND_CONSTANT = 0.55;
 
@@ -158,16 +162,31 @@ export const RUBBERBAND_CONSTANT = 0.55;
  * surface never quite runs away and never freezes either. Sign-preserving, so
  * it works for both edges.
  *
+ * The default is resolved in the BODY rather than in a default parameter, and
+ * that is not a style choice. Reanimated serializes a worklet with its captured
+ * closure unpacked by the first statement of the body:
+ *
+ *   function rubberband(overshoot, dimension, constant = RUBBERBAND_CONSTANT) {
+ *     const { RUBBERBAND_CONSTANT } = this.__closure;   // <- injected
+ *
+ * A default parameter is evaluated in the parameter scope, which is outside that
+ * body — so it reads a binding that does not exist there yet, and on the UI
+ * thread the call dies with `ReferenceError: Property 'RUBBERBAND_CONSTANT'
+ * doesn't exist`. That killed the app on every tab swipe until it was found. The
+ * crash is invisible in Jest (worklets run as plain JS there, where the module
+ * scope IS visible) and invisible to any caller that passes the argument.
+ *
  * @param {number} overshoot  Signed distance dragged past the boundary.
  * @param {number} dimension  Size of the container the drag happens in.
  * @param {number} [constant] Resistance constant; lower = stiffer.
  * @returns {number} Signed distance the surface should move.
  */
-export function rubberband(overshoot, dimension, constant = RUBBERBAND_CONSTANT) {
+export function rubberband(overshoot, dimension, constant) {
   'worklet';
+  const resistance = constant ?? RUBBERBAND_CONSTANT;
   if (!dimension || dimension <= 0) return 0;
   const magnitude = Math.abs(overshoot);
-  const resisted = (magnitude * dimension * constant) / (dimension + constant * magnitude);
+  const resisted = (magnitude * dimension * resistance) / (dimension + resistance * magnitude);
   return overshoot < 0 ? -resisted : resisted;
 }
 
@@ -179,10 +198,12 @@ export function rubberband(overshoot, dimension, constant = RUBBERBAND_CONSTANT)
  * @param {number} min        Lower bound.
  * @param {number} max        Upper bound.
  * @param {number} dimension  Size of the container (sets the resistance scale).
- * @param {number} [constant] Resistance constant; lower = stiffer.
+ * @param {number} [constant] Resistance constant; lower = stiffer. Omitted, it
+ *   is `rubberband`'s own default — passed through as `undefined` rather than
+ *   defaulted here, for the closure-capture reason documented on that function.
  * @returns {number} Position to render.
  */
-export function clampWithRubberband(value, min, max, dimension, constant = RUBBERBAND_CONSTANT) {
+export function clampWithRubberband(value, min, max, dimension, constant) {
   'worklet';
   if (value > max) return max + rubberband(value - max, dimension, constant);
   if (value < min) return min + rubberband(value - min, dimension, constant);
