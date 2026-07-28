@@ -38,6 +38,21 @@ appId: com.heywood8.monkeep
 # Screenshot 1: Operations screen (default first tab)
 - takeScreenshot: screenshots/01_operations_light
 
+# Screenshot 1a: long-press action menu. The lifted clone must sit exactly on top of
+# the row it copies — this frame is the regression check for that (see
+# OverlayHostContext). Captured here, right after the plain list, so the two frames
+# can be compared row-for-row.
+- longPressOn:
+    id: "operation-item-0"
+- waitForAnimationToEnd:
+    timeout: 2000
+- takeScreenshot: screenshots/10_action_menu_light
+# Dismiss with the hardware back button: the overlay is not a native window, so this
+# also exercises the BackHandler the menu wires up in place of onRequestClose.
+- back
+- waitForAnimationToEnd:
+    timeout: 1000
+
 # Screenshot 1b: Transfer mode of QuickAdd (shows target account shortcuts below calculator)
 - tapOn: "Transfer"
 - waitForAnimationToEnd:
@@ -62,19 +77,6 @@ appId: com.heywood8.monkeep
 - tapOn: "Expense"
 - waitForAnimationToEnd:
     timeout: 2000
-
-# Screenshot: long-press action menu. The lifted clone must sit exactly on top of the
-# row it copies — this frame is the regression check for that (see OverlayHostContext).
-- longPressOn:
-    id: "operation-item-0"
-- waitForAnimationToEnd:
-    timeout: 2000
-- takeScreenshot: screenshots/10_action_menu_light
-# Dismiss with the hardware back button: the overlay is not a native window, so this
-# also exercises the BackHandler the menu wires up in place of onRequestClose.
-- back
-- waitForAnimationToEnd:
-    timeout: 1000
 
 # Screenshot: Filter modal
 - tapOn:
