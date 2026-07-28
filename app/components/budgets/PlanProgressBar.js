@@ -12,13 +12,44 @@ import { TIMING_ENTER } from '../../utils/motion';
  * of a month most envelopes are at or past their number — so a bar that simply
  * saturates at the end would flatten 101% and 348% into the same full bar, which
  * is exactly what the old background wash did (it clamped the fraction to 1).
- * Reserving the last 28% for the overspend means the bar keeps saying something
- * after the target is passed.
+ * Reserving the last quarter or so of the track for the overspend means the bar
+ * keeps saying something after the target is passed.
  */
 const PLAN_STOP = 0.72;
 
+/**
+ * A hairline of nothing at the target, separating the two zones.
+ *
+ * The step in brightness between the zones was supposed to be the target mark,
+ * and it is — right up until the fill covers it. Every row at or past its target
+ * paints the whole plan zone solid, and on a month-end plan that is most of
+ * them, so the one place the mark is needed is the one place it disappeared.
+ * What was left on such a row was a single vertical line, the pace tick, sitting
+ * some 7% to its left — and a reader looking for the target boundary reads
+ * whatever vertical is there as the boundary. It is a gap rather than a drawn
+ * tick because the track has no background of its own: the zones are the
+ * background, so leaving a slice unpainted shows the card through it, and it
+ * reads over the fill and the overspend alike without needing to know either
+ * colour. It also says "boundary" in a different language than the pace tick
+ * does — negative space against a line — so the two can no longer be confused.
+ *
+ * As a fraction of the track: ~2dp on the ~250dp bar this screen draws.
+ */
+const BOUNDARY_GAP = 0.008;
+
+/** Left edge of the overspend zone: the target, plus the gap that marks it. */
+const OVER_START = PLAN_STOP + BOUNDARY_GAP;
+
 /** What is left of the track for the overspend to grow into. */
-const OVER_ZONE = 1 - PLAN_STOP;
+const OVER_ZONE = 1 - OVER_START;
+
+/**
+ * A fraction as a percentage string, without binary-float debris.
+ *
+ * `${(1 - 0.728) * 100}%` is "27.200000000000003%" — which Yoga parses fine, but
+ * which turns every style assertion in the tests into a guess about rounding.
+ */
+const pct = (fraction) => `${Number((fraction * 100).toFixed(4))}%`;
 
 /**
  * How the overspend zone is compressed.
@@ -89,12 +120,19 @@ const PlanProgressBar = ({
 
   return (
     <View style={[styles.track, { height, borderRadius: height / 2 }]} testID={testID}>
-      {/* Two track zones rather than one track plus a tick at the boundary. The
-          step in brightness between them IS the target marker, so the bar reads
-          "this much was the plan" without carrying a separate mark for it — one
-          fewer element on a 4dp strip that repeats down the whole screen. */}
-      <View style={[styles.planZone, { backgroundColor: trackColor }]} />
-      <View style={[styles.overZone, { backgroundColor: trackColor }]} />
+      {/* Two track zones rather than one track plus a tick at the boundary, with
+          BOUNDARY_GAP of bare card between them. The step in brightness plus that
+          gap IS the target marker, so the bar reads "this much was the plan"
+          without carrying a separate mark for it — one fewer element on a 4dp
+          strip that repeats down the whole screen. */}
+      <View
+        testID={testID ? `${testID}-plan-zone` : undefined}
+        style={[styles.planZone, { backgroundColor: trackColor }]}
+      />
+      <View
+        testID={testID ? `${testID}-over-zone` : undefined}
+        style={[styles.overZone, { backgroundColor: trackColor }]}
+      />
 
       <Animated.View
         testID={testID ? `${testID}-plan` : undefined}
@@ -118,7 +156,7 @@ const PlanProgressBar = ({
       {pace != null && (
         <View
           testID={testID ? `${testID}-pace` : undefined}
-          style={[styles.paceTick, { backgroundColor: paceColor, left: `${Math.min(Math.max(pace, 0), 1) * PLAN_STOP * 100}%` }]}
+          style={[styles.paceTick, { backgroundColor: paceColor, left: pct(Math.min(Math.max(pace, 0), 1) * PLAN_STOP) }]}
         />
       )}
     </View>
@@ -154,19 +192,19 @@ export const PAIR_COLUMN_WIDTH = 96;
 const styles = StyleSheet.create({
   overFill: {
     bottom: 0,
-    left: `${PLAN_STOP * 100}%`,
+    left: pct(OVER_START),
     position: 'absolute',
     top: 0,
     // Without this the segment grows from its centre and detaches from the
     // target boundary it is supposed to spill out of.
     transformOrigin: 'left',
-    width: `${OVER_ZONE * 100}%`,
+    width: pct(OVER_ZONE),
   },
   overZone: {
     bottom: 0,
-    left: `${PLAN_STOP * 100}%`,
-    // Dimmer than the plan zone, so the step between them reads as the target
-    // mark without a separate tick sitting on the boundary.
+    left: pct(OVER_START),
+    // Dimmer than the plan zone, so that on a track the fill has not reached the
+    // step in brightness says where the target is even before the gap does.
     opacity: 0.4,
     position: 'absolute',
     right: 0,
@@ -184,14 +222,14 @@ const styles = StyleSheet.create({
     position: 'absolute',
     top: 0,
     transformOrigin: 'left',
-    width: `${PLAN_STOP * 100}%`,
+    width: pct(PLAN_STOP),
   },
   planZone: {
     bottom: 0,
     left: 0,
     position: 'absolute',
     top: 0,
-    width: `${PLAN_STOP * 100}%`,
+    width: pct(PLAN_STOP),
   },
   track: {
     // Clips the overspend segment to the rounded ends.
