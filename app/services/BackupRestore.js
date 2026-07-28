@@ -102,7 +102,7 @@ export const createBackup = async () => {
 const TABLE_FIELDS = {
   accounts:           ['id', 'name', 'balance', 'currency', 'display_order', 'hidden', 'monthly_target', 'card_mask', 'auto_txn_rounding', 'auto_txn_rounding_mode', 'deleted_at', 'created_at', 'updated_at'],
   categories:         ['id', 'name', 'type', 'category_type', 'parent_id', 'icon', 'color', 'is_shadow', 'created_at', 'updated_at'],
-  operations:         ['id', 'type', 'amount', 'account_id', 'category_id', 'to_account_id', 'date', 'created_at', 'description', 'exchange_rate', 'destination_amount', 'source_currency', 'destination_currency', 'original_balance', 'exclude_from_avg', 'latitude', 'longitude'],
+  operations:         ['id', 'type', 'amount', 'account_id', 'category_id', 'to_account_id', 'date', 'created_at', 'description', 'exchange_rate', 'destination_amount', 'source_currency', 'destination_currency', 'original_balance', 'exclude_from_avg', 'exclude_from_charts', 'latitude', 'longitude'],
   budgets:            ['id', 'category_id', 'amount', 'currency', 'period_type', 'start_date', 'end_date', 'is_recurring', 'rollover_enabled', 'created_at', 'updated_at'],
   app_metadata:       ['key', 'value', 'updated_at'],
   balance_history:    ['id', 'account_id', 'date', 'balance', 'created_at'],
@@ -710,7 +710,7 @@ export const restoreBackup = async (backup, cancelToken) => {
         // value falls through to null (?? null) rather than failing the insert.
         const opType = VALID_OPERATION_TYPES.includes(operation.type) ? operation.type : 'expense';
         await db.runAsync(
-          'INSERT INTO operations (type, amount, account_id, category_id, to_account_id, date, created_at, description, exchange_rate, destination_amount, source_currency, destination_currency, original_balance, exclude_from_avg, latitude, longitude) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)',
+          'INSERT INTO operations (type, amount, account_id, category_id, to_account_id, date, created_at, description, exchange_rate, destination_amount, source_currency, destination_currency, original_balance, exclude_from_avg, exclude_from_charts, latitude, longitude) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)',
           [
             opType,
             operation.amount || '0',
@@ -727,6 +727,8 @@ export const restoreBackup = async (backup, cancelToken) => {
             operation.original_balance ?? null,
             // Older backups lack this column → default to 0 (counted).
             operation.exclude_from_avg ? 1 : 0,
+            // Same for the chart-exclusion flag (added in migration 0023) → 0 (shown).
+            operation.exclude_from_charts ? 1 : 0,
             operation.latitude ?? null,
             operation.longitude ?? null,
           ],

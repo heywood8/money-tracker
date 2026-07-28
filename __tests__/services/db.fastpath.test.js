@@ -82,6 +82,7 @@ const mockSchemaComplete = (db, storedUserVersion) => {
         { name: 'original_balance', type: 'TEXT' }, { name: 'latitude', type: 'REAL' },
         { name: 'longitude', type: 'REAL' }, { name: 'account_id', type: 'INTEGER' },
         { name: 'exclude_from_avg', type: 'INTEGER' },
+        { name: 'exclude_from_charts', type: 'INTEGER' },
       ]);
     }
     if (q.includes('table_info(categories)')) return Promise.resolve([{ name: 'id', type: 'INTEGER' }]);

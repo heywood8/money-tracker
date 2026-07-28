@@ -22,6 +22,14 @@ import getDefaultOperations from '../defaults/defaultOperations';
 const OPERATION_TYPES = ['expense', 'income', 'transfer'];
 const VALID_OPERATION_TYPES = new Set(OPERATION_TYPES);
 
+// Every analytic query (donuts, trend, drill-down, summary totals, forecast)
+// carries this predicate: an operation the user hid from the charts must not
+// reach any of them, or the surfaces would disagree with each other. NULL is
+// treated as 0 — rows written before migration 0023 have no value.
+// `alias` is the operations table's alias in the calling query.
+const chartVisibleSql = (alias = 'o') =>
+  `(${alias}.exclude_from_charts IS NULL OR ${alias}.exclude_from_charts = 0)`;
+
 /**
  * Map database field names to camelCase for application use.
  * Returns null for rows with an invalid type so callers can filter them out.
@@ -55,6 +63,9 @@ const mapOperationFields = (dbOperation) => {
     // Exposed as a boolean for the form/toggle. Stored as 0/1 (nullable) — the
     // integer column coerces any legacy string value, so !! is safe here.
     excludeFromAvg: !!dbOperation.exclude_from_avg,
+    // Same 0/1 storage as above: 1 hides the operation from every chart while
+    // leaving its balance impact in place.
+    excludeFromCharts: !!dbOperation.exclude_from_charts,
   };
 };
 
@@ -503,19 +514,22 @@ export const createOperationInTx = async (db, operation) => {
     // forecast; 0 (counted) by default. Listed before latitude/longitude so those
     // stay the last two columns/params.
     exclude_from_avg: operation.excludeFromAvg ? 1 : 0,
+    // 1 when the operation is hidden from every chart; 0 (shown) by default.
+    exclude_from_charts: operation.excludeFromCharts ? 1 : 0,
     // ?? (not ||) so a valid 0.0 coordinate (equator / prime meridian) survives.
     latitude: operation.latitude ?? null,
     longitude: operation.longitude ?? null,
   };
 
   const result = await db.runAsync(
-    'INSERT INTO operations (type, amount, account_id, category_id, to_account_id, date, created_at, description, exchange_rate, destination_amount, source_currency, destination_currency, exclude_from_avg, latitude, longitude) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)',
+    'INSERT INTO operations (type, amount, account_id, category_id, to_account_id, date, created_at, description, exchange_rate, destination_amount, source_currency, destination_currency, exclude_from_avg, exclude_from_charts, latitude, longitude) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)',
     [
       operationData.type, operationData.amount, operationData.account_id,
       operationData.category_id, operationData.to_account_id, operationData.date,
       operationData.created_at, operationData.description, operationData.exchange_rate,
       operationData.destination_amount, operationData.source_currency, operationData.destination_currency,
-      operationData.exclude_from_avg, operationData.latitude, operationData.longitude,
+      operationData.exclude_from_avg, operationData.exclude_from_charts,
+      operationData.latitude, operationData.longitude,
     ],
   );
 
@@ -655,6 +669,10 @@ export const updateOperation = async (id, updates) => {
       if (updates.excludeFromAvg !== undefined) {
         fields.push('exclude_from_avg = ?');
         values.push(updates.excludeFromAvg ? 1 : 0);
+      }
+      if (updates.excludeFromCharts !== undefined) {
+        fields.push('exclude_from_charts = ?');
+        values.push(updates.excludeFromCharts ? 1 : 0);
       }
 
       if (fields.length === 0) {
@@ -815,6 +833,11 @@ export const splitOperation = async (id, updates, newOperationData) => {
         exclude_from_avg: newOperationData.excludeFromAvg !== undefined
           ? (newOperationData.excludeFromAvg ? 1 : 0)
           : (oldOperation.exclude_from_avg ? 1 : 0),
+        // Same reasoning for the chart-exclusion flag: a slice split off a hidden
+        // expense stays hidden, or the charts would gain a fragment of it back.
+        exclude_from_charts: newOperationData.excludeFromCharts !== undefined
+          ? (newOperationData.excludeFromCharts ? 1 : 0)
+          : (oldOperation.exclude_from_charts ? 1 : 0),
         latitude: newOperationData.latitude !== undefined
           ? (newOperationData.latitude ?? null)
           : (oldOperation.latitude ?? null),
@@ -824,12 +847,13 @@ export const splitOperation = async (id, updates, newOperationData) => {
       };
 
       const result = await db.runAsync(
-        'INSERT INTO operations (type, amount, account_id, category_id, to_account_id, date, created_at, description, exchange_rate, destination_amount, source_currency, destination_currency, exclude_from_avg, latitude, longitude) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)',
+        'INSERT INTO operations (type, amount, account_id, category_id, to_account_id, date, created_at, description, exchange_rate, destination_amount, source_currency, destination_currency, exclude_from_avg, exclude_from_charts, latitude, longitude) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)',
         [
           newRow.type, newRow.amount, newRow.account_id, newRow.category_id,
           newRow.to_account_id, newRow.date, newRow.created_at, newRow.description,
           newRow.exchange_rate, newRow.destination_amount, newRow.source_currency, newRow.destination_currency,
-          newRow.exclude_from_avg, newRow.latitude, newRow.longitude,
+          newRow.exclude_from_avg, newRow.exclude_from_charts,
+          newRow.latitude, newRow.longitude,
         ],
       );
 
@@ -961,12 +985,15 @@ export const getTotalExpenses = async (accountId, startDate, endDate) => {
     // Operations flagged exclude_from_avg = 1 are user-marked one-offs kept out of
     // the daily spending average / burndown forecast (this total is only consumed
     // by the prediction, so excluding them here is exactly the intended scope).
+    // exclude_from_charts = 1 hides an operation from every chart, the forecast
+    // included.
     const results = await queryAll(
       `SELECT o.amount FROM operations o
        LEFT JOIN categories c ON o.category_id = c.id
        WHERE o.account_id = ? AND o.type = 'expense' AND o.date >= ? AND o.date <= ?
          AND (c.is_shadow IS NULL OR c.is_shadow = 0)
-         AND (o.exclude_from_avg IS NULL OR o.exclude_from_avg = 0)`,
+         AND (o.exclude_from_avg IS NULL OR o.exclude_from_avg = 0)
+         AND ${chartVisibleSql()}`,
       [accountId, startDate, endDate],
     );
     if (!results || results.length === 0) return '0';
@@ -998,7 +1025,8 @@ export const getMonthlyExpenseTotals = async (accountId, startDate, endDate) => 
        WHERE o.account_id = ? AND o.type = 'expense'
          AND date(o.date) >= date(?) AND date(o.date) <= date(?)
          AND (c.is_shadow IS NULL OR c.is_shadow = 0)
-         AND (o.exclude_from_avg IS NULL OR o.exclude_from_avg = 0)`,
+         AND (o.exclude_from_avg IS NULL OR o.exclude_from_avg = 0)
+         AND ${chartVisibleSql()}`,
       [accountId, startDate, endDate],
     );
     const totals = {};
@@ -1026,7 +1054,8 @@ export const getTotalIncome = async (accountId, startDate, endDate) => {
       `SELECT o.amount FROM operations o
        LEFT JOIN categories c ON o.category_id = c.id
        WHERE o.account_id = ? AND o.type = 'income' AND o.date >= ? AND o.date <= ?
-         AND (c.is_shadow IS NULL OR c.is_shadow = 0)`,
+         AND (c.is_shadow IS NULL OR c.is_shadow = 0)
+         AND ${chartVisibleSql()}`,
       [accountId, startDate, endDate],
     );
     if (!results || results.length === 0) return '0';
@@ -1093,10 +1122,11 @@ export const getTransferTotals = async (accountId, startDate, endDate) => {
 export const getSpendingByCategory = async (startDate, endDate) => {
   try {
     const results = await queryAll(
-      `SELECT category_id, SUM(CAST(amount AS REAL)) as total
-       FROM operations
-       WHERE type = 'expense' AND date >= ? AND date <= ? AND category_id IS NOT NULL
-       GROUP BY category_id
+      `SELECT o.category_id, SUM(CAST(o.amount AS REAL)) as total
+       FROM operations o
+       WHERE o.type = 'expense' AND o.date >= ? AND o.date <= ? AND o.category_id IS NOT NULL
+         AND ${chartVisibleSql()}
+       GROUP BY o.category_id
        ORDER BY total DESC`,
       [startDate, endDate],
     );
@@ -1116,10 +1146,11 @@ export const getSpendingByCategory = async (startDate, endDate) => {
 export const getIncomeByCategory = async (startDate, endDate) => {
   try {
     const results = await queryAll(
-      `SELECT category_id, SUM(CAST(amount AS REAL)) as total
-       FROM operations
-       WHERE type = 'income' AND date >= ? AND date <= ? AND category_id IS NOT NULL
-       GROUP BY category_id
+      `SELECT o.category_id, SUM(CAST(o.amount AS REAL)) as total
+       FROM operations o
+       WHERE o.type = 'income' AND o.date >= ? AND o.date <= ? AND o.category_id IS NOT NULL
+         AND ${chartVisibleSql()}
+       GROUP BY o.category_id
        ORDER BY total DESC`,
       [startDate, endDate],
     );
@@ -1285,6 +1316,7 @@ export const getSpendingByCategoryAndCurrency = async (currency, startDate, endD
            AND o.date >= ?
            AND o.date <= ?
            AND o.category_id IS NOT NULL
+           AND ${chartVisibleSql()}
          GROUP BY o.category_id, a.currency`,
         [startDate, endDate],
       );
@@ -1298,7 +1330,8 @@ export const getSpendingByCategoryAndCurrency = async (currency, startDate, endD
          AND a.currency = ?
          AND o.date >= ?
          AND o.date <= ?
-         AND o.category_id IS NOT NULL`;
+         AND o.category_id IS NOT NULL
+         AND ${chartVisibleSql()}`;
 
     const params = [currency, startDate, endDate];
 
@@ -1338,6 +1371,7 @@ export const getIncomeByCategoryAndCurrency = async (currency, startDate, endDat
            AND o.date >= ?
            AND o.date <= ?
            AND o.category_id IS NOT NULL
+           AND ${chartVisibleSql()}
          GROUP BY o.category_id, a.currency`,
         [startDate, endDate],
       );
@@ -1353,6 +1387,7 @@ export const getIncomeByCategoryAndCurrency = async (currency, startDate, endDat
          AND o.date >= ?
          AND o.date <= ?
          AND o.category_id IS NOT NULL
+         AND ${chartVisibleSql()}
        GROUP BY o.category_id
        ORDER BY total DESC`,
       [currency, startDate, endDate],
@@ -1384,11 +1419,14 @@ export const getIncomeByCategoryAndCurrency = async (currency, startDate, endDat
  */
 export const getOperationsByCategoryAndCurrency = async (categoryId, currency, startDate, endDate, type = null, convertAll = false) => {
   try {
+    // The drill-down list must add up to the slice the user tapped, so it hides
+    // the same operations the donut does.
     let sql = `SELECT o.*, a.currency as account_currency FROM operations o
        JOIN accounts a ON o.account_id = a.id
        WHERE o.category_id = ?
          AND o.date >= ?
-         AND o.date <= ?`;
+         AND o.date <= ?
+         AND ${chartVisibleSql()}`;
 
     const params = [categoryId, startDate, endDate];
 
@@ -2118,6 +2156,7 @@ export const getMonthlySpendingByCategories = async (currency, year, categoryIds
          AND o.date >= ?
          AND o.date <= ?
          AND o.category_id IN (${placeholders})
+         AND ${chartVisibleSql()}
        ORDER BY month ASC`,
       [currency, startDate, endDate, ...categoryIds],
     );
@@ -2185,6 +2224,7 @@ export const getLast12MonthsSpendingByCategories = async (currency, categoryIds,
          AND o.date >= ?
          AND o.date <= ?
          ${categoryFilter}
+         AND ${chartVisibleSql()}
        ORDER BY year_month ASC`,
       params,
     );

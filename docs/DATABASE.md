@@ -87,11 +87,25 @@ Financial transactions (expenses, income, transfers):
   exchange_rate: TEXT,
   destination_amount: TEXT,
   source_currency: TEXT,
-  destination_currency: TEXT
+  destination_currency: TEXT,
+  original_balance: TEXT,        // balance before a balance-adjustment op (0006)
+  latitude: TEXT,                // optional capture location (0009)
+  longitude: TEXT,
+  exclude_from_avg: INTEGER DEFAULT 0,    // 1 = out of the daily average / forecast only (0013)
+  exclude_from_charts: INTEGER DEFAULT 0  // 1 = out of every chart (0023)
 }
 ```
 
 **Indexes**: `date`, `account_id`, `category_id`, `type`
+
+**Analytic visibility**: `exclude_from_charts = 1` removes the operation from
+every analytic surface — the expense/income donuts, the 12-month spending trend,
+the category drill-down list, the summary totals and the burndown forecast —
+while leaving its money in place (account balances, balance history and the
+operations list are unaffected). Settable on balance adjustments too, from the
+operations list's long-press menu, since their editor is read-only.
+`exclude_from_avg` is narrower: it only keeps an operation out of the daily
+average / burndown forecast and deliberately leaves it in the charts.
 
 ### 5. budgets (legacy — superseded by budget_plan_lines)
 

@@ -2,8 +2,9 @@
  * Build a fresh operation payload that repeats an existing one (QoL-7 "Repeat").
  *
  * Every money-bearing field is copied verbatim — amount, source/destination
- * accounts, the multi-currency exchange metadata, and the exclude-from-average
- * flag — so the duplicate reproduces the original's balance impact exactly. Only
+ * accounts, the multi-currency exchange metadata, and the exclude-from-average /
+ * exclude-from-charts flags — so the duplicate reproduces the original's balance
+ * impact and its analytic visibility exactly. Only
  * the date is re-stamped to `dateString`. Volatile per-event context is dropped
  * on purpose: the row id / createdAt (a new row is inserted) and latitude/
  * longitude (a repeat happens here-and-now, so the original's coordinates would
@@ -26,4 +27,5 @@ export const buildRepeatedOperation = (operation, dateString) => ({
   sourceCurrency: operation.sourceCurrency,
   destinationCurrency: operation.destinationCurrency,
   excludeFromAvg: operation.excludeFromAvg,
+  excludeFromCharts: operation.excludeFromCharts,
 });

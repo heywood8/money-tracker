@@ -21,6 +21,7 @@ describe('buildRepeatedOperation', () => {
       date: '2026-01-01',
       description: 'Coffee',
       excludeFromAvg: false,
+      excludeFromCharts: false,
       createdAt: '2026-01-01T08:00:00.000Z',
     };
 
@@ -39,6 +40,7 @@ describe('buildRepeatedOperation', () => {
       sourceCurrency: undefined,
       destinationCurrency: undefined,
       excludeFromAvg: false,
+      excludeFromCharts: false,
     });
   });
 
@@ -54,6 +56,7 @@ describe('buildRepeatedOperation', () => {
       latitude: 55.75,
       longitude: 37.61,
       excludeFromAvg: true,
+      excludeFromCharts: true,
     };
 
     const result = buildRepeatedOperation(source, TODAY);
@@ -64,6 +67,9 @@ describe('buildRepeatedOperation', () => {
     expect(result.longitude).toBeUndefined();
     // excludeFromAvg must survive so a repeated non-spending entry stays excluded.
     expect(result.excludeFromAvg).toBe(true);
+    // Same for the chart-visibility flag: repeating a hidden operation must not
+    // silently put it back into the donut and the trend.
+    expect(result.excludeFromCharts).toBe(true);
   });
 
   it('preserves the multi-currency transfer metadata', () => {

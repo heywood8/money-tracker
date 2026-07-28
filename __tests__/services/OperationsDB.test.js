@@ -315,10 +315,10 @@ describe('OperationsDB Service', () => {
         (c) => typeof c[0] === 'string' && c[0].includes('INSERT INTO operations'),
       );
       expect(insertCall[0]).toContain('exclude_from_avg');
-      // Column list ends with exclude_from_avg, latitude, longitude → the flag is
-      // the third param from the end (latitude/longitude stay last).
+      // Column list ends with exclude_from_avg, exclude_from_charts, latitude,
+      // longitude → the flag is the fourth param from the end.
       const params = insertCall[1];
-      expect(params[params.length - 3]).toBe(1);
+      expect(params[params.length - 4]).toBe(1);
     });
 
     it('defaults exclude_from_avg to 0 when the flag is not supplied', async () => {
@@ -336,7 +336,56 @@ describe('OperationsDB Service', () => {
         (c) => typeof c[0] === 'string' && c[0].includes('INSERT INTO operations'),
       );
       const params = insertCall[1];
-      expect(params[params.length - 3]).toBe(0);
+      expect(params[params.length - 4]).toBe(0);
+    });
+
+    it('maps exclude_from_charts to an excludeFromCharts boolean on read', async () => {
+      queryFirst.mockResolvedValue({
+        id: 6,
+        type: 'expense',
+        amount: '100',
+        account_id: 'acc1',
+        category_id: 'cat1',
+        date: '2025-12-05',
+        created_at: '2025-12-05T10:00:00Z',
+        exclude_from_charts: 1,
+      });
+      const hidden = await OperationsDB.getOperationById(6);
+      expect(hidden.excludeFromCharts).toBe(true);
+
+      queryFirst.mockResolvedValue({
+        id: 7,
+        type: 'expense',
+        amount: '100',
+        account_id: 'acc1',
+        category_id: 'cat1',
+        date: '2025-12-05',
+        created_at: '2025-12-05T10:00:00Z',
+      });
+      // Legacy row written before migration 0023 → shown.
+      const legacy = await OperationsDB.getOperationById(7);
+      expect(legacy.excludeFromCharts).toBe(false);
+    });
+
+    it('persists exclude_from_charts = 1 in the INSERT when the operation is hidden', async () => {
+      mockDb.getFirstAsync.mockResolvedValue({ balance: '1000' });
+
+      await OperationsDB.createOperation({
+        type: 'expense',
+        amount: '100',
+        accountId: 'acc1',
+        categoryId: 'cat1',
+        date: '2025-12-05',
+        excludeFromCharts: true,
+      });
+
+      const insertCall = mockDb.runAsync.mock.calls.find(
+        (c) => typeof c[0] === 'string' && c[0].includes('INSERT INTO operations'),
+      );
+      expect(insertCall[0]).toContain('exclude_from_charts');
+      // Third param from the end (latitude/longitude stay last).
+      const params = insertCall[1];
+      expect(params[params.length - 3]).toBe(1);
     });
 
     it('updates latitude/longitude when provided', async () => {
@@ -637,6 +686,60 @@ describe('OperationsDB Service', () => {
         .mockResolvedValueOnce({ balance: '1000' });
 
       await OperationsDB.updateOperation(1, { excludeFromAvg: false });
+
+      const updateCall = mockDb.runAsync.mock.calls.find(
+        (c) => typeof c[0] === 'string' && c[0].includes('UPDATE operations SET'),
+      );
+      expect(updateCall[1]).toEqual([0, 1]);
+    });
+
+    it('persists exclude_from_charts when the operation is hidden from the charts', async () => {
+      // A balance adjustment: its category is a shadow one and the modal is
+      // read-only, so the long-press menu writes this single field on its own.
+      const oldOperation = {
+        id: 1,
+        type: 'expense',
+        amount: '100',
+        account_id: 'acc1',
+        category_id: 'shadow-adjustment-expense',
+        date: '2025-12-05',
+        exclude_from_charts: 0,
+      };
+      const updatedOperation = { ...oldOperation, exclude_from_charts: 1 };
+
+      mockDb.getFirstAsync
+        .mockResolvedValueOnce(oldOperation)
+        .mockResolvedValueOnce(updatedOperation)
+        .mockResolvedValueOnce({ balance: '1000' });
+
+      await OperationsDB.updateOperation(1, { excludeFromCharts: true });
+
+      const updateCall = mockDb.runAsync.mock.calls.find(
+        (c) => typeof c[0] === 'string' && c[0].includes('UPDATE operations SET'),
+      );
+      expect(updateCall[0]).toContain('exclude_from_charts = ?');
+      // Only the flag changed → params are [1 (flag), 1 (id for WHERE)].
+      expect(updateCall[1]).toEqual([1, 1]);
+    });
+
+    it('writes exclude_from_charts = 0 when the operation is returned to the charts', async () => {
+      const oldOperation = {
+        id: 1,
+        type: 'expense',
+        amount: '100',
+        account_id: 'acc1',
+        category_id: 'cat1',
+        date: '2025-12-05',
+        exclude_from_charts: 1,
+      };
+      const updatedOperation = { ...oldOperation, exclude_from_charts: 0 };
+
+      mockDb.getFirstAsync
+        .mockResolvedValueOnce(oldOperation)
+        .mockResolvedValueOnce(updatedOperation)
+        .mockResolvedValueOnce({ balance: '1000' });
+
+      await OperationsDB.updateOperation(1, { excludeFromCharts: false });
 
       const updateCall = mockDb.runAsync.mock.calls.find(
         (c) => typeof c[0] === 'string' && c[0].includes('UPDATE operations SET'),
@@ -954,6 +1057,28 @@ describe('OperationsDB Service', () => {
       expect(result).toBe('1200');
     });
 
+    // Every analytic surface hides the operations a user flagged, or the totals
+    // would disagree with each other (donut says X, the trend says Y).
+    it.each([
+      ['getTotalExpenses', () => OperationsDB.getTotalExpenses('acc1', '2025-12-01', '2025-12-31')],
+      ['getMonthlyExpenseTotals', () => OperationsDB.getMonthlyExpenseTotals('acc1', '2025-01-01', '2025-12-31')],
+      ['getTotalIncome', () => OperationsDB.getTotalIncome('acc1', '2025-12-01', '2025-12-31')],
+      ['getSpendingByCategoryAndCurrency', () => OperationsDB.getSpendingByCategoryAndCurrency('USD', '2025-12-01', '2025-12-31')],
+      ['getIncomeByCategoryAndCurrency', () => OperationsDB.getIncomeByCategoryAndCurrency('USD', '2025-12-01', '2025-12-31')],
+      ['getOperationsByCategoryAndCurrency', () => OperationsDB.getOperationsByCategoryAndCurrency('cat1', 'USD', '2025-12-01', '2025-12-31')],
+      ['getMonthlySpendingByCategories', () => OperationsDB.getMonthlySpendingByCategories('USD', 2025, ['cat1'])],
+      ['getLast12MonthsSpendingByCategories', () => OperationsDB.getLast12MonthsSpendingByCategories('USD', ['cat1'])],
+      ['getSpendingByCategory', () => OperationsDB.getSpendingByCategory('2025-12-01', '2025-12-31')],
+      ['getIncomeByCategory', () => OperationsDB.getIncomeByCategory('2025-12-01', '2025-12-31')],
+    ])('%s filters out operations hidden from the charts', async (_name, run) => {
+      queryAll.mockResolvedValue([]);
+
+      await run();
+
+      const sql = queryAll.mock.calls[0][0];
+      expect(sql).toContain('exclude_from_charts');
+    });
+
     describe('getTransferTotals', () => {
       it('splits transfers into incoming (destination_amount) and outgoing (amount)', async () => {
         queryAll.mockResolvedValue([
@@ -1001,7 +1126,8 @@ describe('OperationsDB Service', () => {
       const result = await OperationsDB.getSpendingByCategory('2025-12-01', '2025-12-31');
 
       expect(queryAll).toHaveBeenCalledWith(
-        expect.stringContaining('GROUP BY category_id'),
+        // Aliased since the chart-visibility predicate qualifies its column.
+        expect.stringContaining('GROUP BY o.category_id'),
         ['2025-12-01', '2025-12-31'],
       );
       expect(result).toHaveLength(2);

@@ -45,6 +45,7 @@ const useOperationForm = ({
     destinationAmount: '',
     operationCurrency: '',
     excludeFromAvg: false,
+    excludeFromCharts: false,
   });
   const [errors, setErrors] = useState({});
   const [showDatePicker, setShowDatePicker] = useState(false);
@@ -308,6 +309,7 @@ const useOperationForm = ({
             destinationAmount: loadDestAmount,
             operationCurrency: operation.type !== 'transfer' ? (operation.sourceCurrency || '') : '',
             excludeFromAvg: !!operation.excludeFromAvg,
+            excludeFromCharts: !!operation.excludeFromCharts,
           });
         }
       } else if (isNew) {
@@ -334,6 +336,7 @@ const useOperationForm = ({
             exchangeRate: '',
             destinationAmount: '',
             excludeFromAvg: false,
+            excludeFromCharts: false,
           });
         }
       }

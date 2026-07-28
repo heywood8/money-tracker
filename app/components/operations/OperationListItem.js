@@ -73,6 +73,8 @@ const OperationListItem = ({
   // and can't be opened for editing until the persisted row replaces it.
   const isPending = !!operation._pending;
 
+  const isHiddenFromCharts = !!operation.excludeFromCharts;
+
   const isMultiCurrencyTransfer = isTransfer && operation.exchangeRate && operation.destinationAmount;
 
   // Foreign currency expense/income: has exchange metadata but is NOT a transfer
@@ -134,6 +136,9 @@ const OperationListItem = ({
   if (labels.length > 0) {
     accessibilityLabel += `, ${t('labels')}: ${labels.map(displayLabel).join(', ')}`;
   }
+  if (isHiddenFromCharts) {
+    accessibilityLabel += `, ${t('hidden_from_charts')}`;
+  }
 
   return (
     <>
@@ -179,6 +184,17 @@ const OperationListItem = ({
                 <View style={[styles.labelChip, { backgroundColor: colors.altRow, borderColor: colors.border }]}>
                   <Text style={[styles.labelChipText, { color: colors.mutedText }]}>{`+${overflowCount}`}</Text>
                 </View>
+              )}
+              {/* Marks an operation the user hid from the charts — otherwise the
+                  flag is invisible until the graphs are opened and a total looks
+                  wrong. Muted on purpose: it is a state, not a warning. */}
+              {isHiddenFromCharts && (
+                <Icon
+                  name="eye-off-outline"
+                  size={ICON_SIZE.xs}
+                  color={colors.mutedText}
+                  testID="op-hidden-from-charts"
+                />
               )}
             </View>
             <Text style={[styles.subtitle, { color: colors.mutedText }]} numberOfLines={1}>
@@ -239,6 +255,7 @@ OperationListItem.propTypes = {
     sourceCurrency: PropTypes.string,
     destinationCurrency: PropTypes.string,
     description: PropTypes.string,
+    excludeFromCharts: PropTypes.oneOfType([PropTypes.bool, PropTypes.number]),
     _pending: PropTypes.bool,
   }).isRequired,
   colors: PropTypes.object.isRequired,

@@ -320,6 +320,15 @@ export default function OperationModal({
     }
   }, [isShadowOperation, setValues]);
 
+  // Handler for the "hide from the charts" toggle. Balance adjustments have no
+  // editable form at all (every field above is disabled), so they are toggled
+  // from the operations list's long-press menu instead.
+  const handleToggleExcludeFromCharts = useCallback((val) => {
+    if (!isShadowOperation) {
+      setValues(v => ({ ...v, excludeFromCharts: val }));
+    }
+  }, [isShadowOperation, setValues]);
+
   // Handler for description focus (auto-scroll to end)
   // We scroll twice: immediately for initial positioning, then again after the
   // suggestion chips have animated in (150ms fade-in), so chips are visible.
@@ -619,6 +628,28 @@ export default function OperationModal({
           </View>
         )}
 
+        {/* Hide-from-charts toggle. Expenses and income both feed a donut and the
+            summary totals; a transfer feeds neither, so it has nothing to hide. */}
+        {!isNew && !isShadowOperation && values.type !== 'transfer' && (
+          <View style={styles.excludeAvgRow}>
+            <View style={styles.excludeAvgTextContainer}>
+              <Text style={[modalSharedStyles.fieldLabel, styles.excludeAvgLabel, { color: colors.mutedText }]}>
+                {(t('exclude_from_charts') || 'Hide from charts').toUpperCase()}
+              </Text>
+              <Text style={[styles.excludeAvgHint, { color: colors.mutedText }]}>
+                {t('exclude_from_charts_hint') || "Won't appear in the donut or the spending trend"}
+              </Text>
+            </View>
+            <Switch
+              value={!!values.excludeFromCharts}
+              onValueChange={handleToggleExcludeFromCharts}
+              trackColor={{ false: colors.border, true: colors.primary + '66' }}
+              thumbColor={values.excludeFromCharts ? colors.primary : colors.mutedText}
+              testID="exclude-from-charts-switch"
+            />
+          </View>
+        )}
+
         {errors.general && <Text style={styles.error}>{errors.general}</Text>}
       </ModalShell>
 
@@ -803,6 +834,7 @@ OperationModal.propTypes = {
     latitude: PropTypes.oneOfType([PropTypes.string, PropTypes.number]),
     longitude: PropTypes.oneOfType([PropTypes.string, PropTypes.number]),
     excludeFromAvg: PropTypes.oneOfType([PropTypes.bool, PropTypes.number]),
+    excludeFromCharts: PropTypes.oneOfType([PropTypes.bool, PropTypes.number]),
   }),
   isNew: PropTypes.bool,
   onDelete: PropTypes.func,

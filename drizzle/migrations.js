@@ -24,6 +24,7 @@ import m0019, { postMigration as m0019PostMigration } from './0019_recurring_pla
 import m0020, { postMigration as m0020PostMigration } from './0020_plan_line_templates.js';
 import m0021 from './0021_plan_line_categories.js';
 import m0022 from './0022_plan_line_groups.js';
+import m0023 from './0023_operation_exclude_from_charts.js';
 
 export default {
   journal,
@@ -51,6 +52,7 @@ export default {
     m0020,
     m0021,
     m0022,
+    m0023,
   },
   postMigrationHandlers: {
     m0003: m0003PostMigration,

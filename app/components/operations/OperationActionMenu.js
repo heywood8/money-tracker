@@ -29,12 +29,15 @@ const GAP = 10;
  * press. The overlay shares a parent with the content it covers, so `layout.y` means
  * the same thing on both sides and the clone always lands on the row.
  *
+ * Actions: edit, repeat, hide-from-charts (expense/income only — see below) and
+ * delete.
+ *
  * The parent owns visibility: pass a `menu` object to open, `null` to close.
  * Entrance is animated; closing unmounts immediately (a snappy dismiss is the
  * expected feel for a context menu, and keeping no internal open/close state
  * avoids setState-in-effect churn).
  */
-export default function OperationActionMenu({ menu, colors, t, onClose, onEdit, onRepeat, onDelete }) {
+export default function OperationActionMenu({ menu, colors, t, onClose, onEdit, onRepeat, onToggleCharts, onDelete }) {
   const insets = useSafeAreaInsets();
   const progress = useRef(new Animated.Value(0)).current;
   // Height of the overlay layer itself, not of the screen: the layer is the box the
@@ -127,6 +130,13 @@ export default function OperationActionMenu({ menu, colors, t, onClose, onEdit, 
 
   const deleteColor = colors.delete || colors.expense || '#d32f2f';
 
+  // Transfers feed no chart, so the hide/show action would be a no-op for them.
+  // Balance adjustments DO get it: they have no editable form, which makes this
+  // menu their only way to leave the charts.
+  const operationType = menu.operation?.type;
+  const showChartsAction = operationType === 'expense' || operationType === 'income';
+  const hiddenFromCharts = !!menu.operation?.excludeFromCharts;
+
   return (
     <>
       <ModalBlurOverlay />
@@ -194,6 +204,19 @@ export default function OperationActionMenu({ menu, colors, t, onClose, onEdit, 
                 textColor={colors.text}
                 onPress={onRepeat}
               />
+              {showChartsAction && (
+                <ActionButton
+                  testID="operation-action-charts"
+                  icon={hiddenFromCharts ? 'eye-outline' : 'eye-off-outline'}
+                  // Short label — four buttons share the row width. The full
+                  // phrase goes to the accessibility label.
+                  label={hiddenFromCharts ? t('show_in_charts') : t('hide_from_charts')}
+                  a11yLabel={hiddenFromCharts ? t('include_in_charts') : t('exclude_from_charts')}
+                  color={hiddenFromCharts ? colors.mutedText : colors.primary}
+                  textColor={colors.text}
+                  onPress={onToggleCharts}
+                />
+              )}
               <ActionButton
                 testID="operation-action-delete"
                 icon="trash-can-outline"
@@ -210,14 +233,14 @@ export default function OperationActionMenu({ menu, colors, t, onClose, onEdit, 
   );
 }
 
-function ActionButton({ testID, icon, label, color, textColor, onPress }) {
+function ActionButton({ testID, icon, label, a11yLabel, color, textColor, onPress }) {
   return (
     <Pressable
       testID={testID}
       onPress={onPress}
       style={({ pressed }) => [styles.actionButton, pressed && styles.actionButtonPressed]}
       accessibilityRole="button"
-      accessibilityLabel={label}
+      accessibilityLabel={a11yLabel || label}
     >
       <Icon name={icon} size={ICON_SIZE.md} color={color} />
       <Text style={[styles.actionLabel, { color: textColor }]} numberOfLines={1}>
@@ -231,6 +254,7 @@ ActionButton.propTypes = {
   testID: PropTypes.string,
   icon: PropTypes.string.isRequired,
   label: PropTypes.string.isRequired,
+  a11yLabel: PropTypes.string,
   color: PropTypes.string.isRequired,
   textColor: PropTypes.string.isRequired,
   onPress: PropTypes.func.isRequired,
@@ -238,6 +262,8 @@ ActionButton.propTypes = {
 
 OperationActionMenu.propTypes = {
   menu: PropTypes.shape({
+    // Carries `type` and `excludeFromCharts`, which decide whether the
+    // hide/show-in-charts action is offered and which way it points.
     operation: PropTypes.object,
     layout: PropTypes.shape({
       x: PropTypes.number,
@@ -252,6 +278,7 @@ OperationActionMenu.propTypes = {
   onClose: PropTypes.func.isRequired,
   onEdit: PropTypes.func.isRequired,
   onRepeat: PropTypes.func.isRequired,
+  onToggleCharts: PropTypes.func.isRequired,
   onDelete: PropTypes.func.isRequired,
 };
 
