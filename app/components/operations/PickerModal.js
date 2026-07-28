@@ -1,28 +1,18 @@
 import React, { useCallback } from 'react';
-import { View, Text, StyleSheet, FlatList, ScrollView, Modal, Pressable } from 'react-native';
+import { Text, StyleSheet, ScrollView, Modal, Pressable } from 'react-native';
 import PropTypes from 'prop-types';
-import * as Currency from '../../services/currency';
-import currencies from '../../../assets/currencies.json';
 import ModalBlurOverlay from '../ModalBlurOverlay';
 import CategoryGridSelector from '../CategoryGridSelector';
+import AccountGridSelector from '../AccountGridSelector';
 import { SPACING } from '../../styles/designTokens';
-
-/**
- * Get currency symbol from currency code
- */
-const getCurrencySymbol = (currencyCode) => {
-  if (!currencyCode) return '';
-  const currency = currencies[currencyCode];
-  return currency ? currency.symbol : currencyCode;
-};
 
 /**
  * Unified picker modal for account and category selection.
  *
- * Accounts are a list and render as one. Categories are a tree, so they render
- * through CategoryGridSelector — the app's shared category grid, which owns the
- * drill-down (see CLAUDE.md, "Category selection"). `pickerData` is therefore the
- * whole category list, not one folder level.
+ * Neither list is rendered here: categories go through CategoryGridSelector and
+ * accounts through AccountGridSelector, the app's two shared pickers (see
+ * CLAUDE.md, "Category selection" and "Account selection"). `pickerData` is the
+ * whole list in both cases — the grids decide what to show.
  */
 const PickerModal = ({
   visible,
@@ -41,37 +31,23 @@ const PickerModal = ({
   onAutoAddWithCategory,
   onAutoAddWithAccount,
 }) => {
-  const renderAccountItem = useCallback(({ item }) => (
-    <Pressable
-      onPress={() => {
-        if (pickerType === 'account') {
-          onSelectAccount(item.id);
-          onClose();
-        } else {
-          const hasValidAmount = quickAddValues?.amount &&
-          quickAddValues.amount.trim() !== '';
-          if (hasValidAmount && onAutoAddWithAccount) {
-            onAutoAddWithAccount(item.id);
-          } else {
-            onSelectToAccount(item.id);
-            onClose();
-          }
-        }
-      }}
-      style={({ pressed }) => [
-        styles.pickerOption,
-        { borderColor: colors.border },
-        pressed && { backgroundColor: colors.selected },
-      ]}
-    >
-      <View style={styles.accountOption}>
-        <Text style={[styles.pickerOptionText, styles.accountName, { color: colors.text }]} numberOfLines={1}>{item.name}</Text>
-        <Text style={[styles.pickerSmallText, { color: colors.mutedText }]} numberOfLines={1}>
-          {getCurrencySymbol(item.currency)}{Currency.formatAmount(item.balance, item.currency)}
-        </Text>
-      </View>
-    </Pressable>
-  ), [pickerType, quickAddValues, colors, onClose, onSelectAccount, onSelectToAccount, onAutoAddWithAccount]);
+  // The source account replaces the selection outright. A transfer destination
+  // with an amount already typed completes the operation on the spot — the same
+  // shortcut the category grid offers below.
+  const handleSelectAccount = useCallback((accountId) => {
+    if (pickerType === 'account') {
+      onSelectAccount(accountId);
+      onClose();
+      return;
+    }
+    const hasValidAmount = quickAddValues?.amount && quickAddValues.amount.trim() !== '';
+    if (hasValidAmount && onAutoAddWithAccount) {
+      onAutoAddWithAccount(accountId);
+    } else {
+      onSelectToAccount(accountId);
+      onClose();
+    }
+  }, [pickerType, quickAddValues, onClose, onSelectAccount, onSelectToAccount, onAutoAddWithAccount]);
 
   // A category tapped with an amount already typed completes the operation on the
   // spot — that shortcut is the whole point of the quick-add flow.
@@ -109,16 +85,16 @@ const PickerModal = ({
               </ScrollView>
             ) : (
               <>
-                <FlatList
-                  data={pickerType === 'account' || pickerType === 'toAccount' ? pickerData : []}
-                  keyExtractor={(item) => item.id || item.key}
-                  renderItem={renderAccountItem}
-                  ListEmptyComponent={
-                    <Text style={[styles.centeredPaddedText, { color: colors.mutedText }]}>
-                      {t('no_accounts')}
-                    </Text>
-                  }
-                />
+                <ScrollView contentContainerStyle={styles.gridContent} keyboardShouldPersistTaps="handled">
+                  <AccountGridSelector
+                    accounts={pickerType === 'account' || pickerType === 'toAccount' ? pickerData : []}
+                    selectedAccountId={pickerType === 'account' ? quickAddValues?.accountId : quickAddValues?.toAccountId}
+                    onSelect={handleSelectAccount}
+                    colors={colors}
+                    t={t}
+                    icon={pickerType === 'toAccount' ? 'bank-transfer-in' : 'wallet-outline'}
+                  />
+                </ScrollView>
                 <Pressable style={styles.closeButton} onPress={onClose}>
                   <Text style={[styles.closeButtonText, { color: colors.primary }]}>{t('close')}</Text>
                 </Pressable>
@@ -132,20 +108,6 @@ const PickerModal = ({
 };
 
 const styles = StyleSheet.create({
-  accountName: {
-    flex: 1,
-    marginRight: 4,
-  },
-  accountOption: {
-    alignItems: 'center',
-    flex: 1,
-    flexDirection: 'row',
-    justifyContent: 'space-between',
-  },
-  centeredPaddedText: {
-    paddingVertical: 40,
-    textAlign: 'center',
-  },
   closeButton: {
     alignItems: 'center',
     paddingVertical: 12,
@@ -167,19 +129,6 @@ const styles = StyleSheet.create({
     borderTopRightRadius: 20,
     maxHeight: '70%',
     width: '100%',
-  },
-  pickerOption: {
-    borderBottomWidth: 1,
-    flexDirection: 'row',
-    paddingHorizontal: 16,
-    paddingVertical: 12,
-  },
-  pickerOptionText: {
-    fontSize: 16,
-  },
-  pickerSmallText: {
-    fontSize: 14,
-    marginLeft: 8,
   },
 });
 

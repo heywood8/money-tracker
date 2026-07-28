@@ -35,6 +35,7 @@ import { hasOperation, evaluateExpression } from '../utils/calculatorUtils';
 import useOperationForm from '../hooks/useOperationForm';
 import ModalShell from '../components/ModalShell';
 import CategoryGridSelector from '../components/CategoryGridSelector';
+import AccountGridSelector from '../components/AccountGridSelector';
 import { modalSharedStyles } from '../styles/modalStyles';
 import useOperationPicker from '../hooks/useOperationPicker';
 
@@ -419,32 +420,10 @@ export default function OperationModal({
     }
   }, [values, setValues, closePicker, isNew, isForeignCurrencyOp, addOperation, onClose, hasOperation, evaluateExpression, attachLocation, location]);
 
-  // FlatList key extractor
-  const keyExtractor = useCallback((item) => {
-    return item.id || item.key;
-  }, []);
-
-  // FlatList render item — accounts only; categories render as the shared grid.
-  const renderPickerItem = useCallback(({ item }) => {
-    const handlePress = pickerState.type === 'account' ? handleAccountSelect : handleToAccountSelect;
-    return (
-      <Pressable
-        onPress={() => handlePress(item.id)}
-        style={({ pressed }) => [
-          styles.pickerOption,
-          { borderColor: colors.border },
-          pressed && { backgroundColor: colors.selected },
-        ]}
-      >
-        <View style={styles.accountOption}>
-          <Text style={[styles.pickerOptionText, styles.accountName, { color: colors.text }]} numberOfLines={1}>{item.name}</Text>
-          <Text style={[styles.pickerOptionCurrency, { color: colors.mutedText }]} numberOfLines={1}>
-            {getCurrencySymbol(item.currency)}{Currency.formatAmount(item.balance, item.currency)}
-          </Text>
-        </View>
-      </Pressable>
-    );
-  }, [pickerState.type, colors, handleAccountSelect, handleToAccountSelect]);
+  const handleSelectPickedAccount = useCallback((accountId) => {
+    const select = pickerState.type === 'account' ? handleAccountSelect : handleToAccountSelect;
+    select(accountId);
+  }, [pickerState.type, handleAccountSelect, handleToAccountSelect]);
 
   const TYPES = [
     { key: 'expense', label: t('expense'), icon: 'minus-circle' },
@@ -690,16 +669,18 @@ export default function OperationModal({
                 />
               </ScrollView>
             ) : (
-              <FlatList
-                data={pickerState.type === 'account' || pickerState.type === 'toAccount' ? pickerState.data : []}
-                keyExtractor={keyExtractor}
-                renderItem={renderPickerItem}
-                ListEmptyComponent={
-                  <Text style={[styles.pickerEmptyText, { color: colors.mutedText }]}>
-                    {t('no_accounts')}
-                  </Text>
-                }
-              />
+              // Accounts group by currency in the shared account grid
+              // (CLAUDE.md, "Account selection").
+              <ScrollView contentContainerStyle={styles.gridContent} keyboardShouldPersistTaps="handled">
+                <AccountGridSelector
+                  accounts={pickerState.type === 'account' || pickerState.type === 'toAccount' ? pickerState.data : []}
+                  selectedAccountId={pickerState.type === 'account' ? values.accountId : values.toAccountId}
+                  onSelect={handleSelectPickedAccount}
+                  colors={colors}
+                  t={t}
+                  icon={pickerState.type === 'toAccount' ? 'bank-transfer-in' : 'wallet-outline'}
+                />
+              </ScrollView>
             )}
             {(pickerState.type !== 'category' || !isNew) && (
               <Pressable style={styles.closeButton} onPress={closePicker}>
@@ -714,15 +695,6 @@ export default function OperationModal({
 }
 
 const styles = StyleSheet.create({
-  accountName: {
-    flex: 1,
-    marginRight: SPACING.sm,
-  },
-  accountOption: {
-    alignItems: 'center',
-    flexDirection: 'row',
-    justifyContent: 'space-between',
-  },
   categoryDateRow: {
     flexDirection: 'row',
     gap: SPACING.sm,
@@ -786,29 +758,12 @@ const styles = StyleSheet.create({
   pickerButtonText: {
     fontSize: 13,
   },
-  pickerEmptyText: {
-    padding: 20,
-    textAlign: 'center',
-  },
   pickerModalContent: {
     borderTopLeftRadius: BORDER_RADIUS.lg,
     borderTopRightRadius: BORDER_RADIUS.lg,
     maxHeight: '70%',
     padding: SPACING.md,
     width: '100%',
-  },
-  pickerOption: {
-    borderBottomWidth: 1,
-    justifyContent: 'center',
-    minHeight: 44,
-    paddingHorizontal: 8,
-    paddingVertical: 8,
-  },
-  pickerOptionCurrency: {
-    fontSize: 14,
-  },
-  pickerOptionText: {
-    fontSize: 16,
   },
   pickerOverlay: {
     alignItems: 'center',

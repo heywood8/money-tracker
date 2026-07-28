@@ -356,6 +356,31 @@ Options, each off by default:
 
 The grid renders a plain `View`, so a host that can overflow wraps it in a `ScrollView`. Hosts: `BudgetPlanLineModal`, `SplitOperationModal`, `PickerModal`, `OperationModal`, `NotificationBindingCard`, `NotificationProcessingContentPanel`.
 
+### Account Selection
+
+**Rule: the same applies to accounts — every account picker renders `app/components/AccountGridSelector.js`.**
+
+A chip grid grouped by currency. The groups are *not* a hierarchy — there is nothing to drill into, they are containers you read past — but "which account" is nearly always asked inside a currency, and a flat list of a dozen accounts makes the reader do that sort in their head every time.
+
+```javascript
+<AccountGridSelector
+  accounts={accounts}            // already filtered by the host (e.g. source account removed)
+  selectedAccountId={id}
+  onSelect={handleSelect}        // called with the chosen account id
+  colors={colors}
+  t={t}
+  icon="bank-transfer-in"        // optional leading glyph, defaults to wallet-outline
+  query={query}                  // optional, filters by account name
+  testIDPrefix="plan-account-option"
+/>
+```
+
+- Group order follows the accounts' own order (first currency to appear wins), so it matches what the user arranged on the Accounts screen; accounts are never reordered within a group.
+- A single-currency set gets **no** headers — one header over everything says nothing. The same applies after a search narrows the set to one currency.
+- The grid reads `hideBalances` from `DisplaySettingsContext` itself rather than taking it as a prop, so a host cannot forget the setting.
+
+Hosts: `PickerModal`, `OperationModal`, `BudgetPlanLineModal` (transfer target + execution account), `AccountsScreen` (transfer-on-delete).
+
 ### Testing
 
 The app uses Jest with React Native Testing Library for unit, integration, and regression testing.
