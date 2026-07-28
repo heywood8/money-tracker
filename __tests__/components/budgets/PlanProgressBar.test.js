@@ -91,6 +91,44 @@ describe('PlanProgressBar', () => {
     });
   });
 
+  // The target boundary used to be nothing but the step in brightness between
+  // the two track zones — which the fill covers on any row at or past its
+  // target, i.e. on most rows of a month-end plan. What was left on such a row
+  // was the pace tick, a lone vertical some 7% to the boundary's left, and that
+  // is what a reader took the boundary to be.
+  describe('Target boundary', () => {
+    it('leaves a gap between the two zones, so the target is marked on an empty track', async () => {
+      const { getByTestId } = await renderBar({ ratio: 0.4 });
+      expect(styleOf(getByTestId('bar-plan-zone')).width).toBe('72%');
+      expect(styleOf(getByTestId('bar-over-zone')).left).toBe('72.8%');
+    });
+
+    it('keeps the gap when the fill has covered the whole plan zone', async () => {
+      // The case the old brightness step could not survive: solid fill up to the
+      // target, solid overspend past it, and nothing in between to read.
+      const { getByTestId } = await renderBar({ ratio: 1.8 });
+      expect(styleOf(getByTestId('bar-plan')).width).toBe('72%');
+      expect(styleOf(getByTestId('bar-over')).left).toBe('72.8%');
+    });
+
+    it('starts the overspend segment where its zone starts, not at the target', async () => {
+      // Both zone and fill move together; an overspend segment still anchored to
+      // 72% would paint over the gap the moment a row went over.
+      const { getByTestId } = await renderBar({ ratio: 2 });
+      expect(styleOf(getByTestId('bar-over')).left)
+        .toBe(styleOf(getByTestId('bar-over-zone')).left);
+      expect(styleOf(getByTestId('bar-over')).width).toBe('27.2%');
+    });
+
+    it('keeps the pace tick clear of the boundary it was being mistaken for', async () => {
+      // Even at the end of the month the tick lands ON the target rather than in
+      // the gap, so the gap stays the only thing that separates the zones.
+      const { getByTestId } = await renderBar({ ratio: 1.8, pace: 1 });
+      expect(styleOf(getByTestId('bar-pace')).left).toBe('72%');
+      expect(styleOf(getByTestId('bar-over-zone')).left).toBe('72.8%');
+    });
+  });
+
   describe('Pace marker', () => {
     it('is absent when the month has no pace to speak of', async () => {
       const { queryByTestId } = await renderBar({ pace: null });
