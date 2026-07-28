@@ -1,5 +1,12 @@
 # Changelog
 
+## [0.243.3](https://github.com/heywood8/money-tracker/compare/penny-v0.243.2...penny-v0.243.3) (2026-07-28)
+
+
+### Bug Fixes
+
+* **operations:** draw the long-press menu in a shared coordinate space ([#1488](https://github.com/heywood8/money-tracker/issues/1488)) ([6db1fc0](https://github.com/heywood8/money-tracker/commit/6db1fc077eb17a9cd5e7b5e96b67daf496be3f2c))
+
 ## [0.243.2](https://github.com/heywood8/money-tracker/compare/penny-v0.243.1...penny-v0.243.2) (2026-07-28)
 
 
