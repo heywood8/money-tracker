@@ -1,5 +1,12 @@
 # Changelog
 
+## [0.246.1](https://github.com/heywood8/money-tracker/compare/penny-v0.246.0...penny-v0.246.1) (2026-07-28)
+
+
+### Bug Fixes
+
+* **budgets:** mark the plan bar's target boundary with a gap ([#1500](https://github.com/heywood8/money-tracker/issues/1500)) ([4ca1c16](https://github.com/heywood8/money-tracker/commit/4ca1c16c27295bf2db3322c160103715e3410dec))
+
 ## [0.246.0](https://github.com/heywood8/money-tracker/compare/penny-v0.245.0...penny-v0.246.0) (2026-07-28)
 
 
