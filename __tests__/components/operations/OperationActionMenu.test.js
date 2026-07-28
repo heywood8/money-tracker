@@ -76,4 +76,19 @@ describe('OperationActionMenu', () => {
     fireEvent.press(getByTestId('operation-action-menu-backdrop'));
     expect(props.onClose).toHaveBeenCalledTimes(1);
   });
+
+  describe('Regression Tests', () => {
+    // The app runs edge-to-edge, so measureInWindow reports the pressed row's
+    // position relative to the top of the screen. A Modal window that stops at
+    // the status bar would render the lifted clone one status-bar height too
+    // low, making the row visibly jump on long press.
+    it('spans under both system bars so the lifted clone keeps the row position', async () => {
+      const { getByTestId } = await render(
+        <OperationActionMenu menu={makeMenu()} {...baseProps()} />,
+      );
+      const modal = getByTestId('operation-action-menu-window');
+      expect(modal.props.statusBarTranslucent).toBe(true);
+      expect(modal.props.navigationBarTranslucent).toBe(true);
+    });
+  });
 });
