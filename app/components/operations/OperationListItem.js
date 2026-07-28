@@ -6,6 +6,7 @@ import PropTypes from 'prop-types';
 import { getCategoryNames } from '../../utils/categoryUtils';
 import { parseLabels, visibleListLabels, displayLabel } from '../../utils/labelUtils';
 import DescriptionSuggestionRow from './DescriptionSuggestionRow';
+import { useOverlayHost } from '../../contexts/OverlayHostContext';
 import { SPACING, FONT_SIZE, FONT_WEIGHT, ICON_SIZE, HEIGHTS } from '../../styles/designTokens';
 import currencies from '../../../assets/currencies.json';
 
@@ -34,9 +35,13 @@ const OperationListItem = ({
   onApplySuggestion = () => {},
   onDismissSuggestion = () => {},
 }) => {
-  // Measure the row in window coordinates on long-press so the caller can float
-  // an action menu / lifted clone exactly over it (see OperationActionMenu).
+  // Measure the row on long-press so the caller can float an action menu / lifted
+  // clone exactly over it (see OperationActionMenu). Measured against the overlay
+  // host — the shared ancestor of this row and of the layer the clone is drawn in —
+  // rather than the window: same origin on both ends, so the clone cannot land
+  // anywhere but on top of the row it copies.
   const rowRef = useRef(null);
+  const { hostRef } = useOverlayHost();
   // Bind the operation to the edit handler INSIDE the row so the stable `onEdit`
   // prop can flow down unchanged. This keeps OperationListItem's React.memo
   // compare stable — the list no longer hands each row a fresh inline
@@ -46,14 +51,19 @@ const OperationListItem = ({
   }, [onEdit, operation]);
   const handleLongPress = useCallback(() => {
     const node = rowRef.current;
-    if (!node || typeof node.measureInWindow !== 'function') {
+    const host = hostRef?.current;
+    // No host (or no measurement support, as under test): the menu still opens, just
+    // centred instead of anchored.
+    if (!node || !host || typeof node.measureLayout !== 'function') {
       onLongPress(operation, null);
       return;
     }
-    node.measureInWindow((x, y, width, height) => {
-      onLongPress(operation, { x, y, width, height });
-    });
-  }, [onLongPress, operation]);
+    node.measureLayout(
+      host,
+      (x, y, width, height) => onLongPress(operation, { x, y, width, height }),
+      () => onLongPress(operation, null),
+    );
+  }, [onLongPress, operation, hostRef]);
   const isExpense = operation.type === 'expense';
   const isIncome = operation.type === 'income';
   const isTransfer = operation.type === 'transfer';

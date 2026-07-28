@@ -20,6 +20,7 @@ import { DialogProvider } from './app/contexts/DialogContext';
 import { ImportProgressProvider } from './app/contexts/ImportProgressContext';
 import { UpdateDownloadProvider } from './app/contexts/UpdateDownloadContext';
 import { AppBlurProvider, useAppBlur } from './app/contexts/AppBlurContext';
+import { OverlayHostProvider, OverlayOutlet, useOverlayHost } from './app/contexts/OverlayHostContext';
 import { DisplaySettingsProvider } from './app/contexts/DisplaySettingsContext';
 import { SearchProvider } from './app/contexts/SearchContext';
 import ErrorBoundary from './app/components/ErrorBoundary';
@@ -51,15 +52,27 @@ function ThemedStatusBar() {
 function AppContent() {
   const paperTheme = useMaterialTheme();
   const { blurCount } = useAppBlur();
+  const { hostRef } = useOverlayHost();
 
+  // The content view and the overlay outlet are siblings filling the same parent, so
+  // they share an origin: anything measured against `hostRef` can be positioned in the
+  // outlet with no coordinate translation. Overlays sit outside the blurred view on
+  // purpose — the blur is for what's behind them (see OverlayHostContext).
   return (
-    <View style={[styles.container, blurCount > 0 && styles.blurred]}>
-      <PaperProvider theme={paperTheme}>
-        <ThemedStatusBar />
-        <AppInitializer />
-        <ImportProgressModal />
-      </PaperProvider>
-    </View>
+    <PaperProvider theme={paperTheme}>
+      <View style={styles.container}>
+        <View
+          ref={hostRef}
+          collapsable={false}
+          style={[styles.container, blurCount > 0 && styles.blurred]}
+        >
+          <ThemedStatusBar />
+          <AppInitializer />
+          <ImportProgressModal />
+        </View>
+        <OverlayOutlet />
+      </View>
+    </PaperProvider>
   );
 }
 
@@ -73,29 +86,31 @@ function App() {
               <DisplaySettingsProvider>
                 <ThemeColorsProvider>
                   <AppBlurProvider>
-                    <SearchProvider>
-                      <DialogProvider>
-                        <UpdateDownloadProvider>
-                          <ImportProgressProvider>
-                            <AccountsDataProvider>
-                              <AccountsActionsProvider>
-                                <CategoriesProvider>
-                                  <OperationsDataProvider>
-                                    <OperationsActionsProvider>
-                                      <BudgetsProvider>
-                                        <BudgetPlansProvider>
-                                          <AppContent />
-                                        </BudgetPlansProvider>
-                                      </BudgetsProvider>
-                                    </OperationsActionsProvider>
-                                  </OperationsDataProvider>
-                                </CategoriesProvider>
-                              </AccountsActionsProvider>
-                            </AccountsDataProvider>
-                          </ImportProgressProvider>
-                        </UpdateDownloadProvider>
-                      </DialogProvider>
-                    </SearchProvider>
+                    <OverlayHostProvider>
+                      <SearchProvider>
+                        <DialogProvider>
+                          <UpdateDownloadProvider>
+                            <ImportProgressProvider>
+                              <AccountsDataProvider>
+                                <AccountsActionsProvider>
+                                  <CategoriesProvider>
+                                    <OperationsDataProvider>
+                                      <OperationsActionsProvider>
+                                        <BudgetsProvider>
+                                          <BudgetPlansProvider>
+                                            <AppContent />
+                                          </BudgetPlansProvider>
+                                        </BudgetsProvider>
+                                      </OperationsActionsProvider>
+                                    </OperationsDataProvider>
+                                  </CategoriesProvider>
+                                </AccountsActionsProvider>
+                              </AccountsDataProvider>
+                            </ImportProgressProvider>
+                          </UpdateDownloadProvider>
+                        </DialogProvider>
+                      </SearchProvider>
+                    </OverlayHostProvider>
                   </AppBlurProvider>
                 </ThemeColorsProvider>
               </DisplaySettingsProvider>

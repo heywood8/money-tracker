@@ -1,9 +1,10 @@
-import React, { useEffect, useRef } from 'react';
-import { Modal, View, Text, Pressable, StyleSheet, Animated, Dimensions } from 'react-native';
+import React, { useCallback, useEffect, useRef, useState } from 'react';
+import { BackHandler, View, Text, Pressable, StyleSheet, Animated, Dimensions } from 'react-native';
 import PropTypes from 'prop-types';
 import Icon from '@expo/vector-icons/MaterialCommunityIcons';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import ModalBlurOverlay from '../ModalBlurOverlay';
+import { OverlayPortal } from '../../contexts/OverlayHostContext';
 import { SPACING, BORDER_RADIUS, FONT_SIZE, ICON_SIZE } from '../../styles/designTokens';
 import { isReduceMotionEnabled } from '../../utils/reducedMotion';
 
@@ -16,9 +17,17 @@ const GAP = 10;
  * Context action menu shown on long-pressing an operation row.
  *
  * Instead of a plain "choose action" dialog, the pressed row is lifted above a
- * blurred backdrop (a static clone rendered at its measured window position) and
- * a compact icon bar floats just above (or below) it. Tapping the backdrop or
- * pressing back dismisses it.
+ * blurred backdrop (a static clone rendered at its measured position) and a compact
+ * icon bar floats just above (or below) it. Tapping the backdrop or pressing back
+ * dismisses it.
+ *
+ * The clone is drawn in the app-wide overlay layer (OverlayPortal), NOT in a core
+ * `<Modal>`. That is the whole trick: a Modal is a separate native window, so a row
+ * measured in the app's coordinates and re-drawn inside that window drifts by
+ * whatever the two origins disagree on — a status bar's worth of offset on
+ * edge-to-edge Android, which is exactly what made the row visibly jump on long
+ * press. The overlay shares a parent with the content it covers, so `layout.y` means
+ * the same thing on both sides and the clone always lands on the row.
  *
  * The parent owns visibility: pass a `menu` object to open, `null` to close.
  * Entrance is animated; closing unmounts immediately (a snappy dismiss is the
@@ -28,6 +37,26 @@ const GAP = 10;
 export default function OperationActionMenu({ menu, colors, t, onClose, onEdit, onRepeat, onDelete }) {
   const insets = useSafeAreaInsets();
   const progress = useRef(new Animated.Value(0)).current;
+  // Height of the overlay layer itself, not of the screen: the layer is the box the
+  // panel is being placed in, so clamping against anything else re-introduces the
+  // guesswork this component just got rid of. Seeded from window height for the
+  // first frame, corrected by the first onLayout.
+  const [layerHeight, setLayerHeight] = useState(() => Dimensions.get('window').height);
+
+  const handleLayerLayout = useCallback((e) => {
+    const { height } = e.nativeEvent.layout;
+    setLayerHeight((prev) => (height > 0 && height !== prev ? height : prev));
+  }, []);
+
+  // The overlay is not a native window, so the hardware back button is ours to handle.
+  useEffect(() => {
+    if (!menu) return undefined;
+    const sub = BackHandler.addEventListener('hardwareBackPress', () => {
+      onClose();
+      return true;
+    });
+    return () => sub.remove();
+  }, [menu, onClose]);
 
   useEffect(() => {
     if (menu) {
@@ -51,7 +80,6 @@ export default function OperationActionMenu({ menu, colors, t, onClose, onEdit, 
   if (!menu) return null;
 
   const { layout, row } = menu;
-  const screenHeight = Dimensions.get('window').height;
 
   // Where the floating icon bar goes. Prefer above the row; fall back to below.
   // Both edges are bounded so the bar never lands under the status bar / notch
@@ -60,7 +88,7 @@ export default function OperationActionMenu({ menu, colors, t, onClose, onEdit, 
   let panelPlacedAbove = true;
   if (layout) {
     const topLimit = insets.top + SPACING.sm;
-    const bottomLimit = screenHeight - insets.bottom - SPACING.sm - PANEL_HEIGHT;
+    const bottomLimit = layerHeight - insets.bottom - SPACING.sm - PANEL_HEIGHT;
     const above = layout.y - GAP - PANEL_HEIGHT;
     const below = layout.y + layout.height + GAP;
     if (above >= topLimit) {
@@ -74,7 +102,7 @@ export default function OperationActionMenu({ menu, colors, t, onClose, onEdit, 
     }
   } else {
     // No measurement (rare): center the bar on screen.
-    panelTop = screenHeight / 2 - PANEL_HEIGHT / 2;
+    panelTop = layerHeight / 2 - PANEL_HEIGHT / 2;
     panelPlacedAbove = false;
   }
 
@@ -102,26 +130,12 @@ export default function OperationActionMenu({ menu, colors, t, onClose, onEdit, 
   return (
     <>
       <ModalBlurOverlay />
-      {/* `statusBarTranslucent`/`navigationBarTranslucent` are load-bearing here, not
-          cosmetic: the app runs edge-to-edge, so `measureInWindow` reports the row's
-          position in a coordinate space whose origin is the top of the screen. Without
-          these props the Modal's native window starts *below* the status bar, and the
-          lifted clone (positioned at `layout.y`) lands one status-bar height lower than
-          the row it is supposed to replace — the row visibly jumps on long press. The
-          same offset would skew `panelTop` and the `insets`-based clamping below. */}
-      <Modal
-        testID="operation-action-menu-window"
-        visible
-        transparent
-        statusBarTranslucent
-        navigationBarTranslucent
-        animationType="none"
-        onRequestClose={onClose}
-      >
+      <OverlayPortal>
         <Pressable
           testID="operation-action-menu-backdrop"
           style={styles.fill}
           onPress={onClose}
+          onLayout={handleLayerLayout}
         >
           <Animated.View style={[styles.backdrop, backdropStyle]} pointerEvents="none" />
 
@@ -153,11 +167,14 @@ export default function OperationActionMenu({ menu, colors, t, onClose, onEdit, 
               panelStyle,
               {
                 top: panelTop,
-                left: layout ? layout.x : SPACING.lg,
-                width: layout ? layout.width : Dimensions.get('window').width - SPACING.lg * 2,
                 backgroundColor: colors.surface,
                 borderColor: colors.border,
               },
+              // Anchored to the row when it was measured; otherwise inset from both
+              // edges of the layer, which needs no width arithmetic at all.
+              layout
+                ? { left: layout.x, width: layout.width }
+                : { left: SPACING.lg, right: SPACING.lg },
             ]}
           >
             <Pressable style={styles.panelRow} onPress={() => {}}>
@@ -188,7 +205,7 @@ export default function OperationActionMenu({ menu, colors, t, onClose, onEdit, 
             </Pressable>
           </Animated.View>
         </Pressable>
-      </Modal>
+      </OverlayPortal>
     </>
   );
 }

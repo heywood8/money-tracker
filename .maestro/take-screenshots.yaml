@@ -49,6 +49,19 @@ appId: com.heywood8.monkeep
 - waitForAnimationToEnd:
     timeout: 2000
 
+# Screenshot: long-press action menu. The lifted clone must sit exactly on top of the
+# row it copies — this frame is the regression check for that (see OverlayHostContext).
+- longPressOn:
+    id: "operation-item-0"
+- waitForAnimationToEnd:
+    timeout: 2000
+- takeScreenshot: screenshots/10_action_menu_light
+# Dismiss with the hardware back button: the overlay is not a native window, so this
+# also exercises the BackHandler the menu wires up in place of onRequestClose.
+- back
+- waitForAnimationToEnd:
+    timeout: 1000
+
 # Screenshot: Filter modal
 - tapOn:
     id: "filter-fab"
