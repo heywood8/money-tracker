@@ -1,5 +1,17 @@
 # Changelog
 
+## [0.246.0](https://github.com/heywood8/money-tracker/compare/penny-v0.245.0...penny-v0.246.0) (2026-07-28)
+
+
+### Features
+
+* **graphs:** draw the balance chart for a whole-year selection ([#1497](https://github.com/heywood8/money-tracker/issues/1497)) ([cedd1f8](https://github.com/heywood8/money-tracker/commit/cedd1f81fcd630d966569f0a270977cf0a6b1ae9))
+
+
+### Bug Fixes
+
+* **motion:** stop every horizontal swipe crashing the app ([#1498](https://github.com/heywood8/money-tracker/issues/1498)) ([1cfe841](https://github.com/heywood8/money-tracker/commit/1cfe841b8eb09165f499c3302736c993f9741f48))
+
 ## [0.245.0](https://github.com/heywood8/money-tracker/compare/penny-v0.244.1...penny-v0.245.0) (2026-07-28)
 
 
