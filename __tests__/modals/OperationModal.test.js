@@ -682,6 +682,69 @@ describe('OperationModal', () => {
 
       expect(queryByText('save')).toBeFalsy();
     });
+
+    // A balance adjustment is read-only here, but skewed charts are exactly what a
+    // correction causes — so the hide-from-charts switch stays live and writes itself
+    // straight to the DB (there is no Save button to press afterwards).
+    it('offers the hide-from-charts switch for a balance adjustment and persists it immediately', async () => {
+      const useOperationForm = require('../../app/hooks/useOperationForm');
+      useOperationForm.mockReturnValue({
+        ...useOperationForm(),
+        isShadowOperation: true,
+      });
+
+      const mockOperation = {
+        id: 'op1',
+        type: 'expense',
+        amount: '292380.35',
+        accountId: 'acc1',
+        categoryId: 'shadow-adjustment-expense',
+        date: '2024-01-15',
+      };
+
+      const { getByTestId } = await render(
+        <OperationModal
+          visible={true}
+          onClose={mockOnClose}
+          operation={mockOperation}
+          isNew={false}
+        />,
+      );
+
+      fireEvent(getByTestId('exclude-from-charts-switch'), 'valueChange', true);
+
+      expect(mockUpdateOperation).toHaveBeenCalledWith('op1', { excludeFromCharts: true });
+    });
+
+    it('does not write on toggle for an ordinary operation — Save does that', async () => {
+      const useOperationForm = require('../../app/hooks/useOperationForm');
+      useOperationForm.mockReturnValue({
+        ...useOperationForm(),
+        isShadowOperation: false,
+      });
+
+      const mockOperation = {
+        id: 'op2',
+        type: 'expense',
+        amount: '12',
+        accountId: 'acc1',
+        categoryId: 'cat2',
+        date: '2024-01-15',
+      };
+
+      const { getByTestId } = await render(
+        <OperationModal
+          visible={true}
+          onClose={mockOnClose}
+          operation={mockOperation}
+          isNew={false}
+        />,
+      );
+
+      fireEvent(getByTestId('exclude-from-charts-switch'), 'valueChange', true);
+
+      expect(mockUpdateOperation).not.toHaveBeenCalled();
+    });
   });
 
   describe('Picker Interactions', () => {
