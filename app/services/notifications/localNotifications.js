@@ -92,6 +92,10 @@ export const requestNotificationsPermission = async () => {
  * Post (or refresh) the "transactions to review" alert. Uses a fixed identifier
  * so repeated calls update a single notification rather than stacking.
  *
+ * The body may be multi-line (one line per queued transaction): expo-notifications
+ * wraps the Android notification in a BigTextStyle, so the collapsed row shows the
+ * first line and expanding the shade reveals the rest.
+ *
  * @param {{ title: string, body: string, channelName?: string }} copy
  * @returns {Promise<void>}
  */

@@ -13,6 +13,7 @@ import * as backgroundBankTask from '../../../app/services/notifications/backgro
 import * as processMod from '../../../app/services/notifications/processBankNotifications';
 import * as localNotifications from '../../../app/services/notifications/localNotifications';
 import * as notificationStrings from '../../../app/services/notifications/notificationStrings';
+import { collectPendingAlertDetails } from '../../../app/services/notifications/pendingAlertItems';
 import { getPendingCount } from '../../../app/services/PendingNotificationsDB';
 import * as PreferencesDB from '../../../app/services/PreferencesDB';
 
@@ -26,6 +27,9 @@ jest.mock('../../../app/services/notifications/localNotifications', () => ({
 }));
 jest.mock('../../../app/services/notifications/notificationStrings', () => ({
   getPendingAlertCopy: jest.fn(),
+}));
+jest.mock('../../../app/services/notifications/pendingAlertItems', () => ({
+  collectPendingAlertDetails: jest.fn(),
 }));
 jest.mock('../../../app/services/PendingNotificationsDB', () => ({
   getPendingCount: jest.fn(),
@@ -60,6 +64,7 @@ describe('backgroundBankTask', () => {
       channelName: 'Bank operations',
     });
     getPendingCount.mockResolvedValue(2);
+    collectPendingAlertDetails.mockResolvedValue([]);
   });
 
   describe('task definition', () => {
@@ -142,12 +147,40 @@ describe('backgroundBankTask', () => {
       const result = await backgroundBankTask.runBackgroundBankCheck();
 
       expect(getPendingCount).toHaveBeenCalled();
-      expect(notificationStrings.getPendingAlertCopy).toHaveBeenCalledWith(2);
+      expect(notificationStrings.getPendingAlertCopy).toHaveBeenCalledWith(2, []);
       expect(localNotifications.presentPendingOperationsAlert).toHaveBeenCalledWith({
         title: 'Transactions to review',
         body: '2 transactions are waiting to be added',
         channelName: 'Bank operations',
       });
+      expect(result.notified).toBe(true);
+    });
+
+    it('describes the items this run queued and passes them to the copy', async () => {
+      enableBothGates();
+      processMod.processBankNotifications.mockResolvedValue({ created: 0, pending: 2, skipped: 0 });
+      const details = [
+        { amount: '1299', currency: 'AMD', merchant: 'SAS', missing: 'category' },
+        { amount: '4500', currency: 'AMD', merchant: null, missing: 'account_category' },
+      ];
+      collectPendingAlertDetails.mockResolvedValue(details);
+
+      await backgroundBankTask.runBackgroundBankCheck();
+
+      // Detail collection is scoped to the items this run added, not the queue.
+      expect(collectPendingAlertDetails).toHaveBeenCalledWith(2);
+      expect(notificationStrings.getPendingAlertCopy).toHaveBeenCalledWith(2, details);
+    });
+
+    it('still alerts when no details could be described', async () => {
+      enableBothGates();
+      processMod.processBankNotifications.mockResolvedValue({ created: 0, pending: 1, skipped: 0 });
+      collectPendingAlertDetails.mockResolvedValue([]);
+
+      const result = await backgroundBankTask.runBackgroundBankCheck();
+
+      expect(notificationStrings.getPendingAlertCopy).toHaveBeenCalledWith(2, []);
+      expect(localNotifications.presentPendingOperationsAlert).toHaveBeenCalled();
       expect(result.notified).toBe(true);
     });
 

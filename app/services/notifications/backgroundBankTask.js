@@ -23,6 +23,7 @@ import {
   presentPendingOperationsAlert,
 } from './localNotifications';
 import { getPendingAlertCopy } from './notificationStrings';
+import { collectPendingAlertDetails } from './pendingAlertItems';
 
 /** Task identifier, also used as the WorkManager unique work name. */
 export const BACKGROUND_BANK_TASK = 'penny-background-bank-notifications';
@@ -62,7 +63,8 @@ export const setBackgroundAlertsEnabled = async (enabled) => {
  *
  * Ingests any newly-captured bank notifications, and — when this run queued new
  * items for review and the OS notification permission is granted — posts/refreshes
- * the pending-operations alert with the current review-queue size.
+ * the pending-operations alert with the current review-queue size plus a
+ * description of what this run parsed and what it still needs from the user.
  *
  * @returns {Promise<{ created: number, pending: number, skipped: number, notified: boolean }>}
  */
@@ -79,7 +81,11 @@ export const runBackgroundBankCheck = async () => {
   // items the user hasn't gotten to yet must not re-notify on every wakeup.
   if (summary.pending > 0 && (await areNotificationsGranted())) {
     const totalPending = await getPendingCount();
-    const copy = await getPendingAlertCopy(totalPending);
+    // Describe what this run actually queued (amount, payee, resolved account /
+    // category, and the field still missing) so the alert is actionable at a
+    // glance; an empty list degrades to the plain count-only copy.
+    const details = await collectPendingAlertDetails(summary.pending);
+    const copy = await getPendingAlertCopy(totalPending, details);
     await presentPendingOperationsAlert(copy);
     return { ...summary, notified: true };
   }
