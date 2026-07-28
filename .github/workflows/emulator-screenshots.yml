@@ -90,6 +90,12 @@ jobs:
 
       - name: Run emulator and capture screenshots
         uses: reactivecircus/android-emulator-runner@v2
+        env:
+          # This job builds a release APK purely to photograph it, and it runs without
+          # the SENTRY_* secrets that build-release-apk.yml passes in. Without this the
+          # Gradle build dies at :app:...SentryUpload with "Auth token is required".
+          # Screenshots need no source maps or debug symbols.
+          SENTRY_DISABLE_AUTO_UPLOAD: 'true'
         with:
           api-level: 34
           arch: x86_64

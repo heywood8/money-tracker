@@ -285,15 +285,28 @@ describe('OperationListItem', () => {
 
   describe('Long press', () => {
     it('forwards the operation on long press without throwing', async () => {
-      // The row measures itself (measureInWindow) before reporting layout to the
-      // caller; that native call is a no-op in the test renderer (it never invokes
-      // its callback), so the (operation, layout) payload can't be observed here.
-      // We assert the wiring holds — long-press runs the handler without throwing.
+      // The row measures itself against the overlay host before reporting layout to
+      // the caller; that native call is a no-op in the test renderer (it never
+      // invokes its callback), so the (operation, layout) payload can't be observed
+      // here. We assert the wiring holds — long-press runs the handler without
+      // throwing.
       const onLongPress = jest.fn();
       const { getByTestId } = await render(
         <OperationListItem {...baseProps} testID="op-row" onLongPress={onLongPress} />,
       );
       expect(() => fireEvent(getByTestId('op-row'), 'longPress')).not.toThrow();
+    });
+
+    it('reports a null layout when there is no overlay host to measure against', async () => {
+      // Rendered outside OverlayHostProvider (as here), there is no shared ancestor
+      // to resolve coordinates in. The menu must still open — just centred rather
+      // than anchored — instead of silently swallowing the long press.
+      const onLongPress = jest.fn();
+      const { getByTestId } = await render(
+        <OperationListItem {...baseProps} testID="op-row" onLongPress={onLongPress} />,
+      );
+      fireEvent(getByTestId('op-row'), 'longPress');
+      expect(onLongPress).toHaveBeenCalledWith(baseProps.operation, null);
     });
 
     it('does not throw when onLongPress is omitted', async () => {

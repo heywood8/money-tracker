@@ -12,6 +12,20 @@ appId: com.heywood8.monkeep
 - tapOn: "English"
 - tapOn: "Continue"
 
+# The release build checks for updates on launch, and on CI there is always a newer
+# release than the one just built — the prompt then covers the app and takes
+# everything under it out of the accessibility tree, so every later step fails to
+# find its target. Give it a moment to appear, then dismiss it if it did.
+- waitForAnimationToEnd:
+    timeout: 5000
+- runFlow:
+    when:
+      visible: "Update available"
+    commands:
+      - tapOn: "Later"
+      - waitForAnimationToEnd:
+          timeout: 1000
+
 # Wait for main app to load (Operations tab is the default)
 - extendedWaitUntil:
     visible: "Operations"
@@ -24,6 +38,21 @@ appId: com.heywood8.monkeep
 # Screenshot 1: Operations screen (default first tab)
 - takeScreenshot: screenshots/01_operations_light
 
+# Screenshot 1a: long-press action menu. The lifted clone must sit exactly on top of
+# the row it copies — this frame is the regression check for that (see
+# OverlayHostContext). Captured here, right after the plain list, so the two frames
+# can be compared row-for-row.
+- longPressOn:
+    id: "operation-item-0"
+- waitForAnimationToEnd:
+    timeout: 2000
+- takeScreenshot: screenshots/10_action_menu_light
+# Dismiss with the hardware back button: the overlay is not a native window, so this
+# also exercises the BackHandler the menu wires up in place of onRequestClose.
+- back
+- waitForAnimationToEnd:
+    timeout: 1000
+
 # Screenshot 1b: Transfer mode of QuickAdd (shows target account shortcuts below calculator)
 - tapOn: "Transfer"
 - waitForAnimationToEnd:
@@ -31,9 +60,9 @@ appId: com.heywood8.monkeep
 - takeScreenshot: screenshots/05_transfer_light
 
 # Screenshot 1c: Multi-currency transfer (select different-currency account, enter amount)
-- tapOn: "All accounts"
-- waitForAnimationToEnd:
-    timeout: 2000
+# "All accounts" only renders past 8 accounts (OperationFormFields), and the seed data
+# has 4 — the picker step this flow used to go through no longer exists, so tap the
+# target account straight from the shortcut row.
 - tapOn: "EUR Cash"
 - waitForAnimationToEnd:
     timeout: 2000
