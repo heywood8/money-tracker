@@ -11,6 +11,7 @@ import { useBudgetPlans } from '../../contexts/BudgetPlansContext';
 import * as Currency from '../../services/currency';
 import usePlanLineAmounts from '../../hooks/usePlanLineAmounts';
 import { SPACING } from '../../styles/layout';
+import { envelopeHue } from '../../styles/envelopePalette';
 import BudgetPlanLineModal from './BudgetPlanLineModal';
 import BudgetLineGroupModal from './BudgetLineGroupModal';
 import PlanLineRow from './PlanLineRow';
@@ -363,9 +364,21 @@ const MonthlyPlanSection = forwardRef(function MonthlyPlanSection({
   // rather than leaving it in muted 14px at the bottom of a long scrolling card.
   // Reported rather than lifted wholesale: computing it needs the lines, the
   // plan status and the staleness gate above, all of which live here.
+  // `allocated` and `actual` ride along for the same reason: they used to sit in
+  // 12px muted type at the very bottom of the card, which on a plan of any
+  // length means below the fold and half-covered by the FAB. They are the
+  // month's two orientation figures, so they belong beside the one figure the
+  // remainder answers with.
+  const displayActual = freshPlanStatus ? freshPlanStatus.totals.totalActual : null;
   useEffect(() => {
-    onTotalsChange?.({ remainder: displayRemainder, hasIncomeBasis, currency: planCurrency });
-  }, [onTotalsChange, displayRemainder, hasIncomeBasis, planCurrency]);
+    onTotalsChange?.({
+      remainder: displayRemainder,
+      hasIncomeBasis,
+      currency: planCurrency,
+      allocated: displayAllocated,
+      actual: displayActual,
+    });
+  }, [onTotalsChange, displayRemainder, hasIncomeBasis, planCurrency, displayAllocated, displayActual]);
 
   // Only invoked from the section's own header, which renders in uncontrolled
   // mode only; in controlled mode the host header drives month navigation.
@@ -840,7 +853,7 @@ const MonthlyPlanSection = forwardRef(function MonthlyPlanSection({
 
   // Shared row renderer for every block — each list moves independently (own
   // sort_order sequence), so `list` and `onMove` are passed in per block.
-  const renderLine = useCallback((line, index, list, onMove, indented = false) => {
+  const renderLine = useCallback((line, index, list, onMove, indented = false, envelopeColor = null) => {
     const executed = line.lastExecutedMonth === month;
     return (
       <PlanLineRow
@@ -848,6 +861,7 @@ const MonthlyPlanSection = forwardRef(function MonthlyPlanSection({
         line={line}
         index={index}
         indented={indented}
+        envelopeColor={envelopeColor}
         name={lineDisplayName(line)}
         icon={lineIcon(line)}
         status={lineStatusById.get(line.id) || null}
@@ -969,31 +983,41 @@ const MonthlyPlanSection = forwardRef(function MonthlyPlanSection({
             structurally — categories from unrelated trees, a transfer target, a
             recurring line next to a one-off one — so it sits above the loose
             ones rather than among them. */}
-        {groupViews.map((view, groupIndex) => (
-          <React.Fragment key={view.group.id}>
-            <PlanGroupRow
-              group={view.group}
-              index={groupIndex}
-              listLength={groupViews.length}
-              status={groupStatusById.get(view.group.id) || null}
-              displayAmount={view.displayAmount}
-              converting={converting}
-              childCount={view.children.length}
-              colors={colors}
-              t={t}
-              pace={pace}
-              onMove={moveGroup}
-              onPress={openEditGroup}
-              onLongPress={handleLongPressGroup}
-            />
-            {view.recurring.map((line, index) => renderLine(
-              line, index, view.recurring, groupMovers.get(`${view.group.id}|r`), true,
-            ))}
-            {view.oneOff.map((line, index) => renderLine(
-              line, index, view.oneOff, groupMovers.get(`${view.group.id}|o`), true,
-            ))}
-          </React.Fragment>
-        ))}
+        {groupViews.map((view, groupIndex) => {
+          // Assigned by position, and handed to the header and every child so
+          // one envelope reads as one object: the folder glyph, the rail beside
+          // the header and the rail beside each row below it are all the same
+          // colour. See envelopePalette for why colour identifies an envelope
+          // here rather than flagging a status.
+          const hue = envelopeHue(groupIndex);
+          return (
+            <React.Fragment key={view.group.id}>
+              <PlanGroupRow
+                group={view.group}
+                index={groupIndex}
+                listLength={groupViews.length}
+                status={groupStatusById.get(view.group.id) || null}
+                displayAmount={view.displayAmount}
+                converting={converting}
+                childCount={view.children.length}
+                envelopeColor={hue}
+                planCurrency={planCurrency}
+                colors={colors}
+                t={t}
+                pace={pace}
+                onMove={moveGroup}
+                onPress={openEditGroup}
+                onLongPress={handleLongPressGroup}
+              />
+              {view.recurring.map((line, index) => renderLine(
+                line, index, view.recurring, groupMovers.get(`${view.group.id}|r`), true, hue,
+              ))}
+              {view.oneOff.map((line, index) => renderLine(
+                line, index, view.oneOff, groupMovers.get(`${view.group.id}|o`), true, hue,
+              ))}
+            </React.Fragment>
+          );
+        })}
 
         {recurringLines.map((line, index) => renderLine(line, index, recurringLines, handleMoveRecurring))}
         {oneOffLines.map((line, index) => renderLine(line, index, oneOffLines, handleMoveOneOff))}
@@ -1049,31 +1073,32 @@ const MonthlyPlanSection = forwardRef(function MonthlyPlanSection({
 
         {(plan || hasAnyLines) && (
           <>
-            {/* Totals: allocated vs actual, then the planned remainder.
+            {/* Allocated / actual / remainder are all reported to the host,
+                which prints them in the sticky header: they are the month's
+                orientation figures, and at the bottom of a card this long they
+                were below the fold and half-covered by the FAB. Rendered here
+                only in uncontrolled mode (no host header to carry them), so the
+                two can never appear at once.
+
                 Both labels get flexShrink + a gap: in Russian they are long
                 enough that a bare space-between row let them collide into
-                "…800.00 USDФактический: …". Compact magnitudes here for the
-                same reason as the income header — these two are orientation,
-                and the remainder below is the figure to act on, so that one
-                stays exact. */}
-            <View style={[styles.totalsRow, { borderTopColor: colors.border }]} testID="plan-totals">
-              <Text style={[styles.totalsLabel, { color: colors.mutedText }]} numberOfLines={1}>
-                {t('allocated')}: {Currency.formatCompact(displayAllocated)}{currencySuffix}
-              </Text>
-              {planStatus && (
-                <Text
-                  style={[styles.totalsLabel, styles.totalsLabelRight, { color: colors.mutedText }]}
-                  numberOfLines={1}
-                  testID="plan-actual-total"
-                >
-                  {t('actual')}: {Currency.formatCompact(planStatus.totals.totalActual)}{currencySuffix}
+                "…800.00 USDФактический: …". */}
+            {!controlledMonth && (
+              <View style={[styles.totalsRow, { borderTopColor: colors.border }]} testID="plan-totals">
+                <Text style={[styles.totalsLabel, { color: colors.mutedText }]} numberOfLines={1}>
+                  {t('allocated')}: {Currency.formatCompact(displayAllocated)}{currencySuffix}
                 </Text>
-              )}
-            </View>
-            {/* The remainder is reported to the host, which prints it in the
-                sticky header where the figure you act on belongs. Rendered here
-                only in uncontrolled mode (no host header to carry it), so the
-                two never appear at once. */}
+                {planStatus && (
+                  <Text
+                    style={[styles.totalsLabel, styles.totalsLabelRight, { color: colors.mutedText }]}
+                    numberOfLines={1}
+                    testID="plan-actual-total"
+                  >
+                    {t('actual')}: {Currency.formatCompact(planStatus.totals.totalActual)}{currencySuffix}
+                  </Text>
+                )}
+              </View>
+            )}
             {!controlledMonth && (
               <View style={styles.remainderRow}>
                 {hasIncomeBasis ? (

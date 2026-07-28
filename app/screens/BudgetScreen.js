@@ -101,6 +101,8 @@ const BudgetScreen = () => {
         && prev.remainder === next.remainder
         && prev.hasIncomeBasis === next.hasIncomeBasis
         && prev.currency === next.currency
+        && prev.allocated === next.allocated
+        && prev.actual === next.actual
         ? prev
         : next
     ));
@@ -280,6 +282,21 @@ const BudgetScreen = () => {
                 : PENDING_PLACEHOLDER}
             </Text>
           )}
+          {/* The month's two orientation figures, moved up from the very bottom
+              of the plan card — on a plan of any length they sat below the fold
+              with the FAB over them, which is a strange place for the totals of
+              the thing being read. Here they qualify the remainder directly:
+              7490 left OF 443K committed, against 419K actually spent. */}
+          {planTotals?.allocated != null && (
+            <Text
+              style={[styles.heroTotals, { color: colors.mutedText }]}
+              numberOfLines={1}
+              testID="budget-hero-totals"
+            >
+              {t('allocated')} {Currency.formatCompact(planTotals.allocated)}
+              {planTotals.actual != null && ` · ${t('actual')} ${Currency.formatCompact(planTotals.actual)}`}
+            </Text>
+          )}
         </View>
         {currencies.length > 1 && (
           <View style={styles.heroControls}>
@@ -417,8 +434,14 @@ const styles = StyleSheet.create({
     justifyContent: 'space-between',
     marginTop: SPACING.sm,
   },
+  heroTotals: {
+    fontSize: 12,
+    fontVariant: ['tabular-nums'],
+    marginTop: 2,
+  },
   heroValue: {
     fontSize: 24,
+    fontVariant: ['tabular-nums'],
     fontWeight: '700',
     letterSpacing: -0.5,
   },
