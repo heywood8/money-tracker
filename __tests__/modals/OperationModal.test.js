@@ -165,13 +165,8 @@ jest.mock('../../app/hooks/useOperationPicker', () => {
       type: null,
       data: [],
     },
-    categoryNavigation: {
-      breadcrumb: [],
-    },
     openPicker: jest.fn(),
     closePicker: jest.fn(),
-    navigateIntoFolder: jest.fn(),
-    navigateBack: jest.fn(),
   }));
 });
 
@@ -701,18 +696,13 @@ describe('OperationModal', () => {
               id: 'cat1',
               name: 'Food',
               type: 'folder',
-              category_type: 'expense',
+              categoryType: 'expense',
               icon: 'food',
             },
           ],
         },
-        categoryNavigation: {
-          breadcrumb: [],
-        },
         openPicker: jest.fn(),
         closePicker: jest.fn(),
-        navigateIntoFolder: jest.fn(),
-        navigateBack: jest.fn(),
       });
 
       const { getByText } = await render(
@@ -723,29 +713,31 @@ describe('OperationModal', () => {
       expect(getByText('Food')).toBeTruthy();
     });
 
-    it('shows breadcrumb navigation for category picker', async () => {
+    it('names the folder the category picker walked into', async () => {
       const useOperationPicker = require('../../app/hooks/useOperationPicker');
       useOperationPicker.mockReturnValue({
         pickerState: {
           visible: true,
           type: 'category',
-          data: [],
-        },
-        categoryNavigation: {
-          breadcrumb: [{ id: 'cat1', name: 'Food' }],
+          data: [
+            { id: 'cat1', name: 'Food', type: 'folder', categoryType: 'expense', icon: 'food' },
+            { id: 'cat2', name: 'Groceries', type: 'entry', categoryType: 'expense', icon: 'cart', parentId: 'cat1' },
+          ],
         },
         openPicker: jest.fn(),
         closePicker: jest.fn(),
-        navigateIntoFolder: jest.fn(),
-        navigateBack: jest.fn(),
       });
 
-      const { getByText } = await render(
+      const { getByText, getByTestId, queryByTestId } = await render(
         <OperationModal visible={true} onClose={mockOnClose} isNew={true} />,
       );
 
-      // Should show breadcrumb
-      expect(getByText('Food')).toBeTruthy();
+      expect(queryByTestId('category-grid-breadcrumb')).toBeNull();
+
+      await fireEvent.press(getByText('Food'));
+
+      await waitFor(() => expect(getByTestId('category-grid-breadcrumb')).toBeTruthy());
+      expect(getByTestId('category-grid-breadcrumb')).toHaveTextContent('Food');
     });
 
     it('shows close button for non-category pickers', async () => {
@@ -756,13 +748,8 @@ describe('OperationModal', () => {
           type: 'account',
           data: [{ id: 'acc1', name: 'Checking', currency: 'USD', balance: '1000' }],
         },
-        categoryNavigation: {
-          breadcrumb: [],
-        },
         openPicker: jest.fn(),
         closePicker: jest.fn(),
-        navigateIntoFolder: jest.fn(),
-        navigateBack: jest.fn(),
       });
 
       const { getAllByText } = await render(
@@ -942,13 +929,8 @@ describe('OperationModal', () => {
             { id: 'acc2', name: 'Savings', currency: 'EUR', balance: '500' },
           ],
         },
-        categoryNavigation: {
-          breadcrumb: [],
-        },
         openPicker: jest.fn(),
         closePicker: jest.fn(),
-        navigateIntoFolder: jest.fn(),
-        navigateBack: jest.fn(),
       });
 
       const { getByText } = await render(
@@ -977,13 +959,8 @@ describe('OperationModal', () => {
             { id: 'acc1', name: 'Checking', currency: 'USD', balance: '1000' },
           ],
         },
-        categoryNavigation: {
-          breadcrumb: [],
-        },
         openPicker: jest.fn(),
         closePicker: mockClosePicker,
-        navigateIntoFolder: jest.fn(),
-        navigateBack: jest.fn(),
       });
 
       const { getByText } = await render(
@@ -1014,13 +991,8 @@ describe('OperationModal', () => {
             { id: 'acc2', name: 'Savings', currency: 'EUR', balance: '500' },
           ],
         },
-        categoryNavigation: {
-          breadcrumb: [],
-        },
         openPicker: jest.fn(),
         closePicker: mockClosePicker,
-        navigateIntoFolder: jest.fn(),
-        navigateBack: jest.fn(),
       });
 
       const { getByText } = await render(
@@ -1043,17 +1015,12 @@ describe('OperationModal', () => {
           visible: true,
           type: 'category',
           data: [
-            { id: 'cat1', name: 'Food', type: 'folder', icon: 'food' },
-            { id: 'cat2', name: 'Groceries', type: 'entry', icon: 'cart' },
+            { id: 'cat1', name: 'Food', type: 'folder', categoryType: 'expense', icon: 'food' },
+            { id: 'cat2', name: 'Groceries', type: 'entry', categoryType: 'expense', icon: 'cart' },
           ],
-        },
-        categoryNavigation: {
-          breadcrumb: [],
         },
         openPicker: jest.fn(),
         closePicker: jest.fn(),
-        navigateIntoFolder: jest.fn(),
-        navigateBack: jest.fn(),
       });
 
       const { getByText } = await render(
@@ -1065,32 +1032,30 @@ describe('OperationModal', () => {
     });
 
     it('navigates into folder when folder is pressed', async () => {
-      const mockNavigateIntoFolder = jest.fn();
       const useOperationPicker = require('../../app/hooks/useOperationPicker');
       useOperationPicker.mockReturnValue({
         pickerState: {
           visible: true,
           type: 'category',
           data: [
-            { id: 'cat1', name: 'Food', type: 'folder', icon: 'food' },
+            { id: 'cat1', name: 'Food', type: 'folder', categoryType: 'expense', icon: 'food' },
+            { id: 'cat2', name: 'Groceries', type: 'entry', categoryType: 'expense', icon: 'cart', parentId: 'cat1' },
           ],
-        },
-        categoryNavigation: {
-          breadcrumb: [],
         },
         openPicker: jest.fn(),
         closePicker: jest.fn(),
-        navigateIntoFolder: mockNavigateIntoFolder,
-        navigateBack: jest.fn(),
       });
 
-      const { getByText } = await render(
+      const { getByText, queryByText } = await render(
         <OperationModal visible={true} onClose={mockOnClose} isNew={true} />,
       );
 
+      // The folder's children stay hidden until it is opened.
+      expect(queryByText('Groceries')).toBeNull();
+
       await fireEvent.press(getByText('Food'));
 
-      expect(mockNavigateIntoFolder).toHaveBeenCalledWith({ id: 'cat1', name: 'Food', type: 'folder', icon: 'food' });
+      await waitFor(() => expect(getByText('Groceries')).toBeTruthy());
     });
 
     it('selects category entry when entry is pressed', async () => {
@@ -1115,16 +1080,11 @@ describe('OperationModal', () => {
           visible: true,
           type: 'category',
           data: [
-            { id: 'cat2', name: 'Groceries', type: 'entry', icon: 'cart' },
+            { id: 'cat2', name: 'Groceries', type: 'entry', categoryType: 'expense', icon: 'cart' },
           ],
-        },
-        categoryNavigation: {
-          breadcrumb: [],
         },
         openPicker: jest.fn(),
         closePicker: mockClosePicker,
-        navigateIntoFolder: jest.fn(),
-        navigateBack: jest.fn(),
       });
 
       const { getByText } = await render(
@@ -1144,16 +1104,11 @@ describe('OperationModal', () => {
           visible: true,
           type: 'category',
           data: [
-            { id: 'cat1', name: 'Unnamed', nameKey: 'category_food', type: 'entry', icon: 'food' },
+            { id: 'cat1', name: 'Unnamed', nameKey: 'category_food', type: 'entry', categoryType: 'expense', icon: 'food' },
           ],
-        },
-        categoryNavigation: {
-          breadcrumb: [],
         },
         openPicker: jest.fn(),
         closePicker: jest.fn(),
-        navigateIntoFolder: jest.fn(),
-        navigateBack: jest.fn(),
       });
 
       const { getByText } = await render(
@@ -1189,16 +1144,11 @@ describe('OperationModal', () => {
           visible: true,
           type: 'category',
           data: [
-            { id: 'cat2', name: 'Groceries', type: 'entry', icon: 'cart' },
+            { id: 'cat2', name: 'Groceries', type: 'entry', categoryType: 'expense', icon: 'cart' },
           ],
-        },
-        categoryNavigation: {
-          breadcrumb: [],
         },
         openPicker: jest.fn(),
         closePicker: mockClosePicker,
-        navigateIntoFolder: jest.fn(),
-        navigateBack: jest.fn(),
       });
 
       const { getByText } = await render(
@@ -1235,16 +1185,11 @@ describe('OperationModal', () => {
           visible: true,
           type: 'category',
           data: [
-            { id: 'cat2', name: 'Groceries', type: 'entry', icon: 'cart' },
+            { id: 'cat2', name: 'Groceries', type: 'entry', categoryType: 'expense', icon: 'cart' },
           ],
-        },
-        categoryNavigation: {
-          breadcrumb: [],
         },
         openPicker: jest.fn(),
         closePicker: mockClosePicker,
-        navigateIntoFolder: jest.fn(),
-        navigateBack: jest.fn(),
       });
 
       const mockOperation = {
@@ -1510,13 +1455,8 @@ describe('OperationModal', () => {
             { id: 'item1', name: 'Unknown Item' },
           ],
         },
-        categoryNavigation: {
-          breadcrumb: [],
-        },
         openPicker: jest.fn(),
         closePicker: jest.fn(),
-        navigateIntoFolder: jest.fn(),
-        navigateBack: jest.fn(),
       });
 
       // This tests the fallback path in keyExtractor
@@ -1539,13 +1479,8 @@ describe('OperationModal', () => {
           type: 'category',
           data: [],
         },
-        categoryNavigation: {
-          breadcrumb: [],
-        },
         openPicker: jest.fn(),
         closePicker: jest.fn(),
-        navigateIntoFolder: jest.fn(),
-        navigateBack: jest.fn(),
       });
 
       const { getByText } = await render(
@@ -1563,13 +1498,8 @@ describe('OperationModal', () => {
           type: 'account',
           data: [],
         },
-        categoryNavigation: {
-          breadcrumb: [],
-        },
         openPicker: jest.fn(),
         closePicker: jest.fn(),
-        navigateIntoFolder: jest.fn(),
-        navigateBack: jest.fn(),
       });
 
       const { getByText } = await render(
@@ -1581,35 +1511,32 @@ describe('OperationModal', () => {
   });
 
   describe('Breadcrumb Navigation', () => {
-    it('calls navigateBack when back button is pressed', async () => {
-      const mockNavigateBack = jest.fn();
+    it('walks back out of a folder', async () => {
       const useOperationPicker = require('../../app/hooks/useOperationPicker');
       useOperationPicker.mockReturnValue({
         pickerState: {
           visible: true,
           type: 'category',
           data: [
-            { id: 'cat2', name: 'Groceries', type: 'entry', icon: 'cart' },
+            { id: 'cat1', name: 'Food', type: 'folder', categoryType: 'expense', icon: 'food' },
+            { id: 'cat2', name: 'Groceries', type: 'entry', categoryType: 'expense', icon: 'cart', parentId: 'cat1' },
           ],
-        },
-        categoryNavigation: {
-          breadcrumb: [{ id: 'cat1', name: 'Food' }],
         },
         openPicker: jest.fn(),
         closePicker: jest.fn(),
-        navigateIntoFolder: jest.fn(),
-        navigateBack: mockNavigateBack,
       });
 
-      const { getByTestId } = await render(
+      const { getByText, getByTestId, queryByText } = await render(
         <OperationModal visible={true} onClose={mockOnClose} isNew={true} />,
       );
 
-      // Find the back button by its icon
-      const backIcon = getByTestId('icon-arrow-left');
-      await fireEvent.press(backIcon.parent);
+      await fireEvent.press(getByText('Food'));
+      await waitFor(() => expect(getByText('Groceries')).toBeTruthy());
 
-      expect(mockNavigateBack).toHaveBeenCalled();
+      await fireEvent.press(getByTestId('category-grid-back'));
+
+      await waitFor(() => expect(getByText('Food')).toBeTruthy());
+      expect(queryByText('Groceries')).toBeNull();
     });
   });
 

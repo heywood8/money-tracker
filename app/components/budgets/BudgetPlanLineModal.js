@@ -6,6 +6,7 @@ import {
   Pressable,
   StyleSheet,
   FlatList,
+  ScrollView,
   Keyboard,
   Animated,
   Easing,
@@ -21,6 +22,7 @@ import { motionDuration } from '../../utils/reducedMotion';
 import { useDialog } from '../../contexts/DialogContext';
 import FormInput from '../FormInput';
 import ModalShell from '../ModalShell';
+import CategoryGridSelector from '../CategoryGridSelector';
 import { SPACING, BORDER_RADIUS, FONT_SIZE, ICON_SIZE } from '../../styles/designTokens';
 import * as Currency from '../../services/currency';
 
@@ -515,12 +517,12 @@ export default function BudgetPlanLineModal({
   // Categories toggle rather than replace, and the panel STAYS OPEN — picking a
   // set of them is the point, and closing on the first tap would make adding a
   // second category a four-tap round trip. "Done" (or back) closes it.
-  const handleToggleCategory = useCallback((cat) => {
+  const handleToggleCategory = useCallback((categoryId) => {
     setToAccountId(null);
     setKind(prev => (prev === 'transfer' ? 'expense' : prev));
     setError(null);
     setCategoryIds(prev => (
-      prev.includes(cat.id) ? prev.filter(id => id !== cat.id) : [...prev, cat.id]
+      prev.includes(categoryId) ? prev.filter(id => id !== categoryId) : [...prev, categoryId]
     ));
   }, []);
 
@@ -653,35 +655,27 @@ export default function BudgetPlanLineModal({
   const mainOpacity = mainAnim.interpolate({ inputRange: [0, 1], outputRange: [1, 0] });
   const switchTranslateX = recurringAnim.interpolate({ inputRange: [0, 1], outputRange: [0, SWITCH_TRAVEL] });
 
-  // The picker's list, filtered by whatever is in the panel's search field.
-  const targetOptions = kind !== 'income' && pickerKind === 'account' ? accounts : targetCategories;
-  const visibleTargetOptions = useMemo(
-    () => targetOptions.filter(item => matchesQuery(item.name, query)),
-    [targetOptions, query],
-  );
+  // Which of the two lists the target picker is showing. An income line tracks no
+  // transfer target, so for one of those it is always the categories.
+  const showingCategories = kind === 'income' || pickerKind === 'category';
+  // Whether the panel earns a search field. Categories are counted whole (the grid
+  // searches the entire tree, not the folder level it happens to be showing).
+  const targetOptionCount = showingCategories ? targetCategories.length : accounts.length;
   const visibleAccounts = useMemo(
     () => accounts.filter(item => matchesQuery(item.name, query)),
     [accounts, query],
   );
 
-  const renderTargetItem = useCallback(({ item }) => {
-    const isCat = pickerKind === 'category' || kind === 'income';
-    const selected = isCat ? categoryIds.includes(item.id) : toAccountId === item.id;
-    return (
-      <OptionRow
-        colors={colors}
-        icon={isCat ? (item.icon || 'shape-outline') : 'bank-transfer'}
-        label={item.name}
-        selected={selected}
-        onPress={() => (isCat ? handleToggleCategory(item) : handleSelectTransferTarget(item))}
-        // A category toggles in and out of the set; an account replaces the
-        // target outright, so they get different a11y roles.
-        accessibilityRole={isCat ? 'checkbox' : 'button'}
-        accessibilityState={isCat ? { checked: selected } : { selected }}
-        testID={`plan-target-option-${isCat ? 'cat' : 'acc'}-${item.id}`}
-      />
-    );
-  }, [pickerKind, kind, categoryIds, toAccountId, colors, handleToggleCategory, handleSelectTransferTarget]);
+  const renderTransferTargetItem = useCallback(({ item }) => (
+    <OptionRow
+      colors={colors}
+      icon="bank-transfer"
+      label={item.name}
+      selected={toAccountId === item.id}
+      onPress={() => handleSelectTransferTarget(item)}
+      testID={`plan-target-option-acc-${item.id}`}
+    />
+  ), [toAccountId, colors, handleSelectTransferTarget]);
 
   const renderExecutionAccountItem = useCallback(({ item }) => (
     <OptionRow
@@ -716,7 +710,7 @@ export default function BudgetPlanLineModal({
             {/* Categories toggle in place instead of closing the panel, so there
                 has to be something that says "I'm finished picking". The account
                 tab needs none — one tap there is the whole selection. */}
-            {(pickerKind === 'category' || kind === 'income') && (
+            {showingCategories && (
               <Pressable
                 onPress={closeSubPanel}
                 style={styles.panelDone}
@@ -744,7 +738,7 @@ export default function BudgetPlanLineModal({
             />
           )}
 
-          {targetOptions.length >= SEARCH_THRESHOLD && (
+          {targetOptionCount >= SEARCH_THRESHOLD && (
             <FormInput
               value={query}
               onChangeText={setQuery}
@@ -754,20 +748,44 @@ export default function BudgetPlanLineModal({
             />
           )}
 
-          <FlatList
-            data={visibleTargetOptions}
-            keyExtractor={(item) => String(item.id)}
-            renderItem={renderTargetItem}
-            keyboardShouldPersistTaps="handled"
-            style={styles.panelListBody}
-            contentContainerStyle={styles.panelList}
-            ListEmptyComponent={(
-              <Text style={[styles.emptyText, { color: colors.mutedText }]}>
-                {emptyListText
-                  || (pickerKind === 'category' || kind === 'income' ? t('no_categories') : t('no_accounts'))}
-              </Text>
-            )}
-          />
+          {/* Categories are a tree, so they get the app's shared category grid
+              rather than a list that pretends they are all siblings. A folder is
+              a legitimate target here — spending in a parent's whole subtree rolls
+              up into it — which is what `selectableFolders` offers inside it. */}
+          {showingCategories ? (
+            <ScrollView
+              style={styles.panelListBody}
+              contentContainerStyle={styles.panelList}
+              keyboardShouldPersistTaps="handled"
+            >
+              <CategoryGridSelector
+                categories={targetCategories}
+                categoryType={kind === 'income' ? 'income' : 'expense'}
+                selectedCategoryIds={categoryIds}
+                onSelect={handleToggleCategory}
+                colors={colors}
+                t={t}
+                selectableFolders
+                query={query}
+                onQueryChange={setQuery}
+                testIDPrefix="plan-target-option-cat"
+              />
+            </ScrollView>
+          ) : (
+            <FlatList
+              data={visibleAccounts}
+              keyExtractor={(item) => String(item.id)}
+              renderItem={renderTransferTargetItem}
+              keyboardShouldPersistTaps="handled"
+              style={styles.panelListBody}
+              contentContainerStyle={styles.panelList}
+              ListEmptyComponent={(
+                <Text style={[styles.emptyText, { color: colors.mutedText }]}>
+                  {emptyListText || t('no_accounts')}
+                </Text>
+              )}
+            />
+          )}
         </>
       )}
 

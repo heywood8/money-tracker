@@ -442,6 +442,7 @@
   "daily_avg": "Дн. средн.",
   "tap_for_details": "Нажмите для деталей",
   "all_categories": "Все категории",
+  "whole_category": "Вся категория",
   "all_accounts": "Все счета",
   "default_account": "Счёт по умолчанию",
   "default_account_hint": "Предварительно выбирать этот счёт при добавлении операций",

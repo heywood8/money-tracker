@@ -439,6 +439,7 @@
   "daily_avg": "日平均",
   "tap_for_details": "タップして詳細を表示",
   "all_categories": "すべてのカテゴリー",
+  "whole_category": "カテゴリー全体",
   "all_accounts": "すべての口座",
   "default_account": "デフォルト口座",
   "default_account_hint": "操作を追加するときにこの口座を事前選択します",

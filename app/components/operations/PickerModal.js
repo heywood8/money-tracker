@@ -1,11 +1,11 @@
 import React, { useCallback } from 'react';
-import { View, Text, StyleSheet, FlatList, Modal, Pressable, Dimensions } from 'react-native';
+import { View, Text, StyleSheet, FlatList, ScrollView, Modal, Pressable } from 'react-native';
 import PropTypes from 'prop-types';
-import Icon from '@expo/vector-icons/MaterialCommunityIcons';
 import * as Currency from '../../services/currency';
 import currencies from '../../../assets/currencies.json';
 import ModalBlurOverlay from '../ModalBlurOverlay';
-import { SPACING, BORDER_RADIUS } from '../../styles/designTokens';
+import CategoryGridSelector from '../CategoryGridSelector';
+import { SPACING } from '../../styles/designTokens';
 
 /**
  * Get currency symbol from currency code
@@ -17,8 +17,12 @@ const getCurrencySymbol = (currencyCode) => {
 };
 
 /**
- * Unified picker modal for account and category selection
- * Supports hierarchical category navigation with breadcrumbs
+ * Unified picker modal for account and category selection.
+ *
+ * Accounts are a list and render as one. Categories are a tree, so they render
+ * through CategoryGridSelector — the app's shared category grid, which owns the
+ * drill-down (see CLAUDE.md, "Category selection"). `pickerData` is therefore the
+ * whole category list, not one folder level.
  */
 const PickerModal = ({
   visible,
@@ -31,90 +35,55 @@ const PickerModal = ({
   onSelectAccount,
   onSelectToAccount,
   // Category selection
-  categoryNavigation,
+  categoryType = 'expense',
   quickAddValues,
-  onNavigateBack,
-  onNavigateIntoFolder,
   onSelectCategory,
   onAutoAddWithCategory,
   onAutoAddWithAccount,
 }) => {
-  const renderItem = useCallback(({ item }) => {
-    if (pickerType === 'account' || pickerType === 'toAccount') {
-      return (
-        <Pressable
-          onPress={() => {
-            if (pickerType === 'account') {
-              onSelectAccount(item.id);
-              onClose();
-            } else {
-              const hasValidAmount = quickAddValues?.amount &&
-              quickAddValues.amount.trim() !== '';
-              if (hasValidAmount && onAutoAddWithAccount) {
-                onAutoAddWithAccount(item.id);
-              } else {
-                onSelectToAccount(item.id);
-                onClose();
-              }
-            }
-          }}
-          style={({ pressed }) => [
-            styles.pickerOption,
-            { borderColor: colors.border },
-            pressed && { backgroundColor: colors.selected },
-          ]}
-        >
-          <View style={styles.accountOption}>
-            <Text style={[styles.pickerOptionText, styles.accountName, { color: colors.text }]} numberOfLines={1}>{item.name}</Text>
-            <Text style={[styles.pickerSmallText, { color: colors.mutedText }]} numberOfLines={1}>
-              {getCurrencySymbol(item.currency)}{Currency.formatAmount(item.balance, item.currency)}
-            </Text>
-          </View>
-        </Pressable>
-      );
-    } else if (pickerType === 'category') {
-      const isFolder = item.type === 'folder';
-      const isSelected = !isFolder && quickAddValues?.categoryId === item.id;
-      const name = item.nameKey ? t(item.nameKey) : item.name;
+  const renderAccountItem = useCallback(({ item }) => (
+    <Pressable
+      onPress={() => {
+        if (pickerType === 'account') {
+          onSelectAccount(item.id);
+          onClose();
+        } else {
+          const hasValidAmount = quickAddValues?.amount &&
+          quickAddValues.amount.trim() !== '';
+          if (hasValidAmount && onAutoAddWithAccount) {
+            onAutoAddWithAccount(item.id);
+          } else {
+            onSelectToAccount(item.id);
+            onClose();
+          }
+        }
+      }}
+      style={({ pressed }) => [
+        styles.pickerOption,
+        { borderColor: colors.border },
+        pressed && { backgroundColor: colors.selected },
+      ]}
+    >
+      <View style={styles.accountOption}>
+        <Text style={[styles.pickerOptionText, styles.accountName, { color: colors.text }]} numberOfLines={1}>{item.name}</Text>
+        <Text style={[styles.pickerSmallText, { color: colors.mutedText }]} numberOfLines={1}>
+          {getCurrencySymbol(item.currency)}{Currency.formatAmount(item.balance, item.currency)}
+        </Text>
+      </View>
+    </Pressable>
+  ), [pickerType, quickAddValues, colors, onClose, onSelectAccount, onSelectToAccount, onAutoAddWithAccount]);
 
-      return (
-        <Pressable
-          onPress={() => {
-            if (isFolder) {
-              onNavigateIntoFolder(item);
-            } else {
-              const hasValidAmount = quickAddValues?.amount &&
-              quickAddValues.amount.trim() !== '';
-
-              if (hasValidAmount) {
-                onAutoAddWithCategory(item.id);
-              } else {
-                onSelectCategory(item.id);
-                onClose();
-              }
-            }
-          }}
-          style={({ pressed }) => [
-            styles.gridCell,
-            { backgroundColor: isSelected ? colors.selected : colors.altRow, borderColor: colors.border },
-            pressed && { backgroundColor: colors.selected },
-          ]}
-        >
-          <Icon name={item.icon} size={24} color={colors.text} />
-          <Text style={[styles.gridCellName, { color: colors.text }]} numberOfLines={2}>
-            {name}
-          </Text>
-          {isFolder && (
-            <View style={styles.folderBadge}>
-              <Icon name="folder-outline" size={12} color={colors.mutedText} />
-            </View>
-          )}
-        </Pressable>
-      );
+  // A category tapped with an amount already typed completes the operation on the
+  // spot — that shortcut is the whole point of the quick-add flow.
+  const handleSelectCategory = useCallback((categoryId) => {
+    const hasValidAmount = quickAddValues?.amount && quickAddValues.amount.trim() !== '';
+    if (hasValidAmount && onAutoAddWithCategory) {
+      onAutoAddWithCategory(categoryId);
+    } else {
+      onSelectCategory(categoryId);
+      onClose();
     }
-    return null;
-  }, [pickerType, quickAddValues, colors, t, onClose, onSelectAccount, onSelectToAccount,
-    onAutoAddWithAccount, onNavigateIntoFolder, onAutoAddWithCategory, onSelectCategory, onNavigateBack]);
+  }, [quickAddValues, onAutoAddWithCategory, onSelectCategory, onClose]);
 
   return (
     <>
@@ -127,36 +96,33 @@ const PickerModal = ({
       >
         <Pressable style={styles.modalOverlay} onPress={onClose}>
           <Pressable style={[styles.pickerModalContent, { backgroundColor: colors.card }]} onPress={() => {}}>
-            {/* Breadcrumb navigation for categories */}
-            {pickerType === 'category' && categoryNavigation.breadcrumb.length > 0 && (
-              <View style={[styles.breadcrumbContainer, { borderBottomColor: colors.border }]}>
-                <Pressable onPress={onNavigateBack} style={styles.backButton}>
-                  <Icon name="arrow-left" size={24} color={colors.primary} />
+            {pickerType === 'category' ? (
+              <ScrollView contentContainerStyle={styles.gridContent} keyboardShouldPersistTaps="handled">
+                <CategoryGridSelector
+                  categories={pickerData}
+                  categoryType={categoryType}
+                  selectedCategoryId={quickAddValues?.categoryId || null}
+                  onSelect={handleSelectCategory}
+                  colors={colors}
+                  t={t}
+                />
+              </ScrollView>
+            ) : (
+              <>
+                <FlatList
+                  data={pickerType === 'account' || pickerType === 'toAccount' ? pickerData : []}
+                  keyExtractor={(item) => item.id || item.key}
+                  renderItem={renderAccountItem}
+                  ListEmptyComponent={
+                    <Text style={[styles.centeredPaddedText, { color: colors.mutedText }]}>
+                      {t('no_accounts')}
+                    </Text>
+                  }
+                />
+                <Pressable style={styles.closeButton} onPress={onClose}>
+                  <Text style={[styles.closeButtonText, { color: colors.primary }]}>{t('close')}</Text>
                 </Pressable>
-                <Text style={[styles.breadcrumbText, { color: colors.text }]} numberOfLines={1}>
-                  {categoryNavigation.breadcrumb[categoryNavigation.breadcrumb.length - 1].name}
-                </Text>
-              </View>
-            )}
-
-            <FlatList
-              data={pickerData}
-              keyExtractor={(item) => item.id || item.key}
-              numColumns={pickerType === 'category' ? 3 : 1}
-              columnWrapperStyle={pickerType === 'category' ? styles.gridRow : undefined}
-              contentContainerStyle={pickerType === 'category' ? styles.gridContent : undefined}
-              renderItem={renderItem}
-              ListEmptyComponent={
-                <Text style={[styles.centeredPaddedText, { color: colors.mutedText }]}>
-                  {pickerType === 'category' ? t('no_categories') : t('no_accounts')}
-                </Text>
-              }
-            />
-            {/* Action buttons - only show Close button for non-category pickers */}
-            {pickerType !== 'category' && (
-              <Pressable style={styles.closeButton} onPress={onClose}>
-                <Text style={[styles.closeButtonText, { color: colors.primary }]}>{t('close')}</Text>
-              </Pressable>
+              </>
             )}
           </Pressable>
         </Pressable>
@@ -176,22 +142,6 @@ const styles = StyleSheet.create({
     flexDirection: 'row',
     justifyContent: 'space-between',
   },
-  backButton: {
-    marginRight: 8,
-    padding: 4,
-  },
-  breadcrumbContainer: {
-    alignItems: 'center',
-    borderBottomWidth: 1,
-    flexDirection: 'row',
-    paddingHorizontal: 16,
-    paddingVertical: 12,
-  },
-  breadcrumbText: {
-    flex: 1,
-    fontSize: 16,
-    fontWeight: '600',
-  },
   centeredPaddedText: {
     paddingVertical: 40,
     textAlign: 'center',
@@ -204,31 +154,8 @@ const styles = StyleSheet.create({
     fontSize: 16,
     fontWeight: '600',
   },
-  folderBadge: {
-    position: 'absolute',
-    right: 4,
-    top: 4,
-  },
-  gridCell: {
-    alignItems: 'center',
-    borderRadius: BORDER_RADIUS.lg,
-    borderWidth: 1,
-    gap: SPACING.sm,
-    margin: SPACING.xs,
-    padding: SPACING.md,
-    position: 'relative',
-    width: (Dimensions.get('window').width - SPACING.sm * 2 - SPACING.xs * 2 * 3) / 3,
-  },
-  gridCellName: {
-    fontSize: 12,
-    fontWeight: '500',
-    textAlign: 'center',
-  },
   gridContent: {
     padding: SPACING.sm,
-  },
-  gridRow: {
-    justifyContent: 'flex-start',
   },
   modalOverlay: {
     alignItems: 'center',
@@ -265,10 +192,8 @@ PickerModal.propTypes = {
   onClose: PropTypes.func.isRequired,
   onSelectAccount: PropTypes.func,
   onSelectToAccount: PropTypes.func,
-  categoryNavigation: PropTypes.object,
+  categoryType: PropTypes.oneOf(['expense', 'income']),
   quickAddValues: PropTypes.object,
-  onNavigateBack: PropTypes.func,
-  onNavigateIntoFolder: PropTypes.func,
   onSelectCategory: PropTypes.func,
   onAutoAddWithCategory: PropTypes.func,
   onAutoAddWithAccount: PropTypes.func,
