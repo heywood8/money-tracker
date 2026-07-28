@@ -118,6 +118,7 @@
   "select_currency": "Seleccionar moneda",
   "close": "Cerrar",
   "no_accounts": "No hay cuentas todavía.",
+  "no_results": "No se encontró nada",
   "delete_account": "Eliminar cuenta",
   "delete_account_confirm": "¿Estás seguro de que quieres eliminar esta cuenta?",
   "russian": "Ruso",

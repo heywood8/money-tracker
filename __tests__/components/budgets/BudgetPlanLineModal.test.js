@@ -168,6 +168,42 @@ describe('BudgetPlanLineModal', () => {
     }));
   });
 
+  describe('Target picker search', () => {
+    const manyCategories = Array.from({ length: 10 }, (_, i) => ({
+      id: `c${i}`, name: `Category ${i}`, categoryType: 'expense',
+    }));
+
+    it('offers no search field for a list that fits on one screen', async () => {
+      const { getByTestId, queryByTestId } = await render(<BudgetPlanLineModal {...baseProps()} />);
+      await fireEvent.press(getByTestId('plan-target-picker'));
+      await waitFor(() => expect(getByTestId('plan-target-option-cat-cat1')).toBeTruthy());
+      expect(queryByTestId('plan-target-search')).toBeNull();
+    });
+
+    it('filters a long category list down to what was typed', async () => {
+      const props = { ...baseProps(), expenseCategories: manyCategories };
+      const { getByTestId, queryByTestId } = await render(<BudgetPlanLineModal {...props} />);
+      await fireEvent.press(getByTestId('plan-target-picker'));
+      await waitFor(() => expect(getByTestId('plan-target-search')).toBeTruthy());
+      await fireEvent.changeText(getByTestId('plan-target-search'), 'category 7');
+      await waitFor(() => expect(queryByTestId('plan-target-option-cat-c0')).toBeNull());
+      expect(getByTestId('plan-target-option-cat-c7')).toBeTruthy();
+    });
+
+    it('reopening the picker starts from an unfiltered list', async () => {
+      const props = { ...baseProps(), expenseCategories: manyCategories };
+      const { getByTestId, queryByTestId } = await render(<BudgetPlanLineModal {...props} />);
+      await fireEvent.press(getByTestId('plan-target-picker'));
+      await waitFor(() => expect(getByTestId('plan-target-search')).toBeTruthy());
+      await fireEvent.changeText(getByTestId('plan-target-search'), 'category 7');
+      await waitFor(() => expect(queryByTestId('plan-target-option-cat-c0')).toBeNull());
+      await fireEvent.press(getByTestId('plan-target-option-cat-c7'));
+      await fireEvent.press(getByTestId('plan-target-done'));
+      await fireEvent.press(getByTestId('plan-target-picker'));
+      await waitFor(() => expect(getByTestId('plan-target-option-cat-c0')).toBeTruthy());
+    });
+  });
+
   describe('Line kinds (Budgets v3 phase 3)', () => {
     it('an income line saves without requiring a target', async () => {
       const props = { ...baseProps(), initialKind: 'income' };
@@ -265,12 +301,29 @@ describe('BudgetPlanLineModal', () => {
     });
 
     it('the currency picker is offered on a one-off line too, not only a recurring one', async () => {
-      const props = baseProps();
+      const props = { ...baseProps(), accounts: [...ACCOUNTS, { id: 2, name: 'Foreign', currency: 'EUR' }] };
       const { getByTestId } = await render(<BudgetPlanLineModal {...props} />);
       await waitFor(() => expect(getByTestId('plan-line-recurring-toggle')).toBeTruthy());
       expect(getByTestId('plan-line-currency-USD')).toBeTruthy();
       await fireEvent.press(getByTestId('plan-line-recurring-toggle'));
       await waitFor(() => expect(getByTestId('plan-line-currency-USD')).toBeTruthy());
+    });
+
+    it('offers no currency picker when there is only one currency to pick', async () => {
+      // A single chip is the plan's own currency, permanently selected: it is
+      // not a choice, and the amount's label already names that currency.
+      const props = baseProps();
+      const { getByTestId, queryByTestId } = await render(<BudgetPlanLineModal {...props} />);
+      await waitFor(() => expect(getByTestId('plan-line-recurring-toggle')).toBeTruthy());
+      expect(queryByTestId('plan-line-currency-USD')).toBeNull();
+      // ...and the line still saves as inheriting the plan's currency.
+      await fireEvent.press(getByTestId('plan-target-picker'));
+      await waitFor(() => expect(getByTestId('plan-target-option-cat-cat1')).toBeTruthy());
+      await fireEvent.press(getByTestId('plan-target-option-cat-cat1'));
+      await fireEvent.press(getByTestId('plan-target-done'));
+      await fireEvent.changeText(getByTestId('plan-line-amount'), '150');
+      await fireEvent.press(getByTestId('plan-line-save'));
+      expect(props.onSaveLine).toHaveBeenCalledWith(expect.objectContaining({ currency: null }));
     });
 
     it('a one-off line on a currency other than the plan\'s saves that currency', async () => {
