@@ -383,19 +383,42 @@ describe('MonthlyPlanSection', () => {
       setPlanWithStatus();
       const { getByTestId, getByText, queryByText } = await renderSection();
       await waitFor(() => expect(getByTestId('plan-line-l1')).toBeTruthy());
-      // The amount column carries the pair — actual against target, the two
-      // figures a person compares, as compact magnitudes: a row is scanned, not
-      // audited, and the pair shares one line with the category name.
+      // The row leads with what is LEFT — the figure a person acts on — and
+      // carries the actual/target pair below it as the context for that figure.
+      // Compact magnitudes on both: a row is scanned, not audited.
+      expect(getByTestId('plan-line-primary-l1')).toHaveTextContent('150');
       expect(getByText('150 / 300')).toBeTruthy();
-      // "remaining: 150" is gone with the bar (target minus actual, both right
-      // there), so is the "50%" badge (the fill encodes the ratio), and so is
-      // "over budget by 50" — it made an overspent row two lines tall while
-      // every other row was one, restating a subtraction the pair already shows.
+      // The labelled forms are gone: "remaining" is the headline figure now, the
+      // "50%" badge is the bar's length, and "over budget by 50" restated a
+      // subtraction the pair already shows while making an overspent row two
+      // lines tall when every other row was one.
       expect(queryByText('remaining_budget: 150.00')).toBeNull();
       expect(queryByText('50%')).toBeNull();
       expect(queryByText('over_budget_by 50')).toBeNull();
-      // The overspent row says so with its tone instead.
-      expect(getByTestId('plan-line-fill-l2')).toBeTruthy();
+      // The overspent row says so with the segment past the target mark.
+      expect(getByTestId('plan-line-bar-l2')).toBeTruthy();
+      expect(getByTestId('plan-line-bar-l2-over')).toBeTruthy();
+    });
+
+    it('keeps the headline figure equal to the pair it sits under', async () => {
+      // The status is computed from the plan's stored amount while the row's
+      // target comes from the host's converted one. They normally agree, but a
+      // rounding step apart on a converted line — or a status a beat behind a
+      // just-saved edit — used to put a headline on the row that did not equal
+      // target minus actual, which is arithmetic the reader can watch fail.
+      setPlanWithStatus({
+        ...STATUS,
+        lines: [
+          { lineId: 'l1', broken: false, amount: '299.50', actual: '150.00', remaining: '149.50', percentage: 50, isExceeded: false, status: 'safe' },
+          ...STATUS.lines.slice(1),
+        ],
+      });
+      const { getByTestId } = await renderSection();
+      await waitFor(() => expect(getByTestId('plan-line-l1')).toBeTruthy());
+      // 300 − 150, from the two figures actually printed — not the status's own
+      // 149.50, which belongs to a target this row never shows.
+      expect(getByTestId('plan-line-primary-l1')).toHaveTextContent('150');
+      expect(getByTestId('plan-line-pair-l1')).toHaveTextContent('150 / 300');
     });
 
     it('shows actual income against expected income in the header', async () => {
@@ -742,13 +765,23 @@ describe('MonthlyPlanSection', () => {
           unconvertible: [],
         }]]),
       });
+      // Allocated and actual are reported to the host rather than printed at the
+      // bottom of the card, so this reads them where the host does.
+      const onTotalsChange = jest.fn();
       const { getByTestId, queryByTestId } = await renderSection(undefined, {
-        currency: 'AMD', month: THIS_MONTH,
+        currency: 'AMD', month: THIS_MONTH, onTotalsChange,
       });
       await waitFor(() => expect(getByTestId('plan-line-l1')).toBeTruthy());
 
-      expect(getByTestId('plan-totals')).toHaveTextContent(/300/);
-      expect(getByTestId('plan-totals')).not.toHaveTextContent(/99999|100K/);
+      expect(onTotalsChange).toHaveBeenLastCalledWith(
+        expect.objectContaining({ allocated: '300', actual: null }),
+      );
+      expect(onTotalsChange).not.toHaveBeenLastCalledWith(
+        expect.objectContaining({ allocated: '99999.00' }),
+      );
+      // Nothing is printed in the card either — the totals row there is for
+      // uncontrolled mode, where there is no host header to carry them.
+      expect(queryByTestId('plan-totals')).toBeNull();
       expect(queryByTestId('plan-actual-total')).toBeNull();
     });
 
@@ -764,13 +797,15 @@ describe('MonthlyPlanSection', () => {
           unconvertible: [],
         }]]),
       });
+      const onTotalsChange = jest.fn();
       const { getByTestId } = await renderSection(undefined, {
-        currency: 'AMD', month: THIS_MONTH,
+        currency: 'AMD', month: THIS_MONTH, onTotalsChange,
       });
       await waitFor(() => expect(getByTestId('plan-line-l1')).toBeTruthy());
 
-      expect(getByTestId('plan-totals')).toHaveTextContent(/410/);
-      expect(getByTestId('plan-actual-total')).toHaveTextContent(/250/);
+      expect(onTotalsChange).toHaveBeenLastCalledWith(
+        expect.objectContaining({ allocated: '410.00', actual: '250.00' }),
+      );
     });
   });
 
@@ -1037,7 +1072,7 @@ describe('MonthlyPlanSection', () => {
       unconvertible: [],
     }]]);
 
-    it('collapses a done row to a single line — no fill, no comment', async () => {
+    it('collapses a done row to a single line — no bar, no comment', async () => {
       setPlans({
         plans: [{ id: 'p1', month: THIS_MONTH, currency: 'USD', expectedIncome: '1000' }],
         lines: [doneLine],
@@ -1045,14 +1080,17 @@ describe('MonthlyPlanSection', () => {
       });
       const { getByTestId, queryByTestId, queryByText } = await renderSection();
       await waitFor(() => expect(getByTestId('plan-line-l-done')).toBeTruthy());
-      // A done line's fill reads 100% by construction of "executed" — which is
+      // A done line's bar reads 100% by construction of "executed" — which is
       // what the check badge already says.
-      expect(queryByTestId('plan-line-fill-l-done')).toBeNull();
+      expect(queryByTestId('plan-line-bar-l-done')).toBeNull();
+      // Nor the pair — it would read "300 / 300" by the same construction, and
+      // it is what would make the row two lines tall.
+      expect(queryByTestId('plan-line-pair-l-done')).toBeNull();
       expect(queryByText('monthly')).toBeNull();
       expect(getByTestId('plan-line-check-l-done')).toBeTruthy();
     });
 
-    it('still shows the fill on a done row that went over target', async () => {
+    it('still shows the bar on a done row that went over target', async () => {
       setPlans({
         plans: [{ id: 'p1', month: THIS_MONTH, currency: 'USD', expectedIncome: '1000' }],
         lines: [doneLine],
@@ -1063,15 +1101,17 @@ describe('MonthlyPlanSection', () => {
       // Overspend is news; burying it under a state the user set by hand is how
       // a row stops being worth reading.
       expect(getByText('420 / 300')).toBeTruthy();
-      expect(getByTestId('plan-line-fill-l-done')).toBeTruthy();
-      expect(fillTone(getByTestId, 'l-done')).toContain(COLORS.overspend);
+      expect(getByTestId('plan-line-bar-l-done')).toBeTruthy();
+      expect(barOverColor(getByTestId, 'l-done')).toBe(COLORS.overspend);
     });
 
-    // The row's fill IS its progress bar. Whether the spend is ahead of the
-    // month's pace is said in the fill's TONE — there is no vertical "today"
-    // marker anymore: Android draws a 1dp dashed border solid, so one per row at
-    // the same x stacked into an unbroken grey line down the card that read as a
-    // rendering artefact rather than as a date.
+    // The bar carries the status now, in geometry: how much of the target is
+    // gone is its length, going PAST the target is a second segment beyond the
+    // mark at 72% of the track, and where the month says you should be is a tick
+    // on it. Colour was tried for all three and could not carry them — on a
+    // real month-end plan most rows are at or over target, so tinting them all
+    // separated nothing, and the amber and red tints were within a few units of
+    // each other at the alpha they were drawn with.
     const pacedLine = (id, actual, amount, isExceeded = false) => ({
       plans: [{ id: 'p1', month: THIS_MONTH, currency: 'USD', expectedIncome: '1000' }],
       lines: [{
@@ -1094,17 +1134,24 @@ describe('MonthlyPlanSection', () => {
       }]]),
     });
 
-    const fillTone = (getByTestId, id) =>
-      StyleSheet.flatten(getByTestId(`plan-line-fill-${id}-bar`).props.style).backgroundColor;
+    const barOverColor = (getByTestId, id) =>
+      StyleSheet.flatten(getByTestId(`plan-line-bar-${id}-over`).props.style).backgroundColor;
+    const barFillColor = (getByTestId, id) =>
+      StyleSheet.flatten(getByTestId(`plan-line-bar-${id}-plan`).props.style).backgroundColor;
 
-    it('draws no vertical today marker across the fill on the current month', async () => {
+    it('marks where the month says the spend should be, on the current month', async () => {
+      // The marker EnvelopeFill had to drop, restored on a 4dp strip: as a
+      // hairline across a full-height row wash it stacked into one unbroken line
+      // down the card, because every row drew it at the same x. On the bars it
+      // sits at a different x per row and is 4dp tall.
       setPlans(pacedLine('l-pace', '10', '100'));
-      const { getByTestId, queryByTestId } = await renderSection();
-      await waitFor(() => expect(getByTestId('plan-line-fill-l-pace')).toBeTruthy());
-      expect(queryByTestId('plan-line-fill-l-pace-pace')).toBeNull();
+      const { getByTestId } = await renderSection();
+      await waitFor(() => expect(getByTestId('plan-line-bar-l-pace')).toBeTruthy());
+      expect(getByTestId('plan-line-bar-l-pace-pace')).toBeTruthy();
     });
 
-    it('draws no vertical today marker on a month that is not the current one either', async () => {
+    it('draws no pace marker on a month that is not the current one', async () => {
+      // "Ahead of pace" is not a thing that can be true about a finished month.
       const previous = pacedLine('l-pace', '10', '100');
       previous.plans[0].month = PREV_MONTH;
       previous.planStatuses = new Map([['p1', {
@@ -1112,39 +1159,46 @@ describe('MonthlyPlanSection', () => {
       }]]);
       setPlans(previous);
       const { getByTestId, queryByTestId } = await renderSection(undefined, { month: PREV_MONTH });
-      await waitFor(() => expect(getByTestId('plan-line-fill-l-pace')).toBeTruthy());
-      expect(queryByTestId('plan-line-fill-l-pace-pace')).toBeNull();
+      await waitFor(() => expect(getByTestId('plan-line-bar-l-pace')).toBeTruthy());
+      expect(queryByTestId('plan-line-bar-l-pace-pace')).toBeNull();
     });
 
-    // Three signals, replacing four fixed spent-percentage bands. The old scale
-    // graded how much of the envelope was gone without knowing the date, so 99%
-    // on the 27th and 76% on the 3rd came out the same shade of "fine".
-    it('leaves a line that is behind the month pace untinted', async () => {
-      // 1% spent — behind any pace, on any day. Colour is spent only where there
-      // is something to say: with every row tinted, ten coloured blocks sat side
-      // by side and none of them stood out.
+    it('gives a line inside its target no signal colour at all', async () => {
+      // 1% spent. The fill is a neutral material, not a grade: the only
+      // saturated colour left on the screen is the segment past the target, so
+      // an alarm on the row means one thing and reads at a glance.
       setPlans(pacedLine('l-calm', '1', '100'));
-      const { getByTestId } = await renderSection();
-      await waitFor(() => expect(getByTestId('plan-line-fill-l-calm')).toBeTruthy());
-      const tone = fillTone(getByTestId, 'l-calm');
-      expect(tone).toContain(COLORS.mutedText);
-      expect(tone).not.toContain(COLORS.warning);
-      expect(tone).not.toContain(COLORS.overspend);
+      const { getByTestId, queryByTestId } = await renderSection();
+      await waitFor(() => expect(getByTestId('plan-line-bar-l-calm')).toBeTruthy());
+      const fill = barFillColor(getByTestId, 'l-calm');
+      expect(fill).toContain(COLORS.mutedText);
+      expect(fill).not.toContain(COLORS.warning);
+      expect(fill).not.toContain(COLORS.overspend);
+      expect(queryByTestId('plan-line-bar-l-calm-over')).toBeNull();
+      expect(flatColor(getByTestId('plan-line-primary-l-calm'))).toBe(COLORS.text);
     });
 
-    it('tints a line that is ahead of the month pace with the warning tone', async () => {
-      // 99% spent — ahead of the month's pace on any day of it.
+    it('says how far a line is ahead of the month by position, not by tone', async () => {
+      // 99% spent — ahead of the month's pace on any day of it. That used to be
+      // an amber wash indistinguishable from the red one; it is now the fill
+      // reaching past the pace tick, and the row stays uncoloured.
       setPlans(pacedLine('l-ahead', '99', '100'));
-      const { getByTestId } = await renderSection();
-      await waitFor(() => expect(getByTestId('plan-line-fill-l-ahead')).toBeTruthy());
-      expect(fillTone(getByTestId, 'l-ahead')).toContain(COLORS.warning);
+      const { getByTestId, queryByTestId } = await renderSection();
+      await waitFor(() => expect(getByTestId('plan-line-bar-l-ahead')).toBeTruthy());
+      expect(barFillColor(getByTestId, 'l-ahead')).not.toContain(COLORS.warning);
+      expect(queryByTestId('plan-line-bar-l-ahead-over')).toBeNull();
+      expect(getByTestId('plan-line-bar-l-ahead-pace')).toBeTruthy();
     });
 
-    it('tints a line past its target with the overspend tone', async () => {
+    it('spills a line past its target into the overspend segment', async () => {
       setPlans(pacedLine('l-over', '140', '100', true));
       const { getByTestId } = await renderSection();
-      await waitFor(() => expect(getByTestId('plan-line-fill-l-over')).toBeTruthy());
-      expect(fillTone(getByTestId, 'l-over')).toContain(COLORS.overspend);
+      await waitFor(() => expect(getByTestId('plan-line-bar-l-over')).toBeTruthy());
+      expect(barOverColor(getByTestId, 'l-over')).toBe(COLORS.overspend);
+      // And the headline figure goes negative in the same colour — the row's
+      // "you have this much left" is now "you are this much past".
+      expect(getByTestId('plan-line-primary-l-over')).toHaveTextContent('-40');
+      expect(flatColor(getByTestId('plan-line-primary-l-over'))).toBe(COLORS.overspend);
     });
 
     it('states the ratio once in the template strip', async () => {
@@ -1447,21 +1501,31 @@ describe('MonthlyPlanSection', () => {
       },
     ]);
 
-    it('renders a group header with the sum of its lines and indents its children', async () => {
+    it('renders a group header with the sum of its lines and rails its children to it', async () => {
       setPlans({
         plans: [{ id: 'p1', month: THIS_MONTH, currency: 'USD', expectedIncome: '0' }],
         lines: groupedLines(),
         groups: [GROUP],
       });
-      const { getByTestId } = await renderSection();
+      const { getByTestId, queryByTestId } = await renderSection();
       await waitFor(() => expect(getByTestId('plan-group-g1')).toBeTruthy());
 
       // Derived budget: 300 + 120, formatted compactly like every other figure.
       expect(getByTestId('plan-group-g1')).toHaveTextContent(/420/);
-      // Both children render, and both are indented; the ungrouped line is not.
-      const indent = (id) => StyleSheet.flatten(getByTestId(id).props.style)?.paddingLeft;
-      expect(indent('plan-line-l-fuel')).toBeGreaterThan(indent('plan-line-l-loose') ?? 0);
-      expect(indent('plan-line-l-parking')).toBe(indent('plan-line-l-fuel'));
+      // Both children carry the envelope's rail — one bracket down the side of
+      // the group, in the envelope's own colour, continuing the header's. An
+      // indent alone was a 24dp offset that read as a typo beside a full-width
+      // sibling, so an ungrouped line now differs by having no rail at all.
+      const railColor = (id) =>
+        StyleSheet.flatten(getByTestId(id).props.style)?.backgroundColor;
+      const headColor = railColor('plan-group-rail-g1');
+      expect(headColor).toBeTruthy();
+      // The children's rail is the header's hue, dimmed: the header is the thing
+      // being identified and the rows below it are its parts.
+      expect(railColor('plan-line-rail-l-fuel')).toContain(headColor);
+      expect(railColor('plan-line-rail-l-fuel')).not.toBe(headColor);
+      expect(railColor('plan-line-rail-l-parking')).toBe(railColor('plan-line-rail-l-fuel'));
+      expect(queryByTestId('plan-line-rail-l-loose')).toBeNull();
     });
 
     it('counts a custom group budget in the month total instead of its children', async () => {
