@@ -102,7 +102,22 @@ export default function OperationActionMenu({ menu, colors, t, onClose, onEdit, 
   return (
     <>
       <ModalBlurOverlay />
-      <Modal visible transparent animationType="none" onRequestClose={onClose}>
+      {/* `statusBarTranslucent`/`navigationBarTranslucent` are load-bearing here, not
+          cosmetic: the app runs edge-to-edge, so `measureInWindow` reports the row's
+          position in a coordinate space whose origin is the top of the screen. Without
+          these props the Modal's native window starts *below* the status bar, and the
+          lifted clone (positioned at `layout.y`) lands one status-bar height lower than
+          the row it is supposed to replace — the row visibly jumps on long press. The
+          same offset would skew `panelTop` and the `insets`-based clamping below. */}
+      <Modal
+        testID="operation-action-menu-window"
+        visible
+        transparent
+        statusBarTranslucent
+        navigationBarTranslucent
+        animationType="none"
+        onRequestClose={onClose}
+      >
         <Pressable
           testID="operation-action-menu-backdrop"
           style={styles.fill}
