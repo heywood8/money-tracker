@@ -1,5 +1,12 @@
 # Changelog
 
+## [0.245.0](https://github.com/heywood8/money-tracker/compare/penny-v0.244.1...penny-v0.245.0) (2026-07-28)
+
+
+### Features
+
+* **operations:** let a single operation be hidden from the charts ([#1495](https://github.com/heywood8/money-tracker/issues/1495)) ([f4ff848](https://github.com/heywood8/money-tracker/commit/f4ff8484552f628d854ec7497d501537b8fd7121))
+
 ## [0.244.1](https://github.com/heywood8/money-tracker/compare/penny-v0.244.0...penny-v0.244.1) (2026-07-28)
 
 
