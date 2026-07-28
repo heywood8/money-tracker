@@ -1,5 +1,12 @@
 # Changelog
 
+## [0.244.1](https://github.com/heywood8/money-tracker/compare/penny-v0.244.0...penny-v0.244.1) (2026-07-28)
+
+
+### Bug Fixes
+
+* **accounts:** group every account picker by currency in a shared grid ([#1491](https://github.com/heywood8/money-tracker/issues/1491)) ([2695932](https://github.com/heywood8/money-tracker/commit/2695932d12c896c128bf0dc467da6c7054f3392a))
+
 ## [0.244.0](https://github.com/heywood8/money-tracker/compare/penny-v0.243.3...penny-v0.244.0) (2026-07-28)
 
 
