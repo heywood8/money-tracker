@@ -1,5 +1,11 @@
 import { renderHook, act, waitFor } from '@testing-library/react-native';
-import useBalanceHistory, { buildYearAverageSeries, median } from '../../app/hooks/useBalanceHistory';
+import useBalanceHistory, {
+  buildYearAverageSeries,
+  buildYearSampleDays,
+  buildYearSeries,
+  dayOfYearFromDateString,
+  median,
+} from '../../app/hooks/useBalanceHistory';
 import * as BalanceHistoryDB from '../../app/services/BalanceHistoryDB';
 import * as OperationsDB from '../../app/services/OperationsDB';
 
@@ -90,15 +96,19 @@ describe('useBalanceHistory', () => {
       expect(result.current.loadingBalanceHistory).toBe(false);
     });
 
-    it('should return early if no month selected', async () => {
+    // "No month" is the whole-year view, not an empty state: it loads the year
+    // rather than returning early (which is what used to hide the card entirely).
+    it('loads the whole year when no month is selected', async () => {
+      BalanceHistoryDB.getBalanceHistory.mockResolvedValue([]);
+
       const { result } = await renderHook(() => useBalanceHistory(mockAccountId, mockYear, null));
 
       await act(async () => {
         await result.current.loadBalanceHistory();
       });
 
-      expect(BalanceHistoryDB.getBalanceHistory).not.toHaveBeenCalled();
-      expect(result.current.balanceHistoryData).toEqual({ labels: [] });
+      expect(BalanceHistoryDB.getBalanceHistory).toHaveBeenCalledWith(mockAccountId, '2024-01-01', '2024-12-31');
+      expect(result.current.balanceHistoryData.granularity).toBe('year');
       expect(result.current.loadingBalanceHistory).toBe(false);
     });
 
@@ -815,6 +825,148 @@ describe('useBalanceHistory', () => {
         expect(result.current.balanceHistoryData.prevMonth[4]).toBe(900);
         expect(result.current.balanceHistoryData.prevMonth[3]).toBeUndefined();
       });
+    });
+  });
+
+  describe('Whole-year view', () => {
+    describe('buildYearSampleDays', () => {
+      it('walks the year on a 7-day stride', () => {
+        const days = buildYearSampleDays(365);
+
+        expect(days[0]).toBe(1);
+        expect(days[1]).toBe(8);
+        expect(days).toHaveLength(53);
+        // A 365-day year lands its last stride exactly on the last day
+        expect(days[days.length - 1]).toBe(365);
+      });
+
+      it('appends the leap day so the line still reaches the end of the year', () => {
+        const days = buildYearSampleDays(366);
+
+        expect(days[days.length - 1]).toBe(366);
+        expect(days[days.length - 2]).toBe(365);
+      });
+    });
+
+    describe('dayOfYearFromDateString', () => {
+      it('counts from Jan 1 and accounts for the leap day', () => {
+        expect(dayOfYearFromDateString('2024-01-01')).toBe(1);
+        expect(dayOfYearFromDateString('2024-03-01')).toBe(61); // 31 + 29 + 1
+        expect(dayOfYearFromDateString('2023-03-01')).toBe(60);
+        expect(dayOfYearFromDateString('2024-12-31')).toBe(366);
+      });
+
+      it('returns null for junk instead of NaN', () => {
+        expect(dayOfYearFromDateString(null)).toBeNull();
+        expect(dayOfYearFromDateString('not-a-date')).toBeNull();
+      });
+    });
+
+    describe('buildYearSeries', () => {
+      it('forward-fills between samples and starts from the carried-in balance', () => {
+        const series = buildYearSeries({
+          historyRows: [
+            { date: '2023-01-03', balance: '100' },
+            { date: '2023-01-10', balance: '80' },
+          ],
+          sampleDays: [1, 8, 15, 22],
+          anchorBalance: '150',
+          maxDay: null,
+        });
+
+        // Day 1 has no record of its own → the balance carried in from December
+        expect(series).toEqual([150, 100, 80, 80]);
+      });
+
+      it('leaves days after maxDay undefined instead of drawing a flat future', () => {
+        const series = buildYearSeries({
+          historyRows: [{ date: '2026-01-03', balance: '100' }],
+          sampleDays: [1, 8, 15, 22],
+          anchorBalance: null,
+          maxDay: 10,
+        });
+
+        expect(series[1]).toBe(100);
+        expect(series[2]).toBeUndefined();
+        expect(series[3]).toBeUndefined();
+      });
+
+      it('holds the last known value when a year has no records at all after it', () => {
+        const series = buildYearSeries({
+          historyRows: [],
+          sampleDays: [1, 8],
+          anchorBalance: '42',
+          maxDay: null,
+        });
+
+        expect(series).toEqual([42, 42]);
+      });
+    });
+
+    it('loads the year plus the year before it for comparison', async () => {
+      BalanceHistoryDB.getBalanceHistory
+        .mockResolvedValueOnce([{ date: '2023-01-01', balance: '1000' }])
+        .mockResolvedValueOnce([{ date: '2022-01-01', balance: '500' }]);
+      OperationsDB.getTotalExpenses.mockResolvedValue(3650);
+
+      const { result } = await renderHook(() => useBalanceHistory(mockAccountId, 2023, null));
+
+      await act(async () => {
+        await result.current.loadBalanceHistory();
+      });
+
+      await waitFor(() => {
+        expect(result.current.balanceHistoryData.granularity).toBe('year');
+      });
+
+      const data = result.current.balanceHistoryData;
+      expect(BalanceHistoryDB.getBalanceHistory).toHaveBeenCalledWith(mockAccountId, '2023-01-01', '2023-12-31');
+      expect(BalanceHistoryDB.getBalanceHistory).toHaveBeenCalledWith(mockAccountId, '2022-01-01', '2022-12-31');
+      expect(OperationsDB.getTotalExpenses).toHaveBeenCalledWith(mockAccountId, '2022-01-01', '2022-12-31');
+      expect(data.labels).toHaveLength(53);
+      expect(data.labels[data.labels.length - 1]).toBe(365);
+      expect(data.actualForChart[0]).toBe(1000);
+      expect(data.prevYear[0]).toBe(500);
+      expect(data.prevYearTotalExpenses).toBe(3650);
+      expect(data.prevYearDaysCount).toBe(365);
+      expect(data.daysInYear).toBe(365);
+    });
+
+    it('does not compute the monthly-only series in the year view', async () => {
+      BalanceHistoryDB.getBalanceHistory.mockResolvedValue([{ date: '2023-05-01', balance: '700' }]);
+
+      const { result } = await renderHook(() => useBalanceHistory(mockAccountId, 2023, null));
+
+      await act(async () => {
+        await result.current.loadBalanceHistory();
+      });
+
+      await waitFor(() => {
+        expect(result.current.balanceHistoryData.granularity).toBe('year');
+      });
+
+      // The burndown anchor, the forecast inputs and the 12-month median are all
+      // month-scoped: the year view must not even query for them.
+      expect(OperationsDB.getTotalIncome).not.toHaveBeenCalled();
+      expect(OperationsDB.getTransferTotals).not.toHaveBeenCalled();
+      expect(OperationsDB.getMonthlyExpenseTotals).not.toHaveBeenCalled();
+      expect(result.current.balanceHistoryData.plainAvgMax).toBeUndefined();
+      expect(result.current.balanceHistoryData.yearAvg).toBeUndefined();
+    });
+
+    it('reports the year 366 days long in a leap year', async () => {
+      BalanceHistoryDB.getBalanceHistory.mockResolvedValue([]);
+
+      const { result } = await renderHook(() => useBalanceHistory(mockAccountId, 2024, null));
+
+      await act(async () => {
+        await result.current.loadBalanceHistory();
+      });
+
+      await waitFor(() => {
+        expect(result.current.balanceHistoryData.daysInYear).toBe(366);
+      });
+      expect(result.current.balanceHistoryData.prevYearDaysCount).toBe(365);
     });
   });
 });

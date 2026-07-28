@@ -5,7 +5,14 @@
 
 import React from 'react';
 import { render, fireEvent, waitFor } from '@testing-library/react-native';
-import BalanceHistoryCard, { computeBalanceChart, formatYAxisLabel, nextThirdLineMode, toRgba } from '../../app/components/graphs/BalanceHistoryCard';
+import BalanceHistoryCard, {
+  computeBalanceChart,
+  computeYearBalanceChart,
+  formatYAxisLabel,
+  monthStartDaysOfYear,
+  nextThirdLineMode,
+  toRgba,
+} from '../../app/components/graphs/BalanceHistoryCard';
 
 // Mock DisplaySettingsContext
 jest.mock('../../app/contexts/DisplaySettingsContext', () => ({
@@ -49,9 +56,11 @@ const mockT = (key) => {
     burndown: 'Burndown',
     forecast: 'Forecast',
     prev_month: 'Prev Month',
+    prev_year: 'Prev Year',
     year_avg: 'Year avg',
     comparison_none: 'No comparison',
     no_balance_history: 'No balance history available for this month',
+    no_balance_history_year: 'No balance history available for this year',
     plain_avg: 'Plain avg',
     max: 'Max',
     current: 'Current',
@@ -2278,6 +2287,268 @@ describe('BalanceHistoryCard', () => {
 
       expect(computed.hasYearAvgData).toBe(false);
       expect(series.find(s => s.yKey === 'yearAvg')).toBeFalsy();
+    });
+  });
+
+  describe('Whole-year view (selectedMonth === null)', () => {
+    // Weekly samples, as the hook produces them: day-of-year on x.
+    const yearData = {
+      granularity: 'year',
+      labels: [1, 8, 15, 22, 29, 36],
+      actual: [
+        { x: 1, y: 1000 },
+        { x: 8, y: 950 },
+        { x: 15, y: 900 },
+        { x: 22, y: 870 },
+      ],
+      actualForChart: [1000, 950, 900, 870, undefined, undefined],
+      prevYear: [800, 780, 760, 740, 720, 700],
+      prevYearTotalExpenses: 3650,
+      prevYearDaysCount: 365,
+      daysInYear: 365,
+    };
+
+    const renderYearCard = (props = {}) => render(
+      <BalanceHistoryCard
+        colors={mockColors}
+        t={mockT}
+        selectedAccount="acc1"
+        onAccountChange={jest.fn()}
+        accountItems={mockAccountItems}
+        loadingBalanceHistory={false}
+        balanceHistoryData={yearData}
+        selectedYear={2024}
+        selectedMonth={null}
+        accounts={mockAccounts}
+        isCurrentMonth={false}
+        spendingPrediction={null}
+        balanceHistoryTableData={[]}
+        editingBalanceValue=""
+        onEditingBalanceValueChange={jest.fn()}
+        onEditBalance={jest.fn()}
+        onCancelEdit={jest.fn()}
+        onSaveBalance={jest.fn()}
+        onDeleteBalance={jest.fn()}
+        onShowCalendar={jest.fn()}
+        {...props}
+      />,
+    );
+
+    it('drops the burndown norm: no plainAvg series and no plain-avg legend row', async () => {
+      const { series } = computeYearBalanceChart({
+        balanceHistoryData: yearData,
+        selectedYear: 2024,
+        primaryColor: mockColors.primary,
+        thirdLine: 'prevYear',
+      });
+
+      expect(series.map(s => s.yKey)).toEqual(['actual', 'prevYear', 'zero']);
+
+      const { queryByTestId, queryByText } = await renderYearCard();
+      expect(queryByTestId('legend-row-plain-avg')).toBeNull();
+      expect(queryByText('Plain avg')).toBeNull();
+    });
+
+    it('labels the axis by month: one tick per 1st, in day-of-year coordinates', () => {
+      // 2024 is a leap year, so March starts a day later than in 2023
+      expect(monthStartDaysOfYear(2024)).toEqual([1, 32, 61, 92, 122, 153, 183, 214, 245, 275, 306, 336]);
+      expect(monthStartDaysOfYear(2023)[2]).toBe(60);
+
+      const { computed } = computeYearBalanceChart({
+        balanceHistoryData: yearData,
+        selectedYear: 2024,
+        primaryColor: mockColors.primary,
+      });
+
+      expect(computed.monthTicks).toHaveLength(12);
+      expect(computed.monthByDay[1]).toBe(0);
+      expect(computed.monthByDay[336]).toBe(11);
+    });
+
+    it('cycles prevYear → none → prevYear, never through the monthly modes', () => {
+      expect(nextThirdLineMode('prevYear', 'year')).toBe('none');
+      expect(nextThirdLineMode('none', 'year')).toBe('prevYear');
+      // A mode carried over from the month view is not a valid year mode: step to
+      // the first year one rather than off the end of the list.
+      expect(nextThirdLineMode('yearAvg', 'year')).toBe('prevYear');
+      // The month view is untouched by the second argument's default
+      expect(nextThirdLineMode('prevMonth')).toBe('yearAvg');
+    });
+
+    it('shows the prev-year comparison and drops it on press', async () => {
+      const { getByTestId, getByText, queryByText, queryByTestId } = await renderYearCard();
+
+      expect(getByText('Prev Year')).toBeTruthy();
+
+      await fireEvent.press(getByTestId('third-line-toggle-btn'));
+
+      await waitFor(() => expect(queryByText('Prev Year')).toBeNull());
+      expect(queryByTestId('legend-row-prev-year')).toBeNull();
+
+      await fireEvent.press(getByTestId('third-line-toggle-btn'));
+
+      await waitFor(() => expect(getByText('Prev Year')).toBeTruthy());
+    });
+
+    it('falls back to the prev-year line when the month view left yearAvg selected', async () => {
+      const monthData = {
+        labels: [1, 2, 3],
+        actual: [{ x: 1, y: 100 }, { x: 3, y: 80 }],
+        actualForChart: [100, 90, 80],
+        prevMonth: [95, 94, 93],
+        yearAvg: [70, 69, 68],
+        yearAvgDailyAvg: -1,
+      };
+
+      const { getByTestId, getByText, rerender } = await renderYearCard({
+        balanceHistoryData: monthData,
+        selectedMonth: 0,
+      });
+
+      // Month view: step prevMonth → yearAvg
+      await fireEvent.press(getByTestId('third-line-toggle-btn'));
+      await waitFor(() => expect(getByText('Year avg')).toBeTruthy());
+
+      await rerender(
+        <BalanceHistoryCard
+          colors={mockColors}
+          t={mockT}
+          selectedAccount="acc1"
+          onAccountChange={jest.fn()}
+          accountItems={mockAccountItems}
+          loadingBalanceHistory={false}
+          balanceHistoryData={yearData}
+          selectedYear={2024}
+          selectedMonth={null}
+          accounts={mockAccounts}
+          isCurrentMonth={false}
+          spendingPrediction={null}
+          balanceHistoryTableData={[]}
+          editingBalanceValue=""
+          onEditingBalanceValueChange={jest.fn()}
+          onEditBalance={jest.fn()}
+          onCancelEdit={jest.fn()}
+          onSaveBalance={jest.fn()}
+          onDeleteBalance={jest.fn()}
+          onShowCalendar={jest.fn()}
+        />,
+      );
+
+      await waitFor(() => expect(getByText('Prev Year')).toBeTruthy());
+    });
+
+    it('keeps the y-axis off the comparison line while it is hidden', () => {
+      const towering = { ...yearData, prevYear: yearData.prevYear.map(() => 100000) };
+
+      const hidden = computeYearBalanceChart({
+        balanceHistoryData: towering,
+        selectedYear: 2024,
+        primaryColor: mockColors.primary,
+        thirdLine: 'none',
+      });
+      const shown = computeYearBalanceChart({
+        balanceHistoryData: towering,
+        selectedYear: 2024,
+        primaryColor: mockColors.primary,
+        thirdLine: 'prevYear',
+      });
+
+      expect(hidden.computed.hasPrevYearData).toBe(false);
+      expect(hidden.computed.niceMax).toBeLessThan(shown.computed.niceMax);
+      expect(hidden.series.map(s => s.yKey)).toEqual(['actual', 'zero']);
+    });
+
+    it('fills the legend from the samples: current is the last one with data, end is the year-end', () => {
+      const { computed } = computeYearBalanceChart({
+        balanceHistoryData: yearData,
+        selectedYear: 2024,
+        primaryColor: mockColors.primary,
+        thirdLine: 'prevYear',
+      });
+
+      expect(computed.maxBalance).toBe(1000);
+      expect(computed.actualCurrent).toBe(870);
+      // The running year has not reached its final sample yet — "End" must not
+      // silently repeat "Current"
+      expect(computed.actualEnd).toBeNull();
+      // (870 - 1000) / (22 - 1)
+      expect(computed.actualDailyAvg).toBeCloseTo(-6.19, 2);
+      expect(computed.prevYearMax).toBe(800);
+      // Read at the same day-of-year the actual line stops at (day 22)
+      expect(computed.prevYearCurrent).toBe(740);
+      expect(computed.prevYearEnd).toBe(700);
+      // -3650 spent over 365 days
+      expect(computed.prevYearDailyAvg).toBe(-10);
+    });
+
+    it('hides the calendar toggle — the calendar is a month grid', async () => {
+      const { queryByTestId } = await renderYearCard();
+
+      expect(queryByTestId('calendar-toggle-btn')).toBeNull();
+      expect(queryByTestId('third-line-toggle-btn')).toBeTruthy();
+    });
+
+    // Switching period with the calendar open would otherwise strand the user in
+    // a month grid: the year view hides the toggle that switches back.
+    it('falls back to the chart when the period changes with the calendar open', async () => {
+      const monthData = {
+        labels: [1, 2, 3],
+        actual: [{ x: 1, y: 100 }, { x: 3, y: 80 }],
+        actualForChart: [100, 90, 80],
+        prevMonth: [95, 94, 93],
+      };
+
+      const { container, getByTestId, queryByTestId, rerender } = await renderYearCard({
+        balanceHistoryData: monthData,
+        selectedMonth: 0,
+      });
+
+      await fireEvent.press(getByTestId('calendar-toggle-btn'));
+      await waitFor(() => expect(queryByTestId('third-line-toggle-btn')).toBeNull());
+
+      await rerender(
+        <BalanceHistoryCard
+          colors={mockColors}
+          t={mockT}
+          selectedAccount="acc1"
+          onAccountChange={jest.fn()}
+          accountItems={mockAccountItems}
+          loadingBalanceHistory={false}
+          balanceHistoryData={yearData}
+          selectedYear={2024}
+          selectedMonth={null}
+          accounts={mockAccounts}
+          isCurrentMonth={false}
+          spendingPrediction={null}
+          balanceHistoryTableData={[]}
+          editingBalanceValue=""
+          onEditingBalanceValueChange={jest.fn()}
+          onEditBalance={jest.fn()}
+          onCancelEdit={jest.fn()}
+          onSaveBalance={jest.fn()}
+          onDeleteBalance={jest.fn()}
+          onShowCalendar={jest.fn()}
+        />,
+      );
+
+      // Back on the chart, with its own controls reachable again
+      await waitFor(() => expect(queryByTestId('third-line-toggle-btn')).toBeTruthy());
+      expect(container.queryAll(n => n.props.testID === 'vn-line').length).toBeGreaterThan(0);
+    });
+
+    it('explains an empty year in year terms', async () => {
+      const { getByText } = await renderYearCard({
+        balanceHistoryData: { granularity: 'year', labels: [], actual: [], actualForChart: [], prevYear: [] },
+      });
+
+      expect(getByText('No balance history available for this year')).toBeTruthy();
+    });
+
+    it('renders one line per series on the canvas', async () => {
+      const { container } = await renderYearCard();
+
+      // actual + prevYear + zero baseline
+      expect(container.queryAll(n => n.props.testID === 'vn-line')).toHaveLength(3);
     });
   });
 });

@@ -24,6 +24,7 @@ import currencies from '../../../assets/currencies.json';
 import { useDisplaySettings } from '../../contexts/DisplaySettingsContext';
 import { balanceLineColors } from '../../styles/chartPalette';
 import BalanceHistoryCalendarView from './BalanceHistoryCalendarView';
+import { MONTH_ABBREVIATIONS } from './monthLabels';
 
 // Helper to format numbers compactly (e.g., 10K, 1.5M)
 const formatCompact = (value, currency) => {
@@ -123,13 +124,37 @@ const formatXAxisLabel = (value, lastDay) => {
   return '';
 };
 
+// First day-of-year of each month, i.e. where the year view's month ticks go.
+// Exported for unit testing.
+export const monthStartDaysOfYear = (year) => {
+  const days = [];
+  let day = 1;
+  for (let month = 0; month < 12; month++) {
+    days.push(day);
+    day += new Date(year, month + 1, 0).getDate();
+  }
+  return days;
+};
+
 // Comparison line the user cycles through with the header toggle. 'none' drops
 // the third line and its legend row entirely.
 export const THIRD_LINE_MODES = ['prevMonth', 'yearAvg', 'none'];
 
-export const nextThirdLineMode = (mode) => {
-  const index = THIRD_LINE_MODES.indexOf(mode);
-  return THIRD_LINE_MODES[(index + 1) % THIRD_LINE_MODES.length];
+// The year view compares against one thing only — the same year before it. The
+// 12-month median *is* a year, so offering it here would plot a year against
+// itself, and "prev month" has no meaning on a year-long axis.
+export const YEAR_THIRD_LINE_MODES = ['prevYear', 'none'];
+
+export const thirdLineModesFor = (granularity) =>
+  (granularity === 'year' ? YEAR_THIRD_LINE_MODES : THIRD_LINE_MODES);
+
+export const nextThirdLineMode = (mode, granularity = 'month') => {
+  const modes = thirdLineModesFor(granularity);
+  const index = modes.indexOf(mode);
+  // An unknown mode (e.g. a monthly one left over from before a period switch)
+  // steps to the first valid one rather than wrapping off the end of the list.
+  if (index === -1) return modes[0];
+  return modes[(index + 1) % modes.length];
 };
 
 // Line colours come from the chart palette, which steps them per mode: the old
@@ -143,6 +168,7 @@ const DEFAULT_BASELINE_COLOR = '#e6e6e6';
 
 const THIRD_LINE_ICONS = {
   prevMonth: 'calendar-arrow-left',
+  prevYear: 'calendar-arrow-left',
   yearAvg: 'chart-bell-curve',
   none: 'eye-off-outline',
 };
@@ -416,6 +442,149 @@ export const computeBalanceChart = ({
   return { computed, data, series };
 };
 
+/**
+ * Pure builder for the whole-year variant of the chart. Same return shape as
+ * computeBalanceChart, but a deliberately thinner chart:
+ *
+ * - **no burndown ("plain avg") line and no deviation band.** That line is the
+ *   month's spendable ceiling drawn down to zero; stretched across a year it
+ *   would claim you plan to end December at nothing, which nobody does.
+ * - **no forecast.** The month's prediction has no year-scale counterpart.
+ * - x is day-of-year, sampled weekly by the hook, so the axis stays linear in
+ *   time and the month ticks land on the actual 1sts.
+ *
+ * Exported for unit testing.
+ */
+export const computeYearBalanceChart = ({
+  balanceHistoryData,
+  selectedYear,
+  primaryColor,
+  lineColors = DEFAULT_LINE_COLORS,
+  baselineColor = DEFAULT_BASELINE_COLOR,
+  thirdLine = 'prevYear',
+}) => {
+  if (!balanceHistoryData.actual || balanceHistoryData.actual.length === 0) {
+    return { computed: null, data: [], series: [] };
+  }
+
+  const labels = balanceHistoryData.labels || [];
+  const actualForChart = balanceHistoryData.actualForChart || [];
+  const actualPoints = balanceHistoryData.actual || [];
+  const prevYearSeries = balanceHistoryData.prevYear || [];
+
+  const actualValues = actualForChart.filter(v => v !== undefined && v !== null);
+  const maxBalance = actualValues.length > 0 ? Math.max(...actualValues) : 0;
+
+  const hasPrevYearData = thirdLine === 'prevYear'
+    && prevYearSeries.some(v => v !== undefined && v !== null);
+  // Only the line actually on screen may stretch the y-axis.
+  const comparisonValues = hasPrevYearData
+    ? prevYearSeries.filter(v => v !== undefined && v !== null)
+    : [];
+
+  const allValues = [...actualValues, ...comparisonValues];
+  const maxValue = allValues.length > 0 ? Math.max(...allValues) : 0;
+  const minValue = allValues.length > 0 ? Math.min(...allValues) : 0;
+  const hasNegativeValues = minValue < 0;
+  const { max: niceMax, interval: niceInterval } = calculateNiceScale(maxValue);
+
+  const lastDay = labels.length > 0 ? labels[labels.length - 1] : null;
+  const firstPoint = actualPoints[0];
+  const lastPoint = actualPoints[actualPoints.length - 1];
+  // "Current" is the last sample that has data (today, in the running year);
+  // "End" is the final sample of the year, which for the running year has not
+  // happened yet and correctly reads as "—" rather than repeating Current.
+  const displayDay = lastPoint ? lastPoint.x : null;
+  const actualCurrent = lastPoint ? lastPoint.y : undefined;
+  const lastIndex = labels.length - 1;
+  const actualEnd = actualForChart[lastIndex] === undefined ? null : actualForChart[lastIndex];
+
+  let actualDailyAvg = null;
+  if (actualPoints.length >= 2) {
+    const daySpan = lastPoint.x - firstPoint.x;
+    actualDailyAvg = daySpan > 0 ? (lastPoint.y - firstPoint.y) / daySpan : 0;
+  } else if (actualPoints.length === 1) {
+    actualDailyAvg = 0;
+  }
+
+  let prevYearMax = null;
+  let prevYearCurrent = null;
+  let prevYearEnd = null;
+  let prevYearDailyAvg = null;
+  if (hasPrevYearData) {
+    prevYearMax = Math.max(...comparisonValues);
+
+    // Read the comparison at the same day-of-year the actual line stops at, so
+    // the Current column compares like with like.
+    const currentIndex = labels.indexOf(displayDay);
+    for (let i = currentIndex >= 0 ? currentIndex : labels.length - 1; i >= 0; i--) {
+      const value = prevYearSeries[i];
+      if (value !== undefined && value !== null) { prevYearCurrent = value; break; }
+    }
+    for (let i = prevYearSeries.length - 1; i >= 0; i--) {
+      const value = prevYearSeries[i];
+      if (value !== undefined && value !== null) { prevYearEnd = value; break; }
+    }
+
+    // Mirrors the prev-month row: spending per day, not the balance delta, so the
+    // comparison column answers "what did a day cost me last year".
+    const prevTotalExpenses = balanceHistoryData.prevYearTotalExpenses;
+    const prevDaysCount = balanceHistoryData.prevYearDaysCount;
+    if (prevTotalExpenses != null && prevDaysCount > 0) {
+      const parsed = parseFloat(prevTotalExpenses);
+      if (Number.isFinite(parsed)) prevYearDailyAvg = -parsed / prevDaysCount;
+    }
+  }
+
+  // Month ticks: 12 values, one per 1st of the month. Passed to the axis as
+  // explicit tickValues so the labels sit on the real month boundaries instead of
+  // on whatever evenly-spaced positions a tickCount would produce.
+  const monthTicks = monthStartDaysOfYear(selectedYear);
+  const monthByDay = {};
+  monthTicks.forEach((day, month) => { monthByDay[day] = month; });
+
+  const computed = {
+    granularity: 'year',
+    thirdLine,
+    labels,
+    maxBalance,
+    actualCurrent,
+    actualEnd,
+    actualDailyAvg,
+    displayDay,
+    hasNegativeValues,
+    niceMax,
+    niceInterval,
+    lastDay,
+    hasPrevYearData,
+    prevYearMax,
+    prevYearCurrent,
+    prevYearEnd,
+    prevYearDailyAvg,
+    monthTicks,
+    monthByDay,
+  };
+
+  const data = labels.map((day, i) => ({
+    day,
+    actual: actualForChart[i] === undefined ? null : actualForChart[i],
+    prevYear: prevYearSeries[i] === undefined ? null : prevYearSeries[i],
+    zero: 0,
+  }));
+
+  const series = [
+    { yKey: 'actual', color: primaryColor, strokeWidth: 3, curveType: 'monotoneX', dashed: false },
+  ];
+  if (hasPrevYearData) {
+    // Same slot the prev-month line uses: it is the same idea (the period before
+    // this one), and the two never appear together.
+    series.push({ yKey: 'prevYear', color: lineColors.prevMonth, strokeWidth: 2, curveType: 'monotoneX', dashed: false });
+  }
+  series.push({ yKey: 'zero', color: baselineColor, strokeWidth: 1, curveType: 'linear', dashed: false });
+
+  return { computed, data, series };
+};
+
 // Skia needs concrete colour strings for gradient stops, and theme colours may be
 // hex or rgb(a). Normalising here keeps the gradient from throwing on an unexpected
 // format. Exported for unit testing.
@@ -518,6 +687,9 @@ const BalanceChart = ({
   hideBalances,
   lastDay,
   onScrub,
+  xTickValues,
+  monthByDay,
+  showDeviationBand = true,
 }) => {
   const pressInit = useRef({
     x: 0,
@@ -538,13 +710,25 @@ const BalanceChart = ({
     if (!isActive) onScrub(null);
   }, [isActive, onScrub]);
 
-  const xAxis = useMemo(() => ({
-    font: axisFont,
-    lineColor: colors.border,
-    labelColor: colors.mutedText,
-    formatXLabel: (value) => formatXAxisLabel(value, lastDay),
-    enableRescaling: true,
-  }), [axisFont, colors.border, colors.mutedText, lastDay]);
+  // Year view: explicit month ticks (the 1st of each month, in day-of-year
+  // coordinates) labelled with the month, so 53 weekly samples produce 12 labels
+  // instead of a smear of day numbers.
+  const xAxis = useMemo(() => {
+    const base = {
+      font: axisFont,
+      lineColor: colors.border,
+      labelColor: colors.mutedText,
+      enableRescaling: true,
+    };
+    if (xTickValues) {
+      return {
+        ...base,
+        tickValues: xTickValues,
+        formatXLabel: (value) => MONTH_ABBREVIATIONS[monthByDay?.[Math.round(value)]] ?? '',
+      };
+    }
+    return { ...base, formatXLabel: (value) => formatXAxisLabel(value, lastDay) };
+  }, [axisFont, colors.border, colors.mutedText, lastDay, xTickValues, monthByDay]);
 
   const yAxis = useMemo(() => ([{
     font: axisFont,
@@ -571,11 +755,13 @@ const BalanceChart = ({
     >
       {({ points, chartBounds }) => (
         <>
-          <DeviationBand
-            actualPoints={points.actual}
-            normPoints={points.plainAvg}
-            color={colors.primary}
-          />
+          {showDeviationBand && (
+            <DeviationBand
+              actualPoints={points.actual}
+              normPoints={points.plainAvg}
+              color={colors.primary}
+            />
+          )}
           {/* Gradient fill under the actual balance, fading to transparent at the axis. */}
           <Area
             points={points.actual}
@@ -630,7 +816,10 @@ BalanceChart.propTypes = {
   colors: PropTypes.object.isRequired,
   hideBalances: PropTypes.bool,
   lastDay: PropTypes.number,
+  monthByDay: PropTypes.object,
   onScrub: PropTypes.func.isRequired,
+  showDeviationBand: PropTypes.bool,
+  xTickValues: PropTypes.arrayOf(PropTypes.number),
   yDomain: PropTypes.object,
 };
 
@@ -658,9 +847,13 @@ const BalanceHistoryCard = ({
   onShowCalendar,
 }) => {
   const { hideBalances } = useDisplaySettings();
+  // `showCalendar` is the user's intent; `calendarVisible` below is whether it
+  // can be honoured — the year view has no calendar and hides the toggle, so a
+  // calendar left open across a period switch would otherwise strand the user in
+  // a month grid with no way back to the chart.
   const [showCalendar, setShowCalendar] = useState(false);
   // Which comparison line rides along with the actual balance: last month, the
-  // 12-month median, or nothing at all.
+  // 12-month median, or nothing at all (the year view offers last year / nothing).
   const [thirdLine, setThirdLine] = useState('prevMonth');
   const [contentHeight, setContentHeight] = useState(340);
   // Day currently under the finger while scrubbing the chart (null when idle).
@@ -668,6 +861,17 @@ const BalanceHistoryCard = ({
   // Comparison-line steps for the current mode — the legend dots below read from
   // the same object, so a swatch can never drift from the line it stands for.
   const chartLineColors = useMemo(() => balanceLineColors(colors), [colors]);
+
+  // No month selected = the whole-year view. Derived rather than passed so the
+  // card cannot disagree with the data the hook loaded for the same period.
+  const isYearView = selectedMonth === null;
+  const granularity = isYearView ? 'year' : 'month';
+  const calendarVisible = showCalendar && !isYearView;
+  // The mode is kept across a period switch when it still exists there, and
+  // otherwise falls back to that period's first mode — switching to the year view
+  // must not leave a stale 'yearAvg' selected and no line drawn.
+  const thirdLineModes = thirdLineModesFor(granularity);
+  const effectiveThirdLine = thirdLineModes.includes(thirdLine) ? thirdLine : thirdLineModes[0];
 
   const selectedAccountData = accounts.find(acc => acc.id === selectedAccount);
   const currency = selectedAccountData?.currency || 'USD';
@@ -680,18 +884,27 @@ const BalanceHistoryCard = ({
     : null;
 
   const { computed: chartComputed, data: chartData, series: chartSeries } = useMemo(
-    () => computeBalanceChart({
-      balanceHistoryData,
-      spendingPrediction,
-      isCurrentMonth,
-      selectedYear,
-      selectedMonth,
-      primaryColor: colors.primary,
-      lineColors: chartLineColors,
-      baselineColor: colors.border,
-      thirdLine,
-    }),
-    [balanceHistoryData, spendingPrediction, isCurrentMonth, selectedYear, selectedMonth, colors.primary, colors.border, chartLineColors, thirdLine],
+    () => (isYearView
+      ? computeYearBalanceChart({
+        balanceHistoryData,
+        selectedYear,
+        primaryColor: colors.primary,
+        lineColors: chartLineColors,
+        baselineColor: colors.border,
+        thirdLine: effectiveThirdLine,
+      })
+      : computeBalanceChart({
+        balanceHistoryData,
+        spendingPrediction,
+        isCurrentMonth,
+        selectedYear,
+        selectedMonth,
+        primaryColor: colors.primary,
+        lineColors: chartLineColors,
+        baselineColor: colors.border,
+        thirdLine: effectiveThirdLine,
+      })),
+    [isYearView, balanceHistoryData, spendingPrediction, isCurrentMonth, selectedYear, selectedMonth, colors.primary, colors.border, chartLineColors, effectiveThirdLine],
   );
 
   // yKeys drive Victory's shared y-domain (the always-present "zero" key keeps the
@@ -719,26 +932,43 @@ const BalanceHistoryCard = ({
   const handleScrub = useCallback((day) => setScrubDay(day), []);
 
   // While scrubbing, the header reports the balance under the finger instead of
-  // the latest one — the chart itself carries no numbers.
+  // the latest one — the chart itself carries no numbers. The year view is
+  // sampled weekly, so the scrubbed day rarely lands exactly on a record: take
+  // the nearest sample rather than reporting nothing.
   const scrubbedBalance = useMemo(() => {
     if (scrubDay == null) return null;
-    const point = chartData.find((d) => d.day === scrubDay);
+    let point = chartData.find((d) => d.day === scrubDay);
+    if (!point && isYearView && chartData.length > 0) {
+      point = chartData.reduce((closest, candidate) =>
+        (Math.abs(candidate.day - scrubDay) < Math.abs(closest.day - scrubDay) ? candidate : closest));
+    }
     if (!point) return null;
     return point.actual ?? point.forecast ?? null;
-  }, [scrubDay, chartData]);
+  }, [scrubDay, chartData, isYearView]);
 
   const headerBalance = scrubbedBalance != null ? scrubbedBalance : currentBalance;
   const headerDay = scrubDay != null ? scrubDay : headerDayNum;
-  const showDayContext = (isCurrentMonth || scrubDay != null) && headerDaysInMonth !== null;
+  const showDayContext = !isYearView && (isCurrentMonth || scrubDay != null) && headerDaysInMonth !== null;
+  // Year view: name the month under the finger instead of a day-of-month counter
+  // that would be meaningless on a year-long axis.
+  const scrubMonthLabel = useMemo(() => {
+    if (!isYearView || scrubDay == null) return null;
+    const monthStarts = monthStartDaysOfYear(selectedYear);
+    let month = 0;
+    monthStarts.forEach((start, index) => { if (scrubDay >= start) month = index; });
+    return MONTH_ABBREVIATIONS[month];
+  }, [isYearView, scrubDay, selectedYear]);
 
   // Series composition drives the press-state shape; remount the canvas when it changes.
   const chartKey = chartYKeys.join('|');
 
-  const thirdLineLabel = thirdLine === 'prevMonth'
+  const thirdLineLabel = effectiveThirdLine === 'prevMonth'
     ? (t('prev_month') || 'Prev Month')
-    : thirdLine === 'yearAvg'
-      ? (t('year_avg') || 'Year avg')
-      : (t('comparison_none') || 'No comparison');
+    : effectiveThirdLine === 'prevYear'
+      ? (t('prev_year') || 'Prev Year')
+      : effectiveThirdLine === 'yearAvg'
+        ? (t('year_avg') || 'Year avg')
+        : (t('comparison_none') || 'No comparison');
 
   return (
     <View style={[styles.balanceHistoryCard, { backgroundColor: colors.surface, borderColor: colors.border }]}>
@@ -757,28 +987,35 @@ const BalanceHistoryCard = ({
                   {`day ${headerDay}/${headerDaysInMonth}`}
                 </Text>
               )}
+              {scrubMonthLabel !== null && (
+                <Text style={[styles.balanceDayContext, { color: colors.mutedText }]}>
+                  {`${scrubMonthLabel} ${selectedYear}`}
+                </Text>
+              )}
             </View>
           )}
         </View>
-        {/* Comparison line toggle: prev month → year average → off */}
-        {!showCalendar && balanceHistoryData.actual && balanceHistoryData.actual.length > 0 && (
+        {/* Comparison line toggle: month view steps prev month → year average →
+            off, year view steps prev year → off. */}
+        {!calendarVisible && balanceHistoryData.actual && balanceHistoryData.actual.length > 0 && (
           <TouchableOpacity
             testID="third-line-toggle-btn"
             style={[styles.calendarToggleBtn, { backgroundColor: colors.surface }]}
-            onPress={() => setThirdLine(nextThirdLineMode(thirdLine))}
+            onPress={() => setThirdLine(nextThirdLineMode(effectiveThirdLine, granularity))}
             activeOpacity={0.7}
             accessibilityRole="button"
             accessibilityLabel={thirdLineLabel}
           >
             <Icon
-              name={THIRD_LINE_ICONS[thirdLine]}
+              name={THIRD_LINE_ICONS[effectiveThirdLine]}
               size={18}
-              color={thirdLine === 'none' ? colors.mutedText : colors.primary}
+              color={effectiveThirdLine === 'none' ? colors.mutedText : colors.primary}
             />
           </TouchableOpacity>
         )}
-        {/* Calendar / Chart toggle */}
-        {balanceHistoryData.actual && balanceHistoryData.actual.length > 0 && (
+        {/* Calendar / Chart toggle. The calendar is a month grid, so the year
+            view has nothing to switch to. */}
+        {!isYearView && balanceHistoryData.actual && balanceHistoryData.actual.length > 0 && (
           <TouchableOpacity
             testID="calendar-toggle-btn"
             style={[styles.calendarToggleBtn, { backgroundColor: colors.surface }]}
@@ -816,7 +1053,7 @@ const BalanceHistoryCard = ({
         </View>
       ) : balanceHistoryData.actual && balanceHistoryData.actual.length > 0 ? (
         <>
-          {showCalendar ? (
+          {calendarVisible ? (
             <View style={[styles.calendarContainer, { minHeight: contentHeight }]}>
               <BalanceHistoryCalendarView
                 colors={colors}
@@ -852,6 +1089,9 @@ const BalanceHistoryCard = ({
                       hideBalances={hideBalances}
                       lastDay={chartComputed.lastDay}
                       onScrub={handleScrub}
+                      xTickValues={isYearView ? chartComputed.monthTicks : undefined}
+                      monthByDay={isYearView ? chartComputed.monthByDay : undefined}
+                      showDeviationBand={!isYearView}
                     />
                   </View>
                 )}
@@ -881,17 +1121,34 @@ const BalanceHistoryCard = ({
                     <Text style={[styles.legendTableValue, { color: colors.text }]}>{formatCompact(chartComputed.hasForecastData ? chartComputed.forecastEnd : chartComputed.actualEnd, currency)}</Text>
                   </View>
 
-                  {/* Plain avg row */}
-                  <View style={styles.legendTableRow}>
-                    <View style={styles.legendTableLabelCell}>
-                      <View style={[styles.legendDot, { backgroundColor: chartLineColors.norm }]} />
-                      <Text style={[styles.legendTableLabel, { color: colors.text }]}>{t('plain_avg') || 'Plain avg'}</Text>
+                  {/* Plain avg row — the burndown norm, month view only (see
+                      computeYearBalanceChart for why a year has none) */}
+                  {!isYearView && (
+                    <View style={styles.legendTableRow} testID="legend-row-plain-avg">
+                      <View style={styles.legendTableLabelCell}>
+                        <View style={[styles.legendDot, { backgroundColor: chartLineColors.norm }]} />
+                        <Text style={[styles.legendTableLabel, { color: colors.text }]}>{t('plain_avg') || 'Plain avg'}</Text>
+                      </View>
+                      <Text style={[styles.legendTableValue, { color: colors.text }]}>{formatCompact(chartComputed.plainAvgMax, currency)}</Text>
+                      <Text style={[styles.legendTableValue, { color: colors.text }]}>{formatCompact(chartComputed.plainAvgCurrent, currency)}</Text>
+                      <Text style={[styles.legendTableValue, { color: colors.text }]}>{formatCompact(chartComputed.plainAvgDaily, currency)}</Text>
+                      <Text style={[styles.legendTableValue, { color: colors.text }]}>{formatCompact(0, currency)}</Text>
                     </View>
-                    <Text style={[styles.legendTableValue, { color: colors.text }]}>{formatCompact(chartComputed.plainAvgMax, currency)}</Text>
-                    <Text style={[styles.legendTableValue, { color: colors.text }]}>{formatCompact(chartComputed.plainAvgCurrent, currency)}</Text>
-                    <Text style={[styles.legendTableValue, { color: colors.text }]}>{formatCompact(chartComputed.plainAvgDaily, currency)}</Text>
-                    <Text style={[styles.legendTableValue, { color: colors.text }]}>{formatCompact(0, currency)}</Text>
-                  </View>
+                  )}
+
+                  {/* Prev year row (year view's only comparison) */}
+                  {chartComputed.hasPrevYearData && (
+                    <View style={styles.legendTableRow} testID="legend-row-prev-year">
+                      <View style={styles.legendTableLabelCell}>
+                        <View style={[styles.legendDot, { backgroundColor: chartLineColors.prevMonth }]} />
+                        <Text style={[styles.legendTableLabel, { color: colors.text }]}>{t('prev_year') || 'Prev Year'}</Text>
+                      </View>
+                      <Text style={[styles.legendTableValue, { color: colors.text }]}>{formatCompact(chartComputed.prevYearMax, currency)}</Text>
+                      <Text style={[styles.legendTableValue, { color: colors.text }]}>{formatCompact(chartComputed.prevYearCurrent, currency)}</Text>
+                      <Text style={[styles.legendTableValue, { color: colors.text }]}>{formatCompact(chartComputed.prevYearDailyAvg, currency)}</Text>
+                      <Text style={[styles.legendTableValue, { color: colors.text }]}>{formatCompact(chartComputed.prevYearEnd, currency)}</Text>
+                    </View>
+                  )}
 
                   {/* Prev month row */}
                   {chartComputed.hasPrevMonthData && (
@@ -928,7 +1185,9 @@ const BalanceHistoryCard = ({
       ) : (
         <View style={styles.balanceHistoryNoData}>
           <Text style={[styles.balanceHistoryNoDataText, { color: colors.mutedText }]}>
-            {t('no_balance_history') || 'No balance history available for this month'}
+            {isYearView
+              ? (t('no_balance_history_year') || 'No balance history available for this year')
+              : (t('no_balance_history') || 'No balance history available for this month')}
           </Text>
         </View>
       )}
@@ -954,6 +1213,12 @@ BalanceHistoryCard.propTypes = {
     plainAvgMax: PropTypes.number,
     yearAvg: PropTypes.array,
     yearAvgDailyAvg: PropTypes.number,
+    // Whole-year view (selectedMonth === null): weekly samples of this year and
+    // the one before it, plus what the comparison row needs.
+    granularity: PropTypes.oneOf(['month', 'year']),
+    prevYear: PropTypes.array,
+    prevYearTotalExpenses: PropTypes.oneOfType([PropTypes.number, PropTypes.string]),
+    prevYearDaysCount: PropTypes.number,
   }).isRequired,
   selectedYear: PropTypes.number.isRequired,
   selectedMonth: PropTypes.number,

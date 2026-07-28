@@ -91,9 +91,76 @@ export const buildYearAverageSeries = ({
   };
 };
 
+// Whole-year view: 365 daily balances would be both illegible and slow to draw,
+// so the year is sampled on a fixed 7-day stride. A constant stride (rather than
+// "N points per month") keeps the x-axis linear in time, so the slope of the line
+// means the same thing everywhere on it.
+export const YEAR_SAMPLE_STEP = 7;
+
+const daysInYearOf = (year) =>
+  ((year % 4 === 0 && year % 100 !== 0) || year % 400 === 0 ? 366 : 365);
+
+// Sample days as day-of-year: 1, 8, 15 … A 365-day year lands its last stride
+// exactly on day 365; a leap year gets day 366 appended so the line still reaches
+// the end of the year (one short final segment beats a truncated one).
+// Exported for unit testing.
+export const buildYearSampleDays = (daysInYear) => {
+  const days = [];
+  for (let day = 1; day <= daysInYear; day += YEAR_SAMPLE_STEP) days.push(day);
+  if (days[days.length - 1] !== daysInYear) days.push(daysInYear);
+  return days;
+};
+
+// 'YYYY-MM-DD' → 1-based day of year. Parsed off the string (not via a local
+// Date) so a timezone west of UTC can't shift a date onto the previous day.
+export const dayOfYearFromDateString = (dateStr) => {
+  if (typeof dateStr !== 'string') return null;
+  const [year, month, day] = dateStr.split('-').map(part => parseInt(part, 10));
+  if (!Number.isFinite(year) || !Number.isFinite(month) || !Number.isFinite(day)) return null;
+  const diff = Date.UTC(year, month - 1, day) - Date.UTC(year, 0, 1);
+  return Math.round(diff / 86400000) + 1;
+};
+
+/**
+ * Forward-fill a year of recorded balances and read it off at the sample days.
+ *
+ * `anchorBalance` is the balance carried in from before Jan 1, so a year whose
+ * first snapshot lands in March still starts the line at a real number instead of
+ * a gap. Days after `maxDay` (today, for the current year) stay undefined — the
+ * chart must not draw a flat line into the future.
+ *
+ * Exported for unit testing.
+ */
+export const buildYearSeries = ({ historyRows, sampleDays, anchorBalance, maxDay }) => {
+  const balanceByDay = {};
+  (historyRows || []).forEach((row) => {
+    if (!row || typeof row.date !== 'string') return;
+    const balance = parseFloat(row.balance);
+    if (!Number.isFinite(balance)) return;
+    const day = dayOfYearFromDateString(row.date);
+    if (day === null) return;
+    balanceByDay[day] = balance;
+  });
+
+  const anchor = parseFloat(anchorBalance);
+  let lastKnown = Number.isFinite(anchor) ? anchor : undefined;
+  let cursor = 1;
+
+  return sampleDays.map((sampleDay) => {
+    for (; cursor <= sampleDay; cursor++) {
+      if (balanceByDay[cursor] !== undefined) lastKnown = balanceByDay[cursor];
+    }
+    if (maxDay != null && sampleDay > maxDay) return undefined;
+    return lastKnown;
+  });
+};
+
 /**
  * Custom hook for loading and managing balance history data
  * Handles trend calculation, data visualization, and CRUD operations
+ *
+ * `selectedMonth === null` means the whole-year view, which loads a separate,
+ * coarser dataset (see loadYearHistory) rather than the day-by-day month one.
  */
 const useBalanceHistory = (selectedAccount, selectedYear, selectedMonth) => {
   const [balanceHistoryData, setBalanceHistoryData] = useState({ labels: [] });
@@ -127,11 +194,100 @@ const useBalanceHistory = (selectedAccount, selectedYear, selectedMonth) => {
     return { slope, intercept };
   };
 
+  // Whole-year view. Deliberately a much smaller dataset than the monthly one:
+  // the actual balance sampled weekly, the same sampling of the previous year for
+  // comparison, and nothing else. There is no burndown norm (a year-long line to
+  // zero describes nothing) and no forecast (the month's prediction has no
+  // year-scale counterpart).
+  const loadYearHistory = useCallback(async () => {
+    try {
+      setLoadingBalanceHistory(true);
+
+      const daysInYear = daysInYearOf(selectedYear);
+      const prevDaysInYear = daysInYearOf(selectedYear - 1);
+      const sampleDays = buildYearSampleDays(daysInYear);
+
+      const startDateStr = formatDate(new Date(selectedYear, 0, 1));
+      const endDateStr = formatDate(new Date(selectedYear, 11, 31));
+      const prevStartDateStr = formatDate(new Date(selectedYear - 1, 0, 1));
+      const prevEndDateStr = formatDate(new Date(selectedYear - 1, 11, 31));
+
+      // For the running year the line stops at today — the remaining samples are
+      // future days, and a forward-filled flat line through them would read as a
+      // real (unchanging) balance.
+      const now = new Date();
+      const maxDay = selectedYear === now.getFullYear()
+        ? dayOfYearFromDateString(formatDate(now))
+        : null;
+
+      const [
+        history,
+        prevHistory,
+        anchorBalance,
+        prevAnchorBalance,
+        prevYearTotalExpenses,
+      ] = await Promise.all([
+        getBalanceHistory(selectedAccount, startDateStr, endDateStr),
+        getBalanceHistory(selectedAccount, prevStartDateStr, prevEndDateStr),
+        // Balance carried in from before Jan 1, so a year whose first snapshot
+        // lands in March still starts at a real number instead of a gap.
+        getAccountBalanceOnOrBeforeDate(selectedAccount, startDateStr),
+        getAccountBalanceOnOrBeforeDate(selectedAccount, prevStartDateStr),
+        getTotalExpenses(selectedAccount, prevStartDateStr, prevEndDateStr),
+      ]);
+
+      const actualForChart = buildYearSeries({
+        historyRows: history,
+        sampleDays,
+        anchorBalance,
+        maxDay,
+      });
+
+      // The previous year is read at the same day-of-year samples, so the two
+      // lines are directly comparable at every x. A 366th sample in a leap year
+      // simply holds the previous year's final value.
+      const prevYear = buildYearSeries({
+        historyRows: prevHistory,
+        sampleDays,
+        anchorBalance: prevAnchorBalance,
+        maxDay: null,
+      });
+
+      const actual = sampleDays
+        .map((day, index) => (actualForChart[index] === undefined
+          ? null
+          : { x: day, y: actualForChart[index] }))
+        .filter(Boolean);
+
+      setBalanceHistoryData({
+        granularity: 'year',
+        labels: sampleDays,
+        actual,
+        actualForChart,
+        prevYear,
+        prevYearTotalExpenses,
+        prevYearDaysCount: prevDaysInYear,
+        daysInYear,
+        maxDay,
+      });
+    } catch (error) {
+      console.error('Failed to load balance history:', error);
+      setBalanceHistoryData({ labels: [] });
+    } finally {
+      setLoadingBalanceHistory(false);
+    }
+  }, [selectedAccount, selectedYear]);
+
   // Load balance history data
   const loadBalanceHistory = useCallback(async () => {
-    if (!selectedAccount || selectedMonth === null) {
+    if (!selectedAccount) {
       setBalanceHistoryData({ labels: [] });
       setLoadingBalanceHistory(false);
+      return;
+    }
+
+    if (selectedMonth === null) {
+      await loadYearHistory();
       return;
     }
 
@@ -368,7 +524,7 @@ const useBalanceHistory = (selectedAccount, selectedYear, selectedMonth) => {
     } finally {
       setLoadingBalanceHistory(false);
     }
-  }, [selectedAccount, selectedYear, selectedMonth]);
+  }, [selectedAccount, selectedYear, selectedMonth, loadYearHistory]);
 
   // Open balance history modal with table data
   const loadBalanceHistoryTable = useCallback(async () => {
