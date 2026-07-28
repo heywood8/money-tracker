@@ -1,5 +1,12 @@
 # Changelog
 
+## [0.243.0](https://github.com/heywood8/money-tracker/compare/penny-v0.242.0...penny-v0.243.0) (2026-07-28)
+
+
+### Features
+
+* **budgets:** rebuild the plan line editor as a bottom sheet ([#1482](https://github.com/heywood8/money-tracker/issues/1482)) ([e2f405f](https://github.com/heywood8/money-tracker/commit/e2f405fac5bb6f13726fe75eb3168e1bec490605))
+
 ## [0.242.0](https://github.com/heywood8/money-tracker/compare/penny-v0.241.3...penny-v0.242.0) (2026-07-28)
 
 
