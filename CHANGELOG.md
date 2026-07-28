@@ -1,5 +1,12 @@
 # Changelog
 
+## [0.242.0](https://github.com/heywood8/money-tracker/compare/penny-v0.241.3...penny-v0.242.0) (2026-07-28)
+
+
+### Features
+
+* **notifications:** say what was parsed in the background review alert ([#1480](https://github.com/heywood8/money-tracker/issues/1480)) ([877ce49](https://github.com/heywood8/money-tracker/commit/877ce49b69d76eec5db99219e4780fa626fd3ad1))
+
 ## [0.241.3](https://github.com/heywood8/money-tracker/compare/penny-v0.241.2...penny-v0.241.3) (2026-07-27)
 
 
