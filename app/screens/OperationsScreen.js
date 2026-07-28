@@ -580,6 +580,18 @@ const OperationsScreen = () => {
     if (op) handleRepeatOperation(op);
   }, [actionMenu, handleRepeatOperation]);
 
+  // Hide an operation from (or return it to) every chart. Applied immediately —
+  // there is no form to save afterwards, and for a balance adjustment there is no
+  // form at all: its OperationModal is read-only, so this menu is the only way to
+  // keep a correction out of the donut and the spending trend.
+  const handleMenuToggleCharts = useCallback(async () => {
+    const op = actionMenu?.operation;
+    setActionMenu(null);
+    if (!op) return;
+    // updateOperation surfaces its own failures via dialog (OperationsActionsContext).
+    await updateOperation(op.id, { excludeFromCharts: !op.excludeFromCharts });
+  }, [actionMenu, updateOperation]);
+
   const handleMenuDelete = useCallback(() => {
     const op = actionMenu?.operation;
     setActionMenu(null);
@@ -1291,6 +1303,7 @@ const OperationsScreen = () => {
         onClose={closeActionMenu}
         onEdit={handleMenuEdit}
         onRepeat={handleMenuRepeat}
+        onToggleCharts={handleMenuToggleCharts}
         onDelete={handleMenuDelete}
       />
 

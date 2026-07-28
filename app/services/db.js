@@ -304,6 +304,13 @@ const isSchemaComplete = async (rawDb) => {
     // would throw `no such column: group_id`.
     if (!planLineCols.some(c => c.name === 'group_id')) return false;
 
+    // Check operations has exclude_from_charts column (migration 0023). Same
+    // reasoning as 0013's check: an install complete through 0022 would otherwise
+    // report "schema complete" and skip migrate(), so the column would never be
+    // added and every chart query (which filters on it) would throw
+    // `no such column: exclude_from_charts`.
+    if (!opsCols.some(c => c.name === 'exclude_from_charts')) return false;
+
     return true;
   } catch (error) {
     console.warn('[DB] isSchemaComplete check failed:', error.message);
@@ -644,6 +651,14 @@ const detectAppliedMigrations = async (rawDb) => {
     if ((await tableExists('budget_plan_line_groups'))
       && planLineCols.some(c => c.name === 'group_id')) {
       applied.push(22);
+    }
+  }
+
+  // Migration 0023: Adds operations.exclude_from_charts column.
+  if (await tableExists('operations')) {
+    const opsCols = await getColumns('operations');
+    if (opsCols.some(c => c.name === 'exclude_from_charts')) {
+      applied.push(23);
     }
   }
 

@@ -545,4 +545,31 @@ describe('OperationListItem', () => {
       expect(onEdit).toHaveBeenCalledWith(operation);
     });
   });
+
+  describe('Hidden from charts', () => {
+    it('marks a row whose operation is hidden from the charts', async () => {
+      const { getByTestId } = await render(
+        <OperationListItem
+          {...baseProps}
+          operation={{ ...baseOperation, excludeFromCharts: true }}
+        />,
+      );
+      expect(getByTestId('op-hidden-from-charts')).toBeTruthy();
+    });
+
+    it('shows no marker for an ordinary operation', async () => {
+      const { queryByTestId } = await render(<OperationListItem {...baseProps} />);
+      expect(queryByTestId('op-hidden-from-charts')).toBeNull();
+    });
+
+    it('announces the hidden state to screen readers', async () => {
+      const { getByLabelText } = await render(
+        <OperationListItem
+          {...baseProps}
+          operation={{ ...baseOperation, excludeFromCharts: true }}
+        />,
+      );
+      expect(getByLabelText(/hidden_from_charts/)).toBeTruthy();
+    });
+  });
 });

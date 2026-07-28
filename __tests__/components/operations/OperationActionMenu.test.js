@@ -1,6 +1,7 @@
 /**
  * Tests for OperationActionMenu — the long-press context menu shown over an
- * operation row (Edit / Repeat / Delete on a lifted, blurred backdrop).
+ * operation row (Edit / Repeat / hide-from-charts / Delete on a lifted, blurred
+ * backdrop).
  */
 import React from 'react';
 import { BackHandler, StyleSheet, Text, View } from 'react-native';
@@ -22,18 +23,19 @@ const colors = {
 
 const t = (key) => key;
 
-const makeMenu = () => ({
-  operation: { id: 'op-1', type: 'expense', amount: '10.00' },
+const makeMenu = (operation = {}) => ({
+  operation: { id: 'op-1', type: 'expense', amount: '10.00', ...operation },
   layout: { x: 16, y: 200, width: 320, height: 48 },
   row: <Text>Groceries</Text>,
 });
 
 const baseProps = () => ({
-  colors,
+  colors: { ...colors, mutedText: '#888' },
   t,
   onClose: jest.fn(),
   onEdit: jest.fn(),
   onRepeat: jest.fn(),
+  onToggleCharts: jest.fn(),
   onDelete: jest.fn(),
 });
 
@@ -65,10 +67,11 @@ describe('OperationActionMenu', () => {
     expect(queryByTestId('operation-action-menu-backdrop')).toBeNull();
   });
 
-  it('renders the three action buttons and the lifted row when open', async () => {
+  it('renders the action buttons and the lifted row when open', async () => {
     const { getByTestId, getByText } = await renderMenu({ menu: makeMenu(), ...baseProps() });
     await waitFor(() => expect(getByTestId('operation-action-edit')).toBeTruthy());
     expect(getByTestId('operation-action-repeat')).toBeTruthy();
+    expect(getByTestId('operation-action-charts')).toBeTruthy();
     expect(getByTestId('operation-action-delete')).toBeTruthy();
     expect(getByText('Groceries')).toBeTruthy();
   });
@@ -76,6 +79,7 @@ describe('OperationActionMenu', () => {
   it.each([
     ['operation-action-edit', 'onEdit'],
     ['operation-action-repeat', 'onRepeat'],
+    ['operation-action-charts', 'onToggleCharts'],
     ['operation-action-delete', 'onDelete'],
   ])('fires %s callback when pressed', async (testID, handler) => {
     const props = baseProps();
@@ -83,6 +87,41 @@ describe('OperationActionMenu', () => {
     await waitFor(() => expect(getByTestId(testID)).toBeTruthy());
     fireEvent.press(getByTestId(testID));
     expect(props[handler]).toHaveBeenCalledTimes(1);
+  });
+
+  describe('hide-from-charts action', () => {
+    it('offers it for a balance adjustment — its modal is read-only, so this is the only entry point', async () => {
+      const props = baseProps();
+      const { getByTestId } = await renderMenu({
+        menu: makeMenu({ categoryId: 'shadow-adjustment-expense' }),
+        ...props,
+      });
+      await waitFor(() => expect(getByTestId('operation-action-charts')).toBeTruthy());
+      fireEvent.press(getByTestId('operation-action-charts'));
+      expect(props.onToggleCharts).toHaveBeenCalledTimes(1);
+    });
+
+    it('is not offered for a transfer, which feeds no chart', async () => {
+      const { getByTestId, queryByTestId } = await renderMenu({
+        menu: makeMenu({ type: 'transfer' }),
+        ...baseProps(),
+      });
+      // The other actions stay.
+      await waitFor(() => expect(getByTestId('operation-action-edit')).toBeTruthy());
+      expect(queryByTestId('operation-action-charts')).toBeNull();
+    });
+
+    it('reads "hide" while the operation is shown and "show" once it is hidden', async () => {
+      const shown = await renderMenu({ menu: makeMenu(), ...baseProps() });
+      await waitFor(() => expect(shown.getByLabelText('exclude_from_charts')).toBeTruthy());
+      expect(shown.queryByLabelText('include_in_charts')).toBeNull();
+
+      const hidden = await renderMenu({
+        menu: makeMenu({ excludeFromCharts: true }),
+        ...baseProps(),
+      });
+      await waitFor(() => expect(hidden.getByLabelText('include_in_charts')).toBeTruthy());
+    });
   });
 
   it('dismisses when the backdrop is pressed', async () => {

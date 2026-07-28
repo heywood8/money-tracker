@@ -100,6 +100,14 @@ export const operations = sqliteTable('operations', {
   // 0 / null = counted (default). Lets a one-off large purchase not skew the
   // forecast. Physically appended last by migration 0013 (after longitude).
   excludeFromAvg: integer('exclude_from_avg').default(0),
+  // When 1, this operation is left out of every analytic surface: the expense and
+  // income donuts, the 12-month spending trend, the category drill-down list, the
+  // summary totals and the burndown forecast. Its money still moves — account
+  // balances, balance history and the operations list are untouched. 0 / null =
+  // shown (default). Unlike excludeFromAvg this flag is also settable on balance
+  // adjustments (shadow-category ops), which have no editable form and are toggled
+  // from the operations list's long-press menu. Appended by migration 0023.
+  excludeFromCharts: integer('exclude_from_charts').default(0),
 }, (table) => ({
   dateIdx: index('idx_operations_date').on(table.date),
   accountIdx: index('idx_operations_account').on(table.accountId),

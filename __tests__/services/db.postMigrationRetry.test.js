@@ -137,6 +137,7 @@ describe('DB post-migration handler retry (data-loss regression, adversarial rev
             { name: 'id', type: 'INTEGER' }, { name: 'account_id', type: 'INTEGER' },
             { name: 'original_balance', type: 'TEXT' }, { name: 'latitude', type: 'REAL' },
             { name: 'longitude', type: 'REAL' }, { name: 'exclude_from_avg', type: 'INTEGER' },
+            { name: 'exclude_from_charts', type: 'INTEGER' },
           ]);
         }
         if (sql.includes('table_info(categories)')) return Promise.resolve([{ name: 'id', type: 'INTEGER' }]);
