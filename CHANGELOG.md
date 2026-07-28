@@ -1,5 +1,12 @@
 # Changelog
 
+## [0.243.2](https://github.com/heywood8/money-tracker/compare/penny-v0.243.1...penny-v0.243.2) (2026-07-28)
+
+
+### Bug Fixes
+
+* **categories:** show the category tree in every picker, not a flat list ([#1486](https://github.com/heywood8/money-tracker/issues/1486)) ([cea9c8a](https://github.com/heywood8/money-tracker/commit/cea9c8ab4d2fbc1a0ed04007e29e6c01d7c50de8))
+
 ## [0.243.1](https://github.com/heywood8/money-tracker/compare/penny-v0.243.0...penny-v0.243.1) (2026-07-28)
 
 
