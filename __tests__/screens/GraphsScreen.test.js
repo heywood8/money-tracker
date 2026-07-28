@@ -5,7 +5,7 @@
  */
 
 import React from 'react';
-import { render, fireEvent, waitFor } from '@testing-library/react-native';
+import { act, render, fireEvent, waitFor } from '@testing-library/react-native';
 
 // Mock all dependencies.
 // Charts are Victory Native XL now — victory-native and @shopify/react-native-skia
@@ -905,6 +905,37 @@ describe('GraphsScreen', () => {
       const { queryByTestId } = await render(<GraphsScreen />);
 
       expect(queryByTestId('balance-history-empty')).toBeNull();
+    });
+  });
+
+  describe('Full-year selection', () => {
+    // The balance card used to be dropped entirely when a full year was picked,
+    // leaving the screen with a gap where the chart had been.
+    it('keeps the balance card on screen, in its year form', async () => {
+      const GraphsScreen = require('../../app/screens/GraphsScreen').default;
+      const { useAccountsData } = require('../../app/contexts/AccountsDataContext');
+      const { useLocalization } = require('../../app/contexts/LocalizationContext');
+      const { getAvailableMonths } = require('../../app/services/OperationsDB');
+
+      // Earlier cases leave a language mock in place (clearAllMocks keeps
+      // implementations), so pin the identity translator this case asserts on.
+      useLocalization.mockReturnValue({ t: (key) => key, language: 'en' });
+      useAccountsData.mockReturnValue({
+        accounts: [{ id: 'acc-1', name: 'Cash', currency: 'USD', balance: '100.00', displayOrder: 0 }],
+      });
+      const year = new Date().getFullYear() - 1;
+      getAvailableMonths.mockResolvedValue([{ year, month: 5 }]);
+
+      const { getByTestId, findByText } = await render(<GraphsScreen />);
+
+      // periodItems are newest-first: current month, then last year's month, then
+      // that year's "Full Year" entry — two steps down lands on the full year.
+      await waitFor(() => expect(getByTestId('period-chevron-older')).toBeTruthy());
+      await act(async () => { fireEvent.press(getByTestId('period-chevron-older')); });
+      await act(async () => { fireEvent.press(getByTestId('period-chevron-older')); });
+
+      // The card is present and speaking about a year, not a month
+      expect(await findByText('no_balance_history_year')).toBeTruthy();
     });
   });
 });

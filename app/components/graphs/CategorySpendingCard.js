@@ -9,6 +9,7 @@ import currencies from '../../../assets/currencies.json';
 import useCategoryMonthlySpending, { ALL_EXPENSE_CATEGORIES } from '../../hooks/useCategoryMonthlySpending';
 import { HORIZONTAL_PADDING } from '../../styles/layout';
 import { comparisonSeriesColor } from '../../styles/chartPalette';
+import { MONTH_ABBREVIATIONS } from './monthLabels';
 import ModalBlurOverlay from '../ModalBlurOverlay';
 import { useDisplaySettings } from '../../contexts/DisplaySettingsContext';
 
@@ -404,7 +405,7 @@ const CategorySpendingCard = ({
 
   const { hideBalances } = useDisplaySettings();
 
-  const monthAbbreviations = ['Ja', 'Fe', 'Mr', 'Ap', 'My', 'Jn', 'Jl', 'Au', 'Se', 'Oc', 'No', 'De'];
+  const monthAbbreviations = MONTH_ABBREVIATIONS;
   const monthKeys = ['month_january', 'month_february', 'month_march', 'month_april', 'month_may', 'month_june', 'month_july', 'month_august', 'month_september', 'month_october', 'month_november', 'month_december'];
 
   const hasData = monthlyData.some(item => item.total > 0);

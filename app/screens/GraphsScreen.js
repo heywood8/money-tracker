@@ -772,42 +772,42 @@ const GraphsScreen = () => {
             </Animated.View>
           </Animated.View>
 
-          {/* Balance History Card — shown for a specific month. When no account is
-              available, render an explicit empty state instead of silently dropping
-              the card, so the user sees an explanation rather than a blank gap
-              (QoL-11). Full-year selection intentionally omits this monthly card. */}
-          {selectedMonth !== null && (
-            selectedAccount ? (
-              <BalanceHistoryCard
-                colors={colors}
-                t={t}
-                selectedAccount={selectedAccount}
-                onAccountChange={setSelectedAccount}
-                accountItems={accountItems}
-                loadingBalanceHistory={loadingBalanceHistory}
-                balanceHistoryData={balanceHistoryData}
-                selectedYear={selectedYear}
-                selectedMonth={selectedMonth}
-                accounts={accounts}
-                spendingPrediction={spendingPrediction}
-                isCurrentMonth={isCurrentMonth}
-                closeLabel={t('close')}
-                onShowCalendar={handleShowCalendar}
-                balanceHistoryTableData={balanceHistoryTableData}
-                editingBalanceValue={editingBalanceValue}
-                onEditingBalanceValueChange={setEditingBalanceValue}
-                onEditBalance={handleEditBalance}
-                onCancelEdit={handleCancelEdit}
-                onSaveBalance={handleSaveBalance}
-                onDeleteBalance={handleDeleteBalance}
-              />
-            ) : (
-              <EmptyState
-                icon="chart-line-variant"
-                message={t('no_balance_history')}
-                testID="balance-history-empty"
-              />
-            )
+          {/* Balance History Card. A specific month draws the daily line with its
+              burndown norm; a full-year selection draws the same card in its year
+              form (weekly samples, month ticks, no norm — the card derives that
+              from selectedMonth === null). When no account is available, render an
+              explicit empty state instead of silently dropping the card, so the
+              user sees an explanation rather than a blank gap (QoL-11). */}
+          {selectedAccount ? (
+            <BalanceHistoryCard
+              colors={colors}
+              t={t}
+              selectedAccount={selectedAccount}
+              onAccountChange={setSelectedAccount}
+              accountItems={accountItems}
+              loadingBalanceHistory={loadingBalanceHistory}
+              balanceHistoryData={balanceHistoryData}
+              selectedYear={selectedYear}
+              selectedMonth={selectedMonth}
+              accounts={accounts}
+              spendingPrediction={spendingPrediction}
+              isCurrentMonth={isCurrentMonth}
+              closeLabel={t('close')}
+              onShowCalendar={handleShowCalendar}
+              balanceHistoryTableData={balanceHistoryTableData}
+              editingBalanceValue={editingBalanceValue}
+              onEditingBalanceValueChange={setEditingBalanceValue}
+              onEditBalance={handleEditBalance}
+              onCancelEdit={handleCancelEdit}
+              onSaveBalance={handleSaveBalance}
+              onDeleteBalance={handleDeleteBalance}
+            />
+          ) : (
+            <EmptyState
+              icon="chart-line-variant"
+              message={selectedMonth === null ? t('no_balance_history_year') : t('no_balance_history')}
+              testID="balance-history-empty"
+            />
           )}
 
           {/* Category Spending Trend Card - Last 12 Months */}
