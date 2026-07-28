@@ -2,11 +2,10 @@ import React, { useState, useEffect, useMemo, useCallback, useRef } from 'react'
 import {
   View,
   Text,
-  Modal,
+  TextInput,
   Pressable,
   StyleSheet,
   FlatList,
-  ScrollView,
   Keyboard,
   Animated,
   Easing,
@@ -14,27 +13,236 @@ import {
 } from 'react-native';
 import PropTypes from 'prop-types';
 import Icon from '@expo/vector-icons/MaterialCommunityIcons';
+import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { useThemeColors } from '../../contexts/ThemeColorsContext';
 import { useLocalization } from '../../contexts/LocalizationContext';
 import { DURATION_ENTER, DURATION_EXIT } from '../../utils/motion';
 import { motionDuration } from '../../utils/reducedMotion';
 import { useDialog } from '../../contexts/DialogContext';
-import useKeyboardOffset from '../../hooks/useKeyboardOffset';
 import FormInput from '../FormInput';
-import ModalBlurOverlay from '../ModalBlurOverlay';
-import ModalHeader from '../ModalHeader';
+import ModalShell from '../ModalShell';
+import { SPACING, BORDER_RADIUS, FONT_SIZE, ICON_SIZE } from '../../styles/designTokens';
 import * as Currency from '../../services/currency';
-
-// The overlay carries the keyboard inset, so it has to be animatable.
-const AnimatedPressable = Animated.createAnimatedComponent(Pressable);
 
 const KINDS = ['income', 'expense', 'transfer'];
 
+// Accent tints, as hex alpha suffixes on `colors.primary` (a real hex in both
+// themes — see ThemeColorsContext). A tinted accent reads as "selected" in light
+// and dark alike, which a solid primary fill does not: white-on-#4da3ff sits at
+// ~2.8:1 in the dark theme, and that is what every filled chip in here used to be.
+const TINT = '1F';
+const TINT_STRONG = '33';
+
+// A picker gets a search field once its list stops fitting on one screenful.
+// Below that, the field is one more thing to look past.
+const SEARCH_THRESHOLD = 8;
+
+// Track width − thumb − 2×inset. Kept as a constant because the thumb travels it
+// on the native driver, where the value has to be known up front.
+const SWITCH_TRAVEL = 20;
+
+/**
+ * One row of the sheet's grouped settings card: tinted leading glyph, the field
+ * name above its current value, and a trailing affordance (a chevron by default,
+ * or whatever `trailing` supplies).
+ *
+ * The field name lives INSIDE the row rather than as a caption above it: seven
+ * stacked label+control pairs is what made the old editor a wall of text where
+ * everything had equal weight and nothing had focus.
+ */
+function SheetRow({
+  colors,
+  icon,
+  title,
+  value,
+  muted = false,
+  onPress,
+  testID,
+  accessibilityLabel = null,
+  accessibilityRole = 'button',
+  accessibilityState = null,
+  trailing = null,
+}) {
+  return (
+    <Pressable
+      style={({ pressed }) => [styles.row, pressed && { backgroundColor: colors.selected }]}
+      onPress={onPress}
+      accessibilityRole={accessibilityRole}
+      accessibilityState={accessibilityState}
+      accessibilityLabel={accessibilityLabel || title}
+      accessibilityValue={{ text: value }}
+      testID={testID}
+    >
+      <View style={[styles.rowIcon, { backgroundColor: colors.primary + TINT }]}>
+        <Icon name={icon} size={ICON_SIZE.sm} color={colors.primary} />
+      </View>
+      <View style={styles.rowBody}>
+        <Text style={[styles.rowTitle, { color: colors.mutedText }]} numberOfLines={1}>
+          {title}
+        </Text>
+        <Text
+          style={[styles.rowValue, { color: muted ? colors.mutedText : colors.text }]}
+          numberOfLines={1}
+        >
+          {value}
+        </Text>
+      </View>
+      {trailing || <Icon name="chevron-right" size={ICON_SIZE.md} color={colors.mutedText} />}
+    </Pressable>
+  );
+}
+
+SheetRow.propTypes = {
+  colors: PropTypes.object.isRequired,
+  icon: PropTypes.string.isRequired,
+  title: PropTypes.string.isRequired,
+  value: PropTypes.string.isRequired,
+  muted: PropTypes.bool,
+  onPress: PropTypes.func.isRequired,
+  testID: PropTypes.string,
+  accessibilityLabel: PropTypes.string,
+  accessibilityRole: PropTypes.string,
+  accessibilityState: PropTypes.object,
+  trailing: PropTypes.node,
+};
+
+/**
+ * Inset segmented control — a recessed track with the selected option raised out
+ * of it, marked by the accent rather than filled with it.
+ */
+function Segments({ colors, options, value, onChange }) {
+  return (
+    <View style={[styles.segment, { backgroundColor: colors.background }]}>
+      {options.map((option) => {
+        const active = option.key === value;
+        return (
+          <Pressable
+            key={option.key}
+            style={[
+              styles.segmentButton,
+              active && { backgroundColor: colors.card, borderColor: colors.border },
+            ]}
+            onPress={() => onChange(option.key)}
+            accessibilityRole="button"
+            accessibilityState={{ selected: active }}
+            accessibilityLabel={option.label}
+            testID={option.testID}
+          >
+            <Text
+              style={[styles.segmentText, { color: active ? colors.primary : colors.mutedText }]}
+              numberOfLines={1}
+            >
+              {option.label}
+            </Text>
+          </Pressable>
+        );
+      })}
+    </View>
+  );
+}
+
+Segments.propTypes = {
+  colors: PropTypes.object.isRequired,
+  options: PropTypes.arrayOf(PropTypes.shape({
+    key: PropTypes.string.isRequired,
+    label: PropTypes.string.isRequired,
+    testID: PropTypes.string,
+  })).isRequired,
+  value: PropTypes.string,
+  onChange: PropTypes.func.isRequired,
+};
+
+/** One tappable row inside a picker subpanel. */
+function OptionRow({
+  colors,
+  icon,
+  label,
+  selected = false,
+  onPress,
+  testID,
+  accessibilityRole = 'button',
+  accessibilityState = null,
+}) {
+  return (
+    <Pressable
+      onPress={onPress}
+      style={({ pressed }) => [
+        styles.optionRow,
+        selected && { backgroundColor: colors.primary + TINT },
+        pressed && { backgroundColor: colors.selected },
+      ]}
+      accessibilityRole={accessibilityRole}
+      accessibilityState={accessibilityState || { selected }}
+      accessibilityLabel={label}
+      testID={testID}
+    >
+      <Icon name={icon} size={ICON_SIZE.md} color={selected ? colors.primary : colors.text} />
+      <Text style={[styles.optionText, { color: colors.text }]} numberOfLines={1}>
+        {label}
+      </Text>
+      {selected && <Icon name="check-circle" size={ICON_SIZE.sm} color={colors.primary} />}
+    </Pressable>
+  );
+}
+
+OptionRow.propTypes = {
+  colors: PropTypes.object.isRequired,
+  icon: PropTypes.string.isRequired,
+  label: PropTypes.string.isRequired,
+  selected: PropTypes.bool,
+  onPress: PropTypes.func.isRequired,
+  testID: PropTypes.string,
+  accessibilityRole: PropTypes.string,
+  accessibilityState: PropTypes.object,
+};
+
+/** Back arrow + title (+ optional trailing action) for a picker subpanel. */
+function PanelHeader({ colors, title, onBack, backLabel, backTestID, children = null }) {
+  return (
+    <View style={styles.panelHeader}>
+      <Pressable
+        onPress={onBack}
+        style={styles.panelBack}
+        hitSlop={8}
+        accessibilityRole="button"
+        accessibilityLabel={backLabel}
+        testID={backTestID}
+      >
+        <Icon name="arrow-left" size={ICON_SIZE.base} color={colors.text} />
+      </Pressable>
+      <Text style={[styles.panelTitle, { color: colors.text }]} numberOfLines={1}>
+        {title}
+      </Text>
+      {children}
+    </View>
+  );
+}
+
+PanelHeader.propTypes = {
+  colors: PropTypes.object.isRequired,
+  title: PropTypes.string.isRequired,
+  onBack: PropTypes.func.isRequired,
+  backLabel: PropTypes.string.isRequired,
+  backTestID: PropTypes.string,
+  children: PropTypes.node,
+};
+
+const matchesQuery = (name, query) => (
+  !query || String(name || '').toLowerCase().includes(query.toLowerCase())
+);
+
 /**
  * BudgetPlanLineModal — editor for a single budget line: a monthly target that
- * may also carry an executable template. Follows the repo's subpanel pattern (see
- * CLAUDE.md): the target and account pickers slide in over the form inside the
- * SAME modal — never a nested Modal.
+ * may also carry an executable template. Built on ModalShell, the app's shared
+ * bottom sheet (drag-to-dismiss, keyboard lift, cancel/save row), and following
+ * the repo's subpanel pattern (see CLAUDE.md): the target, account and group
+ * pickers slide in over the sheet through ModalShell's `overlayPanel` slot —
+ * never a nested Modal.
+ *
+ * The form is ordered by what decides what: kind first (it settles what the rest
+ * of the sheet means), then the amount as the sheet's one hero figure, then the
+ * links (target / execution account / group / scope) grouped into a single card
+ * of rows, and finally the free-text label and comment.
  *
  * `kind` decides what the line means and what an execution would create:
  *   - expense  → tracks spending across ONE OR MORE expense categories (at least
@@ -75,9 +283,9 @@ export default function BudgetPlanLineModal({
   const { colors } = useThemeColors();
   const { t } = useLocalization();
   const { showDialog } = useDialog();
-  // Lifts the card above the keyboard. NOT a KeyboardAvoidingView — see the
-  // hook's own note for what that one does inside a Modal under edge-to-edge.
-  const keyboardOffset = useKeyboardOffset(visible);
+  // A subpanel covers the sheet edge to edge, including the strip ModalShell
+  // reserves for the system navigation bar — so it pads that back in itself.
+  const insets = useSafeAreaInsets();
 
   const isEditingLine = line != null;
 
@@ -137,11 +345,16 @@ export default function BudgetPlanLineModal({
     if (line?.currency) set.add(line.currency);
     return [...set];
   }, [accounts, currency, line]);
+  // One option is not a choice: the single chip would be the plan's own currency,
+  // permanently selected, saying nothing the amount's own label does not already.
+  const showCurrencyChips = executionCurrency == null && currencyOptions.length > 1;
 
   // Subpanel navigation for the pickers.
   const [activeSubPanel, setActiveSubPanel] = useState(null); // null | 'target' | 'account' | 'group'
   // Which kind of target the target picker is currently showing.
   const [pickerKind, setPickerKind] = useState('category'); // 'category' | 'account'
+  // Filter for the open picker's list. Scoped to the panel, so it resets on open.
+  const [query, setQuery] = useState('');
   const mainAnim = useRef(new Animated.Value(0)).current;
   const subPanelAnim = useRef(new Animated.Value(0)).current;
 
@@ -185,6 +398,18 @@ export default function BudgetPlanLineModal({
     }
   }, [visible, mainAnim, subPanelAnim]);
 
+  // The scope switch animates rather than snapping: it is the one control here
+  // whose state is not spelled out by a value that changes next to it.
+  const recurringAnim = useRef(new Animated.Value(0)).current;
+  useEffect(() => {
+    Animated.timing(recurringAnim, {
+      toValue: isRecurring ? 1 : 0,
+      duration: motionDuration(180),
+      easing: Easing.out(Easing.cubic),
+      useNativeDriver: true,
+    }).start();
+  }, [isRecurring, recurringAnim]);
+
   // Guards the close animation's completion callback against a panel opened in
   // the meantime: closing runs for 180ms, and a tap on the OTHER picker inside
   // that window would otherwise be undone when the stale callback fires and
@@ -194,6 +419,7 @@ export default function BudgetPlanLineModal({
   const openSubPanel = useCallback((panel) => {
     Keyboard.dismiss();
     subPanelTokenRef.current++;
+    setQuery('');
     setActiveSubPanel(panel);
     Animated.parallel([
       Animated.timing(mainAnim, {
@@ -206,6 +432,7 @@ export default function BudgetPlanLineModal({
   }, [mainAnim, subPanelAnim]);
 
   const closeSubPanel = useCallback(() => {
+    Keyboard.dismiss();
     const token = ++subPanelTokenRef.current;
     Animated.parallel([
       Animated.timing(subPanelAnim, {
@@ -228,6 +455,13 @@ export default function BudgetPlanLineModal({
 
   const openAccountPanel = useCallback(() => openSubPanel('account'), [openSubPanel]);
   const openGroupPanel = useCallback(() => openSubPanel('group'), [openSubPanel]);
+
+  // Switching the picker's tab is switching lists, so the filter typed for one
+  // must not carry over and hide the other.
+  const handleSelectPickerKind = useCallback((next) => {
+    setPickerKind(next);
+    setQuery('');
+  }, []);
 
   const handleSelectGroup = useCallback((id) => {
     setGroupId(id);
@@ -383,13 +617,13 @@ export default function BudgetPlanLineModal({
     );
   }, [isEditingLine, showDialog, t, onDeleteLine, line]);
 
-  const handleRequestClose = useCallback(() => {
-    if (activeSubPanel) {
-      closeSubPanel();
-    } else {
-      onClose();
-    }
-  }, [activeSubPanel, closeSubPanel, onClose]);
+  // Android back closes the open picker first; only a sheet with none left to
+  // close is dismissed (ModalShell plays its own exit for that).
+  const handleBackIntercept = useCallback(() => {
+    if (!activeSubPanel) return false;
+    closeSubPanel();
+    return true;
+  }, [activeSubPanel, closeSubPanel]);
 
   // Selected-target summary for the picker row on the main form. With several
   // categories the row names the first and counts the rest ("Groceries +2") —
@@ -417,610 +651,457 @@ export default function BudgetPlanLineModal({
   const subPanelTranslateX = subPanelAnim.interpolate({ inputRange: [0, 1], outputRange: [panelWidth, 0] });
   const mainTranslateX = mainAnim.interpolate({ inputRange: [0, 1], outputRange: [0, -40] });
   const mainOpacity = mainAnim.interpolate({ inputRange: [0, 1], outputRange: [1, 0] });
+  const switchTranslateX = recurringAnim.interpolate({ inputRange: [0, 1], outputRange: [0, SWITCH_TRAVEL] });
+
+  // The picker's list, filtered by whatever is in the panel's search field.
+  const targetOptions = kind !== 'income' && pickerKind === 'account' ? accounts : targetCategories;
+  const visibleTargetOptions = useMemo(
+    () => targetOptions.filter(item => matchesQuery(item.name, query)),
+    [targetOptions, query],
+  );
+  const visibleAccounts = useMemo(
+    () => accounts.filter(item => matchesQuery(item.name, query)),
+    [accounts, query],
+  );
 
   const renderTargetItem = useCallback(({ item }) => {
-    const isCat = pickerKind === 'category';
+    const isCat = pickerKind === 'category' || kind === 'income';
     const selected = isCat ? categoryIds.includes(item.id) : toAccountId === item.id;
     return (
-      <Pressable
+      <OptionRow
+        colors={colors}
+        icon={isCat ? (item.icon || 'shape-outline') : 'bank-transfer'}
+        label={item.name}
+        selected={selected}
         onPress={() => (isCat ? handleToggleCategory(item) : handleSelectTransferTarget(item))}
-        style={({ pressed }) => [
-          styles.pickerOption,
-          { borderColor: colors.border },
-          pressed && { backgroundColor: colors.selected },
-          selected && { backgroundColor: colors.selected },
-        ]}
         // A category toggles in and out of the set; an account replaces the
         // target outright, so they get different a11y roles.
         accessibilityRole={isCat ? 'checkbox' : 'button'}
         accessibilityState={isCat ? { checked: selected } : { selected }}
-        accessibilityLabel={item.name}
         testID={`plan-target-option-${isCat ? 'cat' : 'acc'}-${item.id}`}
-      >
-        <Icon name={isCat ? (item.icon || 'shape-outline') : 'bank-transfer'} size={22} color={colors.text} />
-        <Text style={[styles.optionText, { color: colors.text }]} numberOfLines={1}>{item.name}</Text>
-        {isCat && selected && (
-          <Icon name="check" size={20} color={colors.primary} />
-        )}
-      </Pressable>
+      />
     );
-  }, [pickerKind, categoryIds, toAccountId, colors, handleToggleCategory, handleSelectTransferTarget]);
+  }, [pickerKind, kind, categoryIds, toAccountId, colors, handleToggleCategory, handleSelectTransferTarget]);
 
   const renderExecutionAccountItem = useCallback(({ item }) => (
-    <Pressable
+    <OptionRow
+      colors={colors}
+      icon="wallet-outline"
+      label={`${item.name} · ${item.currency}`}
+      selected={accountId === item.id}
       onPress={() => handleSelectExecutionAccount(item)}
-      style={({ pressed }) => [
-        styles.pickerOption,
-        { borderColor: colors.border },
-        pressed && { backgroundColor: colors.selected },
-        accountId === item.id && { backgroundColor: colors.selected },
-      ]}
-      accessibilityRole="button"
-      accessibilityLabel={item.name}
       testID={`plan-account-option-${item.id}`}
-    >
-      <Icon name="wallet-outline" size={22} color={colors.text} />
-      <Text style={[styles.optionText, { color: colors.text }]} numberOfLines={1}>
-        {item.name} · {item.currency}
-      </Text>
-    </Pressable>
+    />
   ), [accountId, colors, handleSelectExecutionAccount]);
 
   const title = isEditingLine ? t('edit_allocation') : t('add_allocation');
+  const panelStyle = [
+    styles.panel,
+    { backgroundColor: colors.card, paddingBottom: insets.bottom + SPACING.md },
+    { opacity: subPanelAnim, transform: [{ translateX: subPanelTranslateX }] },
+  ];
+  const emptyListText = query ? t('no_results') : null;
+
+  const subPanel = activeSubPanel ? (
+    <Animated.View testID={`plan-${activeSubPanel}-subpanel`} style={panelStyle}>
+      {activeSubPanel === 'target' && (
+        <>
+          <PanelHeader
+            colors={colors}
+            title={t('select_target')}
+            onBack={closeSubPanel}
+            backLabel={t('back')}
+            backTestID="plan-target-back"
+          >
+            {/* Categories toggle in place instead of closing the panel, so there
+                has to be something that says "I'm finished picking". The account
+                tab needs none — one tap there is the whole selection. */}
+            {(pickerKind === 'category' || kind === 'income') && (
+              <Pressable
+                onPress={closeSubPanel}
+                style={styles.panelDone}
+                hitSlop={8}
+                accessibilityRole="button"
+                accessibilityLabel={t('done')}
+                testID="plan-target-done"
+              >
+                <Text style={[styles.panelDoneText, { color: colors.primary }]}>{t('done')}</Text>
+              </Pressable>
+            )}
+          </PanelHeader>
+
+          {/* Two-mode toggle: category OR destination account. An income line
+              tracks no transfer target, so it skips the toggle. */}
+          {kind !== 'income' && (
+            <Segments
+              colors={colors}
+              value={pickerKind}
+              onChange={handleSelectPickerKind}
+              options={[
+                { key: 'category', label: t('category_target'), testID: 'plan-target-tab-category' },
+                { key: 'account', label: t('transfer_target'), testID: 'plan-target-tab-account' },
+              ]}
+            />
+          )}
+
+          {targetOptions.length >= SEARCH_THRESHOLD && (
+            <FormInput
+              value={query}
+              onChangeText={setQuery}
+              placeholder={t('search')}
+              leftIcon="magnify"
+              testID="plan-target-search"
+            />
+          )}
+
+          <FlatList
+            data={visibleTargetOptions}
+            keyExtractor={(item) => String(item.id)}
+            renderItem={renderTargetItem}
+            keyboardShouldPersistTaps="handled"
+            style={styles.panelListBody}
+            contentContainerStyle={styles.panelList}
+            ListEmptyComponent={(
+              <Text style={[styles.emptyText, { color: colors.mutedText }]}>
+                {emptyListText
+                  || (pickerKind === 'category' || kind === 'income' ? t('no_categories') : t('no_accounts'))}
+              </Text>
+            )}
+          />
+        </>
+      )}
+
+      {/* Pick an existing envelope, drop out of one, or create one without
+          leaving the half-filled form. */}
+      {activeSubPanel === 'group' && (
+        <>
+          <PanelHeader
+            colors={colors}
+            title={t('group')}
+            onBack={closeSubPanel}
+            backLabel={t('back')}
+            backTestID="plan-group-back"
+          />
+
+          {onCreateGroup && (
+            <View style={styles.newGroupRow}>
+              <View style={styles.newGroupInput}>
+                <FormInput
+                  value={newGroupName}
+                  onChangeText={setNewGroupName}
+                  placeholder={t('new_group')}
+                  leftIcon="folder-plus-outline"
+                  testID="plan-group-new-name"
+                />
+              </View>
+              <Pressable
+                onPress={handleCreateGroup}
+                disabled={!newGroupName.trim()}
+                style={[
+                  styles.newGroupButton,
+                  { backgroundColor: colors.primary },
+                  !newGroupName.trim() && styles.disabled,
+                ]}
+                accessibilityRole="button"
+                accessibilityLabel={t('create_group')}
+                accessibilityState={{ disabled: !newGroupName.trim() }}
+                testID="plan-group-create"
+              >
+                <Icon name="plus" size={ICON_SIZE.md} color="#fff" />
+              </Pressable>
+            </View>
+          )}
+
+          <OptionRow
+            colors={colors}
+            icon="close-circle-outline"
+            label={t('no_group')}
+            selected={groupId == null}
+            onPress={() => handleSelectGroup(null)}
+            testID="plan-group-option-none"
+          />
+
+          <FlatList
+            data={groups}
+            keyExtractor={(item) => String(item.id)}
+            keyboardShouldPersistTaps="handled"
+            style={styles.panelListBody}
+            contentContainerStyle={styles.panelList}
+            renderItem={({ item }) => (
+              <OptionRow
+                colors={colors}
+                icon="folder-outline"
+                label={item.label}
+                selected={groupId === item.id}
+                onPress={() => handleSelectGroup(item.id)}
+                testID={`plan-group-option-${item.id}`}
+              />
+            )}
+            ListEmptyComponent={(
+              <Text style={[styles.emptyText, { color: colors.mutedText }]}>
+                {t('no_groups_yet')}
+              </Text>
+            )}
+          />
+        </>
+      )}
+
+      {activeSubPanel === 'account' && (
+        <>
+          <PanelHeader
+            colors={colors}
+            title={t('template_account')}
+            onBack={closeSubPanel}
+            backLabel={t('back')}
+            backTestID="plan-account-back"
+          />
+
+          {accounts.length >= SEARCH_THRESHOLD && (
+            <FormInput
+              value={query}
+              onChangeText={setQuery}
+              placeholder={t('search')}
+              leftIcon="magnify"
+              testID="plan-account-search"
+            />
+          )}
+
+          <OptionRow
+            colors={colors}
+            icon="close-circle-outline"
+            label={t('no_template_account')}
+            selected={accountId == null}
+            onPress={() => handleSelectExecutionAccount(null)}
+            testID="plan-account-option-none"
+          />
+
+          <FlatList
+            data={visibleAccounts}
+            keyExtractor={(item) => String(item.id)}
+            renderItem={renderExecutionAccountItem}
+            keyboardShouldPersistTaps="handled"
+            style={styles.panelListBody}
+            contentContainerStyle={styles.panelList}
+            ListEmptyComponent={(
+              <Text style={[styles.emptyText, { color: colors.mutedText }]}>
+                {emptyListText || t('no_accounts')}
+              </Text>
+            )}
+          />
+        </>
+      )}
+    </Animated.View>
+  ) : null;
 
   return (
-    <>
-      {visible && <ModalBlurOverlay />}
-      <Modal
-        visible={visible}
-        animationType="slide"
-        transparent
-        onRequestClose={handleRequestClose}
+    <ModalShell
+      visible={visible}
+      onDismiss={onClose}
+      onCancel={onClose}
+      onSave={handleSave}
+      saveDisabled={saving}
+      saveTestID="plan-line-save"
+      onDelete={isEditingLine ? handleDelete : null}
+      deleteLabel={t('delete_allocation')}
+      deleteTestID="plan-line-delete"
+      title={title}
+      showBlurOverlay
+      overlayPanel={subPanel}
+      onBackIntercept={handleBackIntercept}
+    >
+      <Animated.View
         testID="plan-line-modal"
+        style={[styles.form, { opacity: mainOpacity, transform: [{ translateX: mainTranslateX }] }]}
       >
-        <AnimatedPressable
-          style={[styles.modalOverlay, { paddingBottom: keyboardOffset }]}
-          onPress={onClose}
-        >
-          <Pressable style={[styles.modalContent, { backgroundColor: colors.card }]} onPress={() => {}}>
-            <Animated.View
-              style={[styles.mainContent, { opacity: mainOpacity, transform: [{ translateX: mainTranslateX }] }]}
-            >
-              <ScrollView
-                contentContainerStyle={styles.scrollContent}
-                keyboardShouldPersistTaps="handled"
-              >
-                <ModalHeader title={title} />
+        {/* What this line is: income declares expected income, expense and
+            transfer allocate it. First, because it decides what everything
+            below it means. */}
+        <Segments
+          colors={colors}
+          value={kind}
+          onChange={handleSelectKind}
+          options={KINDS.map(option => ({
+            key: option,
+            label: t(option),
+            testID: `plan-line-kind-${option}`,
+          }))}
+        />
 
-                {/* What this line is: income declares expected income, expense
-                    and transfer allocate it. */}
-                <View style={styles.field}>
-                  <Text style={[styles.fieldLabel, { color: colors.mutedText }]}>
-                    {t('allocation_type')}
-                  </Text>
-                  <View style={styles.segment}>
-                    {KINDS.map((option) => (
-                      <Pressable
-                        key={option}
-                        style={[
-                          styles.segmentButton,
-                          { borderColor: colors.border },
-                          kind === option && { backgroundColor: colors.primary, borderColor: colors.primary },
-                        ]}
-                        onPress={() => handleSelectKind(option)}
-                        accessibilityRole="button"
-                        accessibilityState={{ selected: kind === option }}
-                        accessibilityLabel={t(option)}
-                        testID={`plan-line-kind-${option}`}
-                      >
-                        <Text style={[styles.segmentText, { color: kind === option ? colors.text : colors.mutedText }]}>
-                          {t(option)}
-                        </Text>
-                      </Pressable>
-                    ))}
-                  </View>
-                </View>
+        {/* The sheet's one hero figure. A budget line is a number with things
+            attached to it, and the old editor rendered that number in the same
+            48dp box as its optional comment. */}
+        <View style={[styles.amountCard, { backgroundColor: colors.background }]}>
+          <Text style={[styles.amountLabel, { color: colors.mutedText }]}>
+            {t('amount')}{displayCurrency ? ` · ${displayCurrency}` : ''}
+          </Text>
+          <TextInput
+            value={amount}
+            onChangeText={handleAmountChange}
+            placeholder="0"
+            placeholderTextColor={colors.mutedText}
+            keyboardType="decimal-pad"
+            selectTextOnFocus
+            style={[styles.amountInput, { color: colors.text }]}
+            accessibilityLabel={t('amount')}
+            testID="plan-line-amount"
+          />
 
-                {/* Tracking target */}
-                <View style={styles.field}>
-                  <Text style={[styles.fieldLabel, { color: colors.mutedText }]}>
-                    {kind === 'income' ? `${t('income_target')} · ${t('optional')}` : t('tracking_target')}
-                  </Text>
+          {/* Currency picker — offered for any line without an execution
+              account: with an account the amount is by definition in that
+              account's currency and there is nothing to pick. A one-off line
+              defaults to the plan's currency (and stores null, i.e. "inherit",
+              while it stays on it). */}
+          {showCurrencyChips && (
+            <View style={styles.currencyRow}>
+              {currencyOptions.map((code) => {
+                const active = lineCurrency === code;
+                return (
                   <Pressable
-                    style={[styles.targetButton, { backgroundColor: colors.inputBackground, borderColor: colors.inputBorder }]}
-                    onPress={openTargetPanel}
-                    accessibilityRole="button"
-                    accessibilityLabel={t('select_target')}
-                    testID="plan-target-picker"
-                  >
-                    {targetSummary ? (
-                      <View style={styles.targetValue}>
-                        <Icon name={targetSummary.icon} size={20} color={colors.text} />
-                        <Text style={[styles.text16, { color: colors.text }]} numberOfLines={1}>
-                          {targetSummary.name}
-                        </Text>
-                      </View>
-                    ) : (
-                      <Text style={[styles.text16, { color: colors.mutedText }]}>
-                        {t('select_target')}
-                      </Text>
-                    )}
-                    <Icon name="chevron-right" size={20} color={colors.mutedText} />
-                  </Pressable>
-                </View>
-
-                {/* Execution account — set one and the line becomes a one-tap
-                    payable (the former planned operation). */}
-                <View style={styles.field}>
-                  <Text style={[styles.fieldLabel, { color: colors.mutedText }]}>
-                    {t('template_account')} · {t('optional')}
-                  </Text>
-                  <Pressable
-                    style={[styles.targetButton, { backgroundColor: colors.inputBackground, borderColor: colors.inputBorder }]}
-                    onPress={openAccountPanel}
-                    accessibilityRole="button"
-                    accessibilityLabel={t('template_account')}
-                    testID="plan-account-picker"
-                  >
-                    {executionAccount ? (
-                      <View style={styles.targetValue}>
-                        <Icon name="wallet-outline" size={20} color={colors.text} />
-                        <Text style={[styles.text16, { color: colors.text }]} numberOfLines={1}>
-                          {executionAccount.name} · {executionAccount.currency}
-                        </Text>
-                      </View>
-                    ) : (
-                      <Text style={[styles.text16, { color: colors.mutedText }]}>
-                        {t('no_template_account')}
-                      </Text>
-                    )}
-                    <Icon name="chevron-right" size={20} color={colors.mutedText} />
-                  </Pressable>
-                  <Text style={[styles.fieldHint, { color: colors.mutedText }]}>
-                    {t('template_account_hint')}
-                  </Text>
-                </View>
-
-                {/* Group — an envelope this line shares with others (migration
-                    0022). Offered for allocations only: an income line declares
-                    expected income and has no spending for a group to total. */}
-                {kind !== 'income' && (
-                  <View style={styles.field}>
-                    <Text style={[styles.fieldLabel, { color: colors.mutedText }]}>
-                      {t('group')} · {t('optional')}
-                    </Text>
-                    <Pressable
-                      style={[styles.targetButton, { backgroundColor: colors.inputBackground, borderColor: colors.inputBorder }]}
-                      onPress={openGroupPanel}
-                      accessibilityRole="button"
-                      accessibilityLabel={t('group')}
-                      testID="plan-group-picker"
-                    >
-                      {selectedGroup ? (
-                        <View style={styles.targetValue}>
-                          <Icon name="folder-outline" size={20} color={colors.text} />
-                          <Text style={[styles.text16, { color: colors.text }]} numberOfLines={1}>
-                            {selectedGroup.label}
-                          </Text>
-                        </View>
-                      ) : (
-                        <Text style={[styles.text16, { color: colors.mutedText }]}>
-                          {t('no_group')}
-                        </Text>
-                      )}
-                      <Icon name="chevron-right" size={20} color={colors.mutedText} />
-                    </Pressable>
-                  </View>
-                )}
-
-                {/* Recurring toggle: a recurring line is a global template that
-                    applies to every calendar month automatically, instead of
-                    being scoped to this one month. */}
-                <Pressable
-                  style={[styles.recurringRow, { borderColor: colors.border }]}
-                  onPress={() => setIsRecurring(v => !v)}
-                  accessibilityRole="switch"
-                  accessibilityState={{ checked: isRecurring }}
-                  accessibilityLabel={t('recurring_allocation')}
-                  testID="plan-line-recurring-toggle"
-                >
-                  <View style={styles.recurringLabel}>
-                    <Icon name="repeat" size={20} color={colors.text} />
-                    <Text style={[styles.text16, { color: colors.text }]}>
-                      {t('recurring_allocation')}
-                    </Text>
-                  </View>
-                  <View
+                    key={code}
                     style={[
-                      styles.switchTrack,
-                      { backgroundColor: isRecurring ? colors.primary : colors.border },
+                      styles.currencyChip,
+                      { borderColor: active ? colors.primary : colors.border },
+                      active && { backgroundColor: colors.primary + TINT_STRONG },
                     ]}
-                  >
-                    <View
-                      style={[
-                        styles.switchThumb,
-                        { transform: [{ translateX: isRecurring ? 18 : 2 }] },
-                      ]}
-                    />
-                  </View>
-                </Pressable>
-
-                {/* Currency picker — shown for any line without an execution
-                    account: with an account the amount is by definition in that
-                    account's currency and there is nothing to pick. A one-off
-                    line defaults to the plan's currency (and stores null, i.e.
-                    "inherit", while it stays on it). */}
-                {executionCurrency == null && currencyOptions.length > 0 && (
-                  <View style={styles.field}>
-                    <Text style={[styles.fieldLabel, { color: colors.mutedText }]}>
-                      {t('currency')}
-                    </Text>
-                    <View style={styles.currencyRow}>
-                      {currencyOptions.map((code) => (
-                        <Pressable
-                          key={code}
-                          style={[
-                            styles.currencyChip,
-                            { borderColor: colors.border },
-                            lineCurrency === code && { backgroundColor: colors.primary, borderColor: colors.primary },
-                          ]}
-                          onPress={() => setLineCurrency(code)}
-                          accessibilityRole="button"
-                          accessibilityState={{ selected: lineCurrency === code }}
-                          accessibilityLabel={code}
-                          testID={`plan-line-currency-${code}`}
-                        >
-                          <Text style={[styles.currencyChipText, { color: colors.text }]}>{code}</Text>
-                        </Pressable>
-                      ))}
-                    </View>
-                  </View>
-                )}
-
-                {/* Amount — a plain numeric field. A budget line is typed once
-                    and rarely edited, so the on-screen calculator cost half the
-                    modal's height (its bottom row sat under the button bar) and
-                    bought nothing the number pad doesn't already give. */}
-                <View style={styles.field}>
-                  <Text style={[styles.fieldLabel, { color: colors.mutedText }]}>
-                    {t('amount')}{displayCurrency ? ` · ${displayCurrency}` : ''}
-                  </Text>
-                  <FormInput
-                    value={amount}
-                    onChangeText={handleAmountChange}
-                    placeholder="0"
-                    keyboardType="decimal-pad"
-                    testID="plan-line-amount"
-                  />
-                </View>
-
-                {/* Label + comment */}
-                <View style={styles.field}>
-                  <Text style={[styles.fieldLabel, { color: colors.mutedText }]}>
-                    {t('allocation_label')} · {t('optional')}
-                  </Text>
-                  <FormInput
-                    value={label}
-                    onChangeText={setLabel}
-                    placeholder={targetSummary?.name || t('allocation_label')}
-                    testID="plan-line-label"
-                  />
-                </View>
-                <View style={styles.field}>
-                  <Text style={[styles.fieldLabel, { color: colors.mutedText }]}>
-                    {t('allocation_comment')} · {t('optional')}
-                  </Text>
-                  <FormInput
-                    value={comment}
-                    onChangeText={setComment}
-                    placeholder={t('allocation_comment')}
-                    multiline
-                    numberOfLines={2}
-                    testID="plan-line-comment"
-                  />
-                </View>
-
-                {error && (
-                  <Text style={[styles.error, { color: colors.danger }]} testID="plan-line-error">
-                    {error}
-                  </Text>
-                )}
-
-                {isEditingLine && (
-                  <Pressable
-                    style={[styles.deleteRow, { borderTopColor: colors.border }]}
-                    onPress={handleDelete}
+                    onPress={() => setLineCurrency(code)}
                     accessibilityRole="button"
-                    accessibilityLabel={t('delete_allocation')}
-                    testID="plan-line-delete"
+                    accessibilityState={{ selected: active }}
+                    accessibilityLabel={code}
+                    testID={`plan-line-currency-${code}`}
                   >
-                    <Icon name="delete-outline" size={20} color={colors.delete || colors.danger} />
-                    <Text style={[styles.deleteText, { color: colors.delete || colors.danger }]}>
-                      {t('delete_allocation')}
+                    <Text
+                      style={[styles.currencyChipText, { color: active ? colors.primary : colors.mutedText }]}
+                    >
+                      {code}
                     </Text>
                   </Pressable>
-                )}
-              </ScrollView>
+                );
+              })}
+            </View>
+          )}
+        </View>
 
-              <View style={[styles.buttonRow, { backgroundColor: colors.card }]}>
-                <Pressable
-                  style={[styles.button, { backgroundColor: colors.secondary }]}
-                  onPress={onClose}
-                  accessibilityRole="button"
-                  accessibilityLabel={t('cancel')}
-                >
-                  <Text style={[styles.buttonText, { color: colors.text }]}>{t('cancel')}</Text>
-                </Pressable>
-                <Pressable
-                  style={[styles.button, { backgroundColor: colors.primary }, saving && styles.buttonDisabled]}
-                  onPress={handleSave}
-                  disabled={saving}
-                  accessibilityRole="button"
-                  accessibilityLabel={t('save')}
-                  accessibilityState={{ disabled: saving, busy: saving }}
-                  testID="plan-line-save"
-                >
-                  <Text style={[styles.buttonText, { color: colors.text }]}>{t('save')}</Text>
-                </Pressable>
+        {/* Everything the line is linked to, in one card of rows: what it
+            tracks, what executes it, which envelope it belongs to, and how long
+            it lives. */}
+        <View style={[styles.group, { backgroundColor: colors.background }]}>
+          <SheetRow
+            colors={colors}
+            icon={targetSummary?.icon || (kind === 'transfer' ? 'bank-transfer' : 'target')}
+            title={kind === 'income' ? `${t('income_target')} · ${t('optional')}` : t('tracking_target')}
+            value={targetSummary?.name || t('select_target')}
+            muted={!targetSummary}
+            onPress={openTargetPanel}
+            accessibilityLabel={t('select_target')}
+            testID="plan-target-picker"
+          />
+
+          <View style={[styles.divider, { backgroundColor: colors.border }]} />
+
+          {/* Execution account — set one and the line becomes a one-tap payable
+              (the former planned operation). */}
+          <SheetRow
+            colors={colors}
+            icon="wallet-outline"
+            title={`${t('template_account')} · ${t('optional')}`}
+            value={executionAccount
+              ? `${executionAccount.name} · ${executionAccount.currency}`
+              : t('no_template_account')}
+            muted={!executionAccount}
+            onPress={openAccountPanel}
+            accessibilityLabel={t('template_account')}
+            testID="plan-account-picker"
+          />
+
+          {/* Group — an envelope this line shares with others (migration 0022).
+              Offered for allocations only: an income line declares expected
+              income and has no spending for a group to total. */}
+          {kind !== 'income' && (
+            <>
+              <View style={[styles.divider, { backgroundColor: colors.border }]} />
+              <SheetRow
+                colors={colors}
+                icon="folder-outline"
+                title={`${t('group')} · ${t('optional')}`}
+                value={selectedGroup ? selectedGroup.label : t('no_group')}
+                muted={!selectedGroup}
+                onPress={openGroupPanel}
+                accessibilityLabel={t('group')}
+                testID="plan-group-picker"
+              />
+            </>
+          )}
+
+          <View style={[styles.divider, { backgroundColor: colors.border }]} />
+
+          {/* Scope: a recurring line is a global template that applies to every
+              calendar month automatically, instead of being scoped to this one. */}
+          <SheetRow
+            colors={colors}
+            icon="repeat"
+            title={t('recurring_allocation')}
+            value={isRecurring ? t('recurring') : t('one_time')}
+            onPress={() => setIsRecurring(v => !v)}
+            accessibilityRole="switch"
+            accessibilityState={{ checked: isRecurring }}
+            accessibilityLabel={t('recurring_allocation')}
+            testID="plan-line-recurring-toggle"
+            trailing={(
+              <View style={[styles.switchTrack, { backgroundColor: colors.border }]}>
+                <Animated.View
+                  style={[
+                    styles.switchTrackFill,
+                    { backgroundColor: colors.primary, opacity: recurringAnim },
+                  ]}
+                />
+                <Animated.View
+                  style={[styles.switchThumb, { transform: [{ translateX: switchTranslateX }] }]}
+                />
               </View>
-            </Animated.View>
-
-            {/* Target picker subpanel (slides in over the form) */}
-            {activeSubPanel === 'target' && (
-              <Animated.View
-                testID="plan-target-subpanel"
-                style={[
-                  styles.subPanel,
-                  { backgroundColor: colors.card },
-                  { opacity: subPanelAnim, transform: [{ translateX: subPanelTranslateX }] },
-                ]}
-              >
-                <View style={styles.subPanelHeader}>
-                  <Pressable
-                    onPress={closeSubPanel}
-                    style={styles.subPanelBack}
-                    hitSlop={8}
-                    accessibilityRole="button"
-                    accessibilityLabel={t('back')}
-                    testID="plan-target-back"
-                  >
-                    <Icon name="arrow-left" size={24} color={colors.text} />
-                  </Pressable>
-                  <Text style={[styles.subPanelTitle, { color: colors.text }]}>{t('select_target')}</Text>
-                  {/* Categories toggle in place instead of closing the panel,
-                      so there has to be something that says "I'm finished
-                      picking". The account tab needs none — one tap there is
-                      the whole selection. */}
-                  {pickerKind === 'category' && (
-                    <Pressable
-                      onPress={closeSubPanel}
-                      style={styles.subPanelDone}
-                      hitSlop={8}
-                      accessibilityRole="button"
-                      accessibilityLabel={t('done')}
-                      testID="plan-target-done"
-                    >
-                      <Text style={[styles.subPanelDoneText, { color: colors.primary }]}>{t('done')}</Text>
-                    </Pressable>
-                  )}
-                </View>
-
-                {/* Two-mode toggle: category OR destination account. An income
-                    line tracks no transfer target, so it skips the toggle. */}
-                {kind !== 'income' && (
-                  <View style={styles.segment}>
-                    <Pressable
-                      style={[
-                        styles.segmentButton,
-                        { borderColor: colors.border },
-                        pickerKind === 'category' && { backgroundColor: colors.primary },
-                      ]}
-                      onPress={() => setPickerKind('category')}
-                      accessibilityRole="button"
-                      accessibilityState={{ selected: pickerKind === 'category' }}
-                      accessibilityLabel={t('category_target')}
-                      testID="plan-target-tab-category"
-                    >
-                      <Text style={[styles.segmentText, { color: pickerKind === 'category' ? colors.text : colors.mutedText }]}>
-                        {t('category_target')}
-                      </Text>
-                    </Pressable>
-                    <Pressable
-                      style={[
-                        styles.segmentButton,
-                        { borderColor: colors.border },
-                        pickerKind === 'account' && { backgroundColor: colors.primary },
-                      ]}
-                      onPress={() => setPickerKind('account')}
-                      accessibilityRole="button"
-                      accessibilityState={{ selected: pickerKind === 'account' }}
-                      accessibilityLabel={t('transfer_target')}
-                      testID="plan-target-tab-account"
-                    >
-                      <Text style={[styles.segmentText, { color: pickerKind === 'account' ? colors.text : colors.mutedText }]}>
-                        {t('transfer_target')}
-                      </Text>
-                    </Pressable>
-                  </View>
-                )}
-
-                <FlatList
-                  data={kind !== 'income' && pickerKind === 'account' ? accounts : targetCategories}
-                  keyExtractor={(item) => String(item.id)}
-                  renderItem={renderTargetItem}
-                  keyboardShouldPersistTaps="handled"
-                  ListEmptyComponent={(
-                    <Text style={[styles.emptyText, { color: colors.mutedText }]}>
-                      {pickerKind === 'category' ? t('no_categories') : t('no_accounts')}
-                    </Text>
-                  )}
-                />
-              </Animated.View>
             )}
+          />
+        </View>
 
-            {/* Group subpanel: pick an existing envelope, drop out of one, or
-                create one without leaving the half-filled form. */}
-            {activeSubPanel === 'group' && (
-              <Animated.View
-                testID="plan-group-subpanel"
-                style={[
-                  styles.subPanel,
-                  { backgroundColor: colors.card },
-                  { opacity: subPanelAnim, transform: [{ translateX: subPanelTranslateX }] },
-                ]}
-              >
-                <View style={styles.subPanelHeader}>
-                  <Pressable
-                    onPress={closeSubPanel}
-                    style={styles.subPanelBack}
-                    hitSlop={8}
-                    accessibilityRole="button"
-                    accessibilityLabel={t('back')}
-                    testID="plan-group-back"
-                  >
-                    <Icon name="arrow-left" size={24} color={colors.text} />
-                  </Pressable>
-                  <Text style={[styles.subPanelTitle, { color: colors.text }]}>{t('group')}</Text>
-                </View>
+        {/* Only while it is still an offer — once an account is set, the row
+            above it says so and the hint is spent screen. */}
+        {!executionAccount && (
+          <Text style={[styles.groupHint, { color: colors.mutedText }]}>
+            {t('template_account_hint')}
+          </Text>
+        )}
 
-                {onCreateGroup && (
-                  <View style={styles.newGroupRow}>
-                    <View style={styles.newGroupInput}>
-                      <FormInput
-                        value={newGroupName}
-                        onChangeText={setNewGroupName}
-                        placeholder={t('new_group')}
-                        testID="plan-group-new-name"
-                      />
-                    </View>
-                    <Pressable
-                      onPress={handleCreateGroup}
-                      disabled={!newGroupName.trim()}
-                      style={[
-                        styles.newGroupButton,
-                        { backgroundColor: colors.primary },
-                        !newGroupName.trim() && styles.buttonDisabled,
-                      ]}
-                      accessibilityRole="button"
-                      accessibilityLabel={t('create_group')}
-                      accessibilityState={{ disabled: !newGroupName.trim() }}
-                      testID="plan-group-create"
-                    >
-                      <Icon name="plus" size={20} color={colors.text} />
-                    </Pressable>
-                  </View>
-                )}
+        <Text style={[styles.fieldLabel, { color: colors.mutedText }]}>
+          {t('allocation_label')} · {t('optional')}
+        </Text>
+        <FormInput
+          value={label}
+          onChangeText={setLabel}
+          placeholder={targetSummary?.name || t('allocation_label')}
+          testID="plan-line-label"
+        />
 
-                <Pressable
-                  onPress={() => handleSelectGroup(null)}
-                  style={({ pressed }) => [
-                    styles.pickerOption,
-                    { borderColor: colors.border },
-                    pressed && { backgroundColor: colors.selected },
-                    groupId == null && { backgroundColor: colors.selected },
-                  ]}
-                  accessibilityRole="button"
-                  accessibilityLabel={t('no_group')}
-                  testID="plan-group-option-none"
-                >
-                  <Icon name="close-circle-outline" size={22} color={colors.text} />
-                  <Text style={[styles.optionText, { color: colors.text }]} numberOfLines={1}>
-                    {t('no_group')}
-                  </Text>
-                </Pressable>
+        <Text style={[styles.fieldLabel, { color: colors.mutedText }]}>
+          {t('allocation_comment')} · {t('optional')}
+        </Text>
+        <FormInput
+          value={comment}
+          onChangeText={setComment}
+          placeholder={t('allocation_comment')}
+          multiline
+          numberOfLines={2}
+          testID="plan-line-comment"
+        />
 
-                <FlatList
-                  data={groups}
-                  keyExtractor={(item) => String(item.id)}
-                  keyboardShouldPersistTaps="handled"
-                  renderItem={({ item }) => (
-                    <Pressable
-                      onPress={() => handleSelectGroup(item.id)}
-                      style={({ pressed }) => [
-                        styles.pickerOption,
-                        { borderColor: colors.border },
-                        pressed && { backgroundColor: colors.selected },
-                        groupId === item.id && { backgroundColor: colors.selected },
-                      ]}
-                      accessibilityRole="button"
-                      accessibilityState={{ selected: groupId === item.id }}
-                      accessibilityLabel={item.label}
-                      testID={`plan-group-option-${item.id}`}
-                    >
-                      <Icon name="folder-outline" size={22} color={colors.text} />
-                      <Text style={[styles.optionText, { color: colors.text }]} numberOfLines={1}>
-                        {item.label}
-                      </Text>
-                    </Pressable>
-                  )}
-                  ListEmptyComponent={(
-                    <Text style={[styles.emptyText, { color: colors.mutedText }]}>
-                      {t('no_groups_yet')}
-                    </Text>
-                  )}
-                />
-              </Animated.View>
-            )}
-
-            {/* Execution account subpanel */}
-            {activeSubPanel === 'account' && (
-              <Animated.View
-                testID="plan-account-subpanel"
-                style={[
-                  styles.subPanel,
-                  { backgroundColor: colors.card },
-                  { opacity: subPanelAnim, transform: [{ translateX: subPanelTranslateX }] },
-                ]}
-              >
-                <View style={styles.subPanelHeader}>
-                  <Pressable
-                    onPress={closeSubPanel}
-                    style={styles.subPanelBack}
-                    hitSlop={8}
-                    accessibilityRole="button"
-                    accessibilityLabel={t('back')}
-                    testID="plan-account-back"
-                  >
-                    <Icon name="arrow-left" size={24} color={colors.text} />
-                  </Pressable>
-                  <Text style={[styles.subPanelTitle, { color: colors.text }]}>{t('template_account')}</Text>
-                </View>
-
-                <Pressable
-                  onPress={() => handleSelectExecutionAccount(null)}
-                  style={({ pressed }) => [
-                    styles.pickerOption,
-                    { borderColor: colors.border },
-                    pressed && { backgroundColor: colors.selected },
-                    accountId == null && { backgroundColor: colors.selected },
-                  ]}
-                  accessibilityRole="button"
-                  accessibilityLabel={t('no_template_account')}
-                  testID="plan-account-option-none"
-                >
-                  <Icon name="close-circle-outline" size={22} color={colors.text} />
-                  <Text style={[styles.optionText, { color: colors.text }]} numberOfLines={1}>
-                    {t('no_template_account')}
-                  </Text>
-                </Pressable>
-
-                <FlatList
-                  data={accounts}
-                  keyExtractor={(item) => String(item.id)}
-                  renderItem={renderExecutionAccountItem}
-                  keyboardShouldPersistTaps="handled"
-                  ListEmptyComponent={(
-                    <Text style={[styles.emptyText, { color: colors.mutedText }]}>
-                      {t('no_accounts')}
-                    </Text>
-                  )}
-                />
-              </Animated.View>
-            )}
-          </Pressable>
-        </AnimatedPressable>
-      </Modal>
-    </>
+        {error && (
+          <View style={[styles.errorBanner, { backgroundColor: colors.delete + TINT }]}>
+            <Icon name="alert-circle-outline" size={ICON_SIZE.sm} color={colors.delete} />
+            <Text style={[styles.errorText, { color: colors.delete }]} testID="plan-line-error">
+              {error}
+            </Text>
+          </View>
+        )}
+      </Animated.View>
+    </ModalShell>
   );
 }
 
@@ -1057,100 +1138,87 @@ BudgetPlanLineModal.propTypes = {
 };
 
 const styles = StyleSheet.create({
-  button: {
-    alignItems: 'center',
-    borderRadius: 6,
-    flex: 1,
-    marginHorizontal: 8,
-    paddingVertical: 12,
+  amountCard: {
+    borderRadius: BORDER_RADIUS.lg,
+    marginBottom: SPACING.md,
+    paddingHorizontal: SPACING.lg,
+    paddingVertical: SPACING.md,
   },
-  buttonDisabled: {
-    opacity: 0.5,
+  amountInput: {
+    fontSize: 32,
+    fontWeight: '700',
+    letterSpacing: -0.5,
+    padding: 0,
   },
-  buttonRow: {
-    flexDirection: 'row',
-    justifyContent: 'space-between',
-    marginTop: 12,
-  },
-  buttonText: {
-    fontSize: 16,
-    fontWeight: '500',
+  amountLabel: {
+    fontSize: FONT_SIZE.sm,
+    marginBottom: SPACING.xs,
   },
   currencyChip: {
-    borderRadius: 8,
+    borderRadius: BORDER_RADIUS.md,
     borderWidth: 1,
-    paddingHorizontal: 14,
-    paddingVertical: 8,
+    paddingHorizontal: SPACING.md,
+    paddingVertical: SPACING.xs,
   },
   currencyChipText: {
-    fontSize: 14,
-    fontWeight: '600',
+    fontSize: FONT_SIZE.sm,
+    fontWeight: '700',
   },
   currencyRow: {
     flexDirection: 'row',
     flexWrap: 'wrap',
-    gap: 8,
+    gap: SPACING.sm,
+    marginTop: SPACING.md,
   },
-  deleteRow: {
-    alignItems: 'center',
-    borderTopWidth: 1,
-    flexDirection: 'row',
-    justifyContent: 'center',
-    marginTop: 16,
-    paddingVertical: 12,
+  disabled: {
+    opacity: 0.5,
   },
-  deleteText: {
-    fontSize: 16,
-    fontWeight: '500',
-    marginLeft: 8,
+  divider: {
+    height: StyleSheet.hairlineWidth,
+    // Starts where the row's text does, so the tinted glyphs read as one column
+    // instead of four boxed-off rows.
+    marginLeft: 34 + SPACING.md + SPACING.md,
   },
   emptyText: {
-    paddingVertical: 24,
+    paddingVertical: SPACING.xxl,
     textAlign: 'center',
   },
-  error: {
-    fontSize: 13,
-    marginTop: 8,
+  errorBanner: {
+    alignItems: 'center',
+    borderRadius: BORDER_RADIUS.md,
+    flexDirection: 'row',
+    gap: SPACING.sm,
+    marginTop: SPACING.sm,
+    padding: SPACING.md,
   },
-  field: {
-    marginBottom: 16,
-  },
-  fieldHint: {
-    fontSize: 11,
-    marginTop: 4,
+  errorText: {
+    flex: 1,
+    fontSize: FONT_SIZE.md,
   },
   fieldLabel: {
-    fontSize: 12,
-    marginBottom: 6,
+    fontSize: FONT_SIZE.sm,
+    marginBottom: SPACING.xs,
+    marginTop: SPACING.sm,
   },
-  mainContent: {
-    flexShrink: 1,
-    padding: 20,
+  form: {
+    paddingBottom: SPACING.xs,
   },
-  modalContent: {
-    borderRadius: 12,
-    elevation: 5,
-    flexDirection: 'column',
-    maxHeight: '85%',
-    minHeight: '55%',
+  group: {
+    borderRadius: BORDER_RADIUS.lg,
     overflow: 'hidden',
-    shadowColor: '#000',
-    shadowOffset: { width: 0, height: 2 },
-    shadowOpacity: 0.2,
-    shadowRadius: 4,
-    width: '90%',
   },
-  modalOverlay: {
-    alignItems: 'center',
-    flex: 1,
-    justifyContent: 'center',
+  groupHint: {
+    fontSize: FONT_SIZE.sm,
+    marginTop: SPACING.sm,
+    paddingHorizontal: SPACING.xs,
   },
   newGroupButton: {
     alignItems: 'center',
-    borderRadius: 8,
+    borderRadius: BORDER_RADIUS.md,
+    height: 48,
     justifyContent: 'center',
-    paddingHorizontal: 14,
-    paddingVertical: 10,
+    marginBottom: SPACING.sm,
+    width: 48,
   },
   newGroupInput: {
     flex: 1,
@@ -1158,112 +1226,117 @@ const styles = StyleSheet.create({
   newGroupRow: {
     alignItems: 'center',
     flexDirection: 'row',
-    gap: 8,
-    marginBottom: 12,
+    gap: SPACING.sm,
+  },
+  optionRow: {
+    alignItems: 'center',
+    borderRadius: BORDER_RADIUS.md,
+    flexDirection: 'row',
+    gap: SPACING.md,
+    marginBottom: SPACING.xs,
+    paddingHorizontal: SPACING.md,
+    paddingVertical: SPACING.md,
   },
   optionText: {
     flex: 1,
-    fontSize: 16,
-    marginLeft: 12,
+    fontSize: FONT_SIZE.base,
   },
-  pickerOption: {
+  panel: {
+    flex: 1,
+    paddingHorizontal: SPACING.lg,
+    paddingTop: SPACING.md,
+  },
+  panelBack: {
+    marginRight: SPACING.xs,
+    padding: SPACING.xs,
+  },
+  panelDone: {
+    marginLeft: 'auto',
+    paddingHorizontal: SPACING.xs,
+  },
+  panelDoneText: {
+    fontSize: FONT_SIZE.base,
+    fontWeight: '600',
+  },
+  panelHeader: {
     alignItems: 'center',
-    borderBottomWidth: 1,
     flexDirection: 'row',
-    paddingHorizontal: 8,
-    paddingVertical: 14,
+    marginBottom: SPACING.md,
   },
-  recurringLabel: {
+  panelList: {
+    paddingBottom: SPACING.lg,
+  },
+  // Bounds the list to what is left of the panel. Without it the FlatList sizes
+  // to its content inside a fixed-height column and the overflow is simply
+  // clipped — a category list past the fold that cannot be scrolled to.
+  panelListBody: {
+    flex: 1,
+  },
+  panelTitle: {
+    flexShrink: 1,
+    fontSize: FONT_SIZE.lg,
+    fontWeight: '700',
+  },
+  row: {
     alignItems: 'center',
     flexDirection: 'row',
-    gap: 10,
+    gap: SPACING.md,
+    paddingHorizontal: SPACING.md,
+    paddingVertical: SPACING.md,
   },
-  recurringRow: {
+  rowBody: {
+    flex: 1,
+  },
+  rowIcon: {
     alignItems: 'center',
-    borderRadius: 4,
-    borderWidth: 1,
-    flexDirection: 'row',
-    justifyContent: 'space-between',
-    marginBottom: 16,
-    padding: 12,
+    borderRadius: BORDER_RADIUS.md,
+    height: 34,
+    justifyContent: 'center',
+    width: 34,
   },
-  scrollContent: {
-    paddingBottom: 12,
+  rowTitle: {
+    fontSize: FONT_SIZE.sm,
+  },
+  rowValue: {
+    fontSize: FONT_SIZE.base,
+    fontWeight: '500',
+    marginTop: 1,
   },
   segment: {
+    borderRadius: BORDER_RADIUS.lg,
     flexDirection: 'row',
-    gap: 8,
-    marginBottom: 12,
+    gap: SPACING.xs,
+    marginBottom: SPACING.md,
+    padding: SPACING.xs,
   },
   segmentButton: {
     alignItems: 'center',
-    borderRadius: 8,
+    borderColor: 'transparent',
+    borderRadius: BORDER_RADIUS.md,
     borderWidth: 1,
     flex: 1,
-    paddingVertical: 10,
+    paddingHorizontal: SPACING.xs,
+    paddingVertical: SPACING.sm,
   },
   segmentText: {
-    fontSize: 14,
+    fontSize: FONT_SIZE.md,
     fontWeight: '600',
-  },
-  subPanel: {
-    // `absoluteFill`, NOT `absoluteFillObject`: RN 0.85 dropped the latter (see
-    // Libraries/StyleSheet/StyleSheetExports.js — only `absoluteFill` is
-    // exported). Spreading the removed property is a silent no-op, which left
-    // this panel with no `position: absolute` at all: it was laid out in normal
-    // flow under the still-mounted form, so the picker rendered in the modal's
-    // bottom half below a screenful of blank card.
-    ...StyleSheet.absoluteFill,
-    padding: 20,
-  },
-  subPanelBack: {
-    marginRight: 8,
-    padding: 4,
-  },
-  subPanelDone: {
-    marginLeft: 'auto',
-    paddingHorizontal: 4,
-  },
-  subPanelDoneText: {
-    fontSize: 16,
-    fontWeight: '600',
-  },
-  subPanelHeader: {
-    alignItems: 'center',
-    flexDirection: 'row',
-    marginBottom: 12,
-  },
-  subPanelTitle: {
-    fontSize: 18,
-    fontWeight: 'bold',
   },
   switchThumb: {
     backgroundColor: '#fff',
-    borderRadius: 8,
-    height: 16,
-    width: 16,
+    borderRadius: 11,
+    height: 22,
+    margin: 2,
+    width: 22,
   },
   switchTrack: {
-    borderRadius: 10,
-    height: 20,
+    borderRadius: 13,
+    height: 26,
     justifyContent: 'center',
-    width: 36,
+    overflow: 'hidden',
+    width: 46,
   },
-  targetButton: {
-    alignItems: 'center',
-    borderRadius: 4,
-    borderWidth: 1,
-    flexDirection: 'row',
-    justifyContent: 'space-between',
-    padding: 12,
-  },
-  targetValue: {
-    alignItems: 'center',
-    flex: 1,
-    flexDirection: 'row',
-    gap: 10,
-  },
-  text16: {
-    fontSize: 16,
+  switchTrackFill: {
+    ...StyleSheet.absoluteFill,
   },
 });

@@ -118,6 +118,7 @@
   "select_currency": "Ընտրել արժույթ",
   "close": "Փակել",
   "no_accounts": "Դեռ հաշիվներ չկան։",
+  "no_results": "Ոչինչ չգտնվեց",
   "delete_account": "Ջնջել հաշիվը",
   "delete_account_confirm": "Վստա՞հ եք, որ ցանկանում եք ջնջել այս հաշիվը։",
   "russian": "Ռուսերեն",

@@ -44,9 +44,16 @@ const UPWARD_GIVE = 32;
  * Renders: blur overlay → RNModal → KAV → overlay Pressable →
  *   card (drag handle, header, ScrollView[children],
  *          optional delete row, optional extraActions, cancel/save row)
+ *   + optional overlayPanel covering the whole card
  *
  * When onSave is omitted (shadow operations), only the cancel button is shown.
  * When onDelete is omitted, the delete row is hidden.
+ *
+ * `overlayPanel` is the subpanel slot (see CLAUDE.md): a secondary view inside a
+ * modal slides in over the sheet instead of opening a modal of its own. It is a
+ * sibling of the card rather than a child so it covers the header and the action
+ * row too — a picker that leaves the sheet's Save button tappable underneath it
+ * is a form the user can submit while looking at something else.
  */
 export default function ModalShell({
   visible,
@@ -57,12 +64,17 @@ export default function ModalShell({
   onCancel,
   saveLabel = null,
   cancelLabel = null,
+  saveDisabled = false,
+  saveTestID = null,
   onDelete = null,
   deleteLabel = null,
   deleteDisabled = false,
+  deleteTestID = null,
   extraActions = null,
   scrollRef = null,
   showBlurOverlay = false,
+  overlayPanel = null,
+  onBackIntercept = null,
   children,
 }) {
   const { colors } = useThemeColors();
@@ -178,9 +190,14 @@ export default function ModalShell({
   }, [visible, translateY, screenHeight, resetShrink, keyboardOffset]);
 
   // Back button / gesture: play the shrink, then dismiss.
+  //
+  // A sheet showing an overlay panel gets first refusal: back there means "close
+  // the picker", and the shrink is the whole sheet leaving — playing it would
+  // take the half-filled form with it.
   const handleBackDismiss = useCallback(() => {
+    if (onBackIntercept?.()) return;
     commitShrink(() => onDismissRef.current?.());
-  }, [commitShrink]);
+  }, [commitShrink, onBackIntercept]);
 
   // Animate out then call callback — used for overlay tap and cancel button
   const animateOut = useCallback((callback) => {
@@ -328,6 +345,7 @@ export default function ModalShell({
                       <TouchableRipple
                         onPress={deleteDisabled ? undefined : onDelete}
                         disabled={deleteDisabled}
+                        testID={deleteTestID}
                         rippleColor={colors.delete + '18'}
                         style={[
                           styles.btn,
@@ -369,8 +387,16 @@ export default function ModalShell({
 
                   {onSave ? (
                     <TouchableRipple
-                      onPress={onSave}
-                      style={[styles.btn, { backgroundColor: colors.primary }]}
+                      onPress={saveDisabled ? undefined : onSave}
+                      disabled={saveDisabled}
+                      testID={saveTestID}
+                      accessibilityRole="button"
+                      accessibilityState={{ disabled: saveDisabled, busy: saveDisabled }}
+                      style={[
+                        styles.btn,
+                        { backgroundColor: colors.primary },
+                        saveDisabled && styles.disabled,
+                      ]}
                       rippleColor="rgba(255,255,255,0.2)"
                       borderless={false}
                     >
@@ -381,6 +407,13 @@ export default function ModalShell({
                   ) : null}
                 </View>
               </Pressable>
+
+              {/* Subpanel slot — a sibling of the card, so it covers the header
+                  and the action row as well as the form. Rounds its own top
+                  corners because it stands in for the card's while it is up. */}
+              {overlayPanel ? (
+                <View style={styles.overlayPanel}>{overlayPanel}</View>
+              ) : null}
             </Reanimated.View>
           </Animated.View>
         </AnimatedPressable>
@@ -398,12 +431,17 @@ ModalShell.propTypes = {
   onCancel: PropTypes.func.isRequired,
   saveLabel: PropTypes.string,
   cancelLabel: PropTypes.string,
+  saveDisabled: PropTypes.bool,
+  saveTestID: PropTypes.string,
   onDelete: PropTypes.func,
   deleteLabel: PropTypes.string,
   deleteDisabled: PropTypes.bool,
+  deleteTestID: PropTypes.string,
   extraActions: PropTypes.node,
   scrollRef: PropTypes.object,
   showBlurOverlay: PropTypes.bool,
+  overlayPanel: PropTypes.node,
+  onBackIntercept: PropTypes.func,
   children: PropTypes.node.isRequired,
 };
 
@@ -473,6 +511,12 @@ const styles = StyleSheet.create({
   overlay: {
     flex: 1,
     justifyContent: 'flex-end',
+  },
+  overlayPanel: {
+    ...StyleSheet.absoluteFill,
+    borderTopLeftRadius: 24,
+    borderTopRightRadius: 24,
+    overflow: 'hidden',
   },
   saveBtnText: {
     color: '#fff',

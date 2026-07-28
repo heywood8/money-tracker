@@ -118,6 +118,7 @@
   "select_currency": "选择货币",
   "close": "关闭",
   "no_accounts": "还没有账户。",
+  "no_results": "未找到任何内容",
   "delete_account": "删除账户",
   "delete_account_confirm": "确定要删除此账户吗？",
   "russian": "俄语",

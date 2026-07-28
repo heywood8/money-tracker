@@ -118,6 +118,7 @@
   "select_currency": "通貨を選択",
   "close": "閉じる",
   "no_accounts": "口座がまだありません。",
+  "no_results": "見つかりませんでした",
   "delete_account": "口座を削除",
   "delete_account_confirm": "この口座を削除してもよろしいですか？",
   "russian": "ロシア語",
