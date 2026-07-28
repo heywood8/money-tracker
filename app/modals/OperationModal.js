@@ -7,6 +7,7 @@ import {
   Pressable,
   StyleSheet,
   FlatList,
+  ScrollView,
   Dimensions,
 } from 'react-native';
 import DateTimePicker from '@react-native-community/datetimepicker';
@@ -33,6 +34,7 @@ import currencies from '../../assets/currencies.json';
 import { hasOperation, evaluateExpression } from '../utils/calculatorUtils';
 import useOperationForm from '../hooks/useOperationForm';
 import ModalShell from '../components/ModalShell';
+import CategoryGridSelector from '../components/CategoryGridSelector';
 import { modalSharedStyles } from '../styles/modalStyles';
 import useOperationPicker from '../hooks/useOperationPicker';
 
@@ -176,15 +178,12 @@ export default function OperationModal({
     onDelete,
   });
 
-  // Operation picker hook for category navigation
+  // Which picker is open (the category tree is walked by CategoryGridSelector).
   const {
     pickerState,
-    categoryNavigation,
     openPicker,
     closePicker,
-    navigateIntoFolder,
-    navigateBack,
-  } = useOperationPicker(t);
+  } = useOperationPicker();
 
   // State for split modal
   const [showSplitModal, setShowSplitModal] = useState(false);
@@ -364,7 +363,7 @@ export default function OperationModal({
   }, [setValues, closePicker]);
 
   // Handler for category selection in picker
-  const handleCategorySelect = useCallback(async (category) => {
+  const handleCategorySelect = useCallback(async (categoryId) => {
     // Automatically evaluate any pending math operation before saving
     let finalAmount = values.amount;
 
@@ -376,7 +375,7 @@ export default function OperationModal({
     }
 
     // Select entry category and update amount in one setState call
-    setValues(v => ({ ...v, categoryId: category.id, amount: finalAmount }));
+    setValues(v => ({ ...v, categoryId, amount: finalAmount }));
     closePicker();
 
     // Only auto-add for new operations, not when editing.
@@ -398,7 +397,7 @@ export default function OperationModal({
           type: values.type,
           amount: finalAmount, // Use the evaluated amount directly
           accountId: values.accountId,
-          categoryId: category.id,
+          categoryId,
           date: values.date,
           description: values.description || null,
           ...(buildLocationOverrides(attachLocation, location) || {}),
@@ -425,61 +424,27 @@ export default function OperationModal({
     return item.id || item.key;
   }, []);
 
-  // FlatList render item
+  // FlatList render item — accounts only; categories render as the shared grid.
   const renderPickerItem = useCallback(({ item }) => {
-    if (pickerState.type === 'account' || pickerState.type === 'toAccount') {
-      const handlePress = pickerState.type === 'account' ? handleAccountSelect : handleToAccountSelect;
-      return (
-        <Pressable
-          onPress={() => handlePress(item.id)}
-          style={({ pressed }) => [
-            styles.pickerOption,
-            { borderColor: colors.border },
-            pressed && { backgroundColor: colors.selected },
-          ]}
-        >
-          <View style={styles.accountOption}>
-            <Text style={[styles.pickerOptionText, styles.accountName, { color: colors.text }]} numberOfLines={1}>{item.name}</Text>
-            <Text style={[styles.pickerOptionCurrency, { color: colors.mutedText }]} numberOfLines={1}>
-              {getCurrencySymbol(item.currency)}{Currency.formatAmount(item.balance, item.currency)}
-            </Text>
-          </View>
-        </Pressable>
-      );
-    } else if (pickerState.type === 'category') {
-      const isFolder = item.type === 'folder';
-      const isSelected = !isFolder && values.categoryId === item.id;
-      const name = item.nameKey ? t(item.nameKey) : item.name;
-
-      return (
-        <Pressable
-          onPress={() => {
-            if (isFolder) {
-              navigateIntoFolder(item);
-            } else {
-              handleCategorySelect(item);
-            }
-          }}
-          style={({ pressed }) => [
-            styles.gridCell,
-            { backgroundColor: isSelected ? colors.selected : colors.altRow, borderColor: colors.border },
-            pressed && { backgroundColor: colors.selected },
-          ]}
-        >
-          <Icon name={item.icon} size={24} color={colors.text} />
-          <Text style={[styles.gridCellName, { color: colors.text }]} numberOfLines={2}>
-            {name}
+    const handlePress = pickerState.type === 'account' ? handleAccountSelect : handleToAccountSelect;
+    return (
+      <Pressable
+        onPress={() => handlePress(item.id)}
+        style={({ pressed }) => [
+          styles.pickerOption,
+          { borderColor: colors.border },
+          pressed && { backgroundColor: colors.selected },
+        ]}
+      >
+        <View style={styles.accountOption}>
+          <Text style={[styles.pickerOptionText, styles.accountName, { color: colors.text }]} numberOfLines={1}>{item.name}</Text>
+          <Text style={[styles.pickerOptionCurrency, { color: colors.mutedText }]} numberOfLines={1}>
+            {getCurrencySymbol(item.currency)}{Currency.formatAmount(item.balance, item.currency)}
           </Text>
-          {isFolder && (
-            <View style={styles.folderBadge}>
-              <Icon name="folder-outline" size={12} color={colors.mutedText} />
-            </View>
-          )}
-        </Pressable>
-      );
-    }
-    return null;
-  }, [pickerState.type, colors, values, handleAccountSelect, handleToAccountSelect, handleCategorySelect, navigateIntoFolder, t]);
+        </View>
+      </Pressable>
+    );
+  }, [pickerState.type, colors, handleAccountSelect, handleToAccountSelect]);
 
   const TYPES = [
     { key: 'expense', label: t('expense'), icon: 'minus-circle' },
@@ -711,29 +676,31 @@ export default function OperationModal({
       >
         <Pressable style={styles.pickerOverlay} onPress={closePicker}>
           <Pressable style={[styles.pickerModalContent, { backgroundColor: colors.card }]} onPress={handleStopPropagation}>
-            {pickerState.type === 'category' && categoryNavigation.breadcrumb.length > 0 && (
-              <View style={[styles.breadcrumbContainer, { borderBottomColor: colors.border }]}>
-                <Pressable onPress={navigateBack} style={styles.backButton}>
-                  <Icon name="arrow-left" size={24} color={colors.primary} />
-                </Pressable>
-                <Text style={[styles.breadcrumbText, { color: colors.text }]} numberOfLines={1}>
-                  {categoryNavigation.breadcrumb[categoryNavigation.breadcrumb.length - 1].name}
-                </Text>
-              </View>
+            {pickerState.type === 'category' ? (
+              // Categories nest, so the picker is the app's shared category grid
+              // (CLAUDE.md, "Category selection") rather than a list of its own.
+              <ScrollView contentContainerStyle={styles.gridContent} keyboardShouldPersistTaps="handled">
+                <CategoryGridSelector
+                  categories={pickerState.data}
+                  categoryType={values.type === 'income' ? 'income' : 'expense'}
+                  selectedCategoryId={values.categoryId || null}
+                  onSelect={handleCategorySelect}
+                  colors={colors}
+                  t={t}
+                />
+              </ScrollView>
+            ) : (
+              <FlatList
+                data={pickerState.type === 'account' || pickerState.type === 'toAccount' ? pickerState.data : []}
+                keyExtractor={keyExtractor}
+                renderItem={renderPickerItem}
+                ListEmptyComponent={
+                  <Text style={[styles.pickerEmptyText, { color: colors.mutedText }]}>
+                    {t('no_accounts')}
+                  </Text>
+                }
+              />
             )}
-            <FlatList
-              data={pickerState.data}
-              keyExtractor={keyExtractor}
-              numColumns={pickerState.type === 'category' ? 3 : 1}
-              columnWrapperStyle={pickerState.type === 'category' ? styles.gridRow : undefined}
-              contentContainerStyle={pickerState.type === 'category' ? styles.gridContent : undefined}
-              renderItem={renderPickerItem}
-              ListEmptyComponent={
-                <Text style={[styles.pickerEmptyText, { color: colors.mutedText }]}>
-                  {pickerState.type === 'category' ? t('no_categories') : t('no_accounts')}
-                </Text>
-              }
-            />
             {(pickerState.type !== 'category' || !isNew) && (
               <Pressable style={styles.closeButton} onPress={closePicker}>
                 <Text style={[styles.closeButtonText, { color: colors.primary }]}>{t('close')}</Text>
@@ -755,23 +722,6 @@ const styles = StyleSheet.create({
     alignItems: 'center',
     flexDirection: 'row',
     justifyContent: 'space-between',
-  },
-  backButton: {
-    marginRight: SPACING.sm,
-    padding: SPACING.xs,
-  },
-  breadcrumbContainer: {
-    alignItems: 'center',
-    borderBottomWidth: 1,
-    flexDirection: 'row',
-    marginBottom: SPACING.sm,
-    paddingHorizontal: SPACING.sm,
-    paddingVertical: SPACING.md,
-  },
-  breadcrumbText: {
-    flex: 1,
-    fontSize: 18,
-    fontWeight: '600',
   },
   categoryDateRow: {
     flexDirection: 'row',
@@ -816,31 +766,8 @@ const styles = StyleSheet.create({
   excludeAvgTextContainer: {
     flex: 1,
   },
-  folderBadge: {
-    position: 'absolute',
-    right: 4,
-    top: 4,
-  },
-  gridCell: {
-    alignItems: 'center',
-    borderRadius: BORDER_RADIUS.lg,
-    borderWidth: 1,
-    gap: SPACING.sm,
-    margin: SPACING.xs,
-    padding: SPACING.md,
-    position: 'relative',
-    width: (Dimensions.get('window').width - SPACING.md * 2 - SPACING.sm * 2 - SPACING.xs * 2 * 3) / 3,
-  },
-  gridCellName: {
-    fontSize: 12,
-    fontWeight: '500',
-    textAlign: 'center',
-  },
   gridContent: {
     padding: SPACING.sm,
-  },
-  gridRow: {
-    justifyContent: 'flex-start',
   },
   halfFieldWrapper: {
     flex: 1,

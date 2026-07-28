@@ -439,6 +439,7 @@
   "daily_avg": "일 평균",
   "tap_for_details": "상세 보기를 탭하세요",
   "all_categories": "모든 카테고리",
+  "whole_category": "카테고리 전체",
   "all_accounts": "모든 계정",
   "default_account": "기본 계좌",
   "default_account_hint": "작업 추가 시 이 계좌를 미리 선택",

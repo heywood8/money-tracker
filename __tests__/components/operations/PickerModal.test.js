@@ -199,29 +199,28 @@ describe('PickerModal', () => {
     });
   });
 
+  // Categories render through the shared CategoryGridSelector, so the tree walk
+  // itself is covered in __tests__/components/CategoryGridSelector.test.js; what
+  // matters here is that the modal wires the grid to the quick-add callbacks.
   describe('Category picker', () => {
     const categoryData = [
-      { id: 'cat-1', name: 'Food', icon: 'food', type: 'entry' },
-      { id: 'cat-2', name: 'Transport', icon: 'car', type: 'entry' },
-      { id: 'cat-3', name: 'Shopping', icon: 'cart', type: 'folder' },
+      { id: 'cat-1', name: 'Food', icon: 'food', type: 'entry', categoryType: 'expense' },
+      { id: 'cat-2', name: 'Transport', icon: 'car', type: 'entry', categoryType: 'expense' },
+      { id: 'cat-3', name: 'Shopping', icon: 'cart', type: 'folder', categoryType: 'expense' },
+      { id: 'cat-4', name: 'Clothes', icon: 'tshirt-crew', type: 'entry', categoryType: 'expense', parentId: 'cat-3' },
     ];
-
-    const categoryNavigation = {
-      breadcrumb: [],
-    };
 
     const quickAddValues = {
       amount: '',
       categoryId: null,
     };
 
-    it('renders category list', async () => {
-      const { getByText } = await render(
+    it('renders the root level of the category tree', async () => {
+      const { getByText, queryByText } = await render(
         <PickerModal
           {...defaultProps}
           pickerType="category"
           pickerData={categoryData}
-          categoryNavigation={categoryNavigation}
           quickAddValues={quickAddValues}
         />,
       );
@@ -229,6 +228,8 @@ describe('PickerModal', () => {
       expect(getByText('Food')).toBeTruthy();
       expect(getByText('Transport')).toBeTruthy();
       expect(getByText('Shopping')).toBeTruthy();
+      // Nested categories stay behind their folder.
+      expect(queryByText('Clothes')).toBeNull();
     });
 
     it('renders category icons', async () => {
@@ -237,7 +238,6 @@ describe('PickerModal', () => {
           {...defaultProps}
           pickerType="category"
           pickerData={categoryData}
-          categoryNavigation={categoryNavigation}
           quickAddValues={quickAddValues}
         />,
       );
@@ -252,7 +252,6 @@ describe('PickerModal', () => {
           {...defaultProps}
           pickerType="category"
           pickerData={categoryData}
-          categoryNavigation={categoryNavigation}
           quickAddValues={quickAddValues}
         />,
       );
@@ -261,22 +260,23 @@ describe('PickerModal', () => {
       expect(folderBadges.length).toBe(1); // Only Shopping folder has badge
     });
 
-    it('calls onNavigateIntoFolder when folder is pressed', async () => {
-      const onNavigateIntoFolder = jest.fn();
-      const { getByText } = await render(
+    it('drills into a folder instead of selecting it', async () => {
+      const onSelectCategory = jest.fn();
+      const { getByText, queryByText } = await render(
         <PickerModal
           {...defaultProps}
           pickerType="category"
           pickerData={categoryData}
-          categoryNavigation={categoryNavigation}
           quickAddValues={quickAddValues}
-          onNavigateIntoFolder={onNavigateIntoFolder}
+          onSelectCategory={onSelectCategory}
         />,
       );
 
       await fireEvent.press(getByText('Shopping'));
 
-      expect(onNavigateIntoFolder).toHaveBeenCalledWith(categoryData[2]);
+      await waitFor(() => expect(getByText('Clothes')).toBeTruthy());
+      expect(onSelectCategory).not.toHaveBeenCalled();
+      expect(queryByText('Food')).toBeNull();
     });
 
     it('calls onSelectCategory when entry category is pressed without amount', async () => {
@@ -287,7 +287,6 @@ describe('PickerModal', () => {
           {...defaultProps}
           pickerType="category"
           pickerData={categoryData}
-          categoryNavigation={categoryNavigation}
           quickAddValues={quickAddValues}
           onSelectCategory={onSelectCategory}
           onClose={onClose}
@@ -311,7 +310,6 @@ describe('PickerModal', () => {
           {...defaultProps}
           pickerType="category"
           pickerData={categoryData}
-          categoryNavigation={categoryNavigation}
           quickAddValues={quickAddWithAmount}
           onAutoAddWithCategory={onAutoAddWithCategory}
         />,
@@ -324,13 +322,50 @@ describe('PickerModal', () => {
       });
     });
 
+    it('picks a nested category reached through its folder', async () => {
+      const onSelectCategory = jest.fn();
+      const { getByText } = await render(
+        <PickerModal
+          {...defaultProps}
+          pickerType="category"
+          pickerData={categoryData}
+          quickAddValues={quickAddValues}
+          onSelectCategory={onSelectCategory}
+        />,
+      );
+
+      await fireEvent.press(getByText('Shopping'));
+      await waitFor(() => expect(getByText('Clothes')).toBeTruthy());
+      await fireEvent.press(getByText('Clothes'));
+
+      expect(onSelectCategory).toHaveBeenCalledWith('cat-4');
+    });
+
+    it('shows the income tree when the picker is opened for income', async () => {
+      const mixed = [
+        ...categoryData,
+        { id: 'inc-1', name: 'Salary', icon: 'cash', type: 'entry', categoryType: 'income' },
+      ];
+      const { getByText, queryByText } = await render(
+        <PickerModal
+          {...defaultProps}
+          pickerType="category"
+          pickerData={mixed}
+          categoryType="income"
+          quickAddValues={quickAddValues}
+        />,
+      );
+
+      expect(getByText('Salary')).toBeTruthy();
+      expect(queryByText('Food')).toBeNull();
+    });
+
     it('does not show close button for category picker', async () => {
       const { queryByText } = await render(
         <PickerModal
           {...defaultProps}
           pickerType="category"
           pickerData={categoryData}
-          categoryNavigation={categoryNavigation}
           quickAddValues={quickAddValues}
         />,
       );
@@ -340,7 +375,7 @@ describe('PickerModal', () => {
 
     it('uses translated nameKey if available', async () => {
       const categoryWithNameKey = [
-        { id: 'cat-1', name: 'Food', nameKey: 'food_category', icon: 'food', type: 'entry' },
+        { id: 'cat-1', name: 'Food', nameKey: 'food_category', icon: 'food', type: 'entry', categoryType: 'expense' },
       ];
       const mockTWithKey = (key) => {
         if (key === 'food_category') return 'Translated Food';
@@ -352,7 +387,6 @@ describe('PickerModal', () => {
           {...defaultProps}
           pickerType="category"
           pickerData={categoryWithNameKey}
-          categoryNavigation={categoryNavigation}
           quickAddValues={quickAddValues}
           t={mockTWithKey}
         />,
@@ -360,64 +394,29 @@ describe('PickerModal', () => {
 
       expect(getByText('Translated Food')).toBeTruthy();
     });
-  });
 
-  describe('Breadcrumb navigation', () => {
-    const categoryNavigation = {
-      breadcrumb: [{ id: 'parent-1', name: 'Parent Category' }],
-    };
-
-    const quickAddValues = {
-      amount: '',
-      categoryId: null,
-    };
-
-    it('shows breadcrumb when navigation has items', async () => {
-      const { getByText, getByTestId } = await render(
+    it('names the folder it walked into, and walks back out of it', async () => {
+      const { getByText, getByTestId, queryByTestId } = await render(
         <PickerModal
           {...defaultProps}
           pickerType="category"
-          pickerData={[]}
-          categoryNavigation={categoryNavigation}
+          pickerData={categoryData}
           quickAddValues={quickAddValues}
         />,
       );
 
-      expect(getByText('Parent Category')).toBeTruthy();
-      expect(getByTestId('icon-arrow-left')).toBeTruthy();
-    });
+      // At the root there is nowhere to go back to.
+      expect(queryByTestId('category-grid-breadcrumb')).toBeNull();
 
-    it('does not show breadcrumb when navigation is empty', async () => {
-      const emptyNavigation = { breadcrumb: [] };
-      const { queryByTestId } = await render(
-        <PickerModal
-          {...defaultProps}
-          pickerType="category"
-          pickerData={[]}
-          categoryNavigation={emptyNavigation}
-          quickAddValues={quickAddValues}
-        />,
-      );
+      await fireEvent.press(getByText('Shopping'));
 
-      expect(queryByTestId('icon-arrow-left')).toBeNull();
-    });
+      await waitFor(() => expect(getByTestId('category-grid-breadcrumb')).toBeTruthy());
+      expect(getByTestId('category-grid-breadcrumb')).toHaveTextContent('Shopping');
 
-    it('calls onNavigateBack when back button is pressed', async () => {
-      const onNavigateBack = jest.fn();
-      const { getByTestId } = await render(
-        <PickerModal
-          {...defaultProps}
-          pickerType="category"
-          pickerData={[]}
-          categoryNavigation={categoryNavigation}
-          quickAddValues={quickAddValues}
-          onNavigateBack={onNavigateBack}
-        />,
-      );
+      await fireEvent.press(getByTestId('category-grid-back'));
 
-      await fireEvent.press(getByTestId('icon-arrow-left').parent);
-
-      expect(onNavigateBack).toHaveBeenCalled();
+      await waitFor(() => expect(getByText('Food')).toBeTruthy());
+      expect(queryByTestId('category-grid-breadcrumb')).toBeNull();
     });
   });
 
@@ -436,7 +435,6 @@ describe('PickerModal', () => {
           {...defaultProps}
           pickerType="category"
           pickerData={[]}
-          categoryNavigation={{ breadcrumb: [] }}
           quickAddValues={{ amount: '', categoryId: null }}
         />,
       );
@@ -520,25 +518,23 @@ describe('PickerModal', () => {
   describe('Selected category highlighting', () => {
     it('highlights selected category', async () => {
       const categoryData = [
-        { id: 'cat-1', name: 'Food', icon: 'food', type: 'entry' },
+        { id: 'cat-1', name: 'Food', icon: 'food', type: 'entry', categoryType: 'expense' },
       ];
       const quickAddValues = {
         amount: '',
         categoryId: 'cat-1', // This category is selected
       };
 
-      const { getByText } = await render(
+      const { getByTestId } = await render(
         <PickerModal
           {...defaultProps}
           pickerType="category"
           pickerData={categoryData}
-          categoryNavigation={{ breadcrumb: [] }}
           quickAddValues={quickAddValues}
         />,
       );
 
-      // Category should await render (highlight is applied via style)
-      expect(getByText('Food')).toBeTruthy();
+      expect(getByTestId('category-grid-cat-1').props.accessibilityState.selected).toBe(true);
     });
   });
 });

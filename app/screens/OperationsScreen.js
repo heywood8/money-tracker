@@ -219,12 +219,9 @@ const OperationsScreen = () => {
 
   const {
     pickerState,
-    categoryNavigation,
     openPicker,
     closePicker,
-    navigateIntoFolder,
-    navigateBack,
-  } = useOperationPicker(t);
+  } = useOperationPicker();
 
   // Insert a placeholder row for a just-accepted notification suggestion so the
   // binding card can leave the deck immediately while its write runs in the
@@ -1279,10 +1276,8 @@ const OperationsScreen = () => {
         onClose={closePicker}
         onSelectAccount={handleSelectAccount}
         onSelectToAccount={handleSelectToAccount}
-        categoryNavigation={categoryNavigation}
+        categoryType={quickAddValues.type === 'income' ? 'income' : 'expense'}
         quickAddValues={quickAddValues}
-        onNavigateBack={navigateBack}
-        onNavigateIntoFolder={navigateIntoFolder}
         onSelectCategory={handleSelectCategory}
         onAutoAddWithCategory={handleAutoAddWithCategory}
         onAutoAddWithAccount={handleAutoAddWithAccount}

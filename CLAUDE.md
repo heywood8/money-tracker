@@ -330,6 +330,32 @@ const closeSubPanel = useCallback(() => {
 
 **Log/chat-style lists:** Use `FlatList` with `inverted={true}` and `data={entries.slice().reverse()}`. Newest entry is always item[0], shown at the bottom automatically — no `scrollToEnd` calls needed, and no mount cost from rendering all entries at once.
 
+### Category Selection
+
+**Rule: never render a list of categories yourself. Any UI that asks the user to pick a category renders `app/components/CategoryGridSelector.js`.**
+
+Categories are a tree (folders holding entries). Every picker that flattened that tree into a `FlatList` lost the hierarchy and showed parents and children as equals — which is what happened four separate times before these were consolidated. The shared grid owns the drill-down (folder chips walk in, a Back chip walks out, a breadcrumb names where you are), so a host only supplies data and receives an id:
+
+```javascript
+<CategoryGridSelector
+  categories={categories}        // the WHOLE list — the grid slices each level itself
+  categoryType={type}            // 'expense' | 'income'; shadow categories are filtered out
+  selectedCategoryId={id}        // single-select
+  onSelect={handleSelect}        // called with the chosen category id
+  colors={colors}
+  t={t}
+/>
+```
+
+Options, each off by default:
+- `selectedCategoryIds={[...]}` — multi-select. Chips become checkboxes and report every tap; the host keeps the array (see `BudgetPlanLineModal`).
+- `selectableFolders` — a folder may itself be the target. The folder chip still drills in; a "whole category" chip inside it picks the folder, so navigating and selecting never fight over one tap.
+- `query` + `onQueryChange` — external search field. A non-empty query searches the whole tree instead of one level; the grid clears it through `onQueryChange` when a folder result takes over the navigation.
+- `topCategoryIds={[...]}` — QuickAdd-style suggestions layout (frequent leaves four across, plus "All categories").
+- `testIDPrefix` — keep a host's existing chip testIDs.
+
+The grid renders a plain `View`, so a host that can overflow wraps it in a `ScrollView`. Hosts: `BudgetPlanLineModal`, `SplitOperationModal`, `PickerModal`, `OperationModal`, `NotificationBindingCard`, `NotificationProcessingContentPanel`.
+
 ### Testing
 
 The app uses Jest with React Native Testing Library for unit, integration, and regression testing.

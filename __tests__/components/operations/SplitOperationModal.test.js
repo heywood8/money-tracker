@@ -66,6 +66,7 @@ describe('SplitOperationModal', () => {
     { id: 'cat-2', name: 'Transport', icon: 'car', categoryType: 'expense', type: 'entry' },
     { id: 'cat-3', name: 'Salary', icon: 'cash', categoryType: 'income', type: 'entry' },
     { id: 'cat-4', name: 'Shopping', icon: 'cart', categoryType: 'expense', type: 'folder' },
+    { id: 'cat-5', name: 'Clothes', icon: 'tshirt-crew', categoryType: 'expense', type: 'entry', parentId: 'cat-4' },
   ];
 
   const defaultProps = {
@@ -179,8 +180,26 @@ describe('SplitOperationModal', () => {
       expect(getByText('Transport')).toBeTruthy();
       // Should not show income categories
       expect(queryByText('Salary')).toBeNull();
-      // Should not show folders
-      expect(queryByText('Shopping')).toBeNull();
+      // A folder shows at its own level as somewhere to go, not as a target, and
+      // its children stay behind it until it is opened.
+      expect(getByText('Shopping')).toBeTruthy();
+      expect(queryByText('Clothes')).toBeNull();
+    });
+
+    it('drills into a folder to reach a nested category', async () => {
+      const { getByTestId, getByText, queryByText } = await render(
+        <SplitOperationModal {...defaultProps} />,
+      );
+
+      await fireEvent.press(getByTestId('category-picker-button'));
+      await fireEvent.press(getByTestId('category-option-cat-4'));
+
+      await waitFor(() => expect(getByText('Clothes')).toBeTruthy());
+      // The level swapped — the root categories are behind the folder now.
+      expect(queryByText('Food')).toBeNull();
+
+      await fireEvent.press(getByTestId('category-option-back'));
+      await waitFor(() => expect(getByText('Food')).toBeTruthy());
     });
 
     it('filters categories by operation type (income)', async () => {
