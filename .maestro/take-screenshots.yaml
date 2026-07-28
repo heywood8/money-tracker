@@ -60,9 +60,9 @@ appId: com.heywood8.monkeep
 - takeScreenshot: screenshots/05_transfer_light
 
 # Screenshot 1c: Multi-currency transfer (select different-currency account, enter amount)
-- tapOn: "All accounts"
-- waitForAnimationToEnd:
-    timeout: 2000
+# "All accounts" only renders past 8 accounts (OperationFormFields), and the seed data
+# has 4 — the picker step this flow used to go through no longer exists, so tap the
+# target account straight from the shortcut row.
 - tapOn: "EUR Cash"
 - waitForAnimationToEnd:
     timeout: 2000
