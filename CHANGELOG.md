@@ -1,5 +1,12 @@
 # Changelog
 
+## [0.244.0](https://github.com/heywood8/money-tracker/compare/penny-v0.243.3...penny-v0.244.0) (2026-07-28)
+
+
+### Features
+
+* **budgets:** move colour off status and onto envelopes ([#1492](https://github.com/heywood8/money-tracker/issues/1492)) ([aea319f](https://github.com/heywood8/money-tracker/commit/aea319f109ced9a0684d24e7a32d2357883bfb95))
+
 ## [0.243.3](https://github.com/heywood8/money-tracker/compare/penny-v0.243.2...penny-v0.243.3) (2026-07-28)
 
 
