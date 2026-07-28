@@ -442,6 +442,7 @@
   "daily_avg": "Daily Avg",
   "tap_for_details": "Tap for details",
   "all_categories": "All categories",
+  "whole_category": "Whole category",
   "all_accounts": "All accounts",
   "default_account": "Default account",
   "default_account_hint": "Pre-select this account when adding operations",

@@ -1,5 +1,19 @@
 # Changelog
 
+## [0.243.2](https://github.com/heywood8/money-tracker/compare/penny-v0.243.1...penny-v0.243.2) (2026-07-28)
+
+
+### Bug Fixes
+
+* **categories:** show the category tree in every picker, not a flat list ([#1486](https://github.com/heywood8/money-tracker/issues/1486)) ([cea9c8a](https://github.com/heywood8/money-tracker/commit/cea9c8ab4d2fbc1a0ed04007e29e6c01d7c50de8))
+
+## [0.243.1](https://github.com/heywood8/money-tracker/compare/penny-v0.243.0...penny-v0.243.1) (2026-07-28)
+
+
+### Bug Fixes
+
+* **operations:** keep the long-pressed row in place in the action menu ([#1484](https://github.com/heywood8/money-tracker/issues/1484)) ([1c7eb25](https://github.com/heywood8/money-tracker/commit/1c7eb251f875a89cb90426812d99607cb4313cf8))
+
 ## [0.243.0](https://github.com/heywood8/money-tracker/compare/penny-v0.242.0...penny-v0.243.0) (2026-07-28)
 
 

@@ -14,14 +14,33 @@ const SUGGEST_COLUMNS = 4;
 const TOP_WITH_ALL = 7;
 const TOP_WITHOUT_ALL = 8;
 
+// Chips carry their selection as a tint of the accent rather than a solid fill:
+// white-on-accent sits at ~2.8:1 in the dark theme, which is what a filled chip
+// used to be. Hex alpha suffix on `colors.primary` (a real hex in both themes —
+// see ThemeColorsContext), with a graceful fallback for any palette that isn't.
+const TINT = '1F';
+const tintOf = (primary, fallback) => (
+  typeof primary === 'string' && /^#[0-9a-f]{6}$/i.test(primary) ? primary + TINT : fallback
+);
+
+const DEFAULT_TEST_ID_PREFIX = 'category-grid';
+
+const displayName = (item, t) => (item.nameKey ? t(item.nameKey) : item.name);
+
 /**
- * Inline hierarchical category grid.
+ * The app's one category picker.
+ *
+ * Categories are a tree (folders holding entries), so every place that asks the
+ * user to pick one renders THIS component — a chip grid that drills through the
+ * hierarchy — rather than flattening the tree into a list of its own. See
+ * CLAUDE.md ("Category selection"); the call sites are the budget line target
+ * picker, the split-operation picker, the operations/quick-add picker and the
+ * bank-notification binding panels.
  *
  * Two layouts, selected by whether `topCategoryIds` is supplied:
  *
- * - **Legacy (no `topCategoryIds`)**: a flat grid of the current folder level's
- *   categories (folders drill in, a Back chip pops out), three chips across.
- *   Used by the Settings → Notification processing review queue.
+ * - **Hierarchy (no `topCategoryIds`)**: the current folder level's categories
+ *   (folders drill in, a Back chip pops out), three chips across.
  *
  * - **Suggestions (`topCategoryIds` given)**: mirrors the QuickAdd category
  *   picker — an "All categories" entry plus the most-frequent leaf shortcuts,
@@ -33,30 +52,60 @@ const TOP_WITHOUT_ALL = 8;
  * @param {Array}    categories        All categories (folders + entries).
  * @param {string}   categoryType      'expense' | 'income' — restricts the grid.
  * @param {string}   selectedCategoryId Currently chosen leaf id (highlighted).
- * @param {Function} onSelect          Called with the tapped leaf category id.
+ * @param {string[]} [selectedCategoryIds] Multi-select: presence switches chips to
+ *   checkboxes that toggle, and the host is expected to keep the array. Takes
+ *   precedence over `selectedCategoryId`.
+ * @param {Function} onSelect          Called with the tapped category id.
  * @param {Object}   colors            Theme colours.
  * @param {Function} t                 Translation function.
  * @param {string[]} [topCategoryIds]  Most-frequent-first category ids; presence
  *   switches the grid into the QuickAdd-style suggestions layout.
+ * @param {boolean}  [selectableFolders] A folder may be picked as a target in its
+ *   own right (a budget on a parent category covers its whole subtree). Tapping
+ *   the folder still drills in — inside it, a leading "whole category" chip picks
+ *   the folder itself, so navigating and selecting never fight over one tap.
+ * @param {string}   [query]           External search text. While it is non-empty
+ *   the grid shows every match in the tree instead of one folder level; entering
+ *   a folder from a result clears it through `onQueryChange`.
+ * @param {Function} [onQueryChange]   Required alongside `query` — the grid clears
+ *   the search when navigation takes over.
+ * @param {string}   [testIDPrefix]    Chip testID prefix, so a host can keep the
+ *   ids its own tests already know.
+ * @param {string}   [emptyText]       Message for an empty grid (defaults to
+ *   `no_categories`; a fruitless search always says `no_results`).
  */
 export default function CategoryGridSelector({
   categories,
   categoryType,
   selectedCategoryId = null,
+  selectedCategoryIds = null,
   onSelect,
   colors,
   t,
   topCategoryIds = null,
+  selectableFolders = false,
+  query = '',
+  onQueryChange = null,
+  testIDPrefix = DEFAULT_TEST_ID_PREFIX,
+  emptyText = null,
 }) {
   const suggestMode = Array.isArray(topCategoryIds);
+  const multiSelect = Array.isArray(selectedCategoryIds);
   const columns = suggestMode ? SUGGEST_COLUMNS : LEGACY_COLUMNS;
+  const searchTerm = String(query || '').trim().toLowerCase();
+  const searching = searchTerm.length > 0;
 
   // Folders drilled into: [{ id, name }]. Empty array = root level.
   const [breadcrumb, setBreadcrumb] = useState([]);
   // In suggestions mode the grid opens on the shortcuts; "All categories" flips
-  // it to the hierarchy browser. In legacy mode the hierarchy is always shown.
+  // it to the hierarchy browser. Otherwise the hierarchy is always shown.
   const [browsing, setBrowsing] = useState(!suggestMode);
-  const currentFolderId = breadcrumb.length ? breadcrumb[breadcrumb.length - 1].id : null;
+  const currentFolder = breadcrumb.length ? breadcrumb[breadcrumb.length - 1] : null;
+  const currentFolderId = currentFolder ? currentFolder.id : null;
+
+  const selectedIds = useMemo(() => new Set(
+    multiSelect ? selectedCategoryIds : (selectedCategoryId ? [selectedCategoryId] : []),
+  ), [multiSelect, selectedCategoryIds, selectedCategoryId]);
 
   // Non-shadow categories (folders + entries) of the requested type.
   const typed = useMemo(
@@ -68,6 +117,15 @@ export default function CategoryGridSelector({
   const levelItems = useMemo(
     () => typed.filter((c) => (currentFolderId == null ? !c.parentId : c.parentId === currentFolderId)),
     [typed, currentFolderId],
+  );
+
+  // A search reaches across the whole tree — the point of typing is to skip the
+  // walk down to a category, so results ignore which folder is open.
+  const searchResults = useMemo(
+    () => (searching
+      ? typed.filter((c) => String(displayName(c, t) || '').toLowerCase().includes(searchTerm))
+      : []),
+    [searching, typed, searchTerm, t],
   );
 
   // Leaf entries of this type, used for the suggestions shortcuts and to decide
@@ -91,9 +149,11 @@ export default function CategoryGridSelector({
   }, [suggestMode, showAllButton, typedLeaves, topCategoryIds]);
 
   const enterFolder = useCallback((folder) => {
-    const name = folder.nameKey ? t(folder.nameKey) : folder.name;
-    setBreadcrumb((prev) => [...prev, { id: folder.id, name }]);
-  }, [t]);
+    // Navigation takes over from the search: results span every level, so the
+    // filter would otherwise hide the very children the tap asked to see.
+    if (onQueryChange) onQueryChange('');
+    setBreadcrumb((prev) => [...prev, { id: folder.id, name: displayName(folder, t) }]);
+  }, [t, onQueryChange]);
 
   // Back: pop a folder level; at root in suggestions mode, return to the shortcuts.
   const goBack = useCallback(() => {
@@ -112,30 +172,34 @@ export default function CategoryGridSelector({
     setBrowsing(true);
   }, []);
 
-  // Select a leaf; in suggestions mode also collapse the browser back to the
-  // shortcuts so the next open starts clean.
-  const selectLeaf = useCallback((id) => {
+  // Select a category. In suggestions mode a pick also collapses the browser back
+  // to the shortcuts so the next open starts clean; a multi-select grid stays put,
+  // since picking several is the whole point.
+  const select = useCallback((id) => {
     onSelect(id);
-    if (suggestMode) {
+    if (suggestMode && !multiSelect) {
       setBrowsing(false);
       setBreadcrumb([]);
     }
-  }, [onSelect, suggestMode]);
+  }, [onSelect, suggestMode, multiSelect]);
 
   const chipBackground = colors.inputBackground || colors.surface;
+  const selectedBackground = tintOf(colors.primary, colors.selected);
 
   // Build the slot list for the current view, then chunk into rows and pad the
   // final row with invisible spacers so chips keep an even width.
   const rows = useMemo(() => {
     const slots = [];
-    if (suggestMode && !browsing) {
+    if (searching) {
+      searchResults.forEach((item) => slots.push({ kind: 'item', item }));
+    } else if (suggestMode && !browsing) {
       if (showAllButton) slots.push({ kind: 'all' });
       topCategories.forEach((item) => slots.push({ kind: 'item', item }));
     } else {
-      // Hierarchy browser (legacy always, or suggestions after "All categories").
-      // Suggestions mode shows a Back chip at every level (root Back returns to
-      // the shortcuts); legacy only inside a folder.
+      // Hierarchy browser. Suggestions mode shows a Back chip at every level (root
+      // Back returns to the shortcuts); otherwise only inside a folder.
       if (breadcrumb.length > 0 || suggestMode) slots.push({ kind: 'back' });
+      if (selectableFolders && currentFolder) slots.push({ kind: 'whole', item: currentFolder });
       levelItems.forEach((item) => slots.push({ kind: 'item', item }));
     }
 
@@ -146,13 +210,22 @@ export default function CategoryGridSelector({
       while (last.length < columns) last.push({ kind: 'spacer', id: `spacer-${last.length}` });
     }
     return chunked;
-  }, [suggestMode, browsing, showAllButton, topCategories, breadcrumb.length, levelItems, columns]);
+  }, [searching, searchResults, suggestMode, browsing, showAllButton, topCategories,
+    breadcrumb.length, selectableFolders, currentFolder, levelItems, columns]);
 
   // In suggestions mode the grid sits over the quick-add panel, so its chips
   // adopt the compact proportions the quick-add category shortcuts use — shorter,
   // smaller text and icons — to occupy the same vertical space.
   const affixIconSize = suggestMode ? 16 : 18; // "All categories" / Back
   const itemIconSize = suggestMode ? 18 : 20;
+
+  const chipStyle = (extra) => ({ pressed }) => [
+    styles.chip,
+    suggestMode && styles.chipCompact,
+    { backgroundColor: chipBackground, borderColor: colors.border },
+    extra,
+    pressed && { backgroundColor: colors.selected },
+  ];
 
   const renderSlot = (slot, key) => {
     if (slot.kind === 'spacer') {
@@ -163,16 +236,11 @@ export default function CategoryGridSelector({
       return (
         <Pressable
           key={key}
-          testID="category-grid-all"
+          testID={`${testIDPrefix}-all`}
           onPress={openBrowse}
           accessibilityRole="button"
           accessibilityLabel={t('all_categories') || 'All categories'}
-          style={({ pressed }) => [
-            styles.chip,
-            suggestMode && styles.chipCompact,
-            { backgroundColor: chipBackground, borderColor: colors.border },
-            pressed && { backgroundColor: colors.selected },
-          ]}
+          style={chipStyle(null)}
         >
           <Icon name="menu" size={affixIconSize} color={colors.text} />
           <Text style={[styles.chipText, suggestMode && styles.chipTextCompact, { color: colors.text }]} numberOfLines={2}>
@@ -186,16 +254,11 @@ export default function CategoryGridSelector({
       return (
         <Pressable
           key={key}
-          testID="category-grid-back"
+          testID={`${testIDPrefix}-back`}
           onPress={goBack}
           accessibilityRole="button"
           accessibilityLabel={t('back') || 'Back'}
-          style={({ pressed }) => [
-            styles.chip,
-            suggestMode && styles.chipCompact,
-            { backgroundColor: chipBackground, borderColor: colors.border },
-            pressed && { backgroundColor: colors.selected },
-          ]}
+          style={chipStyle(null)}
         >
           <Icon name="arrow-left" size={affixIconSize} color={colors.text} />
           <Text style={[styles.chipText, suggestMode && styles.chipTextCompact, { color: colors.text }]} numberOfLines={1}>
@@ -205,36 +268,62 @@ export default function CategoryGridSelector({
       );
     }
 
+    // "Whole category": picks the folder you are standing in, so a parent can be
+    // a target without stealing the tap that walks into it.
+    if (slot.kind === 'whole') {
+      const folderId = slot.item.id;
+      const isSelected = selectedIds.has(folderId);
+      const tone = isSelected ? colors.primary : colors.text;
+      return (
+        <Pressable
+          key={key}
+          testID={`${testIDPrefix}-whole-${folderId}`}
+          onPress={() => select(folderId)}
+          accessibilityRole={multiSelect ? 'checkbox' : 'button'}
+          accessibilityState={multiSelect ? { checked: isSelected } : { selected: isSelected }}
+          accessibilityLabel={`${t('whole_category') || 'Whole category'}: ${slot.item.name}`}
+          style={chipStyle(isSelected && { backgroundColor: selectedBackground, borderColor: colors.primary })}
+        >
+          <Icon name="select-all" size={itemIconSize} color={tone} />
+          <Text style={[styles.chipText, suggestMode && styles.chipTextCompact, { color: tone }]} numberOfLines={2}>
+            {t('whole_category') || 'Whole category'}
+          </Text>
+          {isSelected && (
+            <View style={styles.checkBadge}>
+              <Icon name="check-circle" size={12} color={colors.primary} />
+            </View>
+          )}
+        </Pressable>
+      );
+    }
+
     const { item } = slot;
     const isFolder = item.type === 'folder';
-    const isSelected = !isFolder && selectedCategoryId === item.id;
-    const name = item.nameKey ? t(item.nameKey) : item.name;
-    const textColor = isSelected ? '#ffffff' : colors.text;
+    const isSelected = selectedIds.has(item.id);
+    const name = displayName(item, t);
+    const tone = isSelected ? colors.primary : colors.text;
 
     return (
       <Pressable
         key={key}
-        testID={`category-grid-${item.id}`}
-        onPress={() => (isFolder ? enterFolder(item) : selectLeaf(item.id))}
-        accessibilityRole="button"
-        accessibilityState={{ selected: isSelected }}
-        style={({ pressed }) => [
-          styles.chip,
-          suggestMode && styles.chipCompact,
-          {
-            backgroundColor: isSelected ? colors.primary : chipBackground,
-            borderColor: isSelected ? colors.primary : colors.border,
-          },
-          pressed && !isSelected && { backgroundColor: colors.selected },
-        ]}
+        testID={`${testIDPrefix}-${item.id}`}
+        onPress={() => (isFolder ? enterFolder(item) : select(item.id))}
+        accessibilityRole={multiSelect && !isFolder ? 'checkbox' : 'button'}
+        accessibilityState={multiSelect && !isFolder ? { checked: isSelected } : { selected: isSelected }}
+        style={chipStyle(isSelected && { backgroundColor: selectedBackground, borderColor: colors.primary })}
       >
-        <Icon name={item.icon || (isFolder ? 'folder' : 'tag')} size={itemIconSize} color={textColor} />
-        <Text style={[styles.chipText, suggestMode && styles.chipTextCompact, { color: textColor }]} numberOfLines={2}>
+        <Icon name={item.icon || (isFolder ? 'folder' : 'tag')} size={itemIconSize} color={tone} />
+        <Text style={[styles.chipText, suggestMode && styles.chipTextCompact, { color: tone }]} numberOfLines={2}>
           {name}
         </Text>
         {isFolder && (
           <View style={styles.folderBadge}>
             <Icon name="folder-outline" size={11} color={colors.mutedText} />
+          </View>
+        )}
+        {isSelected && (
+          <View style={styles.checkBadge}>
+            <Icon name="check-circle" size={12} color={colors.primary} />
           </View>
         )}
       </Pressable>
@@ -243,9 +332,22 @@ export default function CategoryGridSelector({
 
   return (
     <View style={styles.grid}>
+      {/* Where you are, once you are anywhere but the root — a Back chip alone
+          says there is a way out, not what you walked into. */}
+      {!searching && breadcrumb.length > 0 && (
+        <Text
+          testID={`${testIDPrefix}-breadcrumb`}
+          style={[styles.breadcrumb, { color: colors.mutedText }]}
+          numberOfLines={1}
+        >
+          {breadcrumb.map((crumb) => crumb.name).join(' › ')}
+        </Text>
+      )}
       {rows.length === 0 ? (
-        <Text testID="category-grid-empty" style={[styles.empty, { color: colors.mutedText }]}>
-          {t('no_categories') || 'No categories yet.'}
+        <Text testID={`${testIDPrefix}-empty`} style={[styles.empty, { color: colors.mutedText }]}>
+          {searching
+            ? (t('no_results') || 'Nothing found')
+            : (emptyText || t('no_categories') || 'No categories yet.')}
         </Text>
       ) : (
         rows.map((row, ri) => (
@@ -278,13 +380,29 @@ CategoryGridSelector.propTypes = {
   })).isRequired,
   categoryType: PropTypes.oneOf(['expense', 'income']).isRequired,
   selectedCategoryId: PropTypes.string,
+  selectedCategoryIds: PropTypes.arrayOf(PropTypes.string),
   onSelect: PropTypes.func.isRequired,
   colors: PropTypes.object.isRequired,
   t: PropTypes.func.isRequired,
   topCategoryIds: PropTypes.arrayOf(PropTypes.string),
+  selectableFolders: PropTypes.bool,
+  query: PropTypes.string,
+  onQueryChange: PropTypes.func,
+  testIDPrefix: PropTypes.string,
+  emptyText: PropTypes.string,
 };
 
 const styles = StyleSheet.create({
+  breadcrumb: {
+    fontSize: FONT_SIZE.sm,
+    fontWeight: '600',
+    paddingHorizontal: SPACING.xs,
+  },
+  checkBadge: {
+    position: 'absolute',
+    right: 4,
+    top: 4,
+  },
   chip: {
     alignItems: 'center',
     borderRadius: BORDER_RADIUS.md,
@@ -319,8 +437,8 @@ const styles = StyleSheet.create({
     textAlign: 'center',
   },
   folderBadge: {
+    left: 4,
     position: 'absolute',
-    right: 4,
     top: 4,
   },
   grid: {

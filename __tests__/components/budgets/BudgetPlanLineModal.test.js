@@ -168,6 +168,60 @@ describe('BudgetPlanLineModal', () => {
     }));
   });
 
+  // Categories nest, and the picker used to lay every level out as one flat list.
+  // It now renders the app's shared category grid.
+  describe('Target picker hierarchy', () => {
+    const nested = [
+      { id: 'food', name: 'Food', type: 'folder', categoryType: 'expense' },
+      { id: 'groceries', name: 'Groceries', type: 'entry', categoryType: 'expense', parentId: 'food' },
+      { id: 'taxi', name: 'Taxi', type: 'entry', categoryType: 'expense' },
+    ];
+
+    it('keeps a folder\'s children behind it until it is opened', async () => {
+      const props = { ...baseProps(), expenseCategories: nested };
+      const { getByTestId, queryByTestId } = await render(<BudgetPlanLineModal {...props} />);
+      await fireEvent.press(getByTestId('plan-target-picker'));
+      await waitFor(() => expect(getByTestId('plan-target-option-cat-food')).toBeTruthy());
+      expect(queryByTestId('plan-target-option-cat-groceries')).toBeNull();
+
+      await fireEvent.press(getByTestId('plan-target-option-cat-food'));
+      await waitFor(() => expect(getByTestId('plan-target-option-cat-groceries')).toBeTruthy());
+      expect(queryByTestId('plan-target-option-cat-taxi')).toBeNull();
+    });
+
+    it('saves a nested category reached through its folder', async () => {
+      const props = { ...baseProps(), expenseCategories: nested };
+      const { getByTestId } = await render(<BudgetPlanLineModal {...props} />);
+      await fireEvent.press(getByTestId('plan-target-picker'));
+      await waitFor(() => expect(getByTestId('plan-target-option-cat-food')).toBeTruthy());
+      await fireEvent.press(getByTestId('plan-target-option-cat-food'));
+      await waitFor(() => expect(getByTestId('plan-target-option-cat-groceries')).toBeTruthy());
+      await fireEvent.press(getByTestId('plan-target-option-cat-groceries'));
+      await fireEvent.press(getByTestId('plan-target-done'));
+      await fireEvent.changeText(getByTestId('plan-line-amount'), '150');
+      await fireEvent.press(getByTestId('plan-line-save'));
+      expect(props.onSaveLine).toHaveBeenCalledWith(expect.objectContaining({
+        categoryIds: ['groceries'],
+      }));
+    });
+
+    it('saves the folder itself as a target — its subtree rolls up into it', async () => {
+      const props = { ...baseProps(), expenseCategories: nested };
+      const { getByTestId } = await render(<BudgetPlanLineModal {...props} />);
+      await fireEvent.press(getByTestId('plan-target-picker'));
+      await waitFor(() => expect(getByTestId('plan-target-option-cat-food')).toBeTruthy());
+      await fireEvent.press(getByTestId('plan-target-option-cat-food'));
+      await waitFor(() => expect(getByTestId('plan-target-option-cat-whole-food')).toBeTruthy());
+      await fireEvent.press(getByTestId('plan-target-option-cat-whole-food'));
+      await fireEvent.press(getByTestId('plan-target-done'));
+      await fireEvent.changeText(getByTestId('plan-line-amount'), '150');
+      await fireEvent.press(getByTestId('plan-line-save'));
+      expect(props.onSaveLine).toHaveBeenCalledWith(expect.objectContaining({
+        categoryIds: ['food'],
+      }));
+    });
+  });
+
   describe('Target picker search', () => {
     const manyCategories = Array.from({ length: 10 }, (_, i) => ({
       id: `c${i}`, name: `Category ${i}`, categoryType: 'expense',

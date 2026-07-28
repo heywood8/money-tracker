@@ -7,7 +7,7 @@ import {
   Modal,
   Pressable,
   StyleSheet,
-  FlatList,
+  ScrollView,
   Animated,
   Easing,
   Dimensions,
@@ -18,6 +18,7 @@ import { SPACING, BORDER_RADIUS, HEIGHTS, FONT_SIZE } from '../../styles/designT
 import { DURATION_ENTER } from '../../utils/motion';
 import { motionDuration } from '../../utils/reducedMotion';
 import ModalBlurOverlay from '../ModalBlurOverlay';
+import CategoryGridSelector from '../CategoryGridSelector';
 import useKeyboardOffset from '../../hooks/useKeyboardOffset';
 
 const SCREEN_WIDTH = Dimensions.get('window').width;
@@ -63,15 +64,6 @@ export default function SplitOperationModal({
       pickerAnim.setValue(0);
     }
   }, [visible, pickerAnim]);
-
-  // Filter categories by operation type (expense or income) and exclude folders/shadow
-  const filteredCategories = useMemo(() => {
-    return categories.filter(cat => {
-      if (cat.isShadow) return false;
-      if (cat.type === 'folder') return false;
-      return cat.categoryType === operationType;
-    });
-  }, [categories, operationType]);
 
   // Get selected category name for display
   const selectedCategoryName = useMemo(() => {
@@ -156,29 +148,6 @@ export default function SplitOperationModal({
 
   // Empty handler for preventing event propagation
   const handleStopPropagation = useCallback(() => {}, []);
-
-  // Render category item
-  const renderCategoryItem = useCallback(({ item }) => (
-    <Pressable
-      onPress={() => handleCategorySelect(item.id)}
-      style={({ pressed }) => [
-        styles.categoryOption,
-        { borderColor: colors.border },
-        pressed && { backgroundColor: colors.selected },
-      ]}
-      testID={`category-option-${item.id}`}
-    >
-      <View style={styles.categoryOptionContent}>
-        <Icon name={item.icon} size={24} color={colors.text} />
-        <Text style={[styles.categoryOptionText, { color: colors.text }]}>
-          {item.nameKey ? t(item.nameKey) : item.name}
-        </Text>
-      </View>
-    </Pressable>
-  ), [colors, handleCategorySelect, t]);
-
-  // Key extractor for FlatList
-  const keyExtractor = useCallback((item) => item.id, []);
 
   // Subpanel slides in from the right; the overlay opacity fades it in.
   const pickerTranslateX = pickerAnim.interpolate({
@@ -297,16 +266,20 @@ export default function SplitOperationModal({
                   <Text style={[styles.pickerTitle, { color: colors.text }]}>
                     {t('select_category')}
                   </Text>
-                  <FlatList
-                    data={filteredCategories}
-                    keyExtractor={keyExtractor}
-                    renderItem={renderCategoryItem}
-                    ListEmptyComponent={
-                      <Text style={[styles.emptyText, { color: colors.mutedText }]}>
-                        {t('no_categories')}
-                      </Text>
-                    }
-                  />
+                  {/* The app's shared category grid — categories nest, so the
+                      picker drills through folders instead of flattening them
+                      into a list of equals. */}
+                  <ScrollView keyboardShouldPersistTaps="handled">
+                    <CategoryGridSelector
+                      categories={categories}
+                      categoryType={operationType}
+                      selectedCategoryId={selectedCategoryId || null}
+                      onSelect={handleCategorySelect}
+                      colors={colors}
+                      t={t}
+                      testIDPrefix="category-option"
+                    />
+                  </ScrollView>
                   <Pressable
                     style={styles.closeButton}
                     onPress={closeCategoryPicker}
@@ -343,21 +316,6 @@ const styles = StyleSheet.create({
     fontSize: FONT_SIZE.base,
     fontWeight: '500',
   },
-  categoryOption: {
-    borderBottomWidth: 1,
-    justifyContent: 'center',
-    minHeight: HEIGHTS.listItem,
-    paddingHorizontal: SPACING.sm,
-    paddingVertical: SPACING.md,
-  },
-  categoryOptionContent: {
-    alignItems: 'center',
-    flexDirection: 'row',
-    gap: SPACING.md,
-  },
-  categoryOptionText: {
-    fontSize: FONT_SIZE.lg,
-  },
   closeButton: {
     alignItems: 'center',
     alignSelf: 'center',
@@ -371,10 +329,6 @@ const styles = StyleSheet.create({
   closeButtonText: {
     fontSize: FONT_SIZE.base,
     fontWeight: '600',
-  },
-  emptyText: {
-    padding: SPACING.xl,
-    textAlign: 'center',
   },
   errorText: {
     color: '#ff6b6b',
