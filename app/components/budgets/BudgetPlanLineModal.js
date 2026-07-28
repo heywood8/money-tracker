@@ -23,6 +23,7 @@ import { useDialog } from '../../contexts/DialogContext';
 import FormInput from '../FormInput';
 import ModalShell from '../ModalShell';
 import CategoryGridSelector from '../CategoryGridSelector';
+import AccountGridSelector from '../AccountGridSelector';
 import { SPACING, BORDER_RADIUS, FONT_SIZE, ICON_SIZE } from '../../styles/designTokens';
 import * as Currency from '../../services/currency';
 
@@ -228,10 +229,6 @@ PanelHeader.propTypes = {
   backTestID: PropTypes.string,
   children: PropTypes.node,
 };
-
-const matchesQuery = (name, query) => (
-  !query || String(name || '').toLowerCase().includes(query.toLowerCase())
-);
 
 /**
  * BudgetPlanLineModal — editor for a single budget line: a monthly target that
@@ -526,16 +523,17 @@ export default function BudgetPlanLineModal({
     ));
   }, []);
 
-  const handleSelectTransferTarget = useCallback((acc) => {
-    setToAccountId(acc.id);
+  const handleSelectTransferTargetId = useCallback((id) => {
+    setToAccountId(id);
     setCategoryIds([]);
     setKind('transfer');
     setError(null);
     closeSubPanel();
   }, [closeSubPanel]);
 
-  const handleSelectExecutionAccount = useCallback((acc) => {
-    setAccountId(acc ? acc.id : null);
+  // null clears the template account, turning the line back into a pure target.
+  const handleSelectExecutionAccountId = useCallback((id) => {
+    setAccountId(id ?? null);
     setError(null);
     closeSubPanel();
   }, [closeSubPanel]);
@@ -661,32 +659,6 @@ export default function BudgetPlanLineModal({
   // Whether the panel earns a search field. Categories are counted whole (the grid
   // searches the entire tree, not the folder level it happens to be showing).
   const targetOptionCount = showingCategories ? targetCategories.length : accounts.length;
-  const visibleAccounts = useMemo(
-    () => accounts.filter(item => matchesQuery(item.name, query)),
-    [accounts, query],
-  );
-
-  const renderTransferTargetItem = useCallback(({ item }) => (
-    <OptionRow
-      colors={colors}
-      icon="bank-transfer"
-      label={item.name}
-      selected={toAccountId === item.id}
-      onPress={() => handleSelectTransferTarget(item)}
-      testID={`plan-target-option-acc-${item.id}`}
-    />
-  ), [toAccountId, colors, handleSelectTransferTarget]);
-
-  const renderExecutionAccountItem = useCallback(({ item }) => (
-    <OptionRow
-      colors={colors}
-      icon="wallet-outline"
-      label={`${item.name} · ${item.currency}`}
-      selected={accountId === item.id}
-      onPress={() => handleSelectExecutionAccount(item)}
-      testID={`plan-account-option-${item.id}`}
-    />
-  ), [accountId, colors, handleSelectExecutionAccount]);
 
   const title = isEditingLine ? t('edit_allocation') : t('add_allocation');
   const panelStyle = [
@@ -694,7 +666,6 @@ export default function BudgetPlanLineModal({
     { backgroundColor: colors.card, paddingBottom: insets.bottom + SPACING.md },
     { opacity: subPanelAnim, transform: [{ translateX: subPanelTranslateX }] },
   ];
-  const emptyListText = query ? t('no_results') : null;
 
   const subPanel = activeSubPanel ? (
     <Animated.View testID={`plan-${activeSubPanel}-subpanel`} style={panelStyle}>
@@ -772,19 +743,24 @@ export default function BudgetPlanLineModal({
               />
             </ScrollView>
           ) : (
-            <FlatList
-              data={visibleAccounts}
-              keyExtractor={(item) => String(item.id)}
-              renderItem={renderTransferTargetItem}
-              keyboardShouldPersistTaps="handled"
+            /* Accounts group by currency in the shared account grid — a transfer
+               target is almost always chosen within one currency. */
+            <ScrollView
               style={styles.panelListBody}
               contentContainerStyle={styles.panelList}
-              ListEmptyComponent={(
-                <Text style={[styles.emptyText, { color: colors.mutedText }]}>
-                  {emptyListText || t('no_accounts')}
-                </Text>
-              )}
-            />
+              keyboardShouldPersistTaps="handled"
+            >
+              <AccountGridSelector
+                accounts={accounts}
+                selectedAccountId={toAccountId}
+                onSelect={handleSelectTransferTargetId}
+                colors={colors}
+                t={t}
+                icon="bank-transfer-in"
+                query={query}
+                testIDPrefix="plan-target-option-acc"
+              />
+            </ScrollView>
           )}
         </>
       )}
@@ -889,23 +865,25 @@ export default function BudgetPlanLineModal({
             icon="close-circle-outline"
             label={t('no_template_account')}
             selected={accountId == null}
-            onPress={() => handleSelectExecutionAccount(null)}
+            onPress={() => handleSelectExecutionAccountId(null)}
             testID="plan-account-option-none"
           />
 
-          <FlatList
-            data={visibleAccounts}
-            keyExtractor={(item) => String(item.id)}
-            renderItem={renderExecutionAccountItem}
-            keyboardShouldPersistTaps="handled"
+          <ScrollView
             style={styles.panelListBody}
             contentContainerStyle={styles.panelList}
-            ListEmptyComponent={(
-              <Text style={[styles.emptyText, { color: colors.mutedText }]}>
-                {emptyListText || t('no_accounts')}
-              </Text>
-            )}
-          />
+            keyboardShouldPersistTaps="handled"
+          >
+            <AccountGridSelector
+              accounts={accounts}
+              selectedAccountId={accountId}
+              onSelect={handleSelectExecutionAccountId}
+              colors={colors}
+              t={t}
+              query={query}
+              testIDPrefix="plan-account-option"
+            />
+          </ScrollView>
         </>
       )}
     </Animated.View>

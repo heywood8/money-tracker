@@ -4,6 +4,7 @@ import { View, StyleSheet, Keyboard, FlatList, TouchableOpacity, Pressable, Anim
 import { makeModalStyles, modalSharedStyles } from '../styles/modalStyles';
 import { Text, TextInput as PaperTextInput, Button, Portal, Modal, TouchableRipple, Switch } from 'react-native-paper';
 import AddFAB from '../components/AddFAB';
+import AccountGridSelector from '../components/AccountGridSelector';
 import LoadingView from '../components/LoadingView';
 import EmptyState from '../components/EmptyState';
 import { NestableScrollContainer, NestableDraggableFlatList } from 'react-native-draggable-flatlist';
@@ -102,36 +103,10 @@ CurrencyPickerModal.propTypes = {
 };
 
 // Memoized transfer account picker modal component
-const TransferAccountPickerModal = memo(({ visible = false, onClose = () => {}, accounts = [], accountToDelete = null, accountCurrency = null, operationCount = 0, colors = {}, t = (k) => k, onSelect = () => {}, currencies = DEFAULT_CURRENCIES }) => {
-  const { hideBalances } = useDisplaySettings();
+const TransferAccountPickerModal = memo(({ visible = false, onClose = () => {}, accounts = [], accountToDelete = null, accountCurrency = null, operationCount = 0, colors = {}, t = (k) => k, onSelect = () => {} }) => {
   const availableAccounts = useMemo(() => {
     return accounts.filter(a => a.id !== accountToDelete && a.currency === accountCurrency);
   }, [accounts, accountToDelete, accountCurrency]);
-
-  const renderAccountItem = useCallback(({ item }) => {
-    const currencySymbol = currencies[item.currency]?.symbol || item.currency;
-    const decimals = currencies[item.currency]?.decimal_digits ?? 2;
-    const formattedBalance = parseFloat(item.balance).toFixed(decimals);
-
-    return (
-      <TouchableRipple
-        onPress={() => onSelect(item.id)}
-        style={styles.pickerOption}
-        rippleColor="rgba(0, 0, 0, .12)"
-      >
-        <View>
-          <Text style={styles.pickerAccountName}>{item.name}</Text>
-          {hideBalances ? (
-            <View style={[styles.hiddenBalance, styles.hiddenBalancePicker]} />
-          ) : (
-            <Text style={[styles.pickerAccountBalance, { color: colors.mutedText }]}>
-              {formattedBalance} {currencySymbol}
-            </Text>
-          )}
-        </View>
-      </TouchableRipple>
-    );
-  }, [onSelect, colors, currencies, hideBalances]);
 
   return (
     <Portal>
@@ -149,12 +124,18 @@ const TransferAccountPickerModal = memo(({ visible = false, onClose = () => {}, 
         <Text variant="bodySmall" style={[styles.centeredBodySmall, { color: colors.mutedText }]}>
           {`${operationCount} ${operationCount === 1 ? 'transaction' : 'transactions'}`}
         </Text>
-        <FlatList
-          data={availableAccounts}
-          keyExtractor={(item) => item.id}
-          renderItem={renderAccountItem}
-          style={styles.pickerList}
-        />
+        {/* Same shared account grid as every other account picker. The candidates
+            are already narrowed to the deleted account's currency, so its currency
+            headers stay out of the way here. */}
+        <ScrollView style={styles.pickerList}>
+          <AccountGridSelector
+            accounts={availableAccounts}
+            onSelect={onSelect}
+            colors={colors}
+            t={t}
+            testIDPrefix="transfer-account-option"
+          />
+        </ScrollView>
         <Button mode="text" onPress={onClose} style={styles.pickerCloseButton}>
           {t('cancel') || 'Cancel'}
         </Button>
@@ -175,7 +156,6 @@ TransferAccountPickerModal.propTypes = {
   colors: PropTypes.object,
   t: PropTypes.func,
   onSelect: PropTypes.func,
-  currencies: PropTypes.object,
 };
 
 // Memoized confirmation dialog component
@@ -1318,7 +1298,6 @@ export default function AccountsScreen({ onBackStateChange }) {
         accountToDelete={accountToDelete}
         accountCurrency={accountToDeleteCurrency}
         operationCount={operationCount}
-        currencies={currencies}
         colors={colors}
         t={t}
         onSelect={handleTransferAndDelete}
@@ -1616,10 +1595,6 @@ const styles = StyleSheet.create({
     marginTop: SPACING.xs,
     width: 160,
   },
-  hiddenBalancePicker: {
-    marginTop: 4,
-    width: 70,
-  },
   monthlyChangeRow: {
     marginTop: SPACING.sm,
   },
@@ -1669,14 +1644,6 @@ const styles = StyleSheet.create({
   netWorthWarningText: {
     flex: 1,
     fontSize: 12,
-  },
-  pickerAccountBalance: {
-    fontSize: 14,
-    marginTop: SPACING.xs,
-  },
-  pickerAccountName: {
-    fontSize: 16,
-    fontWeight: '600',
   },
   pickerCloseButton: {
     marginTop: SPACING.sm,

@@ -222,6 +222,47 @@ describe('BudgetPlanLineModal', () => {
     });
   });
 
+  describe('Account pickers', () => {
+    const multiCurrency = [
+      { id: 1, name: 'Savings', currency: 'USD', balance: '100' },
+      { id: 2, name: 'Cash amd', currency: 'AMD', balance: '5000' },
+      { id: 3, name: 'Checking', currency: 'USD', balance: '20' },
+    ];
+
+    it('groups transfer targets by currency', async () => {
+      const props = { ...baseProps(), accounts: multiCurrency };
+      const { getByTestId } = await render(<BudgetPlanLineModal {...props} />);
+      await fireEvent.press(getByTestId('plan-target-picker'));
+      await waitFor(() => expect(getByTestId('plan-target-tab-account')).toBeTruthy());
+      await fireEvent.press(getByTestId('plan-target-tab-account'));
+      await waitFor(() => expect(getByTestId('plan-target-option-acc-1')).toBeTruthy());
+      expect(getByTestId('plan-target-option-acc-group-USD')).toBeTruthy();
+      expect(getByTestId('plan-target-option-acc-group-AMD')).toBeTruthy();
+    });
+
+    it('groups execution accounts by currency, and still offers none', async () => {
+      const props = { ...baseProps(), accounts: multiCurrency };
+      const { getByTestId } = await render(<BudgetPlanLineModal {...props} />);
+      await fireEvent.press(getByTestId('plan-account-picker'));
+      await waitFor(() => expect(getByTestId('plan-account-option-2')).toBeTruthy());
+      expect(getByTestId('plan-account-option-group-AMD')).toBeTruthy();
+      expect(getByTestId('plan-account-option-none')).toBeTruthy();
+
+      await fireEvent.press(getByTestId('plan-account-option-2'));
+      await fireEvent.changeText(getByTestId('plan-line-amount'), '10');
+      await fireEvent.press(getByTestId('plan-target-picker'));
+      await waitFor(() => expect(getByTestId('plan-target-option-cat-cat1')).toBeTruthy());
+      await fireEvent.press(getByTestId('plan-target-option-cat-cat1'));
+      await fireEvent.press(getByTestId('plan-target-done'));
+      await fireEvent.press(getByTestId('plan-line-save'));
+      expect(props.onSaveLine).toHaveBeenCalledWith(expect.objectContaining({
+        accountId: 2,
+        // An executable line is priced in its account's currency.
+        currency: 'AMD',
+      }));
+    });
+  });
+
   describe('Target picker search', () => {
     const manyCategories = Array.from({ length: 10 }, (_, i) => ({
       id: `c${i}`, name: `Category ${i}`, categoryType: 'expense',
