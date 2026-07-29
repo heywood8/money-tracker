@@ -1,5 +1,12 @@
 # Changelog
 
+## [0.246.4](https://github.com/heywood8/money-tracker/compare/penny-v0.246.3...penny-v0.246.4) (2026-07-29)
+
+
+### Bug Fixes
+
+* **budgets:** glyph the one-off lines, dock the month jump beside the label ([#1507](https://github.com/heywood8/money-tracker/issues/1507)) ([56beed7](https://github.com/heywood8/money-tracker/commit/56beed7180645b71b2c53d8da09a658ccf6f0358))
+
 ## [0.246.3](https://github.com/heywood8/money-tracker/compare/penny-v0.246.2...penny-v0.246.3) (2026-07-29)
 
 
