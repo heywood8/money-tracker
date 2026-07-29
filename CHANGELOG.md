@@ -1,5 +1,12 @@
 # Changelog
 
+## [0.246.3](https://github.com/heywood8/money-tracker/compare/penny-v0.246.2...penny-v0.246.3) (2026-07-29)
+
+
+### Bug Fixes
+
+* **budgets:** drop the month-pace tick from the plan bar ([#1505](https://github.com/heywood8/money-tracker/issues/1505)) ([df743e7](https://github.com/heywood8/money-tracker/commit/df743e78a1a8d9362780d5b3a7d229478c71b372))
+
 ## [0.246.2](https://github.com/heywood8/money-tracker/compare/penny-v0.246.1...penny-v0.246.2) (2026-07-29)
 
 
