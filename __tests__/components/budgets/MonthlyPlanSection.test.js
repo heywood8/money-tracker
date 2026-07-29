@@ -530,12 +530,37 @@ describe('MonthlyPlanSection', () => {
       await waitFor(() => expect(getByTestId('plan-line-l-rec')).toBeTruthy());
       expect(getByTestId('plan-empty-state')).toBeTruthy();
       expect(queryByTestId('plan-line-execute-l-rec')).toBeNull(); // no template → not executable
-      // Scope is a glyph beside the name now, not an uppercase text line.
-      expect(getByTestId('plan-line-recurring-l-rec')).toBeTruthy();
+      // Monthly repetition is the default, so it carries no glyph — only a
+      // one-off line is marked.
+      expect(queryByTestId('plan-line-one-time-l-rec')).toBeNull();
       // ...but NOT the "no plan yet" copy: it sat directly under a populated
       // list and above a totals row, contradicting both.
       expect(queryByTestId('plan-create-empty')).toBeTruthy();
       expect(() => getByText('no_plan_for_month')).toThrow();
+    });
+
+    it('glyphs the one-off line and leaves the recurring one unmarked', async () => {
+      setPlans({
+        plans: [{ id: 'p1', month: THIS_MONTH, currency: 'USD', expectedIncome: '1000' }],
+        lines: [
+          recurringLine,
+          {
+            id: 'l-once', planId: 'p1', amount: '4000', label: 'Gift', comment: null,
+            categoryId: 'cat1', toAccountId: null, sortOrder: 1, isBroken: false,
+            isRecurring: false, currency: null,
+          },
+        ],
+      });
+      const { getByTestId, queryByTestId } = await renderSection();
+      await waitFor(() => expect(getByTestId('plan-line-l-once')).toBeTruthy());
+      // The marked row is the exception (this month only); repeating every month
+      // is the default and says nothing worth a glyph.
+      expect(getByTestId('plan-line-one-time-l-once')).toBeTruthy();
+      expect(queryByTestId('plan-line-one-time-l-rec')).toBeNull();
+      // Both scopes stay spelled out for a screen reader, which cannot see the
+      // absence of a glyph.
+      expect(getByTestId('plan-line-l-rec').props.accessibilityLabel).toContain('recurring');
+      expect(getByTestId('plan-line-l-once').props.accessibilityLabel).toContain('one_time');
     });
 
     it('keeps the "no plan yet" copy for a genuinely blank month', async () => {
@@ -1391,15 +1416,16 @@ describe('MonthlyPlanSection', () => {
     // — and it kept saying so on months where execution is disabled anyway.
     // The uppercase "RECURRING · PENDING_EXECUTION" line under every row is gone
     // — it repeated the default on nearly all of them while being the loudest
-    // thing after the amount. Scope is a glyph beside the name, template state is
-    // a badge on the category icon, and both are spelled out in the row's
-    // accessibility label, which a screen reader reads and a glyph cannot say.
+    // thing after the amount. Template state is a badge on the category icon,
+    // scope is a glyph beside the name ON ONE-OFF ROWS ONLY, and both are
+    // spelled out in the row's accessibility label, which a screen reader reads
+    // and a glyph cannot say.
     it('marks a pending template with a badge and names the state for a screen reader', async () => {
       setPlans({ plans: [], lines: [TEMPLATE_LINE] });
-      const { queryByText, getByTestId } = await renderSection();
+      const { queryByText, getByTestId, queryByTestId } = await renderSection();
       await waitFor(() => expect(getByTestId('plan-line-l-tpl')).toBeTruthy());
       expect(getByTestId('plan-line-pending-l-tpl')).toBeTruthy();
-      expect(getByTestId('plan-line-recurring-l-tpl')).toBeTruthy();
+      expect(queryByTestId('plan-line-one-time-l-tpl')).toBeNull();
       expect(getByTestId('plan-line-l-tpl').props.accessibilityLabel)
         .toContain('recurring, pending_execution');
       expect(queryByText('recurring · pending_execution')).toBeNull();
