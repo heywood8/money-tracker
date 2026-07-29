@@ -1,5 +1,12 @@
 # Changelog
 
+## [0.246.2](https://github.com/heywood8/money-tracker/compare/penny-v0.246.1...penny-v0.246.2) (2026-07-29)
+
+
+### Bug Fixes
+
+* **operations:** anchor the long-press menu to the row on a scrolled list ([#1503](https://github.com/heywood8/money-tracker/issues/1503)) ([6d6bfb4](https://github.com/heywood8/money-tracker/commit/6d6bfb4fcad7455a3a5b7f3f6c3a66155c0fbca3))
+
 ## [0.246.1](https://github.com/heywood8/money-tracker/compare/penny-v0.246.0...penny-v0.246.1) (2026-07-28)
 
 
