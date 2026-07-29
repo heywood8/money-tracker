@@ -1,5 +1,12 @@
 # Changelog
 
+## [0.246.6](https://github.com/heywood8/money-tracker/compare/penny-v0.246.5...penny-v0.246.6) (2026-07-29)
+
+
+### Bug Fixes
+
+* **operations:** keep every pickable account reachable as a transfer target ([#1511](https://github.com/heywood8/money-tracker/issues/1511)) ([ca89953](https://github.com/heywood8/money-tracker/commit/ca899537b06e9f976e83bb12b94f320081497c9f))
+
 ## [0.246.5](https://github.com/heywood8/money-tracker/compare/penny-v0.246.4...penny-v0.246.5) (2026-07-29)
 
 
