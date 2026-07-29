@@ -10,11 +10,10 @@ import { SPACING } from '../../styles/layout';
 // PlanLineRow uses, for the same reason.
 const CONVERTING_PLACEHOLDER = '—';
 
-// Track / fill / pace tints, matching PlanLineRow so an envelope's bar and its
+// Track / fill tints, matching PlanLineRow so an envelope's bar and its
 // children's bars read as the same instrument at two sizes.
 const TRACK_ALPHA = '26'; // ~15%
 const FILL_ALPHA = '99'; // ~60%
-const PACE_ALPHA = '59'; // ~35%
 
 /**
  * The header row of a GROUP of allocations (migration 0022).
@@ -42,7 +41,6 @@ const PlanGroupRow = memo(function PlanGroupRow({
   planCurrency,
   colors,
   t,
-  pace = null,
   listLength,
   onMove = null,
   onPress,
@@ -146,11 +144,9 @@ const PlanGroupRow = memo(function PlanGroupRow({
             <View style={styles.meterBar}>
               <PlanProgressBar
                 ratio={ratio}
-                pace={pace}
                 trackColor={`${colors.mutedText}${TRACK_ALPHA}`}
                 fillColor={`${colors.mutedText}${FILL_ALPHA}`}
                 overspendColor={colors.overspend}
-                paceColor={`${colors.text}${PACE_ALPHA}`}
                 height={5}
                 testID={`plan-group-bar-${group.id}`}
               />
@@ -201,7 +197,6 @@ PlanGroupRow.propTypes = {
   planCurrency: PropTypes.string.isRequired,
   colors: PropTypes.object.isRequired,
   t: PropTypes.func.isRequired,
-  pace: PropTypes.number,
   onMove: PropTypes.func,
   onPress: PropTypes.func.isRequired,
   onLongPress: PropTypes.func.isRequired,

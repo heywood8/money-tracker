@@ -24,14 +24,12 @@ const PLAN_STOP = 0.72;
  * and it is — right up until the fill covers it. Every row at or past its target
  * paints the whole plan zone solid, and on a month-end plan that is most of
  * them, so the one place the mark is needed is the one place it disappeared.
- * What was left on such a row was a single vertical line, the pace tick, sitting
- * some 7% to its left — and a reader looking for the target boundary reads
- * whatever vertical is there as the boundary. It is a gap rather than a drawn
- * tick because the track has no background of its own: the zones are the
- * background, so leaving a slice unpainted shows the card through it, and it
- * reads over the fill and the overspend alike without needing to know either
- * colour. It also says "boundary" in a different language than the pace tick
- * does — negative space against a line — so the two can no longer be confused.
+ * It is a gap rather than a drawn tick because the track has no background of
+ * its own: the zones are the background, so leaving a slice unpainted shows the
+ * card through it, and it reads over the fill and the overspend alike without
+ * needing to know either colour. It is also the only vertical on the bar, which
+ * is what keeps it unambiguous: whatever break a reader finds in the strip is
+ * the target.
  *
  * As a fraction of the track: ~2dp on the ~250dp bar this screen draws.
  */
@@ -81,17 +79,20 @@ export function overspendFraction(ratio) {
  * belongs to (see envelopePalette) and this bar carries the status, in
  * geometry, where more spending always means more bar.
  *
+ * The bar says one thing: how the actual stands against the target. It used to
+ * carry a second mark for how far through the month today is, so that 99% spent
+ * read as fine on the 27th and alarming on the 3rd. That mark is gone — on a
+ * screen where every row draws a bar, a second vertical per row was more
+ * furniture than signal, and the calendar is not something a budget row has to
+ * restate.
+ *
  * @param {number} ratio - actual / target. May exceed 1; that is the point.
- * @param {?number} pace - How far through the month we are, 0..1, or null when
- *   the month is not the current one (a finished month has no "should be here").
  */
 const PlanProgressBar = ({
   ratio,
-  pace = null,
   trackColor,
   fillColor,
   overspendColor,
-  paceColor,
   height = 4,
   testID,
 }) => {
@@ -144,32 +145,15 @@ const PlanProgressBar = ({
           style={[styles.overFill, { backgroundColor: overspendColor }, overStyle]}
         />
       )}
-
-      {/* Where the month says the spending should have reached by today. This is
-          the marker EnvelopeFill had to drop: as a dashed hairline across a
-          full-height row wash, Android drew it solid, and every row carrying one
-          at the same x stacked into an unbroken line down the card that read as
-          a rendering artefact. On a 4dp strip there is no such stack — the marks
-          sit at different x on every row and are 4dp tall. Being ahead of pace
-          used to be said with an amber tone that was indistinguishable from the
-          red one at the alpha it was drawn with; it is a position now. */}
-      {pace != null && (
-        <View
-          testID={testID ? `${testID}-pace` : undefined}
-          style={[styles.paceTick, { backgroundColor: paceColor, left: pct(Math.min(Math.max(pace, 0), 1) * PLAN_STOP) }]}
-        />
-      )}
     </View>
   );
 };
 
 PlanProgressBar.propTypes = {
   ratio: PropTypes.number.isRequired,
-  pace: PropTypes.number,
   trackColor: PropTypes.string.isRequired,
   fillColor: PropTypes.string.isRequired,
   overspendColor: PropTypes.string.isRequired,
-  paceColor: PropTypes.string.isRequired,
   height: PropTypes.number,
   testID: PropTypes.string,
 };
@@ -209,12 +193,6 @@ const styles = StyleSheet.create({
     position: 'absolute',
     right: 0,
     top: 0,
-  },
-  paceTick: {
-    bottom: 0,
-    position: 'absolute',
-    top: 0,
-    width: 1.5,
   },
   planFill: {
     bottom: 0,

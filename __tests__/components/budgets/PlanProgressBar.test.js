@@ -7,7 +7,6 @@ const COLORS = {
   track: '#aaaaaa26',
   fill: '#aaaaaa99',
   overspend: '#FF6B6B',
-  pace: '#ffffff59',
 };
 
 const renderBar = async (props = {}) => render(
@@ -16,7 +15,6 @@ const renderBar = async (props = {}) => render(
     trackColor={COLORS.track}
     fillColor={COLORS.fill}
     overspendColor={COLORS.overspend}
-    paceColor={COLORS.pace}
     testID="bar"
     {...props}
   />,
@@ -93,9 +91,8 @@ describe('PlanProgressBar', () => {
 
   // The target boundary used to be nothing but the step in brightness between
   // the two track zones — which the fill covers on any row at or past its
-  // target, i.e. on most rows of a month-end plan. What was left on such a row
-  // was the pace tick, a lone vertical some 7% to the boundary's left, and that
-  // is what a reader took the boundary to be.
+  // target, i.e. on most rows of a month-end plan, leaving nothing on the strip
+  // to read the target off.
   describe('Target boundary', () => {
     it('leaves a gap between the two zones, so the target is marked on an empty track', async () => {
       const { getByTestId } = await renderBar({ ratio: 0.4 });
@@ -120,37 +117,13 @@ describe('PlanProgressBar', () => {
       expect(styleOf(getByTestId('bar-over')).width).toBe('27.2%');
     });
 
-    it('keeps the pace tick clear of the boundary it was being mistaken for', async () => {
-      // Even at the end of the month the tick lands ON the target rather than in
-      // the gap, so the gap stays the only thing that separates the zones.
-      const { getByTestId } = await renderBar({ ratio: 1.8, pace: 1 });
-      expect(styleOf(getByTestId('bar-pace')).left).toBe('72%');
-      expect(styleOf(getByTestId('bar-over-zone')).left).toBe('72.8%');
-    });
-  });
-
-  describe('Pace marker', () => {
-    it('is absent when the month has no pace to speak of', async () => {
-      const { queryByTestId } = await renderBar({ pace: null });
+    it('leaves the gap as the only vertical on the strip', async () => {
+      // The bar used to carry a second mark for the month's pace, and a reader
+      // looking for the target read whichever vertical was there as the target.
+      // Nothing but the two zones and their fills is drawn now.
+      const { getByTestId, queryByTestId } = await renderBar({ ratio: 1.8 });
       expect(queryByTestId('bar-pace')).toBeNull();
-    });
-
-    it('sits inside the plan zone, proportionally to the month', async () => {
-      // The plan occupies 72% of the track, so half the month is at 36% — the
-      // mark has to land where the fill would be at that point, not at half the
-      // whole track.
-      const { getByTestId } = await renderBar({ pace: 0.5 });
-      expect(styleOf(getByTestId('bar-pace')).left).toBe('36%');
-    });
-
-    it('lands on the target boundary at the end of the month', async () => {
-      const { getByTestId } = await renderBar({ pace: 1 });
-      expect(styleOf(getByTestId('bar-pace')).left).toBe('72%');
-    });
-
-    it('clamps a pace outside the month rather than drawing off the track', async () => {
-      const { getByTestId } = await renderBar({ pace: 1.4 });
-      expect(styleOf(getByTestId('bar-pace')).left).toBe('72%');
+      expect(styleOf(getByTestId('bar-over-zone')).left).toBe('72.8%');
     });
   });
 });

@@ -1106,13 +1106,12 @@ describe('MonthlyPlanSection', () => {
     });
 
     // The bar carries the status now, in geometry: how much of the target is
-    // gone is its length, going PAST the target is a second segment beyond the
-    // mark at 72% of the track, and where the month says you should be is a tick
-    // on it. Colour was tried for all three and could not carry them — on a
-    // real month-end plan most rows are at or over target, so tinting them all
-    // separated nothing, and the amber and red tints were within a few units of
-    // each other at the alpha they were drawn with.
-    const pacedLine = (id, actual, amount, isExceeded = false) => ({
+    // gone is its length, and going PAST the target is a second segment beyond
+    // the mark at 72% of the track. Colour was tried for both and could not
+    // carry them — on a real month-end plan most rows are at or over target, so
+    // tinting them all separated nothing, and the amber and red tints were
+    // within a few units of each other at the alpha they were drawn with.
+    const trackedLine = (id, actual, amount, isExceeded = false) => ({
       plans: [{ id: 'p1', month: THIS_MONTH, currency: 'USD', expectedIncome: '1000' }],
       lines: [{
         id, planId: 'p1', amount, label: 'Food', comment: null, kind: 'expense',
@@ -1139,35 +1138,22 @@ describe('MonthlyPlanSection', () => {
     const barFillColor = (getByTestId, id) =>
       StyleSheet.flatten(getByTestId(`plan-line-bar-${id}-plan`).props.style).backgroundColor;
 
-    it('marks where the month says the spend should be, on the current month', async () => {
-      // The marker EnvelopeFill had to drop, restored on a 4dp strip: as a
-      // hairline across a full-height row wash it stacked into one unbroken line
-      // down the card, because every row drew it at the same x. On the bars it
-      // sits at a different x per row and is 4dp tall.
-      setPlans(pacedLine('l-pace', '10', '100'));
-      const { getByTestId } = await renderSection();
-      await waitFor(() => expect(getByTestId('plan-line-bar-l-pace')).toBeTruthy());
-      expect(getByTestId('plan-line-bar-l-pace-pace')).toBeTruthy();
-    });
-
-    it('draws no pace marker on a month that is not the current one', async () => {
-      // "Ahead of pace" is not a thing that can be true about a finished month.
-      const previous = pacedLine('l-pace', '10', '100');
-      previous.plans[0].month = PREV_MONTH;
-      previous.planStatuses = new Map([['p1', {
-        ...previous.planStatuses.get('p1'), month: PREV_MONTH,
-      }]]);
-      setPlans(previous);
-      const { getByTestId, queryByTestId } = await renderSection(undefined, { month: PREV_MONTH });
-      await waitFor(() => expect(getByTestId('plan-line-bar-l-pace')).toBeTruthy());
-      expect(queryByTestId('plan-line-bar-l-pace-pace')).toBeNull();
+    it('draws the bar without a second mark for the month, on any month', async () => {
+      // A row's bar said two things at once: fill against target, and a tick for
+      // how far through the month today is. The tick was dropped — on a screen
+      // where every row draws a bar, a vertical per row is furniture, and the
+      // one vertical left on the strip is the target boundary.
+      setPlans(trackedLine('l-bar', '10', '100'));
+      const { getByTestId, queryByTestId } = await renderSection();
+      await waitFor(() => expect(getByTestId('plan-line-bar-l-bar')).toBeTruthy());
+      expect(queryByTestId('plan-line-bar-l-bar-pace')).toBeNull();
     });
 
     it('gives a line inside its target no signal colour at all', async () => {
       // 1% spent. The fill is a neutral material, not a grade: the only
       // saturated colour left on the screen is the segment past the target, so
       // an alarm on the row means one thing and reads at a glance.
-      setPlans(pacedLine('l-calm', '1', '100'));
+      setPlans(trackedLine('l-calm', '1', '100'));
       const { getByTestId, queryByTestId } = await renderSection();
       await waitFor(() => expect(getByTestId('plan-line-bar-l-calm')).toBeTruthy());
       const fill = barFillColor(getByTestId, 'l-calm');
@@ -1178,20 +1164,19 @@ describe('MonthlyPlanSection', () => {
       expect(flatColor(getByTestId('plan-line-primary-l-calm'))).toBe(COLORS.text);
     });
 
-    it('says how far a line is ahead of the month by position, not by tone', async () => {
-      // 99% spent — ahead of the month's pace on any day of it. That used to be
-      // an amber wash indistinguishable from the red one; it is now the fill
-      // reaching past the pace tick, and the row stays uncoloured.
-      setPlans(pacedLine('l-ahead', '99', '100'));
+    it('says how nearly spent a line is by length, not by tone', async () => {
+      // 99% spent but not over. That used to be an amber wash indistinguishable
+      // from the red one; it is now a fill that stops just short of the target
+      // gap, with no overspend segment and no colour on the row.
+      setPlans(trackedLine('l-ahead', '99', '100'));
       const { getByTestId, queryByTestId } = await renderSection();
       await waitFor(() => expect(getByTestId('plan-line-bar-l-ahead')).toBeTruthy());
       expect(barFillColor(getByTestId, 'l-ahead')).not.toContain(COLORS.warning);
       expect(queryByTestId('plan-line-bar-l-ahead-over')).toBeNull();
-      expect(getByTestId('plan-line-bar-l-ahead-pace')).toBeTruthy();
     });
 
     it('spills a line past its target into the overspend segment', async () => {
-      setPlans(pacedLine('l-over', '140', '100', true));
+      setPlans(trackedLine('l-over', '140', '100', true));
       const { getByTestId } = await renderSection();
       await waitFor(() => expect(getByTestId('plan-line-bar-l-over')).toBeTruthy());
       expect(barOverColor(getByTestId, 'l-over')).toBe(COLORS.overspend);

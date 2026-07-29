@@ -17,27 +17,6 @@ export const addMonths = (monthKey, delta) => {
 };
 
 /**
- * How far through `monthKey` today is, as a 0..1 fraction — or null when the
- * month shown is not the current one.
- *
- * Drives the "today" marker on a plan row: the marker is what makes 99% spent
- * legible as fine on the 27th and alarming on the 3rd. A past month is fully
- * spent and a future one hasn't started, so in neither case does "are you ahead
- * of pace" mean anything, and the marker is not drawn at all.
- *
- * Measured at the END of today (day N of M → N/M), so the last day of the month
- * reads as a full month elapsed rather than one day short.
- * @param {string} monthKey - YYYY-MM
- * @returns {number|null}
- */
-export const monthProgressFraction = (monthKey) => {
-  if (monthKey !== currentMonthKey()) return null;
-  const now = new Date();
-  const daysInMonth = new Date(now.getFullYear(), now.getMonth() + 1, 0).getDate();
-  return now.getDate() / daysInMonth;
-};
-
-/**
  * Localized "Month YYYY" label for a YYYY-MM key.
  *
  * `language` is the app's own language code (LocalizationContext), NOT the device
