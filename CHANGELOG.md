@@ -1,5 +1,12 @@
 # Changelog
 
+## [0.246.5](https://github.com/heywood8/money-tracker/compare/penny-v0.246.4...penny-v0.246.5) (2026-07-29)
+
+
+### Bug Fixes
+
+* **budgets:** drop the template summary strip above the plan card ([#1509](https://github.com/heywood8/money-tracker/issues/1509)) ([909bad5](https://github.com/heywood8/money-tracker/commit/909bad54631800404eb9ba0cc8ea7d7ba873e643))
+
 ## [0.246.4](https://github.com/heywood8/money-tracker/compare/penny-v0.246.3...penny-v0.246.4) (2026-07-29)
 
 
