@@ -570,8 +570,10 @@ const OperationFormFields = memo(({
 
   // Suggested-category shortcut rows (the default QuickAdd view)
   const renderCategorySuggestionRows = () => {
+    // Seven shortcuts fit next to the entry button, eight without it — the slices
+    // stop there so the row render never has to drop a chip on the floor.
     const firstRowCats = showAllCategoriesButton ? topCategoriesForType.slice(0, 3) : topCategoriesForType.slice(0, 4);
-    const secondRowCats = showAllCategoriesButton ? topCategoriesForType.slice(3) : topCategoriesForType.slice(4);
+    const secondRowCats = showAllCategoriesButton ? topCategoriesForType.slice(3, 7) : topCategoriesForType.slice(4, 8);
 
     return (
       <>
@@ -760,11 +762,20 @@ const OperationFormFields = memo(({
         }
       };
 
-      // Show "all" button only when there are more than 8 available target accounts
-      const availableAccountCount = accounts.filter(acc => acc.id !== values.accountId).length;
-      const showAllAccountsButton = availableAccountCount > 8;
+      // The "all accounts" entry appears whenever the eight shortcut slots can't
+      // reach every pickable target — more than eight of them, or shortcuts that
+      // point at accounts this picker doesn't offer. Keying it off the raw account
+      // count alone left a pickable account with no route to it at all.
+      const availableAccounts = accounts.filter(acc => acc.id !== values.accountId);
+      const availableIds = new Set(availableAccounts.map(acc => acc.id));
+      const reachableWithoutButton = new Set(
+        topTransferAccounts.slice(0, 8).map(acc => acc.id).filter(id => availableIds.has(id)),
+      ).size;
+      const showAllAccountsButton = availableAccounts.length > reachableWithoutButton;
+      // The entry button takes the first slot, so only seven shortcuts fit; slicing
+      // to seven keeps the eighth from being silently dropped by the row below.
       const firstRowAccounts = showAllAccountsButton ? topTransferAccounts.slice(0, 3) : topTransferAccounts.slice(0, 4);
-      const secondRowAccounts = showAllAccountsButton ? topTransferAccounts.slice(3) : topTransferAccounts.slice(4);
+      const secondRowAccounts = showAllAccountsButton ? topTransferAccounts.slice(3, 7) : topTransferAccounts.slice(4, 8);
 
       const renderAccountChip = (account) => {
         const isSelected = values.toAccountId === account.id;
@@ -815,6 +826,7 @@ const OperationFormFields = memo(({
           <View style={styles.categoryButtonsContainer}>
             {showAllAccountsButton && (
               <Pressable
+                testID="all-accounts-button"
                 style={[styles.categoryPickerButton, inputStyle, toAccountBorderStyle, disabledStyle]}
                 onPress={() => !disabled && openPicker('toAccount', accounts.filter(acc => acc.id !== values.accountId))}
                 disabled={disabled}
