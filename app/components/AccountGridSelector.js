@@ -7,9 +7,10 @@ import * as Currency from '../services/currency';
 import currencies from '../../assets/currencies.json';
 import { SPACING, BORDER_RADIUS, FONT_SIZE } from '../styles/designTokens';
 
-// Accounts carry a name AND a balance, so two across rather than the category
-// grid's three — a third column turns every real account name into an ellipsis.
-const COLUMNS = 2;
+// Three across, matching the category grid. An account chip carries a name AND a
+// balance, so the name gets two lines and the balance a smaller size than the
+// category chips need — at two across the row was mostly air.
+const COLUMNS = 3;
 
 // Selection is a tint of the accent rather than a solid fill: white-on-accent
 // sits at ~2.8:1 in the dark theme. Same treatment as CategoryGridSelector.
