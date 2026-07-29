@@ -22,8 +22,8 @@ const lightTheme = {
     danger: 'red',
     // Budget-row signal colours. Real hex (unlike `danger`, a bare CSS keyword)
     // because a plan row tints its background with these at a low alpha, which
-    // needs an appendable hex channel. `warning` means "ahead of the month's
-    // pace", `overspend` means "past the target".
+    // needs an appendable hex channel. `overspend` means "past the target" — the
+    // one status a plan row states in colour.
     warning: '#C77700',
     overspend: '#C62828',
     delete: '#d9534f',

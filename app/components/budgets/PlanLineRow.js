@@ -27,9 +27,6 @@ const TRACK_ALPHA = '26'; // ~15%
 // target is gone is said by the length, and the only saturated colour left on
 // this screen is the overspend segment past the target mark.
 const FILL_ALPHA = '99'; // ~60%
-// The pace mark has to stay legible over both the empty track and the fill, so
-// it is drawn in the row's text colour rather than in the track's.
-const PACE_ALPHA = '59'; // ~35%
 
 /**
  * One row of the unified Budgets list (Budgets v3 phase 3).
@@ -67,7 +64,6 @@ const PlanLineRow = memo(function PlanLineRow({
   showProgress = true,
   indented = false,
   envelopeColor = null,
-  pace = null,
   listLength,
   onMove = null,
   onPress,
@@ -140,9 +136,9 @@ const PlanLineRow = memo(function PlanLineRow({
   }
 
   // Over target is the one thing on this row that gets a colour. Everything else
-  // — on pace, ahead of pace, nearly spent — is said by the bar's length and by
-  // the mark on it, because colouring those too is how the previous design ended
-  // up with ten tinted rows and no hierarchy.
+  // — barely started, half gone, nearly spent — is said by the bar's length,
+  // because colouring those too is how the previous design ended up with ten
+  // tinted rows and no hierarchy.
   const overspent = remaining != null && Currency.isNegative(remaining);
   let primaryColor = colors.text;
   if (overspent) primaryColor = colors.overspend;
@@ -292,11 +288,9 @@ const PlanLineRow = memo(function PlanLineRow({
             <View style={styles.meterBar}>
               <PlanProgressBar
                 ratio={ratio}
-                pace={pace}
                 trackColor={`${colors.mutedText}${TRACK_ALPHA}`}
                 fillColor={`${colors.mutedText}${FILL_ALPHA}`}
                 overspendColor={colors.overspend}
-                paceColor={`${colors.text}${PACE_ALPHA}`}
                 testID={`plan-line-bar-${line.id}`}
               />
             </View>
@@ -427,7 +421,6 @@ PlanLineRow.propTypes = {
   showProgress: PropTypes.bool,
   indented: PropTypes.bool,
   envelopeColor: PropTypes.string,
-  pace: PropTypes.number,
   onMove: PropTypes.func,
   onPress: PropTypes.func.isRequired,
   onLongPress: PropTypes.func.isRequired,

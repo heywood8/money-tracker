@@ -1,5 +1,5 @@
 // __tests__/utils/monthUtils.test.js
-import { currentMonthKey, addMonths, formatMonthLabel, monthProgressFraction } from '../../app/utils/monthUtils';
+import { currentMonthKey, addMonths, formatMonthLabel } from '../../app/utils/monthUtils';
 
 describe('monthUtils', () => {
   describe('currentMonthKey', () => {
@@ -49,29 +49,6 @@ describe('monthUtils', () => {
     it('falls back to the device locale when no language is given', () => {
       expect(typeof formatMonthLabel('2026-07')).toBe('string');
       expect(formatMonthLabel('2026-07')).toMatch(/2026/);
-    });
-  });
-
-  describe('monthProgressFraction', () => {
-    it('returns how far through the current month today is', () => {
-      const now = new Date();
-      const daysInMonth = new Date(now.getFullYear(), now.getMonth() + 1, 0).getDate();
-      expect(monthProgressFraction(currentMonthKey())).toBeCloseTo(now.getDate() / daysInMonth, 10);
-    });
-
-    it('stays within (0, 1]', () => {
-      const fraction = monthProgressFraction(currentMonthKey());
-      expect(fraction).toBeGreaterThan(0);
-      expect(fraction).toBeLessThanOrEqual(1);
-    });
-
-    it('returns null for any month but the current one', () => {
-      // A past month is fully spent and a future one has not started, so "are
-      // you ahead of pace" is not a question either can answer — the caller
-      // draws no today marker at all rather than pinning one to an edge.
-      expect(monthProgressFraction(addMonths(currentMonthKey(), -1))).toBeNull();
-      expect(monthProgressFraction(addMonths(currentMonthKey(), 1))).toBeNull();
-      expect(monthProgressFraction('2020-01')).toBeNull();
     });
   });
 });
