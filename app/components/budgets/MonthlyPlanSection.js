@@ -16,7 +16,6 @@ import BudgetPlanLineModal from './BudgetPlanLineModal';
 import BudgetLineGroupModal from './BudgetLineGroupModal';
 import PlanLineRow from './PlanLineRow';
 import PlanGroupRow from './PlanGroupRow';
-import PlanTemplateSummary from './PlanTemplateSummary';
 import { currentMonthKey, addMonths, formatMonthLabel } from '../../utils/monthUtils';
 
 const CLOSED_MODAL = { visible: false, line: null, kind: 'expense' };
@@ -903,16 +902,6 @@ const MonthlyPlanSection = forwardRef(function MonthlyPlanSection({
 
   return (
     <>
-      <PlanTemplateSummary
-        lines={lines}
-        month={month}
-        amountById={amountById}
-        planCurrency={planCurrency}
-        currencySuffix={currencySuffix}
-        colors={colors}
-        t={t}
-      />
-
       <View style={[styles.card, { backgroundColor: colors.surface, borderColor: colors.border }]} testID="monthly-plan-section">
         {/* Month header with ‹ › navigation — rendered only when the section owns
             the month; when the host controls it a single shared header sits above. */}
