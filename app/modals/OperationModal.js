@@ -320,14 +320,19 @@ export default function OperationModal({
     }
   }, [isShadowOperation, setValues]);
 
-  // Handler for the "hide from the charts" toggle. Balance adjustments have no
-  // editable form at all (every field above is disabled), so they are toggled
-  // from the operations list's long-press menu instead.
+  // Handler for the "hide from the charts" toggle.
+  //
+  // A balance adjustment is read-only here — every field above is disabled and
+  // ModalShell shows no Save button — so for one the flag is written straight to
+  // the DB on toggle. `values` is updated first so the switch tracks the finger
+  // rather than the round-trip; a failed write surfaces via the dialog inside
+  // OperationsActionsContext, and reopening the row shows the persisted state.
   const handleToggleExcludeFromCharts = useCallback((val) => {
-    if (!isShadowOperation) {
-      setValues(v => ({ ...v, excludeFromCharts: val }));
+    setValues(v => ({ ...v, excludeFromCharts: val }));
+    if (isShadowOperation && operation?.id != null) {
+      updateOperation(operation.id, { excludeFromCharts: val });
     }
-  }, [isShadowOperation, setValues]);
+  }, [isShadowOperation, setValues, updateOperation, operation]);
 
   // Handler for description focus (auto-scroll to end)
   // We scroll twice: immediately for initial positioning, then again after the
@@ -629,8 +634,12 @@ export default function OperationModal({
         )}
 
         {/* Hide-from-charts toggle. Expenses and income both feed a donut and the
-            summary totals; a transfer feeds neither, so it has nothing to hide. */}
-        {!isNew && !isShadowOperation && values.type !== 'transfer' && (
+            summary totals; a transfer feeds neither, so it has nothing to hide.
+            Shown for a balance adjustment too — it is the one control that is live
+            on an otherwise read-only form, and skewed charts are exactly what a
+            correction causes (it writes itself straight to the DB, see the
+            handler). */}
+        {!isNew && values.type !== 'transfer' && (
           <View style={styles.excludeAvgRow}>
             <View style={styles.excludeAvgTextContainer}>
               <Text style={[modalSharedStyles.fieldLabel, styles.excludeAvgLabel, { color: colors.mutedText }]}>
