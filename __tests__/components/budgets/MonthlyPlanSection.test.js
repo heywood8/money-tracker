@@ -1211,23 +1211,6 @@ describe('MonthlyPlanSection', () => {
       expect(flatColor(getByTestId('plan-line-primary-l-over'))).toBe(COLORS.overspend);
     });
 
-    it('states the ratio once in the template strip', async () => {
-      setPlans({
-        plans: [],
-        lines: [
-          TEMPLATE_LINE,
-          { ...TEMPLATE_LINE, id: 'l-tpl2', lastExecutedMonth: THIS_MONTH },
-        ],
-      });
-      const { getByTestId, queryByText } = await renderSection();
-      await waitFor(() => expect(getByTestId('summary-done-count')).toHaveTextContent('1 / 2'));
-      // The bar under it draws the same ratio; a "done: 1 / remaining: 1" line
-      // below that was a third and fourth statement of one fact.
-      expect(getByTestId('summary-progress-bar')).toBeTruthy();
-      expect(queryByText('done_count: 1')).toBeNull();
-      expect(queryByText('remaining_count: 1')).toBeNull();
-    });
-
     it('has no add rows — the screen FAB owns adding', async () => {
       setPlans({ plans: [{ id: 'p1', month: THIS_MONTH, currency: 'USD', expectedIncome: '1000' }], lines: [] });
       const { queryByTestId } = await renderSection();
@@ -1270,21 +1253,6 @@ describe('MonthlyPlanSection', () => {
       expect(getByTestId('plan-remainder')).toHaveTextContent(/381000/);
     });
 
-    it('sums the template summary strip in the plan currency, not raw stored amounts', async () => {
-      setPlans({
-        plans: [{ id: 'p1', month: THIS_MONTH, currency: 'RUB', expectedIncome: '450000' }],
-        lines: [{
-          id: 'l-amd', planId: null, amount: '300000', label: 'Rent', comment: null,
-          kind: 'expense', categoryId: 'cat1', toAccountId: null, accountId: 1,
-          sortOrder: 0, isBroken: false, isRecurring: true, currency: 'AMD',
-          hasTemplate: true, lastExecutedMonth: null,
-        }],
-      });
-      const { getByTestId } = await renderSection(undefined, { currency: 'RUB' });
-      // 300000 AMD = 69000 RUB. The strip used to add the bare stored number and
-      // print "300K" with no unit at all, contradicting every other figure here.
-      await waitFor(() => expect(getByTestId('summary-pending-out')).toHaveTextContent(/69K \/ 69K RUB/));
-    });
   });
 
   describe('Unconvertible recurring line (Bug 5, adversarial review)', () => {
@@ -1379,7 +1347,13 @@ describe('MonthlyPlanSection', () => {
       await waitFor(() => expect(onNotify).toHaveBeenCalledWith('added_to_operations'));
     });
 
-    it('summarizes template progress (pending out / done / pending in)', async () => {
+    // The pending-out / done / pending-in strip that used to sit above the card
+    // is gone. It was the old Planned tab's header, and on the merged Budgets
+    // screen every figure it carried is already stated below it: each template
+    // row shows its own amount and done badge, and the totals row states the
+    // month's money. Three restatements above the fold, for a screen whose first
+    // job is to show the remainder.
+    it('has no template summary strip above the card', async () => {
       setPlans({
         plans: [],
         lines: [
@@ -1390,25 +1364,13 @@ describe('MonthlyPlanSection', () => {
           },
         ],
       });
-      const { getByTestId } = await renderSection();
-      await waitFor(() => expect(getByTestId('planned-summary-strip')).toBeTruthy());
-      expect(getByTestId('summary-done-count')).toHaveTextContent('1 / 2');
-      // The strip now labels its currency, and sums with the same precise decimal
-      // math as the totals row — it used to add bare parseFloat values across
-      // whatever currencies the templates stored and print them with no unit.
-      expect(getByTestId('summary-pending-out')).toHaveTextContent(/65K \/ 65K USD/);
-      // The income template is already done, so nothing is pending in.
-      expect(getByTestId('summary-pending-in')).toHaveTextContent(/0 \/ 220K USD/);
-    });
-
-    it('has no summary strip when no line carries a template', async () => {
-      setPlans({
-        plans: [],
-        lines: [{ ...TEMPLATE_LINE, accountId: null, hasTemplate: false }],
-      });
-      const { queryByTestId, getByTestId } = await renderSection();
+      const { getByTestId, queryByTestId } = await renderSection();
       await waitFor(() => expect(getByTestId('plan-line-l-tpl')).toBeTruthy());
       expect(queryByTestId('planned-summary-strip')).toBeNull();
+      expect(queryByTestId('summary-done-count')).toBeNull();
+      expect(queryByTestId('summary-pending-out')).toBeNull();
+      expect(queryByTestId('summary-pending-in')).toBeNull();
+      expect(queryByTestId('summary-progress-bar')).toBeNull();
     });
 
     // Regression: the row's meta line reused the `execute` button caption, so it
