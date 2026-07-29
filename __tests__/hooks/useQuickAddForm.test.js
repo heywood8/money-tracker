@@ -814,6 +814,41 @@ describe('useQuickAddForm', () => {
 
       expect(result.current.topTransferAccountsForForm).toHaveLength(8);
     });
+
+    it('should not let hidden accounts occupy suggestion slots', async () => {
+      // Eight hidden accounts dominate the transfer history; the only pickable
+      // target besides the source has never received a transfer.
+      const hidden = Array.from({ length: 8 }, (_, i) => ({
+        id: `hid-${i + 1}`,
+        name: `Hidden ${i + 1}`,
+        currency: 'USD',
+        balance: '10',
+        hidden: true,
+      }));
+      const visible = [
+        { id: 'acc-1', name: 'Checking', currency: 'USD', balance: '1000' },
+        { id: 'acc-fresh', name: 'Fresh', currency: 'USD', balance: '0' },
+      ];
+
+      mockGetTopTransferTargets.mockResolvedValue(
+        hidden.map((acc, i) => ({ accountId: acc.id, count: 10 - i })),
+      );
+
+      const { result } = await renderHook(() =>
+        useQuickAddForm(visible, [...visible, ...hidden], mockCategories, mockT),
+      );
+
+      await waitFor(() => {
+        expect(mockGetTopTransferTargets).toHaveBeenCalled();
+      });
+
+      await act(async () => {
+        result.current.setQuickAddValues(prev => ({ ...prev, type: 'transfer', accountId: 'acc-1' }));
+      });
+
+      const ids = result.current.topTransferAccountsForForm.map(a => a.id);
+      expect(ids).toEqual(['acc-fresh']);
+    });
   });
 
   describe('operationCurrency (foreign currency expense/income)', () => {

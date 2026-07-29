@@ -221,28 +221,33 @@ const useQuickAddForm = (visibleAccounts, accounts, categories, t) => {
     return [...fromHistory, ...fillers];
   }, [topCategories, categories, quickAddValues.type]);
 
-  // Get top transfer target accounts, filtered to existing accounts excluding current source
+  // Get top transfer target accounts. The candidate pool is exactly what the form
+  // lets the user pick — visible accounts minus the source — and history only
+  // decides their order. Resolving history against the full account list used to
+  // let hidden accounts occupy suggestion slots, pushing pickable accounts out of
+  // a grid that the "all accounts" fallback then thought was already complete.
   const topTransferAccountsForForm = useMemo(() => {
     if (quickAddValues.type !== 'transfer') return [];
 
     const sourceId = quickAddValues.accountId;
+    const selectable = visibleAccounts.filter(acc => acc.id !== sourceId);
 
-    // Filter history targets to accounts that still exist and aren't the source
+    // Order history targets that are still selectable, most used first
     const fromHistory = topTransferTargets
-      .map(tt => accounts.find(acc => acc.id === tt.accountId))
-      .filter(acc => acc && acc.id !== sourceId)
+      .map(tt => selectable.find(acc => acc.id === tt.accountId))
+      .filter(Boolean)
       .slice(0, 8);
 
     if (fromHistory.length >= 8) return fromHistory;
 
-    // Fill remaining slots from visible accounts excluding source and already-included
+    // Fill remaining slots from the rest of the selectable accounts
     const historyIds = new Set(fromHistory.map(acc => acc.id));
-    const fillers = visibleAccounts
-      .filter(acc => acc.id !== sourceId && !historyIds.has(acc.id))
+    const fillers = selectable
+      .filter(acc => !historyIds.has(acc.id))
       .slice(0, 8 - fromHistory.length);
 
     return [...fromHistory, ...fillers];
-  }, [topTransferTargets, accounts, visibleAccounts, quickAddValues.type, quickAddValues.accountId]);
+  }, [topTransferTargets, visibleAccounts, quickAddValues.type, quickAddValues.accountId]);
 
   // Reset form but keep account and type; restore operationCurrency to account currency
   const resetForm = useCallback(() => {

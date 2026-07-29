@@ -458,6 +458,75 @@ describe('OperationFormFields', () => {
     });
   });
 
+  describe('Transfer Target Shortcuts', () => {
+    const makeAccounts = (count, prefix = 'T') =>
+      Array.from({ length: count }, (_, i) => ({
+        id: `t-${i + 1}`,
+        name: `${prefix}${i + 1}`,
+        currency: 'USD',
+        balance: '100',
+      }));
+
+    const transferProps = (accounts, topTransferAccounts) => ({
+      ...defaultProps,
+      values: {
+        type: 'transfer',
+        amount: '100',
+        accountId: 'src',
+        toAccountId: '',
+        categoryId: '',
+      },
+      accounts: [{ id: 'src', name: 'Source', currency: 'USD', balance: '900' }, ...accounts],
+      topTransferAccounts,
+      transferLayout: 'sideBySide',
+      getAccountName: (id) => (id === 'src' ? 'Source' : accounts.find(a => a.id === id)?.name || 'Unknown'),
+      getAccountBalance: () => '',
+    });
+
+    it('should not show the all-accounts entry when the shortcuts reach every target', async () => {
+      const accounts = makeAccounts(3);
+      const { queryByTestId, getByText } = await render(
+        <OperationFormFields {...transferProps(accounts, accounts)} />,
+      );
+
+      expect(queryByTestId('all-accounts-button')).toBeNull();
+      accounts.forEach(acc => expect(getByText(acc.name)).toBeTruthy());
+    });
+
+    it('should show the all-accounts entry and seven shortcuts when targets overflow', async () => {
+      const accounts = makeAccounts(9);
+      const { getByTestId, getByText, queryByText } = await render(
+        <OperationFormFields {...transferProps(accounts, accounts.slice(0, 8))} />,
+      );
+
+      expect(getByTestId('all-accounts-button')).toBeTruthy();
+      // Seven chips fit beside the entry button; the eighth suggestion is dropped
+      accounts.slice(0, 7).forEach(acc => expect(getByText(acc.name)).toBeTruthy());
+      expect(queryByText('T8')).toBeNull();
+      expect(queryByText('T9')).toBeNull();
+    });
+
+    it('should offer the all-accounts entry when a pickable account is missing from the shortcuts', async () => {
+      // Regression: suggestions filled with accounts this picker does not offer
+      // (e.g. hidden ones) left a pickable account unreachable — no chip, no entry.
+      const accounts = makeAccounts(8);
+      const stale = Array.from({ length: 8 }, (_, i) => ({
+        id: `gone-${i + 1}`,
+        name: `Gone${i + 1}`,
+        currency: 'USD',
+        balance: '5',
+      }));
+      const props = transferProps(accounts, stale);
+
+      const { getByTestId } = await render(<OperationFormFields {...props} />);
+
+      const entry = getByTestId('all-accounts-button');
+      await fireEvent.press(entry);
+
+      expect(props.openPicker).toHaveBeenCalledWith('toAccount', accounts);
+    });
+  });
+
   describe('Account Balance Display', () => {
     it('should show account balance when showAccountBalance is true', async () => {
       const props = {
