@@ -322,7 +322,7 @@ describe('BudgetScreen', () => {
 
   describe('Month navigation (Fix 4: jump back to the current month)', () => {
     it('shows a jump-to-current-month affordance after navigating away, and returns on press', async () => {
-      const { getByTestId, queryByTestId, getByText } = await render(<BudgetScreen />);
+      const { getByTestId, queryByTestId, queryByText } = await render(<BudgetScreen />);
       await waitFor(() => expect(getByTestId('budget-month-header')).toBeTruthy());
       const originalLabel = getByTestId('budget-month-label').props.children;
 
@@ -330,7 +330,11 @@ describe('BudgetScreen', () => {
       await waitFor(() => expect(getByTestId('budget-jump-current')).toBeTruthy());
       // The month label actually changed away from the current month.
       expect(getByTestId('budget-month-label').props.children).not.toBe(originalLabel);
-      expect(getByText('jump_to_current_period')).toBeTruthy();
+      // Icon-only, beside the label: the labelled button used to occupy a row of
+      // its own and pushed the hero figure and the whole plan down on any month
+      // but this one. The wording survives as the accessibility label.
+      expect(queryByText('jump_to_current_period')).toBeNull();
+      expect(getByTestId('budget-jump-current').props.accessibilityLabel).toBe('jump_to_current_period');
 
       fireEvent.press(getByTestId('budget-jump-current'));
       await waitFor(() => expect(queryByTestId('budget-jump-current')).toBeNull());

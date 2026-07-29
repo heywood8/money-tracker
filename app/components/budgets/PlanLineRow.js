@@ -252,16 +252,18 @@ const PlanLineRow = memo(function PlanLineRow({
               >
                 {name}
               </Text>
-              {/* Replaces a full uppercase "RECURRING" line that sat on nearly
-                  every row, saying the same thing each time while being the
-                  loudest thing after the amount. A one-off line gets no marker:
-                  the glyph is the exception, not the label. */}
-              {line.isRecurring && (
+              {/* Marks the EXCEPTION, not the rule. A plan line repeats every
+                  month by default — that is what a monthly plan is — so a
+                  repeat glyph on nearly every row was a column of identical
+                  marks carrying no information. What a reader actually needs to
+                  spot is the row that lives for this month only, and that is
+                  what gets the glyph. */}
+              {!line.isRecurring && (
                 <Icon
-                  name="repeat"
+                  name="numeric-1-circle-outline"
                   size={13}
                   color={colors.mutedText}
-                  testID={`plan-line-recurring-${line.id}`}
+                  testID={`plan-line-one-time-${line.id}`}
                 />
               )}
             </View>

@@ -218,9 +218,40 @@ const BudgetScreen = () => {
         >
           <Icon name="chevron-left" size={26} color={colors.text} />
         </Pressable>
-        <Text style={[styles.monthTitle, { color: colors.text }]} testID="budget-month-label">
-          {formatMonthLabel(month, language)}
-        </Text>
+        {/* Fix 4: the screen never unmounts across tab switches, so a user who
+            wanders off-month and returns later needs an explicit, visible way
+            back — silently auto-resetting the month would be surprising.
+            It used to be a labelled button on a row of its own under the title,
+            which pushed the hero figure and the whole plan down by ~22dp the
+            moment you stepped one month back — the content shifting under the
+            thumb that navigated. Now it is a glyph beside the label, in a slot
+            mirrored on the other side so the month name stays on the same
+            centre line whether or not the button is up. */}
+        <View style={styles.monthTitleWrap}>
+          {!isCurrentMonth && <View style={styles.jumpSlot} />}
+          <Text
+            style={[styles.monthTitle, { color: colors.text }]}
+            numberOfLines={1}
+            testID="budget-month-label"
+          >
+            {formatMonthLabel(month, language)}
+          </Text>
+          {!isCurrentMonth && (
+            <Pressable
+              onPress={handleJumpToCurrentMonth}
+              style={styles.jumpSlot}
+              // The glyph's own box is 26×18; the slop is what brings the target
+              // up to a thumb's worth without widening the slot the label is
+              // centred against.
+              hitSlop={12}
+              accessibilityRole="button"
+              accessibilityLabel={t('jump_to_current_period')}
+              testID="budget-jump-current"
+            >
+              <Icon name="calendar-today" size={18} color={colors.primary} />
+            </Pressable>
+          )}
+        </View>
         <Pressable
           onPress={handleNextMonth}
           hitSlop={8}
@@ -232,24 +263,6 @@ const BudgetScreen = () => {
           <Icon name="chevron-right" size={26} color={colors.text} />
         </Pressable>
       </View>
-      {/* Fix 4: the screen never unmounts across tab switches, so a user who
-          wanders off-month and returns later needs an explicit, visible way
-          back — silently auto-resetting the month would be surprising. */}
-      {!isCurrentMonth && (
-        <Pressable
-          onPress={handleJumpToCurrentMonth}
-          style={styles.jumpToCurrentButton}
-          hitSlop={8}
-          accessibilityRole="button"
-          accessibilityLabel={t('jump_to_current_period')}
-          testID="budget-jump-current"
-        >
-          <Icon name="calendar-today" size={14} color={colors.primary} />
-          <Text style={[styles.jumpToCurrentText, { color: colors.primary }]}>
-            {t('jump_to_current_period')}
-          </Text>
-        </Pressable>
-      )}
       {/* The month's headline figure. It used to sit at the very bottom of the
           plan card in 14px muted text, below every row and the allocated/actual
           totals — the one number a person acts on, placed where they would reach
@@ -445,17 +458,12 @@ const styles = StyleSheet.create({
     fontWeight: '700',
     letterSpacing: -0.5,
   },
-  jumpToCurrentButton: {
+  // Both sides of the label reserve the same box, so mounting the jump button
+  // never moves the month name off centre.
+  jumpSlot: {
     alignItems: 'center',
-    alignSelf: 'center',
-    flexDirection: 'row',
-    gap: 4,
-    marginTop: 4,
-    paddingVertical: 2,
-  },
-  jumpToCurrentText: {
-    fontSize: 12,
-    fontWeight: '600',
+    justifyContent: 'center',
+    width: 26,
   },
   listContent: {
     flexGrow: 1,
@@ -477,8 +485,16 @@ const styles = StyleSheet.create({
     justifyContent: 'space-between',
   },
   monthTitle: {
+    flexShrink: 1,
     fontSize: 17,
     fontWeight: '700',
+  },
+  monthTitleWrap: {
+    alignItems: 'center',
+    flex: 1,
+    flexDirection: 'row',
+    gap: 2,
+    justifyContent: 'center',
   },
   navButton: {
     padding: 4,
