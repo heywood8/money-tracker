@@ -1,5 +1,12 @@
 # Changelog
 
+## [0.247.0](https://github.com/heywood8/money-tracker/compare/penny-v0.246.6...penny-v0.247.0) (2026-07-30)
+
+
+### Features
+
+* **notifications:** drop review cards for operations already recorded ([#1513](https://github.com/heywood8/money-tracker/issues/1513)) ([21c21ab](https://github.com/heywood8/money-tracker/commit/21c21ab449a4bfebccf3f937fc7ae8e7bc7dcf5d))
+
 ## [0.246.6](https://github.com/heywood8/money-tracker/compare/penny-v0.246.5...penny-v0.246.6) (2026-07-29)
 
 
