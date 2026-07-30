@@ -41,6 +41,7 @@ import {
   hidePackage,
 } from '../services/notifications/notificationFilters';
 import { getPendingNotifications } from '../services/PendingNotificationsDB';
+import { reconcilePendingNotifications } from '../services/notifications/duplicateOperations';
 import { getLabelForMerchant } from '../services/NotificationRulesDB';
 import { getRecentNotifications } from '../services/NotificationAccess';
 import * as Currency from '../services/currency';
@@ -125,7 +126,11 @@ export default function NotificationProcessingContentPanel({ bottomInset = 0 }) 
     value: a.id,
   }));
 
-  const reloadPending = useCallback(async () => {
+  const reloadPending = useCallback(async ({ reconcile = true } = {}) => {
+    // Drop any queued item the user has already recorded by hand so it never
+    // shows as something still needing review. Skipped when the caller just ran
+    // the pipeline (which already reconciled the queue).
+    if (reconcile) await reconcilePendingNotifications();
     const items = await getPendingNotifications();
     // The bound cash account pre-fills the target picker on transfer (ATM) items.
     let atmAccount = null;
@@ -198,7 +203,8 @@ export default function NotificationProcessingContentPanel({ bottomInset = 0 }) 
         if (isOn) {
           await processBankNotifications();
         }
-        if (mountedRef.current) await Promise.all([reloadPending(), reloadRecent()]);
+        // The pipeline (when run) already reconciled the queue.
+        if (mountedRef.current) await Promise.all([reloadPending({ reconcile: !isOn }), reloadRecent()]);
       } catch (error) {
         // Non-fatal; show whatever loaded.
       } finally {
@@ -210,10 +216,12 @@ export default function NotificationProcessingContentPanel({ bottomInset = 0 }) 
   const handleRefresh = useCallback(async () => {
     setProcessing(true);
     try {
-      if (await isBankNotificationsEnabled()) {
+      const ran = await isBankNotificationsEnabled();
+      if (ran) {
         await processBankNotifications();
       }
-      await Promise.all([reloadPending(), reloadRecent()]);
+      // Skip a redundant reconcile when the pipeline just performed one.
+      await Promise.all([reloadPending({ reconcile: !ran }), reloadRecent()]);
     } finally {
       if (mountedRef.current) setProcessing(false);
     }
@@ -225,10 +233,11 @@ export default function NotificationProcessingContentPanel({ bottomInset = 0 }) 
     if (autoRefreshingRef.current) return;
     autoRefreshingRef.current = true;
     try {
-      if (await isBankNotificationsEnabled()) {
+      const ran = await isBankNotificationsEnabled();
+      if (ran) {
         await processBankNotifications();
       }
-      if (mountedRef.current) await Promise.all([reloadPending(), reloadRecent()]);
+      if (mountedRef.current) await Promise.all([reloadPending({ reconcile: !ran }), reloadRecent()]);
     } catch (error) {
       // Non-fatal; keep the last good data until the next tick.
     } finally {

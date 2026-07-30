@@ -1151,6 +1151,21 @@ describe('processBankNotifications', () => {
       expect(PendingNotificationsDB.addPendingNotification).toHaveBeenCalled();
     });
 
+    it('re-creates even when a matching operation already exists (explicit re-add)', async () => {
+      AccountsDB.getAccountByCardMask.mockResolvedValue({ id: 7, currency: 'AMD' });
+      NotificationRulesDB.getMerchantRule.mockResolvedValue({ categoryId: 'cat-food' });
+      // A matching operation is already recorded — the duplicate check would skip
+      // this during normal ingestion, but a user-initiated re-add must bypass it.
+      OperationsDB.getOperationsByAccountTypeAndDate.mockImplementation(async (accountId, type, date) => [
+        { id: 1, type, accountId, date, amount: '3900', destinationAmount: null },
+      ]);
+
+      const summary = await pipeline.reAddNotification(PURCHASE);
+
+      expect(summary).toEqual({ created: 1, pending: 0, skipped: 0 });
+      expect(OperationsDB.createOperation).toHaveBeenCalled();
+    });
+
     it('re-adds an ATM cash withdrawal as a transfer when a cash account is bound', async () => {
       AccountsDB.getAccountByCardMask.mockResolvedValue({ id: 7, currency: 'AMD' });
       PreferencesDB.getNumberPreference.mockResolvedValue(9);
@@ -1179,6 +1194,82 @@ describe('processBankNotifications', () => {
 
       await pipeline.dismissPendingNotification('p1');
 
+      expect(PendingNotificationsDB.deletePendingNotification).toHaveBeenCalledWith('p1');
+      expect(emitSpy).toHaveBeenCalledWith(EVENTS.RELOAD_ALL);
+    });
+  });
+
+  describe('duplicate detection', () => {
+    it('skips (does not create or queue) a purchase already recorded by hand', async () => {
+      NotificationAccess.getRecentNotifications.mockResolvedValue([PURCHASE]);
+      AccountsDB.getAccountByCardMask.mockResolvedValue({ id: 7, currency: 'AMD' });
+      NotificationRulesDB.getMerchantRule.mockResolvedValue({ categoryId: 'cat-food' });
+      // Trusted source: without a duplicate this would auto-create.
+      PreferencesDB.getJsonPreference.mockImplementation((key) => prefs([], [PKG])(key));
+      // An operation matching this notification (same account/type/date/amount) exists.
+      OperationsDB.getOperationsByAccountTypeAndDate.mockImplementation(async (accountId, type, date) => [
+        { id: 1, type, accountId, date, amount: '3900', destinationAmount: null },
+      ]);
+
+      const summary = await pipeline.processBankNotifications();
+
+      expect(summary).toEqual({ created: 0, pending: 0, skipped: 1 });
+      expect(OperationsDB.createOperation).not.toHaveBeenCalled();
+      expect(PendingNotificationsDB.addPendingNotification).not.toHaveBeenCalled();
+    });
+
+    it('still queues when the existing operation is on a different day', async () => {
+      NotificationAccess.getRecentNotifications.mockResolvedValue([PURCHASE]);
+      AccountsDB.getAccountByCardMask.mockResolvedValue({ id: 7, currency: 'AMD' });
+      NotificationRulesDB.getMerchantRule.mockResolvedValue(null); // no category → queue
+      OperationsDB.getOperationsByAccountTypeAndDate.mockImplementation(async (accountId, type) => [
+        { id: 1, type, accountId, date: '1999-01-01', amount: '3900', destinationAmount: null },
+      ]);
+
+      const summary = await pipeline.processBankNotifications();
+
+      expect(summary).toEqual({ created: 0, pending: 1, skipped: 0 });
+      expect(PendingNotificationsDB.addPendingNotification).toHaveBeenCalled();
+    });
+
+    it('only suppresses one of two identical charges against a single recorded operation', async () => {
+      // Two genuinely distinct purchases the same day for the same amount (distinct
+      // postTime → distinct signatures), a trusted auto-create source, and a single
+      // matching operation already recorded. Exactly one notification should be
+      // suppressed; the other must still be created — not both absorbed by the op.
+      const A = { ...PURCHASE, postTime: PURCHASE.postTime + 1000 };
+      const B = { ...PURCHASE, postTime: PURCHASE.postTime + 2000 };
+      NotificationAccess.getRecentNotifications.mockResolvedValue([A, B]);
+      AccountsDB.getAccountByCardMask.mockResolvedValue({ id: 7, currency: 'AMD' });
+      NotificationRulesDB.getMerchantRule.mockResolvedValue({ categoryId: 'cat-food' });
+      PreferencesDB.getJsonPreference.mockImplementation((key) => prefs([], [PKG])(key));
+      OperationsDB.createOperation.mockResolvedValue({ id: 1 });
+      OperationsDB.getOperationsByAccountTypeAndDate.mockImplementation(async (accountId, type, date) => [
+        { id: 1, type, accountId, date, amount: '3900', destinationAmount: null },
+      ]);
+
+      const summary = await pipeline.processBankNotifications();
+
+      expect(summary).toEqual({ created: 1, pending: 0, skipped: 1 });
+      expect(OperationsDB.createOperation).toHaveBeenCalledTimes(1);
+    });
+
+    it('prunes a queued item once a matching operation is recorded', async () => {
+      // Nothing new to parse — the run only reconciles the existing queue.
+      NotificationAccess.getRecentNotifications.mockResolvedValue([]);
+      PendingNotificationsDB.getPendingNotifications.mockResolvedValue([
+        { id: 'p1', type: 'expense', amount: '3900', currency: 'AMD', date: '2026-06-28', accountId: 7 },
+      ]);
+      AccountsDB.getAccountById.mockResolvedValue({ id: 7, currency: 'AMD' });
+      OperationsDB.getOperationsByAccountTypeAndDate.mockImplementation(async (accountId, type, date) => [
+        { id: 1, type, accountId, date, amount: '3900', destinationAmount: null },
+      ]);
+      PendingNotificationsDB.deletePendingNotification.mockResolvedValue();
+      const emitSpy = jest.spyOn(appEvents, 'emit');
+
+      const summary = await pipeline.processBankNotifications();
+
+      expect(summary).toEqual({ created: 0, pending: 0, skipped: 0 });
       expect(PendingNotificationsDB.deletePendingNotification).toHaveBeenCalledWith('p1');
       expect(emitSpy).toHaveBeenCalledWith(EVENTS.RELOAD_ALL);
     });

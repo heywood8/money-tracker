@@ -7,6 +7,7 @@ import {
   dismissPendingNotification,
   resolveAtmTargetAccount,
 } from '../services/notifications/processBankNotifications';
+import { reconcilePendingNotifications } from '../services/notifications/duplicateOperations';
 import { kindRequiresCategory } from '../services/notifications/parseBankNotification';
 import { getLabelForMerchant } from '../services/NotificationRulesDB';
 import { getAccountByCardMask } from '../services/AccountsDB';
@@ -105,8 +106,12 @@ export default function usePendingOperationSuggestions({
   const mountedRef = useRef(true);
   useEffect(() => () => { mountedRef.current = false; }, []);
 
-  const reload = useCallback(async () => {
+  const reload = useCallback(async ({ reconcile = true } = {}) => {
     try {
+      // Drop any card the user has already recorded by hand before reading the
+      // queue, so a matching operation makes its suggestion disappear at once.
+      // Skipped when the caller just ran the pipeline (which already reconciled).
+      if (reconcile) await reconcilePendingNotifications();
       const [items, atmAccount] = await Promise.all([
         getPendingNotifications(),
         resolveAtmTargetAccount().catch(() => null),
@@ -216,10 +221,19 @@ export default function usePendingOperationSuggestions({
 
   // Initial load, then stay in sync with every app-wide data change: the
   // ingestion pipeline and the settings review panel both emit RELOAD_ALL after
-  // enqueueing/booking/dismissing notifications.
+  // enqueueing/booking/dismissing notifications. OPERATION_CHANGED (emitted when
+  // the user adds/edits/deletes an operation by hand) also triggers a reload so a
+  // just-entered operation prunes its matching suggestion from the deck at once.
   useEffect(() => {
     reload();
-    return appEvents.on(EVENTS.RELOAD_ALL, reload);
+    // Wrap so an event payload is never read as reload's options argument.
+    const onEvent = () => reload();
+    const offReloadAll = appEvents.on(EVENTS.RELOAD_ALL, onEvent);
+    const offOperationChanged = appEvents.on(EVENTS.OPERATION_CHANGED, onEvent);
+    return () => {
+      offReloadAll();
+      offOperationChanged();
+    };
   }, [reload]);
 
   // Drop save flags and choices for items that left the queue (accepted or
@@ -262,7 +276,8 @@ export default function usePendingOperationSuggestions({
     } catch (error) {
       // Ingestion failure is non-fatal — still reload whatever is queued.
     }
-    await reload();
+    // The pipeline already reconciled the queue, so skip a redundant second pass.
+    await reload({ reconcile: false });
   }, [reload]);
 
   /**

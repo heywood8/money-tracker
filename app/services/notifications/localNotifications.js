@@ -121,6 +121,25 @@ export const presentPendingOperationsAlert = async ({ title, body, channelName }
 };
 
 /**
+ * Dismiss the "transactions to review" alert from the tray.
+ *
+ * Used when the review queue empties — every queued item resolved, dismissed, or
+ * pruned as a duplicate of an operation the user already recorded — so the shade
+ * no longer nags about transactions that are no longer waiting. Best-effort: a
+ * failed dismissal is non-fatal (the alert is low-urgency and self-replaces on
+ * the next background run).
+ *
+ * @returns {Promise<void>}
+ */
+export const dismissPendingOperationsAlert = async () => {
+  try {
+    await Notifications.dismissNotificationAsync(PENDING_ALERT_IDENTIFIER);
+  } catch (error) {
+    // Non-fatal — the alert is a low-urgency nudge and will refresh on its own.
+  }
+};
+
+/**
  * Whether a tapped-notification response is Penny's review-queue deep link.
  * @param {object|null} response - a Notifications.NotificationResponse
  * @returns {boolean}

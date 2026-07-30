@@ -38,6 +38,9 @@ jest.mock('../../app/contexts/CategoriesContext', () => ({
 }));
 
 jest.mock('../../app/services/notifications/processBankNotifications');
+jest.mock('../../app/services/notifications/duplicateOperations', () => ({
+  reconcilePendingNotifications: jest.fn(() => Promise.resolve(0)),
+}));
 jest.mock('../../app/services/PendingNotificationsDB');
 jest.mock('../../app/services/NotificationAccess');
 jest.mock('../../app/services/notifications/notificationFilters', () => ({

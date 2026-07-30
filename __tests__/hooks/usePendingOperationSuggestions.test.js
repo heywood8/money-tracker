@@ -14,6 +14,9 @@ import { kindRequiresCategory } from '../../app/services/notifications/parseBank
 import { appEvents, EVENTS } from '../../app/services/eventEmitter';
 
 jest.mock('../../app/services/notifications/processBankNotifications');
+jest.mock('../../app/services/notifications/duplicateOperations', () => ({
+  reconcilePendingNotifications: jest.fn(() => Promise.resolve(0)),
+}));
 jest.mock('../../app/services/PendingNotificationsDB');
 jest.mock('../../app/services/NotificationRulesDB', () => ({
   getLabelForMerchant: jest.fn(),
