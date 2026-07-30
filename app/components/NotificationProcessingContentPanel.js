@@ -41,6 +41,7 @@ import {
   hidePackage,
 } from '../services/notifications/notificationFilters';
 import { getPendingNotifications } from '../services/PendingNotificationsDB';
+import { reconcilePendingNotifications } from '../services/notifications/duplicateOperations';
 import { getLabelForMerchant } from '../services/NotificationRulesDB';
 import { getRecentNotifications } from '../services/NotificationAccess';
 import * as Currency from '../services/currency';
@@ -126,6 +127,9 @@ export default function NotificationProcessingContentPanel({ bottomInset = 0 }) 
   }));
 
   const reloadPending = useCallback(async () => {
+    // Drop any queued item the user has already recorded by hand so it never
+    // shows as something still needing review.
+    await reconcilePendingNotifications();
     const items = await getPendingNotifications();
     // The bound cash account pre-fills the target picker on transfer (ATM) items.
     let atmAccount = null;

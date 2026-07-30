@@ -393,6 +393,33 @@ export const getFilteredOperationsAllDates = async (filters = {}) => {
 };
 
 /**
+ * Get operations for one account on a single date and of a single type.
+ *
+ * A focused lookup for duplicate detection: matching a bank notification against
+ * operations the user may have already recorded by hand only ever needs the rows
+ * sharing the notification's account, type, and calendar date, so this avoids
+ * loading (and mapping) an account's whole history. For transfers the account is
+ * matched on the source side (account_id), mirroring how a transfer is booked.
+ *
+ * @param {string|number} accountId
+ * @param {string} type - 'expense', 'income', or 'transfer'
+ * @param {string} date - ISO date string (YYYY-MM-DD)
+ * @returns {Promise<Array>}
+ */
+export const getOperationsByAccountTypeAndDate = async (accountId, type, date) => {
+  try {
+    const operations = await queryAll(
+      'SELECT * FROM operations WHERE account_id = ? AND type = ? AND date = ?',
+      [accountId, type, date],
+    );
+    return (operations || []).map(mapOperationFields).filter(Boolean);
+  } catch (error) {
+    console.error('Failed to get operations by account/type/date:', error);
+    throw error;
+  }
+};
+
+/**
  * Get operations by type
  * @param {string} type - 'expense', 'income', or 'transfer'
  * @returns {Promise<Array>}

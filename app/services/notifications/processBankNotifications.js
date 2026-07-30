@@ -22,6 +22,8 @@ import { captureLocationIfEnabled, isAttachLocationEnabled, operationLocationFie
 import { parseBankNotification, kindRequiresCategory } from './parseBankNotification';
 import { resolveNotification } from './resolveNotification';
 import { learnAccountBinding } from './accountBindings';
+import { findMatchingOperation, reconcilePendingNotifications } from './duplicateOperations';
+import { dismissPendingOperationsAlert } from './localNotifications';
 
 /**
  * A per-run location provider. Captures the device location at most once (lazily,
@@ -319,6 +321,37 @@ const isAllowedSource = (packageName, allowed) =>
   !!packageName && allowed.includes(packageName);
 
 /**
+ * Whether a notification describes an operation the user has already recorded by
+ * hand — matched on the resolved account, date, amount, and type. Returns false
+ * when the account didn't resolve (nothing to match against) or when the caller
+ * opted out via `checkDuplicate: false` (an explicit re-add).
+ *
+ * @param {Object} descriptor - parsed notification
+ * @param {Object} resolution - resolveNotification() result
+ * @param {string} date - resolved ISO date
+ * @param {{ checkDuplicate?: boolean }} options
+ * @returns {Promise<boolean>}
+ */
+const isAlreadyRecorded = async (descriptor, resolution, date, options) => {
+  if (options.checkDuplicate === false || resolution.accountId == null) return false;
+  const existing = await findMatchingOperation(
+    {
+      type: descriptor.type,
+      amount: descriptor.amount,
+      currency: descriptor.currency,
+      date,
+      accountId: resolution.accountId,
+    },
+    {
+      currency: resolution.accountCurrency,
+      autoTxnRounding: resolution.accountRounding,
+      autoTxnRoundingMode: resolution.accountRoundingMode,
+    },
+  );
+  return existing != null;
+};
+
+/**
  * Book a parsed expense/income notification: auto-create the operation when the
  * card resolves to an account, the merchant resolves to a category, and the source
  * is trusted; otherwise enqueue it for review. Mutates `summary`.
@@ -330,8 +363,18 @@ const isAllowedSource = (packageName, allowed) =>
  * @param {{ created: number, pending: number }} summary
  * @param {() => Promise<Object|null>} [getLocation] - best-effort location provider
  *   for auto-created operations; omitted callers book without coordinates.
+ * @param {{ checkDuplicate?: boolean }} [options] - when checkDuplicate is false,
+ *   book even if a matching operation already exists (explicit re-add).
  */
-const bookExpenseOrQueue = async (descriptor, resolution, date, allowedPackages, summary, getLocation) => {
+const bookExpenseOrQueue = async (descriptor, resolution, date, allowedPackages, summary, getLocation, options = {}) => {
+  // Skip a charge the user has already recorded by hand (see isAlreadyRecorded):
+  // neither auto-create nor queue a duplicate. Counted as skipped; the caller
+  // still marks the notification seen so it isn't re-checked every run.
+  if (await isAlreadyRecorded(descriptor, resolution, date, options)) {
+    summary.skipped += 1;
+    return;
+  }
+
   // Everything an auto-create needs except the currency match. Auto-create only
   // for trusted sources; kinds that require a manual category (C2C transfers,
   // DEBIT ACCOUNT) always wait in the queue.
@@ -434,8 +477,17 @@ const bookExpenseOrQueue = async (descriptor, resolution, date, allowedPackages,
  * @param {{ created: number, pending: number }} summary
  * @param {() => Promise<Object|null>} [getLocation] - best-effort location provider
  *   for auto-created transfers; omitted callers book without coordinates.
+ * @param {{ checkDuplicate?: boolean }} [options] - when checkDuplicate is false,
+ *   book even if a matching operation already exists (explicit re-add).
  */
-const bookTransferOrQueue = async (descriptor, resolution, date, allowedPackages, summary, getLocation) => {
+const bookTransferOrQueue = async (descriptor, resolution, date, allowedPackages, summary, getLocation, options = {}) => {
+  // Skip an ATM withdrawal the user has already recorded by hand, mirroring the
+  // expense/income path (matched on the source account, date, amount, and type).
+  if (await isAlreadyRecorded(descriptor, resolution, date, options)) {
+    summary.skipped += 1;
+    return;
+  }
+
   const target = await resolveAtmTargetAccount();
   const eligibleForAutoCreate =
     resolution.matchedAccount &&
@@ -520,6 +572,22 @@ export const processBankNotifications = async () => {
   }
 };
 
+/**
+ * Dismiss the tray "transactions to review" alert once the review queue is empty,
+ * so a resolved/dismissed/pruned queue stops nagging from the shade. Best-effort.
+ * @returns {Promise<void>}
+ */
+const syncPendingOperationsAlert = async () => {
+  try {
+    const remaining = await PendingNotificationsDB.getPendingCount();
+    if (remaining === 0) {
+      await dismissPendingOperationsAlert();
+    }
+  } catch (error) {
+    // Non-fatal — the alert self-replaces on the next background run.
+  }
+};
+
 const runProcess = async () => {
   const summary = { created: 0, pending: 0, skipped: 0 };
 
@@ -527,8 +595,16 @@ const runProcess = async () => {
     return summary;
   }
 
+  // Drop any queued review item the user has already recorded by hand since it
+  // was enqueued, before parsing new notifications.
+  const prunedExisting = await reconcilePendingNotifications();
+
   const notifications = await getRecentNotifications();
   if (!notifications || notifications.length === 0) {
+    if (prunedExisting > 0) {
+      appEvents.emit(EVENTS.RELOAD_ALL);
+      await syncPendingOperationsAlert();
+    }
     return summary;
   }
 
@@ -587,8 +663,15 @@ const runProcess = async () => {
   }
 
   // Refresh on any change so a pending badge updates too, not just on creates.
-  if (summary.created > 0 || summary.pending > 0) {
+  // A prune (a queued item matched an already-recorded operation) counts too.
+  if (summary.created > 0 || summary.pending > 0 || prunedExisting > 0) {
     appEvents.emit(EVENTS.RELOAD_ALL);
+  }
+
+  // Clear the tray nudge if the review queue is now empty (e.g. every queued item
+  // was pruned as a duplicate this run).
+  if (prunedExisting > 0) {
+    await syncPendingOperationsAlert();
   }
 
   return summary;
@@ -771,6 +854,7 @@ export const resolvePendingNotification = async (pendingId, choices = {}) => {
 
   await PendingNotificationsDB.deletePendingNotification(pendingId);
   appEvents.emit(EVENTS.RELOAD_ALL);
+  await syncPendingOperationsAlert();
   return operation;
 };
 
@@ -881,6 +965,7 @@ const resolvePendingTransfer = async (pending, choices = {}) => {
 
   await PendingNotificationsDB.deletePendingNotification(pending.id);
   appEvents.emit(EVENTS.RELOAD_ALL);
+  await syncPendingOperationsAlert();
   return operation;
 };
 
@@ -913,10 +998,14 @@ export const reAddNotification = async (notification) => {
   const trustedAllowlist = descriptor.packageName ? [descriptor.packageName] : [];
   const getLocation = makeLocationProvider();
 
+  // The user explicitly asked to re-add this notification, so book it even if a
+  // matching operation already exists (they may be intentionally recording a
+  // second identical charge, or re-adding one they deleted).
+  const options = { checkDuplicate: false };
   if (descriptor.isTransfer) {
-    await bookTransferOrQueue(descriptor, resolution, date, trustedAllowlist, summary, getLocation);
+    await bookTransferOrQueue(descriptor, resolution, date, trustedAllowlist, summary, getLocation, options);
   } else {
-    await bookExpenseOrQueue(descriptor, resolution, date, trustedAllowlist, summary, getLocation);
+    await bookExpenseOrQueue(descriptor, resolution, date, trustedAllowlist, summary, getLocation, options);
   }
 
   if (summary.created > 0 || summary.pending > 0) {
@@ -937,6 +1026,7 @@ export const reAddNotification = async (notification) => {
 export const dismissPendingNotification = async (pendingId) => {
   await PendingNotificationsDB.deletePendingNotification(pendingId);
   appEvents.emit(EVENTS.RELOAD_ALL);
+  await syncPendingOperationsAlert();
 };
 
 export default processBankNotifications;

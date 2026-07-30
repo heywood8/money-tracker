@@ -1054,6 +1054,7 @@ jest.mock('expo-notifications', () => ({
   getPermissionsAsync: jest.fn(() => Promise.resolve({ status: 'granted', granted: true })),
   requestPermissionsAsync: jest.fn(() => Promise.resolve({ status: 'granted', granted: true })),
   scheduleNotificationAsync: jest.fn(() => Promise.resolve('test-notification-id')),
+  dismissNotificationAsync: jest.fn(() => Promise.resolve()),
   addNotificationResponseReceivedListener: jest.fn(() => ({ remove: jest.fn() })),
   getLastNotificationResponseAsync: jest.fn(() => Promise.resolve(null)),
   AndroidImportance: {
