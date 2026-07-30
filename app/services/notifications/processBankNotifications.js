@@ -321,20 +321,25 @@ const isAllowedSource = (packageName, allowed) =>
   !!packageName && allowed.includes(packageName);
 
 /**
- * Whether a notification describes an operation the user has already recorded by
- * hand — matched on the resolved account, date, amount, and type. Returns false
- * when the account didn't resolve (nothing to match against) or when the caller
- * opted out via `checkDuplicate: false` (an explicit re-add).
+ * The operation the user has already recorded by hand that this notification
+ * duplicates — matched on the resolved account, date, amount, and type — or null.
+ * Returns null when the account didn't resolve (nothing to match against) or when
+ * the caller opted out via `checkDuplicate: false` (an explicit re-add).
+ *
+ * `options.claimedOpIds` (when supplied) both excludes operations already paired
+ * with an earlier notification in this run and receives no writes here — the
+ * caller records the pairing so two distinct same-day/same-amount charges don't
+ * collapse onto one operation.
  *
  * @param {Object} descriptor - parsed notification
  * @param {Object} resolution - resolveNotification() result
  * @param {string} date - resolved ISO date
- * @param {{ checkDuplicate?: boolean }} options
- * @returns {Promise<boolean>}
+ * @param {{ checkDuplicate?: boolean, claimedOpIds?: Set }} options
+ * @returns {Promise<Object|null>}
  */
-const isAlreadyRecorded = async (descriptor, resolution, date, options) => {
-  if (options.checkDuplicate === false || resolution.accountId == null) return false;
-  const existing = await findMatchingOperation(
+const findExistingOperation = async (descriptor, resolution, date, options) => {
+  if (options.checkDuplicate === false || resolution.accountId == null) return null;
+  return findMatchingOperation(
     {
       type: descriptor.type,
       amount: descriptor.amount,
@@ -347,8 +352,8 @@ const isAlreadyRecorded = async (descriptor, resolution, date, options) => {
       autoTxnRounding: resolution.accountRounding,
       autoTxnRoundingMode: resolution.accountRoundingMode,
     },
+    options.claimedOpIds || null,
   );
-  return existing != null;
 };
 
 /**
@@ -367,10 +372,13 @@ const isAlreadyRecorded = async (descriptor, resolution, date, options) => {
  *   book even if a matching operation already exists (explicit re-add).
  */
 const bookExpenseOrQueue = async (descriptor, resolution, date, allowedPackages, summary, getLocation, options = {}) => {
-  // Skip a charge the user has already recorded by hand (see isAlreadyRecorded):
-  // neither auto-create nor queue a duplicate. Counted as skipped; the caller
-  // still marks the notification seen so it isn't re-checked every run.
-  if (await isAlreadyRecorded(descriptor, resolution, date, options)) {
+  // Skip a charge the user has already recorded by hand: neither auto-create nor
+  // queue a duplicate. Claim the matched operation so a sibling notification in
+  // this run pairs with a different one. Counted as skipped; the caller still
+  // marks the notification seen so it isn't re-checked every run.
+  const duplicate = await findExistingOperation(descriptor, resolution, date, options);
+  if (duplicate) {
+    if (options.claimedOpIds && duplicate.id != null) options.claimedOpIds.add(duplicate.id);
     summary.skipped += 1;
     return;
   }
@@ -419,7 +427,7 @@ const bookExpenseOrQueue = async (descriptor, resolution, date, allowedPackages,
     // the raw merchant for the operation's label.
     const label = resolution.labelOverride || descriptor.merchant;
     const location = getLocation ? await getLocation() : null;
-    await OperationsDB.createOperation({
+    const created = await OperationsDB.createOperation({
       type: descriptor.type,
       ...currencyFields,
       accountId: resolution.accountId,
@@ -428,6 +436,9 @@ const bookExpenseOrQueue = async (descriptor, resolution, date, allowedPackages,
       description: label ? serializeLabels([label]) : null,
       ...operationLocationFields(location),
     });
+    // Claim the new operation so a later duplicate notification in this run pairs
+    // with a different existing operation rather than re-matching this one.
+    if (options.claimedOpIds && created && created.id != null) options.claimedOpIds.add(created.id);
     summary.created += 1;
 
     // Float the merchant's binding to the top of the bindings list on this
@@ -483,7 +494,9 @@ const bookExpenseOrQueue = async (descriptor, resolution, date, allowedPackages,
 const bookTransferOrQueue = async (descriptor, resolution, date, allowedPackages, summary, getLocation, options = {}) => {
   // Skip an ATM withdrawal the user has already recorded by hand, mirroring the
   // expense/income path (matched on the source account, date, amount, and type).
-  if (await isAlreadyRecorded(descriptor, resolution, date, options)) {
+  const duplicate = await findExistingOperation(descriptor, resolution, date, options);
+  if (duplicate) {
+    if (options.claimedOpIds && duplicate.id != null) options.claimedOpIds.add(duplicate.id);
     summary.skipped += 1;
     return;
   }
@@ -523,7 +536,7 @@ const bookTransferOrQueue = async (descriptor, resolution, date, allowedPackages
       };
     }
     const location = getLocation ? await getLocation() : null;
-    await OperationsDB.createOperation({
+    const created = await OperationsDB.createOperation({
       type: 'transfer',
       ...transferFields,
       accountId: resolution.accountId,
@@ -532,6 +545,7 @@ const bookTransferOrQueue = async (descriptor, resolution, date, allowedPackages
       description: descriptor.merchant ? serializeLabels([descriptor.merchant]) : null,
       ...operationLocationFields(location),
     });
+    if (options.claimedOpIds && created && created.id != null) options.claimedOpIds.add(created.id);
     summary.created += 1;
   } else {
     // Capture the location NOW (at ingestion, near the ATM) and store it on the
@@ -615,6 +629,12 @@ const runProcess = async () => {
   // One best-effort location fix, shared by every operation auto-created this run.
   const getLocation = makeLocationProvider();
 
+  // Operations paired with a notification this run (matched-as-duplicate or
+  // freshly auto-created), so a second identical charge in the same batch pairs
+  // with a different operation instead of being absorbed by the first.
+  const claimedOpIds = new Set();
+  const bookOptions = { claimedOpIds };
+
   // Oldest first so operations are created in chronological order.
   const ordered = [...notifications].sort(
     (a, b) => (a.postTime || 0) - (b.postTime || 0),
@@ -645,9 +665,9 @@ const runProcess = async () => {
       // accounts, so they resolve a *target* account (a bound "cash" account)
       // instead of a category. Everything else books as expense/income.
       if (descriptor.isTransfer) {
-        await bookTransferOrQueue(descriptor, resolution, date, allowedPackages, summary, getLocation);
+        await bookTransferOrQueue(descriptor, resolution, date, allowedPackages, summary, getLocation, bookOptions);
       } else {
-        await bookExpenseOrQueue(descriptor, resolution, date, allowedPackages, summary, getLocation);
+        await bookExpenseOrQueue(descriptor, resolution, date, allowedPackages, summary, getLocation, bookOptions);
       }
 
       seen.add(signature);

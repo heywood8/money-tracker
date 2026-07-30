@@ -106,11 +106,12 @@ export default function usePendingOperationSuggestions({
   const mountedRef = useRef(true);
   useEffect(() => () => { mountedRef.current = false; }, []);
 
-  const reload = useCallback(async () => {
+  const reload = useCallback(async ({ reconcile = true } = {}) => {
     try {
       // Drop any card the user has already recorded by hand before reading the
       // queue, so a matching operation makes its suggestion disappear at once.
-      await reconcilePendingNotifications();
+      // Skipped when the caller just ran the pipeline (which already reconciled).
+      if (reconcile) await reconcilePendingNotifications();
       const [items, atmAccount] = await Promise.all([
         getPendingNotifications(),
         resolveAtmTargetAccount().catch(() => null),
@@ -225,8 +226,10 @@ export default function usePendingOperationSuggestions({
   // just-entered operation prunes its matching suggestion from the deck at once.
   useEffect(() => {
     reload();
-    const offReloadAll = appEvents.on(EVENTS.RELOAD_ALL, reload);
-    const offOperationChanged = appEvents.on(EVENTS.OPERATION_CHANGED, reload);
+    // Wrap so an event payload is never read as reload's options argument.
+    const onEvent = () => reload();
+    const offReloadAll = appEvents.on(EVENTS.RELOAD_ALL, onEvent);
+    const offOperationChanged = appEvents.on(EVENTS.OPERATION_CHANGED, onEvent);
     return () => {
       offReloadAll();
       offOperationChanged();
@@ -273,7 +276,8 @@ export default function usePendingOperationSuggestions({
     } catch (error) {
       // Ingestion failure is non-fatal — still reload whatever is queued.
     }
-    await reload();
+    // The pipeline already reconciled the queue, so skip a redundant second pass.
+    await reload({ reconcile: false });
   }, [reload]);
 
   /**

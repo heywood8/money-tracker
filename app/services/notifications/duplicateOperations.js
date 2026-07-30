@@ -69,8 +69,15 @@ export const operationMatchesNotification = (op, item, account) => {
     );
   }
 
-  // Cross-currency: the operation preserves the original foreign charge in
-  // destination_amount (unrounded), so compare that against the notification.
+  // A transfer books its `amount` in the source-account currency and never
+  // preserves the notification's original charge (destination_amount is a second,
+  // unrelated source→target conversion), so a cross-currency transfer can't be
+  // compared reliably — don't risk a wrong match. The common same-currency
+  // transfer is already handled by the branch above.
+  if (op.type === 'transfer') return false;
+
+  // Cross-currency expense/income: the operation preserves the original foreign
+  // charge in destination_amount (unrounded), so compare that against the item.
   if (op.destinationAmount == null) return false;
   return Currency.compare(op.destinationAmount, item.amount) === 0;
 };
@@ -78,12 +85,18 @@ export const operationMatchesNotification = (op, item, account) => {
 /**
  * Find an operation the user has already recorded that matches a notification.
  *
+ * `claimedOpIds`, when supplied, excludes operations already paired with an
+ * earlier notification in the same batch, keeping matching 1:1: two genuinely
+ * distinct same-day/same-amount charges pair with two distinct operations rather
+ * than both being absorbed by the first one.
+ *
  * @param {{ type: string, amount: string, currency?: string|null, date?: string|null,
  *   accountId: string|number|null }} item
  * @param {Object|null} [account] - the item's account; fetched by id when omitted
+ * @param {Set<number|string>|null} [claimedOpIds] - operation ids already matched
  * @returns {Promise<Object|null>} the matching operation, or null
  */
-export const findMatchingOperation = async (item, account) => {
+export const findMatchingOperation = async (item, account, claimedOpIds = null) => {
   if (!item || item.accountId == null || !item.type || !item.date) return null;
   try {
     const resolvedAccount = account !== undefined
@@ -93,7 +106,8 @@ export const findMatchingOperation = async (item, account) => {
     if (typeof query !== 'function') return null;
     const candidates = await query(item.accountId, item.type, item.date);
     return (candidates || []).find(
-      (op) => operationMatchesNotification(op, item, resolvedAccount),
+      (op) => (!claimedOpIds || !claimedOpIds.has(op.id))
+        && operationMatchesNotification(op, item, resolvedAccount),
     ) || null;
   } catch (error) {
     // Never let a duplicate-check failure block ingestion — treat it as "no match".
@@ -101,15 +115,6 @@ export const findMatchingOperation = async (item, account) => {
     return null;
   }
 };
-
-/**
- * Whether an operation matching the notification already exists.
- * @param {Object} item
- * @param {Object|null} [account]
- * @returns {Promise<boolean>}
- */
-export const hasMatchingOperation = async (item, account) =>
-  (await findMatchingOperation(item, account)) != null;
 
 /**
  * Remove queued review items the user has since recorded by hand.
@@ -129,6 +134,9 @@ export const reconcilePendingNotifications = async () => {
 
     // Cache accounts by id so a batch of items on one account is fetched once.
     const accountCache = new Map();
+    // Track operations already claimed by an earlier item so two queued
+    // duplicates can't both be pruned against a single recorded operation.
+    const claimedOpIds = new Set();
     for (const item of pending) {
       if (item.accountId == null || !item.date) continue;
       if (!accountCache.has(item.accountId)) {
@@ -138,8 +146,9 @@ export const reconcilePendingNotifications = async () => {
         );
       }
       const account = accountCache.get(item.accountId);
-      const match = await findMatchingOperation(item, account);
+      const match = await findMatchingOperation(item, account, claimedOpIds);
       if (match) {
+        claimedOpIds.add(match.id);
         await PendingNotificationsDB.deletePendingNotification(item.id);
         pruned += 1;
       }

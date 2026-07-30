@@ -7,7 +7,6 @@
 import {
   operationMatchesNotification,
   findMatchingOperation,
-  hasMatchingOperation,
   reconcilePendingNotifications,
 } from '../../../app/services/notifications/duplicateOperations';
 import * as OperationsDB from '../../../app/services/OperationsDB';
@@ -93,6 +92,20 @@ describe('operationMatchesNotification', () => {
     const eurOp = op({ amount: '55000', destinationAmount: null });
     expect(operationMatchesNotification(eurOp, eurItem, AMD)).toBe(false);
   });
+
+  it('never cross-currency matches a transfer (its amount is not the foreign charge)', () => {
+    // A cross-currency ATM transfer books `amount` in the source currency and
+    // never preserves the dispensed foreign amount, so it must not match.
+    const eurItem = item({ type: 'transfer', currency: 'EUR', amount: '129.99' });
+    const eurTransfer = op({ type: 'transfer', amount: '55000', destinationAmount: '129.99' });
+    expect(operationMatchesNotification(eurTransfer, eurItem, AMD)).toBe(false);
+  });
+
+  it('still matches a same-currency transfer', () => {
+    const transferItem = item({ type: 'transfer' });
+    const transferOp = op({ type: 'transfer' });
+    expect(operationMatchesNotification(transferOp, transferItem, AMD)).toBe(true);
+  });
 });
 
 describe('findMatchingOperation', () => {
@@ -125,11 +138,15 @@ describe('findMatchingOperation', () => {
     expect(OperationsDB.getOperationsByAccountTypeAndDate).not.toHaveBeenCalled();
   });
 
-  it('hasMatchingOperation reflects findMatchingOperation', async () => {
-    OperationsDB.getOperationsByAccountTypeAndDate.mockResolvedValue([op()]);
-    expect(await hasMatchingOperation(item(), AMD)).toBe(true);
-    OperationsDB.getOperationsByAccountTypeAndDate.mockResolvedValue([]);
-    expect(await hasMatchingOperation(item(), AMD)).toBe(false);
+  it('excludes operations already claimed by an earlier notification', async () => {
+    OperationsDB.getOperationsByAccountTypeAndDate.mockResolvedValue([op({ id: 1 })]);
+    const claimed = new Set([1]);
+    // The only candidate is already claimed → no match despite matching fields.
+    expect(await findMatchingOperation(item(), AMD, claimed)).toBeNull();
+    // A second, unclaimed candidate is still matchable.
+    OperationsDB.getOperationsByAccountTypeAndDate.mockResolvedValue([op({ id: 1 }), op({ id: 2 })]);
+    const match = await findMatchingOperation(item(), AMD, claimed);
+    expect(match.id).toBe(2);
   });
 });
 
@@ -152,6 +169,21 @@ describe('reconcilePendingNotifications', () => {
     expect(pruned).toBe(1);
     expect(PendingNotificationsDB.deletePendingNotification).toHaveBeenCalledTimes(1);
     expect(PendingNotificationsDB.deletePendingNotification).toHaveBeenCalledWith('p1');
+  });
+
+  it('prunes only one of two identical queued items against a single operation', async () => {
+    // Two genuinely distinct same-day/same-amount charges, but only one matching
+    // recorded operation — exactly one card should be pruned, not both.
+    PendingNotificationsDB.getPendingNotifications.mockResolvedValue([
+      { id: 'p1', ...item() },
+      { id: 'p2', ...item() },
+    ]);
+    OperationsDB.getOperationsByAccountTypeAndDate.mockResolvedValue([op({ id: 1 })]);
+
+    const pruned = await reconcilePendingNotifications();
+
+    expect(pruned).toBe(1);
+    expect(PendingNotificationsDB.deletePendingNotification).toHaveBeenCalledTimes(1);
   });
 
   it('returns 0 and deletes nothing when the queue is empty', async () => {

@@ -1232,6 +1232,28 @@ describe('processBankNotifications', () => {
       expect(PendingNotificationsDB.addPendingNotification).toHaveBeenCalled();
     });
 
+    it('only suppresses one of two identical charges against a single recorded operation', async () => {
+      // Two genuinely distinct purchases the same day for the same amount (distinct
+      // postTime → distinct signatures), a trusted auto-create source, and a single
+      // matching operation already recorded. Exactly one notification should be
+      // suppressed; the other must still be created — not both absorbed by the op.
+      const A = { ...PURCHASE, postTime: PURCHASE.postTime + 1000 };
+      const B = { ...PURCHASE, postTime: PURCHASE.postTime + 2000 };
+      NotificationAccess.getRecentNotifications.mockResolvedValue([A, B]);
+      AccountsDB.getAccountByCardMask.mockResolvedValue({ id: 7, currency: 'AMD' });
+      NotificationRulesDB.getMerchantRule.mockResolvedValue({ categoryId: 'cat-food' });
+      PreferencesDB.getJsonPreference.mockImplementation((key) => prefs([], [PKG])(key));
+      OperationsDB.createOperation.mockResolvedValue({ id: 1 });
+      OperationsDB.getOperationsByAccountTypeAndDate.mockImplementation(async (accountId, type, date) => [
+        { id: 1, type, accountId, date, amount: '3900', destinationAmount: null },
+      ]);
+
+      const summary = await pipeline.processBankNotifications();
+
+      expect(summary).toEqual({ created: 1, pending: 0, skipped: 1 });
+      expect(OperationsDB.createOperation).toHaveBeenCalledTimes(1);
+    });
+
     it('prunes a queued item once a matching operation is recorded', async () => {
       // Nothing new to parse — the run only reconciles the existing queue.
       NotificationAccess.getRecentNotifications.mockResolvedValue([]);
