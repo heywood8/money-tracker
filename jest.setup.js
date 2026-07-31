@@ -598,6 +598,7 @@ jest.mock(
     Paint: 'SkPaint',
     DashPathEffect: 'SkDashPathEffect',
     LinearGradient: 'SkLinearGradient',
+    BlurMask: 'SkBlurMask',
     vec: (x, y) => ({ x, y }),
   }),
   { virtual: true },
@@ -676,6 +677,7 @@ jest.mock('react-native-gesture-handler', () => {
       onUpdate: jest.fn().mockReturnThis(),
       onEnd: jest.fn().mockReturnThis(),
       onFinalize: jest.fn().mockReturnThis(),
+      runOnJS: jest.fn().mockReturnThis(),
       enabled: jest.fn().mockReturnThis(),
       shouldCancelWhenOutside: jest.fn().mockReturnThis(),
       activeOffsetX: jest.fn().mockReturnThis(),
@@ -704,12 +706,23 @@ jest.mock('react-native-gesture-handler', () => {
       enabled: jest.fn().mockReturnThis(),
       minDuration: jest.fn().mockReturnThis(),
     })),
+    Pinch: jest.fn(() => ({
+      onStart: jest.fn().mockReturnThis(),
+      onUpdate: jest.fn().mockReturnThis(),
+      onEnd: jest.fn().mockReturnThis(),
+      onFinalize: jest.fn().mockReturnThis(),
+      runOnJS: jest.fn().mockReturnThis(),
+      enabled: jest.fn().mockReturnThis(),
+    })),
     Native: jest.fn(() => ({
       enabled: jest.fn().mockReturnThis(),
       blocksExternalGesture: jest.fn().mockReturnThis(),
       simultaneousWithExternalGesture: jest.fn().mockReturnThis(),
       requireExternalGestureToFail: jest.fn().mockReturnThis(),
     })),
+    Simultaneous: jest.fn((...gestures) => ({ gestures })),
+    Exclusive: jest.fn((...gestures) => ({ gestures })),
+    Race: jest.fn((...gestures) => ({ gestures })),
   };
 
   return {
@@ -739,7 +752,9 @@ jest.mock('react-native-gesture-handler', () => {
     FlatList: View,
     gestureHandlerRootHOC: jest.fn(component => component),
     Directions: {},
-    GestureHandlerRootView: View,
+    // RNView, not the internal Libraries/.../View require above — that path
+    // resolves to a module object under RN 0.85 and breaks as an element type.
+    GestureHandlerRootView: RNView,
     GestureDetector,
     Gesture,
   };

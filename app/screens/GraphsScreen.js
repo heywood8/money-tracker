@@ -17,6 +17,7 @@ import BalanceHistoryCard from '../components/graphs/BalanceHistoryCard';
 import CategoryBackChip from '../components/graphs/CategoryBackChip';
 import { chartTransition, CHART_DROP } from '../components/graphs/chartTransitions';
 import CategorySpendingCard from '../components/graphs/CategorySpendingCard';
+import OperationsHeatmapCard from '../components/graphs/OperationsHeatmapCard';
 import ExpenseSummaryCard from '../components/graphs/ExpenseSummaryCard';
 import IncomeSummaryCard from '../components/graphs/IncomeSummaryCard';
 import IncomePieChart from '../components/graphs/IncomePieChart';
@@ -374,6 +375,18 @@ const GraphsScreen = () => {
 
     return items;
   }, [availableYears, availableMonths, t, monthKeys]);
+
+  // Human-readable name of the selected period, for surfaces that show the
+  // current scope as text (heatmap header). Falls back to reconstructing the
+  // label for a period not present in periodItems (cannot happen today, but a
+  // blank scope label would be confusing enough to warrant the guard).
+  const selectedPeriodLabel = useMemo(() => {
+    const item = periodItems.find(i => i.value === selectedPeriod);
+    if (item) return item.label;
+    return selectedMonth === null
+      ? `${t('full_year')} ${selectedYear}`
+      : `${t(monthKeys[selectedMonth])} ${selectedYear}`;
+  }, [periodItems, selectedPeriod, selectedMonth, selectedYear, t, monthKeys]);
 
   // Use account-specific expenses from balance history for the prediction.
   // totalExpenses from useExpenseData covers all accounts in the currency (by design),
@@ -819,6 +832,16 @@ const GraphsScreen = () => {
             onCategoryChange={setSelectedCategoryForTrend}
             categories={categories}
             convertAllCurrencies={convertAllCurrencies}
+          />
+
+          {/* Operations location heatmap — an inert row until tapped; the
+              fullscreen map (and its DB/tile loading) mounts only on open. */}
+          <OperationsHeatmapCard
+            colors={colors}
+            t={t}
+            selectedYear={selectedYear}
+            selectedMonth={selectedMonth}
+            periodLabel={selectedPeriodLabel}
           />
         </View>
       </ScrollView>
