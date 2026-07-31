@@ -74,6 +74,43 @@ export const normalizeLabel = (label) => {
 export const sanitizeLabel = (label) => normalizeLabel(label).slice(0, MAX_LABEL_LENGTH).trim();
 
 /**
+ * Tidy a raw merchant name for use as a *suggested* operation label.
+ *
+ * Bank notifications frequently shout the shop name in ALL CAPS ("GURMAN",
+ * "YANDEX GO"). When that name is proposed to the user as the operation's label
+ * — or booked automatically without review — this converts it to first-capital,
+ * rest-lowercase per word ("Gurman", "Yandex Go") so the label reads naturally.
+ *
+ * Only genuinely all-caps names are reformatted. A name that already carries any
+ * lower-case letter ("МегаФон", "iHerb", "McDonald's") is left untouched: that
+ * casing was chosen deliberately and lower-casing it would lose information. A
+ * name with no cased letters at all (digits, CJK) is likewise returned as-is.
+ *
+ * This never applies to a learned/user-typed label override — those are the
+ * user's own casing and are always authoritative.
+ *
+ * @param {*} merchant
+ * @returns {*} the tidied name, the original string when not all-caps, or the
+ *   input unchanged when it is not a string.
+ */
+export const normalizeMerchantLabel = (merchant) => {
+  if (typeof merchant !== 'string') return merchant;
+  const trimmed = merchant.trim();
+  if (!trimmed) return trimmed;
+  // Not all-caps (has a lower-case letter) or has no cased letters at all → leave
+  // the deliberate casing intact.
+  if (trimmed !== trimmed.toUpperCase() || trimmed === trimmed.toLowerCase()) {
+    return trimmed;
+  }
+  // Capitalize the first character of each whitespace-separated word and
+  // lower-case the rest. \S+ preserves the original spacing between words.
+  return trimmed.replace(
+    /\S+/g,
+    (word) => word.charAt(0).toUpperCase() + word.slice(1).toLowerCase(),
+  );
+};
+
+/**
  * Parse a description string into an ordered, de-duplicated list of labels.
  * De-duplication is case-insensitive; the first occurrence's casing is kept.
  * Every delimiter-separated segment becomes a label, including legacy markers

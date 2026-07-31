@@ -154,7 +154,7 @@ describe('processBankNotifications', () => {
     expect(OperationsDB.createOperation).toHaveBeenCalledWith(
       expect.objectContaining({
         type: 'expense', amount: '3900.00', accountId: 7,
-        categoryId: 'cat-food', date: '2026-06-28', description: 'NAREK MEHRABYAN',
+        categoryId: 'cat-food', date: '2026-06-28', description: 'Narek Mehrabyan',
       }),
     );
     expect(emitSpy).toHaveBeenCalledWith(EVENTS.RELOAD_ALL);
@@ -594,7 +594,7 @@ describe('processBankNotifications', () => {
       expect(OperationsDB.createOperation).toHaveBeenCalledWith(
         expect.objectContaining({
           type: 'transfer', amount: '200000', accountId: 7, toAccountId: 9,
-          date: '2026-07-01', description: 'ATM 401 REPUBLIC 67/1',
+          date: '2026-07-01', description: 'Atm 401 Republic 67/1',
         }),
       );
     });
@@ -941,9 +941,9 @@ describe('processBankNotifications', () => {
         accountId: 7, categoryId: 'cat-health', labelOverride: '',
       });
 
-      // The operation falls back to the raw shop name...
+      // The operation falls back to the raw shop name, tidied from ALL CAPS...
       expect(OperationsDB.createOperation).toHaveBeenCalledWith(
-        expect.objectContaining({ description: 'ECOSENSE BYUZAND' }),
+        expect.objectContaining({ description: 'Ecosense Byuzand' }),
       );
       // ...and the blanked field clears the stored override.
       expect(NotificationRulesDB.upsertMerchantLabel).toHaveBeenCalledWith(
@@ -984,14 +984,15 @@ describe('processBankNotifications', () => {
       expect(NotificationRulesDB.upsertMerchantLabel).not.toHaveBeenCalled();
     });
 
-    it('uses the raw merchant when there is no override at all', async () => {
+    it('tidies the raw ALL-CAPS merchant when there is no override at all', async () => {
       PendingNotificationsDB.getPendingNotificationById.mockResolvedValue(pending);
       NotificationRulesDB.getLabelForMerchant.mockResolvedValue(null);
 
       await pipeline.resolvePendingNotification('p1', { accountId: 7, categoryId: 'cat-food' });
 
+      // 'NAREK MEHRABYAN' -> 'Narek Mehrabyan' (first-capital per word).
       expect(OperationsDB.createOperation).toHaveBeenCalledWith(
-        expect.objectContaining({ description: 'NAREK MEHRABYAN' }),
+        expect.objectContaining({ description: 'Narek Mehrabyan' }),
       );
       expect(NotificationRulesDB.upsertMerchantLabel).not.toHaveBeenCalled();
     });
@@ -1046,7 +1047,7 @@ describe('processBankNotifications', () => {
       expect(OperationsDB.createOperation).toHaveBeenCalledWith(
         expect.objectContaining({
           type: 'transfer', amount: '200000', accountId: 7, toAccountId: 9,
-          date: '2026-07-01', description: 'ATM 401 REPUBLIC 67/1',
+          date: '2026-07-01', description: 'Atm 401 Republic 67/1',
         }),
       );
       // Learns the card -> source-account binding.

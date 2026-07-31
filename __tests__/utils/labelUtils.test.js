@@ -17,6 +17,7 @@ import {
   visibleListLabels,
   isProtectedOperation,
   displayLabel,
+  normalizeMerchantLabel,
 } from '../../app/utils/labelUtils';
 
 describe('labelUtils', () => {
@@ -387,6 +388,52 @@ describe('labelUtils', () => {
       expect(isProtectedOperation('')).toBe(false);
       expect(isProtectedOperation(null)).toBe(false);
       expect(isProtectedOperation(undefined)).toBe(false);
+    });
+  });
+
+  describe('normalizeMerchantLabel', () => {
+    it('title-cases an all-caps single-word shop name', () => {
+      expect(normalizeMerchantLabel('GURMAN')).toBe('Gurman');
+    });
+
+    it('title-cases each word of an all-caps multi-word name', () => {
+      expect(normalizeMerchantLabel('YANDEX GO')).toBe('Yandex Go');
+    });
+
+    it('title-cases all-caps Cyrillic names', () => {
+      expect(normalizeMerchantLabel('ПЯТЁРОЧКА')).toBe('Пятёрочка');
+      expect(normalizeMerchantLabel('ООО РОГА')).toBe('Ооо Рога');
+    });
+
+    it('leaves an already mixed-case name untouched', () => {
+      expect(normalizeMerchantLabel('МегаФон')).toBe('МегаФон');
+      expect(normalizeMerchantLabel('iHerb')).toBe('iHerb');
+      expect(normalizeMerchantLabel('McDonald\'s')).toBe('McDonald\'s');
+      expect(normalizeMerchantLabel('Yandex Go')).toBe('Yandex Go');
+    });
+
+    it('leaves a name with no cased letters untouched', () => {
+      expect(normalizeMerchantLabel('7-11')).toBe('7-11');
+      expect(normalizeMerchantLabel('1234')).toBe('1234');
+    });
+
+    it('keeps digits alongside letters and tidies only the letters', () => {
+      expect(normalizeMerchantLabel('GURMAN 24')).toBe('Gurman 24');
+    });
+
+    it('trims surrounding whitespace', () => {
+      expect(normalizeMerchantLabel('  GURMAN  ')).toBe('Gurman');
+    });
+
+    it('returns non-string input unchanged', () => {
+      expect(normalizeMerchantLabel(null)).toBe(null);
+      expect(normalizeMerchantLabel(undefined)).toBe(undefined);
+      expect(normalizeMerchantLabel(42)).toBe(42);
+    });
+
+    it('returns an empty string for blank input', () => {
+      expect(normalizeMerchantLabel('')).toBe('');
+      expect(normalizeMerchantLabel('   ')).toBe('');
     });
   });
 });
