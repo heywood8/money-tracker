@@ -135,9 +135,11 @@ describe('NotificationBindingStack', () => {
     // Field captions (custom-name, ACCOUNT, CATEGORY) were dropped to reclaim
     // vertical space for three rows of the category grid — the inputs stay, their
     // captions don't. The label input is anchored by its merchant placeholder and
-    // the account picker by its selected account label.
+    // the account picker by its selected account label. The ALL-CAPS shop name is
+    // tidied to first-capital for the suggested label ('SAS SUPERMARKET' ->
+    // 'Sas Supermarket').
     const { getByText, getByPlaceholderText, getByTestId, queryByText } = await renderStack();
-    expect(getByPlaceholderText('SAS SUPERMARKET')).toBeTruthy();
+    expect(getByPlaceholderText('Sas Supermarket')).toBeTruthy();
     expect(getByText('Checking')).toBeTruthy();
     expect(getByTestId('category-grid-c1')).toBeTruthy();
     expect(queryByText('BANK_NOTIFICATIONS_CUSTOM_LABEL')).toBeNull();
@@ -165,7 +167,7 @@ describe('NotificationBindingStack', () => {
   it('propagates label edits as a choice patch for the item', async () => {
     const onChoiceChange = jest.fn();
     const { getByPlaceholderText } = await renderStack({ onChoiceChange });
-    fireEvent.changeText(getByPlaceholderText('SAS SUPERMARKET'), 'My grocery');
+    fireEvent.changeText(getByPlaceholderText('Sas Supermarket'), 'My grocery');
     expect(onChoiceChange).toHaveBeenCalledWith('p1', { labelOverride: 'My grocery' });
   });
 
