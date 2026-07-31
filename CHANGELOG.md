@@ -1,5 +1,12 @@
 # Changelog
 
+## [0.248.0](https://github.com/heywood8/money-tracker/compare/penny-v0.247.0...penny-v0.248.0) (2026-07-31)
+
+
+### Features
+
+* **operations:** tidy ALL-CAPS shop names in notification labels ([#1515](https://github.com/heywood8/money-tracker/issues/1515)) ([47f76f7](https://github.com/heywood8/money-tracker/commit/47f76f70339d0364046230b9012c22ae05b58ee9))
+
 ## [0.247.0](https://github.com/heywood8/money-tracker/compare/penny-v0.246.6...penny-v0.247.0) (2026-07-30)
 
 
