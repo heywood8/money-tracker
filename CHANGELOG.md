@@ -1,5 +1,12 @@
 # Changelog
 
+## [0.249.0](https://github.com/heywood8/money-tracker/compare/penny-v0.248.0...penny-v0.249.0) (2026-07-31)
+
+
+### Features
+
+* **graphs:** expandable operations heatmap with cached OSM tiles ([#1518](https://github.com/heywood8/money-tracker/issues/1518)) ([05e63b2](https://github.com/heywood8/money-tracker/commit/05e63b2c02c1248c5d55f9359cae43ce3cb88def))
+
 ## [0.248.0](https://github.com/heywood8/money-tracker/compare/penny-v0.247.0...penny-v0.248.0) (2026-07-31)
 
 
