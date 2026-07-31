@@ -160,66 +160,49 @@ const HeatmapMapModal = ({
       prev.width === width && prev.height === height ? prev : { width, height });
   }, []);
 
-  // One shared gesture accumulator: pan and pinch both re-derive the region
-  // from the snapshot taken when the FIRST of them touched down, so their
-  // contributions compose instead of overwriting each other.
-  const gestureState = useRef({ active: 0, base: null, tx: 0, ty: 0, scale: 1, fx: 0, fy: 0 });
-
-  const applyGesture = useCallback(() => {
-    const s = gestureState.current;
-    const { width, height } = sizeRef.current;
-    if (!s.base || !width || !height) return;
-    const panned = translateRegion(s.base, s.tx, s.ty);
-    setRegion(scaleRegion(panned, s.scale, s.fx, s.fy, width, height));
-  }, []);
-
-  const beginGesture = useCallback(() => {
-    const s = gestureState.current;
-    if (s.active === 0) {
-      s.base = regionRef.current;
-      s.tx = 0;
-      s.ty = 0;
-      s.scale = 1;
-      s.fx = sizeRef.current.width / 2;
-      s.fy = sizeRef.current.height / 2;
-    }
-    s.active += 1;
-  }, []);
-
-  const finishGesture = useCallback(() => {
-    const s = gestureState.current;
-    s.active = Math.max(0, s.active - 1);
-    if (s.active === 0) s.base = null;
-  }, []);
+  // Pan and pinch each apply the DELTA since their previous event to the
+  // current region, rather than re-deriving from a touch-down snapshot. That
+  // keeps simultaneous gestures composable and survives one gesture ending
+  // and restarting while the other is still active — a snapshot scheme jumps
+  // in that case because the restarted gesture's translation resets to zero.
+  const panLast = useRef({ x: 0, y: 0 });
+  const pinchLast = useRef({ scale: 1, fx: 0, fy: 0 });
 
   const composedGesture = useMemo(() => {
     const pan = Gesture.Pan()
       .runOnJS(true)
-      .onStart(beginGesture)
-      .onUpdate((e) => {
-        const s = gestureState.current;
-        s.tx = e.translationX;
-        s.ty = e.translationY;
-        applyGesture();
+      .onStart(() => {
+        panLast.current = { x: 0, y: 0 };
       })
-      .onFinalize(finishGesture);
+      .onUpdate((e) => {
+        const last = panLast.current;
+        const dx = e.translationX - last.x;
+        const dy = e.translationY - last.y;
+        panLast.current = { x: e.translationX, y: e.translationY };
+        setRegion(translateRegion(regionRef.current, dx, dy));
+      });
     const pinch = Gesture.Pinch()
       .runOnJS(true)
       .onStart((e) => {
-        beginGesture();
-        const s = gestureState.current;
-        // Anchor the zoom on the initial focal point; centroid drift while
-        // pinching is already covered by the pan's translation.
-        s.fx = e.focalX ?? s.fx;
-        s.fy = e.focalY ?? s.fy;
+        const { width, height } = sizeRef.current;
+        pinchLast.current = {
+          scale: 1,
+          // Anchor the zoom on the initial focal point; centroid drift while
+          // pinching is already covered by the pan's translation.
+          fx: e.focalX ?? width / 2,
+          fy: e.focalY ?? height / 2,
+        };
       })
       .onUpdate((e) => {
-        gestureState.current.scale = e.scale;
-        applyGesture();
-      })
-      .onFinalize(finishGesture);
+        const { width, height } = sizeRef.current;
+        if (!width || !height) return;
+        const last = pinchLast.current;
+        const factor = e.scale / (last.scale || 1);
+        last.scale = e.scale;
+        setRegion(scaleRegion(regionRef.current, factor, last.fx, last.fy, width, height));
+      });
     return Gesture.Simultaneous(pan, pinch);
-  }, [applyGesture, beginGesture, finishGesture]);
+  }, []);
 
   const tiles = useMemo(
     () => visibleTiles(region, size.width, size.height),
@@ -308,7 +291,9 @@ const HeatmapMapModal = ({
             </View>
           </View>
 
-          <View style={[styles.header, { top: insets.top + 8 }]}>
+          {/* box-none: the strip itself must not swallow pan gestures — only
+              its buttons and badges are touch targets. */}
+          <View style={[styles.header, { top: insets.top + 8 }]} pointerEvents="box-none">
             <TouchableOpacity
               style={[styles.headerButton, { backgroundColor: colors.surface, borderColor: colors.border }]}
               onPress={onClose}

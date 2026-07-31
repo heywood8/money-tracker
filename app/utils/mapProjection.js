@@ -88,9 +88,14 @@ export const scaleRegion = (region, factor, focalX, focalY, width, height) => {
   const fy = latToWorldY(region.latitude, region.zoom) + (focalY - height / 2);
   const newCx = fx * applied - (focalX - width / 2);
   const newCy = fy * applied - (focalY - height / 2);
+  const size = worldSize(newZoom);
+  // Wrap/clamp like translateRegion so zooming near the antimeridian cannot
+  // walk the center out of the projection.
+  const wrappedX = ((newCx % size) + size) % size;
+  const clampedY = Math.max(0, Math.min(size, newCy));
   return {
-    latitude: worldYToLat(newCy, newZoom),
-    longitude: worldXToLon(newCx, newZoom),
+    latitude: worldYToLat(clampedY, newZoom),
+    longitude: worldXToLon(wrappedX, newZoom),
     zoom: newZoom,
   };
 };

@@ -132,6 +132,15 @@ describe('mapProjection', () => {
       expect(next.latitude).toBeCloseTo(40, 6);
       expect(next.longitude).toBeCloseTo(44, 6);
     });
+
+    it('keeps longitude in range when zooming near the antimeridian', () => {
+      const region = { latitude: 0, longitude: 179.99, zoom: 4 };
+      // Zoom anchored far right of center pushes the center eastward across
+      // the antimeridian — the result must wrap, not walk out of range.
+      const next = scaleRegion(region, 2, 390, 400, 400, 800);
+      expect(next.longitude).toBeGreaterThanOrEqual(-180);
+      expect(next.longitude).toBeLessThanOrEqual(180);
+    });
   });
 
   describe('fitBounds', () => {
