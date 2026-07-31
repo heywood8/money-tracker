@@ -180,9 +180,20 @@ describe('resolveNotification', () => {
         labelOverride: null,
         matchedAccount: true,
         matchedCategory: true,
+        matchedLabel: false,
         currencyMatch: true,
         fullyMatched: true,
       });
+    });
+
+    it('reports matchedLabel true only when a label override is bound', async () => {
+      AccountsDB.getAccountByCardMask.mockResolvedValue({ id: 7, currency: 'AMD' });
+
+      NotificationRulesDB.getMerchantRule.mockResolvedValue({ categoryId: 'cat-food' });
+      expect((await resolver.resolveNotification(descriptor)).matchedLabel).toBe(false);
+
+      NotificationRulesDB.getMerchantRule.mockResolvedValue({ categoryId: 'cat-food', labelOverride: 'Groceries' });
+      expect((await resolver.resolveNotification(descriptor)).matchedLabel).toBe(true);
     });
 
     it('is NOT fullyMatched on a currency mismatch', async () => {

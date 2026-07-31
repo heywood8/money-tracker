@@ -144,7 +144,7 @@ describe('processBankNotifications', () => {
   it('auto-creates an operation when fully matched and source is trusted', async () => {
     NotificationAccess.getRecentNotifications.mockResolvedValue([PURCHASE]);
     AccountsDB.getAccountByCardMask.mockResolvedValue({ id: 7, currency: 'AMD' });
-    NotificationRulesDB.getMerchantRule.mockResolvedValue({ categoryId: 'cat-food' });
+    NotificationRulesDB.getMerchantRule.mockResolvedValue({ categoryId: 'cat-food', labelOverride: 'Groceries' });
     PreferencesDB.getJsonPreference.mockImplementation((key) => prefs([], [PKG])(key));
     const emitSpy = jest.spyOn(appEvents, 'emit');
 
@@ -154,10 +154,30 @@ describe('processBankNotifications', () => {
     expect(OperationsDB.createOperation).toHaveBeenCalledWith(
       expect.objectContaining({
         type: 'expense', amount: '3900.00', accountId: 7,
-        categoryId: 'cat-food', date: '2026-06-28', description: 'NAREK MEHRABYAN',
+        categoryId: 'cat-food', date: '2026-06-28', description: 'Groceries',
       }),
     );
     expect(emitSpy).toHaveBeenCalledWith(EVENTS.RELOAD_ALL);
+  });
+
+  it('queues instead of auto-creating when the merchant has a category but no name binding', async () => {
+    // Regression: a purchase whose merchant resolves an account + category but has
+    // no learned display-name binding must NOT be silently booked with the raw
+    // (often bank-truncated) merchant — it is routed to review so the user can set
+    // the name there. Guards the "auto-create only when account + category + name
+    // all resolve" rule.
+    NotificationAccess.getRecentNotifications.mockResolvedValue([PURCHASE]);
+    AccountsDB.getAccountByCardMask.mockResolvedValue({ id: 7, currency: 'AMD' });
+    NotificationRulesDB.getMerchantRule.mockResolvedValue({ categoryId: 'cat-food' }); // category only, no labelOverride
+    PreferencesDB.getJsonPreference.mockImplementation((key) => prefs([], [PKG])(key));
+
+    const summary = await pipeline.processBankNotifications();
+
+    expect(summary).toEqual({ created: 0, pending: 1, skipped: 0 });
+    expect(OperationsDB.createOperation).not.toHaveBeenCalled();
+    expect(PendingNotificationsDB.addPendingNotification).toHaveBeenCalledWith(
+      expect.objectContaining({ merchant: 'NAREK MEHRABYAN', accountId: 7, categoryId: 'cat-food' }),
+    );
   });
 
   describe('location capture', () => {
@@ -165,7 +185,7 @@ describe('processBankNotifications', () => {
       OperationLocation.captureLocationIfEnabled.mockResolvedValue({ latitude: '40.1', longitude: '44.2' });
       NotificationAccess.getRecentNotifications.mockResolvedValue([PURCHASE]);
       AccountsDB.getAccountByCardMask.mockResolvedValue({ id: 7, currency: 'AMD' });
-      NotificationRulesDB.getMerchantRule.mockResolvedValue({ categoryId: 'cat-food' });
+      NotificationRulesDB.getMerchantRule.mockResolvedValue({ categoryId: 'cat-food', labelOverride: 'Groceries' });
       PreferencesDB.getJsonPreference.mockImplementation((key) => prefs([], [PKG])(key));
 
       await pipeline.processBankNotifications();
@@ -179,7 +199,7 @@ describe('processBankNotifications', () => {
       OperationLocation.captureLocationIfEnabled.mockResolvedValue(null);
       NotificationAccess.getRecentNotifications.mockResolvedValue([PURCHASE]);
       AccountsDB.getAccountByCardMask.mockResolvedValue({ id: 7, currency: 'AMD' });
-      NotificationRulesDB.getMerchantRule.mockResolvedValue({ categoryId: 'cat-food' });
+      NotificationRulesDB.getMerchantRule.mockResolvedValue({ categoryId: 'cat-food', labelOverride: 'Groceries' });
       PreferencesDB.getJsonPreference.mockImplementation((key) => prefs([], [PKG])(key));
 
       await pipeline.processBankNotifications();
@@ -194,7 +214,7 @@ describe('processBankNotifications', () => {
       const SECOND = { ...PURCHASE, text: PURCHASE.text.replace('NAREK MEHRABYAN', 'SECOND SHOP'), postTime: PURCHASE.postTime + 1000 };
       NotificationAccess.getRecentNotifications.mockResolvedValue([PURCHASE, SECOND]);
       AccountsDB.getAccountByCardMask.mockResolvedValue({ id: 7, currency: 'AMD' });
-      NotificationRulesDB.getMerchantRule.mockResolvedValue({ categoryId: 'cat-food' });
+      NotificationRulesDB.getMerchantRule.mockResolvedValue({ categoryId: 'cat-food', labelOverride: 'Groceries' });
       PreferencesDB.getJsonPreference.mockImplementation((key) => prefs([], [PKG])(key));
 
       const summary = await pipeline.processBankNotifications();
@@ -318,7 +338,7 @@ describe('processBankNotifications', () => {
     };
     NotificationAccess.getRecentNotifications.mockResolvedValue([ROUNDED]);
     AccountsDB.getAccountByCardMask.mockResolvedValue({ id: 7, currency: 'AMD', autoTxnRounding: 100 });
-    NotificationRulesDB.getMerchantRule.mockResolvedValue({ categoryId: 'cat-food' });
+    NotificationRulesDB.getMerchantRule.mockResolvedValue({ categoryId: 'cat-food', labelOverride: 'Groceries' });
     PreferencesDB.getJsonPreference.mockImplementation((key) => prefs([], [PKG])(key));
 
     const summary = await pipeline.processBankNotifications();
@@ -337,7 +357,7 @@ describe('processBankNotifications', () => {
     };
     NotificationAccess.getRecentNotifications.mockResolvedValue([ROUNDED]);
     AccountsDB.getAccountByCardMask.mockResolvedValue({ id: 7, currency: 'AMD', autoTxnRounding: 100, autoTxnRoundingMode: 'up' });
-    NotificationRulesDB.getMerchantRule.mockResolvedValue({ categoryId: 'cat-food' });
+    NotificationRulesDB.getMerchantRule.mockResolvedValue({ categoryId: 'cat-food', labelOverride: 'Groceries' });
     PreferencesDB.getJsonPreference.mockImplementation((key) => prefs([], [PKG])(key));
 
     await pipeline.processBankNotifications();
@@ -357,7 +377,7 @@ describe('processBankNotifications', () => {
     };
     NotificationAccess.getRecentNotifications.mockResolvedValue([ROUNDED]);
     AccountsDB.getAccountByCardMask.mockResolvedValue({ id: 7, currency: 'AMD', autoTxnRounding: 100, autoTxnRoundingMode: 'down' });
-    NotificationRulesDB.getMerchantRule.mockResolvedValue({ categoryId: 'cat-food' });
+    NotificationRulesDB.getMerchantRule.mockResolvedValue({ categoryId: 'cat-food', labelOverride: 'Groceries' });
     PreferencesDB.getJsonPreference.mockImplementation((key) => prefs([], [PKG])(key));
 
     await pipeline.processBankNotifications();
@@ -371,7 +391,7 @@ describe('processBankNotifications', () => {
   it('rounds the converted amount on a currency mismatch, leaving the foreign value intact', async () => {
     NotificationAccess.getRecentNotifications.mockResolvedValue([PURCHASE]); // 3,900 AMD
     AccountsDB.getAccountByCardMask.mockResolvedValue({ id: 7, currency: 'USD', autoTxnRounding: 10 });
-    NotificationRulesDB.getMerchantRule.mockResolvedValue({ categoryId: 'cat-food' });
+    NotificationRulesDB.getMerchantRule.mockResolvedValue({ categoryId: 'cat-food', labelOverride: 'Groceries' });
     PreferencesDB.getJsonPreference.mockImplementation((key) => prefs([], [PKG])(key));
     Currency.fetchLiveExchangeRate.mockResolvedValue({ rate: '0.0026', source: 'offline' });
 
@@ -390,7 +410,7 @@ describe('processBankNotifications', () => {
   it('does not round the auto-created amount when no rounding is set', async () => {
     NotificationAccess.getRecentNotifications.mockResolvedValue([PURCHASE]); // 3,900.00 AMD
     AccountsDB.getAccountByCardMask.mockResolvedValue({ id: 7, currency: 'AMD' }); // no autoTxnRounding
-    NotificationRulesDB.getMerchantRule.mockResolvedValue({ categoryId: 'cat-food' });
+    NotificationRulesDB.getMerchantRule.mockResolvedValue({ categoryId: 'cat-food', labelOverride: 'Groceries' });
     PreferencesDB.getJsonPreference.mockImplementation((key) => prefs([], [PKG])(key));
 
     await pipeline.processBankNotifications();
@@ -414,7 +434,7 @@ describe('processBankNotifications', () => {
   it('auto-creates with a converted amount on a currency mismatch (trusted, fully matched)', async () => {
     NotificationAccess.getRecentNotifications.mockResolvedValue([PURCHASE]); // 3,900 AMD
     AccountsDB.getAccountByCardMask.mockResolvedValue({ id: 7, currency: 'USD' });
-    NotificationRulesDB.getMerchantRule.mockResolvedValue({ categoryId: 'cat-food' });
+    NotificationRulesDB.getMerchantRule.mockResolvedValue({ categoryId: 'cat-food', labelOverride: 'Groceries' });
     PreferencesDB.getJsonPreference.mockImplementation((key) => prefs([], [PKG])(key));
     Currency.fetchLiveExchangeRate.mockResolvedValue({ rate: '0.0026', source: 'offline' });
 
@@ -438,7 +458,7 @@ describe('processBankNotifications', () => {
   it('queues a foreign-currency purchase when no exchange rate is available', async () => {
     NotificationAccess.getRecentNotifications.mockResolvedValue([PURCHASE]); // AMD
     AccountsDB.getAccountByCardMask.mockResolvedValue({ id: 7, currency: 'USD' });
-    NotificationRulesDB.getMerchantRule.mockResolvedValue({ categoryId: 'cat-food' });
+    NotificationRulesDB.getMerchantRule.mockResolvedValue({ categoryId: 'cat-food', labelOverride: 'Groceries' });
     PreferencesDB.getJsonPreference.mockImplementation((key) => prefs([], [PKG])(key));
     Currency.fetchLiveExchangeRate.mockResolvedValue({ rate: null, source: 'none' });
 
@@ -483,7 +503,7 @@ describe('processBankNotifications', () => {
   it('auto-creates an E-POS PURCHASE, converting the foreign amount to the account currency', async () => {
     NotificationAccess.getRecentNotifications.mockResolvedValue([EPOS_EUR]); // 129.99 EUR
     AccountsDB.getAccountByCardMask.mockResolvedValue({ id: 7, currency: 'AMD' });
-    NotificationRulesDB.getMerchantRule.mockResolvedValue({ categoryId: 'cat-shopping' });
+    NotificationRulesDB.getMerchantRule.mockResolvedValue({ categoryId: 'cat-shopping', labelOverride: 'Nike' });
     PreferencesDB.getJsonPreference.mockImplementation((key) => prefs([], [PKG])(key));
     Currency.fetchLiveExchangeRate.mockResolvedValue({ rate: '418.5', source: 'offline' });
 
@@ -500,7 +520,7 @@ describe('processBankNotifications', () => {
         destinationAmount: '129.99',
         sourceCurrency: 'EUR',
         destinationCurrency: 'AMD',
-        description: 'Nike ES',
+        description: 'Nike',
       }),
     );
   });
@@ -664,7 +684,7 @@ describe('processBankNotifications', () => {
   it('falls back to a valid date when the notification has none', async () => {
     NotificationAccess.getRecentNotifications.mockResolvedValue([PURCHASE_NO_DATE]);
     AccountsDB.getAccountByCardMask.mockResolvedValue({ id: 7, currency: 'AMD' });
-    NotificationRulesDB.getMerchantRule.mockResolvedValue({ categoryId: 'cat-food' });
+    NotificationRulesDB.getMerchantRule.mockResolvedValue({ categoryId: 'cat-food', labelOverride: 'Groceries' });
     PreferencesDB.getJsonPreference.mockImplementation((key) => prefs([], [PKG])(key));
 
     await pipeline.processBankNotifications();
@@ -696,7 +716,7 @@ describe('processBankNotifications', () => {
   it('retries (does not record signature) when processing throws', async () => {
     NotificationAccess.getRecentNotifications.mockResolvedValue([PURCHASE]);
     AccountsDB.getAccountByCardMask.mockResolvedValue({ id: 7, currency: 'AMD' });
-    NotificationRulesDB.getMerchantRule.mockResolvedValue({ categoryId: 'cat-food' });
+    NotificationRulesDB.getMerchantRule.mockResolvedValue({ categoryId: 'cat-food', labelOverride: 'Groceries' });
     PreferencesDB.getJsonPreference.mockImplementation((key) => prefs([], [PKG])(key));
     OperationsDB.createOperation.mockRejectedValue(new Error('db down'));
 
@@ -1129,7 +1149,7 @@ describe('processBankNotifications', () => {
   describe('reAddNotification', () => {
     it('re-creates the operation for a fully-resolved notification, bypassing the trust gate', async () => {
       AccountsDB.getAccountByCardMask.mockResolvedValue({ id: 7, currency: 'AMD' });
-      NotificationRulesDB.getMerchantRule.mockResolvedValue({ categoryId: 'cat-food' });
+      NotificationRulesDB.getMerchantRule.mockResolvedValue({ categoryId: 'cat-food', labelOverride: 'Groceries' });
       // allowlist empty -> normally not trusted, but re-add is user-initiated.
       PreferencesDB.getJsonPreference.mockImplementation((key) => prefs([], [])(key));
 
@@ -1153,7 +1173,7 @@ describe('processBankNotifications', () => {
 
     it('re-creates even when a matching operation already exists (explicit re-add)', async () => {
       AccountsDB.getAccountByCardMask.mockResolvedValue({ id: 7, currency: 'AMD' });
-      NotificationRulesDB.getMerchantRule.mockResolvedValue({ categoryId: 'cat-food' });
+      NotificationRulesDB.getMerchantRule.mockResolvedValue({ categoryId: 'cat-food', labelOverride: 'Groceries' });
       // A matching operation is already recorded — the duplicate check would skip
       // this during normal ingestion, but a user-initiated re-add must bypass it.
       OperationsDB.getOperationsByAccountTypeAndDate.mockImplementation(async (accountId, type, date) => [
@@ -1241,7 +1261,7 @@ describe('processBankNotifications', () => {
       const B = { ...PURCHASE, postTime: PURCHASE.postTime + 2000 };
       NotificationAccess.getRecentNotifications.mockResolvedValue([A, B]);
       AccountsDB.getAccountByCardMask.mockResolvedValue({ id: 7, currency: 'AMD' });
-      NotificationRulesDB.getMerchantRule.mockResolvedValue({ categoryId: 'cat-food' });
+      NotificationRulesDB.getMerchantRule.mockResolvedValue({ categoryId: 'cat-food', labelOverride: 'Groceries' });
       PreferencesDB.getJsonPreference.mockImplementation((key) => prefs([], [PKG])(key));
       OperationsDB.createOperation.mockResolvedValue({ id: 1 });
       OperationsDB.getOperationsByAccountTypeAndDate.mockImplementation(async (accountId, type, date) => [
