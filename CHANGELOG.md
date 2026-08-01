@@ -1,5 +1,12 @@
 # Changelog
 
+## [0.250.0](https://github.com/heywood8/money-tracker/compare/penny-v0.249.1...penny-v0.250.0) (2026-08-01)
+
+
+### Features
+
+* **graphs:** let the burndown norm line be toggled off, hidden by default ([#1522](https://github.com/heywood8/money-tracker/issues/1522)) ([7fa3222](https://github.com/heywood8/money-tracker/commit/7fa32225a9aca7c26e06460cae97f5e71b4ff4f4))
+
 ## [0.249.1](https://github.com/heywood8/money-tracker/compare/penny-v0.249.0...penny-v0.249.1) (2026-08-01)
 
 
