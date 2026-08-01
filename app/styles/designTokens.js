@@ -29,12 +29,22 @@ export const SPACING = {
 /**
  * Standardized border radius values
  * Previously had 7 different values (4, 6, 8, 12, 16, 20, 24px)
- * Now consolidated to just 3 for consistency
+ * Now consolidated to a short scale for consistency
  */
 export const BORDER_RADIUS = {
   sm: 4,    // Inputs, small interactive elements, calculator buttons
   md: 8,    // Cards, buttons, most containers
   lg: 12,   // Modals, major containers
+  // Material 3's `corner.extra-large`, the radius the platform gives to a
+  // surface that floats free of everything behind it — a dialog, a bottom
+  // sheet. It is a fourth value in a scale whose whole point was to stop at
+  // three, and it earns the exception by being a spec number rather than
+  // another judgement call: at `lg` a dialog reads as a 2019 AlertDialog no
+  // matter what else is done to it.
+  xl: 28,
+  // Fully-rounded, for pill-shaped action buttons. Not a size — any value past
+  // half the height gets clamped — so it does not compete with the scale above.
+  pill: 999,
 };
 
 // ============ COMPONENT HEIGHTS ============

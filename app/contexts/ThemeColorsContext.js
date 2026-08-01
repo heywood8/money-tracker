@@ -16,6 +16,11 @@ const lightTheme = {
     border: '#e6e6e6',
     card: '#fff',
     modalBackground: 'rgba(0,0,0,0.65)',
+    // Material 3's dialog scrim. Lighter than `modalBackground` on purpose: a
+    // dialog is already sitting on the root blur (App.js), so this only has to
+    // supply the separation the blur does not — and 0.65 on top of a blurred
+    // screen reads as a blackout rather than as a layer.
+    scrim: 'rgba(0,0,0,0.32)',
     inputBackground: '#fff',
     inputBorder: '#cccccc',
     calcButtonBackground: '#ffffff',
@@ -57,6 +62,10 @@ const darkTheme = {
     border: '#3a3a3a',
     card: '#222222',
     modalBackground: 'rgba(0,0,0,0.65)',
+    // See lightTheme note. Same value in both themes — M3 states the scrim as
+    // black at 32% regardless of scheme, and a dark-theme dialog needs the
+    // separation more, not less, since card and background are closer together.
+    scrim: 'rgba(0,0,0,0.32)',
     inputBackground: '#333333',
     inputBorder: '#555555',
     calcButtonBackground: '#1e1e1e',
