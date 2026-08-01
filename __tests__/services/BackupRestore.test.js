@@ -173,8 +173,9 @@ describe('BackupRestore', () => {
       expect(backup.timestamp).toBeDefined();
       // accounts, categories, operations, budgets, app_metadata, balance_history,
       // planned_operations, notification_merchant_rules, budget_plans,
-      // budget_plan_lines, budget_plan_line_categories, budget_plan_line_groups
-      expect(mockDb.queryAll).toHaveBeenCalledTimes(12);
+      // budget_plan_lines, budget_plan_line_categories, budget_plan_line_groups,
+      // budget_plan_line_accounts
+      expect(mockDb.queryAll).toHaveBeenCalledTimes(13);
     });
 
     it('includes empty arrays when tables are empty', async () => {
@@ -562,17 +563,18 @@ describe('BackupRestore', () => {
       expect(deleteCalls[0]).toContain('notification_merchant_rules');
       expect(deleteCalls[1]).toContain('planned_operations');
       expect(deleteCalls[2]).toContain('budgets');
-      // The 0021 junction is cleared before the lines it hangs off.
+      // The 0021 and 0024 junctions are cleared before the lines they hang off.
       expect(deleteCalls[3]).toContain('budget_plan_line_categories');
-      expect(deleteCalls[4]).toContain('budget_plan_lines');
-      expect(deleteCalls[5]).toContain('budget_plans');
+      expect(deleteCalls[4]).toContain('budget_plan_line_accounts');
+      expect(deleteCalls[5]).toContain('budget_plan_lines');
+      expect(deleteCalls[6]).toContain('budget_plans');
       // Groups (migration 0022) are referenced BY lines (ON DELETE SET NULL), so
       // they clear after the lines that point at them.
-      expect(deleteCalls[6]).toContain('budget_plan_line_groups');
-      expect(deleteCalls[7]).toContain('accounts_balance_history');
-      expect(deleteCalls[8]).toContain('operations');
-      expect(deleteCalls[9]).toContain('categories');
-      expect(deleteCalls[10]).toContain('accounts');
+      expect(deleteCalls[7]).toContain('budget_plan_line_groups');
+      expect(deleteCalls[8]).toContain('accounts_balance_history');
+      expect(deleteCalls[9]).toContain('operations');
+      expect(deleteCalls[10]).toContain('categories');
+      expect(deleteCalls[11]).toContain('accounts');
     });
 
     it('preserves db_version metadata', async () => {
@@ -1746,6 +1748,45 @@ op-2,income,20,acc-1,cat-1`;
       const lineInserts = findInsert(dbInstance, 'budget_plan_lines');
       expect(lineInserts[0][1]).toContain(0);
       expect(lineInserts[0][1][13]).toBe(0);
+    });
+
+    // Migration 0024: the source-account filter round-trips through its own
+    // junction, and its account ids go through the same remapping every other
+    // account reference does.
+    it('restores a line\'s source-account filter, remapping the account ids', async () => {
+      const dbInstance = makeDbInstance();
+      mockDb.executeTransaction.mockImplementation(async (cb) => { await cb(dbInstance); });
+
+      const backup = backupWithPlan();
+      backup.data.budget_plan_lines = [categoryLine];
+      backup.data.budget_plan_line_accounts = [
+        { line_id: 'line-cat', account_id: 'acc-uuid' },
+        // An account the backup doesn't contain is dropped rather than failing
+        // the NOT NULL FK and aborting the whole restore.
+        { line_id: 'line-cat', account_id: 'acc-gone' },
+        // Same for a link to a line that was never inserted.
+        { line_id: 'line-gone', account_id: 'acc-uuid' },
+      ];
+
+      await BackupRestore.restoreBackup(backup);
+
+      const accountLinks = dbInstance.runAsync.mock.calls.filter(
+        (c) => typeof c[0] === 'string' && c[0].includes('INTO budget_plan_line_accounts'),
+      );
+      expect(accountLinks.map(c => c[1])).toEqual([['line-cat', REMAPPED_ACCOUNT_ID]]);
+    });
+
+    it('writes no source-account filter for a pre-0024 backup', async () => {
+      const dbInstance = makeDbInstance();
+      mockDb.executeTransaction.mockImplementation(async (cb) => { await cb(dbInstance); });
+
+      // No `budget_plan_line_accounts` section at all — and no fallback should
+      // invent one: such a line counted spending from any account.
+      await BackupRestore.restoreBackup(backupWithPlan());
+
+      expect(dbInstance.runAsync.mock.calls.filter(
+        (c) => typeof c[0] === 'string' && c[0].includes('INTO budget_plan_line_accounts'),
+      )).toHaveLength(0);
     });
 
     it('restores a recurring (global template) line with no plan_id and its own currency', async () => {

@@ -109,6 +109,71 @@ describe('AccountGridSelector', () => {
     });
   });
 
+  // Migration 0024's spending-account filter needs a SET of accounts, so the
+  // grid takes the same `selected…Ids` option CategoryGridSelector has.
+  describe('Multi-select', () => {
+    it('marks every id in the array as checked', async () => {
+      const { getByTestId } = await render(
+        <AccountGridSelector
+          accounts={ACCOUNTS}
+          selectedAccountIds={['a1', 'a3']}
+          onSelect={jest.fn()}
+          colors={colors}
+          t={t}
+        />,
+      );
+      expect(getByTestId('account-grid-a1').props.accessibilityState).toEqual({ checked: true });
+      expect(getByTestId('account-grid-a2').props.accessibilityState).toEqual({ checked: false });
+      expect(getByTestId('account-grid-a3').props.accessibilityState).toEqual({ checked: true });
+    });
+
+    it('reports each tap so the host can toggle', async () => {
+      const onSelect = jest.fn();
+      const { getByTestId } = await render(
+        <AccountGridSelector
+          accounts={ACCOUNTS}
+          selectedAccountIds={['a1']}
+          onSelect={onSelect}
+          colors={colors}
+          t={t}
+        />,
+      );
+      await press(getByTestId('account-grid-a1'));
+      await press(getByTestId('account-grid-a2'));
+      expect(onSelect.mock.calls).toEqual([['a1'], ['a2']]);
+    });
+
+    it('matches an id across the string/number divide', async () => {
+      // Account ids are integers in SQLite but arrive as strings from a CSV or
+      // Sheets round trip; a chip that silently fails to highlight is
+      // indistinguishable from one the user never picked.
+      const numeric = [{ id: 7, name: 'Card', balance: '1', currency: 'USD' }];
+      const { getByTestId } = await render(
+        <AccountGridSelector
+          accounts={numeric}
+          selectedAccountIds={['7']}
+          onSelect={jest.fn()}
+          colors={colors}
+          t={t}
+        />,
+      );
+      expect(getByTestId('account-grid-7').props.accessibilityState).toEqual({ checked: true });
+    });
+
+    it('stays a single-select radio when no array is given', async () => {
+      const { getByTestId } = await render(
+        <AccountGridSelector
+          accounts={ACCOUNTS}
+          selectedAccountId="a1"
+          onSelect={jest.fn()}
+          colors={colors}
+          t={t}
+        />,
+      );
+      expect(getByTestId('account-grid-a1').props.accessibilityState).toEqual({ selected: true });
+    });
+  });
+
   describe('Hidden balances', () => {
     it('honours the app-wide setting instead of spelling the balance out', async () => {
       mockDisplaySettings.hideBalances = true;

@@ -42,6 +42,10 @@ const symbolOf = (code) => (code ? (currencies[code]?.symbol || code) : '');
  * @param {Array}    accounts          Accounts to offer, already filtered by the
  *   host (e.g. the source account removed from a transfer's destination list).
  * @param {string}   [selectedAccountId] Currently chosen account (highlighted).
+ * @param {Array}    [selectedAccountIds] Multi-select: presence switches chips to
+ *   checkboxes that toggle, and the host is expected to keep the array. Takes
+ *   precedence over `selectedAccountId`. Mirrors CategoryGridSelector's option of
+ *   the same shape, so a host that offers both pickers reads the same either way.
  * @param {Function} onSelect          Called with the tapped account id.
  * @param {Object}   colors            Theme colours.
  * @param {Function} t                 Translation function.
@@ -55,6 +59,7 @@ const symbolOf = (code) => (code ? (currencies[code]?.symbol || code) : '');
 export default function AccountGridSelector({
   accounts,
   selectedAccountId = null,
+  selectedAccountIds = null,
   onSelect,
   colors,
   t,
@@ -68,6 +73,16 @@ export default function AccountGridSelector({
   // as a prop so no host can forget it. The `|| {}` is for host tests that render
   // the grid outside the provider — in the app it is always there.
   const { hideBalances } = useDisplaySettings() || {};
+
+  const multiSelect = Array.isArray(selectedAccountIds);
+  // Keyed by String: account ids are integers in the database but reach a host
+  // through JSON, CSV and Sheets round trips as strings just as often, and a
+  // chip that silently fails to highlight is indistinguishable from one the user
+  // never picked.
+  const selectedIds = useMemo(() => new Set(
+    (multiSelect ? selectedAccountIds : (selectedAccountId != null ? [selectedAccountId] : []))
+      .map(id => String(id)),
+  ), [multiSelect, selectedAccountIds, selectedAccountId]);
 
   const searchTerm = String(query || '').trim().toLowerCase();
   const searching = searchTerm.length > 0;
@@ -110,7 +125,7 @@ export default function AccountGridSelector({
       return <View key={key} style={[styles.chip, styles.invisible]} />;
     }
 
-    const isSelected = selectedAccountId === account.id;
+    const isSelected = selectedIds.has(String(account.id));
     const tone = isSelected ? colors.primary : colors.text;
 
     return (
@@ -118,8 +133,8 @@ export default function AccountGridSelector({
         key={key}
         testID={`${testIDPrefix}-${account.id}`}
         onPress={() => onSelect(account.id)}
-        accessibilityRole="button"
-        accessibilityState={{ selected: isSelected }}
+        accessibilityRole={multiSelect ? 'checkbox' : 'button'}
+        accessibilityState={multiSelect ? { checked: isSelected } : { selected: isSelected }}
         accessibilityLabel={account.name}
         style={({ pressed }) => [
           styles.chip,
@@ -191,6 +206,7 @@ AccountGridSelector.propTypes = {
     currency: PropTypes.string,
   })).isRequired,
   selectedAccountId: PropTypes.oneOfType([PropTypes.string, PropTypes.number]),
+  selectedAccountIds: PropTypes.arrayOf(PropTypes.oneOfType([PropTypes.string, PropTypes.number])),
   onSelect: PropTypes.func.isRequired,
   colors: PropTypes.object.isRequired,
   t: PropTypes.func.isRequired,

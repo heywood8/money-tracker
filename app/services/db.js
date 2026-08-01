@@ -171,7 +171,7 @@ const isSchemaComplete = async (rawDb) => {
       'app_metadata', 'accounts_balance_history', 'planned_operations',
       'notification_merchant_rules', 'pending_notifications',
       'budget_plans', 'budget_plan_lines', 'budget_plan_line_categories',
-      'budget_plan_line_groups',
+      'budget_plan_line_groups', 'budget_plan_line_accounts',
     ];
     const existingTables = await rawDb.getAllAsync(
       "SELECT name FROM sqlite_master WHERE type='table'",
@@ -310,6 +310,11 @@ const isSchemaComplete = async (rawDb) => {
     // added and every chart query (which filters on it) would throw
     // `no such column: exclude_from_charts`.
     if (!opsCols.some(c => c.name === 'exclude_from_charts')) return false;
+
+    // Migration 0024: creates budget_plan_line_accounts (the per-line source
+    // account filter). Covered by the expectedTables check above — it is a
+    // CREATE TABLE with no accompanying ALTER, so there is no half-applied state
+    // a column check would have to catch.
 
     return true;
   } catch (error) {
@@ -651,6 +656,13 @@ const detectAppliedMigrations = async (rawDb) => {
     if ((await tableExists('budget_plan_line_groups'))
       && planLineCols.some(c => c.name === 'group_id')) {
       applied.push(22);
+    }
+
+    // Migration 0024: creates budget_plan_line_accounts (the per-line source
+    // account filter). One CREATE TABLE plus an IF NOT EXISTS index, so the
+    // table's presence is the whole marker and re-running is harmless.
+    if (await tableExists('budget_plan_line_accounts')) {
+      applied.push(24);
     }
   }
 

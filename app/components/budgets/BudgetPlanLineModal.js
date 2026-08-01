@@ -246,15 +246,24 @@ PanelHeader.propTypes = {
  * of rows, and finally the free-text label and comment.
  *
  * `kind` decides what the line means and what an execution would create:
- *   - expense  → tracks spending across ONE OR MORE expense categories (at least
- *     one required); the picker toggles them, and spending in their descendants
- *     always rolls up (a parent category IS its subtree — nothing to configure),
+ *   - expense  → tracks spending across ONE OR MORE expense categories and/or
+ *     ONE OR MORE source accounts (at least one of the two required); the pickers
+ *     toggle them, and spending in a category's descendants always rolls up (a
+ *     parent category IS its subtree — nothing to configure),
  *   - transfer → tracks incoming transfers into ONE destination account (required),
  *   - income   → declares part of the month's expected income; categories are
  *     optional context (income is compared against the month's real income as a
  *     whole, see BudgetPlansDB.calculateLineActual).
- * A line links to categories OR an account, never both — enforced here and again
- * in BudgetPlansDB.
+ * A line links to categories OR a transfer target, never both — enforced here and
+ * again in BudgetPlansDB.
+ *
+ * The SOURCE-ACCOUNT filter (migration 0024) is a SECOND, INDEPENDENT dimension,
+ * not a third kind of target: it says which accounts an expense must have been
+ * paid from, and combines with the categories by AND. Categories only → those
+ * categories from any account (every pre-0024 line); accounts only → everything
+ * spent on those accounts; both → the intersection. It is offered for expense
+ * lines only — a transfer line tracks incoming transfers and an income line has
+ * no per-line spending, so neither has expenses for it to narrow.
  *
  * Picking an EXECUTION ACCOUNT turns the line into a one-tap payable (the former
  * planned operation): the account is what the created operation touches, so the
@@ -298,6 +307,9 @@ export default function BudgetPlanLineModal({
   // kind of target" invariant); an income line may have neither. Since migration
   // 0021 the category side is a SET — several categories can share one budget.
   const [categoryIds, setCategoryIds] = useState([]);
+  // The source accounts whose expenses count (migration 0024). Empty = any
+  // account, which is what every line was before this existed.
+  const [sourceAccountIds, setSourceAccountIds] = useState([]);
   const [toAccountId, setToAccountId] = useState(null);
   // Execution account — set means "this line is executable".
   const [accountId, setAccountId] = useState(null);
@@ -351,7 +363,7 @@ export default function BudgetPlanLineModal({
   const showCurrencyChips = executionCurrency == null && currencyOptions.length > 1;
 
   // Subpanel navigation for the pickers.
-  const [activeSubPanel, setActiveSubPanel] = useState(null); // null | 'target' | 'account' | 'group'
+  const [activeSubPanel, setActiveSubPanel] = useState(null); // null | 'target' | 'sources' | 'account' | 'group'
   // Which kind of target the target picker is currently showing.
   const [pickerKind, setPickerKind] = useState('category'); // 'category' | 'account'
   // Filter for the open picker's list. Scoped to the panel, so it resets on open.
@@ -370,6 +382,7 @@ export default function BudgetPlanLineModal({
       setComment(line.comment || '');
       // Older callers (and stored lines read before 0021) only carry categoryId.
       setCategoryIds(line.categoryIds ?? (line.categoryId != null ? [line.categoryId] : []));
+      setSourceAccountIds(line.sourceAccountIds ?? []);
       setToAccountId(line.toAccountId ?? null);
       setAccountId(line.accountId ?? null);
       setIsRecurring(!!line.isRecurring);
@@ -381,6 +394,7 @@ export default function BudgetPlanLineModal({
       setLabel('');
       setComment('');
       setCategoryIds([]);
+      setSourceAccountIds([]);
       setToAccountId(null);
       setAccountId(null);
       setIsRecurring(false);
@@ -454,6 +468,7 @@ export default function BudgetPlanLineModal({
     openSubPanel('target');
   }, [kind, toAccountId, openSubPanel]);
 
+  const openSourcesPanel = useCallback(() => openSubPanel('sources'), [openSubPanel]);
   const openAccountPanel = useCallback(() => openSubPanel('account'), [openSubPanel]);
   const openGroupPanel = useCallback(() => openSubPanel('group'), [openSubPanel]);
 
@@ -495,6 +510,12 @@ export default function BudgetPlanLineModal({
   const handleSelectKind = useCallback((next) => {
     setKind(next);
     setError(null);
+    // Only an expense line has expenses of its own for the source filter to
+    // narrow; carrying it over would leave a setting on the sheet that changes
+    // nothing, and BudgetPlansDB rejects it outright.
+    if (next !== 'expense') {
+      setSourceAccountIds([]);
+    }
     if (next === 'transfer') {
       setCategoryIds([]);
     } else {
@@ -528,10 +549,32 @@ export default function BudgetPlanLineModal({
   const handleSelectTransferTargetId = useCallback((id) => {
     setToAccountId(id);
     setCategoryIds([]);
+    // A transfer line tracks incoming transfers, not expenses — same reason
+    // handleSelectKind clears it.
+    setSourceAccountIds([]);
     setKind('transfer');
     setError(null);
     closeSubPanel();
   }, [closeSubPanel]);
+
+  // Source accounts toggle and the panel stays open, exactly like the category
+  // side: picking a SET is the point, and one tap per round trip would make a
+  // two-card filter a four-tap affair.
+  const handleToggleSourceAccount = useCallback((accountId) => {
+    setError(null);
+    setSourceAccountIds(prev => (
+      prev.some(id => String(id) === String(accountId))
+        ? prev.filter(id => String(id) !== String(accountId))
+        : [...prev, accountId]
+    ));
+  }, []);
+
+  // "Any account" — the default state, and the way back out of a filter without
+  // hunting down each selected chip.
+  const handleClearSourceAccounts = useCallback(() => {
+    setSourceAccountIds([]);
+    setError(null);
+  }, []);
 
   // null clears the template account, turning the line back into a pure target.
   const handleSelectExecutionAccountId = useCallback((id) => {
@@ -564,7 +607,9 @@ export default function BudgetPlanLineModal({
     // line of defense against a tap that lands before the disabled style commits.
     if (saving) return;
     Keyboard.dismiss();
-    if (kind === 'expense' && categoryIds.length === 0) {
+    // Either filter alone is a complete expense budget ("everything on this
+    // card" needs no category), so the line only needs one of the two.
+    if (kind === 'expense' && categoryIds.length === 0 && sourceAccountIds.length === 0) {
       setError(t('allocation_needs_target'));
       return;
     }
@@ -590,6 +635,10 @@ export default function BudgetPlanLineModal({
       label: label.trim() || null,
       comment: comment.trim() || null,
       categoryIds: kind === 'transfer' ? [] : categoryIds,
+      // Expense lines only — see the component doc comment. Always sent (never
+      // omitted) so clearing the filter on an existing line actually clears it:
+      // an absent `sourceAccountIds` means "leave it alone" to BudgetPlansDB.
+      sourceAccountIds: kind === 'expense' ? sourceAccountIds : [],
       toAccountId: kind === 'transfer' ? (toAccountId ?? null) : null,
       accountId: accountId ?? null,
       isRecurring,
@@ -600,7 +649,8 @@ export default function BudgetPlanLineModal({
       // group row is not offered for one (see the picker below).
       groupId: kind === 'income' ? null : groupId,
     });
-  }, [saving, kind, amount, amountIsParseable, amountIsPositive, label, comment, categoryIds, toAccountId, accountId,
+  }, [saving, kind, amount, amountIsParseable, amountIsPositive, label, comment, categoryIds,
+    sourceAccountIds, toAccountId, accountId,
     isRecurring, effectiveCurrency, groupId, onSaveLine, t]);
 
   const handleDelete = useCallback(() => {
@@ -645,6 +695,16 @@ export default function BudgetPlanLineModal({
     }
     return null;
   }, [kind, categoryIds, toAccountId, categoriesById, accountsById, t]);
+
+  // Same "first name, count the rest" shorthand the target row uses, for the
+  // same reason: three account names do not fit on one row at any font size.
+  const sourceAccountsSummary = useMemo(() => {
+    if (sourceAccountIds.length === 0) return null;
+    const names = sourceAccountIds.map(
+      id => accountsById.get(id)?.name || t('allocation_unlinked'),
+    );
+    return names.length > 1 ? `${names[0]} +${names.length - 1}` : names[0];
+  }, [sourceAccountIds, accountsById, t]);
 
   const executionAccount = accountId != null ? accountsById.get(accountId) : null;
   const selectedGroup = groupId != null ? groups.find(g => g.id === groupId) : null;
@@ -764,6 +824,72 @@ export default function BudgetPlanLineModal({
               />
             </ScrollView>
           )}
+        </>
+      )}
+
+      {/* Which accounts the spending has to come from (migration 0024). A
+          multi-select grid, not a single pick: "the two cards I actually pay
+          with" is the common shape of this filter. */}
+      {activeSubPanel === 'sources' && (
+        <>
+          <PanelHeader
+            colors={colors}
+            title={t('spending_accounts')}
+            onBack={closeSubPanel}
+            backLabel={t('back')}
+            backTestID="plan-sources-back"
+          >
+            {/* Chips toggle in place rather than closing the panel, so — as on
+                the category tab — something has to say "I'm finished picking". */}
+            <Pressable
+              onPress={closeSubPanel}
+              style={styles.panelDone}
+              hitSlop={8}
+              accessibilityRole="button"
+              accessibilityLabel={t('done')}
+              testID="plan-sources-done"
+            >
+              <Text style={[styles.panelDoneText, { color: colors.primary }]}>{t('done')}</Text>
+            </Pressable>
+          </PanelHeader>
+
+          {accounts.length >= SEARCH_THRESHOLD && (
+            <FormInput
+              value={query}
+              onChangeText={setQuery}
+              placeholder={t('search')}
+              leftIcon="magnify"
+              testID="plan-sources-search"
+            />
+          )}
+
+          {/* The no-filter state, spelled out rather than implied by "nothing is
+              selected" — and the one tap back to it from a filter of five. */}
+          <OptionRow
+            colors={colors}
+            icon="check-all"
+            label={t('all_accounts')}
+            selected={sourceAccountIds.length === 0}
+            onPress={handleClearSourceAccounts}
+            testID="plan-sources-option-all"
+          />
+
+          <ScrollView
+            style={styles.panelListBody}
+            contentContainerStyle={styles.panelList}
+            keyboardShouldPersistTaps="handled"
+          >
+            <AccountGridSelector
+              accounts={accounts}
+              selectedAccountIds={sourceAccountIds}
+              onSelect={handleToggleSourceAccount}
+              colors={colors}
+              t={t}
+              icon="credit-card-outline"
+              query={query}
+              testIDPrefix="plan-sources-option"
+            />
+          </ScrollView>
         </>
       )}
 
@@ -992,6 +1118,29 @@ export default function BudgetPlanLineModal({
             testID="plan-target-picker"
           />
 
+          {/* Which accounts the spending must come from (migration 0024).
+              Expense lines only: a transfer line tracks incoming transfers and
+              an income line has no per-line spending, so there is nothing for
+              this to narrow on either. Sits directly under the target row —
+              the two together are the one sentence "what counts toward this
+              budget", and reading them apart is what makes an AND filter
+              confusing. */}
+          {kind === 'expense' && (
+            <>
+              <View style={[styles.divider, { backgroundColor: colors.border }]} />
+              <SheetRow
+                colors={colors}
+                icon="credit-card-outline"
+                title={`${t('spending_accounts')} · ${t('optional')}`}
+                value={sourceAccountsSummary || t('all_accounts')}
+                muted={!sourceAccountsSummary}
+                onPress={openSourcesPanel}
+                accessibilityLabel={t('spending_accounts')}
+                testID="plan-sources-picker"
+              />
+            </>
+          )}
+
           <View style={[styles.divider, { backgroundColor: colors.border }]} />
 
           {/* Execution account — set one and the line becomes a one-tap payable
@@ -1058,6 +1207,15 @@ export default function BudgetPlanLineModal({
           />
         </View>
 
+        {/* The one thing the rows above cannot say on their own: that the two
+            filters INTERSECT. Shown only once a filter is actually set — before
+            that there is no ambiguity to resolve. */}
+        {sourceAccountsSummary && (
+          <Text style={[styles.groupHint, { color: colors.mutedText }]} testID="plan-sources-hint">
+            {categoryIds.length > 0 ? t('spending_accounts_hint_with_categories') : t('spending_accounts_hint')}
+          </Text>
+        )}
+
         {/* Only while it is still an offer — once an account is set, the row
             above it says so and the hint is spent screen. */}
         {!executionAccount && (
@@ -1110,6 +1268,7 @@ BudgetPlanLineModal.propTypes = {
     comment: PropTypes.string,
     categoryId: PropTypes.string,
     categoryIds: PropTypes.arrayOf(PropTypes.string),
+    sourceAccountIds: PropTypes.arrayOf(PropTypes.oneOfType([PropTypes.string, PropTypes.number])),
     toAccountId: PropTypes.oneOfType([PropTypes.string, PropTypes.number]),
     accountId: PropTypes.oneOfType([PropTypes.string, PropTypes.number]),
     kind: PropTypes.oneOf(KINDS),

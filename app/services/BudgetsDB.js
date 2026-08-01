@@ -600,49 +600,96 @@ export const expandCategoryIds = async (categoryIds, includeChildren) => {
 };
 
 /**
- * Calculate spending across a SET of categories in a date range. The
- * multi-category form of {@link calculateSpendingForBudget} (migration 0021),
- * used by plan lines that track several categories at once.
- * @param {Array<string>} categoryIds - Category IDs to sum over
- * @param {string} currency - Currency code
- * @param {string} startDate - Period start (YYYY-MM-DD)
- * @param {string} endDate - Period end (YYYY-MM-DD)
- * @param {boolean} includeChildren - Include descendant category spending (default: true)
- * @param {boolean} convertAll - When true, spending from accounts in ANY
+ * De-duplicated list of set account IDs, order preserved. Mirrors the category
+ * side's cleanup in {@link expandCategoryIds} — accounts have no hierarchy to
+ * expand, so de-duplication is all there is to do.
+ * @param {Array<string|number>} accountIds
+ * @returns {Array<string|number>}
+ */
+const normalizeAccountIds = (accountIds) => {
+  const seen = new Set();
+  const out = [];
+  for (const id of accountIds || []) {
+    if (id === null || id === undefined || id === '') continue;
+    const key = String(id);
+    if (seen.has(key)) continue;
+    seen.add(key);
+    out.push(id);
+  }
+  return out;
+};
+
+/**
+ * Calculate expense spending matching a set of filters in a date range. The
+ * general form behind {@link calculateSpendingForCategories}, used by plan lines
+ * that narrow spending by the SOURCE ACCOUNT the money left as well as by
+ * category (migration 0024).
+ *
+ * The two filters are INDEPENDENT and combined with logical AND:
+ *   - categories only → those categories, from any account (the pre-0024 form),
+ *   - accounts only   → any expense paid from those accounts,
+ *   - both            → the intersection,
+ *   - neither         → '0'. A filterless sum would be "every expense you have
+ *     ever made", which is never what a caller with an empty filter set means —
+ *     it means the line tracks nothing (its targets were deleted).
+ *
+ * @param {Object} filters
+ * @param {Array<string>} [filters.categoryIds] - Category IDs to sum over
+ * @param {Array<string|number>} [filters.accountIds] - Source accounts to count from
+ * @param {string} filters.currency - Currency code
+ * @param {string} filters.startDate - Period start (YYYY-MM-DD)
+ * @param {string} filters.endDate - Period end (YYYY-MM-DD)
+ * @param {boolean} [filters.includeChildren=true] - Include descendant category spending
+ * @param {boolean} [filters.convertAll=false] - When true, spending from accounts in ANY
  *   currency counts toward the budget, converted into the budget's currency at
  *   the current rate (offline table first, live fallback) — the same
  *   conversion path Graphs uses, so the two surfaces agree. Currencies with no
  *   available rate are dropped from the sum, mirroring mergeConvertedByCategory.
  * @returns {Promise<string>} Total spending amount (decimal string)
  */
-export const calculateSpendingForCategories = async (
-  categoryIds,
+export const calculateSpendingForFilters = async ({
+  categoryIds = [],
+  accountIds = [],
   currency,
   startDate,
   endDate,
   includeChildren = true,
   convertAll = false,
-) => {
+}) => {
   try {
     const expandedIds = await expandCategoryIds(categoryIds, includeChildren);
+    const filterAccountIds = normalizeAccountIds(accountIds);
 
-    // No categories tracked (a line whose every category was deleted) — there is
-    // nothing to sum, and an empty IN () is a SQL syntax error.
-    if (expandedIds.length === 0) return '0';
+    // Nothing to filter on: a line whose every category AND account was deleted.
+    // Summing without a filter would report the user's entire spend as this one
+    // line's actual, so the empty set means zero, not everything.
+    if (expandedIds.length === 0 && filterAccountIds.length === 0) return '0';
 
-    const placeholders = expandedIds.map(() => '?').join(',');
+    // Each clause is added only when its set is non-empty — an empty `IN ()` is a
+    // SQL syntax error, and an absent clause is exactly the "any" semantics.
+    const conditions = [];
+    const filterParams = [];
+    if (expandedIds.length > 0) {
+      conditions.push(`o.category_id IN (${expandedIds.map(() => '?').join(',')})`);
+      filterParams.push(...expandedIds);
+    }
+    if (filterAccountIds.length > 0) {
+      conditions.push(`o.account_id IN (${filterAccountIds.map(() => '?').join(',')})`);
+      filterParams.push(...filterAccountIds);
+    }
+    const filterClause = conditions.join(' AND ');
 
     if (convertAll) {
       const rows = await queryAll(
         `SELECT a.currency as currency, SUM(CAST(o.amount AS REAL)) as total
          FROM operations o
          JOIN accounts a ON o.account_id = a.id
-         WHERE o.category_id IN (${placeholders})
+         WHERE ${filterClause}
            AND o.type = 'expense'
            AND o.date >= ?
            AND o.date <= ?
          GROUP BY a.currency`,
-        [...expandedIds, startDate, endDate],
+        [...filterParams, startDate, endDate],
       );
 
       const rowList = rows || [];
@@ -656,19 +703,19 @@ export const calculateSpendingForCategories = async (
       return total;
     }
 
-    // Query operations in date range for these categories and currency
+    // Query operations in date range for these filters and currency
     const query = `
       SELECT SUM(CAST(o.amount AS REAL)) as total
       FROM operations o
       JOIN accounts a ON o.account_id = a.id
-      WHERE o.category_id IN (${placeholders})
+      WHERE ${filterClause}
         AND o.type = 'expense'
         AND a.currency = ?
         AND o.date >= ?
         AND o.date <= ?
     `;
 
-    const params = [...expandedIds, currency, startDate, endDate];
+    const params = [...filterParams, currency, startDate, endDate];
     const result = await queryFirst(query, params);
 
     return result && result.total != null ? String(result.total) : '0';
@@ -677,6 +724,36 @@ export const calculateSpendingForCategories = async (
     throw error;
   }
 };
+
+/**
+ * Calculate spending across a SET of categories in a date range. The
+ * multi-category form of {@link calculateSpendingForBudget} (migration 0021),
+ * used by plan lines that track several categories at once. Delegates to
+ * {@link calculateSpendingForFilters} with no account filter, i.e. "these
+ * categories, from any account".
+ * @param {Array<string>} categoryIds - Category IDs to sum over
+ * @param {string} currency - Currency code
+ * @param {string} startDate - Period start (YYYY-MM-DD)
+ * @param {string} endDate - Period end (YYYY-MM-DD)
+ * @param {boolean} includeChildren - Include descendant category spending (default: true)
+ * @param {boolean} convertAll - See {@link calculateSpendingForFilters}
+ * @returns {Promise<string>} Total spending amount (decimal string)
+ */
+export const calculateSpendingForCategories = async (
+  categoryIds,
+  currency,
+  startDate,
+  endDate,
+  includeChildren = true,
+  convertAll = false,
+) => calculateSpendingForFilters({
+  categoryIds,
+  currency,
+  startDate,
+  endDate,
+  includeChildren,
+  convertAll,
+});
 
 /**
  * Calculate spending for a single category in a date range — the single-category

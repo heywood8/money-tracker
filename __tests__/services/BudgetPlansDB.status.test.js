@@ -9,7 +9,7 @@
 
 import * as BudgetPlansDB from '../../app/services/BudgetPlansDB';
 import * as CategoriesDB from '../../app/services/CategoriesDB';
-import { calculateSpendingForCategories } from '../../app/services/BudgetsDB';
+import { calculateSpendingForFilters } from '../../app/services/BudgetsDB';
 import { queryAll, queryFirst } from '../../app/services/db';
 import {
   fetchRatesToTarget,
@@ -24,7 +24,7 @@ jest.mock('../../app/services/CategoriesDB');
 // spending engine — its own behavior is covered by BudgetsDB.convertAll.test.js.
 jest.mock('../../app/services/BudgetsDB', () => ({
   ...jest.requireActual('../../app/services/BudgetsDB'),
-  calculateSpendingForCategories: jest.fn(),
+  calculateSpendingForFilters: jest.fn(),
 }));
 jest.mock('../../app/services/OperationsDB', () => ({
   fetchRatesToTarget: jest.fn(),
@@ -73,7 +73,7 @@ describe('BudgetPlansDB plan-vs-actual', () => {
     queryAll.mockResolvedValue([]);
     queryFirst.mockResolvedValue(null);
     CategoriesDB.getAllDescendants.mockResolvedValue([]);
-    calculateSpendingForCategories.mockResolvedValue('0');
+    calculateSpendingForFilters.mockResolvedValue('0');
     getTransferTotals.mockResolvedValue({ incoming: '0', outgoing: '0' });
     getUnconvertibleCurrencies.mockResolvedValue([]);
     stubRates({});
@@ -104,36 +104,54 @@ describe('BudgetPlansDB plan-vs-actual', () => {
 
   describe('calculateLineActual — category lines', () => {
     it('delegates to the shared spending engine including descendants', async () => {
-      calculateSpendingForCategories.mockResolvedValue('123.45');
+      calculateSpendingForFilters.mockResolvedValue('123.45');
 
       const result = await BudgetPlansDB.calculateLineActual(categoryLine(), '2026-07', 'USD', true);
 
       expect(result).toEqual({ broken: false, actual: '123.45' });
-      expect(calculateSpendingForCategories).toHaveBeenCalledWith(
-        ['cat1'], 'USD', '2026-07-01', '2026-07-31', true, true,
-      );
+      expect(calculateSpendingForFilters).toHaveBeenCalledWith({
+        categoryIds: ['cat1'],
+        accountIds: [],
+        currency: 'USD',
+        startDate: '2026-07-01',
+        endDate: '2026-07-31',
+        includeChildren: true,
+        convertAll: true,
+      });
     });
 
     it('passes convertAll=false through so only plan-currency operations count', async () => {
       await BudgetPlansDB.calculateLineActual(categoryLine(), '2026-07', 'USD', false);
 
-      expect(calculateSpendingForCategories).toHaveBeenCalledWith(
-        ['cat1'], 'USD', '2026-07-01', '2026-07-31', true, false,
-      );
+      expect(calculateSpendingForFilters).toHaveBeenCalledWith({
+        categoryIds: ['cat1'],
+        accountIds: [],
+        currency: 'USD',
+        startDate: '2026-07-01',
+        endDate: '2026-07-31',
+        includeChildren: true,
+        convertAll: false,
+      });
     });
 
     // Migration 0021.
     it('sums every category a multi-category line tracks', async () => {
-      calculateSpendingForCategories.mockResolvedValue('700');
+      calculateSpendingForFilters.mockResolvedValue('700');
 
       const result = await BudgetPlansDB.calculateLineActual(
         categoryLine({ categoryId: 'cat1', categoryIds: ['cat1', 'cat2'] }), '2026-07', 'USD', false,
       );
 
       expect(result).toEqual({ broken: false, actual: '700' });
-      expect(calculateSpendingForCategories).toHaveBeenCalledWith(
-        ['cat1', 'cat2'], 'USD', '2026-07-01', '2026-07-31', true, false,
-      );
+      expect(calculateSpendingForFilters).toHaveBeenCalledWith({
+        categoryIds: ['cat1', 'cat2'],
+        accountIds: [],
+        currency: 'USD',
+        startDate: '2026-07-01',
+        endDate: '2026-07-31',
+        includeChildren: true,
+        convertAll: false,
+      });
     });
 
     it('always rolls descendants up, even for a line stored with the old flag off', async () => {
@@ -141,9 +159,15 @@ describe('BudgetPlansDB plan-vs-actual', () => {
         categoryLine({ categoryIds: ['cat1'], includeChildren: false }), '2026-07', 'USD', false,
       );
 
-      expect(calculateSpendingForCategories).toHaveBeenCalledWith(
-        ['cat1'], 'USD', '2026-07-01', '2026-07-31', true, false,
-      );
+      expect(calculateSpendingForFilters).toHaveBeenCalledWith({
+        categoryIds: ['cat1'],
+        accountIds: [],
+        currency: 'USD',
+        startDate: '2026-07-01',
+        endDate: '2026-07-31',
+        includeChildren: true,
+        convertAll: false,
+      });
     });
 
     it('reports a line whose category set is empty as broken', async () => {
@@ -152,7 +176,7 @@ describe('BudgetPlansDB plan-vs-actual', () => {
       );
 
       expect(result).toEqual({ broken: true, actual: '0' });
-      expect(calculateSpendingForCategories).not.toHaveBeenCalled();
+      expect(calculateSpendingForFilters).not.toHaveBeenCalled();
     });
   });
 
@@ -208,7 +232,7 @@ describe('BudgetPlansDB plan-vs-actual', () => {
       const result = await BudgetPlansDB.calculateLineActual(broken, '2026-07', 'USD', true);
 
       expect(result).toEqual({ broken: true, actual: '0' });
-      expect(calculateSpendingForCategories).not.toHaveBeenCalled();
+      expect(calculateSpendingForFilters).not.toHaveBeenCalled();
       expect(getTransferTotals).not.toHaveBeenCalled();
     });
   });
@@ -322,7 +346,7 @@ describe('BudgetPlansDB plan-vs-actual', () => {
       const spendingByCategory = {
         'cat-safe': '50', 'cat-warn': '70', 'cat-danger': '95', 'cat-over': '150',
       };
-      calculateSpendingForCategories.mockImplementation(async (categoryIds) => spendingByCategory[categoryIds[0]]);
+      calculateSpendingForFilters.mockImplementation(async ({ categoryIds }) => spendingByCategory[categoryIds[0]]);
 
       const status = await BudgetPlansDB.calculatePlanStatus('p1', 'USD', false);
 
@@ -352,7 +376,7 @@ describe('BudgetPlansDB plan-vs-actual', () => {
         ],
         incomeTotal: 0,
       });
-      calculateSpendingForCategories.mockResolvedValue('30');
+      calculateSpendingForFilters.mockResolvedValue('30');
 
       const status = await BudgetPlansDB.calculatePlanStatus('p1', 'USD', false);
 
@@ -373,7 +397,7 @@ describe('BudgetPlansDB plan-vs-actual', () => {
         expenseCurrencies: ['XYZ', 'USD'],
         accountCurrency: 'AMD',
       });
-      calculateSpendingForCategories.mockResolvedValue('0');
+      calculateSpendingForFilters.mockResolvedValue('0');
       getTransferTotals.mockResolvedValue({ incoming: '10', outgoing: '0' });
       stubRates({ AMD: '0.0025' });
       getUnconvertibleCurrencies.mockResolvedValue(['XYZ']);
@@ -408,14 +432,20 @@ describe('BudgetPlansDB plan-vs-actual', () => {
 
     it('defaults the display currency to the plan currency', async () => {
       setupDb({ lines: [lineRow('l1', '100', 'cat1', null, 0)] });
-      calculateSpendingForCategories.mockResolvedValue('10');
+      calculateSpendingForFilters.mockResolvedValue('10');
 
       const status = await BudgetPlansDB.calculatePlanStatus('p1');
 
       expect(status.currency).toBe('USD');
-      expect(calculateSpendingForCategories).toHaveBeenCalledWith(
-        ['cat1'], 'USD', '2026-07-01', '2026-07-31', true, false,
-      );
+      expect(calculateSpendingForFilters).toHaveBeenCalledWith({
+        categoryIds: ['cat1'],
+        accountIds: [],
+        currency: 'USD',
+        startDate: '2026-07-01',
+        endDate: '2026-07-31',
+        includeChildren: true,
+        convertAll: false,
+      });
     });
 
     it('throws for a missing plan', async () => {
@@ -431,7 +461,7 @@ describe('BudgetPlansDB plan-vs-actual', () => {
           recurringLines: [recurringLineRow('l-rec', '50', 'USD', 'cat2', null, 0)],
           incomeTotal: 0,
         });
-        calculateSpendingForCategories.mockResolvedValue('10');
+        calculateSpendingForFilters.mockResolvedValue('10');
 
         const status = await BudgetPlansDB.calculatePlanStatus('p1', 'USD', false);
 
@@ -444,7 +474,7 @@ describe('BudgetPlansDB plan-vs-actual', () => {
           lines: [],
           recurringLines: [recurringLineRow('l-rec', '100', 'AMD', 'cat2', null, 0)],
         });
-        calculateSpendingForCategories.mockResolvedValue('0');
+        calculateSpendingForFilters.mockResolvedValue('0');
         stubRates({ AMD: '0.0025' });
 
         const status = await BudgetPlansDB.calculatePlanStatus('p1', 'USD', false);
@@ -467,7 +497,7 @@ describe('BudgetPlansDB plan-vs-actual', () => {
             recurringLineRow('l-rec-3', '25', 'AMD', 'cat4', null, 2), // duplicate currency
           ],
         });
-        calculateSpendingForCategories.mockResolvedValue('0');
+        calculateSpendingForFilters.mockResolvedValue('0');
         stubRates({ AMD: '0.0025', EUR: '1.1' });
 
         await BudgetPlansDB.calculatePlanStatus('p1', 'USD', false);
@@ -495,7 +525,7 @@ describe('BudgetPlansDB plan-vs-actual', () => {
 
       it('a one-off line (no currency of its own) is never converted, matching pre-recurring behavior', async () => {
         setupDb({ lines: [lineRow('l1', '100', 'cat1', null, 0)] });
-        calculateSpendingForCategories.mockResolvedValue('10');
+        calculateSpendingForFilters.mockResolvedValue('10');
 
         await BudgetPlansDB.calculatePlanStatus('p1', 'USD', false);
 

@@ -645,7 +645,7 @@ describe('GoogleSheetsService', () => {
       const sheets = buildSheetsData(mockBackup);
       const lines = sheets.find(s => s.range === 'Budget Plan Lines!A1');
       const header = lines.values[0];
-      expect(header).toEqual(['id', 'plan_id', 'label', 'amount', 'comment', 'category', 'account', 'category_id', 'to_account_id', 'sort_order', 'is_recurring', 'currency', 'kind', 'execution_account', 'account_id', 'last_executed_month', 'categories', 'category_ids', 'include_children', 'group', 'group_id']);
+      expect(header).toEqual(['id', 'plan_id', 'label', 'amount', 'comment', 'category', 'account', 'category_id', 'to_account_id', 'sort_order', 'is_recurring', 'currency', 'kind', 'execution_account', 'account_id', 'last_executed_month', 'categories', 'category_ids', 'include_children', 'group', 'group_id', 'spending_accounts', 'spending_account_ids']);
 
       const catRow = lines.values.find(r => r[0] === 'line-cat');
       expect(catRow[header.indexOf('category')]).toBe('Food');
@@ -702,6 +702,102 @@ describe('GoogleSheetsService', () => {
       expect(row[header.indexOf('include_children')]).toBe(0);
       // The single-category columns still name the primary one.
       expect(row[header.indexOf('category_id')]).toBe('cat-1');
+    });
+
+    // Migration 0024: the source-account filter travels as names + IDs, the same
+    // two-column shape the categories use.
+    it('writes a line\'s spending-account filter into the sheet', () => {
+      const backup = {
+        ...mockBackup,
+        data: {
+          ...mockBackup.data,
+          accounts: [
+            { id: 1, name: 'Savings', balance: '0', currency: 'USD' },
+            { id: 2, name: 'Cash', balance: '0', currency: 'USD' },
+          ],
+          budget_plan_line_accounts: [
+            { line_id: 'line-cat', account_id: 1 },
+            { line_id: 'line-cat', account_id: 2 },
+          ],
+        },
+      };
+      const sheets = buildSheetsData(backup);
+      const lines = sheets.find(s => s.range === 'Budget Plan Lines!A1');
+      const header = lines.values[0];
+      const row = lines.values.find(r => r[0] === 'line-cat');
+      expect(row[header.indexOf('spending_account_ids')]).toBe('1;2');
+      expect(row[header.indexOf('spending_accounts')]).toBe('Savings;Cash');
+      // A line with no filter exports blank cells — "any account".
+      const xfer = lines.values.find(r => r[0] === 'line-xfer');
+      expect(xfer[header.indexOf('spending_account_ids')]).toBe('');
+      expect(xfer[header.indexOf('spending_accounts')]).toBe('');
+    });
+
+    it('reads a spending-account filter back from IDs or from the names column', async () => {
+      getPreference.mockResolvedValue('sheet-id-123');
+      mockFetch.mockResolvedValue({
+        ok: true,
+        json: async () => ({
+          valueRanges: [
+            {
+              range: 'Accounts!A1:D3',
+              values: [
+                ['id', 'name', 'balance', 'currency'],
+                ['1', 'Savings', '0', 'USD'],
+                ['2', 'Cash', '0', 'USD'],
+              ],
+            },
+            { range: 'Categories!A1:B2', values: [['id', 'name', 'type', 'category_type', 'icon', 'parent_id', 'color', 'is_shadow'], ['cat-1', 'Food', 'entry', 'expense', 'food', '', '', '0']] },
+            { range: 'Budget Plans!A1:D2', values: [['id', 'month', 'currency', 'expected_income'], ['plan-1', '2026-07', 'USD', '3000.00']] },
+            {
+              range: 'Budget Plan Lines!A1:W4',
+              values: [
+                ['id', 'plan_id', 'label', 'amount', 'comment', 'category', 'account', 'category_id', 'to_account_id', 'sort_order', 'is_recurring', 'currency', 'kind', 'execution_account', 'account_id', 'last_executed_month', 'categories', 'category_ids', 'include_children', 'group', 'group_id', 'spending_accounts', 'spending_account_ids'],
+                ['line-ids', 'plan-1', 'Card food', '400', '', 'Food', '', 'cat-1', '', '0', '0', '', '', '', '', '', '', '', '', '', '', '', '1;2'],
+                // Hand-edited row: names typed into the readable column, no IDs.
+                ['line-names', 'plan-1', 'Card only', '300', '', '', '', '', '', '1', '0', '', '', '', '', '', '', '', '', '', '', 'Cash', ''],
+                // No filter at all — every account counts.
+                ['line-none', 'plan-1', 'Anything', '200', '', 'Food', '', 'cat-1', '', '2', '0', '', '', '', '', '', '', '', '', '', '', '', ''],
+              ],
+            },
+          ],
+        }),
+      });
+
+      const backup = await importFromSheets('token');
+
+      expect(backup.data.budget_plan_line_accounts).toEqual([
+        { line_id: 'line-ids', account_id: '1' },
+        { line_id: 'line-ids', account_id: '2' },
+        { line_id: 'line-names', account_id: '2' },
+      ]);
+    });
+
+    it('yields no spending-account filters for a pre-0024 spreadsheet', async () => {
+      getPreference.mockResolvedValue('sheet-id-123');
+      mockFetch.mockResolvedValue({
+        ok: true,
+        json: async () => ({
+          valueRanges: [
+            { range: 'Accounts!A1:D2', values: [['id', 'name', 'balance', 'currency'], ['1', 'Savings', '0', 'USD']] },
+            { range: 'Categories!A1:B2', values: [['id', 'name', 'type', 'category_type', 'icon', 'parent_id', 'color', 'is_shadow'], ['cat-1', 'Food', 'entry', 'expense', 'food', '', '', '0']] },
+            { range: 'Budget Plans!A1:D2', values: [['id', 'month', 'currency', 'expected_income'], ['plan-1', '2026-07', 'USD', '3000.00']] },
+            {
+              range: 'Budget Plan Lines!A1:L2',
+              values: [
+                ['id', 'plan_id', 'label', 'amount', 'comment', 'category', 'account', 'category_id', 'to_account_id', 'sort_order', 'is_recurring', 'currency'],
+                ['line-cat', 'plan-1', 'Groceries', '400', '', 'Food', '', 'cat-1', '', '0', '0', ''],
+              ],
+            },
+          ],
+        }),
+      });
+
+      const backup = await importFromSheets('token');
+
+      // No fallback exists, and none should: a pre-0024 line counted spending
+      // from any account, which is an empty filter.
+      expect(backup.data.budget_plan_line_accounts).toEqual([]);
     });
 
     it('tolerates a backup that lacks budget plan data (empty sheets)', () => {

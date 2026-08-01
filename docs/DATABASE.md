@@ -289,7 +289,49 @@ source of truth; `category_id` above is the denormalized primary entry, kept for
 the backup/Sheets shape. `include_children` survives from that migration but no
 longer expresses a choice — descendant spending always rolls up.
 
-### 10. budget_plan_line_groups (migration 0022)
+Since **migration 0024** a line may also narrow spending by the SOURCE account
+the money left from, via the `budget_plan_line_accounts` junction. See below.
+
+### 10. budget_plan_line_accounts (migration 0024)
+
+The set of source accounts whose expenses count toward a line — matched against
+`operations.account_id`. An empty set (the default, and what every pre-0024 line
+has) means "any account", so nothing about an existing line changed.
+
+This is a **second, independent filter** alongside the line's categories,
+combined with logical AND:
+
+| categories | accounts | the line's actual counts |
+|---|---|---|
+| set | empty | those categories, from any account (the pre-0024 form) |
+| empty | set | every expense paid from those accounts |
+| set | set | the intersection of the two |
+| empty | empty | nothing — the line reads as *broken* |
+
+Not to be confused with either account column on the line itself:
+`to_account_id` is a transfer TARGET, `account_id` is an executable template's
+EXECUTION account. This junction only narrows which operations count.
+
+Both FKs cascade, like `budget_plan_line_categories`: deleting the line drops its
+links, and deleting an account merely SHRINKS the filter — an account-only line
+whose last account is deleted becomes broken, the same state (and the same
+re-link prompt) a category-only line already reaches.
+
+The filter is meaningless on a transfer line (which tracks incoming transfers,
+not expenses) and on an income line (which has no per-line actual), so
+`BudgetPlansDB` rejects it on both and clears it when a line changes kind.
+
+```javascript
+{
+  line_id: TEXT NOT NULL REFERENCES budget_plan_lines(id) ON DELETE CASCADE,
+  account_id: INTEGER NOT NULL REFERENCES accounts(id) ON DELETE CASCADE,
+  PRIMARY KEY (line_id, account_id)
+}
+```
+
+**Indexes**: `account_id`
+
+### 11. budget_plan_line_groups (migration 0022)
 
 An envelope over several `budget_plan_lines`. Members may mix category targets
 from unrelated trees with transfer targets, and recurring lines with one-off

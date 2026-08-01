@@ -7,7 +7,7 @@
  */
 
 import * as BudgetPlansDB from '../../app/services/BudgetPlansDB';
-import { calculateSpendingForCategories } from '../../app/services/BudgetsDB';
+import { calculateSpendingForFilters } from '../../app/services/BudgetsDB';
 import { executeQuery, queryAll, queryFirst, executeTransaction } from '../../app/services/db';
 import {
   fetchRatesToTarget,
@@ -22,7 +22,7 @@ jest.mock('../../app/services/CategoriesDB');
 // only the spending engine, exactly as BudgetPlansDB.status.test.js does.
 jest.mock('../../app/services/BudgetsDB', () => ({
   ...jest.requireActual('../../app/services/BudgetsDB'),
-  calculateSpendingForCategories: jest.fn(),
+  calculateSpendingForFilters: jest.fn(),
 }));
 jest.mock('../../app/services/OperationsDB', () => ({
   fetchRatesToTarget: jest.fn(),
@@ -80,7 +80,7 @@ const setupDb = ({ lines = [], groups = [], spending = '0' }) => {
     if (sql.includes('FROM budget_plan_lines')) return lines;
     return [];
   });
-  calculateSpendingForCategories.mockResolvedValue(spending);
+  calculateSpendingForFilters.mockResolvedValue(spending);
 };
 
 describe('BudgetPlansDB line groups', () => {
@@ -92,7 +92,7 @@ describe('BudgetPlansDB line groups', () => {
     executeQuery.mockResolvedValue(undefined);
     queryAll.mockResolvedValue([]);
     queryFirst.mockResolvedValue(null);
-    calculateSpendingForCategories.mockResolvedValue('0');
+    calculateSpendingForFilters.mockResolvedValue('0');
     getTransferTotals.mockResolvedValue({ incoming: '0', outgoing: '0' });
     getUnconvertibleCurrencies.mockResolvedValue([]);
     stubRates({});
@@ -229,7 +229,10 @@ describe('BudgetPlansDB line groups', () => {
     it('drops the group when a line is turned into an income line', async () => {
       await BudgetPlansDB.updateLine('l1', { kind: 'income' });
 
-      const [sql, params] = executeQuery.mock.calls[0];
+      // Becoming an income line also clears the source-account filter (migration
+      // 0024), which is a junction write — so the whole update runs inside a
+      // transaction rather than as a bare executeQuery.
+      const [sql, params] = mockRunAsync.mock.calls[0];
       expect(sql).toContain('group_id = ?');
       // kind, group_id, updated_at, id — the group is nulled without being asked.
       expect(params[1]).toBeNull();
