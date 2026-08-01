@@ -1,5 +1,12 @@
 # Changelog
 
+## [0.250.1](https://github.com/heywood8/money-tracker/compare/penny-v0.250.0...penny-v0.250.1) (2026-08-01)
+
+
+### Bug Fixes
+
+* **notifications:** require a name binding before auto-creating an operation ([#1517](https://github.com/heywood8/money-tracker/issues/1517)) ([9e280cb](https://github.com/heywood8/money-tracker/commit/9e280cb39cb52afa8280e7a62e97ce4444752d7a))
+
 ## [0.250.0](https://github.com/heywood8/money-tracker/compare/penny-v0.249.1...penny-v0.250.0) (2026-08-01)
 
 
