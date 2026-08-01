@@ -160,17 +160,23 @@ const HeatmapMapModal = ({
       prev.width === width && prev.height === height ? prev : { width, height });
   }, []);
 
-  // Pan and pinch each apply the DELTA since their previous event to the
-  // current region, rather than re-deriving from a touch-down snapshot. That
-  // keeps simultaneous gestures composable and survives one gesture ending
-  // and restarting while the other is still active — a snapshot scheme jumps
-  // in that case because the restarted gesture's translation resets to zero.
+  // Strict split by finger count: ONE finger pans, TWO fingers pinch. The pan
+  // is capped at one pointer because letting it run alongside the pinch made
+  // the two fight — pan activates first (its ~10px threshold beats the scale
+  // change of a starting pinch) and keeps dragging the map while the zoom's
+  // contribution drowns. The pinch handler therefore does BOTH two-finger
+  // jobs itself: focal-point movement between events is the two-finger pan,
+  // the scale delta is the zoom around the current focal point.
+  // Every handler applies the DELTA since its previous event to the current
+  // region (no touch-down snapshots), so gesture hand-offs — lifting to one
+  // finger mid-pinch, adding a second finger mid-pan — never jump.
   const panLast = useRef({ x: 0, y: 0 });
   const pinchLast = useRef({ scale: 1, fx: 0, fy: 0 });
 
   const composedGesture = useMemo(() => {
     const pan = Gesture.Pan()
       .runOnJS(true)
+      .maxPointers(1)
       .onStart(() => {
         panLast.current = { x: 0, y: 0 };
       })
@@ -187,8 +193,6 @@ const HeatmapMapModal = ({
         const { width, height } = sizeRef.current;
         pinchLast.current = {
           scale: 1,
-          // Anchor the zoom on the initial focal point; centroid drift while
-          // pinching is already covered by the pan's translation.
           fx: e.focalX ?? width / 2,
           fy: e.focalY ?? height / 2,
         };
@@ -197,9 +201,15 @@ const HeatmapMapModal = ({
         const { width, height } = sizeRef.current;
         if (!width || !height) return;
         const last = pinchLast.current;
+        const fx = e.focalX ?? last.fx;
+        const fy = e.focalY ?? last.fy;
+        // Two-finger pan: how far the pinch centroid moved since last event.
+        let next = translateRegion(regionRef.current, fx - last.fx, fy - last.fy);
+        // Zoom by the scale delta, anchored on the current focal point.
         const factor = e.scale / (last.scale || 1);
-        last.scale = e.scale;
-        setRegion(scaleRegion(regionRef.current, factor, last.fx, last.fy, width, height));
+        next = scaleRegion(next, factor, fx, fy, width, height);
+        pinchLast.current = { scale: e.scale, fx, fy };
+        setRegion(next);
       });
     return Gesture.Simultaneous(pan, pinch);
   }, []);
