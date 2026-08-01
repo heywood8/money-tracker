@@ -2585,3 +2585,52 @@ export const getLabelsNearLocation = async (lat, lng, { radiusMeters = 150, limi
     return [];
   }
 };
+
+/**
+ * Coordinates of every operation that has a location, for the heatmap.
+ * Optionally bounded to a date range; pass no dates for "all time".
+ *
+ * Carries the chart-visibility predicate like every other analytic query — an
+ * operation hidden from the charts must not reappear as a heatmap blob.
+ * Coordinates are stored as text (see migration 0009), so CAST to REAL and
+ * drop anything non-finite rather than let a corrupt row poison the render.
+ * Never throws: the heatmap degrades to an empty state on failure.
+ *
+ * @param {string|null} [startDate] - YYYY-MM-DD inclusive lower bound
+ * @param {string|null} [endDate] - YYYY-MM-DD inclusive upper bound
+ * @returns {Promise<Array<{latitude: number, longitude: number}>>}
+ */
+export const getOperationCoordinates = async (startDate = null, endDate = null) => {
+  try {
+    const where = [
+      'latitude IS NOT NULL',
+      'longitude IS NOT NULL',
+      chartVisibleSql('operations'),
+    ];
+    const params = [];
+    if (startDate) {
+      where.push('date >= ?');
+      params.push(startDate);
+    }
+    if (endDate) {
+      where.push('date <= ?');
+      params.push(endDate);
+    }
+    const rows = await queryAll(
+      `SELECT CAST(latitude AS REAL) AS latitude,
+              CAST(longitude AS REAL) AS longitude
+       FROM operations
+       WHERE ${where.join(' AND ')}`,
+      params,
+    );
+    // Number.isFinite, not the coercing global — a null must not slip through
+    // as 0 and paint a phantom blob at the equator.
+    return (rows || []).filter(
+      (row) => Number.isFinite(row.latitude) && Number.isFinite(row.longitude) &&
+        Math.abs(row.latitude) <= 90 && Math.abs(row.longitude) <= 180,
+    );
+  } catch (error) {
+    console.error('Failed to get operation coordinates:', error);
+    return [];
+  }
+};

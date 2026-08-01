@@ -14,6 +14,7 @@ import CategoryGridSelector from '../CategoryGridSelector';
 import useTopCategoryIds from '../../hooks/useTopCategoryIds';
 import { canSaveSuggestion } from '../../hooks/usePendingOperationSuggestions';
 import { getCategoryDisplayName } from '../../utils/categoryUtils';
+import { normalizeMerchantLabel } from '../../utils/labelUtils';
 import * as Currency from '../../services/currency';
 import { SPACING, BORDER_RADIUS } from '../../styles/designTokens';
 
@@ -135,7 +136,9 @@ const NotificationBindingCard = ({
         <FormInput
           value={choice.labelOverride ?? ''}
           onChangeText={(v) => onChoiceChange({ labelOverride: v })}
-          placeholder={item.merchant || ''}
+          // The suggested label matches what a blank field books: the raw shop
+          // name tidied from ALL CAPS ("GURMAN" -> "Gurman").
+          placeholder={normalizeMerchantLabel(item.merchant) || ''}
           style={styles.nameInput}
         />
 

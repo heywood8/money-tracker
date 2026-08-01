@@ -1,5 +1,26 @@
 # Changelog
 
+## [0.249.1](https://github.com/heywood8/money-tracker/compare/penny-v0.249.0...penny-v0.249.1) (2026-08-01)
+
+
+### Bug Fixes
+
+* **graphs:** make pinch-zoom on the heatmap reliable ([#1520](https://github.com/heywood8/money-tracker/issues/1520)) ([4d47a6f](https://github.com/heywood8/money-tracker/commit/4d47a6f80baf9a9e0725ecb25cc62f6e861d6eba))
+
+## [0.249.0](https://github.com/heywood8/money-tracker/compare/penny-v0.248.0...penny-v0.249.0) (2026-07-31)
+
+
+### Features
+
+* **graphs:** expandable operations heatmap with cached OSM tiles ([#1518](https://github.com/heywood8/money-tracker/issues/1518)) ([05e63b2](https://github.com/heywood8/money-tracker/commit/05e63b2c02c1248c5d55f9359cae43ce3cb88def))
+
+## [0.248.0](https://github.com/heywood8/money-tracker/compare/penny-v0.247.0...penny-v0.248.0) (2026-07-31)
+
+
+### Features
+
+* **operations:** tidy ALL-CAPS shop names in notification labels ([#1515](https://github.com/heywood8/money-tracker/issues/1515)) ([47f76f7](https://github.com/heywood8/money-tracker/commit/47f76f70339d0364046230b9012c22ae05b58ee9))
+
 ## [0.247.0](https://github.com/heywood8/money-tracker/compare/penny-v0.246.6...penny-v0.247.0) (2026-07-30)
 
 

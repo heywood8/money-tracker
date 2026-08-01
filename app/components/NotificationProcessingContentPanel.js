@@ -44,6 +44,7 @@ import { getPendingNotifications } from '../services/PendingNotificationsDB';
 import { reconcilePendingNotifications } from '../services/notifications/duplicateOperations';
 import { getLabelForMerchant } from '../services/NotificationRulesDB';
 import { getRecentNotifications } from '../services/NotificationAccess';
+import { normalizeMerchantLabel } from '../utils/labelUtils';
 import * as Currency from '../services/currency';
 
 // How often the panel silently re-runs the pipeline and reloads its lists so
@@ -512,7 +513,9 @@ export default function NotificationProcessingContentPanel({ bottomInset = 0 }) 
               <FormInput
                 value={choice.labelOverride ?? ''}
                 onChangeText={(v) => setChoice(item.id, { labelOverride: v })}
-                placeholder={item.merchant || ''}
+                // The suggested label matches what a blank field books: the raw
+                // shop name tidied from ALL CAPS ("GURMAN" -> "Gurman").
+                placeholder={normalizeMerchantLabel(item.merchant) || ''}
               />
               <Text style={[styles.helpText, { color: colors.mutedText }]}>
                 {isTransfer

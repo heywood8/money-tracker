@@ -17,7 +17,7 @@ import * as AccountsDB from '../AccountsDB';
 import * as Currency from '../currency';
 import * as NotificationRulesDB from '../NotificationRulesDB';
 import * as PendingNotificationsDB from '../PendingNotificationsDB';
-import { serializeLabels, sanitizeLabel } from '../../utils/labelUtils';
+import { serializeLabels, sanitizeLabel, normalizeMerchantLabel } from '../../utils/labelUtils';
 import { appEvents, EVENTS } from '../eventEmitter';
 import { captureLocationIfEnabled, isAttachLocationEnabled, operationLocationFields } from '../operationLocation';
 import { parseBankNotification, kindRequiresCategory } from './parseBankNotification';
@@ -437,8 +437,9 @@ const bookExpenseOrQueue = async (descriptor, resolution, date, allowedPackages,
     }
 
     // A learned label override (e.g. "ECOSENSE BYUZAND" -> "Ecosense") wins over
-    // the raw merchant for the operation's label.
-    const label = resolution.labelOverride || descriptor.merchant;
+    // the raw merchant for the operation's label. Otherwise the raw shop name is
+    // tidied from ALL CAPS to first-capital ("GURMAN" -> "Gurman").
+    const label = resolution.labelOverride || normalizeMerchantLabel(descriptor.merchant);
     const location = getLocation ? await getLocation() : null;
     const created = await OperationsDB.createOperation({
       type: descriptor.type,
@@ -555,7 +556,9 @@ const bookTransferOrQueue = async (descriptor, resolution, date, allowedPackages
       accountId: resolution.accountId,
       toAccountId: target.id,
       date,
-      description: descriptor.merchant ? serializeLabels([descriptor.merchant]) : null,
+      description: descriptor.merchant
+        ? serializeLabels([normalizeMerchantLabel(descriptor.merchant)])
+        : null,
       ...operationLocationFields(location),
     });
     if (options.claimedOpIds && created && created.id != null) options.claimedOpIds.add(created.id);
@@ -746,7 +749,9 @@ export const resolvePendingNotification = async (pendingId, choices = {}) => {
     ? (await NotificationRulesDB.getLabelForMerchant(pending.merchant, pending.packageName)) || ''
     : '';
   const chosenLabel = hasLabelChoice ? typedLabel : learnedLabel;
-  const label = chosenLabel || pending.merchant;
+  // Fall back to the raw shop name, tidied from ALL CAPS to first-capital
+  // ("GURMAN" -> "Gurman"), when neither a typed nor a learned label is present.
+  const label = chosenLabel || normalizeMerchantLabel(pending.merchant);
 
   // Fetch the chosen account once: its currency drives conversion and its
   // rounding setting is applied to the booked amount below.
@@ -951,7 +956,7 @@ const resolvePendingTransfer = async (pending, choices = {}) => {
   // otherwise the raw ATM location (merchant) is used. No merchant rule is learned
   // for a transfer — an ATM location is not a category to remember.
   const typedLabel = sanitizeLabel(choices.labelOverride);
-  const label = typedLabel || pending.merchant;
+  const label = typedLabel || normalizeMerchantLabel(pending.merchant);
 
   // Prefer the fix captured at ingestion (near the ATM); fall back to a live,
   // opt-in-gated capture only when the pending row carries no stored coordinates.
