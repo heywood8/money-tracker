@@ -456,7 +456,8 @@ describe('BalanceHistoryCard', () => {
         />,
       );
 
-      expect(container.queryAll(n => n.props.testID === 'vn-line')).toHaveLength(4);
+      // Rendered: actual + prevMonth + zero (the burndown norm is off by default)
+      expect(container.queryAll(n => n.props.testID === 'vn-line')).toHaveLength(3);
       const { data, series } = computeBalanceChart({
         balanceHistoryData: mockBalanceHistoryData,
         spendingPrediction: null,
@@ -594,7 +595,8 @@ describe('BalanceHistoryCard', () => {
         />,
       );
 
-      expect(container.queryAll(n => n.props.testID === 'vn-line')).toHaveLength(5);
+      // Rendered: actual + forecast + prevMonth + zero (norm off by default)
+      expect(container.queryAll(n => n.props.testID === 'vn-line')).toHaveLength(4);
       const { series } = computeBalanceChart({
         balanceHistoryData: mockBalanceHistoryData,
         spendingPrediction: mockSpendingPrediction,
@@ -636,7 +638,8 @@ describe('BalanceHistoryCard', () => {
         />,
       );
 
-      expect(container.queryAll(n => n.props.testID === 'vn-line')).toHaveLength(4);
+      // Rendered: actual + prevMonth + zero (the burndown norm is off by default)
+      expect(container.queryAll(n => n.props.testID === 'vn-line')).toHaveLength(3);
       const { series } = computeBalanceChart({
         balanceHistoryData: mockBalanceHistoryData,
         spendingPrediction: null,
@@ -681,7 +684,8 @@ describe('BalanceHistoryCard', () => {
         />,
       );
 
-      expect(container.queryAll(n => n.props.testID === 'vn-line')).toHaveLength(3);
+      // Rendered: actual + zero (the burndown norm is off by default)
+      expect(container.queryAll(n => n.props.testID === 'vn-line')).toHaveLength(2);
       const { series } = computeBalanceChart({
         balanceHistoryData: dataWithoutPrevMonth,
         spendingPrediction: null,
@@ -724,7 +728,8 @@ describe('BalanceHistoryCard', () => {
         />,
       );
 
-      expect(container.queryAll(n => n.props.testID === 'vn-line')).toHaveLength(3);
+      // Rendered: actual + zero (the burndown norm is off by default)
+      expect(container.queryAll(n => n.props.testID === 'vn-line')).toHaveLength(2);
       const { series } = computeBalanceChart({
         balanceHistoryData: dataWithUndefinedPrevMonth,
         spendingPrediction: null,
@@ -812,7 +817,8 @@ describe('BalanceHistoryCard', () => {
       );
 
       expect(getByText('Actual')).toBeTruthy();
-      expect(getByText('Plain avg')).toBeTruthy();
+      // The burndown norm is off by default; its row appears only once toggled on
+      expect(queryByText('Plain avg')).toBeNull();
       // Forecast only shows when isCurrentMonth and spendingPrediction are provided
       expect(queryByText('Forecast')).toBeNull();
       expect(getByText('Prev Month')).toBeTruthy();
@@ -833,7 +839,7 @@ describe('BalanceHistoryCard', () => {
       const mockDate = new Date(2024, 0, 16);
       jest.spyOn(global, 'Date').mockImplementation(() => mockDate);
 
-      const { getByText } = await render(
+      const { getByText, queryByText } = await render(
         <BalanceHistoryCard
           colors={mockColors}
           t={mockT}
@@ -860,7 +866,8 @@ describe('BalanceHistoryCard', () => {
 
       // Actual row now includes forecast data (combined line)
       expect(getByText('Actual')).toBeTruthy();
-      expect(getByText('Plain avg')).toBeTruthy();
+      // The burndown norm is off by default (see the Plain Avg Toggle block)
+      expect(queryByText('Plain avg')).toBeNull();
       // Forecast is now combined with Actual, no separate row
 
       global.Date.mockRestore();
@@ -2132,6 +2139,110 @@ describe('BalanceHistoryCard', () => {
       expect(onShowCalendar).toHaveBeenCalledTimes(1);
     });
   });
+  describe('Plain Avg Toggle', () => {
+    const plainAvgData = {
+      labels: [1, 2, 3, 4, 5, 6, 7],
+      actual: [
+        { x: 1, y: 1000 },
+        { x: 4, y: 900 },
+        { x: 7, y: 800 },
+      ],
+      actualForChart: [1000, 1000, 1000, 900, 900, 900, 800],
+      burndown: [],
+      prevMonth: [950, 940, 930, 920, 910, 900, 890],
+      plainAvgMax: 5000,
+    };
+
+    const renderCard = (overrides = {}) => render(
+      <BalanceHistoryCard
+        colors={mockColors}
+        t={mockT}
+        selectedAccount="acc1"
+        onAccountChange={jest.fn()}
+        accountItems={mockAccountItems}
+        loadingBalanceHistory={false}
+        balanceHistoryData={plainAvgData}
+        selectedYear={2024}
+        selectedMonth={0}
+        accounts={mockAccounts}
+        isCurrentMonth={false}
+        spendingPrediction={null}
+        balanceHistoryTableData={[]}
+        editingBalanceValue=""
+        onEditingBalanceValueChange={jest.fn()}
+        onEditBalance={jest.fn()}
+        onCancelEdit={jest.fn()}
+        onSaveBalance={jest.fn()}
+        onDeleteBalance={jest.fn()}
+        onShowCalendar={jest.fn()}
+        {...overrides}
+      />,
+    );
+
+    it('starts with the burndown norm hidden', async () => {
+      const { container, queryByText } = await renderCard();
+
+      expect(queryByText('Plain avg')).toBeNull();
+      // actual + prev month + zero baseline only
+      expect(container.queryAll(n => n.props.testID === 'vn-line')).toHaveLength(3);
+    });
+
+    it('draws the line and its legend row once toggled on, and drops both again', async () => {
+      const { container, getByTestId, getByText, queryByText } = await renderCard();
+
+      await fireEvent.press(getByTestId('plain-avg-toggle-btn'));
+
+      await waitFor(() => expect(getByText('Plain avg')).toBeTruthy());
+      expect(container.queryAll(n => n.props.testID === 'vn-line')).toHaveLength(4);
+
+      await fireEvent.press(getByTestId('plain-avg-toggle-btn'));
+
+      await waitFor(() => expect(queryByText('Plain avg')).toBeNull());
+      expect(container.queryAll(n => n.props.testID === 'vn-line')).toHaveLength(3);
+    });
+
+    it('hides the toggle in the year view and while the calendar is open', async () => {
+      const { queryByTestId: queryYear } = await renderCard({ selectedMonth: null });
+      expect(queryYear('plain-avg-toggle-btn')).toBeNull();
+
+      const { getByTestId, queryByTestId } = await renderCard();
+      await fireEvent.press(getByTestId('calendar-toggle-btn'));
+      await waitFor(() => expect(queryByTestId('plain-avg-toggle-btn')).toBeNull());
+    });
+
+    it('omits the plainAvg series and keeps the y-axis off it when hidden', () => {
+      const hidden = computeBalanceChart({
+        balanceHistoryData: plainAvgData,
+        spendingPrediction: null,
+        isCurrentMonth: false,
+        selectedYear: 2024,
+        selectedMonth: 0,
+        primaryColor: mockColors.primary,
+        thirdLine: 'none',
+        showPlainAvg: false,
+      });
+      const shown = computeBalanceChart({
+        balanceHistoryData: plainAvgData,
+        spendingPrediction: null,
+        isCurrentMonth: false,
+        selectedYear: 2024,
+        selectedMonth: 0,
+        primaryColor: mockColors.primary,
+        thirdLine: 'none',
+        showPlainAvg: true,
+      });
+
+      expect(hidden.series.map(s => s.yKey)).toEqual(['actual', 'zero']);
+      expect(shown.series.map(s => s.yKey)).toEqual(['actual', 'plainAvg', 'zero']);
+      expect(hidden.computed.showPlainAvg).toBe(false);
+      expect(hidden.data.every(d => d.plainAvg === null)).toBe(true);
+      // plainAvgMax (5000) is well above the actual peak (1000): only the visible
+      // line may stretch the axis
+      expect(shown.computed.niceMax).toBeGreaterThan(1000);
+      expect(hidden.computed.niceMax).toBeLessThan(shown.computed.niceMax);
+    });
+  });
+
   describe('Third Line Toggle (prev month / year avg / none)', () => {
     const thirdLineData = {
       labels: [1, 2, 3, 4, 5, 6, 7],
@@ -2198,8 +2309,8 @@ describe('BalanceHistoryCard', () => {
 
       await waitFor(() => expect(queryByText('Year avg')).toBeNull());
       expect(queryByText('Prev Month')).toBeNull();
-      // actual + plain avg + zero baseline only
-      expect(container.queryAll(n => n.props.testID === 'vn-line')).toHaveLength(3);
+      // actual + zero baseline only (the burndown norm is off by default)
+      expect(container.queryAll(n => n.props.testID === 'vn-line')).toHaveLength(2);
     });
 
     it('hides the toggle while the calendar view is open', async () => {
