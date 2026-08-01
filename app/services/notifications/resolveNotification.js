@@ -123,10 +123,18 @@ export const resolveLabelOverride = async (descriptor) => {
  * resolves the account but is NOT auto-created — booking the amount in the
  * account's currency would be wrong — so it falls through to the review queue.
  *
+ * `matchedLabel` reports whether a display-name (label) override is bound for the
+ * merchant. It is a separate axis from `fullyMatched` (which stays account +
+ * category + currency): the booking layer additionally requires `matchedLabel`
+ * before it silently auto-creates, so a purchase whose name isn't bound yet is
+ * routed to the review queue where the user can set it, rather than being booked
+ * with the raw (often bank-truncated) merchant string.
+ *
  * @param {Object} descriptor
  * @returns {Promise<{ accountId: number|null, accountCurrency: string|null,
  *   accountRounding: number|null, categoryId: string|null, matchedAccount: boolean,
- *   matchedCategory: boolean, currencyMatch: boolean, fullyMatched: boolean }>}
+ *   matchedCategory: boolean, matchedLabel: boolean, currencyMatch: boolean,
+ *   fullyMatched: boolean }>}
  */
 export const resolveNotification = async (descriptor) => {
   // Read the merchant rule once and derive both category and label from it,
@@ -147,6 +155,7 @@ export const resolveNotification = async (descriptor) => {
   const accountRoundingMode = account ? account.autoTxnRoundingMode : null;
   const matchedAccount = accountId != null;
   const matchedCategory = categoryId != null;
+  const matchedLabel = labelOverride != null;
   const currencyMatch =
     matchedAccount && (!descriptor?.currency || accountCurrency === descriptor.currency);
   return {
@@ -158,6 +167,7 @@ export const resolveNotification = async (descriptor) => {
     labelOverride,
     matchedAccount,
     matchedCategory,
+    matchedLabel,
     currencyMatch,
     fullyMatched: matchedAccount && matchedCategory && currencyMatch,
   };

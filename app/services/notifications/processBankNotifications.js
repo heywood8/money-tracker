@@ -3,8 +3,9 @@
  * account/category, and either create an operation (when fully matched) or
  * enqueue the item for review.
  *
- * Processing model (per the feature design): auto-create when both the card and
- * merchant resolve; otherwise queue. Already-processed notifications are skipped
+ * Processing model (per the feature design): auto-create when the card resolves to
+ * an account and the merchant resolves to both a category and a display-name (label)
+ * binding; otherwise queue. Already-processed notifications are skipped
  * using a rolling set of signatures persisted in preferences, because the native
  * listener exposes a pull-only rolling window with no per-item "seen" state.
  */
@@ -358,8 +359,10 @@ const findExistingOperation = async (descriptor, resolution, date, options) => {
 
 /**
  * Book a parsed expense/income notification: auto-create the operation when the
- * card resolves to an account, the merchant resolves to a category, and the source
- * is trusted; otherwise enqueue it for review. Mutates `summary`.
+ * card resolves to an account, the merchant resolves to a category *and* a display
+ * name (label) binding, and the source is trusted; otherwise enqueue it for review.
+ * A merchant with a category but no name binding is queued (not silently booked)
+ * so the user can set the name at review time. Mutates `summary`.
  *
  * @param {Object} descriptor - parsed notification
  * @param {Object} resolution - resolveNotification() result
@@ -386,9 +389,19 @@ const bookExpenseOrQueue = async (descriptor, resolution, date, allowedPackages,
   // Everything an auto-create needs except the currency match. Auto-create only
   // for trusted sources; kinds that require a manual category (C2C transfers,
   // DEBIT ACCOUNT) always wait in the queue.
+  //
+  // A learned display-name (label) binding is required too, alongside the account
+  // and category: without one the item is routed to the review queue so the user
+  // can set/confirm the name there, instead of silently booking the raw merchant
+  // string. Bank merchant names arrive truncated to varying lengths (e.g.
+  // "YEREVAN CITY HANRAPETUTYU" vs "…TYUN"), so a name bound to one spelling
+  // wouldn't match another; gating the silent create on a resolved name means such
+  // a purchase surfaces for review rather than being booked with a name that
+  // doesn't reflect the user's binding.
   const eligibleForAutoCreate =
     resolution.matchedAccount &&
     resolution.matchedCategory &&
+    resolution.matchedLabel &&
     !descriptor.requiresCategory &&
     isAllowedSource(descriptor.packageName, allowedPackages);
 

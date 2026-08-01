@@ -162,9 +162,13 @@ review item by mistake.
 These were chosen up front and drive the architecture:
 
 1. **Processing model — auto-create when fully matched.** If the card resolves to
-   an account *and* the merchant resolves to a category, the operation is created
-   silently and the user is told. Anything not fully matched goes to a review
-   queue. (Balances trust against control.)
+   an account, the merchant resolves to a category, *and* a display-name (label)
+   binding is set for that merchant, the operation is created silently and the user
+   is told. Anything not fully matched goes to a review queue. (Balances trust
+   against control.) Requiring the name too means a purchase whose merchant string
+   the bank sends truncated to a length the user hasn't named yet surfaces for
+   review — where the name is set — instead of being booked with the raw shop
+   string.
 2. **Card binding — field + learn-on-sight.** Accounts gain a `cardMask` field
    that can be set up front, *and* the first time an unknown card appears the user
    is asked which account it belongs to; the answer is written back to that field.
@@ -193,7 +197,7 @@ These were chosen up front and drive the architecture:
                     ┌─────────────────────────────┐
                     │ Resolver                      │  ← round 2
                     │ cardMask → account            │
-                    │ merchant → category           │
+                    │ merchant → category + name     │
                     └──────────────┬────────────────┘
                        fully matched │ unmatched
                           ▼          ▼
@@ -292,8 +296,9 @@ live on `AccountsDB` (`getAccountByCardMask`, `setAccountCardMask`).
 
 - `processBankNotifications()` reads `getRecentNotifications()`, de-dupes against
   a rolling set of signatures (`postTime + text hash`) persisted in preferences,
-  parses + resolves each, and either `createOperation` (fully matched,
-  description seeded with `merchant`) or enqueues a pending item. Emits
+  parses + resolves each, and either `createOperation` (fully matched — account,
+  category, and a name binding all resolved — description seeded with the learned
+  label) or enqueues a pending item. Emits
   `RELOAD_ALL` when operations are created. No-op when disabled.
 - `resolvePendingNotification(id, choices)` — creates the operation from a
   reviewed item and learns the card → account and merchant → category bindings.
