@@ -12,7 +12,7 @@ import SimplePicker from './SimplePicker';
 import FormInput from './FormInput';
 import { getCategoryDisplayName } from '../utils/categoryUtils';
 import { parseCardMasks, cardMaskLast4 } from '../utils/cardMask';
-import { HORIZONTAL_PADDING, SPACING, BORDER_RADIUS } from '../styles/layout';
+import { BORDER_RADIUS, FONT_SIZE, HORIZONTAL_PADDING, SPACING } from '../styles/designTokens';
 import {
   getAllMerchantRules,
   clearMerchantRuleCategory,
@@ -26,6 +26,8 @@ import {
   setAtmTargetAccount,
   clearAtmTargetAccount,
 } from '../services/notifications/processBankNotifications';
+import { BUTTON_COMPACT, BUTTON_TEXT, CARD_SURFACE, SECTION_LABEL } from '../styles/componentStyles';
+import EmptyState from './EmptyState';
 
 /**
  * "Bindings" subpanel for notification processing (header three-dots → Bindings).
@@ -318,7 +320,7 @@ export default function NotificationBindingsContentPanel({ bottomInset = 0 }) {
             accessibilityLabel={t('delete') || 'Delete'}
             hitSlop={{ top: 8, bottom: 8, left: 8, right: 8 }}
           >
-            <Ionicons name="trash" size={20} color={colors.delete || '#d9534f'} />
+            <Ionicons name="trash" size={20} color={colors.destructive} />
           </TouchableOpacity>
         </View>
       );
@@ -387,21 +389,23 @@ export default function NotificationBindingsContentPanel({ bottomInset = 0 }) {
       )}
 
       {!hasAnyBinding && !addingCard && (
-        <View style={styles.emptyState}>
-          <Ionicons name="link-outline" size={40} color={colors.mutedText} />
-          <Text style={[styles.emptyText, { color: colors.mutedText }]}>
-            {t('notification_bindings_empty')
-              || 'No bindings yet. Penny learns them as you review notifications.'}
-          </Text>
-        </View>
+        <EmptyState
+          icon="link-outline"
+          iconSet="ionicons"
+          iconSize={40}
+          fill={false}
+          style={styles.emptyState}
+          message={t('notification_bindings_empty')
+            || 'No bindings yet. Penny learns them as you review notifications.'}
+        />
       )}
 
       {noSearchResults && (
-        <View style={styles.emptyState}>
-          <Text style={[styles.emptyText, { color: colors.mutedText }]}>
-            {t('notification_bindings_no_results') || 'Nothing matches your search.'}
-          </Text>
-        </View>
+        <EmptyState
+          fill={false}
+          style={styles.emptyState}
+          message={t('notification_bindings_no_results') || 'Nothing matches your search.'}
+        />
       )}
 
       {/* ── Card bindings ── */}
@@ -651,8 +655,7 @@ const styles = StyleSheet.create({
     fontWeight: '700',
   },
   card: {
-    borderRadius: BORDER_RADIUS.md,
-    borderWidth: StyleSheet.hairlineWidth,
+    ...CARD_SURFACE,
     marginBottom: SPACING.sm,
     padding: SPACING.sm,
   },
@@ -690,11 +693,11 @@ const styles = StyleSheet.create({
   },
   editorButtonPrimaryText: {
     color: '#ffffff',
-    fontSize: 14,
+    fontSize: FONT_SIZE.md,
     fontWeight: '600',
   },
   editorButtonText: {
-    fontSize: 14,
+    fontSize: FONT_SIZE.md,
     fontWeight: '600',
   },
   editorButtons: {
@@ -707,11 +710,6 @@ const styles = StyleSheet.create({
     gap: SPACING.md,
     paddingHorizontal: HORIZONTAL_PADDING,
     paddingVertical: SPACING.xl,
-  },
-  emptyText: {
-    fontSize: 14,
-    lineHeight: 20,
-    textAlign: 'center',
   },
   labelEditRow: {
     alignItems: 'center',
@@ -731,17 +729,12 @@ const styles = StyleSheet.create({
     padding: SPACING.xs,
   },
   saveButton: {
-    alignItems: 'center',
-    borderRadius: BORDER_RADIUS.sm,
-    justifyContent: 'center',
+    ...BUTTON_COMPACT,
     minWidth: 72,
-    paddingHorizontal: SPACING.md,
-    paddingVertical: SPACING.sm,
   },
   saveButtonText: {
+    ...BUTTON_TEXT,
     color: '#ffffff',
-    fontSize: 14,
-    fontWeight: '600',
   },
   scroll: {
     flex: 1,
@@ -756,15 +749,13 @@ const styles = StyleSheet.create({
     marginTop: SPACING.lg,
   },
   sectionHint: {
-    fontSize: 12,
+    fontSize: FONT_SIZE.sm,
     lineHeight: 17,
     marginBottom: SPACING.sm,
   },
   sectionTitle: {
-    fontSize: 11,
-    fontWeight: '600',
-    letterSpacing: 0.8,
-    marginBottom: 4,
+    ...SECTION_LABEL,
+    marginBottom: SPACING.xs,
     marginTop: SPACING.lg,
   },
   sectionTitleInRow: {

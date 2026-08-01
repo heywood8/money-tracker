@@ -4,6 +4,8 @@ import PropTypes from 'prop-types';
 import DonutChart, { CHART_SIZE } from './DonutChart';
 import CustomLegend from './CustomLegend';
 import CategoryOperationsList from './CategoryOperationsList';
+import EmptyState from '../EmptyState';
+import { FONT_SIZE } from '../../styles/designTokens';
 
 const IncomePieChart = ({
   colors,
@@ -62,9 +64,7 @@ const IncomePieChart = ({
     return (
       <View>
         {chipHeader}
-        <Text style={[styles.noData, { color: colors.mutedText }]}>
-          {t('no_income_data')}
-        </Text>
+        <EmptyState message={t('no_income_data')} fill={false} />
       </View>
     );
   }
@@ -135,13 +135,8 @@ const styles = StyleSheet.create({
     paddingVertical: 32,
   },
   loadingText: {
-    fontSize: 14,
+    fontSize: FONT_SIZE.md,
     marginTop: 8,
-  },
-  noData: {
-    fontSize: 14,
-    paddingVertical: 32,
-    textAlign: 'center',
   },
   row: {
     // Top-aligned, not centred: the legend's height follows the category count,

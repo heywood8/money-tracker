@@ -2,7 +2,7 @@ import React, { useMemo } from 'react';
 import PropTypes from 'prop-types';
 import { View, Text, Pressable, ActivityIndicator, StyleSheet } from 'react-native';
 import Icon from '@expo/vector-icons/MaterialCommunityIcons';
-import { SPACING, BORDER_RADIUS } from '../../styles/designTokens';
+import { BORDER_RADIUS, FONT_SIZE, SPACING } from '../../styles/designTokens';
 
 /**
  * OperationLocationRow — compact inline row for an operation's attached location.
@@ -113,7 +113,7 @@ const styles = StyleSheet.create({
     paddingVertical: SPACING.sm,
   },
   text: {
-    fontSize: 14,
+    fontSize: FONT_SIZE.md,
   },
 });
 

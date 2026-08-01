@@ -3,7 +3,8 @@ import { View, TextInput, TouchableOpacity, StyleSheet, Text, Keyboard, Platform
 import Animated, { useSharedValue, useAnimatedStyle, withTiming, Easing } from 'react-native-reanimated';
 import Icon from '@expo/vector-icons/MaterialCommunityIcons';
 import PropTypes from 'prop-types';
-import { HORIZONTAL_PADDING, SPACING } from '../../styles/layout';
+import { FONT_SIZE, HORIZONTAL_PADDING, SPACING } from '../../styles/designTokens';
+import FilterBadge from './FilterBadge';
 
 const SCREEN_WIDTH = Dimensions.get('window').width;
 
@@ -155,11 +156,7 @@ const SearchBar = ({
             >
               <View style={styles.iconWrapper}>
                 <Icon name="magnify" size={18} color={colors.text} />
-                {filterCount > 0 && (
-                  <View testID="filter-count-badge-collapsed" style={[styles.filterBadge, { backgroundColor: colors.primary }]}>
-                    <Text style={styles.filterBadgeText}>{filterCount}</Text>
-                  </View>
-                )}
+                <FilterBadge count={filterCount} colors={colors} testID="filter-count-badge-collapsed" />
               </View>
               <Text style={[styles.collapsedLabel, { color: colors.mutedText }]} numberOfLines={1}>
                 {t('search')}
@@ -199,11 +196,7 @@ const SearchBar = ({
                 >
                   <View style={styles.filterButtonContent}>
                     <Icon name="filter-variant" size={22} color={filterCount > 0 ? colors.primary : colors.text} />
-                    {filterCount > 0 && (
-                      <View testID="filter-count-badge" style={[styles.filterBadge, { backgroundColor: colors.primary }]}>
-                        <Text style={styles.filterBadgeText}>{filterCount}</Text>
-                      </View>
-                    )}
+                    <FilterBadge count={filterCount} colors={colors} testID="filter-count-badge" />
                   </View>
                 </TouchableOpacity>
                 <TouchableOpacity
@@ -249,7 +242,7 @@ const styles = StyleSheet.create({
     width: 96, // 44 + 44 + 8
   },
   collapsedLabel: {
-    fontSize: 14,
+    fontSize: FONT_SIZE.md,
   },
   // Fills the holder so a tap anywhere on the resting pill opens search,
   // with the icon + label centered inside.
@@ -269,22 +262,6 @@ const styles = StyleSheet.create({
   contentHolder: {
     flexDirection: 'row',
     height: '100%',
-  },
-  filterBadge: {
-    alignItems: 'center',
-    borderRadius: 9,
-    height: 18,
-    justifyContent: 'center',
-    minWidth: 18,
-    paddingHorizontal: 4,
-    position: 'absolute',
-    right: -4,
-    top: -4,
-  },
-  filterBadgeText: {
-    color: '#fff',
-    fontSize: 11,
-    fontWeight: '700',
   },
   filterButtonContent: {
     position: 'relative',
@@ -328,7 +305,7 @@ const styles = StyleSheet.create({
   },
   searchInput: {
     flex: 1,
-    fontSize: 16,
+    fontSize: FONT_SIZE.base,
     height: '100%',
     paddingVertical: 0,
   },

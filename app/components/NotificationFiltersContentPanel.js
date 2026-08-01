@@ -5,7 +5,7 @@ import { Text, Switch } from 'react-native-paper';
 import Ionicons from '@expo/vector-icons/Ionicons';
 import { useThemeColors } from '../contexts/ThemeColorsContext';
 import { useLocalization } from '../contexts/LocalizationContext';
-import { HORIZONTAL_PADDING, SPACING, BORDER_RADIUS } from '../styles/layout';
+import { BORDER_RADIUS, FONT_SIZE, HORIZONTAL_PADDING, SPACING } from '../styles/designTokens';
 import {
   isBankNotificationsEnabled,
   setBankNotificationsEnabled,
@@ -28,6 +28,8 @@ import {
   togglePackageVisibility,
   isPackageHidden,
 } from '../services/notifications/notificationFilters';
+import { CARD_SURFACE, SECTION_LABEL } from '../styles/componentStyles';
+import EmptyState from './EmptyState';
 
 /**
  * "Filters" subpanel for notification processing (header three-dots → Filters).
@@ -286,13 +288,15 @@ export default function NotificationFiltersContentPanel({ bottomInset = 0 }) {
       </Text>
 
       {known.length === 0 ? (
-        <View style={styles.emptyState}>
-          <Ionicons name="apps-outline" size={40} color={colors.mutedText} />
-          <Text style={[styles.emptyText, { color: colors.mutedText }]}>
-            {t('notification_filter_apps_empty') ||
-              "No apps yet. They'll appear here as notifications arrive."}
-          </Text>
-        </View>
+        <EmptyState
+          icon="apps-outline"
+          iconSet="ionicons"
+          iconSize={40}
+          fill={false}
+          style={styles.emptyState}
+          message={t('notification_filter_apps_empty') ||
+            "No apps yet. They'll appear here as notifications arrive."}
+        />
       ) : (
         orderedApps.map((pkg) => {
           const checked = !isPackageHidden(pkg, hidden);
@@ -339,7 +343,7 @@ const styles = StyleSheet.create({
   },
   appName: {
     flex: 1,
-    fontSize: 14,
+    fontSize: FONT_SIZE.md,
     fontWeight: '500',
   },
   appRow: {
@@ -363,15 +367,9 @@ const styles = StyleSheet.create({
     paddingHorizontal: HORIZONTAL_PADDING,
     paddingVertical: SPACING.xl,
   },
-  emptyText: {
-    fontSize: 14,
-    lineHeight: 20,
-    textAlign: 'center',
-  },
   row: {
+    ...CARD_SURFACE,
     alignItems: 'center',
-    borderRadius: BORDER_RADIUS.md,
-    borderWidth: StyleSheet.hairlineWidth,
     flexDirection: 'row',
     gap: SPACING.sm,
     marginTop: SPACING.md,
@@ -381,7 +379,7 @@ const styles = StyleSheet.create({
     opacity: 0.5,
   },
   rowHint: {
-    fontSize: 12,
+    fontSize: FONT_SIZE.sm,
     lineHeight: 17,
     marginTop: 2,
   },
@@ -397,15 +395,13 @@ const styles = StyleSheet.create({
     flex: 1,
   },
   sectionHint: {
-    fontSize: 12,
+    fontSize: FONT_SIZE.sm,
     lineHeight: 17,
     marginBottom: SPACING.sm,
   },
   sectionTitle: {
-    fontSize: 11,
-    fontWeight: '600',
-    letterSpacing: 0.8,
-    marginBottom: 4,
+    ...SECTION_LABEL,
+    marginBottom: SPACING.xs,
     marginTop: SPACING.lg,
   },
 });

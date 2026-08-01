@@ -56,8 +56,16 @@ export const HEIGHTS = {
   input: 48,           // All text inputs, pickers, buttons (min touch target)
   listItem: 48,        // ALL list item rows (accounts, operations, categories)
   calculator: 44,      // Calculator buttons (compact, intentional)
+  // A button that sits inside a row of content rather than owning its own line
+  // — a card's "Save", an inline "Apply". Below `input` on purpose: a 48px
+  // button inside a 12px-padded card reads as the card's primary act rather
+  // than as one control among several. Still at Android's touch floor.
+  buttonCompact: 44,
   fab: 56,             // Floating action button
   tabBar: 80,          // Bottom tab bar (includes 24px bottom padding)
+  // Count badge (filter count, unread count). Fully round via BORDER_RADIUS.pill
+  // rather than a hand-computed half-height.
+  badge: 18,
 };
 
 // ============ TYPOGRAPHY ============

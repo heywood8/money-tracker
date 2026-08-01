@@ -6,7 +6,8 @@ import DateSeparator from './DateSeparator';
 import OperationListItem from './OperationListItem';
 import OperationsListPlaceholder from './OperationsListPlaceholder';
 import currencies from '../../../assets/currencies.json';
-import { SPACING, BORDER_RADIUS, HEIGHTS } from '../../styles/designTokens';
+import { BORDER_RADIUS, FONT_SIZE, HEIGHTS, SPACING } from '../../styles/designTokens';
+import EmptyState from '../EmptyState';
 
 /**
  * Get currency symbol from currency code
@@ -428,12 +429,12 @@ const OperationsList = forwardRef(({
         initialLoading ? (
           <OperationsListPlaceholder colors={colors} />
         ) : (
-          <View style={styles.emptyContainer}>
-            <Icon name="cash-multiple" size={64} color={colors.mutedText} />
-            <Text style={[styles.emptyText, { color: colors.mutedText }]}>
-              {t('no_operations')}
-            </Text>
-          </View>
+          <EmptyState
+            icon="cash-multiple"
+            iconSize={64}
+            message={t('no_operations')}
+            style={styles.emptyContainer}
+          />
         )
       }
       contentContainerStyle={
@@ -530,17 +531,11 @@ const styles = StyleSheet.create({
     marginHorizontal: SPACING.lg,
   },
   emptyContainer: {
-    alignItems: 'center',
     flex: 1,
-    justifyContent: 'center',
     paddingTop: 80,
   },
   emptyList: {
     flex: 1,
-  },
-  emptyText: {
-    fontSize: 16,
-    marginTop: SPACING.lg,
   },
   groupContainer: {},
   itemWrapper: {
@@ -558,7 +553,7 @@ const styles = StyleSheet.create({
     paddingVertical: SPACING.xl,
   },
   loadingMoreText: {
-    fontSize: 14,
+    fontSize: FONT_SIZE.md,
     marginTop: SPACING.sm,
   },
 });

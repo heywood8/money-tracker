@@ -5,6 +5,8 @@ import Icon from '@expo/vector-icons/MaterialCommunityIcons';
 import { useThemeColors } from '../contexts/ThemeColorsContext';
 import { useLocalization } from '../contexts/LocalizationContext';
 import ModalBlurOverlay from './ModalBlurOverlay';
+import { MODAL_TITLE } from '../styles/componentStyles';
+import { BORDER_RADIUS } from '../styles/designTokens';
 
 export const COMMON_ICONS = [
   // Money & Finance
@@ -138,7 +140,7 @@ const styles = StyleSheet.create({
   },
   iconButton: {
     alignItems: 'center',
-    borderRadius: 8,
+    borderRadius: BORDER_RADIUS.md,
     borderWidth: 2,
     justifyContent: 'center',
     margin: 3,
@@ -154,8 +156,7 @@ const styles = StyleSheet.create({
     justifyContent: 'flex-start',
   },
   title: {
-    fontSize: 18,
-    fontWeight: '700',
+    ...MODAL_TITLE,
   },
 });
 

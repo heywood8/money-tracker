@@ -12,6 +12,7 @@ import Icon from '@expo/vector-icons/MaterialCommunityIcons';
 import PropTypes from 'prop-types';
 import { SPACING, BORDER_RADIUS, FONT_SIZE } from '../../styles/designTokens';
 import { parseLabels, serializeLabels, addLabel, removeLabel, hasLabel, displayLabel } from '../../utils/labelUtils';
+import { CHIP, CHIP_TEXT } from '../../styles/componentStyles';
 
 const MAX_SUGGESTION_CHIPS = 8;
 
@@ -260,18 +261,11 @@ LabelInput.propTypes = {
 
 const styles = StyleSheet.create({
   chip: {
-    alignItems: 'center',
-    borderRadius: 14,
-    borderWidth: 1,
-    flexDirection: 'row',
-    gap: SPACING.xs,
+    ...CHIP,
     maxWidth: '100%',
-    paddingHorizontal: SPACING.md,
-    paddingVertical: SPACING.xs,
   },
   chipText: {
-    fontSize: FONT_SIZE.sm,
-    fontWeight: '500',
+    ...CHIP_TEXT,
     maxWidth: 220,
   },
   chipsContent: {
@@ -301,19 +295,13 @@ const styles = StyleSheet.create({
   input: {
     flexGrow: 1,
     flexShrink: 1,
-    fontSize: 16,
+    fontSize: FONT_SIZE.base,
     minWidth: 80,
     paddingVertical: SPACING.xs,
   },
   suggestionChip: {
-    alignItems: 'center',
-    borderRadius: 14,
-    borderWidth: 1,
-    flexDirection: 'row',
-    gap: 3,
+    ...CHIP,
     marginRight: SPACING.xs,
-    paddingHorizontal: SPACING.md,
-    paddingVertical: SPACING.xs,
   },
   suggestionText: {
     fontSize: FONT_SIZE.sm,

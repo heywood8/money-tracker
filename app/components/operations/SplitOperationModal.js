@@ -20,6 +20,7 @@ import { motionDuration } from '../../utils/reducedMotion';
 import ModalBlurOverlay from '../ModalBlurOverlay';
 import CategoryGridSelector from '../CategoryGridSelector';
 import useKeyboardOffset from '../../hooks/useKeyboardOffset';
+import { BUTTON, BUTTON_TEXT, MODAL_TITLE } from '../../styles/componentStyles';
 
 const SCREEN_WIDTH = Dimensions.get('window').width;
 
@@ -220,7 +221,7 @@ export default function SplitOperationModal({
 
                 {/* Error Message */}
                 {error ? (
-                  <Text style={styles.errorText} testID="error-message">{error}</Text>
+                  <Text style={[styles.errorText, { color: colors.destructive }]} testID="error-message">{error}</Text>
                 ) : null}
 
                 {/* Action Buttons */}
@@ -300,22 +301,16 @@ export default function SplitOperationModal({
 
 const styles = StyleSheet.create({
   button: {
-    alignItems: 'center',
-    borderRadius: BORDER_RADIUS.md,
+    ...BUTTON,
     flex: 1,
     marginHorizontal: SPACING.xs,
-    minHeight: HEIGHTS.input,
-    paddingVertical: SPACING.md,
   },
   buttonRow: {
     flexDirection: 'row',
     justifyContent: 'space-between',
     marginTop: SPACING.lg,
   },
-  buttonText: {
-    fontSize: FONT_SIZE.base,
-    fontWeight: '500',
-  },
+  buttonText: BUTTON_TEXT,
   closeButton: {
     alignItems: 'center',
     alignSelf: 'center',
@@ -331,7 +326,6 @@ const styles = StyleSheet.create({
     fontWeight: '600',
   },
   errorText: {
-    color: '#ff6b6b',
     fontSize: FONT_SIZE.sm,
     marginTop: SPACING.sm,
   },
@@ -371,8 +365,7 @@ const styles = StyleSheet.create({
     justifyContent: 'center',
   },
   modalTitle: {
-    fontSize: FONT_SIZE.xl,
-    fontWeight: 'bold',
+    ...MODAL_TITLE,
     marginBottom: SPACING.md,
     textAlign: 'center',
   },

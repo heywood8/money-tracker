@@ -89,8 +89,11 @@ The app follows a feature-based organization under the `app/` directory:
 - **utils/** (4 files) - Utility functions
   - `resetDatabase.js`, `emergencyReset.js`, `categoryUtils.js`, `calculatorUtils.js`
 
-- **styles/** (2 files) - Shared style definitions
-  - `designTokens.js`, `layout.js`
+- **styles/** (4 files) - Shared style definitions
+  - `designTokens.js` - scalars (spacing, radii, font sizes, heights, icon sizes)
+  - `componentStyles.js` - composite styles for recurring elements (card, chip, badge, button, section label, modal title)
+  - `semanticColors.js` - scheme-keyed semantic colours for consumers that cannot read the theme context
+  - `layout.js` - deprecated re-export of `designTokens.js`, kept for backward compatibility
 
 ### Context-Based State Management
 
@@ -380,6 +383,31 @@ A chip grid grouped by currency. The groups are *not* a hierarchy — there is n
 - The grid reads `hideBalances` from `DisplaySettingsContext` itself rather than taking it as a prop, so a host cannot forget the setting.
 
 Hosts: `PickerModal`, `OperationModal`, `BudgetPlanLineModal` (transfer target + execution account), `AccountsScreen` (transfer-on-delete).
+
+### Shared Element Styles
+
+**Rule: a recurring UI element is styled from `app/styles/componentStyles.js`, never re-specified per file.**
+
+The same handful of elements appear on every screen, and each one had drifted into four or five versions — chips at five different radii, cards at two radii and two border widths, eyebrow labels at four weight/tracking pairs, nine different destructive reds. They are now single constants, spread into the host's own StyleSheet:
+
+```javascript
+import { CARD_SURFACE, CHIP, CHIP_TEXT } from '../styles/componentStyles';
+
+const styles = StyleSheet.create({
+  card: { ...CARD_SURFACE, padding: SPACING.lg },  // host keeps its own spacing
+  chip: CHIP,
+  chipText: CHIP_TEXT,
+});
+```
+
+Available: `CARD_SURFACE`, `CHIP` / `CHIP_TEXT`, `BADGE` / `BADGE_TEXT`, `BUTTON` / `BUTTON_COMPACT` / `BUTTON_TEXT`, `SECTION_LABEL` (eyebrow), `SECTION_HEADING`, `MODAL_TITLE`. Spread them and add the host's own layout (margins, flex, fixed sizes) alongside — the constants deliberately carry no spacing that varies by context.
+
+Two supporting rules:
+
+- **Scalars come from `designTokens.js`.** A bare number for `borderRadius`, `fontSize`, `gap` or padding is a defect unless it is genuinely one-off. In particular a radius that is half its element's own fixed height is `BORDER_RADIUS.pill`, not the computed half — `pill` clamps to half the height, so it renders identically and cannot fall out of sync when the height changes.
+- **There is one red: `colors.destructive`.** Errors, delete affordances and validation all read it. `colors.danger`, `colors.delete` and `colors.error` are aliases of the same value. Never hardcode a red at a call site — four of the old hardcoded ones were the *dark*-theme red, so they rendered unchanged on the light theme.
+
+**Empty states render `app/components/EmptyState.js`** rather than a local icon-plus-text block. `fill={false}` for one that sits inline in a scrolling panel; `iconSet="ionicons"` where the surrounding panel draws from Ionicons.
 
 ### Testing
 

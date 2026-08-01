@@ -23,6 +23,9 @@ import {
   translateRegion,
   scaleRegion,
 } from '../../utils/mapProjection';
+import EmptyState from '../EmptyState';
+import { CARD_SURFACE } from '../../styles/componentStyles';
+import { BORDER_RADIUS, FONT_SIZE, SPACING } from '../../styles/designTokens';
 
 // Fallback view when there is nothing to fit — the whole world.
 const WORLD_REGION = { latitude: 20, longitude: 0, zoom: 2 };
@@ -284,12 +287,13 @@ const HeatmapMapModal = ({
 
             {empty && (
               <View style={styles.centerOverlay} pointerEvents="none">
-                <View style={[styles.emptyBadge, { backgroundColor: colors.surface, borderColor: colors.border }]}>
-                  <Icon name="map-marker-off-outline" size={28} color={colors.mutedText} />
-                  <Text style={[styles.emptyText, { color: colors.mutedText }]}>
-                    {t('graphs_map_no_locations')}
-                  </Text>
-                </View>
+                <EmptyState
+                  icon="map-marker-off-outline"
+                  iconSize={28}
+                  fill={false}
+                  message={t('graphs_map_no_locations')}
+                  style={[styles.emptyBadge, { backgroundColor: colors.surface, borderColor: colors.border }]}
+                />
               </View>
             )}
 
@@ -366,7 +370,7 @@ HeatmapMapModal.propTypes = {
 const styles = StyleSheet.create({
   allTimeChip: {
     alignItems: 'center',
-    borderRadius: 18,
+    borderRadius: BORDER_RADIUS.pill,
     borderWidth: 1,
     elevation: 4,
     flexDirection: 'row',
@@ -379,8 +383,8 @@ const styles = StyleSheet.create({
     fontWeight: '600',
   },
   attribution: {
-    borderRadius: 4,
-    fontSize: 10,
+    borderRadius: BORDER_RADIUS.sm,
+    fontSize: FONT_SIZE.xs,
     paddingHorizontal: 6,
     paddingVertical: 2,
   },
@@ -398,16 +402,14 @@ const styles = StyleSheet.create({
     flex: 1,
   },
   emptyBadge: {
-    alignItems: 'center',
-    borderRadius: 16,
-    borderWidth: 1,
-    gap: 8,
-    marginHorizontal: 32,
-    padding: 20,
-  },
-  emptyText: {
-    fontSize: 14,
-    textAlign: 'center',
+    ...CARD_SURFACE,
+    marginHorizontal: SPACING.xxl,
+    // Both axes stated: EmptyState's container sets paddingVertical, and in
+    // React Native the longhand wins over `padding` regardless of merge order,
+    // so a lone `padding` here would silently keep the container's vertical
+    // value and only apply horizontally.
+    paddingHorizontal: SPACING.xl,
+    paddingVertical: SPACING.xl,
   },
   flex: {
     flex: 1,
@@ -415,14 +417,14 @@ const styles = StyleSheet.create({
   header: {
     alignItems: 'center',
     flexDirection: 'row',
-    gap: 8,
+    gap: SPACING.sm,
     left: 12,
     position: 'absolute',
     right: 12,
   },
   headerButton: {
     alignItems: 'center',
-    borderRadius: 20,
+    borderRadius: BORDER_RADIUS.pill,
     borderWidth: 1,
     elevation: 4,
     height: 40,
@@ -448,7 +450,7 @@ const styles = StyleSheet.create({
     position: 'absolute',
   },
   titleBadge: {
-    borderRadius: 12,
+    borderRadius: BORDER_RADIUS.lg,
     borderWidth: 1,
     elevation: 4,
     flex: 1,

@@ -18,7 +18,7 @@ import frTranslations from '../../assets/i18n/fr.json';
 import zhTranslations from '../../assets/i18n/zh.json';
 import deTranslations from '../../assets/i18n/de.json';
 import hyTranslations from '../../assets/i18n/hy.json';
-import { TOP_CONTENT_SPACING, HORIZONTAL_PADDING } from '../styles/layout';
+import { BORDER_RADIUS, FONT_SIZE, HORIZONTAL_PADDING, TOP_CONTENT_SPACING } from '../styles/designTokens';
 
 // This is the only screen in the app a user sees exactly once, and it is where
 // the whole motion budget for first-run lives: everywhere else in Penny is a
@@ -166,14 +166,14 @@ const styles = StyleSheet.create({
   checkmark: {
     alignItems: 'center',
     backgroundColor: '#2196f3',
-    borderRadius: 14,
+    borderRadius: BORDER_RADIUS.pill,
     height: 28,
     justifyContent: 'center',
     width: 28,
   },
   checkmarkText: {
     color: '#ffffff',
-    fontSize: 18,
+    fontSize: FONT_SIZE.lg,
     fontWeight: 'bold',
   },
   container: {
@@ -189,7 +189,7 @@ const styles = StyleSheet.create({
   continueButton: {
     alignItems: 'center',
     backgroundColor: '#2196f3',
-    borderRadius: 12,
+    borderRadius: BORDER_RADIUS.lg,
     justifyContent: 'center',
     padding: 16,
   },
@@ -198,7 +198,7 @@ const styles = StyleSheet.create({
   },
   continueButtonText: {
     color: '#ffffff',
-    fontSize: 18,
+    fontSize: FONT_SIZE.lg,
     fontWeight: '600',
   },
   continueButtonTextDisabled: {
@@ -216,7 +216,7 @@ const styles = StyleSheet.create({
     alignItems: 'center',
     backgroundColor: '#f5f5f5',
     borderColor: '#f5f5f5',
-    borderRadius: 12,
+    borderRadius: BORDER_RADIUS.lg,
     borderWidth: 2,
     flexDirection: 'row',
     marginBottom: 16,
@@ -228,14 +228,14 @@ const styles = StyleSheet.create({
   },
   languageEnglishName: {
     color: '#666666',
-    fontSize: 14,
+    fontSize: FONT_SIZE.md,
   },
   languageEnglishNameSelected: {
     color: '#1976d2',
   },
   languageName: {
     color: '#1a1a1a',
-    fontSize: 20,
+    fontSize: FONT_SIZE.xl,
     fontWeight: '600',
     marginBottom: 4,
   },
@@ -255,7 +255,7 @@ const styles = StyleSheet.create({
   },
   subtitle: {
     color: '#666666',
-    fontSize: 16,
+    fontSize: FONT_SIZE.base,
     marginBottom: 48,
     textAlign: 'center',
   },

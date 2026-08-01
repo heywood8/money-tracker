@@ -4,7 +4,7 @@ import PropTypes from 'prop-types';
 import ModalBlurOverlay from '../ModalBlurOverlay';
 import CategoryGridSelector from '../CategoryGridSelector';
 import AccountGridSelector from '../AccountGridSelector';
-import { SPACING } from '../../styles/designTokens';
+import { FONT_SIZE, SPACING } from '../../styles/designTokens';
 
 /**
  * Unified picker modal for account and category selection.
@@ -113,7 +113,7 @@ const styles = StyleSheet.create({
     paddingVertical: 12,
   },
   closeButtonText: {
-    fontSize: 16,
+    fontSize: FONT_SIZE.base,
     fontWeight: '600',
   },
   gridContent: {

@@ -3,7 +3,7 @@ import { StyleSheet } from 'react-native';
 import { FAB } from 'react-native-paper';
 import PropTypes from 'prop-types';
 import { useThemeColors } from '../contexts/ThemeColorsContext';
-import { SPACING } from '../styles/layout';
+import { BORDER_RADIUS, SPACING } from '../styles/designTokens';
 
 const AddFAB = ({ onPress, testID, accessibilityLabel, accessibilityHint }) => {
   const { colors } = useThemeColors();
@@ -36,7 +36,7 @@ AddFAB.propTypes = {
 
 const styles = StyleSheet.create({
   fab: {
-    borderRadius: 28,
+    borderRadius: BORDER_RADIUS.xl,
     borderWidth: 1,
     bottom: 100,
     elevation: 8,

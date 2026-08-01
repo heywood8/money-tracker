@@ -1,6 +1,7 @@
 import React, { createContext, useContext, useMemo } from 'react';
 import PropTypes from 'prop-types';
 import { useThemeConfig } from './ThemeConfigContext';
+import { DESTRUCTIVE } from '../styles/semanticColors';
 
 const ThemeColorsContext = createContext();
 
@@ -24,14 +25,25 @@ const lightTheme = {
     inputBackground: '#fff',
     inputBorder: '#cccccc',
     calcButtonBackground: '#ffffff',
-    danger: 'red',
-    // Budget-row signal colours. Real hex (unlike `danger`, a bare CSS keyword)
-    // because a plan row tints its background with these at a low alpha, which
-    // needs an appendable hex channel. `overspend` means "past the target" — the
-    // one status a plan row states in colour.
+    // The one red. Every "this went wrong" or "this destroys something" in the
+    // app resolves here: validation text, delete affordances, error banners,
+    // Paper's `error` role. It used to be nine different reds — `danger` was the
+    // bare CSS keyword `red` (#f00, which no other colour in either palette came
+    // near), and eight more were hardcoded at their call sites, four of them
+    // hardcoding the *dark* red so it rendered unchanged on the light theme.
+    destructive: DESTRUCTIVE.light,
+    // Aliases kept because both names are load-bearing across the app and its
+    // tests. They are the same colour now, which is the point: `danger` (a
+    // negative signal) and `delete` (a destructive act) never wanted to differ.
+    danger: DESTRUCTIVE.light,
+    delete: DESTRUCTIVE.light,
+    error: DESTRUCTIVE.light,
+    // Budget-row signal colours. Separate from `destructive` on purpose: these
+    // are a plan row's *status*, not an error, and a row tints its background
+    // with them at a low alpha — which needs an appendable hex channel.
+    // `overspend` means "past the target".
     warning: '#C77700',
     overspend: '#C62828',
-    delete: '#d9534f',
     selected: '#a8d0f5',
     altRow: '#ffffff', // Added for alternating rows
     expense: '#5a3030',
@@ -69,12 +81,16 @@ const darkTheme = {
     inputBackground: '#333333',
     inputBorder: '#555555',
     calcButtonBackground: '#1e1e1e',
-    danger: 'red',
+    // See lightTheme note. Lifted off the light-theme red so it holds contrast
+    // against a near-black surface.
+    destructive: DESTRUCTIVE.dark,
+    danger: DESTRUCTIVE.dark,
+    delete: DESTRUCTIVE.dark,
+    error: DESTRUCTIVE.dark,
     // See lightTheme note. Lifted for legibility as a tint on a near-black
     // surface.
     warning: '#F2A93B',
     overspend: '#FF6B6B',
-    delete: '#ff6b6b',
     selected: '#003a7a',
     altRow: '#1a1a1a', // Added for alternating rows
     expense: '#e6cccc',

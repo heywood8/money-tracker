@@ -4,6 +4,7 @@ import PropTypes from 'prop-types';
 import Icon from '@expo/vector-icons/MaterialCommunityIcons';
 import currencies from '../../../assets/currencies.json';
 import { useDisplaySettings } from '../../contexts/DisplaySettingsContext';
+import { BORDER_RADIUS, FONT_SIZE, SPACING } from '../../styles/designTokens';
 
 const formatCurrency = (amount, currency) => {
   const currencyInfo = currencies[currency];
@@ -126,16 +127,16 @@ const styles = StyleSheet.create({
     alignItems: 'center',
     flex: 1,
     flexDirection: 'row',
-    gap: 4,
+    gap: SPACING.xs,
     minWidth: 0,
   },
   colorIndicator: {
-    borderRadius: 4,
+    borderRadius: BORDER_RADIUS.pill,
     height: 8,
     width: 8,
   },
   legendAmount: {
-    fontSize: 12,
+    fontSize: FONT_SIZE.sm,
     fontWeight: '600',
   },
   legendChevron: {
@@ -156,10 +157,10 @@ const styles = StyleSheet.create({
   },
   legendName: {
     flex: 1,
-    fontSize: 12,
+    fontSize: FONT_SIZE.sm,
   },
   legendPercentage: {
-    fontSize: 12,
+    fontSize: FONT_SIZE.sm,
     fontWeight: '500',
   },
   percentageColumn: {

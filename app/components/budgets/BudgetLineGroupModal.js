@@ -19,6 +19,8 @@ import FormInput from '../FormInput';
 import ModalBlurOverlay from '../ModalBlurOverlay';
 import ModalHeader from '../ModalHeader';
 import * as Currency from '../../services/currency';
+import { BUTTON, BUTTON_TEXT, SECTION_LABEL } from '../../styles/componentStyles';
+import { BORDER_RADIUS, FONT_SIZE, SPACING } from '../../styles/designTokens';
 
 // The overlay carries the keyboard inset, so it has to be animatable.
 const AnimatedPressable = Animated.createAnimatedComponent(Pressable);
@@ -307,11 +309,9 @@ BudgetLineGroupModal.propTypes = {
 
 const styles = StyleSheet.create({
   button: {
-    alignItems: 'center',
-    borderRadius: 6,
+    ...BUTTON,
     flex: 1,
-    marginHorizontal: 8,
-    paddingVertical: 12,
+    marginHorizontal: SPACING.sm,
   },
   buttonDisabled: {
     opacity: 0.5,
@@ -323,24 +323,21 @@ const styles = StyleSheet.create({
     paddingHorizontal: 12,
     paddingTop: 12,
   },
-  buttonText: {
-    fontSize: 16,
-    fontWeight: '500',
-  },
+  buttonText: BUTTON_TEXT,
   currencyChip: {
-    borderRadius: 8,
+    borderRadius: BORDER_RADIUS.md,
     borderWidth: 1,
     paddingHorizontal: 14,
     paddingVertical: 8,
   },
   currencyChipText: {
-    fontSize: 14,
+    fontSize: FONT_SIZE.md,
     fontWeight: '600',
   },
   currencyRow: {
     flexDirection: 'row',
     flexWrap: 'wrap',
-    gap: 8,
+    gap: SPACING.sm,
   },
   deleteRow: {
     alignItems: 'center',
@@ -351,7 +348,7 @@ const styles = StyleSheet.create({
     paddingVertical: 12,
   },
   deleteText: {
-    fontSize: 16,
+    fontSize: FONT_SIZE.base,
     fontWeight: '500',
     marginLeft: 8,
   },
@@ -368,11 +365,11 @@ const styles = StyleSheet.create({
     marginTop: 4,
   },
   fieldLabel: {
-    fontSize: 12,
-    marginBottom: 6,
+    ...SECTION_LABEL,
+    marginBottom: SPACING.xs,
   },
   modalContent: {
-    borderRadius: 12,
+    borderRadius: BORDER_RADIUS.lg,
     elevation: 5,
     maxHeight: '85%',
     overflow: 'hidden',
@@ -393,18 +390,18 @@ const styles = StyleSheet.create({
   },
   switchThumb: {
     backgroundColor: '#fff',
-    borderRadius: 8,
+    borderRadius: BORDER_RADIUS.pill,
     height: 16,
     width: 16,
   },
   switchTrack: {
-    borderRadius: 10,
+    borderRadius: BORDER_RADIUS.pill,
     height: 20,
     justifyContent: 'center',
     width: 36,
   },
   text16: {
-    fontSize: 16,
+    fontSize: FONT_SIZE.base,
   },
   toggleLabel: {
     alignItems: 'center',
@@ -413,7 +410,7 @@ const styles = StyleSheet.create({
   },
   toggleRow: {
     alignItems: 'center',
-    borderRadius: 4,
+    borderRadius: BORDER_RADIUS.sm,
     borderWidth: 1,
     flexDirection: 'row',
     justifyContent: 'space-between',

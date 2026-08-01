@@ -5,8 +5,9 @@ import { Text, Divider } from 'react-native-paper';
 import Ionicons from '@expo/vector-icons/Ionicons';
 import { useThemeColors } from '../contexts/ThemeColorsContext';
 import { useLocalization } from '../contexts/LocalizationContext';
-import { SPACING, BORDER_RADIUS } from '../styles/layout';
+import { BORDER_RADIUS, FONT_SIZE, SPACING } from '../styles/designTokens';
 import { parseReleaseNotes, formatReleaseDateTime } from '../components/UpdateContentPanel';
+import { BUTTON, MODAL_TITLE } from '../styles/componentStyles';
 
 // Picks the release-note entry describing the version we're prompting the user to install.
 // Prefers the entry whose version matches the latest release; otherwise falls back to the
@@ -187,12 +188,9 @@ const styles = StyleSheet.create({
     paddingTop: SPACING.md,
   },
   button: {
-    alignItems: 'center',
-    borderRadius: BORDER_RADIUS.md,
+    ...BUTTON,
     flexDirection: 'row',
     gap: SPACING.xs,
-    height: 46,
-    justifyContent: 'center',
   },
   card: {
     borderRadius: BORDER_RADIUS.lg,
@@ -217,7 +215,7 @@ const styles = StyleSheet.create({
     marginTop: SPACING.md,
   },
   emptyNotes: {
-    fontSize: 14,
+    fontSize: FONT_SIZE.md,
     lineHeight: 20,
     paddingHorizontal: SPACING.lg,
     paddingTop: SPACING.md,
@@ -292,9 +290,7 @@ const styles = StyleSheet.create({
     paddingHorizontal: SPACING.lg,
   },
   title: {
-    fontSize: 17,
-    fontWeight: '700',
-    letterSpacing: -0.1,
+    ...MODAL_TITLE,
   },
   updateButton: {
     flex: 1,

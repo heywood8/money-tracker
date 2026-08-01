@@ -5,7 +5,8 @@ import PropTypes from 'prop-types';
 // eslint-disable-next-line react-native/split-platform-components
 import { View, StyleSheet, TouchableOpacity, ScrollView, FlatList, Linking, ActivityIndicator, BackHandler, AppState, ToastAndroid } from 'react-native';
 import * as Clipboard from 'expo-clipboard';
-import { HORIZONTAL_PADDING, SPACING, BORDER_RADIUS } from '../styles/layout';
+import { BORDER_RADIUS, FONT_SIZE, HORIZONTAL_PADDING, SPACING } from '../styles/designTokens';
+import { DESTRUCTIVE } from '../styles/semanticColors';
 import { Text, Divider, TouchableRipple, Menu } from 'react-native-paper';
 import Ionicons from '@expo/vector-icons/Ionicons';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
@@ -42,6 +43,8 @@ import NotificationFiltersContentPanel from '../components/NotificationFiltersCo
 import NotificationBindingsContentPanel from '../components/NotificationBindingsContentPanel';
 import AccountsScreen from './AccountsScreen';
 import CategoriesScreen from './CategoriesScreen';
+import { BADGE, BADGE_TEXT, CHIP, CHIP_TEXT, SECTION_LABEL } from '../styles/componentStyles';
+import EmptyState from '../components/EmptyState';
 
 const SHEETS_STEPS = [
   { id: 'auth', label: 'Signing in to Google' },
@@ -57,8 +60,10 @@ const SHEETS_IMPORT_STEPS = [
   { id: 'parse', label: 'Reading sheet data' },
 ];
 
+// Log severity is a categorical scale, fixed across both themes like
+// chartPalette — only its red is pinned to the app's one red.
 const LOG_LEVEL_COLORS = {
-  error: '#e53935',
+  error: DESTRUCTIVE.light,
   warn: '#fb8c00',
   info: '#1e88e5',
   debug: '#757575',
@@ -71,9 +76,6 @@ const LOG_FILTERS = ['all', 'error', 'warn', 'info', 'debug'];
 const SELECTED_BADGE_BG = 'rgba(255,255,255,0.3)';
 
 const SPRING_CONFIG = { mass: 1, damping: 20, stiffness: 200 };
-
-// Red used for the inline "location permission denied" hint under the toggle row.
-const ERROR_TEXT_COLOR = '#e53935';
 
 /**
  * A settings row with an animated on/off switch. Extracted so the three toggle
@@ -99,7 +101,7 @@ const SettingToggleRow = ({ icon, label, hint, value, onToggle, hintError = fals
           <Ionicons name={icon} size={22} color={colors.text} />
           <View style={styles.settingsRowText}>
             <Text style={[styles.settingsRowLabel, { color: colors.text }]}>{label}</Text>
-            <Text style={[styles.settingsRowValue, { color: hintError ? ERROR_TEXT_COLOR : colors.mutedText }]}>
+            <Text style={[styles.settingsRowValue, { color: hintError ? colors.destructive : colors.mutedText }]}>
               {hint}
             </Text>
           </View>
@@ -940,7 +942,7 @@ export default function SettingsScreen({ setSubPanelActive }) {
                 <Text style={[styles.backupConfirmButtonText, { color: colors.mutedText }]}>{t('cancel') || 'Cancel'}</Text>
               </TouchableOpacity>
               <TouchableOpacity onPress={() => handleConfirmDeleteLocalBackup(item.uri)} style={styles.backupConfirmButton}>
-                <Text style={styles.backupConfirmButtonDestructiveText}>{t('delete') || 'Delete'}</Text>
+                <Text style={[styles.backupConfirmButtonDestructiveText, { color: colors.destructive }]}>{t('delete') || 'Delete'}</Text>
               </TouchableOpacity>
             </>
           ) : (
@@ -949,7 +951,7 @@ export default function SettingsScreen({ setSubPanelActive }) {
                 <Ionicons name="refresh-outline" size={20} color={colors.primary} />
               </TouchableOpacity>
               <TouchableOpacity onPress={() => handleDeleteLocalBackup(item.uri)} style={styles.backupActionButton}>
-                <Ionicons name="trash-outline" size={18} color="#c44" />
+                <Ionicons name="trash-outline" size={18} color={colors.destructive} />
               </TouchableOpacity>
             </>
           )}
@@ -1330,18 +1332,18 @@ export default function SettingsScreen({ setSubPanelActive }) {
                       {step.status === 'pending' && <Ionicons name="ellipse-outline" size={22} color={colors.mutedText} />}
                       {step.status === 'in_progress' && <ActivityIndicator size="small" color={colors.primary} />}
                       {step.status === 'completed' && <Ionicons name="checkmark-circle" size={22} color="#4caf50" />}
-                      {step.status === 'error' && <Ionicons name="close-circle" size={22} color="#c44" />}
+                      {step.status === 'error' && <Ionicons name="close-circle" size={22} color={colors.destructive} />}
                     </View>
                     <Text style={[
                       styles.sheetsProgressStepLabel,
-                      step.status === 'error' ? styles.sheetsProgressStepLabelError :
+                      step.status === 'error' ? { color: colors.destructive } :
                         { color: step.status === 'pending' ? colors.mutedText : colors.text },
                     ]}>
                       {step.label}
                     </Text>
                   </View>
                 ))}
-                {sheetsError && <Text style={styles.sheetsErrorText}>{sheetsError}</Text>}
+                {sheetsError && <Text style={[styles.sheetsErrorText, { color: colors.destructive }]}>{sheetsError}</Text>}
                 {sheetsSuccessUrl && (
                   <TouchableOpacity
                     onPress={() => Linking.openURL(sheetsSuccessUrl)}
@@ -1358,14 +1360,14 @@ export default function SettingsScreen({ setSubPanelActive }) {
 
             {activeSubPanel === 'reset' && (
               <View style={styles.confirmContent}>
-                <Ionicons name="warning-outline" size={48} color="#c44" style={styles.confirmWarningIcon} />
+                <Ionicons name="warning-outline" size={48} color={colors.destructive} style={styles.confirmWarningIcon} />
                 <Text style={[styles.confirmText, { color: colors.text }]}>
                   {t('reset_database_confirm') || 'Are you sure you want to reset the database? This will delete all data and create default accounts.'}
                 </Text>
                 <TouchableRipple
                   onPress={confirmResetDatabase}
                   disabled={resetInProgress}
-                  style={[styles.confirmButtonDestructive, resetInProgress && styles.confirmButtonBusy]}
+                  style={[styles.confirmButtonDestructive, { backgroundColor: colors.destructive }, resetInProgress && styles.confirmButtonBusy]}
                 >
                   {resetInProgress ? (
                     <View style={styles.confirmButtonBusyRow}>
@@ -1437,7 +1439,7 @@ export default function SettingsScreen({ setSubPanelActive }) {
                 </TouchableRipple>
                 {sheetsImportError && importStep === 'source' && (
                   <View style={styles.sheetsSetupCta}>
-                    <Text testID="settings-import-no-spreadsheet" style={styles.sheetsImportErrorInline}>
+                    <Text testID="settings-import-no-spreadsheet" style={[styles.sheetsImportErrorInline, { color: colors.destructive }]}>
                       {sheetsImportError}
                     </Text>
                     <TouchableRipple
@@ -1459,9 +1461,7 @@ export default function SettingsScreen({ setSubPanelActive }) {
 
             {activeSubPanel === 'import' && importStep === 'local-list' && (
               backupsLoading ? (
-                <View style={styles.emptyContainer}>
-                  <Text style={[styles.emptyText, { color: colors.mutedText }]}>{'Loading...'}</Text>
-                </View>
+                <EmptyState message={'Loading...'} style={styles.emptyContainer} />
               ) : (
                 <FlatList
                   data={storedBackups}
@@ -1473,9 +1473,7 @@ export default function SettingsScreen({ setSubPanelActive }) {
                     { paddingBottom: scrollBottomInset },
                   ]}
                   ListEmptyComponent={
-                    <Text style={[styles.emptyText, { color: colors.mutedText }]}>
-                      {t('local_backups_empty') || 'No local backups yet'}
-                    </Text>
+                    <EmptyState message={t('local_backups_empty') || 'No local backups yet'} />
                   }
                 />
               )
@@ -1483,11 +1481,11 @@ export default function SettingsScreen({ setSubPanelActive }) {
 
             {activeSubPanel === 'import' && importStep === 'confirm-file' && (
               <View style={styles.confirmContent}>
-                <Ionicons name="warning-outline" size={48} color="#c44" style={styles.confirmWarningIcon} />
+                <Ionicons name="warning-outline" size={48} color={colors.destructive} style={styles.confirmWarningIcon} />
                 <Text style={[styles.confirmText, { color: colors.text }]}>
                   {t('restore_confirm') || 'Are you sure you want to restore from backup? This will replace all current data.'}
                 </Text>
-                <TouchableRipple testID="confirm-import-file-btn" onPress={confirmImportBackup} style={styles.confirmButtonDestructive}>
+                <TouchableRipple testID="confirm-import-file-btn" onPress={confirmImportBackup} style={[styles.confirmButtonDestructive, { backgroundColor: colors.destructive }]}>
                   <Text style={styles.confirmButtonText}>{t('restore_database') || 'Restore'}</Text>
                 </TouchableRipple>
               </View>
@@ -1495,7 +1493,7 @@ export default function SettingsScreen({ setSubPanelActive }) {
 
             {activeSubPanel === 'import' && importStep === 'confirm-local' && (
               <View style={styles.confirmContent}>
-                <Ionicons name="warning-outline" size={48} color="#c44" style={styles.confirmWarningIcon} />
+                <Ionicons name="warning-outline" size={48} color={colors.destructive} style={styles.confirmWarningIcon} />
                 {importSelectedBackup && (
                   <Text style={[styles.confirmText, { color: colors.mutedText }]}>
                     {formatBackupLabel(importSelectedBackup.filename)}
@@ -1504,7 +1502,7 @@ export default function SettingsScreen({ setSubPanelActive }) {
                 <Text style={[styles.confirmText, { color: colors.text }]}>
                   {t('restore_confirm') || 'Are you sure you want to restore from backup? This will replace all current data.'}
                 </Text>
-                <TouchableRipple onPress={confirmRestoreLocalBackup} style={styles.confirmButtonDestructive}>
+                <TouchableRipple onPress={confirmRestoreLocalBackup} style={[styles.confirmButtonDestructive, { backgroundColor: colors.destructive }]}>
                   <Text style={styles.confirmButtonText}>{t('restore_database') || 'Restore'}</Text>
                 </TouchableRipple>
               </View>
@@ -1518,18 +1516,18 @@ export default function SettingsScreen({ setSubPanelActive }) {
                       {step.status === 'pending' && <Ionicons name="ellipse-outline" size={22} color={colors.mutedText} />}
                       {step.status === 'in_progress' && <ActivityIndicator size="small" color={colors.primary} />}
                       {step.status === 'completed' && <Ionicons name="checkmark-circle" size={22} color="#4caf50" />}
-                      {step.status === 'error' && <Ionicons name="close-circle" size={22} color="#c44" />}
+                      {step.status === 'error' && <Ionicons name="close-circle" size={22} color={colors.destructive} />}
                     </View>
                     <Text style={[
                       styles.sheetsProgressStepLabel,
-                      step.status === 'error' ? styles.sheetsProgressStepLabelError :
+                      step.status === 'error' ? { color: colors.destructive } :
                         { color: step.status === 'pending' ? colors.mutedText : colors.text },
                     ]}>
                       {step.label}
                     </Text>
                   </View>
                 ))}
-                {sheetsImportError && <Text style={styles.sheetsErrorText}>{sheetsImportError}</Text>}
+                {sheetsImportError && <Text style={[styles.sheetsErrorText, { color: colors.destructive }]}>{sheetsImportError}</Text>}
               </View>
             )}
 
@@ -1595,9 +1593,7 @@ export default function SettingsScreen({ setSubPanelActive }) {
                   windowSize={5}
                   contentContainerStyle={entries.length === 0 && styles.emptyContainer}
                   ListEmptyComponent={
-                    <Text style={[styles.emptyText, { color: colors.mutedText }]}>
-                      {t('no_logs') || 'No logs yet'}
-                    </Text>
+                    <EmptyState message={t('no_logs') || 'No logs yet'} />
                   }
                 />
 
@@ -1612,7 +1608,7 @@ export default function SettingsScreen({ setSubPanelActive }) {
                   </TouchableOpacity>
                   <TouchableOpacity onPress={handleClearLogs} style={styles.logsActionButton}>
                     <Ionicons name="trash-outline" size={20} color={LOG_LEVEL_COLORS.error} />
-                    <Text style={[styles.logsActionText, styles.clearLogsText]}>
+                    <Text style={[styles.logsActionText, { color: colors.destructive }]}>
                       {t('clear_logs') || 'Clear Logs'}
                     </Text>
                   </TouchableOpacity>
@@ -1852,8 +1848,8 @@ export default function SettingsScreen({ setSubPanelActive }) {
         <TouchableRipple onPress={() => openSubPanel('reset')} style={styles.settingsRow}>
           <View style={styles.settingsRowContent}>
             <View style={styles.settingsRowLeft}>
-              <Ionicons name="trash-outline" size={22} color="#c44" />
-              <Text style={[styles.settingsRowLabel, styles.destructiveText]}>{t('reset_database') || 'Reset Database'}</Text>
+              <Ionicons name="trash-outline" size={22} color={colors.destructive} />
+              <Text style={[styles.settingsRowLabel, { color: colors.destructive }]}>{t('reset_database') || 'Reset Database'}</Text>
             </View>
           </View>
         </TouchableRipple>
@@ -1878,12 +1874,11 @@ const styles = StyleSheet.create({
     paddingVertical: 6,
   },
   backupConfirmButtonDestructiveText: {
-    color: '#c44',
-    fontSize: 14,
+    fontSize: FONT_SIZE.md,
     fontWeight: '600',
   },
   backupConfirmButtonText: {
-    fontSize: 14,
+    fontSize: FONT_SIZE.md,
     fontWeight: '600',
   },
   backupItem: {
@@ -1897,7 +1892,7 @@ const styles = StyleSheet.create({
   backupItemActions: {
     alignItems: 'center',
     flexDirection: 'row',
-    gap: 4,
+    gap: SPACING.xs,
   },
   backupItemLabel: {
     fontSize: 15,
@@ -1909,14 +1904,11 @@ const styles = StyleSheet.create({
     gap: SPACING.md,
   },
   backupItemMeta: {
-    fontSize: 12,
+    fontSize: FONT_SIZE.sm,
     marginTop: 2,
   },
   backupItemText: {
     flex: 1,
-  },
-  clearLogsText: {
-    color: '#e53935',
   },
   confirmButtonBusy: {
     opacity: 0.85,
@@ -1928,7 +1920,6 @@ const styles = StyleSheet.create({
     justifyContent: 'center',
   },
   confirmButtonDestructive: {
-    backgroundColor: '#c44',
     borderRadius: BORDER_RADIUS.md,
     marginTop: SPACING.xl,
     paddingHorizontal: SPACING.xl,
@@ -1936,7 +1927,7 @@ const styles = StyleSheet.create({
   },
   confirmButtonText: {
     color: '#fff',
-    fontSize: 16,
+    fontSize: FONT_SIZE.base,
     fontWeight: '600',
     textAlign: 'center',
   },
@@ -1958,50 +1949,22 @@ const styles = StyleSheet.create({
   container: {
     flex: 1,
   },
-  destructiveText: {
-    color: '#c44',
-  },
   divider: {
     marginVertical: SPACING.xs,
   },
   emptyContainer: {
-    alignItems: 'center',
     flex: 1,
-    justifyContent: 'center',
   },
-  emptyText: {
-    fontSize: 14,
-  },
-  filterChip: {
-    alignItems: 'center',
-    borderRadius: 16,
-    borderWidth: 1,
-    flexDirection: 'row',
-    gap: 5,
-    paddingHorizontal: 12,
-    paddingVertical: 6,
-  },
-  filterChipBadge: {
-    alignItems: 'center',
-    borderRadius: 8,
-    justifyContent: 'center',
-    minWidth: 16,
-    paddingHorizontal: 4,
-  },
-  filterChipBadgeText: {
-    fontSize: 10,
-    fontWeight: '700',
-  },
-  filterChipText: {
-    fontSize: 12,
-    fontWeight: '600',
-  },
+  filterChip: CHIP,
+  filterChipBadge: BADGE,
+  filterChipBadgeText: BADGE_TEXT,
+  filterChipText: CHIP_TEXT,
   filterChipTextSelected: {
     color: '#fff',
   },
   filterRow: {
     flexDirection: 'row',
-    gap: 8,
+    gap: SPACING.sm,
     paddingHorizontal: HORIZONTAL_PADDING,
     paddingVertical: SPACING.sm,
   },
@@ -2009,7 +1972,7 @@ const styles = StyleSheet.create({
     flex: 1,
   },
   formatDescription: {
-    fontSize: 12,
+    fontSize: FONT_SIZE.sm,
     marginTop: SPACING.xs,
   },
   formatItemRow: {
@@ -2035,7 +1998,7 @@ const styles = StyleSheet.create({
     paddingVertical: SPACING.lg,
   },
   listItemText: {
-    fontSize: 16,
+    fontSize: FONT_SIZE.base,
   },
   logEntry: {
     borderBottomWidth: StyleSheet.hairlineWidth,
@@ -2072,14 +2035,14 @@ const styles = StyleSheet.create({
     gap: 6,
   },
   logsActionText: {
-    fontSize: 14,
+    fontSize: FONT_SIZE.md,
     fontWeight: '600',
   },
   resetSpacer: {
     height: SPACING.sm,
   },
   sectionLabel: {
-    letterSpacing: 0.5,
+    ...SECTION_LABEL,
     paddingHorizontal: HORIZONTAL_PADDING,
     paddingVertical: SPACING.sm,
   },
@@ -2100,7 +2063,7 @@ const styles = StyleSheet.create({
     opacity: 0.6,
   },
   settingsRowLabel: {
-    fontSize: 16,
+    fontSize: FONT_SIZE.base,
   },
   settingsRowLeft: {
     alignItems: 'center',
@@ -2117,15 +2080,13 @@ const styles = StyleSheet.create({
     marginTop: 2,
   },
   sheetsErrorText: {
-    color: '#c44',
-    fontSize: 14,
+    fontSize: FONT_SIZE.md,
     lineHeight: 20,
     marginTop: SPACING.lg,
     textAlign: 'center',
   },
   sheetsImportErrorInline: {
-    color: '#c44',
-    fontSize: 14,
+    fontSize: FONT_SIZE.md,
     lineHeight: 20,
     marginBottom: 8,
     marginHorizontal: 16,
@@ -2142,7 +2103,7 @@ const styles = StyleSheet.create({
   },
   sheetsOpenButtonText: {
     color: '#fff',
-    fontSize: 16,
+    fontSize: FONT_SIZE.base,
     fontWeight: '600',
   },
   sheetsProgressContent: {
@@ -2165,9 +2126,6 @@ const styles = StyleSheet.create({
     flex: 1,
     fontSize: 15,
   },
-  sheetsProgressStepLabelError: {
-    color: '#c44',
-  },
   sheetsSetupCta: {
     marginTop: SPACING.sm,
   },
@@ -2185,7 +2143,7 @@ const styles = StyleSheet.create({
     gap: SPACING.sm,
   },
   sheetsSetupCtaText: {
-    fontSize: 14,
+    fontSize: FONT_SIZE.md,
     fontWeight: '600',
   },
   subPanelBody: {
@@ -2228,14 +2186,14 @@ const styles = StyleSheet.create({
   },
   switchThumb: {
     backgroundColor: '#fff',
-    borderRadius: 10,
+    borderRadius: BORDER_RADIUS.pill,
     elevation: 2,
     height: 20,
     position: 'absolute',
     width: 20,
   },
   switchTrack: {
-    borderRadius: 12,
+    borderRadius: BORDER_RADIUS.pill,
     height: 24,
     justifyContent: 'center',
     width: 44,
@@ -2246,7 +2204,7 @@ const styles = StyleSheet.create({
   updateRowRight: {
     alignItems: 'center',
     flexDirection: 'row',
-    gap: 4,
+    gap: SPACING.xs,
   },
   updateRowSpinner: {
     marginLeft: 2,

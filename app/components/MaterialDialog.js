@@ -107,7 +107,7 @@ export default function MaterialDialog({
     }
   };
 
-  const destructiveColor = colors.delete || '#d32f2f';
+  const destructiveColor = colors.destructive;
 
   /** The accent a button speaks in — its label colour, and the base of its fill. */
   const accentFor = (style) => {

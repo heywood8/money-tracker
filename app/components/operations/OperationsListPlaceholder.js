@@ -106,7 +106,7 @@ const styles = StyleSheet.create({
     marginBottom: SPACING.sm,
   },
   iconCircle: {
-    borderRadius: 11,
+    borderRadius: BORDER_RADIUS.pill,
     height: 22,
     marginRight: SPACING.md,
     width: 22,

@@ -10,13 +10,15 @@ import { useDialog } from '../../contexts/DialogContext';
 import { useBudgetPlans } from '../../contexts/BudgetPlansContext';
 import * as Currency from '../../services/currency';
 import usePlanLineAmounts from '../../hooks/usePlanLineAmounts';
-import { SPACING } from '../../styles/layout';
+import { FONT_SIZE, SPACING } from '../../styles/designTokens';
 import { envelopeHue } from '../../styles/envelopePalette';
 import BudgetPlanLineModal from './BudgetPlanLineModal';
 import BudgetLineGroupModal from './BudgetLineGroupModal';
 import PlanLineRow from './PlanLineRow';
 import PlanGroupRow from './PlanGroupRow';
 import { currentMonthKey, addMonths, formatMonthLabel } from '../../utils/monthUtils';
+import { CARD_SURFACE, SECTION_HEADING } from '../../styles/componentStyles';
+import EmptyState from '../EmptyState';
 
 const CLOSED_MODAL = { visible: false, line: null, kind: 'expense' };
 const CLOSED_GROUP_MODAL = { visible: false, group: null };
@@ -1020,10 +1022,12 @@ const MonthlyPlanSection = forwardRef(function MonthlyPlanSection({
                 contradicted everything around it — keep just the bootstrap
                 actions in that case. */}
             {!hasAnyLines && (
-              <>
-                <Icon name="clipboard-text-outline" size={40} color={colors.mutedText} />
-                <Text style={[styles.emptyText, { color: colors.mutedText }]}>{t('no_plan_for_month')}</Text>
-              </>
+              <EmptyState
+                icon="clipboard-text-outline"
+                iconSize={40}
+                fill={false}
+                message={t('no_plan_for_month')}
+              />
             )}
             <View style={styles.emptyActions}>
               <Pressable
@@ -1158,8 +1162,7 @@ export default MonthlyPlanSection;
 
 const styles = StyleSheet.create({
   card: {
-    borderRadius: 16,
-    borderWidth: 1,
+    ...CARD_SURFACE,
     marginBottom: SPACING.md,
     padding: SPACING.md,
   },
@@ -1171,7 +1174,7 @@ const styles = StyleSheet.create({
   },
   convertWarningText: {
     flex: 1,
-    fontSize: 12,
+    fontSize: FONT_SIZE.sm,
   },
   emptyActions: {
     gap: SPACING.sm,
@@ -1182,10 +1185,6 @@ const styles = StyleSheet.create({
     alignItems: 'center',
     paddingVertical: SPACING.md,
   },
-  emptyText: {
-    marginTop: SPACING.sm,
-    textAlign: 'center',
-  },
   monthHeader: {
     alignItems: 'center',
     flexDirection: 'row',
@@ -1193,7 +1192,7 @@ const styles = StyleSheet.create({
     marginBottom: SPACING.sm,
   },
   monthTitle: {
-    fontSize: 16,
+    fontSize: FONT_SIZE.base,
     fontWeight: '700',
   },
   navButton: {
@@ -1203,7 +1202,7 @@ const styles = StyleSheet.create({
     alignItems: 'center',
     borderRadius: 10,
     flexDirection: 'row',
-    gap: 8,
+    gap: SPACING.sm,
     justifyContent: 'center',
     paddingVertical: SPACING.sm,
   },
@@ -1221,7 +1220,7 @@ const styles = StyleSheet.create({
     borderRadius: 10,
     borderWidth: 1,
     flexDirection: 'row',
-    gap: 8,
+    gap: SPACING.sm,
     justifyContent: 'center',
     paddingVertical: SPACING.sm,
   },
@@ -1230,7 +1229,7 @@ const styles = StyleSheet.create({
     fontWeight: '600',
   },
   sectionAmount: {
-    fontSize: 16,
+    fontSize: FONT_SIZE.base,
     fontWeight: '700',
   },
   sectionHeader: {
@@ -1246,28 +1245,24 @@ const styles = StyleSheet.create({
   sectionHeaderSpaced: {
     marginTop: SPACING.md,
   },
-  sectionTitle: {
-    fontSize: 15,
-    fontWeight: '700',
-    textTransform: 'uppercase',
-  },
+  sectionTitle: SECTION_HEADING,
   sectionTitleGroup: {
     alignItems: 'center',
     flexDirection: 'row',
-    gap: 8,
+    gap: SPACING.sm,
   },
   totalsHint: {
-    fontSize: 12,
+    fontSize: FONT_SIZE.sm,
   },
   totalsLabel: {
     flexShrink: 1,
-    fontSize: 14,
+    fontSize: FONT_SIZE.md,
   },
   totalsLabelRight: {
     textAlign: 'right',
   },
   totalsRemainder: {
-    fontSize: 14,
+    fontSize: FONT_SIZE.md,
     fontWeight: '700',
   },
   totalsRow: {

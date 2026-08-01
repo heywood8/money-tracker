@@ -1,6 +1,7 @@
 import { View, StyleSheet } from 'react-native';
 import PropTypes from 'prop-types';
 import { useThemeColors } from '../contexts/ThemeColorsContext';
+import { SPACING } from '../styles/designTokens';
 
 export default function Header({ rightContent = null }) {
   const { colors } = useThemeColors();
@@ -27,7 +28,7 @@ const styles = StyleSheet.create({
   buttonContainer: {
     alignItems: 'center',
     flexDirection: 'row',
-    gap: 8,
+    gap: SPACING.sm,
   },
   container: {
     alignItems: 'center',

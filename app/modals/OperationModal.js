@@ -29,7 +29,7 @@ import { getDistinctLabels, getLabelsNearLocation } from '../services/Operations
 import useOperationLocation from '../hooks/useOperationLocation';
 import * as Currency from '../services/currency';
 import { formatDate } from '../services/BalanceHistoryDB';
-import { SPACING, BORDER_RADIUS } from '../styles/designTokens';
+import { SPACING, BORDER_RADIUS, FONT_SIZE } from '../styles/designTokens';
 import currencies from '../../assets/currencies.json';
 import { hasOperation, evaluateExpression } from '../utils/calculatorUtils';
 import useOperationForm from '../hooks/useOperationForm';
@@ -659,7 +659,7 @@ export default function OperationModal({
           </View>
         )}
 
-        {errors.general && <Text style={styles.error}>{errors.general}</Text>}
+        {errors.general && <Text style={[styles.error, { color: colors.destructive }]}>{errors.general}</Text>}
       </ModalShell>
 
       {/* Split Operation Modal */}
@@ -751,19 +751,18 @@ const styles = StyleSheet.create({
     paddingVertical: SPACING.md,
   },
   closeButtonText: {
-    fontSize: 16,
+    fontSize: FONT_SIZE.base,
     fontWeight: '600',
   },
   disabledInput: {
     opacity: 0.6,
   },
   error: {
-    color: '#ff6b6b',
-    fontSize: 12,
+    fontSize: FONT_SIZE.sm,
     marginBottom: SPACING.sm,
   },
   excludeAvgHint: {
-    fontSize: 12,
+    fontSize: FONT_SIZE.sm,
   },
   excludeAvgLabel: {
     marginBottom: 2,
@@ -820,7 +819,7 @@ const styles = StyleSheet.create({
     paddingVertical: SPACING.sm,
   },
   splitButtonText: {
-    fontSize: 14,
+    fontSize: FONT_SIZE.md,
     fontWeight: '500',
   },
 

@@ -2,6 +2,7 @@ import React from 'react';
 import { Text, StyleSheet, TouchableOpacity } from 'react-native';
 import Icon from '@expo/vector-icons/MaterialCommunityIcons';
 import PropTypes from 'prop-types';
+import { CHIP, CHIP_TEXT } from '../../styles/componentStyles';
 
 /**
  * Shows the category a summary tab is currently drilled into, and pops back to
@@ -38,22 +39,15 @@ CategoryBackChip.propTypes = {
 
 const styles = StyleSheet.create({
   chip: {
-    alignItems: 'center',
-    borderRadius: 20,
-    borderWidth: 1,
-    flexDirection: 'row',
-    gap: 4,
+    ...CHIP,
     // Never wider than the slot it sits in — under the donut that slot is the
     // donut's own width, so a long category name ellipsises instead of pushing
     // the legend around.
     maxWidth: '100%',
-    paddingHorizontal: 10,
-    paddingVertical: 4,
   },
   chipText: {
+    ...CHIP_TEXT,
     flexShrink: 1,
-    fontSize: 13,
-    fontWeight: '600',
   },
 });
 

@@ -2,7 +2,7 @@ import React from 'react';
 import { View, Text, TextInput, StyleSheet, Keyboard } from 'react-native';
 import PropTypes from 'prop-types';
 import Icon from '@expo/vector-icons/MaterialCommunityIcons';
-import { SPACING } from '../../styles/designTokens';
+import { BORDER_RADIUS, FONT_SIZE, SPACING } from '../../styles/designTokens';
 import currencies from '../../../assets/currencies.json';
 import * as Currency from '../../services/currency';
 
@@ -126,18 +126,18 @@ const styles = StyleSheet.create({
     paddingHorizontal: SPACING.xs,
   },
   currencyInfoText: {
-    fontSize: 14,
+    fontSize: FONT_SIZE.md,
     fontWeight: '500',
   },
   currencyLabel: {
-    fontSize: 14,
+    fontSize: FONT_SIZE.md,
     minWidth: 40,
   },
   disabledInput: {
     opacity: 0.5,
   },
   inputLabel: {
-    fontSize: 14,
+    fontSize: FONT_SIZE.md,
     minWidth: 120,
   },
   inputRow: {
@@ -147,17 +147,17 @@ const styles = StyleSheet.create({
     marginBottom: SPACING.sm,
   },
   rateInfo: {
-    fontSize: 12,
+    fontSize: FONT_SIZE.sm,
     marginBottom: SPACING.sm,
     marginTop: SPACING.xs,
     paddingHorizontal: SPACING.xs,
     textAlign: 'center',
   },
   smallInput: {
-    borderRadius: 8,
+    borderRadius: BORDER_RADIUS.md,
     borderWidth: 1,
     flex: 1,
-    fontSize: 16,
+    fontSize: FONT_SIZE.base,
     paddingHorizontal: SPACING.md,
     paddingVertical: SPACING.sm,
   },

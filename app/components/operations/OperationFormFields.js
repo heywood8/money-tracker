@@ -19,12 +19,8 @@ import currencies from '../../../assets/currencies.json';
 
 const getCurrencySymbol = (code) => currencies[code]?.symbol || code;
 
-// Red outline used to flash a field that failed validation on a QuickAdd attempt.
-const FLASH_ERROR_COLOR = '#ef4444';
-
 import { hasOperation as checkHasOperation, evaluateExpression } from '../../utils/calculatorUtils';
-import { SPACING, BORDER_RADIUS } from '../../styles/layout';
-import { FONT_SIZE } from '../../styles/designTokens';
+import { BORDER_RADIUS, FONT_SIZE, SPACING } from '../../styles/designTokens';
 
 /**
  * OperationFormFields Component
@@ -124,8 +120,9 @@ const OperationFormFields = memo(({
     return () => clearTimeout(timer);
   }, [flashError?.field, flashError?.token]);
 
-  const chipBorderColor = flashingField === 'category' ? FLASH_ERROR_COLOR : colors.border;
-  const toAccountChipBorderColor = flashingField === 'toAccount' ? FLASH_ERROR_COLOR : colors.border;
+  // Red outline flashed on the field that failed validation on a QuickAdd attempt.
+  const chipBorderColor = flashingField === 'category' ? colors.destructive : colors.border;
+  const toAccountChipBorderColor = flashingField === 'toAccount' ? colors.destructive : colors.border;
 
   // Inline "All categories" browser state — replaces the bottom-sheet picker in
   // QuickAdd. We render the category hierarchy in-place using chips that look
@@ -257,10 +254,10 @@ const OperationFormFields = memo(({
   // Per-field border overrides — flash red when that field is the one that
   // failed validation, otherwise fall back to the normal group border.
   const accountBorderStyle = flashingField === 'account'
-    ? { borderColor: FLASH_ERROR_COLOR }
+    ? { borderColor: colors.destructive }
     : groupBorderStyle;
   const toAccountBorderStyle = flashingField === 'toAccount'
-    ? { borderColor: FLASH_ERROR_COLOR }
+    ? { borderColor: colors.destructive }
     : groupBorderStyle;
 
   const disabledStyle = useMemo(() =>
@@ -1005,13 +1002,13 @@ OperationFormFields.propTypes = {
 
 const styles = StyleSheet.create({
   accountBalanceText: {
-    fontSize: 12,
+    fontSize: FONT_SIZE.sm,
   },
   accountRows: {
     gap: SPACING.xs,
   },
   accountShortcutBalance: {
-    fontSize: 10,
+    fontSize: FONT_SIZE.xs,
     textAlign: 'center',
   },
   accountShortcutButton: {
@@ -1111,12 +1108,12 @@ const styles = StyleSheet.create({
     marginBottom: SPACING.xs,
   },
   formInputText: {
-    fontSize: 14,
+    fontSize: FONT_SIZE.md,
     fontWeight: '500',
   },
   hiddenBalance: {
     backgroundColor: 'rgba(120, 120, 120, 0.25)',
-    borderRadius: 4,
+    borderRadius: BORDER_RADIUS.sm,
     height: 12,
     width: 64,
   },
@@ -1139,7 +1136,7 @@ const styles = StyleSheet.create({
     opacity: 0.35,
   },
   placeholderDot: {
-    borderRadius: 9,
+    borderRadius: BORDER_RADIUS.pill,
     height: 18,
     width: 18,
   },
@@ -1165,7 +1162,7 @@ const styles = StyleSheet.create({
     paddingVertical: SPACING.sm,
   },
   typeButtonText: {
-    fontSize: 14,
+    fontSize: FONT_SIZE.md,
     fontWeight: '500',
   },
   typeSelector: {

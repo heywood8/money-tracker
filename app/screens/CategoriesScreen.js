@@ -16,7 +16,7 @@ import { Text, TouchableRipple, TextInput as PaperTextInput } from 'react-native
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import Icon from '@expo/vector-icons/MaterialCommunityIcons';
 import { useThemeColors } from '../contexts/ThemeColorsContext';
-import { TOP_CONTENT_SPACING, SPACING, BORDER_RADIUS } from '../styles/designTokens';
+import { TOP_CONTENT_SPACING, SPACING, BORDER_RADIUS, FONT_SIZE } from '../styles/designTokens';
 import { DURATION_ENTER, DURATION_EXIT } from '../utils/motion';
 import { motionDuration } from '../utils/reducedMotion';
 import AddFAB from '../components/AddFAB';
@@ -41,8 +41,8 @@ const CategoriesScreen = ({ onBackStateChange }) => {
   const insets = useSafeAreaInsets();
   const { paperInputTheme } = makeModalStyles(colors);
   const themed = useMemo(() => ({
-    pickerItemText: { color: colors.text, fontSize: 18 },
-    parentText: { color: colors.text, fontSize: 18, marginLeft: 12 },
+    pickerItemText: { color: colors.text, fontSize: FONT_SIZE.lg },
+    parentText: { color: colors.text, fontSize: FONT_SIZE.lg, marginLeft: 12 },
     saveButtonText: { color: '#fff' },
     cancelButtonText: { color: colors.text },
   }), [colors]);
@@ -380,7 +380,7 @@ const CategoriesScreen = ({ onBackStateChange }) => {
             </Text>
             {!formIsNew ? (
               <TouchableOpacity onPress={handleDelete} style={styles.formPanelBack} accessibilityRole="button" accessibilityLabel={t('delete_category')}>
-                <Icon name="trash-can-outline" size={22} color={colors.delete || '#ef4444'} />
+                <Icon name="trash-can-outline" size={22} color={colors.destructive} />
               </TouchableOpacity>
             ) : (
               <View style={styles.formPanelBack} />
@@ -471,7 +471,7 @@ const CategoriesScreen = ({ onBackStateChange }) => {
             </Pressable>
 
             {formErrors.general && (
-              <Text style={styles.errorText}>{formErrors.general}</Text>
+              <Text style={[styles.errorText, { color: colors.destructive }]}>{formErrors.general}</Text>
             )}
           </ScrollView>
 
@@ -622,7 +622,7 @@ const styles = StyleSheet.create({
     gap: 2,
   },
   backLabel: {
-    fontSize: 14,
+    fontSize: FONT_SIZE.md,
     fontWeight: '500',
   },
   container: {
@@ -636,8 +636,7 @@ const styles = StyleSheet.create({
     flex: 1,
   },
   errorText: {
-    color: '#ff6b6b',
-    fontSize: 12,
+    fontSize: FONT_SIZE.sm,
     marginBottom: SPACING.sm,
   },
   folderBadge: {
@@ -648,7 +647,7 @@ const styles = StyleSheet.create({
   // Form footer buttons
   formFooterBtn: {
     alignItems: 'center',
-    borderRadius: 8,
+    borderRadius: BORDER_RADIUS.md,
     borderWidth: 1,
     flex: 1,
     height: 44,
@@ -675,7 +674,7 @@ const styles = StyleSheet.create({
   formPanelFooter: {
     borderTopWidth: StyleSheet.hairlineWidth,
     flexDirection: 'row',
-    gap: 8,
+    gap: SPACING.sm,
     paddingHorizontal: 12,
     paddingTop: 12,
   },
@@ -695,7 +694,7 @@ const styles = StyleSheet.create({
   },
   formPanelTitle: {
     flex: 1,
-    fontSize: 18,
+    fontSize: FONT_SIZE.lg,
     fontWeight: '600',
     textAlign: 'center',
   },
@@ -710,7 +709,7 @@ const styles = StyleSheet.create({
     width: (Dimensions.get('window').width - SPACING.sm * 2 - SPACING.xs * 2 * 3) / 3,
   },
   gridCellName: {
-    fontSize: 12,
+    fontSize: FONT_SIZE.sm,
     fontWeight: '500',
     textAlign: 'center',
   },

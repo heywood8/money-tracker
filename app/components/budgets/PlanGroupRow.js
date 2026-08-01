@@ -4,7 +4,7 @@ import PropTypes from 'prop-types';
 import Icon from '@expo/vector-icons/MaterialCommunityIcons';
 import * as Currency from '../../services/currency';
 import PlanProgressBar, { PAIR_COLUMN_WIDTH } from './PlanProgressBar';
-import { SPACING } from '../../styles/layout';
+import { BORDER_RADIUS, FONT_SIZE, SPACING } from '../../styles/designTokens';
 
 // Stands in for a figure whose exchange rate is still resolving — same em dash
 // PlanLineRow uses, for the same reason.
@@ -206,7 +206,7 @@ export default PlanGroupRow;
 
 const styles = StyleSheet.create({
   groupAmount: {
-    fontSize: 16,
+    fontSize: FONT_SIZE.base,
     fontVariant: ['tabular-nums'],
     fontWeight: '700',
     marginLeft: 8,
@@ -224,11 +224,11 @@ const styles = StyleSheet.create({
   groupMetaRow: {
     alignItems: 'center',
     flexDirection: 'row',
-    gap: 4,
+    gap: SPACING.xs,
     marginTop: 1,
   },
   groupName: {
-    fontSize: 16,
+    fontSize: FONT_SIZE.base,
     fontWeight: '700',
     letterSpacing: 0.2,
   },
@@ -244,7 +244,7 @@ const styles = StyleSheet.create({
     // No hairline under the header any more: the rail down the left edge is what
     // joins this row to its children now, and a rule plus an indent plus a rail
     // would be three devices for one relationship.
-    borderRadius: 8,
+    borderRadius: BORDER_RADIUS.md,
     marginTop: SPACING.sm,
     overflow: 'hidden',
     paddingVertical: 7,
@@ -269,10 +269,10 @@ const styles = StyleSheet.create({
   },
   noteText: {
     flex: 1,
-    fontSize: 12,
+    fontSize: FONT_SIZE.sm,
   },
   rail: {
-    borderRadius: 1,
+    borderRadius: BORDER_RADIUS.pill,
     bottom: 0,
     left: 0,
     position: 'absolute',

@@ -18,7 +18,7 @@ import PropTypes from 'prop-types';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { useThemeColors } from '../contexts/ThemeColorsContext';
 import { useLocalization } from '../contexts/LocalizationContext';
-import { SPACING, BORDER_RADIUS } from '../styles/designTokens';
+import { BORDER_RADIUS, FONT_SIZE, SPACING } from '../styles/designTokens';
 import { useBackShrink } from '../hooks/useBackShrink';
 import ModalBlurOverlay from './ModalBlurOverlay';
 import {
@@ -27,6 +27,7 @@ import {
   rubberband,
 } from '../utils/motion';
 import { isReduceMotionEnabled } from '../utils/reducedMotion';
+import { MODAL_TITLE } from '../styles/componentStyles';
 
 // Pressable that can animate layout props (paddingBottom) for keyboard avoidance.
 const AnimatedPressable = Animated.createAnimatedComponent(Pressable);
@@ -460,7 +461,7 @@ const styles = StyleSheet.create({
     paddingVertical: SPACING.sm,
   },
   btnText: {
-    fontSize: 16,
+    fontSize: FONT_SIZE.base,
     fontWeight: '600',
   },
   cancelBtn: {
@@ -528,12 +529,10 @@ const styles = StyleSheet.create({
     paddingBottom: 0,
   },
   subtitle: {
-    fontSize: 12,
+    fontSize: FONT_SIZE.sm,
     marginTop: 2,
   },
   title: {
-    fontSize: 18,
-    fontWeight: '700',
-    letterSpacing: -0.3,
+    ...MODAL_TITLE,
   },
 });

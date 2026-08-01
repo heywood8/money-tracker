@@ -6,6 +6,7 @@ import currencies from '../../../assets/currencies.json';
 import ModalBlurOverlay from '../ModalBlurOverlay';
 import { getTopSourceCurrencies } from '../../services/OperationsDB';
 import { SPACING, BORDER_RADIUS, FONT_SIZE } from '../../styles/designTokens';
+import { MODAL_TITLE } from '../../styles/componentStyles';
 
 const alphabeticalList = Object.entries(currencies).map(([code, data]) => ({
   code,
@@ -199,8 +200,7 @@ const styles = StyleSheet.create({
     width: 28,
   },
   title: {
-    fontSize: FONT_SIZE.lg,
-    fontWeight: '600',
+    ...MODAL_TITLE,
   },
 });
 

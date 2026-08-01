@@ -24,7 +24,7 @@ import FormInput from './FormInput';
 import CategoryGridSelector from './CategoryGridSelector';
 import { getCategoryDisplayName } from '../utils/categoryUtils';
 import { NotificationCard } from './NotificationsContentPanel';
-import { HORIZONTAL_PADDING, SPACING, BORDER_RADIUS } from '../styles/layout';
+import { BORDER_RADIUS, FONT_SIZE, HORIZONTAL_PADDING, SPACING } from '../styles/designTokens';
 import {
   isBankNotificationsEnabled,
   processBankNotifications,
@@ -46,6 +46,8 @@ import { getLabelForMerchant } from '../services/NotificationRulesDB';
 import { getRecentNotifications } from '../services/NotificationAccess';
 import { normalizeMerchantLabel } from '../utils/labelUtils';
 import * as Currency from '../services/currency';
+import { BUTTON_COMPACT, BUTTON_TEXT, CARD_SURFACE, SECTION_LABEL } from '../styles/componentStyles';
+import EmptyState from './EmptyState';
 
 // How often the panel silently re-runs the pipeline and reloads its lists so
 // newly-arrived notifications surface on their own, without a manual pull.
@@ -428,12 +430,14 @@ export default function NotificationProcessingContentPanel({ bottomInset = 0 }) 
       </Text>
 
       {pending.length === 0 ? (
-        <View style={styles.emptyState}>
-          <Ionicons name="checkmark-done-outline" size={40} color={colors.mutedText} />
-          <Text style={[styles.emptyText, { color: colors.mutedText }]}>
-            {t('bank_notifications_empty') || 'Nothing to review. Matched notifications are saved automatically.'}
-          </Text>
-        </View>
+        <EmptyState
+          icon="checkmark-done-outline"
+          iconSet="ionicons"
+          iconSize={40}
+          fill={false}
+          style={styles.emptyState}
+          message={t('bank_notifications_empty') || 'Nothing to review. Matched notifications are saved automatically.'}
+        />
       ) : (
         pending.map((item) => {
           // Mid-save: the full form is collapsed into a compact progress row so
@@ -621,22 +625,20 @@ export default function NotificationProcessingContentPanel({ bottomInset = 0 }) 
       </Text>
 
       {visibleRecent.length === 0 ? (
-        <View style={styles.emptyState}>
-          {/* Distinguish "nothing captured" from "everything is hidden by the
-              app filters" so an empty feed never looks like a broken listener. */}
-          <Ionicons
-            name={recent.length > 0 ? 'funnel-outline' : 'notifications-off-outline'}
-            size={40}
-            color={colors.mutedText}
-          />
-          <Text style={[styles.emptyText, { color: colors.mutedText }]}>
-            {recent.length > 0
-              ? (t('notifications_all_filtered') ||
-                'All recent notifications are hidden by your app filters.')
-              : (t('notifications_empty') ||
-                'No notifications recorded yet. New notifications will appear here.')}
-          </Text>
-        </View>
+        // Distinguish "nothing captured" from "everything is hidden by the
+        // app filters" so an empty feed never looks like a broken listener.
+        <EmptyState
+          icon={recent.length > 0 ? 'funnel-outline' : 'notifications-off-outline'}
+          iconSet="ionicons"
+          iconSize={40}
+          fill={false}
+          style={styles.emptyState}
+          message={recent.length > 0
+            ? (t('notifications_all_filtered') ||
+              'All recent notifications are hidden by your app filters.')
+            : (t('notifications_empty') ||
+              'No notifications recorded yet. New notifications will appear here.')}
+        />
       ) : (
         keyedRecent.map(({ notification, key }) => {
           // A card is "new" (and animates in) when its key wasn't shown before.
@@ -687,20 +689,11 @@ NotificationProcessingContentPanel.propTypes = {
 };
 
 const styles = StyleSheet.create({
-  actionButton: {
-    alignItems: 'center',
-    borderRadius: BORDER_RADIUS.sm,
-    justifyContent: 'center',
-    paddingHorizontal: SPACING.lg,
-    paddingVertical: SPACING.sm,
-  },
+  actionButton: BUTTON_COMPACT,
   actionButtonPrimary: {
     minWidth: 88,
   },
-  actionLabel: {
-    fontSize: 14,
-    fontWeight: '600',
-  },
+  actionLabel: BUTTON_TEXT,
   actionLabelPrimary: {
     color: '#ffffff',
   },
@@ -712,8 +705,7 @@ const styles = StyleSheet.create({
     marginTop: SPACING.md,
   },
   card: {
-    borderRadius: BORDER_RADIUS.md,
-    borderWidth: StyleSheet.hairlineWidth,
+    ...CARD_SURFACE,
     marginBottom: SPACING.md,
     padding: SPACING.md,
   },
@@ -722,7 +714,7 @@ const styles = StyleSheet.create({
     fontWeight: '700',
   },
   cardConversion: {
-    fontSize: 12,
+    fontSize: FONT_SIZE.sm,
     fontStyle: 'italic',
     marginTop: 2,
   },
@@ -738,7 +730,7 @@ const styles = StyleSheet.create({
     marginRight: SPACING.sm,
   },
   cardMeta: {
-    fontSize: 12,
+    fontSize: FONT_SIZE.sm,
     marginTop: 2,
   },
   categoryLabelRow: {
@@ -759,16 +751,9 @@ const styles = StyleSheet.create({
     paddingHorizontal: HORIZONTAL_PADDING,
     paddingVertical: SPACING.xl,
   },
-  emptyText: {
-    fontSize: 14,
-    lineHeight: 20,
-    textAlign: 'center',
-  },
   fieldLabel: {
-    fontSize: 11,
-    fontWeight: '600',
-    letterSpacing: 0.6,
-    marginBottom: 4,
+    ...SECTION_LABEL,
+    marginBottom: SPACING.xs,
     marginTop: SPACING.sm,
   },
   helpText: {
@@ -793,16 +778,14 @@ const styles = StyleSheet.create({
     fontWeight: '700',
   },
   savingStatus: {
-    fontSize: 12,
+    fontSize: FONT_SIZE.sm,
     marginTop: 2,
   },
   scroll: {
     flex: 1,
   },
   sectionTitle: {
-    fontSize: 11,
-    fontWeight: '600',
-    letterSpacing: 0.8,
+    ...SECTION_LABEL,
     marginBottom: SPACING.sm,
     marginTop: SPACING.lg,
   },
@@ -810,10 +793,10 @@ const styles = StyleSheet.create({
     alignItems: 'center',
     flexDirection: 'row',
     flexShrink: 1,
-    gap: 4,
+    gap: SPACING.xs,
   },
   selectedCategoryText: {
-    fontSize: 12,
+    fontSize: FONT_SIZE.sm,
     fontWeight: '600',
   },
   // Swipe-to-deactivate action revealed under a recent-notification card. The

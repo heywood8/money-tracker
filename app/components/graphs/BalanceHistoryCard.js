@@ -25,6 +25,8 @@ import { useDisplaySettings } from '../../contexts/DisplaySettingsContext';
 import { balanceLineColors } from '../../styles/chartPalette';
 import BalanceHistoryCalendarView from './BalanceHistoryCalendarView';
 import { MONTH_ABBREVIATIONS } from './monthLabels';
+import { CARD_SURFACE } from '../../styles/componentStyles';
+import { BORDER_RADIUS, FONT_SIZE, SPACING } from '../../styles/designTokens';
 
 // Helper to format numbers compactly (e.g., 10K, 1.5M)
 const formatCompact = (value, currency) => {
@@ -1294,7 +1296,7 @@ const styles = StyleSheet.create({
     paddingHorizontal: 10,
   },
   accountPickerWrapper: {
-    borderRadius: 16,
+    borderRadius: BORDER_RADIUS.pill,
     flexShrink: 0,
     width: 150,
   },
@@ -1306,7 +1308,7 @@ const styles = StyleSheet.create({
   balanceAmountRow: {
     alignItems: 'baseline',
     flexDirection: 'row',
-    gap: 8,
+    gap: SPACING.sm,
     marginTop: 4,
   },
   balanceDayContext: {
@@ -1314,9 +1316,8 @@ const styles = StyleSheet.create({
     fontWeight: '500',
   },
   balanceHistoryCard: {
-    borderRadius: 16,
-    borderWidth: 1,
-    marginBottom: 16,
+    ...CARD_SURFACE,
+    marginBottom: SPACING.lg,
     overflow: 'hidden',
     padding: 16,
   },
@@ -1349,7 +1350,7 @@ const styles = StyleSheet.create({
     paddingHorizontal: 32,
   },
   balanceHistoryNoDataText: {
-    fontSize: 14,
+    fontSize: FONT_SIZE.md,
     textAlign: 'center',
   },
   balanceHistoryTitleContainer: {
@@ -1362,14 +1363,14 @@ const styles = StyleSheet.create({
   },
   calendarToggleBtn: {
     alignItems: 'center',
-    borderRadius: 8,
+    borderRadius: BORDER_RADIUS.md,
     height: 32,
     justifyContent: 'center',
     marginRight: 8,
     width: 32,
   },
   legendDot: {
-    borderRadius: 6,
+    borderRadius: BORDER_RADIUS.pill,
     height: 12,
     marginRight: 6,
     width: 12,
@@ -1379,12 +1380,12 @@ const styles = StyleSheet.create({
   },
   legendTableHeader: {
     flex: 1,
-    fontSize: 12,
+    fontSize: FONT_SIZE.sm,
     fontWeight: '600',
     textAlign: 'right',
   },
   legendTableLabel: {
-    fontSize: 12,
+    fontSize: FONT_SIZE.sm,
   },
   legendTableLabelCell: {
     alignItems: 'center',
@@ -1398,7 +1399,7 @@ const styles = StyleSheet.create({
   },
   legendTableValue: {
     flex: 1,
-    fontSize: 12,
+    fontSize: FONT_SIZE.sm,
     textAlign: 'right',
   },
 });
