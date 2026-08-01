@@ -1,5 +1,12 @@
 # Changelog
 
+## [0.249.1](https://github.com/heywood8/money-tracker/compare/penny-v0.249.0...penny-v0.249.1) (2026-08-01)
+
+
+### Bug Fixes
+
+* **graphs:** make pinch-zoom on the heatmap reliable ([#1520](https://github.com/heywood8/money-tracker/issues/1520)) ([4d47a6f](https://github.com/heywood8/money-tracker/commit/4d47a6f80baf9a9e0725ecb25cc62f6e861d6eba))
+
 ## [0.249.0](https://github.com/heywood8/money-tracker/compare/penny-v0.248.0...penny-v0.249.0) (2026-07-31)
 
 
