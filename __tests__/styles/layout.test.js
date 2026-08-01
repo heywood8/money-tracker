@@ -85,26 +85,32 @@ describe('Layout Constants', () => {
   });
 
   describe('BORDER_RADIUS', () => {
-    it('has exactly 3 values', async () => {
-      const keys = Object.keys(BORDER_RADIUS);
-      expect(keys.length).toBe(3);
-    });
-
-    it('has sm, md, lg keys', async () => {
-      expect(BORDER_RADIUS).toHaveProperty('sm');
-      expect(BORDER_RADIUS).toHaveProperty('md');
-      expect(BORDER_RADIUS).toHaveProperty('lg');
+    // The scale started at seven arbitrary values and was cut to three. The
+    // guard is not the number 3 — it is that the set is enumerated here, so
+    // widening it costs a deliberate edit to this test rather than happening by
+    // accident one component at a time.
+    it('is exactly the enumerated scale', async () => {
+      expect(Object.keys(BORDER_RADIUS)).toEqual(['sm', 'md', 'lg', 'xl', 'pill']);
     });
 
     it('has correct values', async () => {
       expect(BORDER_RADIUS.sm).toBe(4);
       expect(BORDER_RADIUS.md).toBe(8);
       expect(BORDER_RADIUS.lg).toBe(12);
+      expect(BORDER_RADIUS.xl).toBe(28);
     });
 
-    it('values increase in order', async () => {
+    it('size values increase in order', async () => {
       expect(BORDER_RADIUS.sm).toBeLessThan(BORDER_RADIUS.md);
       expect(BORDER_RADIUS.md).toBeLessThan(BORDER_RADIUS.lg);
+      expect(BORDER_RADIUS.lg).toBeLessThan(BORDER_RADIUS.xl);
+    });
+
+    // `pill` is a "fully round" sentinel rather than a size — any value past
+    // half the element's height clamps to the same shape — so it sits outside
+    // the ordered scale on purpose.
+    it('pill is large enough to round any action button', async () => {
+      expect(BORDER_RADIUS.pill).toBeGreaterThan(BORDER_RADIUS.xl * 2);
     });
   });
 
