@@ -1,5 +1,12 @@
 # Changelog
 
+## [0.251.0](https://github.com/heywood8/money-tracker/compare/penny-v0.250.1...penny-v0.251.0) (2026-08-01)
+
+
+### Features
+
+* **ui:** align the confirmation dialog with Material 3 ([#1525](https://github.com/heywood8/money-tracker/issues/1525)) ([163796c](https://github.com/heywood8/money-tracker/commit/163796c4c8090b5899b857a2ee314aa59d9f2ace))
+
 ## [0.250.1](https://github.com/heywood8/money-tracker/compare/penny-v0.250.0...penny-v0.250.1) (2026-08-01)
 
 
