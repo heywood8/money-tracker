@@ -1,5 +1,12 @@
 # Changelog
 
+## [0.251.1](https://github.com/heywood8/money-tracker/compare/penny-v0.251.0...penny-v0.251.1) (2026-08-01)
+
+
+### Code Refactoring
+
+* **ui:** unify recurring element styles behind shared tokens ([#1527](https://github.com/heywood8/money-tracker/issues/1527)) ([ecf5821](https://github.com/heywood8/money-tracker/commit/ecf58210baf0957b05c60c70e0ac33f6e2d3cbf5))
+
 ## [0.251.0](https://github.com/heywood8/money-tracker/compare/penny-v0.250.1...penny-v0.251.0) (2026-08-01)
 
 
