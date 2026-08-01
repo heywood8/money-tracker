@@ -188,6 +188,7 @@ export const computeBalanceChart = ({
   lineColors = DEFAULT_LINE_COLORS,
   baselineColor = DEFAULT_BASELINE_COLOR,
   thirdLine = 'prevMonth',
+  showPlainAvg = true,
 }) => {
   if (!balanceHistoryData.actual || balanceHistoryData.actual.length === 0) {
     return { computed: null, data: [], series: [] };
@@ -246,7 +247,14 @@ export const computeBalanceChart = ({
     ? balanceHistoryData.yearAvg
     : (thirdLine === 'prevMonth' ? balanceHistoryData.prevMonth : []);
   const comparisonValues = (comparisonSource || []).filter(v => v !== undefined && v !== null);
-  const allValues = [...actualValues, ...forecastValues, ...comparisonValues, ...plainAvgData];
+  // Same rule for the burndown norm: when it is switched off it must not keep the
+  // y-axis stretched up to the month's spendable ceiling.
+  const allValues = [
+    ...actualValues,
+    ...forecastValues,
+    ...comparisonValues,
+    ...(showPlainAvg ? plainAvgData : []),
+  ];
   const maxValue = allValues.length > 0 ? Math.max(...allValues) : 0;
   const minValue = allValues.length > 0 ? Math.min(...allValues) : 0;
   const hasNegativeValues = minValue < 0;
@@ -366,6 +374,7 @@ export const computeBalanceChart = ({
 
   const computed = {
     thirdLine,
+    showPlainAvg,
     hasYearAvgData,
     yearAvgMax,
     yearAvgCurrent,
@@ -417,7 +426,7 @@ export const computeBalanceChart = ({
       actual: isForecastDay ? null : value,
       // include the boundary day in the forecast series too so the segments touch
       forecast: (isForecastDay || isBoundaryDay) ? value : null,
-      plainAvg: plainAvgData[i] ?? null,
+      plainAvg: showPlainAvg ? (plainAvgData[i] ?? null) : null,
       prevMonth: prevMonth[i] ?? null,
       yearAvg: yearAvgSeries[i] ?? null,
       zero: 0,
@@ -430,7 +439,9 @@ export const computeBalanceChart = ({
   if (showForecast) {
     series.push({ yKey: 'forecast', color: primaryColor, strokeWidth: 2, curveType: 'monotoneX', dashed: true });
   }
-  series.push({ yKey: 'plainAvg', color: lineColors.norm, strokeWidth: 2, curveType: 'linear', dashed: false });
+  if (showPlainAvg) {
+    series.push({ yKey: 'plainAvg', color: lineColors.norm, strokeWidth: 2, curveType: 'linear', dashed: false });
+  }
   if (hasPrevMonthData) {
     series.push({ yKey: 'prevMonth', color: lineColors.prevMonth, strokeWidth: 2, curveType: 'monotoneX', dashed: false });
   }
@@ -855,6 +866,10 @@ const BalanceHistoryCard = ({
   // Which comparison line rides along with the actual balance: last month, the
   // 12-month median, or nothing at all (the year view offers last year / nothing).
   const [thirdLine, setThirdLine] = useState('prevMonth');
+  // The burndown norm ("plain avg") is a second opinion on the same month, not a
+  // reading of it — off by default so the chart opens with just the actual line,
+  // and switched on from the header when the reader wants the comparison.
+  const [showPlainAvg, setShowPlainAvg] = useState(false);
   const [contentHeight, setContentHeight] = useState(340);
   // Day currently under the finger while scrubbing the chart (null when idle).
   const [scrubDay, setScrubDay] = useState(null);
@@ -903,8 +918,9 @@ const BalanceHistoryCard = ({
         lineColors: chartLineColors,
         baselineColor: colors.border,
         thirdLine: effectiveThirdLine,
+        showPlainAvg,
       })),
-    [isYearView, balanceHistoryData, spendingPrediction, isCurrentMonth, selectedYear, selectedMonth, colors.primary, colors.border, chartLineColors, effectiveThirdLine],
+    [isYearView, balanceHistoryData, spendingPrediction, isCurrentMonth, selectedYear, selectedMonth, colors.primary, colors.border, chartLineColors, effectiveThirdLine, showPlainAvg],
   );
 
   // yKeys drive Victory's shared y-domain (the always-present "zero" key keeps the
@@ -995,6 +1011,29 @@ const BalanceHistoryCard = ({
             </View>
           )}
         </View>
+        {/* Burndown-norm toggle. Month view only — the year chart never draws
+            that line (see computeYearBalanceChart). */}
+        {!calendarVisible && !isYearView && balanceHistoryData.actual && balanceHistoryData.actual.length > 0 && (
+          <TouchableOpacity
+            testID="plain-avg-toggle-btn"
+            style={[styles.calendarToggleBtn, { backgroundColor: colors.surface }]}
+            onPress={() => setShowPlainAvg(prev => !prev)}
+            activeOpacity={0.7}
+            accessibilityRole="button"
+            accessibilityState={{ selected: showPlainAvg }}
+            accessibilityLabel={t('plain_avg') || 'Plain avg'}
+          >
+            {/* One icon in both states, muted when off: the comparison toggle
+                next to it already uses eye-off for its own "none" step, and two
+                identical eye-off glyphs side by side say nothing about which
+                line each button owns. */}
+            <Icon
+              name="trending-down"
+              size={18}
+              color={showPlainAvg ? chartLineColors.norm : colors.mutedText}
+            />
+          </TouchableOpacity>
+        )}
         {/* Comparison line toggle: month view steps prev month → year average →
             off, year view steps prev year → off. */}
         {!calendarVisible && balanceHistoryData.actual && balanceHistoryData.actual.length > 0 && (
@@ -1091,7 +1130,7 @@ const BalanceHistoryCard = ({
                       onScrub={handleScrub}
                       xTickValues={isYearView ? chartComputed.monthTicks : undefined}
                       monthByDay={isYearView ? chartComputed.monthByDay : undefined}
-                      showDeviationBand={!isYearView}
+                      showDeviationBand={!isYearView && showPlainAvg}
                     />
                   </View>
                 )}
@@ -1123,7 +1162,7 @@ const BalanceHistoryCard = ({
 
                   {/* Plain avg row — the burndown norm, month view only (see
                       computeYearBalanceChart for why a year has none) */}
-                  {!isYearView && (
+                  {!isYearView && showPlainAvg && (
                     <View style={styles.legendTableRow} testID="legend-row-plain-avg">
                       <View style={styles.legendTableLabelCell}>
                         <View style={[styles.legendDot, { backgroundColor: chartLineColors.norm }]} />
