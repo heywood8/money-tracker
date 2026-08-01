@@ -6,7 +6,7 @@ import WheelPicker from '@quidone/react-native-wheel-picker';
 import { useThemeColors } from '../contexts/ThemeColorsContext';
 import { useLocalization } from '../contexts/LocalizationContext';
 import { useAccountsData } from '../contexts/AccountsDataContext';
-import { TOP_CONTENT_SPACING } from '../styles/layout';
+import { BORDER_RADIUS, FONT_SIZE, SPACING, TOP_CONTENT_SPACING } from '../styles/designTokens';
 import { getAvailableMonths, getUnconvertibleCurrencies } from '../services/OperationsDB';
 import { getAllCategories } from '../services/CategoriesDB';
 import { appEvents, EVENTS } from '../services/eventEmitter';
@@ -26,6 +26,7 @@ import useExpenseData from '../hooks/useExpenseData';
 import useIncomeData from '../hooks/useIncomeData';
 import useCategoryOperations from '../hooks/useCategoryOperations';
 import useBalanceHistory from '../hooks/useBalanceHistory';
+import { CARD_SURFACE } from '../styles/componentStyles';
 
 const CARD_HEADER_HEIGHT = 56;
 const MAX_CHART_HEIGHT = 500;
@@ -997,23 +998,23 @@ const styles = StyleSheet.create({
   },
   convertWarning: {
     alignItems: 'center',
-    borderRadius: 12,
+    borderRadius: BORDER_RADIUS.lg,
     borderWidth: 1,
     flexDirection: 'row',
-    gap: 8,
+    gap: SPACING.sm,
     marginBottom: 12,
     paddingHorizontal: 12,
     paddingVertical: 8,
   },
   convertWarningText: {
     flex: 1,
-    fontSize: 12,
+    fontSize: FONT_SIZE.sm,
   },
   fabToggle: {
     // A compact badge tucked into the currency wheel's bottom-right corner —
     // rendered after the wheel with higher elevation/zIndex so it sits on top.
     alignItems: 'center',
-    borderRadius: 16,
+    borderRadius: BORDER_RADIUS.pill,
     borderWidth: 1,
     bottom: 104,
     elevation: 12,
@@ -1029,8 +1030,7 @@ const styles = StyleSheet.create({
     zIndex: 2,
   },
   fabWheel: {
-    borderRadius: 16,
-    borderWidth: 1,
+    ...CARD_SURFACE,
     bottom: 116,
     elevation: 8,
     overflow: 'hidden',
@@ -1041,7 +1041,7 @@ const styles = StyleSheet.create({
     shadowRadius: 8,
   },
   fabWheelLeft: {
-    borderRadius: 40,
+    borderRadius: BORDER_RADIUS.pill,
     right: 152,
     width: 80,
   },
@@ -1068,9 +1068,8 @@ const styles = StyleSheet.create({
     flex: 1,
   },
   summaryPanel: {
-    borderRadius: 16,
-    borderWidth: 1,
-    marginBottom: 16,
+    ...CARD_SURFACE,
+    marginBottom: SPACING.lg,
     overflow: 'hidden',
   },
   tabDivider: {
@@ -1101,10 +1100,10 @@ const styles = StyleSheet.create({
     fontWeight: '500',
   },
   wheelItemText: {
-    fontSize: 14,
+    fontSize: FONT_SIZE.md,
   },
   wheelOverlayItem: {
-    borderRadius: 8,
+    borderRadius: BORDER_RADIUS.md,
   },
 });
 

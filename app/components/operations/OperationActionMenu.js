@@ -128,7 +128,7 @@ export default function OperationActionMenu({ menu, colors, t, onClose, onEdit, 
     ],
   };
 
-  const deleteColor = colors.delete || colors.expense || '#d32f2f';
+  const deleteColor = colors.destructive;
 
   // Transfers feed no chart, so the hide/show action would be a no-op for them.
   // Balance adjustments DO get it: they have no editable form, which makes this

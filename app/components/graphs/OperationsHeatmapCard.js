@@ -3,6 +3,8 @@ import { View, Text, StyleSheet, TouchableOpacity } from 'react-native';
 import PropTypes from 'prop-types';
 import Icon from '@expo/vector-icons/MaterialCommunityIcons';
 import HeatmapMapModal from './HeatmapMapModal';
+import { CARD_SURFACE } from '../../styles/componentStyles';
+import { BORDER_RADIUS, FONT_SIZE, SPACING } from '../../styles/designTokens';
 
 /**
  * Collapsed Graphs row for the operations location heatmap.
@@ -70,23 +72,22 @@ OperationsHeatmapCard.propTypes = {
 
 const styles = StyleSheet.create({
   card: {
+    ...CARD_SURFACE,
     alignItems: 'center',
-    borderRadius: 16,
-    borderWidth: 1,
     flexDirection: 'row',
-    gap: 12,
+    gap: SPACING.md,
     marginBottom: 16,
     padding: 16,
   },
   iconBadge: {
     alignItems: 'center',
-    borderRadius: 12,
+    borderRadius: BORDER_RADIUS.lg,
     height: 40,
     justifyContent: 'center',
     width: 40,
   },
   subtitle: {
-    fontSize: 12,
+    fontSize: FONT_SIZE.sm,
     marginTop: 2,
   },
   textColumn: {

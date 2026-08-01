@@ -16,7 +16,8 @@ import { canSaveSuggestion } from '../../hooks/usePendingOperationSuggestions';
 import { getCategoryDisplayName } from '../../utils/categoryUtils';
 import { normalizeMerchantLabel } from '../../utils/labelUtils';
 import * as Currency from '../../services/currency';
-import { SPACING, BORDER_RADIUS } from '../../styles/designTokens';
+import { BORDER_RADIUS, FONT_SIZE, SPACING } from '../../styles/designTokens';
+import { BUTTON_COMPACT, BUTTON_TEXT, SECTION_LABEL } from '../../styles/componentStyles';
 
 // "Jun 28" for an ISO YYYY-MM-DD date, localized to the app's language. The
 // T00:00:00 anchors the bare string to local midnight (a bare date parses as UTC
@@ -206,7 +207,7 @@ const NotificationBindingCard = ({
       {/* Pinned outside the scroll body so Save (and any error) is always
           reachable without scrolling the form. */}
       {saveError ? (
-        <Text style={[styles.errorText, { color: colors.delete || '#c0392b' }]} numberOfLines={2}>
+        <Text style={[styles.errorText, { color: colors.destructive }]} numberOfLines={2}>
           {t('bank_notifications_save_error')
             || 'Couldn’t add this operation. Check the account and try again.'}
         </Text>
@@ -261,21 +262,11 @@ const styles = StyleSheet.create({
   accountPicker: {
     marginTop: SPACING.xs,
   },
-  actionButton: {
-    alignItems: 'center',
-    borderRadius: BORDER_RADIUS.sm,
-    justifyContent: 'center',
-    minHeight: 44,
-    paddingHorizontal: SPACING.lg,
-    paddingVertical: SPACING.xs + 2,
-  },
+  actionButton: BUTTON_COMPACT,
   actionButtonPrimary: {
     minWidth: 88,
   },
-  actionLabel: {
-    fontSize: 13,
-    fontWeight: '600',
-  },
+  actionLabel: BUTTON_TEXT,
   actionLabelPrimary: {
     color: '#ffffff',
   },
@@ -319,21 +310,19 @@ const styles = StyleSheet.create({
     marginRight: SPACING.sm,
   },
   conversionText: {
-    fontSize: 12,
+    fontSize: FONT_SIZE.sm,
     fontStyle: 'italic',
     marginTop: 2,
   },
   errorText: {
-    fontSize: 12,
+    fontSize: FONT_SIZE.sm,
     fontWeight: '500',
     paddingHorizontal: SPACING.md,
     paddingTop: SPACING.xs,
   },
   fieldLabel: {
-    fontSize: 11,
-    fontWeight: '600',
-    letterSpacing: 0.6,
-    marginBottom: 4,
+    ...SECTION_LABEL,
+    marginBottom: SPACING.xs,
     marginTop: SPACING.sm,
   },
   merchant: {
@@ -351,12 +340,12 @@ const styles = StyleSheet.create({
     alignItems: 'center',
     flexDirection: 'row',
     flexShrink: 1,
-    gap: 4,
+    gap: SPACING.xs,
     marginBottom: SPACING.xs,
     marginTop: SPACING.sm,
   },
   selectedCategoryText: {
-    fontSize: 12,
+    fontSize: FONT_SIZE.sm,
     fontWeight: '600',
   },
   sourceLabel: {

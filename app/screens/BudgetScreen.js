@@ -13,7 +13,7 @@ import MonthlyPlanSection from '../components/budgets/MonthlyPlanSection';
 import AddFAB from '../components/AddFAB';
 import LoadingView from '../components/LoadingView';
 import * as Currency from '../services/currency';
-import { SPACING } from '../styles/layout';
+import { BORDER_RADIUS, FONT_SIZE, SPACING } from '../styles/designTokens';
 import { currentMonthKey, addMonths, formatMonthLabel } from '../utils/monthUtils';
 import { TIMING_ENTER } from '../utils/motion';
 
@@ -411,7 +411,7 @@ const styles = StyleSheet.create({
   },
   convertToggle: {
     alignItems: 'center',
-    borderRadius: 14,
+    borderRadius: BORDER_RADIUS.pill,
     borderWidth: 1,
     height: 28,
     justifyContent: 'center',
@@ -419,7 +419,7 @@ const styles = StyleSheet.create({
   },
   currencyChip: {
     alignItems: 'center',
-    borderRadius: 14,
+    borderRadius: BORDER_RADIUS.pill,
     borderWidth: 1,
     flexDirection: 'row',
     gap: 2,
@@ -439,7 +439,7 @@ const styles = StyleSheet.create({
     flexShrink: 1,
   },
   heroLabel: {
-    fontSize: 12,
+    fontSize: FONT_SIZE.sm,
   },
   heroRow: {
     alignItems: 'flex-end',
@@ -448,12 +448,12 @@ const styles = StyleSheet.create({
     marginTop: SPACING.sm,
   },
   heroTotals: {
-    fontSize: 12,
+    fontSize: FONT_SIZE.sm,
     fontVariant: ['tabular-nums'],
     marginTop: 2,
   },
   heroValue: {
-    fontSize: 24,
+    fontSize: FONT_SIZE.xxl,
     fontVariant: ['tabular-nums'],
     fontWeight: '700',
     letterSpacing: -0.5,

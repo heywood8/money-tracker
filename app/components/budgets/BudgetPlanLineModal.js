@@ -26,6 +26,8 @@ import CategoryGridSelector from '../CategoryGridSelector';
 import AccountGridSelector from '../AccountGridSelector';
 import { SPACING, BORDER_RADIUS, FONT_SIZE, ICON_SIZE } from '../../styles/designTokens';
 import * as Currency from '../../services/currency';
+import EmptyState from '../EmptyState';
+import { SECTION_LABEL } from '../../styles/componentStyles';
 
 const KINDS = ['income', 'expense', 'transfer'];
 
@@ -832,9 +834,7 @@ export default function BudgetPlanLineModal({
               />
             )}
             ListEmptyComponent={(
-              <Text style={[styles.emptyText, { color: colors.mutedText }]}>
-                {t('no_groups_yet')}
-              </Text>
+              <EmptyState message={t('no_groups_yet')} fill={false} />
             )}
           />
         </>
@@ -1175,10 +1175,6 @@ const styles = StyleSheet.create({
     // instead of four boxed-off rows.
     marginLeft: 34 + SPACING.md + SPACING.md,
   },
-  emptyText: {
-    paddingVertical: SPACING.xxl,
-    textAlign: 'center',
-  },
   errorBanner: {
     alignItems: 'center',
     borderRadius: BORDER_RADIUS.md,
@@ -1192,7 +1188,7 @@ const styles = StyleSheet.create({
     fontSize: FONT_SIZE.md,
   },
   fieldLabel: {
-    fontSize: FONT_SIZE.sm,
+    ...SECTION_LABEL,
     marginBottom: SPACING.xs,
     marginTop: SPACING.sm,
   },
@@ -1320,13 +1316,13 @@ const styles = StyleSheet.create({
   },
   switchThumb: {
     backgroundColor: '#fff',
-    borderRadius: 11,
+    borderRadius: BORDER_RADIUS.pill,
     height: 22,
     margin: 2,
     width: 22,
   },
   switchTrack: {
-    borderRadius: 13,
+    borderRadius: BORDER_RADIUS.pill,
     height: 26,
     justifyContent: 'center',
     overflow: 'hidden',

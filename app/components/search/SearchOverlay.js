@@ -5,7 +5,7 @@ import {
 } from 'react-native';
 import Animated, { useSharedValue, useAnimatedStyle, withTiming, Easing } from 'react-native-reanimated';
 import PropTypes from 'prop-types';
-import { HORIZONTAL_PADDING } from '../../styles/layout';
+import { HORIZONTAL_PADDING } from '../../styles/designTokens';
 import ExpandableFilters from './ExpandableFilters';
 import { useOperationsData } from '../../contexts/OperationsDataContext';
 import { useOperationsActions } from '../../contexts/OperationsActionsContext';

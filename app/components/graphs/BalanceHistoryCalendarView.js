@@ -2,6 +2,7 @@ import React, { useState, useEffect, useRef } from 'react';
 import { View, Text, StyleSheet, TouchableOpacity, TextInput } from 'react-native';
 import PropTypes from 'prop-types';
 import currencies from '../../../assets/currencies.json';
+import { BORDER_RADIUS, FONT_SIZE } from '../../styles/designTokens';
 
 const DAY_HEADERS = ['M', 'T', 'W', 'T', 'F', 'S', 'Su'];
 
@@ -180,7 +181,7 @@ const BalanceHistoryCalendarView = ({
           {selectedEntry?.balance && (
             <TouchableOpacity
               testID="calendar-delete-btn"
-              style={[styles.editBtn, styles.deleteBtn]}
+              style={[styles.editBtn, { backgroundColor: colors.destructive }]}
               onPress={handleDelete}
             >
               <Text style={styles.editBtnText}>🗑</Text>
@@ -214,18 +215,17 @@ BalanceHistoryCalendarView.propTypes = {
 
 const styles = StyleSheet.create({
   cancelBtn: { padding: 4 },
-  cancelBtnText: { fontSize: 18 },
+  cancelBtnText: { fontSize: FONT_SIZE.lg },
   cell: { alignItems: 'center', flex: 1, justifyContent: 'center', paddingVertical: 2 },
   dayBalance: { fontSize: 8, fontWeight: '600' },
-  dayCell: { borderRadius: 4, minHeight: 46, paddingVertical: 6 },
-  dayHeader: { fontSize: 10, fontWeight: '600' },
+  dayCell: { borderRadius: BORDER_RADIUS.sm, minHeight: 46, paddingVertical: 6 },
+  dayHeader: { fontSize: FONT_SIZE.xs, fontWeight: '600' },
   dayNumber: { fontSize: 11 },
-  deleteBtn: { backgroundColor: '#f44336' },
-  editBtn: { alignItems: 'center', borderRadius: 14, height: 28, justifyContent: 'center', width: 28 },
+  editBtn: { alignItems: 'center', borderRadius: BORDER_RADIUS.pill, height: 28, justifyContent: 'center', width: 28 },
   editBtnText: { color: '#fff', fontSize: 13, fontWeight: '700' },
-  editDateLabel: { fontSize: 12, marginRight: 8, minWidth: 24 },
-  editInput: { borderRadius: 4, borderWidth: 1, flex: 1, fontSize: 13, marginRight: 8, paddingHorizontal: 8, paddingVertical: 4, textAlign: 'right' },
-  editRow: { alignItems: 'center', borderRadius: 8, borderWidth: 1, flexDirection: 'row', gap: 6, marginTop: 10, padding: 8 },
+  editDateLabel: { fontSize: FONT_SIZE.sm, marginRight: 8, minWidth: 24 },
+  editInput: { borderRadius: BORDER_RADIUS.sm, borderWidth: 1, flex: 1, fontSize: 13, marginRight: 8, paddingHorizontal: 8, paddingVertical: 4, textAlign: 'right' },
+  editRow: { alignItems: 'center', borderRadius: BORDER_RADIUS.md, borderWidth: 1, flexDirection: 'row', gap: 6, marginTop: 10, padding: 8 },
   headerRow: { flexDirection: 'row', marginBottom: 4 },
   todayBorder: { borderWidth: 1 },
   weekRow: { flexDirection: 'row', marginBottom: 2 },

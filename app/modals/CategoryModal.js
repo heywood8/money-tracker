@@ -23,14 +23,14 @@ import IconPicker from '../components/IconPicker';
 import ModalShell from '../components/ModalShell';
 import { makeModalStyles, modalSharedStyles } from '../styles/modalStyles';
 import PropTypes from 'prop-types';
-import { SPACING, BORDER_RADIUS } from '../styles/designTokens';
+import { SPACING, BORDER_RADIUS, FONT_SIZE } from '../styles/designTokens';
 
 export default function CategoryModal({ visible, onClose, category, isNew }) {
   const { colors } = useThemeColors();
   const { paperInputTheme } = makeModalStyles(colors);
   const themed = useMemo(() => ({
-    pickerItemText: { color: colors.text, fontSize: 18 },
-    parentText: { color: colors.text, fontSize: 18, marginLeft: 12 },
+    pickerItemText: { color: colors.text, fontSize: FONT_SIZE.lg },
+    parentText: { color: colors.text, fontSize: FONT_SIZE.lg, marginLeft: 12 },
   }), [colors]);
   const { t } = useLocalization();
   const { showDialog } = useDialog();
@@ -261,7 +261,7 @@ export default function CategoryModal({ visible, onClose, category, isNew }) {
           </Text>
         </Pressable>
 
-        {errors.general && <Text style={styles.error}>{errors.general}</Text>}
+        {errors.general && <Text style={[styles.error, { color: colors.destructive }]}>{errors.general}</Text>}
 
         {/* In-sheet animated picker panel — slides in from the right */}
         {activePicker && (
@@ -385,8 +385,7 @@ const styles = StyleSheet.create({
     opacity: 0.5,
   },
   error: {
-    color: '#ff6b6b',
-    fontSize: 12,
+    fontSize: FONT_SIZE.sm,
     marginBottom: SPACING.sm,
   },
   iconPickerButton: {

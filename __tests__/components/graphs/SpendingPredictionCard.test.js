@@ -219,7 +219,12 @@ describe('SpendingPredictionCard', () => {
       );
     });
 
-    it('uses default expense color when not provided', async () => {
+    // The card used to fall back to a hardcoded `#ff4444` when `colors.expense`
+    // was missing — a red that was not the expense colour in either palette, so
+    // an incomplete theme rendered an amount in a colour the app never uses.
+    // Both real palettes always define `expense`; the card now just reads it,
+    // and an incomplete theme leaves the colour unset rather than inventing one.
+    it('renders without inventing a colour when expense is not provided', async () => {
       const colorsWithoutExpense = {
         text: '#000000',
         mutedText: '#888888',
@@ -238,11 +243,11 @@ describe('SpendingPredictionCard', () => {
         />,
       );
 
-      // Should render with default #ff4444 color
       const currentSpending = getByText('500.50 USD');
+      expect(currentSpending).toBeTruthy();
       expect(currentSpending.props.style).toEqual(
         expect.arrayContaining([
-          expect.objectContaining({ color: '#ff4444' }),
+          expect.objectContaining({ color: undefined }),
         ]),
       );
     });

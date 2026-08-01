@@ -2,7 +2,7 @@ import React, { memo } from 'react';
 import PropTypes from 'prop-types';
 import { View, StyleSheet } from 'react-native';
 import OperationFormFields from './OperationFormFields';
-import { SPACING, BORDER_RADIUS } from '../../styles/layout';
+import { SPACING, BORDER_RADIUS } from '../../styles/designTokens';
 
 /**
  * QuickAddForm Component

@@ -2,7 +2,7 @@ import React, { useState, useMemo } from 'react';
 import PropTypes from 'prop-types';
 import { View, Text, StyleSheet, TouchableOpacity, Pressable, Modal, FlatList, Platform } from 'react-native';
 import Icon from '@expo/vector-icons/MaterialCommunityIcons';
-import { HORIZONTAL_PADDING } from '../styles/layout';
+import { FONT_SIZE, HORIZONTAL_PADDING, SPACING } from '../styles/designTokens';
 import ModalBlurOverlay from './ModalBlurOverlay';
 
 // Module-level so the default `colors` prop keeps a stable identity across
@@ -160,7 +160,7 @@ const styles = StyleSheet.create({
     width: '100%',
   },
   androidButtonText: {
-    fontSize: 16,
+    fontSize: FONT_SIZE.base,
     fontWeight: '800',
     textAlign: 'center',
   },
@@ -168,14 +168,14 @@ const styles = StyleSheet.create({
   chipButton: {
     alignItems: 'center',
     flexDirection: 'row',
-    gap: 8,
+    gap: SPACING.sm,
     height: 44,
     paddingHorizontal: 14,
     width: '100%',
   },
   chipButtonText: {
     flex: 1,
-    fontSize: 14,
+    fontSize: FONT_SIZE.md,
     fontWeight: '500',
   },
   // Close button
@@ -184,12 +184,12 @@ const styles = StyleSheet.create({
     paddingVertical: 12,
   },
   closeButtonText: {
-    fontSize: 16,
+    fontSize: FONT_SIZE.base,
     fontWeight: '600',
   },
   // Left text label (currency symbol, etc.)
   leftText: {
-    fontSize: 14,
+    fontSize: FONT_SIZE.md,
     fontWeight: '600',
     minWidth: 16,
     textAlign: 'center',
@@ -210,12 +210,12 @@ const styles = StyleSheet.create({
     paddingVertical: 12,
   },
   modalItemSubText: {
-    fontSize: 14,
+    fontSize: FONT_SIZE.md,
     marginLeft: 8,
   },
   modalItemText: {
     flex: 1,
-    fontSize: 16,
+    fontSize: FONT_SIZE.base,
     marginRight: 4,
   },
   modalOverlay: {
@@ -231,7 +231,7 @@ const baseWebSelectStyle = {
   border: 'none',
   outline: 'none',
   backgroundColor: 'transparent',
-  fontSize: 14,
+  fontSize: FONT_SIZE.md,
   fontFamily: 'inherit',
   paddingLeft: 8,
   paddingRight: 8,

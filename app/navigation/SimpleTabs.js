@@ -44,6 +44,7 @@ import { SwipeNavigationGestureProvider } from '../contexts/SwipeNavigationConte
 import Header from '../components/Header';
 import SettingsScreen from '../screens/SettingsScreen';
 import { appEvents, EVENTS } from '../services/eventEmitter';
+import { BORDER_RADIUS } from '../styles/designTokens';
 
 const { width: SCREEN_WIDTH } = Dimensions.get('window');
 
@@ -707,7 +708,7 @@ const styles = StyleSheet.create({
   },
   floatingBar: {
     alignSelf: 'center',
-    borderRadius: 28,
+    borderRadius: BORDER_RADIUS.xl,
     borderWidth: 1,
     marginBottom: 12,
     overflow: 'hidden',

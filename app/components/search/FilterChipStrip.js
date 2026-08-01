@@ -2,7 +2,8 @@ import React from 'react';
 import { View, Text, TouchableOpacity, ScrollView, StyleSheet } from 'react-native';
 import Icon from '@expo/vector-icons/MaterialCommunityIcons';
 import PropTypes from 'prop-types';
-import { HORIZONTAL_PADDING } from '../../styles/layout';
+import { HORIZONTAL_PADDING } from '../../styles/designTokens';
+import { CHIP, CHIP_TEXT } from '../../styles/componentStyles';
 
 const formatDateLabel = (dateRange) => {
   const { startDate, endDate } = dateRange;
@@ -124,19 +125,8 @@ FilterChipStrip.propTypes = {
 };
 
 const styles = StyleSheet.create({
-  chip: {
-    alignItems: 'center',
-    borderRadius: 14,
-    borderWidth: 1,
-    flexDirection: 'row',
-    gap: 5,
-    paddingHorizontal: 10,
-    paddingVertical: 4,
-  },
-  chipText: {
-    fontSize: 12,
-    fontWeight: '500',
-  },
+  chip: CHIP,
+  chipText: CHIP_TEXT,
   container: {
     borderBottomWidth: 1,
   },

@@ -7,11 +7,13 @@ import { runOnJS, useAnimatedReaction } from 'react-native-reanimated';
 import Icon from '@expo/vector-icons/MaterialCommunityIcons';
 import currencies from '../../../assets/currencies.json';
 import useCategoryMonthlySpending, { ALL_EXPENSE_CATEGORIES } from '../../hooks/useCategoryMonthlySpending';
-import { HORIZONTAL_PADDING } from '../../styles/layout';
+import { BORDER_RADIUS, FONT_SIZE, HORIZONTAL_PADDING, SPACING } from '../../styles/designTokens';
 import { comparisonSeriesColor } from '../../styles/chartPalette';
 import { MONTH_ABBREVIATIONS } from './monthLabels';
 import ModalBlurOverlay from '../ModalBlurOverlay';
 import { useDisplaySettings } from '../../contexts/DisplaySettingsContext';
+import { CARD_SURFACE, SECTION_LABEL } from '../../styles/componentStyles';
+import EmptyState from '../EmptyState';
 
 const screenWidth = Dimensions.get('window').width;
 
@@ -641,11 +643,11 @@ const CategorySpendingCard = ({
           <ActivityIndicator size="large" color={colors.primary} />
         </View>
       ) : !hasData ? (
-        <View style={styles.emptyContainer}>
-          <Text style={[styles.emptyText, { color: colors.mutedText }]}>
-            {t('no_spending_data')}
-          </Text>
-        </View>
+        <EmptyState
+          message={t('no_spending_data')}
+          fill={false}
+          style={styles.emptyContainer}
+        />
       ) : (
         <SpendingBarChart
           // Remount when the vs-series appears/disappears: the chart press state
@@ -693,29 +695,28 @@ const styles = StyleSheet.create({
     gap: 5,
   },
   card: {
-    borderRadius: 16,
-    borderWidth: 1,
-    marginBottom: 16,
-    padding: 16,
+    ...CARD_SURFACE,
+    marginBottom: SPACING.lg,
+    padding: SPACING.lg,
   },
   categoryItem: {
-    borderRadius: 4,
+    borderRadius: BORDER_RADIUS.sm,
     flex: 1,
     paddingHorizontal: 8,
     paddingVertical: 12,
   },
   categoryName: {
-    fontSize: 16,
+    fontSize: FONT_SIZE.base,
     fontWeight: '600',
   },
   categorySelector: {
     alignItems: 'center',
     flexDirection: 'row',
-    gap: 4,
+    gap: SPACING.xs,
     marginTop: 4,
   },
   categoryText: {
-    fontSize: 16,
+    fontSize: FONT_SIZE.base,
     fontWeight: '500',
   },
   chartCanvas: {
@@ -734,19 +735,13 @@ const styles = StyleSheet.create({
     fontSize: 15,
   },
   currentAmount: {
-    fontSize: 18,
+    fontSize: FONT_SIZE.lg,
     fontWeight: '700',
     textAlign: 'right',
   },
   emptyContainer: {
-    alignItems: 'center',
     height: 120,
-    justifyContent: 'center',
-    paddingHorizontal: 32,
-  },
-  emptyText: {
-    fontSize: 14,
-    textAlign: 'center',
+    paddingHorizontal: SPACING.xxl,
   },
   expandButton: {
     alignItems: 'center',
@@ -776,7 +771,7 @@ const styles = StyleSheet.create({
     justifyContent: 'center',
   },
   modalContent: {
-    borderRadius: 8,
+    borderRadius: BORDER_RADIUS.md,
     maxHeight: '60%',
     overflow: 'hidden',
     width: '80%',
@@ -791,13 +786,9 @@ const styles = StyleSheet.create({
     borderBottomWidth: 1,
     flexDirection: 'row',
   },
-  sectionLabel: {
-    fontSize: 11,
-    fontWeight: '500',
-    letterSpacing: 0.5,
-  },
+  sectionLabel: SECTION_LABEL,
   seriesDot: {
-    borderRadius: 4,
+    borderRadius: BORDER_RADIUS.pill,
     height: 8,
     width: 8,
   },
@@ -814,13 +805,13 @@ const styles = StyleSheet.create({
   },
   vsCategoryName: {
     flexShrink: 1,
-    fontSize: 12,
+    fontSize: FONT_SIZE.sm,
     fontWeight: '600',
   },
   vsRow: {
     alignItems: 'center',
     flexDirection: 'row',
-    gap: 4,
+    gap: SPACING.xs,
     marginTop: 4,
   },
   vsSelector: {
@@ -829,7 +820,7 @@ const styles = StyleSheet.create({
     gap: 3,
   },
   vsText: {
-    fontSize: 12,
+    fontSize: FONT_SIZE.sm,
     fontWeight: '500',
   },
 });

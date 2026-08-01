@@ -4,6 +4,7 @@ import { View, Text, StyleSheet, Animated, Easing } from 'react-native';
 import NotificationBindingCard from './NotificationBindingCard';
 import { SPACING, BORDER_RADIUS } from '../../styles/designTokens';
 import { motionDuration } from '../../utils/reducedMotion';
+import { BADGE, BADGE_TEXT } from '../../styles/componentStyles';
 
 // At most this many cards render as deck layers; the rest are summed up in the
 // "+N" badge and surface as the front cards drain.
@@ -199,19 +200,15 @@ NotificationBindingStack.propTypes = {
 
 const styles = StyleSheet.create({
   overflowBadge: {
-    alignItems: 'center',
-    borderRadius: BORDER_RADIUS.sm,
+    ...BADGE,
     minWidth: 26,
-    paddingHorizontal: 5,
-    paddingVertical: 1,
     position: 'absolute',
     right: SPACING.lg + (MAX_DECK - 1) * EDGE_INSET,
     top: -2,
   },
   overflowBadgeText: {
+    ...BADGE_TEXT,
     color: '#ffffff',
-    fontSize: 11,
-    fontWeight: '700',
   },
   overlay: {
     bottom: 0,

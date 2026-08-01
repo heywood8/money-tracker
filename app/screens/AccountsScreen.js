@@ -14,7 +14,7 @@ import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { useThemeConfig } from '../contexts/ThemeConfigContext';
 import { useThemeColors } from '../contexts/ThemeColorsContext';
 import { useDisplaySettings } from '../contexts/DisplaySettingsContext';
-import { TOP_CONTENT_SPACING, HORIZONTAL_PADDING, SPACING, BORDER_RADIUS, HEIGHTS } from '../styles/layout';
+import { BORDER_RADIUS, FONT_SIZE, HEIGHTS, HORIZONTAL_PADDING, SPACING, TOP_CONTENT_SPACING } from '../styles/designTokens';
 import { useAccountsData } from '../contexts/AccountsDataContext';
 import { useAccountsActions } from '../contexts/AccountsActionsContext';
 import { useLocalization } from '../contexts/LocalizationContext';
@@ -25,6 +25,7 @@ import { computeNetWorthSummary, getOperationsByDateRange } from '../services/Op
 import { appEvents, EVENTS } from '../services/eventEmitter';
 import { parseCardMasks, serializeCardMasks, cardMaskLast4 } from '../utils/cardMask';
 import currencies from '../../assets/currencies.json';
+import { CARD_SURFACE } from '../styles/componentStyles';
 
 // Alias for use as a prop default: a `currencies = currencies` destructuring
 // default would shadow the import and throw (TDZ), so default to this instead.
@@ -1359,7 +1360,7 @@ const styles = StyleSheet.create({
     textAlign: 'right',
   },
   accountCurrencyLabel: {
-    fontSize: 12,
+    fontSize: FONT_SIZE.sm,
     letterSpacing: 0.2,
     marginTop: 2,
   },
@@ -1394,8 +1395,7 @@ const styles = StyleSheet.create({
     flexDirection: 'row',
   },
   accountsCard: {
-    borderRadius: 16,
-    borderWidth: 1,
+    ...CARD_SURFACE,
     marginHorizontal: SPACING.lg,
     marginTop: SPACING.sm,
     overflow: 'hidden',
@@ -1409,7 +1409,7 @@ const styles = StyleSheet.create({
     gap: SPACING.sm,
   },
   cardMaskHint: {
-    fontSize: 12,
+    fontSize: FONT_SIZE.sm,
     marginTop: 4,
   },
   cardMaskInput: {
@@ -1434,7 +1434,7 @@ const styles = StyleSheet.create({
   },
   cardMaskValue: {
     flex: 1,
-    fontSize: 14,
+    fontSize: FONT_SIZE.md,
   },
   centeredBodyMedium: {
     marginBottom: SPACING.lg,
@@ -1503,7 +1503,7 @@ const styles = StyleSheet.create({
     paddingVertical: SPACING.md,
   },
   currencyPanelItemText: {
-    fontSize: 16,
+    fontSize: FONT_SIZE.base,
   },
   currencyPanelTitle: {
     fontSize: 17,
@@ -1531,7 +1531,7 @@ const styles = StyleSheet.create({
   },
   formFooterBtn: {
     alignItems: 'center',
-    borderRadius: 8,
+    borderRadius: BORDER_RADIUS.md,
     borderWidth: 1,
     flex: 1,
     height: 44,
@@ -1560,7 +1560,7 @@ const styles = StyleSheet.create({
   formPanelFooter: {
     borderTopWidth: StyleSheet.hairlineWidth,
     flexDirection: 'row',
-    gap: 8,
+    gap: SPACING.sm,
     paddingHorizontal: 12,
     paddingTop: 12,
   },
@@ -1580,7 +1580,7 @@ const styles = StyleSheet.create({
   },
   formPanelTitle: {
     flex: 1,
-    fontSize: 18,
+    fontSize: FONT_SIZE.lg,
     fontWeight: '600',
     textAlign: 'center',
   },
@@ -1599,7 +1599,7 @@ const styles = StyleSheet.create({
     marginTop: SPACING.sm,
   },
   monthlyChangeText: {
-    fontSize: 14,
+    fontSize: FONT_SIZE.md,
     fontVariant: ['tabular-nums'],
     fontWeight: '500',
     letterSpacing: -0.1,
@@ -1612,15 +1612,14 @@ const styles = StyleSheet.create({
     marginTop: SPACING.xs,
   },
   netWorthCard: {
-    borderRadius: 16,
-    borderWidth: 1,
+    ...CARD_SURFACE,
     marginHorizontal: SPACING.lg,
     marginTop: SPACING.sm,
     padding: SPACING.xl,
   },
   netWorthConvertToggle: {
     alignItems: 'center',
-    borderRadius: 16,
+    borderRadius: BORDER_RADIUS.pill,
     borderWidth: 1,
     height: 32,
     justifyContent: 'center',
@@ -1638,12 +1637,12 @@ const styles = StyleSheet.create({
   netWorthWarningRow: {
     alignItems: 'center',
     flexDirection: 'row',
-    gap: 4,
+    gap: SPACING.xs,
     marginTop: SPACING.sm,
   },
   netWorthWarningText: {
     flex: 1,
-    fontSize: 12,
+    fontSize: FONT_SIZE.sm,
   },
   pickerCloseButton: {
     marginTop: SPACING.sm,
@@ -1661,11 +1660,11 @@ const styles = StyleSheet.create({
     paddingVertical: SPACING.md,
   },
   pickerOptionText: {
-    fontSize: 16,
+    fontSize: FONT_SIZE.base,
   },
   roundingOption: {
     alignItems: 'center',
-    borderRadius: 8,
+    borderRadius: BORDER_RADIUS.md,
     flex: 1,
     paddingVertical: 10,
   },
@@ -1680,7 +1679,7 @@ const styles = StyleSheet.create({
     borderRadius: 10,
     borderWidth: 1,
     flexDirection: 'row',
-    gap: 4,
+    gap: SPACING.xs,
     marginTop: 4,
     padding: 4,
   },
@@ -1688,7 +1687,7 @@ const styles = StyleSheet.create({
     paddingBottom: 180,
   },
   settingHint: {
-    fontSize: 12,
+    fontSize: FONT_SIZE.sm,
     marginTop: 2,
   },
   settingItem: {
@@ -1716,7 +1715,7 @@ const styles = StyleSheet.create({
     overflow: 'hidden',
   },
   showHiddenButton: {
-    borderRadius: 12,
+    borderRadius: BORDER_RADIUS.lg,
     borderWidth: 1,
     marginHorizontal: SPACING.lg,
     marginTop: SPACING.sm,
@@ -1731,7 +1730,7 @@ const styles = StyleSheet.create({
     paddingVertical: SPACING.md,
   },
   showHiddenText: {
-    fontSize: 14,
+    fontSize: FONT_SIZE.md,
     fontWeight: '500',
   },
 });

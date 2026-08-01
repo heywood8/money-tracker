@@ -4,6 +4,7 @@ import Icon from '@expo/vector-icons/MaterialCommunityIcons';
 import PropTypes from 'prop-types';
 import currencies from '../../../assets/currencies.json';
 import { useDisplaySettings } from '../../contexts/DisplaySettingsContext';
+import { FONT_SIZE, SPACING } from '../../styles/designTokens';
 
 const formatCurrency = (amount, currency) => {
   const currencyInfo = currencies[currency];
@@ -88,7 +89,7 @@ SummaryTab.propTypes = {
 
 const styles = StyleSheet.create({
   amount: {
-    fontSize: 16,
+    fontSize: FONT_SIZE.base,
     fontWeight: '700',
     letterSpacing: -0.3,
     marginTop: 1,
@@ -106,7 +107,7 @@ const styles = StyleSheet.create({
     width: 26,
   },
   label: {
-    fontSize: 10,
+    fontSize: FONT_SIZE.xs,
     fontWeight: '500',
     letterSpacing: 0.3,
   },
@@ -117,7 +118,7 @@ const styles = StyleSheet.create({
     borderBottomWidth: 2,
     flex: 1,
     flexDirection: 'row',
-    gap: 8,
+    gap: SPACING.sm,
     paddingHorizontal: 10,
     paddingVertical: 8,
   },

@@ -6,6 +6,7 @@ import { SPACING, FONT_SIZE, BORDER_RADIUS, DURATION } from '../../styles/design
 import { useSwipeNavigationGesture } from '../../contexts/SwipeNavigationContext';
 import { displayLabel } from '../../utils/labelUtils';
 import { motionDuration } from '../../utils/reducedMotion';
+import { CHIP, CHIP_TEXT } from '../../styles/componentStyles';
 
 const DescriptionSuggestionRow = ({ chips, colors, onApply, onDismiss }) => {
   // Entry polish only (rise into place). Like UndoSnackbar, this row is
@@ -78,12 +79,7 @@ const DescriptionSuggestionRow = ({ chips, colors, onApply, onDismiss }) => {
 };
 
 const styles = StyleSheet.create({
-  chip: {
-    borderRadius: BORDER_RADIUS.lg,
-    borderWidth: 1,
-    paddingHorizontal: SPACING.md,
-    paddingVertical: SPACING.xs,
-  },
+  chip: CHIP,
   chipRow: {
     alignItems: 'center',
     flexDirection: 'row',
@@ -93,10 +89,7 @@ const styles = StyleSheet.create({
   chipScroll: {
     flex: 1,
   },
-  chipText: {
-    fontSize: FONT_SIZE.sm,
-    fontWeight: '500',
-  },
+  chipText: CHIP_TEXT,
   container: {
     paddingBottom: SPACING.md,
     paddingTop: SPACING.sm,

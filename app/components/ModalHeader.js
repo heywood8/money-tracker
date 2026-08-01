@@ -3,8 +3,8 @@ import { StyleSheet } from 'react-native';
 import { Text } from 'react-native-paper';
 import PropTypes from 'prop-types';
 import { useThemeColors } from '../contexts/ThemeColorsContext';
-import { SPACING } from '../styles/layout';
-import { FONT_SIZE } from '../styles/designTokens';
+import { FONT_SIZE, SPACING } from '../styles/designTokens';
+import { MODAL_TITLE } from '../styles/componentStyles';
 
 const ModalHeader = ({ title, testID }) => {
   const { colors } = useThemeColors();
@@ -23,8 +23,7 @@ ModalHeader.propTypes = {
 
 const styles = StyleSheet.create({
   title: {
-    fontSize: FONT_SIZE.xl,
-    fontWeight: '700',
+    ...MODAL_TITLE,
     marginBottom: SPACING.lg,
     textAlign: 'center',
   },

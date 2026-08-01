@@ -5,7 +5,7 @@ import { Text, Divider } from 'react-native-paper';
 import Ionicons from '@expo/vector-icons/Ionicons';
 import { useThemeColors } from '../contexts/ThemeColorsContext';
 import { useLocalization } from '../contexts/LocalizationContext';
-import { HORIZONTAL_PADDING, SPACING, BORDER_RADIUS } from '../styles/layout';
+import { BORDER_RADIUS, FONT_SIZE, HORIZONTAL_PADDING, SPACING } from '../styles/designTokens';
 import { motionDuration } from '../utils/reducedMotion';
 
 const DATE_RE = /(\d{4}-\d{2}-\d{2})/;
@@ -699,7 +699,7 @@ const styles = StyleSheet.create({
     textAlign: 'center',
   },
   apkChipVersion: {
-    fontSize: 12,
+    fontSize: FONT_SIZE.sm,
     fontWeight: '600',
     textAlign: 'center',
   },
@@ -716,7 +716,7 @@ const styles = StyleSheet.create({
     paddingVertical: 1,
   },
   buildProgressText: {
-    fontSize: 10,
+    fontSize: FONT_SIZE.xs,
     fontWeight: '700',
     letterSpacing: 0.5,
     textTransform: 'uppercase',
@@ -755,7 +755,7 @@ const styles = StyleSheet.create({
   },
   corruptNoteText: {
     flex: 1,
-    fontSize: 12,
+    fontSize: FONT_SIZE.sm,
     lineHeight: 17,
   },
   downloadedApksCompact: {
@@ -798,7 +798,7 @@ const styles = StyleSheet.create({
     paddingVertical: 1,
   },
   installedChipText: {
-    fontSize: 10,
+    fontSize: FONT_SIZE.xs,
     fontWeight: '700',
     letterSpacing: 0.5,
     textTransform: 'uppercase',
@@ -811,7 +811,7 @@ const styles = StyleSheet.create({
     paddingLeft: SPACING.sm,
   },
   installedHintText: {
-    fontSize: 12,
+    fontSize: FONT_SIZE.sm,
     fontWeight: '500',
   },
   moreReleasesLink: {
@@ -844,7 +844,7 @@ const styles = StyleSheet.create({
   releaseBadge: {
     borderRadius: BORDER_RADIUS.sm,
     borderWidth: StyleSheet.hairlineWidth,
-    fontSize: 10,
+    fontSize: FONT_SIZE.xs,
     fontWeight: '600',
     letterSpacing: 0.5,
     overflow: 'hidden',
@@ -868,7 +868,7 @@ const styles = StyleSheet.create({
     borderWidth: 1.5,
   },
   releaseDate: {
-    fontSize: 12,
+    fontSize: FONT_SIZE.sm,
     fontWeight: '500',
   },
   releaseHeader: {
@@ -919,7 +919,7 @@ const styles = StyleSheet.create({
   },
   upToDateHeaderText: {
     flex: 1,
-    fontSize: 14,
+    fontSize: FONT_SIZE.md,
     lineHeight: 20,
   },
   updateBottomRow: {

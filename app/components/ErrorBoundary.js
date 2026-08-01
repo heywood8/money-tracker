@@ -3,6 +3,9 @@ import React from 'react';
 import PropTypes from 'prop-types';
 import { View, Text, StyleSheet, TouchableOpacity } from 'react-native';
 import { captureException } from '../services/sentry';
+import { DESTRUCTIVE } from '../styles/semanticColors';
+import { BUTTON, BUTTON_TEXT } from '../styles/componentStyles';
+import { FONT_SIZE } from '../styles/designTokens';
 
 class ErrorBoundary extends React.Component {
   constructor(props) {
@@ -54,15 +57,12 @@ class ErrorBoundary extends React.Component {
 
 const styles = StyleSheet.create({
   button: {
+    ...BUTTON,
     backgroundColor: '#007AFF',
-    borderRadius: 8,
-    paddingHorizontal: 24,
-    paddingVertical: 12,
   },
   buttonText: {
+    ...BUTTON_TEXT,
     color: '#fff',
-    fontSize: 16,
-    fontWeight: '600',
   },
   container: {
     alignItems: 'center',
@@ -72,20 +72,20 @@ const styles = StyleSheet.create({
     padding: 20,
   },
   error: {
-    color: '#ff0000',
+    color: DESTRUCTIVE.light,
     fontFamily: 'monospace',
-    fontSize: 12,
+    fontSize: FONT_SIZE.sm,
     marginTop: 20,
   },
   message: {
     color: '#666',
-    fontSize: 16,
+    fontSize: FONT_SIZE.base,
     marginBottom: 24,
     textAlign: 'center',
   },
   title: {
     color: '#111',
-    fontSize: 24,
+    fontSize: FONT_SIZE.xxl,
     fontWeight: 'bold',
     marginBottom: 12,
   },

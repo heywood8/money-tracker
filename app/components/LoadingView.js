@@ -3,7 +3,7 @@ import { View, StyleSheet } from 'react-native';
 import { ActivityIndicator, Text } from 'react-native-paper';
 import PropTypes from 'prop-types';
 import { useThemeColors } from '../contexts/ThemeColorsContext';
-import { SPACING } from '../styles/layout';
+import { SPACING } from '../styles/designTokens';
 
 const LoadingView = ({ message, testID }) => {
   const { colors } = useThemeColors();

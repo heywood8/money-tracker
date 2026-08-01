@@ -6,7 +6,7 @@ import PropTypes from 'prop-types';
 import Icon from '@expo/vector-icons/MaterialCommunityIcons';
 import * as Currency from '../../services/currency';
 import PlanProgressBar, { PAIR_COLUMN_WIDTH } from './PlanProgressBar';
-import { SPACING } from '../../styles/layout';
+import { BORDER_RADIUS, FONT_SIZE, SPACING } from '../../styles/designTokens';
 import { ENVELOPE_RAIL_CHILD_ALPHA } from '../../styles/envelopePalette';
 import { SPRING_BADGE_POP } from '../../utils/motion';
 
@@ -442,7 +442,7 @@ const styles = StyleSheet.create({
   },
   brokenText: {
     flex: 1,
-    fontSize: 12,
+    fontSize: FONT_SIZE.sm,
   },
   checkBadge: {
     alignItems: 'center',
@@ -469,7 +469,7 @@ const styles = StyleSheet.create({
     marginLeft: 10,
   },
   lineComment: {
-    fontSize: 12,
+    fontSize: FONT_SIZE.sm,
     marginTop: 1,
   },
   lineInner: {
@@ -499,7 +499,7 @@ const styles = StyleSheet.create({
     width: PAIR_COLUMN_WIDTH,
   },
   lineRow: {
-    borderRadius: 8,
+    borderRadius: BORDER_RADIUS.md,
     // Clips the rail to the row's rounded corners.
     overflow: 'hidden',
     paddingVertical: 7,
@@ -517,7 +517,7 @@ const styles = StyleSheet.create({
     marginTop: 6,
   },
   rail: {
-    borderRadius: 1,
+    borderRadius: BORDER_RADIUS.pill,
     bottom: 0,
     left: 0,
     position: 'absolute',
@@ -538,7 +538,7 @@ const styles = StyleSheet.create({
   },
   swipeActionText: {
     color: 'white',
-    fontSize: 12,
+    fontSize: FONT_SIZE.sm,
     fontWeight: '600',
     marginTop: 2,
   },

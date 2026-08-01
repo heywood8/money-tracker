@@ -5,6 +5,7 @@ import Ionicons from '@expo/vector-icons/Ionicons';
 import * as Updates from 'expo-updates';
 import { useThemeColors } from '../contexts/ThemeColorsContext';
 import { useImportProgress } from '../contexts/ImportProgressContext';
+import { BORDER_RADIUS, FONT_SIZE } from '../styles/designTokens';
 
 export default function ImportProgressModal() {
   const { colors } = useThemeColors();
@@ -244,7 +245,7 @@ const styles = StyleSheet.create({
     borderBottomWidth: 0,
   },
   modalContainer: {
-    borderRadius: 12,
+    borderRadius: BORDER_RADIUS.lg,
     margin: 20,
     maxHeight: '80%',
     padding: 24,
@@ -258,7 +259,7 @@ const styles = StyleSheet.create({
     width: 24,
   },
   stepIconPlaceholder: {
-    borderRadius: 12,
+    borderRadius: BORDER_RADIUS.pill,
     borderWidth: 2,
     height: 24,
     marginRight: 12,
@@ -283,7 +284,7 @@ const styles = StyleSheet.create({
     paddingBottom: 8,
   },
   subtitle: {
-    fontSize: 14,
+    fontSize: FONT_SIZE.md,
     textAlign: 'center',
   },
   title: {

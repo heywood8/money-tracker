@@ -1,6 +1,8 @@
 // app/styles/modalStyles.js
 import { StyleSheet } from 'react-native';
 import { SPACING, BORDER_RADIUS } from './designTokens';
+import { SECTION_LABEL } from './componentStyles';
+import { FONT_SIZE } from '../styles/designTokens';
 
 /**
  * Static styles shared across all modal form content.
@@ -9,9 +11,7 @@ import { SPACING, BORDER_RADIUS } from './designTokens';
 export const modalSharedStyles = StyleSheet.create({
   // Small-caps label rendered above each input or picker row
   fieldLabel: {
-    fontSize: 10,
-    fontWeight: '600',
-    letterSpacing: 0.8,
+    ...SECTION_LABEL,
     marginBottom: 2,
     marginTop: SPACING.sm,
   },
@@ -32,7 +32,7 @@ export const modalSharedStyles = StyleSheet.create({
   },
   // Selected value text inside a picker row
   pickerRowValue: {
-    fontSize: 16,
+    fontSize: FONT_SIZE.base,
     fontWeight: '500',
   },
   // Spacing below PaperTextInput

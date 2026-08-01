@@ -6,8 +6,9 @@ import Ionicons from '@expo/vector-icons/Ionicons';
 import { useThemeColors } from '../contexts/ThemeColorsContext';
 import { useLocalization } from '../contexts/LocalizationContext';
 import { parseBankNotification } from '../services/notifications/parseBankNotification';
-import { HORIZONTAL_PADDING, SPACING, BORDER_RADIUS } from '../styles/layout';
+import { BORDER_RADIUS, FONT_SIZE, HORIZONTAL_PADDING, SPACING } from '../styles/designTokens';
 import { motionDuration } from '../utils/reducedMotion';
+import { CARD_SURFACE, SECTION_LABEL } from '../styles/componentStyles';
 
 // Renders the "date · time" label for a notification's post time. Mirrors the
 // update panel's timestamp treatment so the two subpanels read alike.
@@ -231,21 +232,20 @@ const styles = StyleSheet.create({
     alignSelf: 'flex-start',
     borderRadius: BORDER_RADIUS.sm,
     flexDirection: 'row',
-    gap: 4,
+    gap: SPACING.xs,
     marginBottom: SPACING.sm,
     paddingHorizontal: SPACING.sm,
     paddingVertical: 2,
   },
   badgeText: {
     color: '#ffffff',
-    fontSize: 10,
+    fontSize: FONT_SIZE.xs,
     fontWeight: '700',
     letterSpacing: 0.4,
     textTransform: 'uppercase',
   },
   card: {
-    borderRadius: BORDER_RADIUS.md,
-    borderWidth: StyleSheet.hairlineWidth,
+    ...CARD_SURFACE,
     marginBottom: SPACING.md,
     paddingHorizontal: SPACING.md,
     paddingVertical: SPACING.md,
@@ -254,7 +254,7 @@ const styles = StyleSheet.create({
     borderLeftWidth: 3,
   },
   cardBody: {
-    fontSize: 14,
+    fontSize: FONT_SIZE.md,
     lineHeight: 20,
   },
   cardHeader: {
@@ -272,11 +272,11 @@ const styles = StyleSheet.create({
   },
   cardSource: {
     flex: 1,
-    fontSize: 12,
+    fontSize: FONT_SIZE.sm,
     fontWeight: '500',
   },
   cardTime: {
-    fontSize: 12,
+    fontSize: FONT_SIZE.sm,
     fontWeight: '500',
   },
   cardTitle: {
@@ -305,7 +305,7 @@ const styles = StyleSheet.create({
     borderRadius: BORDER_RADIUS.sm,
     borderWidth: StyleSheet.hairlineWidth,
     flexDirection: 'row',
-    gap: 4,
+    gap: SPACING.xs,
     paddingHorizontal: SPACING.md,
     paddingVertical: SPACING.xs,
   },
@@ -316,7 +316,7 @@ const styles = StyleSheet.create({
   reAddFeedback: {
     alignItems: 'center',
     flexDirection: 'row',
-    gap: 4,
+    gap: SPACING.xs,
     paddingVertical: SPACING.xs,
   },
   reAddFeedbackText: {
@@ -337,10 +337,7 @@ const styles = StyleSheet.create({
     marginTop: SPACING.sm,
   },
   sectionTitle: {
-    fontSize: 11,
-    fontWeight: '600',
-    letterSpacing: 0.8,
+    ...SECTION_LABEL,
     marginTop: SPACING.md,
-    textTransform: 'uppercase',
   },
 });

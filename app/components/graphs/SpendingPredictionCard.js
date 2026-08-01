@@ -3,6 +3,7 @@ import { View, Text, StyleSheet } from 'react-native';
 import PropTypes from 'prop-types';
 import Icon from '@expo/vector-icons/MaterialCommunityIcons';
 import currencies from '../../../assets/currencies.json';
+import { BORDER_RADIUS, FONT_SIZE, SPACING } from '../../styles/designTokens';
 
 const formatCurrency = (amount, currency) => {
   const currencyInfo = currencies[currency];
@@ -42,7 +43,7 @@ const SpendingPredictionCard = ({ colors, t, spendingPrediction, selectedCurrenc
           <Text style={[styles.predictionStatLabel, { color: colors.mutedText }]}>
             {t('current_spending')}
           </Text>
-          <Text style={[styles.predictionStatValue, { color: colors.expense || '#ff4444' }]}>
+          <Text style={[styles.predictionStatValue, { color: colors.expense }]}>
             {formatCurrency(spendingPrediction.currentSpending, selectedCurrency)}
           </Text>
         </View>
@@ -96,7 +97,7 @@ SpendingPredictionCard.propTypes = {
 
 const styles = StyleSheet.create({
   accountName: {
-    fontSize: 12,
+    fontSize: FONT_SIZE.sm,
   },
   dailyAverageValue: {
     fontWeight: '600',
@@ -105,7 +106,7 @@ const styles = StyleSheet.create({
     marginHorizontal: 8,
   },
   predictionCard: {
-    borderRadius: 8,
+    borderRadius: BORDER_RADIUS.md,
     borderWidth: 1,
     marginBottom: 16,
     padding: 16,
@@ -117,18 +118,18 @@ const styles = StyleSheet.create({
     marginBottom: 16,
   },
   predictionProgressBar: {
-    borderRadius: 4,
+    borderRadius: BORDER_RADIUS.pill,
     height: 8,
   },
   predictionProgressContainer: {
     marginBottom: 0,
   },
   predictionProgressText: {
-    fontSize: 12,
+    fontSize: FONT_SIZE.sm,
     textAlign: 'center',
   },
   predictionProgressTrack: {
-    borderRadius: 4,
+    borderRadius: BORDER_RADIUS.pill,
     height: 8,
     marginBottom: 8,
   },
@@ -136,11 +137,11 @@ const styles = StyleSheet.create({
     flex: 1,
   },
   predictionStatLabel: {
-    fontSize: 12,
+    fontSize: FONT_SIZE.sm,
     marginBottom: 4,
   },
   predictionStatValue: {
-    fontSize: 18,
+    fontSize: FONT_SIZE.lg,
     fontWeight: 'bold',
   },
   predictionStats: {
@@ -150,13 +151,13 @@ const styles = StyleSheet.create({
     marginBottom: 16,
   },
   predictionTitle: {
-    fontSize: 18,
+    fontSize: FONT_SIZE.lg,
     fontWeight: 'bold',
   },
   predictionTitleContainer: {
     alignItems: 'center',
     flexDirection: 'row',
-    gap: 8,
+    gap: SPACING.sm,
   },
 });
 

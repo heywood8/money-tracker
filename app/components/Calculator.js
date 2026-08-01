@@ -2,12 +2,9 @@ import React, { useState, useEffect, useCallback, useMemo, memo, useRef } from '
 import { View, Text, Pressable, StyleSheet } from 'react-native';
 import Icon from '@expo/vector-icons/MaterialCommunityIcons';
 import PropTypes from 'prop-types';
-import { BORDER_RADIUS, SPACING, HEIGHTS } from '../styles/designTokens';
+import { BORDER_RADIUS, FONT_SIZE, HEIGHTS, SPACING } from '../styles/designTokens';
 import { hasOperation as checkHasOperation, evaluateExpression as evalExpr } from '../utils/calculatorUtils';
 import { getDecimalPlaces } from '../services/currency';
-
-// Validation-flash border color; mirrors FLASH_ERROR_COLOR in OperationFormFields.js
-const FLASH_ERROR_COLOR = '#ef4444';
 
 /**
  * Calculator button component - Memoized for performance
@@ -269,18 +266,18 @@ export default function Calculator({ value = '', onValueChange = () => {}, color
 
   const operationTextStyle = useMemo(() => ({
     color: colors.mutedText,
-    fontSize: 24,
+    fontSize: FONT_SIZE.xxl,
     fontWeight: 'bold',
   }), [colors.mutedText]);
 
   const numberTextStyle = useMemo(() => ({
     color: colors.text,
-    fontSize: 20,
+    fontSize: FONT_SIZE.xl,
   }), [colors.text]);
 
   const decimalTextStyle = useMemo(() => ({
     color: colors.text,
-    fontSize: 24,
+    fontSize: FONT_SIZE.xxl,
     fontWeight: 'bold',
   }), [colors.text]);
 
@@ -288,7 +285,7 @@ export default function Calculator({ value = '', onValueChange = () => {}, color
     // Use provided containerBackground or fallback to altRow for compatibility
     <View style={[styles.container, compact && styles.containerCompact, { backgroundColor: containerBackground || colors.altRow }]}>
       {/* Display */}
-      <View style={[styles.display, flashError && styles.displayError]}>
+      <View style={[styles.display, flashError && { borderColor: colors.destructive }]}>
         {onCurrencyPress ? (
           <Pressable
             onPress={onCurrencyPress}
@@ -498,7 +495,7 @@ const styles = StyleSheet.create({
     shadowRadius: 2,
   },
   buttonText: {
-    fontSize: 16,
+    fontSize: FONT_SIZE.base,
     fontWeight: '500',
   },
   container: {
@@ -551,15 +548,12 @@ const styles = StyleSheet.create({
     justifyContent: 'flex-end',
     width: 80,
   },
-  displayError: {
-    borderColor: FLASH_ERROR_COLOR,
-  },
   displayLeftSpacer: {
     width: 80,
   },
   displayText: {
     flex: 1,
-    fontSize: 20,
+    fontSize: FONT_SIZE.xl,
     fontWeight: '600',
     textAlign: 'center',
   },
@@ -572,7 +566,7 @@ const styles = StyleSheet.create({
     paddingHorizontal: SPACING.xs,
   },
   equalsButtonText: {
-    fontSize: 18,
+    fontSize: FONT_SIZE.lg,
     fontWeight: 'bold',
   },
   keypad: {

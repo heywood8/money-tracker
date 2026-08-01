@@ -5,6 +5,8 @@ import DateTimePicker from '@react-native-community/datetimepicker';
 import PropTypes from 'prop-types';
 import { formatDate } from '../../services/BalanceHistoryDB';
 import currencies from '../../../assets/currencies.json';
+import { CHIP, CHIP_TEXT, SECTION_LABEL } from '../../styles/componentStyles';
+import { BORDER_RADIUS, FONT_SIZE, SPACING } from '../../styles/designTokens';
 
 const ExpandableFilters = ({
   filters,
@@ -388,18 +390,18 @@ ExpandableFilters.propTypes = {
 
 const styles = StyleSheet.create({
   amountCurrencyHint: {
-    fontSize: 14,
+    fontSize: FONT_SIZE.md,
     fontWeight: '600',
     marginRight: 6,
   },
   amountInputField: {
     flex: 1,
-    fontSize: 14,
+    fontSize: FONT_SIZE.md,
     paddingVertical: 9,
   },
   amountInputWrap: {
     alignItems: 'center',
-    borderRadius: 8,
+    borderRadius: BORDER_RADIUS.md,
     borderWidth: 1,
     flex: 1,
     flexDirection: 'row',
@@ -408,34 +410,23 @@ const styles = StyleSheet.create({
   amountRangeContainer: {
     alignItems: 'center',
     flexDirection: 'row',
-    gap: 12,
+    gap: SPACING.md,
   },
   amountRangeSeparator: {
-    fontSize: 16,
+    fontSize: FONT_SIZE.base,
   },
-  chip: {
-    alignItems: 'center',
-    borderRadius: 16,
-    borderWidth: 1,
-    flexDirection: 'row',
-    gap: 5,
-    paddingHorizontal: 12,
-    paddingVertical: 5,
-  },
+  chip: CHIP,
   chipContainer: {
     flexDirection: 'row',
     flexWrap: 'wrap',
     gap: 6,
   },
-  chipText: {
-    fontSize: 13,
-    fontWeight: '500',
-  },
+  chipText: CHIP_TEXT,
   clearDateButton: {
     marginTop: 7,
   },
   clearDateButtonText: {
-    fontSize: 14,
+    fontSize: FONT_SIZE.md,
     fontWeight: '500',
   },
   container: {
@@ -443,20 +434,20 @@ const styles = StyleSheet.create({
   },
   dateInput: {
     alignItems: 'center',
-    borderRadius: 8,
+    borderRadius: BORDER_RADIUS.md,
     borderWidth: 1,
     flex: 1,
     flexDirection: 'row',
-    gap: 8,
+    gap: SPACING.sm,
     paddingHorizontal: 12,
     paddingVertical: 9,
   },
   dateInputText: {
-    fontSize: 14,
+    fontSize: FONT_SIZE.md,
   },
   dateRangeContainer: {
     flexDirection: 'row',
-    gap: 12,
+    gap: SPACING.md,
   },
   footer: {
     alignItems: 'center',
@@ -482,7 +473,7 @@ const styles = StyleSheet.create({
     opacity: 0.4,
   },
   footerButtonText: {
-    fontSize: 14,
+    fontSize: FONT_SIZE.md,
     fontWeight: '600',
   },
   footerCount: {
@@ -513,11 +504,8 @@ const styles = StyleSheet.create({
     paddingVertical: 10,
   },
   sectionLabel: {
-    fontSize: 11,
-    fontWeight: '600',
-    letterSpacing: 0.5,
-    marginBottom: 6,
-    textTransform: 'uppercase',
+    ...SECTION_LABEL,
+    marginBottom: SPACING.xs,
   },
   sectionLast: {
     marginBottom: 0,
