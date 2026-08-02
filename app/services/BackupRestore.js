@@ -30,7 +30,7 @@ export const createBackup = async () => {
     console.log('Creating database backup...');
 
     // Fetch all data from all tables
-    const [accounts, categories, operations, budgets, appMetadata, balanceHistory, plannedOperations, merchantRules, budgetPlans, budgetPlanLines, budgetPlanLineCategories, budgetPlanLineGroups, budgetPlanLineAccounts] = await Promise.all([
+    const [accounts, categories, operations, budgets, appMetadata, balanceHistory, plannedOperations, merchantRules, notificationTemplates, budgetPlans, budgetPlanLines, budgetPlanLineCategories, budgetPlanLineGroups, budgetPlanLineAccounts] = await Promise.all([
       queryAll('SELECT * FROM accounts ORDER BY created_at ASC'),
       queryAll('SELECT * FROM categories ORDER BY created_at ASC'),
       queryAll('SELECT * FROM operations ORDER BY created_at ASC'),
@@ -40,6 +40,11 @@ export const createBackup = async () => {
       queryAll('SELECT * FROM planned_operations ORDER BY created_at ASC').catch(() => []),
       // Newer table — guard so backups of pre-0010 databases don't fail.
       queryAll('SELECT * FROM notification_merchant_rules ORDER BY created_at ASC').catch(() => []),
+      // User-defined parse templates (migration 0025). Guarded so backups of
+      // pre-0025 databases don't fail. These are hand-built by the user and
+      // cannot be re-learned from the data, so unlike the pending queue they
+      // must survive a backup/restore round trip.
+      queryAll('SELECT * FROM notification_templates ORDER BY priority ASC, created_at ASC').catch(() => []),
       // Budgets v2 (migration 0018). Guarded so backups of pre-0018 databases
       // don't fail. Plans before lines so the FK order is preserved on restore.
       queryAll('SELECT * FROM budget_plans ORDER BY created_at ASC').catch(() => []),
@@ -73,6 +78,8 @@ export const createBackup = async () => {
         // Learned merchant -> category rules (the pending_notifications queue is
         // transient state and intentionally not backed up).
         notification_merchant_rules: merchantRules || [],
+        // User-defined notification parse templates.
+        notification_templates: notificationTemplates || [],
         // Budgets v2 monthly plans and their allocation lines.
         budget_plans: budgetPlans || [],
         budget_plan_lines: budgetPlanLines || [],
@@ -89,6 +96,7 @@ export const createBackup = async () => {
       budgets: backup.data.budgets.length,
       balance_history: backup.data.balance_history.length,
       planned_operations: backup.data.planned_operations.length,
+      notification_templates: backup.data.notification_templates.length,
       budget_plans: backup.data.budget_plans.length,
       budget_plan_lines: backup.data.budget_plan_lines.length,
       budget_plan_line_categories: backup.data.budget_plan_line_categories.length,
@@ -114,6 +122,8 @@ const TABLE_FIELDS = {
   balance_history:    ['id', 'account_id', 'date', 'balance', 'created_at'],
   planned_operations: ['id', 'name', 'type', 'amount', 'account_id', 'category_id', 'to_account_id', 'description', 'is_recurring', 'last_executed_month', 'display_order', 'created_at', 'updated_at'],
   notification_merchant_rules: ['id', 'merchant', 'package_name', 'category_id', 'label_override', 'created_at', 'updated_at'],
+  // `fields` and `triggers` are JSON blobs; they round-trip as opaque text.
+  notification_templates: ['id', 'name', 'package_name', 'type', 'enabled', 'priority', 'category_id', 'currency', 'date_order', 'fields', 'triggers', 'sample_title', 'sample_text', 'created_at', 'updated_at'],
   budget_plans: ['id', 'month', 'currency', 'expected_income', 'created_at', 'updated_at'],
   // `plan_id` is nullable (NULL for a recurring/global line, migration 0019).
   // `is_recurring` / `currency` were added by that same migration.
@@ -533,6 +543,16 @@ export const restoreBackup = async (backup, cancelToken) => {
 
       // Clear existing data (in reverse order due to foreign keys)
       await db.runAsync('DELETE FROM notification_merchant_rules').catch(() => {});
+      // Parse templates are cleared ONLY when the backup actually carries them.
+      // The CSV format has no [NOTIFICATION_TEMPLATES] section, so a CSV restore
+      // hands us a `data` object with no such key — clearing unconditionally
+      // would wipe every hand-built template and restore nothing in its place.
+      // That is unrecoverable in a way the rest of this table set is not: a
+      // merchant rule is re-learned the next time the shop is seen, but a
+      // template only exists because someone marked up a notification by hand.
+      if (Array.isArray(backup.data.notification_templates)) {
+        await db.runAsync('DELETE FROM notification_templates').catch(() => {});
+      }
       await db.runAsync('DELETE FROM planned_operations').catch(() => {});
       await db.runAsync('DELETE FROM budgets');
       // Budgets v2: lines reference plans (cascade), categories and accounts (set
@@ -1218,6 +1238,41 @@ export const restoreBackup = async (backup, cancelToken) => {
         console.log(`Restored ${restoredRules} merchant rules`);
       }
 
+      // Restore user-defined notification parse templates
+      if (backup.data.notification_templates && backup.data.notification_templates.length > 0) {
+        let restoredTemplates = 0;
+        for (const template of backup.data.notification_templates) {
+          // `fields` is what makes a template a template — a row without one
+          // could never match anything, so skip it rather than store a stub.
+          if (!template.id || !template.name || !template.fields) {
+            console.warn('Skipping notification template with missing id, name or fields:', template.id);
+            continue;
+          }
+          await db.runAsync(
+            'INSERT OR IGNORE INTO notification_templates (id, name, package_name, type, enabled, priority, category_id, currency, date_order, fields, triggers, sample_title, sample_text, created_at, updated_at) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)',
+            [
+              template.id,
+              template.name,
+              template.package_name || null,
+              template.type === 'income' ? 'income' : 'expense',
+              template.enabled === 0 ? 0 : 1,
+              Number.isFinite(template.priority) ? template.priority : 0,
+              template.category_id || null,
+              template.currency || null,
+              template.date_order || 'dmy',
+              template.fields,
+              template.triggers || null,
+              template.sample_title || null,
+              template.sample_text || null,
+              template.created_at || new Date().toISOString(),
+              template.updated_at || new Date().toISOString(),
+            ],
+          ).catch((e) => { console.warn('Skipping notification template:', e.message); });
+          restoredTemplates += 1;
+        }
+        console.log(`Restored ${restoredTemplates} notification templates`);
+      }
+
       // Post-restore upgrades: Ensure shadow categories exist
       console.log('Performing post-restore database upgrades...');
       appEvents.emit(IMPORT_PROGRESS_EVENT, { stepId: 'upgrades', status: 'in_progress' });
@@ -1558,6 +1613,16 @@ const importBackupSQLite = async (fileUri, cancelToken) => {
       console.warn('No notification_merchant_rules table in imported database (older format)');
     }
 
+    // Parse templates may not exist in pre-0025 backups. Same reasoning as the
+    // merchant rules above: without this extraction restoreBackup clears the live
+    // table and re-inserts nothing, wiping every template the user built.
+    let notificationTemplates = [];
+    try {
+      notificationTemplates = await tempDb.getAllAsync('SELECT * FROM notification_templates ORDER BY priority ASC, created_at ASC');
+    } catch (e) {
+      console.warn('No notification_templates table in imported database (older format)');
+    }
+
     // Budgets v2 tables may not exist in pre-0018 backups.
     let budgetPlans = [];
     let budgetPlanLines = [];
@@ -1617,6 +1682,7 @@ const importBackupSQLite = async (fileUri, cancelToken) => {
         balance_history: balanceHistory || [],
         planned_operations: plannedOperations || [],
         notification_merchant_rules: merchantRules || [],
+        notification_templates: notificationTemplates || [],
         budget_plans: budgetPlans || [],
         budget_plan_lines: budgetPlanLines || [],
         budget_plan_line_categories: budgetPlanLineCategories || [],

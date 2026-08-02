@@ -26,6 +26,7 @@ import m0021 from './0021_plan_line_categories.js';
 import m0022 from './0022_plan_line_groups.js';
 import m0023 from './0023_operation_exclude_from_charts.js';
 import m0024 from './0024_plan_line_accounts.js';
+import m0025 from './0025_notification_templates.js';
 
 export default {
   journal,
@@ -55,6 +56,7 @@ export default {
     m0022,
     m0023,
     m0024,
+    m0025,
   },
   postMigrationHandlers: {
     m0003: m0003PostMigration,

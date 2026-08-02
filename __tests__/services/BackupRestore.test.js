@@ -172,10 +172,10 @@ describe('BackupRestore', () => {
       });
       expect(backup.timestamp).toBeDefined();
       // accounts, categories, operations, budgets, app_metadata, balance_history,
-      // planned_operations, notification_merchant_rules, budget_plans,
-      // budget_plan_lines, budget_plan_line_categories, budget_plan_line_groups,
-      // budget_plan_line_accounts
-      expect(mockDb.queryAll).toHaveBeenCalledTimes(13);
+      // planned_operations, notification_merchant_rules, notification_templates,
+      // budget_plans, budget_plan_lines, budget_plan_line_categories,
+      // budget_plan_line_groups, budget_plan_line_accounts
+      expect(mockDb.queryAll).toHaveBeenCalledTimes(14);
     });
 
     it('includes empty arrays when tables are empty', async () => {
@@ -558,23 +558,77 @@ describe('BackupRestore', () => {
         await callback(mockDbInstance);
       });
 
-      await BackupRestore.restoreBackup(validBackup);
+      // Carries the templates section so the conditional clear runs and the
+      // full delete sequence is asserted.
+      await BackupRestore.restoreBackup({
+        ...validBackup,
+        data: { ...validBackup.data, notification_templates: [] },
+      });
 
       expect(deleteCalls[0]).toContain('notification_merchant_rules');
-      expect(deleteCalls[1]).toContain('planned_operations');
-      expect(deleteCalls[2]).toContain('budgets');
+      // Parse templates (migration 0025) reference categories (ON DELETE SET
+      // NULL), so they clear before the categories they point at.
+      expect(deleteCalls[1]).toContain('notification_templates');
+      expect(deleteCalls[2]).toContain('planned_operations');
+      expect(deleteCalls[3]).toContain('budgets');
       // The 0021 and 0024 junctions are cleared before the lines they hang off.
-      expect(deleteCalls[3]).toContain('budget_plan_line_categories');
-      expect(deleteCalls[4]).toContain('budget_plan_line_accounts');
-      expect(deleteCalls[5]).toContain('budget_plan_lines');
-      expect(deleteCalls[6]).toContain('budget_plans');
+      expect(deleteCalls[4]).toContain('budget_plan_line_categories');
+      expect(deleteCalls[5]).toContain('budget_plan_line_accounts');
+      expect(deleteCalls[6]).toContain('budget_plan_lines');
+      expect(deleteCalls[7]).toContain('budget_plans');
       // Groups (migration 0022) are referenced BY lines (ON DELETE SET NULL), so
       // they clear after the lines that point at them.
-      expect(deleteCalls[7]).toContain('budget_plan_line_groups');
-      expect(deleteCalls[8]).toContain('accounts_balance_history');
-      expect(deleteCalls[9]).toContain('operations');
-      expect(deleteCalls[10]).toContain('categories');
-      expect(deleteCalls[11]).toContain('accounts');
+      expect(deleteCalls[8]).toContain('budget_plan_line_groups');
+      expect(deleteCalls[9]).toContain('accounts_balance_history');
+      expect(deleteCalls[10]).toContain('operations');
+      expect(deleteCalls[11]).toContain('categories');
+      expect(deleteCalls[12]).toContain('accounts');
+    });
+
+    // Regression: a CSV backup structurally cannot carry parse templates (the
+    // format has no [NOTIFICATION_TEMPLATES] section), so restoring one used to
+    // wipe every template the user had hand-built and restore nothing. Unlike
+    // merchant rules, templates cannot be re-learned from the data — the clear
+    // has to be conditional on the backup actually carrying them.
+    it('does NOT clear parse templates when the backup carries no templates section', async () => {
+      const deleteCalls = [];
+      const mockDbInstance = {
+        runAsync: jest.fn().mockImplementation((query) => {
+          if (query.startsWith('DELETE FROM')) deleteCalls.push(query);
+          return Promise.resolve({ lastInsertRowId: 1 });
+        }),
+        getAllAsync: jest.fn().mockResolvedValue([]),
+      };
+      mockDb.executeTransaction.mockImplementation(async (callback) => {
+        await callback(mockDbInstance);
+      });
+
+      // `validBackup.data` has no notification_templates key — exactly what
+      // parseCSVBackup produces.
+      await BackupRestore.restoreBackup(validBackup);
+
+      expect(deleteCalls.some((q) => q.includes('notification_templates'))).toBe(false);
+    });
+
+    it('clears parse templates when the backup does carry them', async () => {
+      const deleteCalls = [];
+      const mockDbInstance = {
+        runAsync: jest.fn().mockImplementation((query) => {
+          if (query.startsWith('DELETE FROM')) deleteCalls.push(query);
+          return Promise.resolve({ lastInsertRowId: 1 });
+        }),
+        getAllAsync: jest.fn().mockResolvedValue([]),
+      };
+      mockDb.executeTransaction.mockImplementation(async (callback) => {
+        await callback(mockDbInstance);
+      });
+
+      await BackupRestore.restoreBackup({
+        ...validBackup,
+        data: { ...validBackup.data, notification_templates: [] },
+      });
+
+      expect(deleteCalls.some((q) => q.includes('notification_templates'))).toBe(true);
     });
 
     it('preserves db_version metadata', async () => {

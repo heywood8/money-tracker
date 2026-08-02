@@ -61,7 +61,8 @@ export const resolveAccountId = async (descriptor) => {
 };
 
 /**
- * Derive the category id from an already-fetched merchant rule.
+ * Derive the category id from an already-fetched merchant rule, falling back to
+ * the parse template's default category.
  *
  * Kinds flagged `requiresCategory` (client-to-client transfers) never resolve a
  * category automatically: the same counterparty maps to different categories
@@ -72,8 +73,13 @@ export const resolveAccountId = async (descriptor) => {
  * @returns {string|null}
  */
 const categoryFromRule = (descriptor, rule) => {
-  if (!descriptor || descriptor.requiresCategory || !descriptor.merchant || !rule) return null;
-  return rule.categoryId || null;
+  if (!descriptor || descriptor.requiresCategory) return null;
+  const learned = descriptor.merchant && rule ? rule.categoryId : null;
+  // A learned merchant rule is the more specific fact and always wins. A parse
+  // template's default category is the fallback for a payee nothing has been
+  // learned about yet — including one with no payee at all, which is why this
+  // no longer bails out when `merchant` is missing.
+  return learned || descriptor.defaultCategoryId || null;
 };
 
 /**
@@ -98,7 +104,8 @@ const labelFromRule = (descriptor, rule) => {
  * @returns {Promise<string|null>}
  */
 export const resolveCategoryId = async (descriptor) => {
-  if (!descriptor || descriptor.requiresCategory || !descriptor.merchant) return null;
+  if (!descriptor || descriptor.requiresCategory) return null;
+  if (!descriptor.merchant) return categoryFromRule(descriptor, null);
   const rule = await NotificationRulesDB.getMerchantRule(descriptor.merchant, descriptor.packageName);
   return categoryFromRule(descriptor, rule);
 };

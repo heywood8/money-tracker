@@ -176,6 +176,13 @@
       "when": 1767900000000,
       "tag": "0024_plan_line_accounts",
       "breakpoints": true
+    },
+    {
+      "idx": 25,
+      "version": "6",
+      "when": 1767900000000,
+      "tag": "0025_notification_templates",
+      "breakpoints": true
     }
   ]
 }

@@ -25,6 +25,7 @@ import CategoryGridSelector from './CategoryGridSelector';
 import { getCategoryDisplayName } from '../utils/categoryUtils';
 import { NotificationCard } from './NotificationsContentPanel';
 import { BORDER_RADIUS, FONT_SIZE, HORIZONTAL_PADDING, SPACING } from '../styles/designTokens';
+import { ensureCustomTemplatesLoaded } from '../services/notifications/customTemplates';
 import {
   isBankNotificationsEnabled,
   processBankNotifications,
@@ -87,7 +88,7 @@ const CARD_COLLAPSE_ANIMATION = {
  *
  * The panel owns all of its async state so the host screen only has to mount it.
  */
-export default function NotificationProcessingContentPanel({ bottomInset = 0 }) {
+export default function NotificationProcessingContentPanel({ onCreateTemplate = null, bottomInset = 0 }) {
   const { colors } = useThemeColors();
   const { t } = useLocalization();
   const { accounts } = useAccountsData();
@@ -201,6 +202,13 @@ export default function NotificationProcessingContentPanel({ bottomInset = 0 }) 
     (async () => {
       setLoading(true);
       try {
+        // Every card in the feed parses itself as it renders, and that parse
+        // reads the user's templates from a synchronous cache. Load it before
+        // the first render — otherwise a notification only a template can read
+        // would draw as unrecognized until something else happened to populate
+        // the cache. Runs regardless of the feature toggle: the feed and its
+        // highlighting are shown either way.
+        await ensureCustomTemplatesLoaded();
         const isOn = await isBankNotificationsEnabled();
         if (!mountedRef.current) return;
         if (isOn) {
@@ -362,6 +370,15 @@ export default function NotificationProcessingContentPanel({ bottomInset = 0 }) 
     }
   }, []);
 
+  // Hand a notification to the template editor, along with the rest of the feed
+  // so the editor can report how much of it a draft template would also read.
+  // `recent` (not the filtered view) is passed on purpose: the match-rate should
+  // measure the app's real traffic, not what the app filters happen to show.
+  const handleCreateTemplate = useCallback((notification) => {
+    if (!onCreateTemplate) return;
+    onCreateTemplate(notification, recent);
+  }, [onCreateTemplate, recent]);
+
   const renderDeactivateAction = useCallback((packageName) => (
     <Pressable
       testID={`deactivate-app-${packageName}`}
@@ -453,7 +470,11 @@ export default function NotificationProcessingContentPanel({ bottomInset = 0 }) 
               >
                 <ActivityIndicator size="small" color={colors.primary} />
                 <View style={styles.savingBody}>
-                  <Text style={[styles.savingMerchant, { color: colors.text }]} numberOfLines={1}>
+                  <Text
+                    style={[styles.savingMerchant, { color: colors.text }]}
+                    numberOfLines={1}
+                    testID={`pending-merchant-${item.id}`}
+                  >
                     {item.merchant || item.kind}
                   </Text>
                   <Text style={[styles.savingStatus, { color: colors.mutedText }]} numberOfLines={1}>
@@ -495,7 +516,11 @@ export default function NotificationProcessingContentPanel({ bottomInset = 0 }) 
               style={[styles.card, { backgroundColor: colors.surface, borderColor: colors.border }]}
             >
               <View style={styles.cardHeader}>
-                <Text style={[styles.cardMerchant, { color: colors.text }]} numberOfLines={1}>
+                <Text
+                  style={[styles.cardMerchant, { color: colors.text }]}
+                  numberOfLines={1}
+                  testID={`pending-merchant-${item.id}`}
+                >
                   {item.merchant || item.kind}
                 </Text>
                 <Text style={[styles.cardAmount, { color: colors.text }]}>
@@ -653,6 +678,7 @@ export default function NotificationProcessingContentPanel({ bottomInset = 0 }) 
               onReAdd={(n) => handleReAdd(n, key)}
               reAddState={reAddState[key]}
               animateIn={isNew}
+              onCreateTemplate={onCreateTemplate ? handleCreateTemplate : null}
             />
           );
           // Only offer swipe-to-hide when the source app is known — a card with no
@@ -685,6 +711,10 @@ export default function NotificationProcessingContentPanel({ bottomInset = 0 }) 
 }
 
 NotificationProcessingContentPanel.propTypes = {
+  // Called with (notification, recentNotifications) when the user asks to build
+  // a parse template from a card in the feed. Omitted when the host has nowhere
+  // to open the editor.
+  onCreateTemplate: PropTypes.func,
   bottomInset: PropTypes.number,
 };
 
