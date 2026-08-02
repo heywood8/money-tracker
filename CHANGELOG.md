@@ -1,5 +1,12 @@
 # Changelog
 
+## [0.255.0](https://github.com/heywood8/money-tracker/compare/penny-v0.254.1...penny-v0.255.0) (2026-08-02)
+
+
+### Features
+
+* **notifications:** let users build parse templates for any banking app ([#1533](https://github.com/heywood8/money-tracker/issues/1533)) ([642cdfd](https://github.com/heywood8/money-tracker/commit/642cdfd626de6cc04d4d6163a0f689bf46aef5cd))
+
 ## [0.254.1](https://github.com/heywood8/money-tracker/compare/penny-v0.254.0...penny-v0.254.1) (2026-08-02)
 
 
