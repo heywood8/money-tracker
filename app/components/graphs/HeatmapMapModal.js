@@ -15,6 +15,8 @@ import { Canvas, Circle, Group, BlurMask } from '@shopify/react-native-skia';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { getOperationCoordinates } from '../../services/OperationsDB';
 import { getTileUri, pruneTileCache } from '../../services/MapTileCache';
+import { ensureLocationPermission, getCurrentLocation } from '../../services/LocationService';
+import { useDisplaySettings } from '../../contexts/DisplaySettingsContext';
 import { formatDate } from '../../services/BalanceHistoryDB';
 import {
   visibleTiles,
@@ -29,6 +31,10 @@ import { BORDER_RADIUS, FONT_SIZE, SPACING } from '../../styles/designTokens';
 
 // Fallback view when there is nothing to fit — the whole world.
 const WORLD_REGION = { latitude: 20, longitude: 0, zoom: 2 };
+
+// Default camera when the device location is available: the user's current
+// city. Zoom 12 spans roughly a city and its districts on a phone screen.
+const CITY_ZOOM = 12;
 
 // Heat blob look. Density comes from overlap: each operation is one
 // semi-transparent blob, so clusters saturate toward opaque. The color is
@@ -97,6 +103,8 @@ const HeatmapMapModal = ({
   periodLabel,
 }) => {
   const insets = useSafeAreaInsets();
+  // No provider in isolated renders (tests) — undefined reads as feature off.
+  const { attachLocation } = useDisplaySettings() ?? {};
   const [allTime, setAllTime] = useState(false);
   const [points, setPoints] = useState([]);
   const [loading, setLoading] = useState(true);
@@ -110,11 +118,41 @@ const HeatmapMapModal = ({
   sizeRef.current = size;
   // Set when a new point set arrives; consumed once the viewport is measured.
   const fitPendingRef = useRef(false);
+  // True once the user pans/zooms — from then on nothing may move the camera
+  // out from under them (a late GPS fix, a scope-toggle refit).
+  const interactedRef = useRef(false);
+  // True once the camera was parked on the device's city. Scope toggles then
+  // only swap the points underneath it instead of refitting.
+  const locationAppliedRef = useRef(false);
 
   // Housekeeping once per opening, off the critical path.
   useEffect(() => {
     if (visible) pruneTileCache();
   }, [visible]);
+
+  // Default camera: the user's current city (CITY_ZOOM around the device
+  // location). Gated on the attach-location opt-in — the map must not surface
+  // a permission prompt for users who kept geolocation off (their heatmap is
+  // empty anyway; for opted-in users the permission is already granted and
+  // this is silent). The fix can take seconds, so it lands as an override of
+  // the points-fit — unless the user has already started moving the map.
+  useEffect(() => {
+    if (!visible || !attachLocation) return;
+    let cancelled = false;
+    (async () => {
+      const { granted } = await ensureLocationPermission();
+      if (!granted || cancelled) return;
+      const fix = await getCurrentLocation();
+      if (cancelled || !fix) return;
+      const latitude = parseFloat(fix.latitude);
+      const longitude = parseFloat(fix.longitude);
+      if (!Number.isFinite(latitude) || !Number.isFinite(longitude)) return;
+      if (interactedRef.current) return;
+      locationAppliedRef.current = true;
+      setRegion({ latitude, longitude, zoom: CITY_ZOOM });
+    })();
+    return () => { cancelled = true; };
+  }, [visible, attachLocation]);
 
   useEffect(() => {
     if (!visible) return;
@@ -151,9 +189,12 @@ const HeatmapMapModal = ({
 
   // Fit the loaded points once the viewport is measured (and again on every
   // scope switch). Runs as an effect because layout and data race each other.
+  // Skipped once the camera belongs to the device-city view or to the user's
+  // own gestures — a reload then only swaps the points underneath.
   useEffect(() => {
     if (!fitPendingRef.current || !size.width || !size.height || loading) return;
     fitPendingRef.current = false;
+    if (locationAppliedRef.current || interactedRef.current) return;
     setRegion(fitBounds(points, size.width, size.height) ?? WORLD_REGION);
   }, [points, size, loading]);
 
@@ -174,13 +215,22 @@ const HeatmapMapModal = ({
   // region (no touch-down snapshots), so gesture hand-offs — lifting to one
   // finger mid-pinch, adding a second finger mid-pan — never jump.
   const panLast = useRef({ x: 0, y: 0 });
-  const pinchLast = useRef({ scale: 1, fx: 0, fy: 0 });
+  const pinchLast = useRef({ scale: 1, fx: 0, fy: 0, pointers: 2 });
+
+  // A finger landing or lifting mid-gesture TELEPORTS the pinch centroid
+  // toward the remaining/added finger — that is not the user dragging, and
+  // treating it as a focal delta threw the map sideways at the end of every
+  // pinch (fingers never lift in the same frame). Any single-event focal move
+  // beyond this many px is such a teleport: re-anchor instead of translating.
+  // A real drag at 60 Hz stays far below it (48 px/frame ≈ 2900 px/s).
+  const FOCAL_TELEPORT_PX = 48;
 
   const composedGesture = useMemo(() => {
     const pan = Gesture.Pan()
       .runOnJS(true)
       .maxPointers(1)
       .onStart(() => {
+        interactedRef.current = true;
         panLast.current = { x: 0, y: 0 };
       })
       .onUpdate((e) => {
@@ -193,11 +243,13 @@ const HeatmapMapModal = ({
     const pinch = Gesture.Pinch()
       .runOnJS(true)
       .onStart((e) => {
+        interactedRef.current = true;
         const { width, height } = sizeRef.current;
         pinchLast.current = {
           scale: 1,
           fx: e.focalX ?? width / 2,
           fy: e.focalY ?? height / 2,
+          pointers: e.numberOfPointers ?? 2,
         };
       })
       .onUpdate((e) => {
@@ -206,12 +258,24 @@ const HeatmapMapModal = ({
         const last = pinchLast.current;
         const fx = e.focalX ?? last.fx;
         const fy = e.focalY ?? last.fy;
+        const pointers = e.numberOfPointers ?? last.pointers;
+        // Centroid teleport (finger count changed, or the focal jumped
+        // farther than a finger can move in one frame): re-baseline both the
+        // focal point and the scale on the new configuration and apply
+        // nothing — the next event's deltas are trustworthy again.
+        const teleported = pointers !== last.pointers ||
+          Math.abs(fx - last.fx) > FOCAL_TELEPORT_PX ||
+          Math.abs(fy - last.fy) > FOCAL_TELEPORT_PX;
+        if (teleported) {
+          pinchLast.current = { scale: e.scale, fx, fy, pointers };
+          return;
+        }
         // Two-finger pan: how far the pinch centroid moved since last event.
         let next = translateRegion(regionRef.current, fx - last.fx, fy - last.fy);
         // Zoom by the scale delta, anchored on the current focal point.
         const factor = e.scale / (last.scale || 1);
         next = scaleRegion(next, factor, fx, fy, width, height);
-        pinchLast.current = { scale: e.scale, fx, fy };
+        pinchLast.current = { scale: e.scale, fx, fy, pointers };
         setRegion(next);
       });
     return Gesture.Simultaneous(pan, pinch);
