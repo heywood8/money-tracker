@@ -14,7 +14,7 @@ import { Gesture, GestureDetector, GestureHandlerRootView } from 'react-native-g
 import { Canvas, Circle, Group, BlurMask } from '@shopify/react-native-skia';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { getOperationCoordinates } from '../../services/OperationsDB';
-import { getTileUri, pruneTileCache } from '../../services/MapTileCache';
+import { getTileUri, getResolvedTileUri, pruneTileCache } from '../../services/MapTileCache';
 import { ensureLocationPermission, getCurrentLocation } from '../../services/LocationService';
 import { useDisplaySettings } from '../../contexts/DisplaySettingsContext';
 import { formatDate } from '../../services/BalanceHistoryDB';
@@ -48,18 +48,21 @@ const MAX_HEAT_POINTS = 4000;
 const HEAT_MARGIN = HEAT_RADIUS + HEAT_BLUR;
 
 /**
- * One raster tile. Resolves its cached-or-downloaded file URI lazily; renders
- * nothing (theme background shows through) until the tile is available.
- * Memoized so panning only re-renders position styles, not the resolution.
+ * One raster tile. A tile some earlier render already resolved paints on its
+ * very first frame (synchronous session cache); anything else resolves
+ * lazily and renders nothing until then. Memoized so panning only re-renders
+ * position styles, not the resolution.
  */
 const MapTile = React.memo(function MapTile({ z, x, y, screenX, screenY, size }) {
-  const [uri, setUri] = useState(null);
+  const [uri, setUri] = useState(() => getResolvedTileUri(z, x, y));
   useEffect(() => {
+    if (uri) return undefined;
     let cancelled = false;
     getTileUri(z, x, y).then((resolved) => {
       if (!cancelled && resolved) setUri(resolved);
     }).catch(() => {});
     return () => { cancelled = true; };
+    // `uri` is deliberately not a dependency: once set it never changes.
   }, [z, x, y]);
 
   if (!uri) return null;
@@ -286,6 +289,28 @@ const HeatmapMapModal = ({
     [region, size],
   );
 
+  // Underlay: while zooming across an integer tile level, the level being
+  // LEFT keeps rendering (rescaled live) beneath the new one. Its tiles all
+  // sit in the synchronous session cache — they were just on screen — so the
+  // hand-off never flashes bare background while the new level streams in.
+  // Never rendered more than one level apart: a wider gap means the camera
+  // jumped (fit, city default), where a 4×-blown underlay would look broken.
+  const currentTileZoom = tiles.length > 0 ? tiles[0].z : null;
+  const tileZoomRef = useRef(null);
+  const underZoomRef = useRef(null);
+  if (currentTileZoom !== null && currentTileZoom !== tileZoomRef.current) {
+    underZoomRef.current = tileZoomRef.current;
+    tileZoomRef.current = currentTileZoom;
+  }
+  const underlayZoom =
+    underZoomRef.current !== null && Math.abs(currentTileZoom - underZoomRef.current) === 1
+      ? underZoomRef.current
+      : null;
+  const underlayTiles = useMemo(
+    () => (underlayZoom === null ? [] : visibleTiles(region, size.width, size.height, underlayZoom)),
+    [region, size, underlayZoom],
+  );
+
   const heatPoints = useMemo(() => {
     if (!size.width || !size.height) return [];
     const projected = [];
@@ -316,6 +341,17 @@ const HeatmapMapModal = ({
           <View style={styles.mapArea} onLayout={handleLayout}>
             <GestureDetector gesture={composedGesture}>
               <View style={styles.mapSurface} collapsable={false} testID="heatmap-map-surface">
+                {underlayTiles.map((tile) => (
+                  <MapTile
+                    key={tile.key}
+                    z={tile.z}
+                    x={tile.x}
+                    y={tile.y}
+                    screenX={tile.screenX}
+                    screenY={tile.screenY}
+                    size={tile.size}
+                  />
+                ))}
                 {tiles.map((tile) => (
                   <MapTile
                     key={tile.key}

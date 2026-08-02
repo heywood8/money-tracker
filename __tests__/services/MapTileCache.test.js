@@ -18,6 +18,7 @@ jest.mock('expo-file-system/legacy', () => ({
 
 import {
   getTileUri,
+  getResolvedTileUri,
   pruneTileCache,
   tileUrl,
   tilePath,
@@ -136,6 +137,34 @@ describe('MapTileCache', () => {
       expect(a).toBe(tilePath(10, 13, 14));
       expect(b).toBe(tilePath(10, 13, 14));
       expect(FileSystem.downloadAsync).toHaveBeenCalledTimes(1);
+    });
+  });
+
+  describe('getResolvedTileUri (synchronous session cache)', () => {
+    it('returns null for a tile no getTileUri call has resolved yet', () => {
+      expect(getResolvedTileUri(15, 1, 1)).toBeNull();
+    });
+
+    it('remembers a fresh disk hit', async () => {
+      FileSystem.getInfoAsync.mockResolvedValue(fileInfo(60_000));
+      await getTileUri(15, 2, 2);
+      expect(getResolvedTileUri(15, 2, 2)).toBe(tilePath(15, 2, 2));
+    });
+
+    it('remembers a downloaded tile', async () => {
+      await getTileUri(15, 3, 3);
+      expect(getResolvedTileUri(15, 3, 3)).toBe(tilePath(15, 3, 3));
+    });
+
+    it('remembers a stale fallback but not a total failure', async () => {
+      FileSystem.getInfoAsync.mockResolvedValue(fileInfo(TILE_TTL_MS + 60_000));
+      FileSystem.downloadAsync.mockRejectedValue(new Error('offline'));
+      await getTileUri(15, 4, 4);
+      expect(getResolvedTileUri(15, 4, 4)).toBe(tilePath(15, 4, 4));
+
+      FileSystem.getInfoAsync.mockResolvedValue(MISSING);
+      await getTileUri(15, 5, 5);
+      expect(getResolvedTileUri(15, 5, 5)).toBeNull();
     });
   });
 
