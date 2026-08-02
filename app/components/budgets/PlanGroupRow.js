@@ -29,6 +29,13 @@ const FILL_ALPHA = '99'; // ~60%
  * because it IS a budget — the thing the person actually tracks when they say
  * "we spend 50k on the car". Its children sit beneath it, joined to it by the
  * rail that starts here and continues down their left edge.
+ *
+ * And because the header IS the budget, it is also what the person usually
+ * wants to read: a tap folds the children away, and the envelopes stay folded
+ * by default. A plan of five envelopes with six lines each is forty rows to
+ * scroll for five figures. Editing the envelope moved to the long-press sheet
+ * (where every other whole-row action already lives) so that the tap can mean
+ * one thing — the sheet's first item is still Edit group.
  */
 const PlanGroupRow = memo(function PlanGroupRow({
   group,
@@ -42,8 +49,9 @@ const PlanGroupRow = memo(function PlanGroupRow({
   colors,
   t,
   listLength,
+  collapsed = true,
   onMove = null,
-  onPress,
+  onToggle,
   onLongPress,
 }) {
   const isUnconvertible = status?.status === 'unconvertible';
@@ -54,11 +62,13 @@ const PlanGroupRow = memo(function PlanGroupRow({
   const ratio = tracked ? status.percentage / 100 : 0;
 
   const target = status?.amount ?? displayAmount;
-  // Leads with what is left, like a line does — an envelope is the level most
-  // people actually budget at, so it is the level where "can I still spend
-  // here?" gets asked most often. Subtracted from the pair's own two figures
-  // rather than read off `status.remaining`, for the reason PlanLineRow does the
-  // same: the three numbers on the row have to add up to each other.
+  // Leads with how full the envelope is, like a line does — and it has to be
+  // the same figure as a line's, because an envelope sits directly above its
+  // children: a header stating one kind of number over rows stating another is
+  // a column that cannot be read down. Both the percentage and the remaining
+  // that colours the row come from the pair's own two figures rather than from
+  // `status.percentage` / `status.remaining`, for the reason PlanLineRow does
+  // the same: the numbers on the row have to follow from each other.
   const showPair = tracked && target != null;
   let primaryText;
   let pairText = null;
@@ -67,7 +77,9 @@ const PlanGroupRow = memo(function PlanGroupRow({
     primaryText = CONVERTING_PLACEHOLDER;
   } else if (showPair) {
     remaining = Currency.subtract(target, status.actual, planCurrency);
-    primaryText = Currency.formatCompact(remaining);
+    // A zero budget has no percentage to state — see PlanLineRow.
+    primaryText = Currency.formatFillPercent(status.actual, target)
+      ?? Currency.formatCompact(remaining);
     pairText = `${Currency.formatCompact(status.actual)} / ${Currency.formatCompact(target)}`;
   } else {
     primaryText = Currency.formatCompact(target);
@@ -88,10 +100,15 @@ const PlanGroupRow = memo(function PlanGroupRow({
   return (
     <Pressable
       style={styles.groupRow}
-      onPress={() => onPress(group)}
+      onPress={() => onToggle(group)}
       onLongPress={() => onLongPress(group, index, listLength, onMove)}
       accessibilityRole="button"
-      accessibilityLabel={`${t('edit_group')}: ${group.label}, ${primaryText}${pairText ? `, ${pairText}` : ''}, ${childCount} ${t('allocations')}`}
+      // Names the envelope and its figures; what the tap DOES is the hint, and
+      // whether it is open is the state — a label that said "Edit group" was
+      // both wrong (the tap folds now) and the wrong place to say it.
+      accessibilityLabel={`${group.label}, ${primaryText}${pairText ? `, ${pairText}` : ''}, ${childCount} ${t('allocations')}`}
+      accessibilityHint={collapsed ? t('expand_group') : t('collapse_group')}
+      accessibilityState={{ expanded: !collapsed }}
       testID={`plan-group-${group.id}`}
     >
       {/* The head of the rail that runs down this envelope's children. At full
@@ -105,8 +122,20 @@ const PlanGroupRow = memo(function PlanGroupRow({
         <View style={styles.groupTop}>
           {/* The envelope's colour, on the one glyph that means "envelope". Two
               places carry it and no more — this and the rail — so the palette
-              identifies without becoming decoration. */}
-          <Icon name="folder" size={20} color={envelopeColor} />
+              identifies without becoming decoration.
+              It is also the disclosure state, open or shut. A separate chevron
+              would have to go somewhere, and both places it could go are
+              columns this screen aligns deliberately: to its left it pushes the
+              folder past the icon column its own children sit in (the indent
+              inverts), and to the right of the amount it pulls the header's
+              figure out of the column every row's figure shares. A folder that
+              is open when its contents are showing costs neither. */}
+          <Icon
+            name={collapsed ? 'folder' : 'folder-open'}
+            size={20}
+            color={envelopeColor}
+            testID={`plan-group-folder-${group.id}`}
+          />
           <View style={styles.groupBody}>
             <Text style={[styles.groupName, { color: colors.text }]} numberOfLines={1}>
               {group.label}
@@ -197,8 +226,9 @@ PlanGroupRow.propTypes = {
   planCurrency: PropTypes.string.isRequired,
   colors: PropTypes.object.isRequired,
   t: PropTypes.func.isRequired,
+  collapsed: PropTypes.bool,
   onMove: PropTypes.func,
-  onPress: PropTypes.func.isRequired,
+  onToggle: PropTypes.func.isRequired,
   onLongPress: PropTypes.func.isRequired,
 };
 

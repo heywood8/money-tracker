@@ -601,6 +601,8 @@
   "group_name": "Gruppenname",
   "group_name_required": "Ein Gruppenname ist erforderlich",
   "edit_group": "Gruppe bearbeiten",
+  "expand_group": "Gruppe ausklappen",
+  "collapse_group": "Gruppe einklappen",
   "delete_group": "Gruppe löschen",
   "delete_group_confirm": "Diese Gruppe löschen? Ihre Posten bleiben erhalten und sind danach einfach ohne Gruppe.",
   "custom_group_budget": "Eigenes Budget",

@@ -601,6 +601,8 @@
   "group_name": "Nombre del grupo",
   "group_name_required": "El nombre del grupo es obligatorio",
   "edit_group": "Editar grupo",
+  "expand_group": "Expandir grupo",
+  "collapse_group": "Contraer grupo",
   "delete_group": "Eliminar grupo",
   "delete_group_confirm": "¿Eliminar este grupo? Sus asignaciones se conservan y quedan sin grupo.",
   "custom_group_budget": "Presupuesto propio",

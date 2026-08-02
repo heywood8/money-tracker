@@ -601,6 +601,8 @@
   "group_name": "그룹 이름",
   "group_name_required": "그룹 이름을 입력하세요",
   "edit_group": "그룹 편집",
+  "expand_group": "그룹 펼치기",
+  "collapse_group": "그룹 접기",
   "delete_group": "그룹 삭제",
   "delete_group_confirm": "이 그룹을 삭제할까요? 안의 항목은 유지되며 그룹만 해제됩니다.",
   "custom_group_budget": "예산 직접 설정",
