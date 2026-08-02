@@ -1,5 +1,12 @@
 # Changelog
 
+## [0.255.2](https://github.com/heywood8/money-tracker/compare/penny-v0.255.1...penny-v0.255.2) (2026-08-02)
+
+
+### Bug Fixes
+
+* **graphs:** keep tile instances alive across heatmap zoom-level hand-off ([#1545](https://github.com/heywood8/money-tracker/issues/1545)) ([b0a0ac7](https://github.com/heywood8/money-tracker/commit/b0a0ac7c8dd1b09f36a939feef4dd31019cbea38))
+
 ## [0.255.1](https://github.com/heywood8/money-tracker/compare/penny-v0.255.0...penny-v0.255.1) (2026-08-02)
 
 
