@@ -1,5 +1,12 @@
 # Changelog
 
+## [0.253.1](https://github.com/heywood8/money-tracker/compare/penny-v0.253.0...penny-v0.253.1) (2026-08-02)
+
+
+### Bug Fixes
+
+* **graphs:** no background flash when the heatmap crosses a zoom level ([#1534](https://github.com/heywood8/money-tracker/issues/1534)) ([b48ab18](https://github.com/heywood8/money-tracker/commit/b48ab18565e4fde2dfff53440f2755e5f1cb1cd6))
+
 ## [0.253.0](https://github.com/heywood8/money-tracker/compare/penny-v0.252.0...penny-v0.253.0) (2026-08-02)
 
 
