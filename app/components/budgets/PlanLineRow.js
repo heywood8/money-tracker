@@ -99,26 +99,34 @@ const PlanLineRow = memo(function PlanLineRow({
   const showMeter = tracked && (!executed || status.isExceeded);
   const ratio = tracked ? status.percentage / 100 : 0;
 
-  // The row leads with what is LEFT, not with what was spent.
+  // The row leads with HOW FULL the budget is, as a percentage.
   //
-  // It used to print `actual / target` and nothing else, which made the reader
-  // do the subtraction on every row — and the subtraction is the whole question
-  // ("can I still spend here?"). The pair stays, one step down in the hierarchy,
-  // because it is the context for that figure: 0 left of 5K and 0 left of 100K
-  // are not the same situation.
+  // It used to lead with what was left, and before that with `actual / target`
+  // alone. The pair alone made the reader do arithmetic on every row; the
+  // remaining amount answered that arithmetic but only in isolation — 2K left
+  // is most of a 2.5K budget and a rounding error on a 200K one, so a column of
+  // remainders could not be scanned down, which is the one thing a column is
+  // for. A percentage is already normalized, so the rows compare to each other
+  // and to the bar beside them. The exact figures stay one step down in the
+  // hierarchy as the pair, and in full in the editor one tap away.
   //
-  // Compact magnitudes, not exact figures: a row is scanned, not audited, and
-  // the exact amounts are one tap away in the editor. No currency code either —
-  // the screen shows one currency, and the header states which. An unconvertible
-  // line is the exception on both counts: with no rate there is nothing to
-  // convert, so it keeps its stored figure in full and says what unit that is.
-  // Derived from the very figures the pair prints rather than read off
-  // `status.remaining`, so the three numbers on the row always agree. The status
-  // is computed from the plan's own stored amount while `displayAmount` is the
-  // host's converted one; they normally match, but when they do not (a rounding
-  // step apart on a converted line, a status a beat behind a just-saved edit) a
-  // headline that does not equal target minus actual is worse than either input
-  // — it is arithmetic the reader can see failing.
+  // Unbounded above on purpose: past the target it keeps counting (125%, 348%)
+  // rather than saturating, exactly like the bar's overspend segment.
+  //
+  // Both the percentage and the remaining that colours the row are derived from
+  // the very figures the pair prints, rather than read off `status.percentage` /
+  // `status.remaining`, so every number on the row agrees with every other. The
+  // status is computed from the plan's own stored amount while `displayAmount`
+  // is the host's converted one; they normally match, but when they do not (a
+  // rounding step apart on a converted line, a status a beat behind a just-saved
+  // edit) a headline that does not follow from the pair under it is arithmetic
+  // the reader can watch fail.
+  //
+  // A row with no actual to compare against — no status yet, or an unconvertible
+  // line — has no fill to state, so it falls back to printing its target. An
+  // unconvertible one keeps its stored figure in full and says what unit that
+  // is, because with no rate a labelled foreign number is honest and an
+  // unlabelled one is not.
   const showPair = showMeter && status.actual != null && displayAmount != null;
   let primaryText;
   let pairText = null;
@@ -129,7 +137,10 @@ const PlanLineRow = memo(function PlanLineRow({
     primaryText = CONVERTING_PLACEHOLDER;
   } else if (showPair) {
     remaining = Currency.subtract(displayAmount, status.actual, planCurrency);
-    primaryText = Currency.formatCompact(remaining);
+    // A zero target has no percentage (nothing to be a fraction of), so such a
+    // row says what is left instead of printing a meaningless 0%.
+    primaryText = Currency.formatFillPercent(status.actual, displayAmount)
+      ?? Currency.formatCompact(remaining);
     pairText = `${Currency.formatCompact(status.actual)} / ${Currency.formatCompact(displayAmount)}`;
   } else {
     primaryText = Currency.formatCompact(displayAmount);

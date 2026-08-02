@@ -601,6 +601,8 @@
   "group_name": "Խմբի անվանումը",
   "group_name_required": "Խմբի անվանումը պարտադիր է",
   "edit_group": "Խմբագրել խումբը",
+  "expand_group": "Բացել խումբը",
+  "collapse_group": "Ծալել խումբը",
   "delete_group": "Ջնջել խումբը",
   "delete_group_confirm": "Ջնջե՞լ այս խումբը։ Դրա հոդվածները կմնան և պարզապես դուրս կգան խմբից։",
   "custom_group_budget": "Սեփական բյուջե",

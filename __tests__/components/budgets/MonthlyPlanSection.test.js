@@ -39,6 +39,15 @@ jest.mock('../../../app/contexts/BudgetPlansContext', () => ({
   useBudgetPlans: () => mockPlans,
 }));
 
+// Which envelopes are unfolded is UI state, kept in the app's preferences.
+const mockGetJsonPreference = jest.fn(async () => null);
+const mockSetJsonPreference = jest.fn(async () => {});
+jest.mock('../../../app/services/PreferencesDB', () => ({
+  PREF_KEYS: { BUDGET_EXPANDED_GROUPS: 'budget_expanded_groups' },
+  getJsonPreference: (...args) => mockGetJsonPreference(...args),
+  setJsonPreference: (...args) => mockSetJsonPreference(...args),
+}));
+
 // Stub the line editor modal: dedicated tests cover its internals. Here it just
 // exposes buttons to drive the section's save/income handlers.
 let capturedModalProps = null;
@@ -263,9 +272,25 @@ const moveLine = async (getByTestId, lineId, direction) => {
   });
 };
 
+// Envelopes are folded by default, so a test that wants to see a group's
+// children has to open it the way a user does.
+const expandGroup = async (getByTestId, groupId) => {
+  await act(async () => {
+    fireEvent.press(getByTestId(`plan-group-${groupId}`));
+  });
+};
+
+const longPressGroup = async (getByTestId, groupId) => {
+  await act(async () => {
+    fireEvent(getByTestId(`plan-group-${groupId}`), 'longPress');
+  });
+};
+
 describe('MonthlyPlanSection', () => {
   beforeEach(() => {
     jest.clearAllMocks();
+    // Nothing stored: every envelope starts folded.
+    mockGetJsonPreference.mockResolvedValue(null);
     capturedModalProps = null;
   });
 
@@ -383,42 +408,51 @@ describe('MonthlyPlanSection', () => {
       setPlanWithStatus();
       const { getByTestId, getByText, queryByText } = await renderSection();
       await waitFor(() => expect(getByTestId('plan-line-l1')).toBeTruthy());
-      // The row leads with what is LEFT — the figure a person acts on — and
-      // carries the actual/target pair below it as the context for that figure.
-      // Compact magnitudes on both: a row is scanned, not audited.
-      expect(getByTestId('plan-line-primary-l1')).toHaveTextContent('150');
+      // The row leads with HOW FULL the budget is — a normalized figure, so a
+      // column of them can be scanned down — and carries the actual/target pair
+      // below it as the exact context for that figure.
+      expect(getByTestId('plan-line-primary-l1')).toHaveTextContent('50%');
       expect(getByText('150 / 300')).toBeTruthy();
-      // The labelled forms are gone: "remaining" is the headline figure now, the
-      // "50%" badge is the bar's length, and "over budget by 50" restated a
-      // subtraction the pair already shows while making an overspent row two
-      // lines tall when every other row was one.
+      // The labelled forms are gone: the percentage is the headline figure now,
+      // and "over budget by 50" restated a subtraction the pair already shows
+      // while making an overspent row two lines tall when every other row was
+      // one.
       expect(queryByText('remaining_budget: 150.00')).toBeNull();
-      expect(queryByText('50%')).toBeNull();
       expect(queryByText('over_budget_by 50')).toBeNull();
       // The overspent row says so with the segment past the target mark.
       expect(getByTestId('plan-line-bar-l2')).toBeTruthy();
       expect(getByTestId('plan-line-bar-l2-over')).toBeTruthy();
     });
 
-    it('keeps the headline figure equal to the pair it sits under', async () => {
+    it('keeps the headline figure derived from the pair it sits under', async () => {
       // The status is computed from the plan's stored amount while the row's
       // target comes from the host's converted one. They normally agree, but a
       // rounding step apart on a converted line — or a status a beat behind a
-      // just-saved edit — used to put a headline on the row that did not equal
-      // target minus actual, which is arithmetic the reader can watch fail.
+      // just-saved edit — used to put a headline on the row that did not follow
+      // from the pair, which is arithmetic the reader can watch fail.
       setPlanWithStatus({
         ...STATUS,
         lines: [
-          { lineId: 'l1', broken: false, amount: '299.50', actual: '150.00', remaining: '149.50', percentage: 50, isExceeded: false, status: 'safe' },
+          { lineId: 'l1', broken: false, amount: '299.50', actual: '150.00', remaining: '149.50', percentage: 87, isExceeded: false, status: 'safe' },
           ...STATUS.lines.slice(1),
         ],
       });
       const { getByTestId } = await renderSection();
       await waitFor(() => expect(getByTestId('plan-line-l1')).toBeTruthy());
-      // 300 − 150, from the two figures actually printed — not the status's own
-      // 149.50, which belongs to a target this row never shows.
-      expect(getByTestId('plan-line-primary-l1')).toHaveTextContent('150');
+      // 150 of 300, from the two figures actually printed — not the status's own
+      // percentage, which belongs to a target this row never shows.
+      expect(getByTestId('plan-line-primary-l1')).toHaveTextContent('50%');
       expect(getByTestId('plan-line-pair-l1')).toHaveTextContent('150 / 300');
+    });
+
+    it('states an overspent line as more than 100 per cent', async () => {
+      // 250 of 200. The headline keeps counting past the target rather than
+      // saturating — "over" and "three times over" are different news.
+      setPlanWithStatus();
+      const { getByTestId } = await renderSection();
+      await waitFor(() => expect(getByTestId('plan-line-l2')).toBeTruthy());
+      expect(getByTestId('plan-line-primary-l2')).toHaveTextContent('125%');
+      expect(flatColor(getByTestId('plan-line-primary-l2'))).toBe(COLORS.overspend);
     });
 
     it('shows actual income against expected income in the header', async () => {
@@ -1205,9 +1239,9 @@ describe('MonthlyPlanSection', () => {
       const { getByTestId } = await renderSection();
       await waitFor(() => expect(getByTestId('plan-line-bar-l-over')).toBeTruthy());
       expect(barOverColor(getByTestId, 'l-over')).toBe(COLORS.overspend);
-      // And the headline figure goes negative in the same colour — the row's
-      // "you have this much left" is now "you are this much past".
-      expect(getByTestId('plan-line-primary-l-over')).toHaveTextContent('-40');
+      // And the headline figure passes 100% in the same colour — the row's
+      // "this budget is this full" is now "this budget is past full".
+      expect(getByTestId('plan-line-primary-l-over')).toHaveTextContent('140%');
       expect(flatColor(getByTestId('plan-line-primary-l-over'))).toBe(COLORS.overspend);
     });
 
@@ -1482,6 +1516,7 @@ describe('MonthlyPlanSection', () => {
       });
       const { getByTestId, queryByTestId } = await renderSection();
       await waitFor(() => expect(getByTestId('plan-group-g1')).toBeTruthy());
+      await expandGroup(getByTestId, 'g1');
 
       // Derived budget: 300 + 120, formatted compactly like every other figure.
       expect(getByTestId('plan-group-g1')).toHaveTextContent(/420/);
@@ -1537,7 +1572,9 @@ describe('MonthlyPlanSection', () => {
       expect(queryByTestId('plan-group-g1')).toBeNull();
     });
 
-    it('opens the group editor when the group row is tapped', async () => {
+    it('opens the group editor from the long-press sheet', async () => {
+      // Editing moved off the tap, which folds the envelope now — the sheet is
+      // where every other whole-row action already lived.
       setPlans({
         plans: [{ id: 'p1', month: THIS_MONTH, currency: 'USD', expectedIncome: '0' }],
         lines: groupedLines(),
@@ -1545,9 +1582,107 @@ describe('MonthlyPlanSection', () => {
       });
       const { getByTestId } = await renderSection();
       await waitFor(() => expect(getByTestId('plan-group-g1')).toBeTruthy());
-      await act(async () => { fireEvent.press(getByTestId('plan-group-g1')); });
+      await longPressGroup(getByTestId, 'g1');
+      await act(async () => { lastDialogAction('edit_group').onPress(); });
       await waitFor(() => expect(getByTestId('plan-group-modal')).toBeTruthy());
       expect(getByTestId('plan-group-name').props.value).toBe('Car');
+    });
+
+    describe('Folding', () => {
+      const planWithGroup = () => setPlans({
+        plans: [{ id: 'p1', month: THIS_MONTH, currency: 'USD', expectedIncome: '0' }],
+        lines: groupedLines(),
+        groups: [GROUP],
+      });
+
+      it('folds every envelope by default, keeping the header and its figures', async () => {
+        // The header carries the whole budget — its figure, its actual, its bar
+        // — so the rows under it are detail, and a plan of five envelopes was
+        // forty rows of scrolling for five numbers.
+        planWithGroup();
+        const { getByTestId, queryByTestId } = await renderSection();
+        await waitFor(() => expect(getByTestId('plan-group-g1')).toBeTruthy());
+        expect(queryByTestId('plan-line-l-fuel')).toBeNull();
+        expect(queryByTestId('plan-line-l-parking')).toBeNull();
+        expect(getByTestId('plan-group-g1')).toHaveTextContent(/420/);
+        // An ungrouped line belongs to no envelope, so nothing folds it away.
+        expect(getByTestId('plan-line-l-loose')).toBeTruthy();
+      });
+
+      it('unfolds and refolds an envelope on tap', async () => {
+        planWithGroup();
+        const { getByTestId, queryByTestId } = await renderSection();
+        await waitFor(() => expect(getByTestId('plan-group-g1')).toBeTruthy());
+
+        await expandGroup(getByTestId, 'g1');
+        expect(getByTestId('plan-line-l-fuel')).toBeTruthy();
+        expect(getByTestId('plan-line-l-parking')).toBeTruthy();
+
+        await expandGroup(getByTestId, 'g1');
+        expect(queryByTestId('plan-line-l-fuel')).toBeNull();
+      });
+
+      it('says which state it is in on the folder glyph and to a screen reader', async () => {
+        planWithGroup();
+        const { getByTestId } = await renderSection();
+        await waitFor(() => expect(getByTestId('plan-group-g1')).toBeTruthy());
+        expect(getByTestId('plan-group-folder-g1')).toHaveTextContent('folder');
+        expect(getByTestId('plan-group-g1').props.accessibilityState.expanded).toBe(false);
+        expect(getByTestId('plan-group-g1').props.accessibilityHint).toBe('expand_group');
+
+        await expandGroup(getByTestId, 'g1');
+        expect(getByTestId('plan-group-folder-g1')).toHaveTextContent('folder-open');
+        expect(getByTestId('plan-group-g1').props.accessibilityState.expanded).toBe(true);
+        expect(getByTestId('plan-group-g1').props.accessibilityHint).toBe('collapse_group');
+      });
+
+      it('remembers which envelopes were left open', async () => {
+        planWithGroup();
+        const { getByTestId } = await renderSection();
+        await waitFor(() => expect(getByTestId('plan-group-g1')).toBeTruthy());
+        await expandGroup(getByTestId, 'g1');
+        expect(mockSetJsonPreference).toHaveBeenLastCalledWith('budget_expanded_groups', ['g1']);
+
+        await expandGroup(getByTestId, 'g1');
+        expect(mockSetJsonPreference).toHaveBeenLastCalledWith('budget_expanded_groups', []);
+      });
+
+      it('restores a stored open envelope on load', async () => {
+        planWithGroup();
+        mockGetJsonPreference.mockResolvedValue(['g1']);
+        const { getByTestId } = await renderSection();
+        await waitFor(() => expect(getByTestId('plan-line-l-fuel')).toBeTruthy());
+        expect(getByTestId('plan-group-g1').props.accessibilityState.expanded).toBe(true);
+      });
+
+      it('writes nothing back before the stored state has been read', async () => {
+        // The initial (empty) set must never race the read and clobber it.
+        planWithGroup();
+        const { getByTestId } = await renderSection();
+        await waitFor(() => expect(getByTestId('plan-group-g1')).toBeTruthy());
+        expect(mockSetJsonPreference).not.toHaveBeenCalled();
+      });
+
+      it('does not undo a tap that landed while the stored state was loading', async () => {
+        planWithGroup();
+        let resolveStored;
+        mockGetJsonPreference.mockReturnValue(new Promise((resolve) => { resolveStored = resolve; }));
+        const { getByTestId } = await renderSection();
+        await waitFor(() => expect(getByTestId('plan-group-g1')).toBeTruthy());
+        await expandGroup(getByTestId, 'g1');
+        // The stored state says "everything folded" and arrives second — the
+        // tap is the newer statement of the two.
+        await act(async () => { resolveStored([]); });
+        expect(getByTestId('plan-line-l-fuel')).toBeTruthy();
+      });
+
+      it('keeps everything folded when the stored preference is unusable', async () => {
+        planWithGroup();
+        mockGetJsonPreference.mockResolvedValue('not-an-array');
+        const { getByTestId, queryByTestId } = await renderSection();
+        await waitFor(() => expect(getByTestId('plan-group-g1')).toBeTruthy());
+        expect(queryByTestId('plan-line-l-fuel')).toBeNull();
+      });
     });
 
     it('carries the picked group through to the saved line', async () => {

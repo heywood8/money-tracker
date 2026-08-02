@@ -604,6 +604,8 @@
   "group_name": "Название группы",
   "group_name_required": "Укажите название группы",
   "edit_group": "Изменить группу",
+  "expand_group": "Раскрыть группу",
+  "collapse_group": "Свернуть группу",
   "delete_group": "Удалить группу",
   "delete_group_confirm": "Удалить эту группу? Её статьи останутся и просто выйдут из группы.",
   "custom_group_budget": "Свой бюджет группы",

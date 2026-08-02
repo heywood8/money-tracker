@@ -604,6 +604,8 @@
   "group_name": "Group name",
   "group_name_required": "A group name is required",
   "edit_group": "Edit group",
+  "expand_group": "Expand group",
+  "collapse_group": "Collapse group",
   "delete_group": "Delete group",
   "delete_group_confirm": "Delete this group? Its allocations are kept — they simply become ungrouped.",
   "custom_group_budget": "Custom budget",

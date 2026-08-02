@@ -9,6 +9,7 @@ import { useLocalization } from '../../contexts/LocalizationContext';
 import { useDialog } from '../../contexts/DialogContext';
 import { useBudgetPlans } from '../../contexts/BudgetPlansContext';
 import * as Currency from '../../services/currency';
+import { PREF_KEYS, getJsonPreference, setJsonPreference } from '../../services/PreferencesDB';
 import usePlanLineAmounts from '../../hooks/usePlanLineAmounts';
 import { FONT_SIZE, SPACING } from '../../styles/designTokens';
 import { envelopeHue } from '../../styles/envelopePalette';
@@ -101,6 +102,16 @@ const MonthlyPlanSection = forwardRef(function MonthlyPlanSection({
   // them from separate effects would let the list render a group's children under
   // a header that has not arrived yet.
   const [groups, setGroups] = useState([]);
+  // Which envelopes are OPEN. Everything not in here is folded, which is the
+  // default state of a plan on first load: an envelope's header carries the
+  // whole budget (its own figure, its actual and its bar), so the six rows under
+  // it are detail, and a plan of five envelopes was forty rows of scrolling for
+  // five numbers. Persisted, because folding a group is a statement about how
+  // the person reads their plan and it would be tedious to restate on every
+  // visit — it is UI state though, not plan data, so it goes to the app's
+  // preferences rather than into the plan's own tables (and never into a
+  // backup's budget rows).
+  const [expandedGroupIds, setExpandedGroupIds] = useState(() => new Set());
   const [modal, setModal] = useState(CLOSED_MODAL);
   const [groupModal, setGroupModal] = useState(CLOSED_GROUP_MODAL);
   const [busy, setBusy] = useState(false);
@@ -242,6 +253,41 @@ const MonthlyPlanSection = forwardRef(function MonthlyPlanSection({
     })();
     return () => { cancelled = true; };
   }, [month, getLinesForMonth, getLineGroups]);
+
+  // Restore which envelopes were left open. Groups are global rather than
+  // month-scoped, so this is loaded once and survives month navigation — an
+  // envelope the user opened stays open as they page through the year, which is
+  // how they were reading it in the first place. A missing or unparseable
+  // preference simply leaves everything folded, the default.
+  //
+  // `foldStateSettled` marks the point where what is on screen becomes the
+  // authoritative fold state — either because the stored one has been read, or
+  // because the user folded something themselves. Before that nothing is
+  // written back, so the empty initial set can never overwrite a stored one by
+  // racing the read; after it, nothing is restored over.
+  const foldStateSettled = useRef(false);
+  useEffect(() => {
+    let cancelled = false;
+    (async () => {
+      const stored = await getJsonPreference(PREF_KEYS.BUDGET_EXPANDED_GROUPS, null);
+      // A tap that landed while the read was in flight is the newer of the two
+      // statements; restoring over it would undo what the user just did.
+      if (cancelled || foldStateSettled.current) return;
+      if (Array.isArray(stored)) setExpandedGroupIds(new Set(stored));
+      foldStateSettled.current = true;
+    })();
+    return () => { cancelled = true; };
+  }, []);
+
+  // Fire-and-forget: the fold has already happened on screen by the time the
+  // write lands, and a preference that fails to save is not worth interrupting
+  // the user over — it costs one tap next time.
+  useEffect(() => {
+    if (!foldStateSettled.current) return;
+    setJsonPreference(PREF_KEYS.BUDGET_EXPANDED_GROUPS, [...expandedGroupIds]).catch((error) => {
+      console.warn('Failed to persist expanded budget groups:', error);
+    });
+  }, [expandedGroupIds]);
 
   // Income lines declare the expected income; the rest allocate it. Recurring
   // (global template) lines and this month's one-off lines are edited and
@@ -770,6 +816,24 @@ const MonthlyPlanSection = forwardRef(function MonthlyPlanSection({
     }
   }, [groupViews, reorderLineGroups, reloadLines]);
 
+  // Tapping an envelope folds or unfolds it. Editing it is the long-press
+  // sheet's first item — the tap can only mean one thing, and on a row whose
+  // children are the thing being hidden, folding is the thing it should mean.
+  //
+  // The write is the effect below, not part of this updater: an updater that
+  // saves is an updater React may not call twice, and the fold has already
+  // happened on screen either way.
+  const toggleGroup = useCallback((group) => {
+    // The user has now said what they want folded, so the restore above must
+    // not land on top of it and this state is worth writing back.
+    foldStateSettled.current = true;
+    setExpandedGroupIds((prev) => {
+      const next = new Set(prev);
+      if (!next.delete(group.id)) next.add(group.id);
+      return next;
+    });
+  }, []);
+
   const openEditGroup = useCallback((group) => setGroupModal({ visible: true, group }), []);
   const closeGroupModal = useCallback(() => setGroupModal(CLOSED_GROUP_MODAL), []);
 
@@ -988,6 +1052,9 @@ const MonthlyPlanSection = forwardRef(function MonthlyPlanSection({
           // colour. See envelopePalette for why colour identifies an envelope
           // here rather than flagging a status.
           const hue = envelopeHue(groupIndex);
+          // Folded is the default, so an envelope shows its children only once
+          // the user has said to — see `expandedGroupIds`.
+          const expanded = expandedGroupIds.has(view.group.id);
           return (
             <React.Fragment key={view.group.id}>
               <PlanGroupRow
@@ -1002,14 +1069,15 @@ const MonthlyPlanSection = forwardRef(function MonthlyPlanSection({
                 planCurrency={planCurrency}
                 colors={colors}
                 t={t}
+                collapsed={!expanded}
                 onMove={moveGroup}
-                onPress={openEditGroup}
+                onToggle={toggleGroup}
                 onLongPress={handleLongPressGroup}
               />
-              {view.recurring.map((line, index) => renderLine(
+              {expanded && view.recurring.map((line, index) => renderLine(
                 line, index, view.recurring, groupMovers.get(`${view.group.id}|r`), true, hue,
               ))}
-              {view.oneOff.map((line, index) => renderLine(
+              {expanded && view.oneOff.map((line, index) => renderLine(
                 line, index, view.oneOff, groupMovers.get(`${view.group.id}|o`), true, hue,
               ))}
             </React.Fragment>

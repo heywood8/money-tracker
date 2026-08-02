@@ -164,6 +164,52 @@ describe('Currency Service', () => {
     });
   });
 
+  describe('formatFillPercent', () => {
+    it('states how much of a target has been used', async () => {
+      expect(Currency.formatFillPercent('0', '300')).toBe('0%');
+      expect(Currency.formatFillPercent('150', '300')).toBe('50%');
+      expect(Currency.formatFillPercent('300', '300')).toBe('100%');
+    });
+
+    it('keeps counting past the target instead of saturating', async () => {
+      // A budget row's headline has to distinguish barely over from three times
+      // over — clamping at 100% is what the old background wash did.
+      expect(Currency.formatFillPercent('250', '200')).toBe('125%');
+      expect(Currency.formatFillPercent('696', '200')).toBe('348%');
+    });
+
+    it('rounds to whole percent', async () => {
+      expect(Currency.formatFillPercent('1', '3')).toBe('33%');
+      expect(Currency.formatFillPercent('2', '3')).toBe('67%');
+    });
+
+    it('never prints 100% for a figure that is not exactly at the target', async () => {
+      // Rounding alone would put "100%" on a row under its target and on a row
+      // over it, disagreeing with the colour that switches at exactly that
+      // point. Those land either side instead.
+      expect(Currency.formatFillPercent('99.6', '100')).toBe('99%');
+      expect(Currency.formatFillPercent('100.4', '100')).toBe('101%');
+      expect(Currency.formatFillPercent('100', '100')).toBe('100%');
+    });
+
+    it('has no percentage to state for a non-positive target', async () => {
+      expect(Currency.formatFillPercent('50', '0')).toBeNull();
+      expect(Currency.formatFillPercent('50', null)).toBeNull();
+      expect(Currency.formatFillPercent('50', '-100')).toBeNull();
+    });
+
+    it('keeps the sign of an actual below zero', async () => {
+      // Refunds can outweigh spending in a category, which is a real state and
+      // reads as a negative fill rather than as an empty budget.
+      expect(Currency.formatFillPercent('-30', '300')).toBe('-10%');
+    });
+
+    it('handles invalid actuals gracefully', async () => {
+      expect(Currency.formatFillPercent(null, '300')).toBe('0%');
+      expect(Currency.formatFillPercent('invalid', '300')).toBe('0%');
+    });
+  });
+
   describe('toCents', () => {
     it('converts string amounts to cents correctly', async () => {
       expect(Currency.toCents('10.50')).toBe(1050);

@@ -16,6 +16,10 @@ export const PREF_KEYS = {
   // Global toggle: show the Budget tab in the bottom navigation. Defaults on
   // (unlike Accounts) because budgets are reachable from nowhere else.
   SHOW_BUDGET_TAB: 'show_budget_tab',
+  // Which budget envelopes (line groups) are unfolded on the Budgets tab, as a
+  // JSON array of group ids. Absent means every envelope is folded, which is
+  // the default a plan opens in.
+  BUDGET_EXPANDED_GROUPS: 'budget_expanded_groups',
   GOOGLE_SHEETS_SPREADSHEET_ID: 'google_sheets_spreadsheet_id',
   DEFAULT_ACCOUNT_ID: 'default_account_id',
   // Bank-notification processing

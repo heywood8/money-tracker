@@ -159,6 +159,41 @@ export const formatCompact = (amount) => {
   return `${sign}${magnitude.toFixed(0)}`;
 };
 
+/**
+ * How much of a target an actual figure covers, as a whole-number percentage:
+ * 150 of 300 → "50%", 250 of 200 → "125%".
+ *
+ * For the headline figure of a budget row, which answers "how full is this
+ * budget?" — so it is deliberately unbounded above: past the target it keeps
+ * counting (348%) rather than saturating at 100%, because "over" and "three
+ * times over" are not the same news.
+ *
+ * Whole percent, with one exception: a value that is near but not exactly at
+ * the target never prints "100%". 99.6% would round up to a figure that says
+ * the budget is exactly used, and 100.4% would round down to one that says it
+ * is not over — and the row's colour, which switches at the target, would then
+ * disagree with its own number. Those two land on 99% and 101% instead, so
+ * "100%" means precisely at target and "over 100" means over.
+ *
+ * @param {Decimal|string|number} actual - What has been spent.
+ * @param {Decimal|string|number} target - What was budgeted.
+ * @returns {string|null} Percentage string, or null when the target is not a
+ *   positive figure and there is therefore no fraction of it to state.
+ */
+export const formatFillPercent = (actual, target) => {
+  const targetDecimal = toDecimal(target);
+  if (!targetDecimal.isFinite() || targetDecimal.lessThanOrEqualTo(0)) {
+    return null;
+  }
+
+  const exact = toDecimal(actual).dividedBy(targetDecimal).times(100);
+  let rounded = exact.toDecimalPlaces(0, Decimal.ROUND_HALF_UP);
+  if (rounded.equals(100) && !exact.equals(100)) {
+    rounded = new Decimal(exact.lessThan(100) ? 99 : 101);
+  }
+  return `${rounded.toFixed(0)}%`;
+};
+
 // Maps a rounding-mode name to the decimal.js rounding constant applied when
 // dividing the amount by the step. Amounts are non-negative magnitudes here, so
 // ROUND_UP/ROUND_DOWN (away from / toward zero) behave as ceil/floor.

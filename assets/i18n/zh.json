@@ -601,6 +601,8 @@
   "group_name": "分组名称",
   "group_name_required": "请填写分组名称",
   "edit_group": "编辑分组",
+  "expand_group": "展开分组",
+  "collapse_group": "收起分组",
   "delete_group": "删除分组",
   "delete_group_confirm": "删除该分组？其中的预算条目会保留，只是不再属于任何分组。",
   "custom_group_budget": "自定义预算",
