@@ -1,5 +1,12 @@
 # Changelog
 
+## [0.254.0](https://github.com/heywood8/money-tracker/compare/penny-v0.253.1...penny-v0.254.0) (2026-08-02)
+
+
+### Features
+
+* **budgets:** lead rows with fill percentage and fold envelopes ([#1537](https://github.com/heywood8/money-tracker/issues/1537)) ([836a027](https://github.com/heywood8/money-tracker/commit/836a027cd1fc38ed686e1d11f8fb4d56f3bb0b4b))
+
 ## [0.253.1](https://github.com/heywood8/money-tracker/compare/penny-v0.253.0...penny-v0.253.1) (2026-08-02)
 
 
