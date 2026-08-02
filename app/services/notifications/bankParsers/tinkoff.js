@@ -48,7 +48,7 @@
  *   transaction, separated by ". ").
  * - **Russian numerics.** Amounts group with spaces (regular / non-breaking /
  *   narrow / thin) and use a comma decimal separator ("1 000,50"), both handled
- *   by normalizeAmount below.
+ *   by the shared `normalizeAmountString` in `../valueFormat`.
  * - **No date/time in the body.** The ingestion layer falls back to the
  *   notification's post time, so `date`/`time` are null.
  *
@@ -58,8 +58,13 @@
  * Registered against its source-app package in `bankParsers/index.js`.
  */
 
+import { currencyCodeFromToken, normalizeAmountString } from '../valueFormat';
+
 /** Android package name(s) this parser handles. */
 export const PACKAGE_NAMES = ['com.idamob.tinkoff.android'];
+
+/** Human-readable name for the templates list. */
+export const DISPLAY_NAME = 'Tinkoff / T-Bank';
 
 /**
  * Maps a Tinkoff notification "kind" keyword (uppercased, `ё` folded to `е`) to
@@ -80,6 +85,9 @@ const KIND_TO_TYPE = {
   ПОПОЛНЕНИЕ: 'income', // top-up / deposit
   ВОЗВРАТ: 'income', // refund
 };
+
+/** Every kind this parser recognizes — shown read-only in the templates list. */
+export const KNOWN_KINDS = Object.keys(KIND_TO_TYPE);
 
 /**
  * Tinkoff expense/income notifications never move money between the user's own
@@ -108,80 +116,6 @@ const ACCOUNT_CURRENCY_RE = /сч[её]т\s+([A-Za-z]{3})\b/iu;
 // A masked card number if the notification happens to include one, e.g. "*1234"
 // or "•• 5678". Optional — this format usually omits it.
 const CARD_MASK_RE = /[*•]{1,4}\s?(\d{4})\b/;
-
-// Currency symbol → ISO code. Anything already a 3-letter code passes through.
-const SYMBOL_TO_CODE = {
-  '₽': 'RUB',
-  руб: 'RUB',
-  'руб.': 'RUB',
-  'р.': 'RUB',
-  $: 'USD',
-  '€': 'EUR',
-};
-
-/**
- * Resolve a currency token (symbol or code) to an ISO code.
- * @param {string} token
- * @returns {string|null}
- */
-const currencyCode = (token) => {
-  if (!token) return null;
-  const key = token.toLowerCase();
-  if (SYMBOL_TO_CODE[token]) return SYMBOL_TO_CODE[token];
-  if (SYMBOL_TO_CODE[key]) return SYMBOL_TO_CODE[key];
-  if (/^[A-Za-z]{3}$/.test(token)) return token.toUpperCase();
-  return null;
-};
-
-/**
- * Normalize a Russian-formatted amount string to a plain decimal string.
- *
- * Spaces (regular, non-breaking, narrow, thin) are always thousands grouping and
- * are stripped first. The remaining separators are then read with the same
- * dual-convention logic used elsewhere: when both a dot and a comma are present
- * the later one is the decimal separator; a lone comma that is not a 3-digit
- * group is a decimal separator ("12,50" → "12.50") while a 3-digit group is
- * treated as grouping ("1,234" → "1234").
- *
- * The result is a string so it feeds the decimal currency layer without ever
- * becoming a lossy float.
- *
- * @param {string} raw - e.g. "1 000,50"
- * @returns {string|null} e.g. "1000.50", or null when no digits are present
- */
-const normalizeAmount = (raw) => {
-  if (!raw) return null;
-  // Strip all whitespace (incl. non-breaking / narrow / thin) — grouping only.
-  let s = raw.replace(/[\s]/g, '');
-  s = s.replace(/[^\d.,]/g, '');
-  if (!/\d/.test(s)) return null;
-
-  const lastDot = s.lastIndexOf('.');
-  const lastComma = s.lastIndexOf(',');
-
-  if (lastDot !== -1 && lastComma !== -1) {
-    if (lastComma > lastDot) {
-      s = s.replace(/\./g, '').replace(',', '.'); // comma decimal, dot grouping
-    } else {
-      s = s.replace(/,/g, ''); // dot decimal, comma grouping
-    }
-  } else if (lastComma !== -1) {
-    const parts = s.split(',');
-    if (parts.length === 2 && parts[1].length !== 3) {
-      s = s.replace(',', '.'); // single comma, not a 3-digit group -> decimal
-    } else {
-      s = s.replace(/,/g, ''); // grouping
-    }
-  } else if (lastDot !== -1) {
-    const parts = s.split('.');
-    if (parts.length > 2) {
-      s = s.replace(/\./g, ''); // multiple dots -> grouping
-    }
-    // single dot -> keep as the decimal point
-  }
-
-  return s;
-};
 
 /**
  * Parse a Tinkoff notification into a normalized transaction descriptor.
@@ -237,7 +171,7 @@ export const parse = (notification) => {
   // 3. Amount + currency — required; without it there's nothing to record.
   const amountMatch = primary.match(AMOUNT_CURRENCY_RE);
   if (!amountMatch) return null;
-  const amount = normalizeAmount(amountMatch[1]);
+  const amount = normalizeAmountString(amountMatch[1]);
   if (!amount) return null;
 
   // 4. Currency — prefer the explicit account ISO code ("счет RUB"), since with
@@ -246,7 +180,7 @@ export const parse = (notification) => {
   const accountCurrencyMatch = primary.match(ACCOUNT_CURRENCY_RE);
   const currency = accountCurrencyMatch
     ? accountCurrencyMatch[1].toUpperCase()
-    : currencyCode(amountMatch[2]);
+    : currencyCodeFromToken(amountMatch[2]);
   if (!currency) return null;
 
   // 5. Card mask — optional; usually absent in this format.
@@ -280,6 +214,8 @@ export const parse = (notification) => {
 
 export default {
   packageNames: PACKAGE_NAMES,
+  displayName: DISPLAY_NAME,
+  knownKinds: KNOWN_KINDS,
   parse,
   kindRequiresCategory,
   kindIsTransfer,

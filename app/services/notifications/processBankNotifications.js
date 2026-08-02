@@ -21,6 +21,7 @@ import { serializeLabels, sanitizeLabel, normalizeMerchantLabel } from '../../ut
 import { appEvents, EVENTS } from '../eventEmitter';
 import { captureLocationIfEnabled, isAttachLocationEnabled, operationLocationFields } from '../operationLocation';
 import { parseBankNotification, kindRequiresCategory } from './parseBankNotification';
+import { ensureCustomTemplatesLoaded } from './customTemplates';
 import { resolveNotification } from './resolveNotification';
 import { learnAccountBinding } from './accountBindings';
 import { findMatchingOperation, reconcilePendingNotifications } from './duplicateOperations';
@@ -625,6 +626,13 @@ const runProcess = async () => {
     return summary;
   }
 
+  // The parser reads the user's templates from a synchronous cache, so they have
+  // to be in it before the first parse. This matters most for the background
+  // task, which starts a fresh JS context on every wakeup and would otherwise
+  // run every pass with no custom templates at all — silently ingesting nothing
+  // for the banks only a template can read. A no-op once loaded.
+  await ensureCustomTemplatesLoaded();
+
   // Drop any queued review item the user has already recorded by hand since it
   // was enqueued, before parsing new notifications.
   const prunedExisting = await reconcilePendingNotifications();
@@ -1021,6 +1029,7 @@ const resolvePendingTransfer = async (pending, choices = {}) => {
 export const reAddNotification = async (notification) => {
   const summary = { created: 0, pending: 0, skipped: 0 };
 
+  await ensureCustomTemplatesLoaded();
   const descriptor = parseBankNotification(notification);
   if (!descriptor) {
     summary.skipped += 1;

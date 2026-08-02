@@ -171,7 +171,7 @@ const isSchemaComplete = async (rawDb) => {
       'app_metadata', 'accounts_balance_history', 'planned_operations',
       'notification_merchant_rules', 'pending_notifications',
       'budget_plans', 'budget_plan_lines', 'budget_plan_line_categories',
-      'budget_plan_line_groups',
+      'budget_plan_line_groups', 'notification_templates',
     ];
     const existingTables = await rawDb.getAllAsync(
       "SELECT name FROM sqlite_master WHERE type='table'",
@@ -310,6 +310,12 @@ const isSchemaComplete = async (rawDb) => {
     // added and every chart query (which filters on it) would throw
     // `no such column: exclude_from_charts`.
     if (!opsCols.some(c => c.name === 'exclude_from_charts')) return false;
+
+    // Migration 0024: adds the notification_templates table (user-defined
+    // parsers). Covered by the expectedTables check above — an install complete
+    // through 0023 doesn't have it, so its schema reads "incomplete" here and
+    // migrate() runs to create it, rather than the fast path skipping migrate()
+    // and every template query throwing `no such table`.
 
     return true;
   } catch (error) {
@@ -660,6 +666,11 @@ const detectAppliedMigrations = async (rawDb) => {
     if (opsCols.some(c => c.name === 'exclude_from_charts')) {
       applied.push(23);
     }
+  }
+
+  // Migration 0024: Adds the notification_templates table (user-defined parsers).
+  if (await tableExists('notification_templates')) {
+    applied.push(24);
   }
 
   return applied.sort((a, b) => a - b);

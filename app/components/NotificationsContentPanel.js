@@ -1,14 +1,73 @@
 import React, { useRef, useEffect, useMemo } from 'react';
 import PropTypes from 'prop-types';
-import { View, StyleSheet, Animated, Easing, ScrollView, ActivityIndicator, RefreshControl, TouchableOpacity } from 'react-native';
+import { View, StyleSheet, Animated, Easing, ScrollView, ActivityIndicator, RefreshControl, TouchableOpacity, Pressable } from 'react-native';
 import { Text } from 'react-native-paper';
 import Ionicons from '@expo/vector-icons/Ionicons';
 import { useThemeColors } from '../contexts/ThemeColorsContext';
 import { useLocalization } from '../contexts/LocalizationContext';
 import { parseBankNotification } from '../services/notifications/parseBankNotification';
+import {
+  notificationHighlights,
+  segmentHighlights,
+} from '../services/notifications/notificationHighlights';
 import { BORDER_RADIUS, FONT_SIZE, HORIZONTAL_PADDING, SPACING } from '../styles/designTokens';
 import { motionDuration } from '../utils/reducedMotion';
 import { CARD_SURFACE, SECTION_LABEL } from '../styles/componentStyles';
+
+/**
+ * Tint for a highlighted span, by what the parser read it as.
+ *
+ * Two hues, not seven. The amount carries real meaning — money in or money out —
+ * so it takes the operation-type colour the rest of the app uses for that. Every
+ * other parsed span (the keyword that classified the notification, the payee,
+ * the card, the date) is tinted with one accent: the point is "these words are
+ * what Penny read", and a different colour per field would turn the card into a
+ * legend the reader has to learn.
+ *
+ * The tint is the colour at 0x1f alpha with the normal text colour on top, so it
+ * stays legible on both the light and dark card backgrounds — the same treatment
+ * budget rows use for their status colours.
+ *
+ * @param {string} field - highlight field name
+ * @param {string} type - descriptor operation type
+ * @param {Object} colors - theme palette
+ * @returns {string} a hex colour with an alpha channel
+ */
+const highlightTint = (field, type, colors) => {
+  if (field !== 'amount' && field !== 'currency') return `${colors.primary}1f`;
+  if (type === 'income') return `${colors.income}33`;
+  if (type === 'transfer') return `${colors.transfer}33`;
+  return `${colors.expense}33`;
+};
+
+/**
+ * Render a notification string with its parsed spans tinted in place.
+ *
+ * Highlighted spans are nested <Text> elements inside the paragraph, so the text
+ * still wraps and copies as one block — the tint rides along with the words
+ * instead of being positioned over them.
+ *
+ * @param {string} value - the original string
+ * @param {Array} ranges - from notificationHighlights
+ * @param {string} type - descriptor operation type (drives the amount's tint)
+ * @param {Object} colors
+ * @returns {React.ReactNode}
+ */
+const renderHighlighted = (value, ranges, type, colors) => {
+  if (!ranges || ranges.length === 0) return value;
+  return segmentHighlights(value, ranges).map((segment, index) => (
+    segment.field ? (
+      <Text
+        // Segments are positional and the string is immutable for this render,
+        // so the index is the stable identity here.
+        key={`${segment.field}-${index}`}
+        style={[styles.highlight, { backgroundColor: highlightTint(segment.field, type, colors) }]}
+      >
+        {segment.text}
+      </Text>
+    ) : segment.text
+  ));
+};
 
 // Renders the "date · time" label for a notification's post time. Mirrors the
 // update panel's timestamp treatment so the two subpanels read alike.
@@ -21,13 +80,29 @@ const formatPostTime = (postTime) => {
   return `${datePart} · ${timePart}`;
 };
 
-export function NotificationCard({ notification, colors, t, onReAdd = null, reAddState = undefined, animateIn = false }) {
+export function NotificationCard({
+  notification,
+  colors,
+  t,
+  onReAdd = null,
+  reAddState = undefined,
+  animateIn = false,
+  onCreateTemplate = null,
+}) {
   const { title, text, packageName, postTime } = notification;
   const timeLabel = formatPostTime(postTime);
   // A notification that parses into a bank transaction is surfaced with an
   // accent tint + badge so the user can tell at a glance which of the many
   // notifications the listener sees actually become operations.
-  const isBank = useMemo(() => parseBankNotification(notification) !== null, [notification]);
+  const descriptor = useMemo(() => parseBankNotification(notification), [notification]);
+  const isBank = descriptor !== null;
+  // …and within such a card, the words the parser actually read are tinted, so
+  // "why did this become a 3,900 AMD purchase at GURMAN" is answerable by
+  // looking at the message rather than by trusting the badge.
+  const highlights = useMemo(
+    () => notificationHighlights(notification, descriptor),
+    [notification, descriptor],
+  );
   const cardColorStyle = isBank
     ? { backgroundColor: colors.selected, borderColor: colors.primary, borderLeftColor: colors.primary }
     : { backgroundColor: colors.surface, borderColor: colors.border, borderLeftColor: colors.border };
@@ -52,79 +127,123 @@ export function NotificationCard({ notification, colors, t, onReAdd = null, reAd
       { translateY: enterAnim.interpolate({ inputRange: [0, 1], outputRange: [-12, 0] }) },
     ],
   };
+  // Long-press turns any captured notification into a new parse template. It is
+  // offered on parsed cards too — that is how a user overrides a built-in parser
+  // that reads their bank's message wrongly — but only the *unparsed* ones get a
+  // visible button, since those are the ones that need the invitation.
+  const handleLongPress = onCreateTemplate ? () => onCreateTemplate(notification) : undefined;
+
   return (
     <Animated.View style={[styles.card, isBank && styles.cardBank, cardColorStyle, enterStyle]}>
-      <View style={styles.cardHeader}>
-        <View style={styles.cardHeaderLeft}>
-          <Ionicons
-            name={isBank ? 'card' : 'notifications-outline'}
-            size={15}
-            color={isBank ? colors.primary : colors.mutedText}
-          />
-          {packageName ? (
-            <Text style={[styles.cardSource, { color: colors.mutedText }]} numberOfLines={1}>
-              {packageName}
-            </Text>
+      <Pressable
+        onLongPress={handleLongPress}
+        disabled={!handleLongPress}
+        delayLongPress={400}
+        accessibilityRole={handleLongPress ? 'button' : undefined}
+        accessibilityLabel={handleLongPress
+          ? (t('notification_template_create') || 'Create parse template')
+          : undefined}
+        accessibilityHint={handleLongPress
+          ? (t('notification_template_create_hint')
+            || 'Teach Penny to read this app’s notifications')
+          : undefined}
+        testID={handleLongPress ? 'notification-card-longpress' : undefined}
+      >
+        <View style={styles.cardHeader}>
+          <View style={styles.cardHeaderLeft}>
+            <Ionicons
+              name={isBank ? 'card' : 'notifications-outline'}
+              size={15}
+              color={isBank ? colors.primary : colors.mutedText}
+            />
+            {packageName ? (
+              <Text style={[styles.cardSource, { color: colors.mutedText }]} numberOfLines={1}>
+                {packageName}
+              </Text>
+            ) : null}
+          </View>
+          {timeLabel ? (
+            <Text style={[styles.cardTime, { color: colors.mutedText }]}>{timeLabel}</Text>
           ) : null}
         </View>
-        {timeLabel ? (
-          <Text style={[styles.cardTime, { color: colors.mutedText }]}>{timeLabel}</Text>
+        {isBank ? (
+          <View style={[styles.badge, { backgroundColor: colors.primary }]}>
+            <Ionicons name="pricetag" size={10} color="#ffffff" />
+            <Text style={styles.badgeText}>
+              {t('notification_bank_badge') || 'Bank operation'}
+            </Text>
+          </View>
         ) : null}
-      </View>
-      {isBank ? (
-        <View style={[styles.badge, { backgroundColor: colors.primary }]}>
-          <Ionicons name="pricetag" size={10} color="#ffffff" />
-          <Text style={styles.badgeText}>
-            {t('notification_bank_badge') || 'Bank operation'}
+        {title ? (
+          <Text style={[styles.cardTitle, { color: colors.text }]}>
+            {renderHighlighted(title, highlights.title, descriptor?.type, colors)}
           </Text>
-        </View>
-      ) : null}
-      {title ? (
-        <Text style={[styles.cardTitle, { color: colors.text }]}>{title}</Text>
-      ) : null}
-      {text ? (
-        <Text style={[styles.cardBody, { color: colors.text }]}>{text}</Text>
-      ) : null}
-      {!title && !text ? (
-        <Text style={[styles.cardBody, { color: colors.mutedText }]}>
-          {t('notification_no_text') || 'No text'}
-        </Text>
-      ) : null}
-      {/* Re-add lets the user turn an already-processed bank notification into an
+        ) : null}
+        {text ? (
+          <Text style={[styles.cardBody, { color: colors.text }]}>
+            {renderHighlighted(text, highlights.text, descriptor?.type, colors)}
+          </Text>
+        ) : null}
+        {!title && !text ? (
+          <Text style={[styles.cardBody, { color: colors.mutedText }]}>
+            {t('notification_no_text') || 'No text'}
+          </Text>
+        ) : null}
+        {/* Re-add lets the user turn an already-processed bank notification into an
           operation again (e.g. after deleting the original or dismissing it). */}
-      {isBank && onReAdd ? (
-        <View style={styles.reAddRow}>
-          {reAddState === 'loading' ? (
-            <ActivityIndicator size="small" color={colors.primary} />
-          ) : reAddState === 'created' ? (
-            <View style={styles.reAddFeedback}>
-              <Ionicons name="checkmark-circle" size={15} color={colors.primary} />
-              <Text style={[styles.reAddFeedbackText, { color: colors.primary }]}>
-                {t('bank_notifications_readd_created') || 'Operation added'}
-              </Text>
-            </View>
-          ) : reAddState === 'pending' ? (
-            <View style={styles.reAddFeedback}>
-              <Ionicons name="list-outline" size={15} color={colors.mutedText} />
-              <Text style={[styles.reAddFeedbackText, { color: colors.mutedText }]}>
-                {t('bank_notifications_readd_queued') || 'Added to review queue'}
-              </Text>
-            </View>
-          ) : (
+        {isBank && onReAdd ? (
+          <View style={styles.reAddRow}>
+            {reAddState === 'loading' ? (
+              <ActivityIndicator size="small" color={colors.primary} />
+            ) : reAddState === 'created' ? (
+              <View style={styles.reAddFeedback}>
+                <Ionicons name="checkmark-circle" size={15} color={colors.primary} />
+                <Text style={[styles.reAddFeedbackText, { color: colors.primary }]}>
+                  {t('bank_notifications_readd_created') || 'Operation added'}
+                </Text>
+              </View>
+            ) : reAddState === 'pending' ? (
+              <View style={styles.reAddFeedback}>
+                <Ionicons name="list-outline" size={15} color={colors.mutedText} />
+                <Text style={[styles.reAddFeedbackText, { color: colors.mutedText }]}>
+                  {t('bank_notifications_readd_queued') || 'Added to review queue'}
+                </Text>
+              </View>
+            ) : (
+              <TouchableOpacity
+                onPress={() => onReAdd(notification)}
+                style={[styles.reAddButton, { borderColor: colors.primary }]}
+                accessibilityRole="button"
+                accessibilityLabel={t('bank_notifications_readd') || 'Re-add operation'}
+              >
+                <Ionicons name="add-circle-outline" size={15} color={colors.primary} />
+                <Text style={[styles.reAddButtonText, { color: colors.primary }]}>
+                  {t('bank_notifications_readd') || 'Re-add operation'}
+                </Text>
+              </TouchableOpacity>
+            )}
+          </View>
+        ) : null}
+        {/* An app Penny can't read yet is the whole reason parse templates exist,
+          so those cards carry the invitation rather than hiding it behind the
+          long-press. */}
+        {!isBank && onCreateTemplate ? (
+          <View style={styles.reAddRow}>
             <TouchableOpacity
-              onPress={() => onReAdd(notification)}
-              style={[styles.reAddButton, { borderColor: colors.primary }]}
+              onPress={() => onCreateTemplate(notification)}
+              style={[styles.reAddButton, { borderColor: colors.mutedText }]}
               accessibilityRole="button"
-              accessibilityLabel={t('bank_notifications_readd') || 'Re-add operation'}
+              accessibilityLabel={t('notification_template_create') || 'Create parse template'}
+              testID="notification-create-template"
             >
-              <Ionicons name="add-circle-outline" size={15} color={colors.primary} />
-              <Text style={[styles.reAddButtonText, { color: colors.primary }]}>
-                {t('bank_notifications_readd') || 'Re-add operation'}
+              <Ionicons name="create-outline" size={15} color={colors.mutedText} />
+              <Text style={[styles.reAddButtonText, { color: colors.mutedText }]}>
+                {t('notification_template_create') || 'Create parse template'}
               </Text>
             </TouchableOpacity>
-          )}
-        </View>
-      ) : null}
+          </View>
+        ) : null}
+      </Pressable>
     </Animated.View>
   );
 }
@@ -144,6 +263,9 @@ NotificationCard.propTypes = {
   reAddState: PropTypes.oneOf(['loading', 'created', 'pending']),
   // Optional: when true, the card plays a fade + slide-in animation on mount.
   animateIn: PropTypes.bool,
+  // Optional: when provided, a long-press (and, on unparsed cards, a button)
+  // starts a new parse template from this notification.
+  onCreateTemplate: PropTypes.func,
 };
 
 export default function NotificationsContentPanel({ isLoading = false, notifications = [], onRefresh = null, bottomInset = 0 }) {
@@ -299,6 +421,9 @@ const styles = StyleSheet.create({
   },
   emptyIcon: {
     marginBottom: SPACING.xs,
+  },
+  highlight: {
+    fontWeight: '700',
   },
   reAddButton: {
     alignItems: 'center',

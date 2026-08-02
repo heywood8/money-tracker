@@ -196,6 +196,59 @@ export const notificationMerchantRules = sqliteTable('notification_merchant_rule
 }));
 
 /**
+ * Notification parse templates table
+ *
+ * User-defined parsers for banking apps Penny doesn't ship a parser for. The
+ * user marks the amount / payee / card / date in one captured notification and
+ * the marks are stored here as context anchors (see
+ * services/notifications/templateEngine.js), not character offsets — the next
+ * notification has a different number of digits and every offset would shift.
+ *
+ * `fields` is a JSON object keyed by field name (amount, currency, merchant,
+ * card, date, time), each holding `{ source, kind, before, after, value,
+ * occurrence }`. `triggers` is a JSON array of literal words the notification
+ * must contain for the template to claim it, which is what stops a template from
+ * matching its app's unrelated messages. Both are JSON columns rather than child
+ * tables: they are read and written whole, only ever by the template editor, and
+ * never queried across.
+ *
+ * The sample the template was built from is kept so the editor can reopen it and
+ * re-derive the marks, and so the preview can show what the template extracts.
+ */
+export const notificationTemplates = sqliteTable('notification_templates', {
+  id: text('id').primaryKey(),
+  // Shown in the templates list, and used as the descriptor's `kind` (the review
+  // queue falls back to it when a notification carries no payee).
+  name: text('name').notNull(),
+  // The app this template parses. Nullable only for a template built from a
+  // notification whose source app was unknown.
+  packageName: text('package_name'),
+  type: text('type', { enum: ['expense', 'income'] }).notNull(),
+  // 0 disables a template without deleting it — the escape hatch for a template
+  // that turns out to misfire, so the user can stop it and fix it rather than
+  // losing the work.
+  enabled: integer('enabled').notNull().default(1),
+  // Evaluation order within an app; lower runs first. Lets a specific template
+  // win over a broader one for the same bank.
+  priority: integer('priority').notNull().default(0),
+  // Optional fallback category for everything this template parses. A learned
+  // merchant rule always wins over it — that is the more specific fact.
+  categoryId: text('category_id').references(() => categories.id, { onDelete: 'set null' }),
+  // Fixed currency, used when the notification doesn't spell one out.
+  currency: text('currency'),
+  // 'dmy' | 'mdy' | 'ymd' — how to read an ambiguous numeric date. Null = 'dmy'.
+  dateOrder: text('date_order'),
+  fields: text('fields').notNull(),
+  triggers: text('triggers'),
+  sampleTitle: text('sample_title'),
+  sampleText: text('sample_text'),
+  createdAt: text('created_at').notNull(),
+  updatedAt: text('updated_at').notNull(),
+}, (table) => ({
+  packageIdx: index('idx_notification_templates_package').on(table.packageName),
+}));
+
+/**
  * Pending notifications table
  *
  * Parsed bank notifications that could not be fully matched (unknown card or

@@ -41,6 +41,8 @@ import UpdateContentPanel from '../components/UpdateContentPanel';
 import NotificationProcessingContentPanel from '../components/NotificationProcessingContentPanel';
 import NotificationFiltersContentPanel from '../components/NotificationFiltersContentPanel';
 import NotificationBindingsContentPanel from '../components/NotificationBindingsContentPanel';
+import NotificationTemplatesContentPanel from '../components/NotificationTemplatesContentPanel';
+import NotificationTemplateEditorPanel from '../components/NotificationTemplateEditorPanel';
 import AccountsScreen from './AccountsScreen';
 import CategoriesScreen from './CategoriesScreen';
 import { BADGE, BADGE_TEXT, CHIP, CHIP_TEXT, SECTION_LABEL } from '../styles/componentStyles';
@@ -145,8 +147,15 @@ export default function SettingsScreen({ setSubPanelActive }) {
   const { startDownload, isDownloading, downloadProgress, downloadPhase } = useUpdateDownload();
   const [activeSubPanel, setActiveSubPanel] = useState(null);
   // Nested view within the notification-processing subpanel: 'main' shows the
-  // review queue + feed, 'filters' shows access/toggle/app-filter controls.
+  // review queue + feed, 'filters' shows access/toggle/app-filter controls,
+  // 'bindings' the learned associations, 'templates' the parser list, and
+  // 'templateEditor' the field-marking editor.
   const [notificationView, setNotificationView] = useState('main');
+  // What the template editor is working on: the captured notification a new
+  // template is being built from, and/or the existing template being edited.
+  // Held here rather than in the panel because the editor is a sibling view —
+  // the panel that launches it unmounts as it opens.
+  const [templateDraft, setTemplateDraft] = useState(null);
   // Controls the notification-processing header overflow (three-dots) menu.
   const [notificationMenuVisible, setNotificationMenuVisible] = useState(false);
   // Measured size of the settings container. The subpanel overlay is sized in
@@ -372,6 +381,7 @@ export default function SettingsScreen({ setSubPanelActive }) {
     if (panel === 'notificationProcessing') {
       setNotificationView('main');
       setNotificationMenuVisible(false);
+      setTemplateDraft(null);
     }
     setActiveSubPanel(panel);
     openPanelAnim();
@@ -1026,17 +1036,46 @@ export default function SettingsScreen({ setSubPanelActive }) {
     if (activeSubPanel === 'notificationProcessing') {
       if (notificationView === 'filters') return t('notification_filters') || 'Filters';
       if (notificationView === 'bindings') return t('notification_bindings') || 'Bindings';
+      if (notificationView === 'templates') return t('notification_templates') || 'Templates';
+      if (notificationView === 'templateEditor') {
+        return templateDraft?.template
+          ? (t('notification_template_edit') || 'Edit template')
+          : (t('notification_template_new') || 'New template');
+      }
       return t('notification_processing') || 'Notification processing';
     }
     if (activeSubPanel === 'reset') return t('reset_database') || 'Reset Database';
     return '';
-  }, [activeSubPanel, exportStep, importStep, isCheckingUpdate, updateResult, notificationView, t]);
+  }, [activeSubPanel, exportStep, importStep, isCheckingUpdate, updateResult, notificationView, templateDraft, t]);
 
   const handleSubPanelBack = useMemo(() => {
     if (activeSubPanel === 'import') return handleImportBack;
     if (activeSubPanel === 'export') return handleExportBack;
     return dismissPanel;
   }, [activeSubPanel, handleImportBack, handleExportBack, dismissPanel]);
+
+  // ─── Notification parse templates ───
+  // Build a new template from a notification the user long-pressed in the feed.
+  // `recent` rides along so the editor can report how many of the app's other
+  // captured notifications the draft also matches.
+  const handleCreateTemplate = useCallback((notification, recent = []) => {
+    setTemplateDraft({ notification, template: null, recent, returnTo: 'main' });
+    setNotificationView('templateEditor');
+  }, []);
+
+  // Open an existing template from the templates list.
+  const handleEditTemplate = useCallback((template) => {
+    setTemplateDraft({ notification: null, template, recent: [], returnTo: 'templates' });
+    setNotificationView('templateEditor');
+  }, []);
+
+  // Leaving the editor. A saved template lands on the templates list — that is
+  // where it now lives, and seeing it there confirms the save; a cancel returns
+  // to wherever the editor was opened from.
+  const handleTemplateEditorDone = useCallback((saved) => {
+    setNotificationView(saved ? 'templates' : (templateDraft?.returnTo || 'main'));
+    setTemplateDraft(null);
+  }, [templateDraft]);
 
   // Resolver behind navigateBack (swipe / hardware-back / header arrow): if an
   // embedded Accounts/Categories screen can still pop a level (form, picker,
@@ -1047,9 +1086,16 @@ export default function SettingsScreen({ setSubPanelActive }) {
       embeddedBackRef.current();
       return;
     }
-    // The Filters view is nested inside the notification-processing panel — step
-    // back to its main view rather than closing the whole panel.
+    // The Filters/Bindings/Templates views are nested inside the
+    // notification-processing panel — step back within it rather than closing
+    // the whole panel. The editor returns to whichever view opened it, so
+    // editing a template from the list lands back on the list.
     if (activeSubPanel === 'notificationProcessing' && notificationView !== 'main') {
+      if (notificationView === 'templateEditor') {
+        setNotificationView(templateDraft?.returnTo || 'main');
+        setTemplateDraft(null);
+        return;
+      }
       setNotificationView('main');
       return;
     }
@@ -1094,6 +1140,15 @@ export default function SettingsScreen({ setSubPanelActive }) {
           title={t('notification_bindings') || 'Bindings'}
           leadingIcon="link-variant"
           testID="notification-bindings-menu-item"
+        />
+        <Menu.Item
+          onPress={() => {
+            setNotificationMenuVisible(false);
+            setNotificationView('templates');
+          }}
+          title={t('notification_templates') || 'Templates'}
+          leadingIcon="text-search"
+          testID="notification-templates-menu-item"
         />
         <Menu.Item
           onPress={() => {
@@ -1636,8 +1691,24 @@ export default function SettingsScreen({ setSubPanelActive }) {
                   <NotificationFiltersContentPanel bottomInset={scrollBottomInset} />
                 ) : notificationView === 'bindings' ? (
                   <NotificationBindingsContentPanel bottomInset={scrollBottomInset} />
+                ) : notificationView === 'templates' ? (
+                  <NotificationTemplatesContentPanel
+                    onEdit={handleEditTemplate}
+                    bottomInset={scrollBottomInset}
+                  />
+                ) : notificationView === 'templateEditor' ? (
+                  <NotificationTemplateEditorPanel
+                    notification={templateDraft?.notification}
+                    template={templateDraft?.template}
+                    recentNotifications={templateDraft?.recent || []}
+                    onDone={handleTemplateEditorDone}
+                    bottomInset={scrollBottomInset}
+                  />
                 ) : (
-                  <NotificationProcessingContentPanel bottomInset={scrollBottomInset} />
+                  <NotificationProcessingContentPanel
+                    onCreateTemplate={handleCreateTemplate}
+                    bottomInset={scrollBottomInset}
+                  />
                 )}
               </View>
             )}

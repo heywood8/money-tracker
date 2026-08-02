@@ -172,9 +172,10 @@ describe('BackupRestore', () => {
       });
       expect(backup.timestamp).toBeDefined();
       // accounts, categories, operations, budgets, app_metadata, balance_history,
-      // planned_operations, notification_merchant_rules, budget_plans,
-      // budget_plan_lines, budget_plan_line_categories, budget_plan_line_groups
-      expect(mockDb.queryAll).toHaveBeenCalledTimes(12);
+      // planned_operations, notification_merchant_rules, notification_templates,
+      // budget_plans, budget_plan_lines, budget_plan_line_categories,
+      // budget_plan_line_groups
+      expect(mockDb.queryAll).toHaveBeenCalledTimes(13);
     });
 
     it('includes empty arrays when tables are empty', async () => {
@@ -560,19 +561,22 @@ describe('BackupRestore', () => {
       await BackupRestore.restoreBackup(validBackup);
 
       expect(deleteCalls[0]).toContain('notification_merchant_rules');
-      expect(deleteCalls[1]).toContain('planned_operations');
-      expect(deleteCalls[2]).toContain('budgets');
+      // Parse templates (migration 0024) reference categories (ON DELETE SET
+      // NULL), so they clear before the categories they point at.
+      expect(deleteCalls[1]).toContain('notification_templates');
+      expect(deleteCalls[2]).toContain('planned_operations');
+      expect(deleteCalls[3]).toContain('budgets');
       // The 0021 junction is cleared before the lines it hangs off.
-      expect(deleteCalls[3]).toContain('budget_plan_line_categories');
-      expect(deleteCalls[4]).toContain('budget_plan_lines');
-      expect(deleteCalls[5]).toContain('budget_plans');
+      expect(deleteCalls[4]).toContain('budget_plan_line_categories');
+      expect(deleteCalls[5]).toContain('budget_plan_lines');
+      expect(deleteCalls[6]).toContain('budget_plans');
       // Groups (migration 0022) are referenced BY lines (ON DELETE SET NULL), so
       // they clear after the lines that point at them.
-      expect(deleteCalls[6]).toContain('budget_plan_line_groups');
-      expect(deleteCalls[7]).toContain('accounts_balance_history');
-      expect(deleteCalls[8]).toContain('operations');
-      expect(deleteCalls[9]).toContain('categories');
-      expect(deleteCalls[10]).toContain('accounts');
+      expect(deleteCalls[7]).toContain('budget_plan_line_groups');
+      expect(deleteCalls[8]).toContain('accounts_balance_history');
+      expect(deleteCalls[9]).toContain('operations');
+      expect(deleteCalls[10]).toContain('categories');
+      expect(deleteCalls[11]).toContain('accounts');
     });
 
     it('preserves db_version metadata', async () => {

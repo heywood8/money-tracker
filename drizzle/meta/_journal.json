@@ -169,6 +169,13 @@
       "when": 1767800000000,
       "tag": "0023_operation_exclude_from_charts",
       "breakpoints": true
+    },
+    {
+      "idx": 24,
+      "version": "6",
+      "when": 1767900000000,
+      "tag": "0024_notification_templates",
+      "breakpoints": true
     }
   ]
 }

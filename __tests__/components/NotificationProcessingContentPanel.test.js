@@ -87,15 +87,15 @@ describe('NotificationProcessingContentPanel', () => {
   });
 
   it('processes on mount and lists the pending notification', async () => {
-    const { getByText } = await render(<NotificationProcessingContentPanel />);
-    await waitFor(() => expect(getByText('NAREK MEHRABYAN')).toBeTruthy());
+    const { getByText, getByTestId } = await render(<NotificationProcessingContentPanel />);
+    await waitFor(() => expect(getByTestId('pending-merchant-p1')).toBeTruthy());
     expect(pipeline.processBankNotifications).toHaveBeenCalled();
     expect(getByText('3900.00 AMD')).toBeTruthy();
   });
 
   it('shows the review empty state when nothing is pending', async () => {
     PendingNotificationsDB.getPendingNotifications.mockResolvedValue([]);
-    const { getByText } = await render(<NotificationProcessingContentPanel />);
+    const { getByText, getByTestId } = await render(<NotificationProcessingContentPanel />);
     await waitFor(() => expect(getByText('bank_notifications_empty')).toBeTruthy());
   });
 
@@ -115,7 +115,7 @@ describe('NotificationProcessingContentPanel', () => {
       accountId: 1, categoryId: null, packageName: 'am.bank',
     };
     PendingNotificationsDB.getPendingNotifications.mockResolvedValue([C2C_PENDING]);
-    const { getByText } = await render(<NotificationProcessingContentPanel />);
+    const { getByText, getByTestId } = await render(<NotificationProcessingContentPanel />);
     await waitFor(() => expect(getByText('N. DORVANYAN')).toBeTruthy());
 
     fireEvent.press(getByText('save'));
@@ -124,8 +124,8 @@ describe('NotificationProcessingContentPanel', () => {
 
   it('allows saving a purchase with only an account chosen (category optional)', async () => {
     PendingNotificationsDB.getPendingNotifications.mockResolvedValue([{ ...PENDING, accountId: 1 }]);
-    const { getByText } = await render(<NotificationProcessingContentPanel />);
-    await waitFor(() => expect(getByText('NAREK MEHRABYAN')).toBeTruthy());
+    const { getByText, getByTestId } = await render(<NotificationProcessingContentPanel />);
+    await waitFor(() => expect(getByTestId('pending-merchant-p1')).toBeTruthy());
 
     fireEvent.press(getByText('save'));
     await waitFor(() =>
@@ -138,7 +138,7 @@ describe('NotificationProcessingContentPanel', () => {
   it('saves a category picked from the inline grid', async () => {
     PendingNotificationsDB.getPendingNotifications.mockResolvedValue([{ ...PENDING, accountId: 1 }]);
     const { getByText, getByTestId } = await render(<NotificationProcessingContentPanel />);
-    await waitFor(() => expect(getByText('NAREK MEHRABYAN')).toBeTruthy());
+    await waitFor(() => expect(getByTestId('pending-merchant-p1')).toBeTruthy());
 
     // Expense categories render as grid chips; tap "Food" and wait for it to
     // register as the selection before saving.
@@ -158,7 +158,7 @@ describe('NotificationProcessingContentPanel', () => {
   it('drills into a folder to reach and save a nested category', async () => {
     PendingNotificationsDB.getPendingNotifications.mockResolvedValue([{ ...PENDING, accountId: 1 }]);
     const { getByText, getByTestId, queryByTestId } = await render(<NotificationProcessingContentPanel />);
-    await waitFor(() => expect(getByText('NAREK MEHRABYAN')).toBeTruthy());
+    await waitFor(() => expect(getByTestId('pending-merchant-p1')).toBeTruthy());
 
     // The nested "Rent" category is hidden until its "Bills" folder is opened.
     expect(queryByTestId('category-grid-c3')).toBeNull();
@@ -179,8 +179,8 @@ describe('NotificationProcessingContentPanel', () => {
   });
 
   it('dismisses a pending item', async () => {
-    const { getByText } = await render(<NotificationProcessingContentPanel />);
-    await waitFor(() => expect(getByText('NAREK MEHRABYAN')).toBeTruthy());
+    const { getByText, getByTestId } = await render(<NotificationProcessingContentPanel />);
+    await waitFor(() => expect(getByTestId('pending-merchant-p1')).toBeTruthy());
     fireEvent.press(getByText('dismiss'));
     await waitFor(() =>
       expect(pipeline.dismissPendingNotification).toHaveBeenCalledWith('p1'),
@@ -188,7 +188,7 @@ describe('NotificationProcessingContentPanel', () => {
   });
 
   it('lists the recent notifications and badges the bank-parseable one', async () => {
-    const { getAllByText, getByText } = await render(<NotificationProcessingContentPanel />);
+    const { getAllByText, getByText, getByTestId } = await render(<NotificationProcessingContentPanel />);
     await waitFor(() => expect(getByText('New message')).toBeTruthy());
     // The bank notification gets the "bank operation" badge; the chat one does not.
     expect(getAllByText('notification_bank_badge')).toHaveLength(1);
@@ -200,8 +200,8 @@ describe('NotificationProcessingContentPanel', () => {
     notificationFilters.filterNotificationsByApp.mockImplementation((items, hidden) =>
       items.filter((n) => !(hidden || []).includes(n.packageName)),
     );
-    const { getByText, queryByText } = await render(<NotificationProcessingContentPanel />);
-    await waitFor(() => expect(getByText('NAREK MEHRABYAN')).toBeTruthy());
+    const { getByText, queryByText, getByTestId } = await render(<NotificationProcessingContentPanel />);
+    await waitFor(() => expect(getByTestId('pending-merchant-p1')).toBeTruthy());
     // The chat notification's app is hidden, so its text must not appear.
     expect(queryByText('New message')).toBeNull();
   });
@@ -231,7 +231,7 @@ describe('NotificationProcessingContentPanel', () => {
     // but exposes no swipe-to-hide affordance (there is no app to filter by).
     const NO_PKG_RAW = { title: 'System', text: 'No package here', postTime: 1718000300000 };
     NotificationAccess.getRecentNotifications.mockResolvedValue([NO_PKG_RAW, CHAT_RAW]);
-    const { getByText, queryByTestId } = await render(<NotificationProcessingContentPanel />);
+    const { getByText, queryByTestId, getByTestId } = await render(<NotificationProcessingContentPanel />);
     await waitFor(() => expect(getByText('No package here')).toBeTruthy());
 
     // The plain card has no deactivate button; the app-backed card still does.
@@ -246,7 +246,7 @@ describe('NotificationProcessingContentPanel', () => {
       items.filter((n) => !(hidden || []).includes(n.packageName)),
     );
     PendingNotificationsDB.getPendingNotifications.mockResolvedValue([]);
-    const { getByText, queryByText } = await render(<NotificationProcessingContentPanel />);
+    const { getByText, queryByText, getByTestId } = await render(<NotificationProcessingContentPanel />);
     // Must use the "hidden by filters" copy, not the "nothing recorded" copy.
     await waitFor(() => expect(getByText('notifications_all_filtered')).toBeTruthy());
     expect(queryByText('notifications_empty')).toBeNull();
@@ -261,7 +261,7 @@ describe('NotificationProcessingContentPanel', () => {
 
     it('shows a target-account picker instead of a category grid for a transfer', async () => {
       PendingNotificationsDB.getPendingNotifications.mockResolvedValue([ATM_PENDING]);
-      const { getByText, queryByTestId } = await render(<NotificationProcessingContentPanel />);
+      const { getByText, queryByTestId, getByTestId } = await render(<NotificationProcessingContentPanel />);
       await waitFor(() => expect(getByText('ATM 401 REPUBLIC 67/1')).toBeTruthy());
       // The "To account" field is present and the category grid is not.
       expect(getByText('BANK_NOTIFICATIONS_TRANSFER_TO *')).toBeTruthy();
@@ -272,7 +272,7 @@ describe('NotificationProcessingContentPanel', () => {
       // No cash account bound yet → target is unset → Save must be a no-op.
       pipeline.resolveAtmTargetAccount.mockResolvedValue(null);
       PendingNotificationsDB.getPendingNotifications.mockResolvedValue([ATM_PENDING]);
-      const { getByText } = await render(<NotificationProcessingContentPanel />);
+      const { getByText, getByTestId } = await render(<NotificationProcessingContentPanel />);
       await waitFor(() => expect(getByText('ATM 401 REPUBLIC 67/1')).toBeTruthy());
 
       fireEvent.press(getByText('save'));
@@ -283,7 +283,7 @@ describe('NotificationProcessingContentPanel', () => {
       // The bound cash account (id 2) pre-fills the target picker.
       pipeline.resolveAtmTargetAccount.mockResolvedValue({ id: 2, currency: 'AMD' });
       PendingNotificationsDB.getPendingNotifications.mockResolvedValue([ATM_PENDING]);
-      const { getByText } = await render(<NotificationProcessingContentPanel />);
+      const { getByText, getByTestId } = await render(<NotificationProcessingContentPanel />);
       await waitFor(() => expect(getByText('ATM 401 REPUBLIC 67/1')).toBeTruthy());
 
       fireEvent.press(getByText('save'));
@@ -308,8 +308,8 @@ describe('NotificationProcessingContentPanel', () => {
     it('arms a 3-second interval that re-runs the pipeline and reloads the lists', async () => {
       const setIntervalSpy = jest.spyOn(global, 'setInterval');
       try {
-        const { getByText } = await render(<NotificationProcessingContentPanel />);
-        await waitFor(() => expect(getByText('NAREK MEHRABYAN')).toBeTruthy());
+        const { getByText, getByTestId } = await render(<NotificationProcessingContentPanel />);
+        await waitFor(() => expect(getByTestId('pending-merchant-p1')).toBeTruthy());
 
         const tick = getAutoRefreshTick(setIntervalSpy);
         const recentBefore = NotificationAccess.getRecentNotifications.mock.calls.length;
@@ -329,7 +329,7 @@ describe('NotificationProcessingContentPanel', () => {
     it('surfaces a notification that only arrives on a later refresh', async () => {
       const setIntervalSpy = jest.spyOn(global, 'setInterval');
       try {
-        const { getByText, queryByText } = await render(<NotificationProcessingContentPanel />);
+        const { getByText, queryByText, getByTestId } = await render(<NotificationProcessingContentPanel />);
         await waitFor(() => expect(getByText('New message')).toBeTruthy());
         // Not present yet — it hasn't been captured at mount time.
         expect(queryByText('Fresh purchase')).toBeNull();
@@ -352,14 +352,14 @@ describe('NotificationProcessingContentPanel', () => {
 
   describe('re-add operation', () => {
     it('offers a re-add action on a bank-parseable recent notification', async () => {
-      const { getByText, getAllByText } = await render(<NotificationProcessingContentPanel />);
+      const { getByText, getAllByText, getByTestId } = await render(<NotificationProcessingContentPanel />);
       await waitFor(() => expect(getByText('New message')).toBeTruthy());
       // Only the bank card (not the chat card) exposes the re-add action.
       expect(getAllByText('bank_notifications_readd')).toHaveLength(1);
     });
 
     it('re-adds the operation and shows confirmation feedback', async () => {
-      const { getByText } = await render(<NotificationProcessingContentPanel />);
+      const { getByText, getByTestId } = await render(<NotificationProcessingContentPanel />);
       await waitFor(() => expect(getByText('bank_notifications_readd')).toBeTruthy());
 
       fireEvent.press(getByText('bank_notifications_readd'));
@@ -384,15 +384,15 @@ describe('NotificationProcessingContentPanel', () => {
         () => new Promise((resolve) => { finishSave = resolve; }),
       );
       PendingNotificationsDB.getPendingNotifications.mockResolvedValue([{ ...PENDING, accountId: 1 }]);
-      const { getByText, queryByText } = await render(<NotificationProcessingContentPanel />);
-      await waitFor(() => expect(getByText('NAREK MEHRABYAN')).toBeTruthy());
+      const { getByText, queryByText, getByTestId } = await render(<NotificationProcessingContentPanel />);
+      await waitFor(() => expect(getByTestId('pending-merchant-p1')).toBeTruthy());
 
       fireEvent.press(getByText('save'));
 
       // The card collapses to the progress row; the merchant is still shown but the
       // Save button (and the whole form) is gone, so it can't be tapped again.
       await waitFor(() => expect(getByText('bank_notifications_adding')).toBeTruthy());
-      expect(getByText('NAREK MEHRABYAN')).toBeTruthy();
+      expect(getByTestId('pending-merchant-p1')).toBeTruthy();
       expect(queryByText('save')).toBeNull();
       expect(pipeline.resolvePendingNotification).toHaveBeenCalledTimes(1);
 
@@ -403,8 +403,8 @@ describe('NotificationProcessingContentPanel', () => {
     it('re-expands the card when the save fails so the user can retry', async () => {
       pipeline.resolvePendingNotification.mockRejectedValueOnce(new Error('no exchange rate'));
       PendingNotificationsDB.getPendingNotifications.mockResolvedValue([{ ...PENDING, accountId: 1 }]);
-      const { getByText, queryByText } = await render(<NotificationProcessingContentPanel />);
-      await waitFor(() => expect(getByText('NAREK MEHRABYAN')).toBeTruthy());
+      const { getByText, queryByText, getByTestId } = await render(<NotificationProcessingContentPanel />);
+      await waitFor(() => expect(getByTestId('pending-merchant-p1')).toBeTruthy());
 
       fireEvent.press(getByText('save'));
 

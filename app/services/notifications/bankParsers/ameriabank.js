@@ -47,8 +47,13 @@
  * patterns; nothing here is shared by assumption.
  */
 
+import { normalizeAmountString, toIsoDate } from '../valueFormat';
+
 /** Android package name(s) this parser handles. */
 export const PACKAGE_NAMES = ['com.banqr.ameriabank'];
+
+/** Human-readable name for the templates list. */
+export const DISPLAY_NAME = 'Ameriabank';
 
 /**
  * Maps a notification "kind" keyword to an operation type. Extend this table to
@@ -82,7 +87,8 @@ const KIND_TO_TYPE = {
   'ATM CASH': 'transfer',
 };
 
-const KNOWN_KINDS = Object.keys(KIND_TO_TYPE);
+/** Every kind this parser recognizes — shown read-only in the templates list. */
+export const KNOWN_KINDS = Object.keys(KIND_TO_TYPE);
 
 /**
  * Kinds that move money between the user's own accounts (operation type
@@ -137,87 +143,6 @@ const DATE_TIME_RE = /\b(\d{2})\.(\d{2})\.(\d{4})(?:\s+(\d{2}:\d{2}))?\b/;
 const TRAILING_COUNTRY_RE = /,\s*([A-Z]{2})\s*$/;
 
 /**
- * Normalize a localized amount string to a plain decimal string.
- *
- * Handles both grouping conventions without corrupting either:
- * - "1,234.56" (comma thousands, dot decimal) -> "1234.56"
- * - "1.234,56" (dot thousands, comma decimal) -> "1234.56"
- * - "12,50" (comma decimal)                   -> "12.50"
- *
- * When both separators are present, the one that appears last is the decimal
- * separator and the other is grouping. When only one separator is present it is
- * treated as a decimal point only if it is not a 3-digit group (so "1,234" and
- * "1.234" are read as thousands, while "12,50" is read as a decimal). The result
- * is a string so it feeds straight into the decimal currency layer without ever
- * becoming a lossy float.
- *
- * @param {string} raw - e.g. "3,900.00"
- * @returns {string|null} e.g. "3900.00", or null when no digits are present
- */
-const normalizeAmount = (raw) => {
-  if (!raw) return null;
-  let s = raw.replace(/[^\d.,]/g, '');
-  if (!/\d/.test(s)) return null;
-
-  const lastDot = s.lastIndexOf('.');
-  const lastComma = s.lastIndexOf(',');
-
-  if (lastDot !== -1 && lastComma !== -1) {
-    if (lastComma > lastDot) {
-      // Comma is the decimal separator: drop dot grouping, comma -> dot.
-      s = s.replace(/\./g, '').replace(',', '.');
-    } else {
-      // Dot is the decimal separator: drop comma grouping.
-      s = s.replace(/,/g, '');
-    }
-  } else if (lastComma !== -1) {
-    const parts = s.split(',');
-    if (parts.length === 2 && parts[1].length !== 3) {
-      s = s.replace(',', '.'); // single comma, not a 3-digit group -> decimal
-    } else {
-      s = s.replace(/,/g, ''); // grouping
-    }
-  } else if (lastDot !== -1) {
-    const parts = s.split('.');
-    if (parts.length > 2) {
-      s = s.replace(/\./g, ''); // multiple dots -> grouping
-    }
-    // single dot -> keep as the decimal point
-  }
-
-  return s;
-};
-
-/**
- * Convert "DD.MM.YYYY" to an ISO "YYYY-MM-DD" date string.
- *
- * Validates against a real calendar via a UTC round-trip, so impossible dates
- * like "31.02.2026" are rejected (returns null) rather than producing
- * "2026-02-31".
- *
- * @param {string} day
- * @param {string} month
- * @param {string} year
- * @returns {string|null} ISO date, or null if the date is not a real calendar date
- */
-const toIsoDate = (day, month, year) => {
-  const d = Number(day);
-  const m = Number(month);
-  const y = Number(year);
-  if (!Number.isInteger(d) || !Number.isInteger(m) || !Number.isInteger(y)) return null;
-  if (m < 1 || m > 12 || d < 1 || d > 31) return null;
-  const dt = new Date(Date.UTC(y, m - 1, d));
-  if (
-    dt.getUTCFullYear() !== y ||
-    dt.getUTCMonth() !== m - 1 ||
-    dt.getUTCDate() !== d
-  ) {
-    return null;
-  }
-  return `${year}-${month}-${day}`;
-};
-
-/**
  * Parse an Ameriabank notification into a normalized transaction descriptor.
  *
  * @param {{ title?: string, text?: string, packageName?: string, postTime?: number }} notification
@@ -263,7 +188,7 @@ export const parse = (notification) => {
   for (const segment of segments) {
     const match = segment.match(AMOUNT_CURRENCY_RE);
     if (match) {
-      amount = normalizeAmount(match[1]);
+      amount = normalizeAmountString(match[1]);
       currency = match[2];
       break;
     }
@@ -284,7 +209,7 @@ export const parse = (notification) => {
   for (const segment of segments) {
     const match = segment.match(DATE_TIME_RE);
     if (match) {
-      const iso = toIsoDate(match[1], match[2], match[3]);
+      const iso = toIsoDate(match[3], match[2], match[1]);
       if (iso) {
         date = iso;
         time = match[4] || null;
@@ -343,6 +268,8 @@ export const parse = (notification) => {
 
 export default {
   packageNames: PACKAGE_NAMES,
+  displayName: DISPLAY_NAME,
+  knownKinds: KNOWN_KINDS,
   parse,
   kindRequiresCategory,
   kindIsTransfer,
