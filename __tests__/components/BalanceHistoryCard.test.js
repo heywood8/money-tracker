@@ -1132,9 +1132,11 @@ describe('BalanceHistoryCard', () => {
       );
 
       expect(container.queryAll(n => n.props.testID === 'cartesian-chart')[0]).toBeTruthy();
-      // Verify the Y-axis label formatter turns large numbers into compact units
+      // Verify the Y-axis label formatter turns large numbers into compact units.
+      // The half unit is kept: rounding it away printed "2M" on both the 1.5M and
+      // the 2M gridline, which are adjacent whenever the step is a half unit.
       const formattedValue = formatYAxisLabel('1500000', false);
-      expect(formattedValue).toBe('2M'); // Should format as millions
+      expect(formattedValue).toBe('1.5M'); // Should format as millions
     });
   });
 
@@ -2660,6 +2662,107 @@ describe('BalanceHistoryCard', () => {
 
       // actual + prevYear + zero baseline
       expect(container.queryAll(n => n.props.testID === 'vn-line')).toHaveLength(3);
+    });
+  });
+  describe('Y-axis ceiling (regression: top of the chart was clipped)', () => {
+    // The axis step used to be rounded to the *nearest* nice number, so a peak
+    // that sat just above a round number produced a ceiling below the data: a
+    // 522.8K balance got a 100K step and a 400K domain, and the whole actual
+    // line was drawn outside [0, niceMax] and clipped off the top of the canvas.
+    const buildData = (peak) => ({
+      labels: [1, 2, 3],
+      actual: [{ x: 1, y: peak }, { x: 2, y: peak * 0.9 }, { x: 3, y: peak * 0.8 }],
+      actualForChart: [peak, peak * 0.9, peak * 0.8],
+      prevMonth: [],
+    });
+
+    const computeFor = (peak) => computeBalanceChart({
+      balanceHistoryData: buildData(peak),
+      spendingPrediction: null,
+      isCurrentMonth: false,
+      selectedYear: 2024,
+      selectedMonth: 0,
+      primaryColor: mockColors.primary,
+      thirdLine: 'none',
+      showPlainAvg: false,
+    });
+
+    it('keeps a 522.8K peak inside the domain', () => {
+      const { computed } = computeFor(522800);
+
+      expect(computed.niceMax).toBeGreaterThanOrEqual(522800);
+      expect(computed.niceMax).toBe(600000);
+      // Four evenly spaced segments, as the axis has always promised
+      expect(computed.niceInterval * 4).toBe(computed.niceMax);
+    });
+
+    it('never puts the ceiling below the data, across magnitudes', () => {
+      const peaks = [
+        1, 999, 1000, 1001, 2600, 12345, 130000, 400001, 522800,
+        1234567, 9999999,
+      ];
+      peaks.forEach((peak) => {
+        const { computed } = computeFor(peak);
+        expect(computed.niceMax).toBeGreaterThanOrEqual(peak);
+      });
+    });
+
+    it('does not waste the canvas either — the peak fills at least 3/4 of it', () => {
+      // Rounding the step up must not overshoot into the next order of
+      // magnitude, which would leave the series squashed along the bottom.
+      const peaks = [1000, 2600, 12345, 130000, 522800, 1234567];
+      peaks.forEach((peak) => {
+        const { computed } = computeFor(peak);
+        expect(peak / computed.niceMax).toBeGreaterThanOrEqual(0.75);
+      });
+    });
+
+    it('lifts the ceiling for the comparison line too', () => {
+      // The prev-month line is on screen, so it may stretch the axis; it must
+      // fit under the ceiling like any other visible series.
+      const { computed } = computeBalanceChart({
+        balanceHistoryData: {
+          labels: [1, 2, 3],
+          actual: [{ x: 1, y: 1000 }],
+          actualForChart: [1000, 1000, 1000],
+          prevMonth: [522800, 500000, 480000],
+        },
+        spendingPrediction: null,
+        isCurrentMonth: false,
+        selectedYear: 2024,
+        selectedMonth: 0,
+        primaryColor: mockColors.primary,
+        thirdLine: 'prevMonth',
+        showPlainAvg: false,
+      });
+
+      expect(computed.niceMax).toBeGreaterThanOrEqual(522800);
+    });
+
+    it('applies the same ceiling rule to the year view', () => {
+      const { computed } = computeYearBalanceChart({
+        balanceHistoryData: {
+          labels: [1, 8, 15],
+          actual: [{ x: 1, y: 522800 }, { x: 8, y: 400000 }, { x: 15, y: 300000 }],
+          actualForChart: [522800, 400000, 300000],
+          prevYear: [],
+        },
+        selectedYear: 2024,
+        primaryColor: mockColors.primary,
+        thirdLine: 'none',
+      });
+
+      expect(computed.niceMax).toBeGreaterThanOrEqual(522800);
+    });
+
+    it('labels half-unit gridlines distinctly', () => {
+      // A 1.5M step used to render "2M" on both the 1.5M and 2M gridlines.
+      expect(formatYAxisLabel('1500000', false)).toBe('1.5M');
+      expect(formatYAxisLabel('2000000', false)).toBe('2M');
+      expect(formatYAxisLabel('150000', false)).toBe('150K');
+      expect(formatYAxisLabel('2500', false)).toBe('2.5K');
+      expect(formatYAxisLabel('-1500000', false)).toBe('-1.5M');
+      expect(formatYAxisLabel('900', false)).toBe('900');
     });
   });
 });

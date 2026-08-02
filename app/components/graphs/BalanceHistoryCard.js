@@ -46,10 +46,21 @@ const formatCompact = (value, currency) => {
   return formatted;
 };
 
+// Step sizes the y-axis is allowed to use, as multiples of the order of
+// magnitude. The half-steps matter: without them the ladder jumps straight from
+// 1 to 2, which doubles the axis height for a peak barely over the round number
+// and leaves the series drawn across the bottom half of the chart.
+const NICE_STEPS = [1, 1.5, 2, 2.5, 3, 4, 5, 7.5, 10];
+
 // Helper function to calculate nice Y-axis scale
-// Returns max value and interval for 4 evenly spaced segments
+// Returns max value and interval for 4 evenly spaced segments.
+//
+// The step is rounded **up**. Rounding to the nearest nice number instead used
+// to hand back a max below the data it was scaling: a peak of 522.8K produced a
+// 100K step and a 400K ceiling, so the top fifth of the balance line was drawn
+// outside the [0, max] domain and clipped away entirely.
 const calculateNiceScale = (maxValue) => {
-  if (maxValue === 0) return { max: 0, interval: 0 };
+  if (!Number.isFinite(maxValue) || maxValue <= 0) return { max: 0, interval: 0 };
 
   // Calculate rough interval for 4 segments
   const roughInterval = maxValue / 4;
@@ -60,17 +71,10 @@ const calculateNiceScale = (maxValue) => {
   // Normalize to range [1, 10)
   const normalized = roughInterval / magnitude;
 
-  // Round to nearest nice number: 1, 2, or 5
-  let niceNormalized;
-  if (normalized <= 1.5) {
-    niceNormalized = 1;
-  } else if (normalized <= 3.5) {
-    niceNormalized = 2;
-  } else if (normalized <= 7.5) {
-    niceNormalized = 5;
-  } else {
-    niceNormalized = 10;
-  }
+  // Smallest allowed step that is still >= the rough interval, so 4 of them
+  // always reach the data. The epsilon absorbs the division's rounding error,
+  // which would otherwise push an exact 1 or 2 up a whole rung.
+  const niceNormalized = NICE_STEPS.find(step => normalized <= step + 1e-9) ?? 10;
 
   const niceInterval = niceNormalized * magnitude;
   const niceMax = niceInterval * 4;
@@ -96,24 +100,29 @@ const formatBalanceCompact = (amount, currency) => {
   return `${symbol}${formatted}`;
 };
 
+// One decimal on an axis tick, kept only when it says something: a 1.5M step
+// rounded to "2M" and printed the same label on two adjacent gridlines.
+const tickUnit = (scaled, suffix) => `${Number(scaled.toFixed(1))}${suffix}`;
+
 // Compact Y-axis tick formatter. Exported so it can be unit-tested directly
 // (Victory Native XL consumes it via axisOptions.formatYLabel, whose output is
 // rendered on the Skia canvas and therefore not inspectable from the test tree).
 export const formatYAxisLabel = (value, hideBalances) => {
   if (hideBalances) return '';
   const numValue = parseFloat(value);
-  if (numValue === 0) return '';
+  if (!Number.isFinite(numValue) || numValue === 0) return '';
   const absValue = Math.abs(numValue);
   const isNegative = numValue < 0;
 
+  let result;
   if (absValue >= 1000000) {
-    const result = `${(absValue / 1000000).toFixed(0)}M`;
-    return isNegative ? `-${result}` : result;
+    result = tickUnit(absValue / 1000000, 'M');
   } else if (absValue >= 1000) {
-    const result = `${(absValue / 1000).toFixed(0)}K`;
-    return isNegative ? `-${result}` : result;
+    result = tickUnit(absValue / 1000, 'K');
+  } else {
+    result = tickUnit(absValue, '');
   }
-  return numValue.toFixed(0);
+  return isNegative ? `-${result}` : result;
 };
 
 // X-axis tick formatter: only label the milestone days (1/5/10/15/20/25 + last).
