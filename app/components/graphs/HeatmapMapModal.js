@@ -319,6 +319,19 @@ const HeatmapMapModal = ({
     [region, size, underlayZoom],
   );
 
+  // ONE flat keyed list, underlay first so the current level draws on top.
+  // Rendering the two layers as separate arrays remounted every tile on a
+  // level crossing: React reconciles keys only within one array, so a tile
+  // moving from the current level into the underlay lost its component — and
+  // with it the native Image's already-decoded bitmap. The re-decode left
+  // both layers transparent for a frame or two: the residual black flash.
+  // In a single list the key survives the role change, the instance (and its
+  // decoded bitmap) persists, and only its position/size props update.
+  const renderTiles = useMemo(
+    () => [...underlayTiles, ...tiles],
+    [underlayTiles, tiles],
+  );
+
   // Once the camera has been still for a beat, warm the ADJACENT zoom levels
   // of the current viewport (one level in — the likely next pinch — first,
   // then one level out). By the time the user crosses a level its tiles are
@@ -374,18 +387,7 @@ const HeatmapMapModal = ({
           <View style={styles.mapArea} onLayout={handleLayout}>
             <GestureDetector gesture={composedGesture}>
               <View style={styles.mapSurface} collapsable={false} testID="heatmap-map-surface">
-                {underlayTiles.map((tile) => (
-                  <MapTile
-                    key={tile.key}
-                    z={tile.z}
-                    x={tile.x}
-                    y={tile.y}
-                    screenX={tile.screenX}
-                    screenY={tile.screenY}
-                    size={tile.size}
-                  />
-                ))}
-                {tiles.map((tile) => (
+                {renderTiles.map((tile) => (
                   <MapTile
                     key={tile.key}
                     z={tile.z}
