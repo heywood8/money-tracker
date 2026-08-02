@@ -30,7 +30,7 @@ export const createBackup = async () => {
     console.log('Creating database backup...');
 
     // Fetch all data from all tables
-    const [accounts, categories, operations, budgets, appMetadata, balanceHistory, plannedOperations, merchantRules, notificationTemplates, budgetPlans, budgetPlanLines, budgetPlanLineCategories, budgetPlanLineGroups] = await Promise.all([
+    const [accounts, categories, operations, budgets, appMetadata, balanceHistory, plannedOperations, merchantRules, notificationTemplates, budgetPlans, budgetPlanLines, budgetPlanLineCategories, budgetPlanLineGroups, budgetPlanLineAccounts] = await Promise.all([
       queryAll('SELECT * FROM accounts ORDER BY created_at ASC'),
       queryAll('SELECT * FROM categories ORDER BY created_at ASC'),
       queryAll('SELECT * FROM operations ORDER BY created_at ASC'),
@@ -40,8 +40,8 @@ export const createBackup = async () => {
       queryAll('SELECT * FROM planned_operations ORDER BY created_at ASC').catch(() => []),
       // Newer table — guard so backups of pre-0010 databases don't fail.
       queryAll('SELECT * FROM notification_merchant_rules ORDER BY created_at ASC').catch(() => []),
-      // User-defined parse templates (migration 0024). Guarded so backups of
-      // pre-0024 databases don't fail. These are hand-built by the user and
+      // User-defined parse templates (migration 0025). Guarded so backups of
+      // pre-0025 databases don't fail. These are hand-built by the user and
       // cannot be re-learned from the data, so unlike the pending queue they
       // must survive a backup/restore round trip.
       queryAll('SELECT * FROM notification_templates ORDER BY priority ASC, created_at ASC').catch(() => []),
@@ -56,6 +56,10 @@ export const createBackup = async () => {
       // Line groups (migration 0022). Guarded the same way; a pre-0022 backup has
       // no groups and every line restores ungrouped.
       queryAll('SELECT * FROM budget_plan_line_groups ORDER BY sort_order ASC, created_at ASC').catch(() => []),
+      // Per-line source account filter (migration 0024). Guarded like the tables
+      // above; a pre-0024 backup has no filters and every line restores counting
+      // any account, which is exactly what it did.
+      queryAll('SELECT * FROM budget_plan_line_accounts ORDER BY line_id ASC, account_id ASC').catch(() => []),
     ]);
 
     // Create backup object
@@ -81,6 +85,7 @@ export const createBackup = async () => {
         budget_plan_lines: budgetPlanLines || [],
         budget_plan_line_categories: budgetPlanLineCategories || [],
         budget_plan_line_groups: budgetPlanLineGroups || [],
+        budget_plan_line_accounts: budgetPlanLineAccounts || [],
       },
     };
 
@@ -96,6 +101,7 @@ export const createBackup = async () => {
       budget_plan_lines: backup.data.budget_plan_lines.length,
       budget_plan_line_categories: backup.data.budget_plan_line_categories.length,
       budget_plan_line_groups: backup.data.budget_plan_line_groups.length,
+      budget_plan_line_accounts: backup.data.budget_plan_line_accounts.length,
     });
 
     return backup;
@@ -131,6 +137,9 @@ const TABLE_FIELDS = {
   // Line groups (migration 0022). `amount`/`currency` are null for a group whose
   // budget is derived from its lines.
   budget_plan_line_groups: ['id', 'label', 'amount', 'currency', 'sort_order', 'created_at', 'updated_at'],
+  // The source-account filter of each line (migration 0024). A line with no rows
+  // here counts spending from any account.
+  budget_plan_line_accounts: ['line_id', 'account_id'],
 };
 
 /**
@@ -191,6 +200,7 @@ export const exportBackupCSV = async () => {
       'budget_plan_lines.csv': convertToCSV(backup.data.budget_plan_lines, TABLE_FIELDS.budget_plan_lines),
       'budget_plan_line_categories.csv': convertToCSV(backup.data.budget_plan_line_categories, TABLE_FIELDS.budget_plan_line_categories),
       'budget_plan_line_groups.csv': convertToCSV(backup.data.budget_plan_line_groups, TABLE_FIELDS.budget_plan_line_groups),
+      'budget_plan_line_accounts.csv': convertToCSV(backup.data.budget_plan_line_accounts, TABLE_FIELDS.budget_plan_line_accounts),
       'backup_info.csv': `version,timestamp,platform\n${backup.version},${backup.timestamp},${backup.platform}`,
     };
 
@@ -209,7 +219,8 @@ export const exportBackupCSV = async () => {
     combinedCSV += `[BUDGET_PLANS]\n${csvFiles['budget_plans.csv']}\n\n`;
     combinedCSV += `[BUDGET_PLAN_LINES]\n${csvFiles['budget_plan_lines.csv']}\n\n`;
     combinedCSV += `[BUDGET_PLAN_LINE_CATEGORIES]\n${csvFiles['budget_plan_line_categories.csv']}\n\n`;
-    combinedCSV += `[BUDGET_PLAN_LINE_GROUPS]\n${csvFiles['budget_plan_line_groups.csv']}\n`;
+    combinedCSV += `[BUDGET_PLAN_LINE_GROUPS]\n${csvFiles['budget_plan_line_groups.csv']}\n\n`;
+    combinedCSV += `[BUDGET_PLAN_LINE_ACCOUNTS]\n${csvFiles['budget_plan_line_accounts.csv']}\n`;
 
     const filename = `money_tracker_backup_${timestamp}.csv`;
     const fileUri = `${FileSystem.documentDirectory}${filename}`;
@@ -542,6 +553,10 @@ export const restoreBackup = async (backup, cancelToken) => {
       // and explicitly — relying on a cascade would leave stale links behind on
       // any build where foreign_keys happens to be off.
       await db.runAsync('DELETE FROM budget_plan_line_categories').catch(() => {});
+      // The source-account filter junction (migration 0024) cascades off both
+      // lines and accounts; cleared first and explicitly for the same reason as
+      // the category junction above.
+      await db.runAsync('DELETE FROM budget_plan_line_accounts').catch(() => {});
       await db.runAsync('DELETE FROM budget_plan_lines').catch(() => {});
       await db.runAsync('DELETE FROM budget_plans').catch(() => {});
       // Groups (migration 0022) reference nothing and are referenced by lines
@@ -1035,7 +1050,35 @@ export const restoreBackup = async (backup, cancelToken) => {
           );
           restoredLinks++;
         }
-        console.log(`Restored ${restoredPlans} budget plans, ${restoredLines} plan lines and ${restoredLinks} category links`);
+
+        // Source-account filter links (migration 0024). Unlike the category
+        // links above there is NO fallback to rebuild from: no pre-0024 line
+        // could carry this filter, and an absent section means "counts any
+        // account", which is a line with no rows here.
+        let restoredAccountLinks = 0;
+        for (const link of backup.data.budget_plan_line_accounts || []) {
+          if (!link.line_id || link.account_id == null || link.account_id === '') continue;
+          if (!restoredLineIds.has(link.line_id)) {
+            console.warn('Skipping plan line account link for an unknown line:', link.line_id);
+            continue;
+          }
+          // Accounts are re-keyed on restore (UUID ids become integers), so the
+          // filter has to travel through the same mapping every other account
+          // reference does — an unmapped id is an account the backup doesn't
+          // contain, and inserting it would fail the NOT NULL FK and abort the
+          // entire import for the sake of one filter entry.
+          const mappedId = accountIdMapping.get(String(link.account_id));
+          if (mappedId == null) {
+            console.warn('Skipping plan line account link for an unknown account:', link.account_id);
+            continue;
+          }
+          await db.runAsync(
+            'INSERT OR IGNORE INTO budget_plan_line_accounts (line_id, account_id) VALUES (?, ?)',
+            [link.line_id, mappedId],
+          );
+          restoredAccountLinks++;
+        }
+        console.log(`Restored ${restoredPlans} budget plans, ${restoredLines} plan lines, ${restoredLinks} category links and ${restoredAccountLinks} account links`);
         appEvents.emit(IMPORT_PROGRESS_EVENT, {
           stepId: 'budget_plans',
           status: 'completed',
@@ -1416,9 +1459,10 @@ const importBackupCSV = async (fileUri, cancelToken) => {
     budget_plan_lines: [],
     budget_plan_line_categories: [],
     budget_plan_line_groups: [],
+    budget_plan_line_accounts: [],
   };
 
-  // Split by section markers. The four [BUDGET_PLAN*] markers don't collide:
+  // Split by section markers. The five [BUDGET_PLAN*] markers don't collide:
   // each marker + newline (`[BUDGET_PLANS]\n`, `[BUDGET_PLAN_LINES]\n`) is not a
   // substring of any of the others.
   const accountsMatch = fileContent.match(/\[ACCOUNTS\]\n([\s\S]*?)(?=\n\[|$)/);
@@ -1432,6 +1476,7 @@ const importBackupCSV = async (fileUri, cancelToken) => {
   const budgetPlanLinesMatch = fileContent.match(/\[BUDGET_PLAN_LINES\]\n([\s\S]*?)(?=\n\[|$)/);
   const budgetPlanLineCategoriesMatch = fileContent.match(/\[BUDGET_PLAN_LINE_CATEGORIES\]\n([\s\S]*?)(?=\n\[|$)/);
   const budgetPlanLineGroupsMatch = fileContent.match(/\[BUDGET_PLAN_LINE_GROUPS\]\n([\s\S]*?)(?=\n\[|$)/);
+  const budgetPlanLineAccountsMatch = fileContent.match(/\[BUDGET_PLAN_LINE_ACCOUNTS\]\n([\s\S]*?)(?=\n\[|$)/);
 
   if (accountsMatch) sections.accounts = parseCSV(accountsMatch[1]);
   if (categoriesMatch) sections.categories = parseCSV(categoriesMatch[1]);
@@ -1444,6 +1489,7 @@ const importBackupCSV = async (fileUri, cancelToken) => {
   if (budgetPlanLinesMatch) sections.budget_plan_lines = parseCSV(budgetPlanLinesMatch[1]);
   if (budgetPlanLineCategoriesMatch) sections.budget_plan_line_categories = parseCSV(budgetPlanLineCategoriesMatch[1]);
   if (budgetPlanLineGroupsMatch) sections.budget_plan_line_groups = parseCSV(budgetPlanLineGroupsMatch[1]);
+  if (budgetPlanLineAccountsMatch) sections.budget_plan_line_accounts = parseCSV(budgetPlanLineAccountsMatch[1]);
 
   // Extract version from header
   const versionMatch = fileContent.match(/# Version: (\d+)/);
@@ -1558,7 +1604,7 @@ const importBackupSQLite = async (fileUri, cancelToken) => {
       console.warn('No notification_merchant_rules table in imported database (older format)');
     }
 
-    // Parse templates may not exist in pre-0024 backups. Same reasoning as the
+    // Parse templates may not exist in pre-0025 backups. Same reasoning as the
     // merchant rules above: without this extraction restoreBackup clears the live
     // table and re-inserts nothing, wiping every template the user built.
     let notificationTemplates = [];
@@ -1601,6 +1647,18 @@ const importBackupSQLite = async (fileUri, cancelToken) => {
       console.warn('No budget_plan_line_groups table in imported database (older format)');
     }
 
+    // The source-account filter (migration 0024), newest of the lot — its own
+    // guard for the same reason: a pre-0024 database has no filters and every
+    // line imports counting spending from any account, exactly as it did.
+    let budgetPlanLineAccounts = [];
+    try {
+      budgetPlanLineAccounts = await tempDb.getAllAsync(
+        'SELECT * FROM budget_plan_line_accounts ORDER BY line_id ASC, account_id ASC',
+      );
+    } catch (e) {
+      console.warn('No budget_plan_line_accounts table in imported database (older format)');
+    }
+
     // Create backup object
     const backup = {
       version: BACKUP_VERSION,
@@ -1620,6 +1678,7 @@ const importBackupSQLite = async (fileUri, cancelToken) => {
         budget_plan_lines: budgetPlanLines || [],
         budget_plan_line_categories: budgetPlanLineCategories || [],
         budget_plan_line_groups: budgetPlanLineGroups || [],
+        budget_plan_line_accounts: budgetPlanLineAccounts || [],
       },
     };
 

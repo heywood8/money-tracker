@@ -478,3 +478,31 @@ export const budgetPlanLineCategories = sqliteTable('budget_plan_line_categories
   pk: primaryKey({ columns: [table.lineId, table.categoryId] }),
   categoryIdx: index('idx_budget_plan_line_categories_category').on(table.categoryId),
 }));
+
+/**
+ * Budget Plan Line ↔ Accounts junction (migration 0024)
+ *
+ * The set of SOURCE accounts a plan line counts spending from — matched against
+ * `operations.account_id`. An empty set (the default, and what every pre-0024
+ * line has) means "any account", so nothing about an existing line changes.
+ *
+ * This is a SECOND, INDEPENDENT filter alongside the line's categories, combined
+ * with logical AND: categories only → those categories from any account;
+ * accounts only → any expense from those accounts; both → the intersection.
+ * A line with neither (and no transfer target) is "broken", the same state an
+ * unlinked line already reaches — see BudgetPlansDB.mapLineFields.
+ *
+ * NOT either of the account columns on the line itself: `to_account_id` is a
+ * transfer TARGET, `account_id` is an executable template's EXECUTION account.
+ * This junction only narrows which operations count toward the actual.
+ *
+ * Both FKs cascade, like budgetPlanLineCategories: deleting the line drops its
+ * links, deleting an account merely SHRINKS the filter.
+ */
+export const budgetPlanLineAccounts = sqliteTable('budget_plan_line_accounts', {
+  lineId: text('line_id').notNull().references(() => budgetPlanLines.id, { onDelete: 'cascade' }),
+  accountId: integer('account_id').notNull().references(() => accounts.id, { onDelete: 'cascade' }),
+}, (table) => ({
+  pk: primaryKey({ columns: [table.lineId, table.accountId] }),
+  accountIdx: index('idx_budget_plan_line_accounts_account').on(table.accountId),
+}));

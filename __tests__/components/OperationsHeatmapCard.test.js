@@ -10,6 +10,8 @@ import { render, fireEvent, waitFor, act } from '@testing-library/react-native';
 import OperationsHeatmapCard from '../../app/components/graphs/OperationsHeatmapCard';
 import { getOperationCoordinates } from '../../app/services/OperationsDB';
 import { pruneTileCache } from '../../app/services/MapTileCache';
+import { ensureLocationPermission, getCurrentLocation } from '../../app/services/LocationService';
+import { useDisplaySettings } from '../../app/contexts/DisplaySettingsContext';
 
 jest.mock('../../app/services/OperationsDB', () => ({
   getOperationCoordinates: jest.fn(),
@@ -18,6 +20,17 @@ jest.mock('../../app/services/OperationsDB', () => ({
 jest.mock('../../app/services/MapTileCache', () => ({
   getTileUri: jest.fn().mockResolvedValue(null),
   pruneTileCache: jest.fn().mockResolvedValue(undefined),
+}));
+
+jest.mock('../../app/services/LocationService', () => ({
+  ensureLocationPermission: jest.fn(),
+  getCurrentLocation: jest.fn(),
+}));
+
+// The modal reads the attach-location opt-in from DisplaySettingsContext
+// itself; mock the hook so each test controls the preference directly.
+jest.mock('../../app/contexts/DisplaySettingsContext', () => ({
+  useDisplaySettings: jest.fn(),
 }));
 
 const press = async (element) => {
@@ -53,6 +66,10 @@ describe('OperationsHeatmapCard', () => {
     getOperationCoordinates.mockResolvedValue([
       { latitude: 40.1772, longitude: 44.5035 },
     ]);
+    // Location feature off by default; individual tests opt in.
+    useDisplaySettings.mockReturnValue({ attachLocation: false });
+    ensureLocationPermission.mockResolvedValue({ granted: true, canAskAgain: true });
+    getCurrentLocation.mockResolvedValue({ latitude: '40.1772', longitude: '44.5035' });
   });
 
   it('renders the collapsed row without touching the DB or the tile cache', async () => {
@@ -111,6 +128,33 @@ describe('OperationsHeatmapCard', () => {
     await waitFor(() => {
       expect(getByText('graphs_map_no_locations')).toBeTruthy();
     });
+  });
+
+  it('does not touch geolocation while the attach-location opt-in is off', async () => {
+    const { getByTestId } = await render(<OperationsHeatmapCard {...defaultProps} />);
+    await press(getByTestId('operations-heatmap-card'));
+    await waitFor(() => expect(getOperationCoordinates).toHaveBeenCalled());
+    expect(ensureLocationPermission).not.toHaveBeenCalled();
+    expect(getCurrentLocation).not.toHaveBeenCalled();
+  });
+
+  it('centers on the device location when the opt-in is on', async () => {
+    useDisplaySettings.mockReturnValue({ attachLocation: true });
+    const { getByTestId } = await render(<OperationsHeatmapCard {...defaultProps} />);
+    await press(getByTestId('operations-heatmap-card'));
+    await waitFor(() => {
+      expect(ensureLocationPermission).toHaveBeenCalledTimes(1);
+      expect(getCurrentLocation).toHaveBeenCalledTimes(1);
+    });
+  });
+
+  it('does not fetch a fix when the location permission is denied', async () => {
+    useDisplaySettings.mockReturnValue({ attachLocation: true });
+    ensureLocationPermission.mockResolvedValue({ granted: false, canAskAgain: false });
+    const { getByTestId } = await render(<OperationsHeatmapCard {...defaultProps} />);
+    await press(getByTestId('operations-heatmap-card'));
+    await waitFor(() => expect(ensureLocationPermission).toHaveBeenCalled());
+    expect(getCurrentLocation).not.toHaveBeenCalled();
   });
 
   it('closes the map and unmounts it entirely', async () => {

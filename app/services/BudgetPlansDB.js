@@ -11,7 +11,7 @@
 import uuid from 'react-native-uuid';
 import { executeQuery, queryAll, queryFirst, executeTransaction } from './db';
 import * as Currency from './currency';
-import { calculateSpendingForCategories, expandCategoryIds, deriveSpendingStatus } from './BudgetsDB';
+import { calculateSpendingForFilters, expandCategoryIds, deriveSpendingStatus } from './BudgetsDB';
 import { formatDate as formatLocalDate } from './BalanceHistoryDB';
 import { sanitizeNewLabel } from '../utils/labelUtils';
 import {
@@ -32,14 +32,15 @@ const LINE_KINDS = ['income', 'expense', 'transfer'];
 
 /**
  * Every line SELECT goes through this, so the category set (migration 0021's
- * budget_plan_line_categories) always travels with the row instead of costing a
- * follow-up query per line. GROUP_CONCAT joins with ',' and category IDs are
- * UUIDs, so splitting back is unambiguous.
+ * budget_plan_line_categories) and the source-account filter (migration 0024's
+ * budget_plan_line_accounts) always travel with the row instead of costing two
+ * follow-up queries per line. GROUP_CONCAT joins with ','; category IDs are
+ * UUIDs and account IDs are integers, so splitting back is unambiguous for both.
  *
- * Deliberately a plain correlated SCALAR subquery: SQLite has no LATERAL, so a
+ * Deliberately plain correlated SCALAR subqueries: SQLite has no LATERAL, so a
  * derived table in FROM cannot reference `l.id` — the tidier
  * `GROUP_CONCAT(...) FROM (SELECT ... ORDER BY ...)` spelling that would pin the
- * concat order fails outright with `no such column: l.id`. The set's order is
+ * concat order fails outright with `no such column: l.id`. The sets' order is
  * not meaningful anyway (the UI sorts by name), and the line's PRIMARY category
  * comes from its own `category_id` column, not from this list's head.
  *
@@ -49,7 +50,11 @@ const LINE_SELECT = `SELECT l.*, (
       SELECT GROUP_CONCAT(lc.category_id)
       FROM budget_plan_line_categories lc
       WHERE lc.line_id = l.id
-    ) AS category_ids
+    ) AS category_ids, (
+      SELECT GROUP_CONCAT(la.account_id)
+      FROM budget_plan_line_accounts la
+      WHERE la.line_id = l.id
+    ) AS source_account_ids
     FROM budget_plan_lines l`;
 
 /** Current month as YYYY-MM (local calendar) — mirrors utils/monthUtils. */
@@ -92,6 +97,13 @@ export const mapPlanFields = (row) => {
  * every consumer can then read `line.kind` unconditionally. `hasTemplate` is the
  * computed "this line can be executed" flag the UI keys the execute action off.
  *
+ * `sourceAccountIds` (migration 0024) is the line's SOURCE ACCOUNT filter — the
+ * accounts an expense must have been paid from to count. Empty (the default, and
+ * what every pre-0024 line has) means "any account", so it changes nothing for
+ * an existing line. It combines with the category set by logical AND, which is
+ * also why it participates in `isBroken`: an account-only line tracks something
+ * real, and a line whose last account AND last category are gone tracks nothing.
+ *
  * NOTE the `isBroken` invariant only applies to expense/transfer lines: an income
  * line needs no tracking target (it declares expected income, and the income
  * section compares the month's real income against the total), so it is never
@@ -102,6 +114,7 @@ export const mapPlanFields = (row) => {
 export const mapLineFields = (row) => {
   if (!row) return null;
   const categoryIds = readCategoryIds(row);
+  const sourceAccountIds = readSourceAccountIds(row);
   const primary = row.category_id ?? null;
   // The junction wins: when the row's denormalized primary category has been
   // deleted (its FK nulled, or it simply is not linked any more) but other
@@ -121,6 +134,8 @@ export const mapLineFields = (row) => {
     comment: row.comment ?? null,
     categoryId,
     categoryIds,
+    // The source-account filter (migration 0024). Empty = any account.
+    sourceAccountIds,
     // NOTE: `include_children` is deliberately NOT surfaced. Descendant spending
     // always rolls up now — picking a parent category means its subtree, and a
     // leaf category has no subtree, so the flag never expressed a real choice.
@@ -132,7 +147,10 @@ export const mapLineFields = (row) => {
     // on its own. An income line is never grouped — groups sit in the allocations
     // section and aggregate spending, which income lines have none of.
     groupId: kind === 'income' ? null : (row.group_id ?? null),
-    isBroken: kind !== 'income' && categoryIds.length === 0 && toAccountId === null,
+    isBroken: kind !== 'income'
+      && categoryIds.length === 0
+      && sourceAccountIds.length === 0
+      && toAccountId === null,
     isRecurring: row.is_recurring === 1,
     currency: row.currency ?? null,
     kind,
@@ -198,6 +216,72 @@ const readCategoryIds = (row) => {
 };
 
 /**
+ * De-duplicated list of set account IDs, normalized to numbers and order
+ * preserved. `accounts.id` is an integer autoincrement, so a filter read back
+ * from GROUP_CONCAT (which yields strings) must come out as numbers or a UI
+ * comparing it against `account.id` would find no match at all.
+ * @param {Array|null|undefined} ids
+ * @returns {Array<number>}
+ */
+const uniqueAccountIds = (ids) => {
+  const out = [];
+  for (const id of ids || []) {
+    if (!isSet(id)) continue;
+    const numeric = Number(id);
+    if (!Number.isFinite(numeric) || out.includes(numeric)) continue;
+    out.push(numeric);
+  }
+  return out;
+};
+
+/**
+ * Parse the `source_account_ids` GROUP_CONCAT column produced by
+ * {@link LINE_SELECT} (migration 0024). A row selected without it (an insert's
+ * in-memory row, a hand-built test row, a legacy `SELECT *`) has no filter at
+ * all — which is "any account", the pre-0024 behaviour — so it reads as empty.
+ * @param {Object} row - Raw budget_plan_lines row
+ * @returns {Array<number>}
+ */
+const readSourceAccountIds = (row) => {
+  const raw = row.source_account_ids;
+  if (Array.isArray(raw)) return uniqueAccountIds(raw);
+  return typeof raw === 'string' && raw.length > 0
+    ? uniqueAccountIds(raw.split(','))
+    : [];
+};
+
+/**
+ * The source-account filter a caller means (migration 0024). Returns `undefined`
+ * when the caller did not mention `sourceAccountIds` at all — which for an update
+ * means "leave the filter alone", as distinct from `[]` ("count any account").
+ * @param {Object} line
+ * @returns {Array<number>|undefined}
+ */
+const resolveSourceAccountIds = (line) => {
+  if (Array.isArray(line?.sourceAccountIds)) return uniqueAccountIds(line.sourceAccountIds);
+  return undefined;
+};
+
+/**
+ * Rewrite a line's source-account links inside an open transaction: drop what's
+ * there, insert the new set. The account-side twin of
+ * {@link writeLineCategoriesInTx}.
+ * @param {Object} db - Transaction-scoped database handle
+ * @param {string} lineId
+ * @param {Array<number>} accountIds
+ * @returns {Promise<void>}
+ */
+const writeLineAccountsInTx = async (db, lineId, accountIds) => {
+  await db.runAsync('DELETE FROM budget_plan_line_accounts WHERE line_id = ?', [lineId]);
+  for (const accountId of accountIds) {
+    await db.runAsync(
+      'INSERT OR IGNORE INTO budget_plan_line_accounts (line_id, account_id) VALUES (?, ?)',
+      [lineId, accountId],
+    );
+  }
+};
+
+/**
  * Rewrite a line's category links inside an open transaction: drop what's there,
  * insert the new set. Called with the already-normalized (de-duplicated) list.
  * @param {Object} db - Transaction-scoped database handle
@@ -245,6 +329,13 @@ export const validatePlan = (plan) => {
  * income as a whole, so it may carry an income category for context or no target
  * at all. It must not link a transfer target, though — that would silently make
  * it track incoming transfers.
+ *
+ * The SOURCE-ACCOUNT filter (migration 0024) is NOT a third kind of target and is
+ * not part of the exclusivity rule: it narrows which expenses count, and combines
+ * with the category set by AND. It does, however, satisfy the "track something"
+ * requirement on its own — "everything I spend on this card" is a complete
+ * budget. It is meaningless on a transfer line (which tracks incoming transfers,
+ * not expenses), so it is rejected there rather than silently ignored.
  * @param {Object} line
  * @returns {string|null} Error message or null if valid.
  */
@@ -257,16 +348,23 @@ export const validatePlanLine = (line) => {
   }
   const hasCategory = (resolveCategoryIds(line) || []).length > 0;
   const hasAccount = isSet(line.toAccountId);
+  const hasSourceAccounts = (resolveSourceAccountIds(line) || []).length > 0;
   if (line.kind === 'income') {
     if (hasAccount) {
       return 'An income line cannot link to a transfer target';
+    }
+    if (hasSourceAccounts) {
+      return 'An income line cannot filter by spending account';
     }
     return null;
   }
   if (hasCategory && hasAccount) {
     return 'A line must link to either a category or an account, not both';
   }
-  if (!hasCategory && !hasAccount) {
+  if (hasAccount && hasSourceAccounts) {
+    return 'A transfer line cannot filter by spending account';
+  }
+  if (!hasCategory && !hasAccount && !hasSourceAccounts) {
     return 'A line must link to a category or an account';
   }
   if (line.kind === 'transfer' && !hasAccount) {
@@ -483,10 +581,13 @@ export const getBrokenLines = async (planId) => {
     // Since migration 0021 "no category" means the junction holds NO row for the
     // line — not that `category_id` is null. A line whose primary category was
     // deleted but which still tracks others is fine, and must not be offered up
-    // for re-linking.
+    // for re-linking. Migration 0024 adds the same requirement on the account
+    // side: a line left with only a source-account filter still tracks real
+    // spending ("everything on this card"), so it is not broken either.
     const rows = await queryAll(
       `${LINE_SELECT} WHERE l.plan_id = ?
          AND NOT EXISTS (SELECT 1 FROM budget_plan_line_categories lc WHERE lc.line_id = l.id)
+         AND NOT EXISTS (SELECT 1 FROM budget_plan_line_accounts la WHERE la.line_id = l.id)
          AND l.to_account_id IS NULL
          AND (l.kind IS NULL OR l.kind != 'income')
        ORDER BY l.sort_order ASC`,
@@ -523,6 +624,12 @@ const insertPlanLine = async (planId, line) => {
 
     const now = new Date().toISOString();
     const categoryIds = resolveCategoryIds(line) || [];
+    // A transfer line tracks incoming transfers and an income line tracks nothing
+    // per-line, so neither has expenses for a source-account filter to narrow —
+    // validatePlanLine has already rejected a caller that asked for one.
+    const sourceAccountIds = line.kind === 'transfer' || line.kind === 'income'
+      ? []
+      : (resolveSourceAccountIds(line) || []);
     const row = {
       id: line.id || uuid.v4(),
       plan_id: planId,
@@ -532,6 +639,7 @@ const insertPlanLine = async (planId, line) => {
       // Primary = first of the set; the full set lives in the junction below.
       category_id: categoryIds[0] ?? null,
       category_ids: categoryIds,
+      source_account_ids: sourceAccountIds,
       to_account_id: isSet(line.toAccountId) ? line.toAccountId : null,
       sort_order: Number.isInteger(line.sortOrder) ? line.sortOrder : 0,
       is_recurring: isRecurring ? 1 : 0,
@@ -552,9 +660,10 @@ const insertPlanLine = async (planId, line) => {
       updated_at: now,
     };
 
-    // The row and its category links go in together: a line that committed
-    // without its links would read as broken (empty set, no transfer target) and
-    // silently stop tracking anything.
+    // The row and its category/account links go in together: a line that
+    // committed without its links would read as broken (empty sets, no transfer
+    // target) and silently stop tracking anything — or worse, an account-filtered
+    // line that lost only its accounts would quietly count the WHOLE category.
     await executeTransaction(async (db) => {
       await db.runAsync(
         'INSERT INTO budget_plan_lines (id, plan_id, label, amount, comment, category_id, to_account_id, sort_order, is_recurring, currency, kind, account_id, last_executed_month, include_children, group_id, created_at, updated_at) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)',
@@ -566,6 +675,7 @@ const insertPlanLine = async (planId, line) => {
         ],
       );
       await writeLineCategoriesInTx(db, row.id, categoryIds);
+      await writeLineAccountsInTx(db, row.id, sourceAccountIds);
     });
 
     return mapLineFields(row);
@@ -711,9 +821,15 @@ const convertLineAmount = async (rawAmount, fromCurrency, toCurrency) => {
  * remembers to convert first. When no exchange rate is available the update is
  * rejected (see {@link convertLineAmount}) rather than persisting a distorted
  * number.
+ * The SOURCE-ACCOUNT filter (migration 0024) follows the same partial-update
+ * rules as the category set: `sourceAccountIds` omitted leaves the filter alone,
+ * `[]` clears it back to "any account". It is not part of the target exclusivity
+ * rule (it narrows expenses rather than naming a target), but assigning a
+ * transfer target does clear it — a transfer line tracks incoming transfers, and
+ * an inherited expense filter on one would silently mean nothing.
  * @param {string} id
- * @param {Object} updates - Partial { label, amount, comment, categoryId, toAccountId,
- *   sortOrder, isRecurring, currency, planId }
+ * @param {Object} updates - Partial { label, amount, comment, categoryId, categoryIds,
+ *   sourceAccountIds, toAccountId, sortOrder, isRecurring, currency, planId }
  * @returns {Promise<void>}
  */
 export const updateLine = async (id, updates) => {
@@ -721,10 +837,21 @@ export const updateLine = async (id, updates) => {
     // `categoryIds` (the whole set) or the legacy single `categoryId`; undefined
     // when the caller mentioned neither, which leaves the existing links alone.
     const requestedCategoryIds = resolveCategoryIds(updates);
+    const requestedSourceAccountIds = resolveSourceAccountIds(updates);
 
     // Reject setting both targets in a single update outright.
     if ((requestedCategoryIds || []).length > 0 && isSet(updates.toAccountId)) {
       throw new Error('A line must link to either a category or an account, not both');
+    }
+    // ...and asking for a source-account filter on a line this same update makes
+    // a transfer or an income line. Rejected rather than quietly dropped, so a
+    // caller that asks for two incompatible things hears about it — the silent
+    // clear below is only for a filter the caller did NOT mention.
+    if ((requestedSourceAccountIds || []).length > 0
+      && (isSet(updates.toAccountId) || updates.kind === 'transfer' || updates.kind === 'income')) {
+      throw new Error(updates.kind === 'income'
+        ? 'An income line cannot filter by spending account'
+        : 'A transfer line cannot filter by spending account');
     }
     if (updates.amount !== undefined
       && (!Currency.isValid(updates.amount) || Currency.compare(updates.amount, '0') <= 0)) {
@@ -736,10 +863,19 @@ export const updateLine = async (id, updates) => {
     // from leaving both set (the row may already hold the other target).
     let categoryIds = requestedCategoryIds;
     let toAccountId = updates.toAccountId;
+    let sourceAccountIds = requestedSourceAccountIds;
     if ((categoryIds || []).length > 0) {
       toAccountId = null;
     } else if (isSet(updates.toAccountId)) {
       categoryIds = [];
+    }
+    // Becoming a transfer or an income line drops whatever filter the row still
+    // holds, for the same reason `group_id` is dropped when a line becomes income
+    // below: the line no longer has expenses of its own to narrow, and a stale
+    // filter would sit in the editor as a setting that changes nothing. (A filter
+    // the caller ASKED for alongside such a change was rejected above.)
+    if (isSet(updates.toAccountId) || updates.kind === 'transfer' || updates.kind === 'income') {
+      sourceAccountIds = [];
     }
 
     const fields = [];
@@ -851,7 +987,13 @@ export const updateLine = async (id, updates) => {
       values.push(String(amount));
     }
 
-    if (fields.length === 0) {
+    // "No columns changed" is not the same as "nothing to do": the source-account
+    // filter (migration 0024) lives entirely in a junction and pushes no column of
+    // its own, so an update that only narrows a line to one card would otherwise
+    // return here and silently discard the change. The category set happens to be
+    // safe (it also writes the denormalized `category_id` column) but is checked
+    // alongside so the two cannot diverge on the next change.
+    if (fields.length === 0 && categoryIds === undefined && sourceAccountIds === undefined) {
       return; // Nothing to update
     }
 
@@ -861,16 +1003,22 @@ export const updateLine = async (id, updates) => {
 
     const sql = `UPDATE budget_plan_lines SET ${fields.join(', ')} WHERE id = ?`;
 
-    if (categoryIds === undefined) {
+    if (categoryIds === undefined && sourceAccountIds === undefined) {
       await executeQuery(sql, values);
       return;
     }
 
     // Row and links move together, so a failure can't leave the primary column
-    // pointing at a category the junction no longer holds.
+    // pointing at a category the junction no longer holds, nor a line counting a
+    // category it was just told to narrow to one account.
     await executeTransaction(async (db) => {
       await db.runAsync(sql, values);
-      await writeLineCategoriesInTx(db, id, categoryIds);
+      if (categoryIds !== undefined) {
+        await writeLineCategoriesInTx(db, id, categoryIds);
+      }
+      if (sourceAccountIds !== undefined) {
+        await writeLineAccountsInTx(db, id, sourceAccountIds);
+      }
     });
   } catch (error) {
     console.error('Failed to update budget plan line:', error);
@@ -1316,8 +1464,10 @@ export const copyPlan = async (fromMonth, toMonth) => {
             ],
           );
           // The clone must track the same SET of categories, not just the primary
-          // one the column carries.
+          // one the column carries — and the same source-account filter, or a
+          // "card only" budget would silently widen to every account next month.
           await writeLineCategoriesInTx(db, clonedId, line.categoryIds || []);
+          await writeLineAccountsInTx(db, clonedId, line.sourceAccountIds || []);
         }
       });
     } catch (txError) {
@@ -1374,16 +1524,19 @@ export const getMonthDateRange = (month) => {
 /**
  * Compute the actual amount tracked by one plan line for a month.
  *
- * - Category-linked line: expense spending across every category the line tracks
- *   (migration 0021 allows several), always including their descendants, via the
- *   shared convert-all engine
- *   ({@link calculateSpendingForCategories}). With `convertAll` off, only
- *   operations in accounts of `displayCurrency` count.
+ * - Category- and/or account-filtered line: expense spending matching BOTH
+ *   filters (migration 0021 allows several categories, 0024 several source
+ *   accounts), always including category descendants, via the shared convert-all
+ *   engine ({@link calculateSpendingForFilters}). An empty category set means
+ *   "any category", an empty account set "any account", so a line may be
+ *   "Groceries, anywhere", "anything on this card", or the intersection of the
+ *   two. With `convertAll` off, only operations in accounts of `displayCurrency`
+ *   count.
  * - Account-linked line (transfer target): incoming transfers into the account
  *   ({@link getTransferTotals}; values are in the destination account's currency),
  *   converted into `displayCurrency` regardless of the toggle — a transfer target
  *   in another currency is still part of the plan.
- * - Broken line (target deleted, FK nulled): `{ broken: true }`.
+ * - Broken line (every target and filter deleted): `{ broken: true }`.
  *
  * @param {Object} line - Plan line (camelCase, see mapLineFields)
  * @param {string} month - YYYY-MM
@@ -1408,15 +1561,20 @@ export const calculateLineActual = async (line, month, displayCurrency, convertA
     }
 
     const categoryIds = line.categoryIds ?? (isSet(line.categoryId) ? [line.categoryId] : []);
-    if (categoryIds.length > 0) {
-      const actual = await calculateSpendingForCategories(
+    const sourceAccountIds = line.sourceAccountIds ?? [];
+    // Either filter alone is a complete budget, and together they intersect —
+    // which is why this is one branch rather than a category branch that an
+    // account filter is bolted onto.
+    if (categoryIds.length > 0 || sourceAccountIds.length > 0) {
+      const actual = await calculateSpendingForFilters({
         categoryIds,
-        displayCurrency,
+        accountIds: sourceAccountIds,
+        currency: displayCurrency,
         startDate,
         endDate,
-        true, // descendants always roll up into the categories a line tracks
+        includeChildren: true, // descendants always roll up into the categories a line tracks
         convertAll,
-      );
+      });
       return { broken: false, actual: String(actual) };
     }
 
@@ -1502,10 +1660,11 @@ export const calculateActualIncome = async (month, displayCurrency, convertAll) 
 
 /**
  * Source currencies whose amounts feed a plan's converted actuals: expense
- * currencies of the linked categories (incl. descendants) and income currencies
- * when `convertAll` is on, plus the destination currencies of transfer lines
- * (those convert regardless of the toggle). Used to compute the
- * unconvertible-currency warning without changing how the sums drop them.
+ * currencies of the linked categories (incl. descendants) and source accounts,
+ * and income currencies, when `convertAll` is on, plus the destination
+ * currencies of transfer lines (those convert regardless of the toggle). Used to
+ * compute the unconvertible-currency warning without changing how the sums drop
+ * them.
  */
 const collectPlanSourceCurrencies = async (lines, startDate, endDate, convertAll, transferCurrencies) => {
   const currencies = new Set(transferCurrencies);
@@ -1517,11 +1676,23 @@ const collectPlanSourceCurrencies = async (lines, startDate, endDate, convertAll
     // toward SQLite's bound-parameter ceiling without changing the DISTINCT
     // result.
     const categoryIdSet = new Set();
+    // Lines carrying a source-account filter (migration 0024) cannot join that
+    // aggregate: their currencies are those of the operations matching BOTH
+    // filters, and folding their categories into the shared set would flag a
+    // currency the line itself can never contribute. They are asked separately,
+    // one query each — the aggregate above still covers the common, unfiltered
+    // case in a single query.
+    const filteredLines = [];
     for (const line of lines) {
       // Income lines track no spending (their category, when set, is an income
       // one) — including them here would query expenses that cannot exist.
       if (line.kind === 'income') continue;
       const linked = line.categoryIds ?? (isSet(line.categoryId) ? [line.categoryId] : []);
+      const sourceAccounts = line.sourceAccountIds ?? [];
+      if (sourceAccounts.length > 0) {
+        filteredLines.push({ categoryIds: linked, accountIds: sourceAccounts });
+        continue;
+      }
       if (linked.length === 0) continue;
       // Same expansion the line's own actual uses, so the currencies collected
       // here are exactly the ones that can feed it — descendants included.
@@ -1542,6 +1713,33 @@ const collectPlanSourceCurrencies = async (lines, startDate, endDate, convertAll
            AND o.date >= ?
            AND o.date <= ?`,
         [...categoryIds, startDate, endDate],
+      );
+      for (const row of rows || []) currencies.add(row.currency);
+    }
+
+    for (const filtered of filteredLines) {
+      const conditions = [];
+      const params = [];
+      if (filtered.categoryIds.length > 0) {
+        const expanded = await expandCategoryIds(filtered.categoryIds, true);
+        // Every tracked category was deleted; only the account filter is left, so
+        // an `IN ()` here would be both a syntax error and the wrong question.
+        if (expanded.length > 0) {
+          conditions.push(`o.category_id IN (${expanded.map(() => '?').join(',')})`);
+          params.push(...expanded);
+        }
+      }
+      conditions.push(`o.account_id IN (${filtered.accountIds.map(() => '?').join(',')})`);
+      params.push(...filtered.accountIds);
+      const rows = await queryAll(
+        `SELECT DISTINCT a.currency as currency
+         FROM operations o
+         JOIN accounts a ON o.account_id = a.id
+         WHERE ${conditions.join(' AND ')}
+           AND o.type = 'expense'
+           AND o.date >= ?
+           AND o.date <= ?`,
+        [...params, startDate, endDate],
       );
       for (const row of rows || []) currencies.add(row.currency);
     }

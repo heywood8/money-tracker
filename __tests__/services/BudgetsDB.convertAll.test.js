@@ -265,4 +265,90 @@ describe('BudgetsDB convert-all spending', () => {
       expect(parseFloat(total)).toBe(2000);
     });
   });
+
+  // Migration 0024: a plan line can also narrow spending by the SOURCE account
+  // the money left from, independently of its categories.
+  describe('calculateSpendingForFilters (source-account filter)', () => {
+    const range = { startDate: '2026-07-01', endDate: '2026-07-31', currency: 'AMD' };
+
+    it('filters by account alone — every category counts', async () => {
+      queryFirst.mockResolvedValue({ total: 4200 });
+
+      const total = await BudgetsDB.calculateSpendingForFilters({
+        ...range, accountIds: [3, 7],
+      });
+
+      expect(parseFloat(total)).toBe(4200);
+      const [sql, params] = queryFirst.mock.calls[0];
+      expect(sql).toContain('o.account_id IN (?,?)');
+      // No category clause at all: an empty set means "any category", not "none".
+      expect(sql).not.toContain('o.category_id IN');
+      expect(params.slice(0, 2)).toEqual([3, 7]);
+    });
+
+    it('intersects the two filters with AND', async () => {
+      CategoriesDB.getAllDescendants.mockResolvedValue([]);
+      queryFirst.mockResolvedValue({ total: 100 });
+
+      await BudgetsDB.calculateSpendingForFilters({
+        ...range, categoryIds: ['groceries'], accountIds: [3],
+      });
+
+      const [sql, params] = queryFirst.mock.calls[0];
+      expect(sql).toContain('o.category_id IN (?)');
+      expect(sql).toContain('AND o.account_id IN (?)');
+      expect(params.slice(0, 2)).toEqual(['groceries', 3]);
+    });
+
+    it('expands category descendants alongside an account filter', async () => {
+      CategoriesDB.getAllDescendants.mockImplementation(async (id) => (
+        id === 'food' ? [{ id: 'cafes' }] : []
+      ));
+      queryFirst.mockResolvedValue({ total: 10 });
+
+      await BudgetsDB.calculateSpendingForFilters({
+        ...range, categoryIds: ['food'], accountIds: [3],
+      });
+
+      const [, params] = queryFirst.mock.calls[0];
+      expect(params.slice(0, 3)).toEqual(['food', 'cafes', 3]);
+    });
+
+    it('de-duplicates repeated account ids', async () => {
+      queryFirst.mockResolvedValue({ total: 10 });
+
+      await BudgetsDB.calculateSpendingForFilters({
+        ...range, accountIds: [3, '3', 7, null, ''],
+      });
+
+      const [sql, params] = queryFirst.mock.calls[0];
+      expect(sql).toContain('o.account_id IN (?,?)');
+      expect(params.slice(0, 2)).toEqual([3, 7]);
+    });
+
+    it('returns 0 without querying when neither filter is set', async () => {
+      // A filterless sum would report the user's ENTIRE spend as one line's
+      // actual — the empty set means the line tracks nothing, not everything.
+      expect(await BudgetsDB.calculateSpendingForFilters({ ...range })).toBe('0');
+      expect(queryFirst).not.toHaveBeenCalled();
+      expect(queryAll).not.toHaveBeenCalled();
+    });
+
+    it('converts across currencies with an account filter applied', async () => {
+      stubRates({ RUB: '5' });
+      queryAll.mockResolvedValue([
+        { currency: 'AMD', total: 1000 },
+        { currency: 'RUB', total: 200 },
+      ]);
+
+      const total = await BudgetsDB.calculateSpendingForFilters({
+        ...range, accountIds: [3], convertAll: true,
+      });
+
+      expect(parseFloat(total)).toBe(2000);
+      const [sql] = queryAll.mock.calls[0];
+      expect(sql).toContain('o.account_id IN (?)');
+      expect(sql).toContain('GROUP BY a.currency');
+    });
+  });
 });

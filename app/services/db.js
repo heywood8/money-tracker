@@ -171,7 +171,8 @@ const isSchemaComplete = async (rawDb) => {
       'app_metadata', 'accounts_balance_history', 'planned_operations',
       'notification_merchant_rules', 'pending_notifications',
       'budget_plans', 'budget_plan_lines', 'budget_plan_line_categories',
-      'budget_plan_line_groups', 'notification_templates',
+      'budget_plan_line_groups', 'budget_plan_line_accounts',
+      'notification_templates',
     ];
     const existingTables = await rawDb.getAllAsync(
       "SELECT name FROM sqlite_master WHERE type='table'",
@@ -311,9 +312,14 @@ const isSchemaComplete = async (rawDb) => {
     // `no such column: exclude_from_charts`.
     if (!opsCols.some(c => c.name === 'exclude_from_charts')) return false;
 
-    // Migration 0024: adds the notification_templates table (user-defined
+    // Migration 0024: creates budget_plan_line_accounts (the per-line source
+    // account filter). Covered by the expectedTables check above — it is a
+    // CREATE TABLE with no accompanying ALTER, so there is no half-applied state
+    // a column check would have to catch.
+
+    // Migration 0025: adds the notification_templates table (user-defined
     // parsers). Covered by the expectedTables check above — an install complete
-    // through 0023 doesn't have it, so its schema reads "incomplete" here and
+    // through 0024 doesn't have it, so its schema reads "incomplete" here and
     // migrate() runs to create it, rather than the fast path skipping migrate()
     // and every template query throwing `no such table`.
 
@@ -658,6 +664,13 @@ const detectAppliedMigrations = async (rawDb) => {
       && planLineCols.some(c => c.name === 'group_id')) {
       applied.push(22);
     }
+
+    // Migration 0024: creates budget_plan_line_accounts (the per-line source
+    // account filter). One CREATE TABLE plus an IF NOT EXISTS index, so the
+    // table's presence is the whole marker and re-running is harmless.
+    if (await tableExists('budget_plan_line_accounts')) {
+      applied.push(24);
+    }
   }
 
   // Migration 0023: Adds operations.exclude_from_charts column.
@@ -668,9 +681,9 @@ const detectAppliedMigrations = async (rawDb) => {
     }
   }
 
-  // Migration 0024: Adds the notification_templates table (user-defined parsers).
+  // Migration 0025: Adds the notification_templates table (user-defined parsers).
   if (await tableExists('notification_templates')) {
-    applied.push(24);
+    applied.push(25);
   }
 
   return applied.sort((a, b) => a - b);

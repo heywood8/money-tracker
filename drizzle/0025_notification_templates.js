@@ -1,5 +1,5 @@
 /**
- * Migration 0024: Add the notification_templates table
+ * Migration 0025: Add the notification_templates table
  *
  * User-defined parse templates for banking apps Penny ships no parser for. The
  * user marks the fields in one captured notification and the marks are stored

@@ -81,7 +81,7 @@ The app follows a feature-based organization under the `app/` directory:
   - Monitoring: `sentry.js` - Privacy-protective crash/error reporting (Sentry)
 
 - **db/** (1 file) - Database schema
-  - `schema.js` - Drizzle ORM schema (tables: accounts, categories, operations, budgets, budgetPlans, budgetPlanLines, budgetPlanLineCategories, budgetPlanLineGroups, plannedOperations, balanceHistory, appMetadata; `budgets` and `plannedOperations` are legacy/append-only since Budgets v3 — see docs/DATABASE.md)
+  - `schema.js` - Drizzle ORM schema (tables: accounts, categories, operations, budgets, budgetPlans, budgetPlanLines, budgetPlanLineCategories, budgetPlanLineAccounts, budgetPlanLineGroups, plannedOperations, balanceHistory, appMetadata; `budgets` and `plannedOperations` are legacy/append-only since Budgets v3 — see docs/DATABASE.md)
 
 - **defaults/** (2 files) - Default/seed data
   - `defaultAccounts.js`, `defaultOperations.js`
@@ -155,7 +155,7 @@ Bottom tab bar height is set to 80px with 24px bottom padding.
 
 **Database Layer** (SQLite via Drizzle ORM):
 - SQLite database (`penny.db`)
-- Schema defined in `app/db/schema.js` - tables: accounts, categories, operations, budgets, budgetPlans, budgetPlanLines, budgetPlanLineCategories, budgetPlanLineGroups, plannedOperations, balanceHistory, appMetadata
+- Schema defined in `app/db/schema.js` - tables: accounts, categories, operations, budgets, budgetPlans, budgetPlanLines, budgetPlanLineCategories, budgetPlanLineAccounts, budgetPlanLineGroups, plannedOperations, balanceHistory, appMetadata
 - Migrations managed by Drizzle Kit in `drizzle/` directory
 - DB modules: `AccountsDB.js`, `BudgetsDB.js`, `BudgetPlansDB.js`, `CategoriesDB.js`, `OperationsDB.js`, `BalanceHistoryDB.js`, `PreferencesDB.js`
 
@@ -378,11 +378,12 @@ A chip grid grouped by currency. The groups are *not* a hierarchy — there is n
 />
 ```
 
+- `selectedAccountIds={[...]}` — multi-select, mirroring `CategoryGridSelector`'s option of the same shape. Chips become checkboxes and report every tap; the host keeps the array (see `BudgetPlanLineModal`'s spending-account filter). Takes precedence over `selectedAccountId`. Ids are compared as strings, so an integer account matches an id that came back from a CSV or Sheets round trip.
 - Group order follows the accounts' own order (first currency to appear wins), so it matches what the user arranged on the Accounts screen; accounts are never reordered within a group.
 - A single-currency set gets **no** headers — one header over everything says nothing. The same applies after a search narrows the set to one currency.
 - The grid reads `hideBalances` from `DisplaySettingsContext` itself rather than taking it as a prop, so a host cannot forget the setting.
 
-Hosts: `PickerModal`, `OperationModal`, `BudgetPlanLineModal` (transfer target + execution account), `AccountsScreen` (transfer-on-delete).
+Hosts: `PickerModal`, `OperationModal`, `BudgetPlanLineModal` (transfer target + execution account + spending-account filter), `AccountsScreen` (transfer-on-delete).
 
 ### Shared Element Styles
 
