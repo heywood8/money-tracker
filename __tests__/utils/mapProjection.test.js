@@ -229,5 +229,19 @@ describe('mapProjection', () => {
       const keys = new Set(tiles.map(tl => tl.key));
       expect(keys.size).toBe(tiles.length);
     });
+
+    it('honors a forced tile level and rescales accordingly', () => {
+      // Region at zoom 13 rendered from level 12 tiles (the underlay case):
+      // tiles come from z12 drawn at double size, covering the viewport.
+      const region = { latitude: 40, longitude: 44, zoom: 13 };
+      const tiles = visibleTiles(region, 400, 800, 12);
+      expect(tiles.length).toBeGreaterThan(0);
+      expect(tiles.every(tl => tl.z === 12)).toBe(true);
+      expect(tiles[0].size).toBeCloseTo(TILE_SIZE * 2);
+      const minX = Math.min(...tiles.map(tl => tl.screenX));
+      const maxX = Math.max(...tiles.map(tl => tl.screenX + tl.size));
+      expect(minX).toBeLessThanOrEqual(0);
+      expect(maxX).toBeGreaterThanOrEqual(400);
+    });
   });
 });

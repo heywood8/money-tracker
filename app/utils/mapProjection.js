@@ -151,12 +151,17 @@ export const fitBounds = (points, width, height, padding = 48) => {
  * length. X wraps around the antimeridian (the fetch coordinate is `x`,
  * already wrapped); Y outside the world is skipped.
  *
+ * `tileZoomOverride` forces a specific integer tile level instead of the
+ * nearest one — the map renders the level it is LEAVING as an underlay while
+ * the new level's tiles stream in, so crossing levels never flashes bare
+ * background.
+ *
  * @returns {Array<{key: string, z: number, x: number, y: number,
  *                  screenX: number, screenY: number, size: number}>}
  */
-export const visibleTiles = (region, width, height) => {
+export const visibleTiles = (region, width, height, tileZoomOverride = null) => {
   if (!width || !height) return [];
-  const tileZoom = Math.round(clampZoom(region.zoom));
+  const tileZoom = tileZoomOverride ?? Math.round(clampZoom(region.zoom));
   const scale = Math.pow(2, region.zoom - tileZoom);
   const scaledTile = TILE_SIZE * scale;
   const tileCount = Math.pow(2, tileZoom);

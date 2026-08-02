@@ -35,6 +35,25 @@ export const tilePath = (z, x, y) => `${TILE_CACHE_DIR}${z}_${x}_${y}.png`;
 // tile again before its first download resolves.
 const inFlight = new Map();
 
+// URIs that already resolved this session, readable SYNCHRONOUSLY. A tile
+// component initializing from here paints on its very first frame — without
+// this, crossing a zoom level remounts every tile empty for the async round
+// trip to disk and the map flashes bare background.
+const resolvedUris = new Map();
+
+const rememberResolved = (z, x, y, uri) => {
+  resolvedUris.set(`${z}/${x}/${y}`, uri);
+  return uri;
+};
+
+/**
+ * Synchronous lookup of a tile URI that some earlier getTileUri call already
+ * resolved. Returns null for tiles not yet seen this session — the caller
+ * then falls back to the async path.
+ */
+export const getResolvedTileUri = (z, x, y) =>
+  resolvedUris.get(`${z}/${x}/${y}`) ?? null;
+
 const downloadTile = async (z, x, y, path) => {
   await FileSystem.makeDirectoryAsync(TILE_CACHE_DIR, { intermediates: true });
   const tmpPath = `${path}.tmp`;
@@ -66,7 +85,7 @@ export const getTileUri = async (z, x, y) => {
     cached = await FileSystem.getInfoAsync(path);
     if (cached.exists) {
       const ageMs = Date.now() - cached.modificationTime * 1000;
-      if (ageMs < TILE_TTL_MS) return path;
+      if (ageMs < TILE_TTL_MS) return rememberResolved(z, x, y, path);
     }
   } catch {
     cached = null;
@@ -83,10 +102,10 @@ export const getTileUri = async (z, x, y) => {
   }
 
   try {
-    return await inFlight.get(path);
+    return rememberResolved(z, x, y, await inFlight.get(path));
   } catch {
     // Refresh failed — fall back to the expired copy when there is one.
-    return cached?.exists ? path : null;
+    return cached?.exists ? rememberResolved(z, x, y, path) : null;
   }
 };
 
