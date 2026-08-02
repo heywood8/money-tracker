@@ -15,6 +15,8 @@ import { Canvas, Circle, Group, BlurMask } from '@shopify/react-native-skia';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { getOperationCoordinates } from '../../services/OperationsDB';
 import { getTileUri, pruneTileCache } from '../../services/MapTileCache';
+import { ensureLocationPermission, getCurrentLocation } from '../../services/LocationService';
+import { useDisplaySettings } from '../../contexts/DisplaySettingsContext';
 import { formatDate } from '../../services/BalanceHistoryDB';
 import {
   visibleTiles,
@@ -29,6 +31,10 @@ import { BORDER_RADIUS, FONT_SIZE, SPACING } from '../../styles/designTokens';
 
 // Fallback view when there is nothing to fit — the whole world.
 const WORLD_REGION = { latitude: 20, longitude: 0, zoom: 2 };
+
+// Default camera when the device location is available: the user's current
+// city. Zoom 12 spans roughly a city and its districts on a phone screen.
+const CITY_ZOOM = 12;
 
 // Heat blob look. Density comes from overlap: each operation is one
 // semi-transparent blob, so clusters saturate toward opaque. The color is
@@ -97,6 +103,8 @@ const HeatmapMapModal = ({
   periodLabel,
 }) => {
   const insets = useSafeAreaInsets();
+  // No provider in isolated renders (tests) — undefined reads as feature off.
+  const { attachLocation } = useDisplaySettings() ?? {};
   const [allTime, setAllTime] = useState(false);
   const [points, setPoints] = useState([]);
   const [loading, setLoading] = useState(true);
@@ -110,11 +118,41 @@ const HeatmapMapModal = ({
   sizeRef.current = size;
   // Set when a new point set arrives; consumed once the viewport is measured.
   const fitPendingRef = useRef(false);
+  // True once the user pans/zooms — from then on nothing may move the camera
+  // out from under them (a late GPS fix, a scope-toggle refit).
+  const interactedRef = useRef(false);
+  // True once the camera was parked on the device's city. Scope toggles then
+  // only swap the points underneath it instead of refitting.
+  const locationAppliedRef = useRef(false);
 
   // Housekeeping once per opening, off the critical path.
   useEffect(() => {
     if (visible) pruneTileCache();
   }, [visible]);
+
+  // Default camera: the user's current city (CITY_ZOOM around the device
+  // location). Gated on the attach-location opt-in — the map must not surface
+  // a permission prompt for users who kept geolocation off (their heatmap is
+  // empty anyway; for opted-in users the permission is already granted and
+  // this is silent). The fix can take seconds, so it lands as an override of
+  // the points-fit — unless the user has already started moving the map.
+  useEffect(() => {
+    if (!visible || !attachLocation) return;
+    let cancelled = false;
+    (async () => {
+      const { granted } = await ensureLocationPermission();
+      if (!granted || cancelled) return;
+      const fix = await getCurrentLocation();
+      if (cancelled || !fix) return;
+      const latitude = parseFloat(fix.latitude);
+      const longitude = parseFloat(fix.longitude);
+      if (!Number.isFinite(latitude) || !Number.isFinite(longitude)) return;
+      if (interactedRef.current) return;
+      locationAppliedRef.current = true;
+      setRegion({ latitude, longitude, zoom: CITY_ZOOM });
+    })();
+    return () => { cancelled = true; };
+  }, [visible, attachLocation]);
 
   useEffect(() => {
     if (!visible) return;
@@ -151,9 +189,12 @@ const HeatmapMapModal = ({
 
   // Fit the loaded points once the viewport is measured (and again on every
   // scope switch). Runs as an effect because layout and data race each other.
+  // Skipped once the camera belongs to the device-city view or to the user's
+  // own gestures — a reload then only swaps the points underneath.
   useEffect(() => {
     if (!fitPendingRef.current || !size.width || !size.height || loading) return;
     fitPendingRef.current = false;
+    if (locationAppliedRef.current || interactedRef.current) return;
     setRegion(fitBounds(points, size.width, size.height) ?? WORLD_REGION);
   }, [points, size, loading]);
 
@@ -189,6 +230,7 @@ const HeatmapMapModal = ({
       .runOnJS(true)
       .maxPointers(1)
       .onStart(() => {
+        interactedRef.current = true;
         panLast.current = { x: 0, y: 0 };
       })
       .onUpdate((e) => {
@@ -201,6 +243,7 @@ const HeatmapMapModal = ({
     const pinch = Gesture.Pinch()
       .runOnJS(true)
       .onStart((e) => {
+        interactedRef.current = true;
         const { width, height } = sizeRef.current;
         pinchLast.current = {
           scale: 1,
