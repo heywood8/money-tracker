@@ -1,5 +1,12 @@
 # Changelog
 
+## [0.254.1](https://github.com/heywood8/money-tracker/compare/penny-v0.254.0...penny-v0.254.1) (2026-08-02)
+
+
+### Performance Improvements
+
+* **graphs:** prefetch adjacent zoom levels on the heatmap ([#1536](https://github.com/heywood8/money-tracker/issues/1536)) ([df0cbe4](https://github.com/heywood8/money-tracker/commit/df0cbe4915fd57d89756f7125fbb7026b4d837b9))
+
 ## [0.254.0](https://github.com/heywood8/money-tracker/compare/penny-v0.253.1...penny-v0.254.0) (2026-08-02)
 
 
