@@ -109,6 +109,39 @@ export const getTileUri = async (z, x, y) => {
   }
 };
 
+// Prefetch runs at most this many downloads at once — a background warm-up
+// must not saturate the connection the visible tiles are loading on, nor
+// hammer the OSM server.
+const PREFETCH_CONCURRENCY = 4;
+
+/**
+ * Fire-and-forget warm-up of tiles the user is likely to need next (e.g. the
+ * adjacent zoom levels of the current viewport). Each tile goes through
+ * getTileUri, so the disk cache, TTL, in-flight dedup and the synchronous
+ * session map all apply — tiles already cached cost no network at all.
+ * Failures are swallowed per tile: a prefetch must never surface an error.
+ *
+ * @param {Array<{z: number, x: number, y: number}>} tiles
+ * @returns {Promise<void>} resolves when the whole batch settled
+ */
+export const prefetchTiles = async (tiles) => {
+  const queue = [...(tiles || [])];
+  if (queue.length === 0) return;
+  const worker = async () => {
+    while (queue.length > 0) {
+      const tile = queue.shift();
+      try {
+        await getTileUri(tile.z, tile.x, tile.y);
+      } catch {
+        // Ignore — getTileUri already degrades to null, this is belt-and-braces.
+      }
+    }
+  };
+  await Promise.all(
+    Array.from({ length: Math.min(PREFETCH_CONCURRENCY, queue.length) }, worker),
+  );
+};
+
 /**
  * Delete tiles older than TILE_PRUNE_AGE_MS. Fire-and-forget housekeeping —
  * callers do not await the per-file deletes' outcome and errors are swallowed:
