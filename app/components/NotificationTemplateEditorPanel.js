@@ -30,8 +30,8 @@ import currencies from '../../assets/currencies.json';
  * ## Marking by tapping words, not by selecting text
  *
  * The notification is rendered as a grid of tappable word chips. Tapping a chip
- * assigns it to whichever field is active; tapping a neighbour extends the
- * selection; tapping an assigned chip clears it. A drag-to-select over live text
+ * assigns it to whichever field is active; tapping another widens the span to
+ * cover both; tapping an assigned chip clears the field. A drag-to-select over live text
  * would be the obvious design and the wrong one: RN text selection can't report
  * offsets back reliably, selection handles fight the parent ScrollView, and
  * precise dragging over a 13px line is miserable on a phone. Tapping a word is a
@@ -267,9 +267,12 @@ export default function NotificationTemplateEditorPanel({
    * Assign a tapped token to the active field.
    *
    * Tapping a token already in the field's span clears the field; tapping one
-   * adjacent to it extends the span (so a two-word payee is two taps); tapping
-   * anywhere else starts over there. Extension is only offered within the same
-   * source string — a span can't straddle the title and the body.
+   * outside it widens the span to cover both (so a multi-word payee is one tap
+   * per word, and an over-wide span is undone by tapping back inside it — the
+   * preview shows what the widened span actually extracts either way).
+   *
+   * Widening is only offered within the same source string — a span can't
+   * straddle the title and the body, so a tap in the other one starts fresh.
    */
   const handleTokenPress = useCallback((token, source) => {
     const field = activeField;
@@ -286,7 +289,8 @@ export default function NotificationTemplateEditorPanel({
       next = null; // tapped inside the existing span -> clear the field
     } else if (current && current.source === source
       && (token.start >= current.end || token.end <= current.start)) {
-      // A neighbouring token extends the span, so a two-word payee is two taps.
+      // A token outside the span widens it to cover both, so a two-word payee
+      // is two taps.
       next = {
         source,
         start: Math.min(current.start, token.start),

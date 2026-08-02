@@ -175,6 +175,16 @@ describe('extractField', () => {
     expect(extractField({ text: 'Баланс 39 000 ₽' }, rule)).toBeNull();
   });
 
+  it('refuses to fall back to a different occurrence than the one marked', () => {
+    // A rule that had to remember "the second match" is one whose anchors were
+    // too weak to single the span out. On a notification with only one match,
+    // returning it would hand back the number the user did NOT mark — for an
+    // amount, a figure nobody chose. Better unparsed than wrong.
+    const weak = { source: 'text', kind: 'amount', before: '', after: '', value: '500', occurrence: 1 };
+    expect(extractField({ text: '100 and 500' }, weak).value).toBe('500');
+    expect(extractField({ text: 'only 100' }, weak)).toBeNull();
+  });
+
   it('ignores an absurdly long notification', () => {
     expect(extractField({ text: `на 100${' '.repeat(5000)}` }, rule)).toBeNull();
   });

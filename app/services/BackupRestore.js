@@ -543,7 +543,16 @@ export const restoreBackup = async (backup, cancelToken) => {
 
       // Clear existing data (in reverse order due to foreign keys)
       await db.runAsync('DELETE FROM notification_merchant_rules').catch(() => {});
-      await db.runAsync('DELETE FROM notification_templates').catch(() => {});
+      // Parse templates are cleared ONLY when the backup actually carries them.
+      // The CSV format has no [NOTIFICATION_TEMPLATES] section, so a CSV restore
+      // hands us a `data` object with no such key — clearing unconditionally
+      // would wipe every hand-built template and restore nothing in its place.
+      // That is unrecoverable in a way the rest of this table set is not: a
+      // merchant rule is re-learned the next time the shop is seen, but a
+      // template only exists because someone marked up a notification by hand.
+      if (Array.isArray(backup.data.notification_templates)) {
+        await db.runAsync('DELETE FROM notification_templates').catch(() => {});
+      }
       await db.runAsync('DELETE FROM planned_operations').catch(() => {});
       await db.runAsync('DELETE FROM budgets');
       // Budgets v2: lines reference plans (cascade), categories and accounts (set

@@ -558,7 +558,12 @@ describe('BackupRestore', () => {
         await callback(mockDbInstance);
       });
 
-      await BackupRestore.restoreBackup(validBackup);
+      // Carries the templates section so the conditional clear runs and the
+      // full delete sequence is asserted.
+      await BackupRestore.restoreBackup({
+        ...validBackup,
+        data: { ...validBackup.data, notification_templates: [] },
+      });
 
       expect(deleteCalls[0]).toContain('notification_merchant_rules');
       // Parse templates (migration 0025) reference categories (ON DELETE SET
@@ -578,6 +583,52 @@ describe('BackupRestore', () => {
       expect(deleteCalls[10]).toContain('operations');
       expect(deleteCalls[11]).toContain('categories');
       expect(deleteCalls[12]).toContain('accounts');
+    });
+
+    // Regression: a CSV backup structurally cannot carry parse templates (the
+    // format has no [NOTIFICATION_TEMPLATES] section), so restoring one used to
+    // wipe every template the user had hand-built and restore nothing. Unlike
+    // merchant rules, templates cannot be re-learned from the data — the clear
+    // has to be conditional on the backup actually carrying them.
+    it('does NOT clear parse templates when the backup carries no templates section', async () => {
+      const deleteCalls = [];
+      const mockDbInstance = {
+        runAsync: jest.fn().mockImplementation((query) => {
+          if (query.startsWith('DELETE FROM')) deleteCalls.push(query);
+          return Promise.resolve({ lastInsertRowId: 1 });
+        }),
+        getAllAsync: jest.fn().mockResolvedValue([]),
+      };
+      mockDb.executeTransaction.mockImplementation(async (callback) => {
+        await callback(mockDbInstance);
+      });
+
+      // `validBackup.data` has no notification_templates key — exactly what
+      // parseCSVBackup produces.
+      await BackupRestore.restoreBackup(validBackup);
+
+      expect(deleteCalls.some((q) => q.includes('notification_templates'))).toBe(false);
+    });
+
+    it('clears parse templates when the backup does carry them', async () => {
+      const deleteCalls = [];
+      const mockDbInstance = {
+        runAsync: jest.fn().mockImplementation((query) => {
+          if (query.startsWith('DELETE FROM')) deleteCalls.push(query);
+          return Promise.resolve({ lastInsertRowId: 1 });
+        }),
+        getAllAsync: jest.fn().mockResolvedValue([]),
+      };
+      mockDb.executeTransaction.mockImplementation(async (callback) => {
+        await callback(mockDbInstance);
+      });
+
+      await BackupRestore.restoreBackup({
+        ...validBackup,
+        data: { ...validBackup.data, notification_templates: [] },
+      });
+
+      expect(deleteCalls.some((q) => q.includes('notification_templates'))).toBe(true);
     });
 
     it('preserves db_version metadata', async () => {

@@ -211,11 +211,18 @@ export const extractField = (notification, rule) => {
   if (!regex) return null;
   const matches = allMatches(text, regex);
   if (matches.length === 0) return null;
+
   // `occurrence` is only ever non-zero when the anchors alone could not single
-  // out the marked span (see deriveFieldRule). Clamp rather than fail: a shorter
-  // notification with fewer occurrences should still yield its last one.
-  const index = Math.min(rule.occurrence || 0, matches.length - 1);
-  return matches[index];
+  // out the marked span (see deriveFieldRule) — i.e. exactly the rules whose
+  // context is weakest. When such a rule finds fewer occurrences than it was
+  // built against, the one it *would* fall back to is not the one the user
+  // marked: on a two-number message where the charge was second, a single-match
+  // notification hands back the other number, which for an amount means booking
+  // a figure nobody chose. Failing here leaves the notification unparsed, which
+  // the user sees and can act on; guessing puts a wrong number in the ledger.
+  const occurrence = rule.occurrence || 0;
+  if (occurrence >= matches.length) return null;
+  return matches[occurrence];
 };
 
 // ── Span refinement ───────────────────────────────────────────────────────────
