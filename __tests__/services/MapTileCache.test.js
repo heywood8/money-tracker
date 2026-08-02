@@ -19,6 +19,7 @@ jest.mock('expo-file-system/legacy', () => ({
 import {
   getTileUri,
   getResolvedTileUri,
+  prefetchTiles,
   pruneTileCache,
   tileUrl,
   tilePath,
@@ -165,6 +166,39 @@ describe('MapTileCache', () => {
       FileSystem.getInfoAsync.mockResolvedValue(MISSING);
       await getTileUri(15, 5, 5);
       expect(getResolvedTileUri(15, 5, 5)).toBeNull();
+    });
+  });
+
+  describe('prefetchTiles', () => {
+    it('warms every tile in the batch through getTileUri', async () => {
+      await prefetchTiles([
+        { z: 16, x: 1, y: 1 },
+        { z: 16, x: 2, y: 1 },
+        { z: 16, x: 3, y: 1 },
+      ]);
+      expect(FileSystem.downloadAsync).toHaveBeenCalledTimes(3);
+      // Prefetched tiles land in the synchronous session cache like any other.
+      expect(getResolvedTileUri(16, 2, 1)).toBe(tilePath(16, 2, 1));
+    });
+
+    it('skips the network entirely for tiles already fresh on disk', async () => {
+      FileSystem.getInfoAsync.mockResolvedValue(fileInfo(60_000));
+      await prefetchTiles([{ z: 16, x: 4, y: 4 }, { z: 16, x: 5, y: 5 }]);
+      expect(FileSystem.downloadAsync).not.toHaveBeenCalled();
+    });
+
+    it('swallows per-tile failures and still settles', async () => {
+      FileSystem.downloadAsync.mockRejectedValue(new Error('offline'));
+      await expect(prefetchTiles([
+        { z: 16, x: 6, y: 6 },
+        { z: 16, x: 7, y: 7 },
+      ])).resolves.toBeUndefined();
+    });
+
+    it('tolerates an empty or missing batch', async () => {
+      await expect(prefetchTiles([])).resolves.toBeUndefined();
+      await expect(prefetchTiles()).resolves.toBeUndefined();
+      expect(FileSystem.downloadAsync).not.toHaveBeenCalled();
     });
   });
 

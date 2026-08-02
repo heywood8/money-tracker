@@ -14,7 +14,7 @@ import { Gesture, GestureDetector, GestureHandlerRootView } from 'react-native-g
 import { Canvas, Circle, Group, BlurMask } from '@shopify/react-native-skia';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { getOperationCoordinates } from '../../services/OperationsDB';
-import { getTileUri, getResolvedTileUri, pruneTileCache } from '../../services/MapTileCache';
+import { getTileUri, getResolvedTileUri, prefetchTiles, pruneTileCache } from '../../services/MapTileCache';
 import { ensureLocationPermission, getCurrentLocation } from '../../services/LocationService';
 import { useDisplaySettings } from '../../contexts/DisplaySettingsContext';
 import { formatDate } from '../../services/BalanceHistoryDB';
@@ -24,6 +24,8 @@ import {
   fitBounds,
   translateRegion,
   scaleRegion,
+  MIN_ZOOM,
+  MAX_ZOOM,
 } from '../../utils/mapProjection';
 import EmptyState from '../EmptyState';
 import { CARD_SURFACE } from '../../styles/componentStyles';
@@ -46,6 +48,12 @@ const HEAT_COLOR = 'rgba(233, 30, 99, 0.35)';
 const MAX_HEAT_POINTS = 4000;
 // Blobs just off-screen still bleed their blur into view, so keep a margin.
 const HEAT_MARGIN = HEAT_RADIUS + HEAT_BLUR;
+
+// Adjacent-zoom-level prefetch: fire only after the camera has been still
+// this long (every move resets the timer), and never more than this many
+// tiles per settle — one level in of a phone viewport is ~40–60 tiles.
+const PREFETCH_DEBOUNCE_MS = 400;
+const PREFETCH_MAX_TILES = 48;
 
 /**
  * One raster tile. A tile some earlier render already resolved paints on its
@@ -310,6 +318,31 @@ const HeatmapMapModal = ({
     () => (underlayZoom === null ? [] : visibleTiles(region, size.width, size.height, underlayZoom)),
     [region, size, underlayZoom],
   );
+
+  // Once the camera has been still for a beat, warm the ADJACENT zoom levels
+  // of the current viewport (one level in — the likely next pinch — first,
+  // then one level out). By the time the user crosses a level its tiles are
+  // already on disk and in the synchronous session cache, so the hand-off is
+  // seamless. Every camera move resets the debounce, so nothing is fetched
+  // mid-gesture; the cap and getTileUri's dedup/cache keep this well within
+  // polite use of the OSM tile server (a settled viewport re-fetches nothing).
+  useEffect(() => {
+    if (tiles.length === 0) return undefined;
+    const timer = setTimeout(() => {
+      const { width, height } = sizeRef.current;
+      const currentRegion = regionRef.current;
+      const z = tiles[0].z;
+      const targets = [];
+      if (z + 1 <= MAX_ZOOM) {
+        targets.push(...visibleTiles(currentRegion, width, height, z + 1));
+      }
+      if (z - 1 >= MIN_ZOOM) {
+        targets.push(...visibleTiles(currentRegion, width, height, z - 1));
+      }
+      prefetchTiles(targets.slice(0, PREFETCH_MAX_TILES));
+    }, PREFETCH_DEBOUNCE_MS);
+    return () => clearTimeout(timer);
+  }, [tiles]);
 
   const heatPoints = useMemo(() => {
     if (!size.width || !size.height) return [];
