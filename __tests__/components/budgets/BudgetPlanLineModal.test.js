@@ -263,6 +263,138 @@ describe('BudgetPlanLineModal', () => {
     });
   });
 
+  // Migration 0024: a second, independent filter — WHERE the money left from.
+  describe('Spending-account filter', () => {
+    const multiCurrency = [
+      { id: 1, name: 'Savings', currency: 'USD', balance: '100' },
+      { id: 2, name: 'Cash amd', currency: 'AMD', balance: '5000' },
+      { id: 3, name: 'Checking', currency: 'USD', balance: '20' },
+    ];
+
+    it('saves an account-only line — no category needed', async () => {
+      const props = { ...baseProps(), accounts: multiCurrency };
+      const { getByTestId } = await render(<BudgetPlanLineModal {...props} />);
+      await fireEvent.press(getByTestId('plan-sources-picker'));
+      await waitFor(() => expect(getByTestId('plan-sources-option-1')).toBeTruthy());
+      await fireEvent.press(getByTestId('plan-sources-option-1'));
+      await fireEvent.press(getByTestId('plan-sources-done'));
+      await fireEvent.changeText(getByTestId('plan-line-amount'), '500');
+      await fireEvent.press(getByTestId('plan-line-save'));
+      expect(props.onSaveLine).toHaveBeenCalledWith(expect.objectContaining({
+        kind: 'expense',
+        categoryIds: [],
+        sourceAccountIds: [1],
+      }));
+    });
+
+    it('toggles accounts and keeps the panel open', async () => {
+      const props = { ...baseProps(), accounts: multiCurrency };
+      const { getByTestId } = await render(<BudgetPlanLineModal {...props} />);
+      await fireEvent.press(getByTestId('plan-sources-picker'));
+      await waitFor(() => expect(getByTestId('plan-sources-option-1')).toBeTruthy());
+      await fireEvent.press(getByTestId('plan-sources-option-1'));
+      await fireEvent.press(getByTestId('plan-sources-option-3'));
+      // A second tap removes it — the grid toggles, it does not replace.
+      await fireEvent.press(getByTestId('plan-sources-option-1'));
+      await fireEvent.press(getByTestId('plan-sources-option-2'));
+      await fireEvent.press(getByTestId('plan-sources-done'));
+      await fireEvent.changeText(getByTestId('plan-line-amount'), '500');
+      await fireEvent.press(getByTestId('plan-line-save'));
+      expect(props.onSaveLine).toHaveBeenCalledWith(expect.objectContaining({
+        sourceAccountIds: [3, 2],
+      }));
+    });
+
+    it('sends both filters when a category and an account are picked', async () => {
+      const props = { ...baseProps(), accounts: multiCurrency };
+      const { getByTestId } = await render(<BudgetPlanLineModal {...props} />);
+      await fireEvent.press(getByTestId('plan-target-picker'));
+      await waitFor(() => expect(getByTestId('plan-target-option-cat-cat1')).toBeTruthy());
+      await fireEvent.press(getByTestId('plan-target-option-cat-cat1'));
+      await fireEvent.press(getByTestId('plan-target-done'));
+      await fireEvent.press(getByTestId('plan-sources-picker'));
+      await waitFor(() => expect(getByTestId('plan-sources-option-2')).toBeTruthy());
+      await fireEvent.press(getByTestId('plan-sources-option-2'));
+      await fireEvent.press(getByTestId('plan-sources-done'));
+      await fireEvent.changeText(getByTestId('plan-line-amount'), '500');
+      await fireEvent.press(getByTestId('plan-line-save'));
+      expect(props.onSaveLine).toHaveBeenCalledWith(expect.objectContaining({
+        categoryIds: ['cat1'],
+        sourceAccountIds: [2],
+      }));
+    });
+
+    it('clears the filter back to "any account"', async () => {
+      const props = {
+        ...baseProps(),
+        accounts: multiCurrency,
+        line: {
+          id: 'l1', amount: '500', kind: 'expense',
+          categoryId: 'cat1', categoryIds: ['cat1'], sourceAccountIds: [1, 3],
+        },
+      };
+      const { getByTestId } = await render(<BudgetPlanLineModal {...props} />);
+      await fireEvent.press(getByTestId('plan-sources-picker'));
+      await waitFor(() => expect(getByTestId('plan-sources-option-all')).toBeTruthy());
+      await fireEvent.press(getByTestId('plan-sources-option-all'));
+      await fireEvent.press(getByTestId('plan-sources-done'));
+      await fireEvent.press(getByTestId('plan-line-save'));
+      // An empty array, not an omitted field: the DB layer reads "absent" as
+      // "leave the filter alone", so clearing has to be said out loud.
+      expect(props.onSaveLine).toHaveBeenCalledWith(expect.objectContaining({
+        sourceAccountIds: [],
+      }));
+    });
+
+    it('seeds the picker from an edited line\'s stored filter', async () => {
+      const props = {
+        ...baseProps(),
+        accounts: multiCurrency,
+        line: {
+          id: 'l1', amount: '500', kind: 'expense',
+          categoryId: null, categoryIds: [], sourceAccountIds: [3],
+        },
+      };
+      const { getByTestId } = await render(<BudgetPlanLineModal {...props} />);
+      await waitFor(() => expect(getByTestId('plan-line-save')).toBeTruthy());
+      await fireEvent.press(getByTestId('plan-line-save'));
+      expect(props.onSaveLine).toHaveBeenCalledWith(expect.objectContaining({
+        sourceAccountIds: [3],
+      }));
+    });
+
+    it('is not offered for transfer or income lines', async () => {
+      const props = { ...baseProps(), accounts: multiCurrency };
+      const { getByTestId, queryByTestId } = await render(<BudgetPlanLineModal {...props} />);
+      expect(getByTestId('plan-sources-picker')).toBeTruthy();
+      await fireEvent.press(getByTestId('plan-line-kind-transfer'));
+      await waitFor(() => expect(queryByTestId('plan-sources-picker')).toBeNull());
+      await fireEvent.press(getByTestId('plan-line-kind-income'));
+      expect(queryByTestId('plan-sources-picker')).toBeNull();
+    });
+
+    it('drops a filter carried over from a line switched to transfer', async () => {
+      const props = { ...baseProps(), accounts: multiCurrency };
+      const { getByTestId } = await render(<BudgetPlanLineModal {...props} />);
+      await fireEvent.press(getByTestId('plan-sources-picker'));
+      await waitFor(() => expect(getByTestId('plan-sources-option-1')).toBeTruthy());
+      await fireEvent.press(getByTestId('plan-sources-option-1'));
+      await fireEvent.press(getByTestId('plan-sources-done'));
+      await fireEvent.press(getByTestId('plan-line-kind-transfer'));
+      await fireEvent.press(getByTestId('plan-target-picker'));
+      await waitFor(() => expect(getByTestId('plan-target-tab-account')).toBeTruthy());
+      await fireEvent.press(getByTestId('plan-target-tab-account'));
+      await fireEvent.press(getByTestId('plan-target-option-acc-2'));
+      await fireEvent.changeText(getByTestId('plan-line-amount'), '500');
+      await fireEvent.press(getByTestId('plan-line-save'));
+      expect(props.onSaveLine).toHaveBeenCalledWith(expect.objectContaining({
+        kind: 'transfer',
+        toAccountId: 2,
+        sourceAccountIds: [],
+      }));
+    });
+  });
+
   describe('Target picker search', () => {
     const manyCategories = Array.from({ length: 10 }, (_, i) => ({
       id: `c${i}`, name: `Category ${i}`, categoryType: 'expense',

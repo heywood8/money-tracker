@@ -544,6 +544,14 @@ const MonthlyPlanSection = forwardRef(function MonthlyPlanSection({
       return categoryIds.length > 1 ? `${first} +${categoryIds.length - 1}` : first;
     }
     if (line.toAccountId != null) return accountsById.get(line.toAccountId)?.name || t('allocation_unlinked');
+    // An account-only line (migration 0024) has no category to borrow a name
+    // from, so it names its accounts the same way — otherwise "everything on the
+    // corporate card" would render as "Unlinked" and read as broken.
+    const sourceAccountIds = line.sourceAccountIds ?? [];
+    if (sourceAccountIds.length > 0) {
+      const first = accountsById.get(sourceAccountIds[0])?.name || t('allocation_unlinked');
+      return sourceAccountIds.length > 1 ? `${first} +${sourceAccountIds.length - 1}` : first;
+    }
     if (line.kind === 'income') return t('expected_income');
     return t('allocation_unlinked');
   }, [categoriesById, accountsById, t]);
@@ -575,6 +583,7 @@ const MonthlyPlanSection = forwardRef(function MonthlyPlanSection({
     line.label
     || (line.categoryId != null ? categoriesById.get(line.categoryId)?.name : null)
     || (line.toAccountId != null ? accountsById.get(line.toAccountId)?.name : null)
+    || (line.sourceAccountIds?.length ? accountsById.get(line.sourceAccountIds[0])?.name : null)
     || null
   ), [categoriesById, accountsById]);
 
@@ -845,6 +854,9 @@ const MonthlyPlanSection = forwardRef(function MonthlyPlanSection({
     if (line.toAccountId != null) return 'bank-transfer';
     const categoryIcon = categoriesById.get(line.categoryId)?.icon;
     if (categoryIcon) return categoryIcon;
+    // An account-only line has no category icon to show; the card glyph says at
+    // a glance that this row is scoped to where the money left from.
+    if (line.sourceAccountIds?.length) return 'credit-card-outline';
     return line.kind === 'income' ? 'cash-plus' : 'shape-outline';
   }, [categoriesById]);
 

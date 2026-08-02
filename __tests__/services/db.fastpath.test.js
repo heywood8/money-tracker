@@ -53,7 +53,7 @@ const COMPLETE_TABLES = [
   'accounts_balance_history', 'planned_operations',
   'notification_merchant_rules', 'pending_notifications',
   'budget_plans', 'budget_plan_lines', 'budget_plan_line_categories',
-  'budget_plan_line_groups',
+  'budget_plan_line_groups', 'budget_plan_line_accounts',
 ];
 const mockSchemaComplete = (db, storedUserVersion) => {
   db.getFirstAsync.mockImplementation((q) => {
