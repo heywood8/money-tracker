@@ -1,5 +1,12 @@
 # Changelog
 
+## [0.253.0](https://github.com/heywood8/money-tracker/compare/penny-v0.252.0...penny-v0.253.0) (2026-08-02)
+
+
+### Features
+
+* **graphs:** city-level default zoom for the heatmap, no pinch-end jump ([#1531](https://github.com/heywood8/money-tracker/issues/1531)) ([1e96fe3](https://github.com/heywood8/money-tracker/commit/1e96fe368fc5ab2c3b0a3922bb0a58b6e65e60ab))
+
 ## [0.252.0](https://github.com/heywood8/money-tracker/compare/penny-v0.251.1...penny-v0.252.0) (2026-08-02)
 
 
