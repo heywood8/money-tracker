@@ -174,7 +174,15 @@ const HeatmapMapModal = ({
   // region (no touch-down snapshots), so gesture hand-offs — lifting to one
   // finger mid-pinch, adding a second finger mid-pan — never jump.
   const panLast = useRef({ x: 0, y: 0 });
-  const pinchLast = useRef({ scale: 1, fx: 0, fy: 0 });
+  const pinchLast = useRef({ scale: 1, fx: 0, fy: 0, pointers: 2 });
+
+  // A finger landing or lifting mid-gesture TELEPORTS the pinch centroid
+  // toward the remaining/added finger — that is not the user dragging, and
+  // treating it as a focal delta threw the map sideways at the end of every
+  // pinch (fingers never lift in the same frame). Any single-event focal move
+  // beyond this many px is such a teleport: re-anchor instead of translating.
+  // A real drag at 60 Hz stays far below it (48 px/frame ≈ 2900 px/s).
+  const FOCAL_TELEPORT_PX = 48;
 
   const composedGesture = useMemo(() => {
     const pan = Gesture.Pan()
@@ -198,6 +206,7 @@ const HeatmapMapModal = ({
           scale: 1,
           fx: e.focalX ?? width / 2,
           fy: e.focalY ?? height / 2,
+          pointers: e.numberOfPointers ?? 2,
         };
       })
       .onUpdate((e) => {
@@ -206,12 +215,24 @@ const HeatmapMapModal = ({
         const last = pinchLast.current;
         const fx = e.focalX ?? last.fx;
         const fy = e.focalY ?? last.fy;
+        const pointers = e.numberOfPointers ?? last.pointers;
+        // Centroid teleport (finger count changed, or the focal jumped
+        // farther than a finger can move in one frame): re-baseline both the
+        // focal point and the scale on the new configuration and apply
+        // nothing — the next event's deltas are trustworthy again.
+        const teleported = pointers !== last.pointers ||
+          Math.abs(fx - last.fx) > FOCAL_TELEPORT_PX ||
+          Math.abs(fy - last.fy) > FOCAL_TELEPORT_PX;
+        if (teleported) {
+          pinchLast.current = { scale: e.scale, fx, fy, pointers };
+          return;
+        }
         // Two-finger pan: how far the pinch centroid moved since last event.
         let next = translateRegion(regionRef.current, fx - last.fx, fy - last.fy);
         // Zoom by the scale delta, anchored on the current focal point.
         const factor = e.scale / (last.scale || 1);
         next = scaleRegion(next, factor, fx, fy, width, height);
-        pinchLast.current = { scale: e.scale, fx, fy };
+        pinchLast.current = { scale: e.scale, fx, fy, pointers };
         setRegion(next);
       });
     return Gesture.Simultaneous(pan, pinch);
