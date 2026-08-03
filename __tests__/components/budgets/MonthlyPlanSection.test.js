@@ -2,8 +2,9 @@
 /* eslint-disable react/prop-types */
 import React from 'react';
 import { render, fireEvent, waitFor, act } from '@testing-library/react-native';
-import { StyleSheet } from 'react-native';
+import { StyleSheet, View } from 'react-native';
 import MonthlyPlanSection from '../../../app/components/budgets/MonthlyPlanSection';
+import { OverlayHostProvider, OverlayOutlet } from '../../../app/contexts/OverlayHostContext';
 
 const COLORS = {
   background: '#111318',
@@ -210,15 +211,23 @@ const TEMPLATE_LINE = {
   hasTemplate: true, lastExecutedMonth: null,
 };
 
+// Mirrors App.js: the section renders inside the (blurred) content view, and the
+// long-press action menu it opens lands in the overlay outlet beside it. Without
+// the outlet the menu would mount nowhere at all.
 const renderSection = (ref, extraProps = {}) => render(
-  <MonthlyPlanSection
-    ref={ref}
-    currency="USD"
-    expenseCategories={EXPENSE_CATEGORIES}
-    incomeCategories={INCOME_CATEGORIES}
-    accounts={ACCOUNTS}
-    {...extraProps}
-  />,
+  <OverlayHostProvider>
+    <View>
+      <MonthlyPlanSection
+        ref={ref}
+        currency="USD"
+        expenseCategories={EXPENSE_CATEGORIES}
+        incomeCategories={INCOME_CATEGORIES}
+        accounts={ACCOUNTS}
+        {...extraProps}
+      />
+    </View>
+    <OverlayOutlet />
+  </OverlayHostProvider>,
 );
 
 const flatColor = (node) => StyleSheet.flatten(node.props.style)?.color;
@@ -238,22 +247,11 @@ const openEditor = async (ref, kind = 'expense') => {
 };
 
 // Reordering moved off the rows (a chevron pair on every one) and into the
-// long-press action sheet. `t` is the identity function here, so an action's
-// text is its translation key.
-const lastDialogAction = (key) => {
-  const calls = mockShowDialog.mock.calls;
-  const buttons = calls[calls.length - 1][2];
-  const action = buttons.find(b => b.text === key);
-  if (!action) {
-    throw new Error(`No "${key}" action in the last dialog: ${buttons.map(b => b.text).join(', ')}`);
-  }
-  return action;
-};
+// long-press action menu, which lifts the pressed row above a blurred backdrop
+// and floats an icon bar over it. Each action is a button in that bar.
+const menuAction = (getByTestId, key) => getByTestId(`plan-action-${key}`);
 
-const hasDialogAction = (key) => {
-  const calls = mockShowDialog.mock.calls;
-  return calls[calls.length - 1][2].some(b => b.text === key);
-};
+const hasMenuAction = (queryByTestId, key) => queryByTestId(`plan-action-${key}`) !== null;
 
 // Always act()-wrapped: several tests here long-press a row while its own
 // reorder/save round trip is still in flight, and firing an event outside act()
@@ -268,7 +266,7 @@ const longPressLine = async (getByTestId, lineId) => {
 const moveLine = async (getByTestId, lineId, direction) => {
   await longPressLine(getByTestId, lineId);
   await act(async () => {
-    lastDialogAction(direction === -1 ? 'move_up' : 'move_down').onPress();
+    fireEvent.press(menuAction(getByTestId, direction === -1 ? 'move-up' : 'move-down'));
   });
 };
 
@@ -1018,14 +1016,14 @@ describe('MonthlyPlanSection', () => {
       mockPlans.reorderRecurringLines = jest.fn(
         () => new Promise((resolve) => { releaseReorder = resolve; }),
       );
-      const { getByTestId } = await renderSection();
+      const { getByTestId, queryByTestId } = await renderSection();
       await waitFor(() => expect(getByTestId('plan-line-l-a')).toBeTruthy());
-      // Before the move: l-a is first, so its action sheet offers only "down".
-      // (The sheet omits a move that has nowhere to land — it used to be a pair
+      // Before the move: l-a is first, so its action bar offers only "down".
+      // (The bar omits a move that has nowhere to land — it used to be a pair
       // of chevrons whose disabled state said the same thing.)
       await longPressLine(getByTestId, 'l-a');
-      expect(hasDialogAction('move_up')).toBe(false);
-      expect(hasDialogAction('move_down')).toBe(true);
+      expect(hasMenuAction(queryByTestId, 'move-up')).toBe(false);
+      expect(hasMenuAction(queryByTestId, 'move-down')).toBe(true);
 
       await moveLine(getByTestId, 'l-a', 1);
 
@@ -1034,8 +1032,8 @@ describe('MonthlyPlanSection', () => {
       // order below can have changed is the optimistic setLines() call that
       // happens BEFORE that await.
       await longPressLine(getByTestId, 'l-a');
-      expect(hasDialogAction('move_up')).toBe(true);
-      expect(hasDialogAction('move_down')).toBe(false);
+      expect(hasMenuAction(queryByTestId, 'move-up')).toBe(true);
+      expect(hasMenuAction(queryByTestId, 'move-down')).toBe(false);
 
       await act(async () => { releaseReorder(); });
     });
@@ -1065,19 +1063,14 @@ describe('MonthlyPlanSection', () => {
 
       // Two taps in immediate succession (same JS task, before either resolves)
       // — a state-only guard would not catch this; only a synchronous ref does.
-      // The action is grabbed once and fired twice, which is what a real double
-      // tap on one sheet button does; re-opening the sheet in between would
-      // instead exercise the sheet's own bounds check.
-      // Two taps in immediate succession (same JS task, before either resolves)
-      // — a state-only guard would not catch this; only a synchronous ref does.
-      // The action is grabbed once and fired twice, which is what a real double
-      // tap on one sheet button does; re-opening the sheet in between would
-      // instead exercise the sheet's own bounds check.
+      // The button is grabbed once and pressed twice, which is what a real
+      // double tap on one action does; re-opening the menu in between would
+      // instead exercise the menu's own bounds check.
       await longPressLine(getByTestId, 'l-a');
-      const moveDown = lastDialogAction('move_down');
+      const moveDown = menuAction(getByTestId, 'move-down');
       await act(async () => {
-        moveDown.onPress();
-        moveDown.onPress();
+        fireEvent.press(moveDown);
+        fireEvent.press(moveDown);
       });
 
       await waitFor(() => expect(mockPlans.getLinesForMonth).toHaveBeenCalledTimes(2)); // mount + one reconcile
@@ -1098,10 +1091,10 @@ describe('MonthlyPlanSection', () => {
       await waitFor(() => expect(getByTestId('plan-line-l1')).toBeTruthy());
 
       await longPressLine(getByTestId, 'l1');
-      const moveDown = lastDialogAction('move_down');
+      const moveDown = menuAction(getByTestId, 'move-down');
       await act(async () => {
-        moveDown.onPress();
-        moveDown.onPress();
+        fireEvent.press(moveDown);
+        fireEvent.press(moveDown);
       });
 
       await waitFor(() => expect(mockPlans.getLinesForMonth).toHaveBeenCalledTimes(2));
@@ -1488,6 +1481,142 @@ describe('MonthlyPlanSection', () => {
       expect(getByTestId('plan-income-total')).toHaveTextContent(/150 \/ 220 USD/);
     });
   });
+  describe('Long-press action menu', () => {
+    // Long-pressing a budget used to open a "Select an action" dialog listing the
+    // row's name — the same actions, one step removed from the thing they act on.
+    // The row is now lifted above a blurred backdrop with an icon bar floating
+    // over it, exactly as an operation row already behaved.
+    const LINE = {
+      id: 'l1', planId: 'p1', amount: '100', label: 'Books', comment: null, kind: 'expense',
+      categoryId: 'cat1', toAccountId: null, sortOrder: 0, isBroken: false, isRecurring: false,
+      currency: 'USD',
+    };
+    const withLine = (line = LINE) => setPlans({
+      plans: [{ id: 'p1', month: THIS_MONTH, currency: 'USD', expectedIncome: '1000' }],
+      lines: [line],
+    });
+
+    it('opens the action bar instead of a dialog, and offers no move for a lone row', async () => {
+      withLine();
+      const { getByTestId, queryByTestId } = await renderSection();
+      await waitFor(() => expect(getByTestId('plan-line-l1')).toBeTruthy());
+
+      await longPressLine(getByTestId, 'l1');
+
+      expect(getByTestId('plan-action-menu-backdrop')).toBeTruthy();
+      expect(getByTestId('plan-action-edit')).toBeTruthy();
+      expect(getByTestId('plan-action-delete')).toBeTruthy();
+      // A single line has nowhere to move to, so neither move action is offered.
+      expect(hasMenuAction(queryByTestId, 'move-up')).toBe(false);
+      expect(hasMenuAction(queryByTestId, 'move-down')).toBe(false);
+      expect(mockShowDialog).not.toHaveBeenCalled();
+    });
+
+    it('opens the line editor from the menu', async () => {
+      withLine();
+      const { getByTestId } = await renderSection();
+      await waitFor(() => expect(getByTestId('plan-line-l1')).toBeTruthy());
+      await longPressLine(getByTestId, 'l1');
+
+      await act(async () => { fireEvent.press(menuAction(getByTestId, 'edit')); });
+
+      await waitFor(() => expect(getByTestId('mock-line-modal')).toBeTruthy());
+      expect(capturedModalProps.line.id).toBe('l1');
+    });
+
+    it('dismisses the menu once an action has run', async () => {
+      withLine();
+      const { getByTestId, queryByTestId } = await renderSection();
+      await waitFor(() => expect(getByTestId('plan-line-l1')).toBeTruthy());
+      await longPressLine(getByTestId, 'l1');
+
+      await act(async () => { fireEvent.press(menuAction(getByTestId, 'edit')); });
+
+      expect(queryByTestId('plan-action-menu-backdrop')).toBeNull();
+    });
+
+    it('dismisses on a backdrop tap without acting', async () => {
+      withLine();
+      const { getByTestId, queryByTestId } = await renderSection();
+      await waitFor(() => expect(getByTestId('plan-line-l1')).toBeTruthy());
+      await longPressLine(getByTestId, 'l1');
+
+      await act(async () => { fireEvent.press(getByTestId('plan-action-menu-backdrop')); });
+
+      expect(queryByTestId('plan-action-menu-backdrop')).toBeNull();
+      expect(queryByTestId('mock-line-modal')).toBeNull();
+      expect(mockPlans.deleteLine).not.toHaveBeenCalled();
+    });
+
+    it('still confirms before deleting a line', async () => {
+      withLine();
+      const { getByTestId } = await renderSection();
+      await waitFor(() => expect(getByTestId('plan-line-l1')).toBeTruthy());
+      await longPressLine(getByTestId, 'l1');
+
+      await act(async () => { fireEvent.press(menuAction(getByTestId, 'delete')); });
+
+      expect(mockShowDialog).toHaveBeenCalledWith(
+        'delete_allocation', 'delete_allocation_confirm', expect.anything(),
+      );
+      expect(mockPlans.deleteLine).not.toHaveBeenCalled();
+      const confirm = mockShowDialog.mock.calls.at(-1)[2].find(b => b.style === 'destructive');
+      await act(async () => { confirm.onPress(); });
+      expect(mockPlans.deleteLine).toHaveBeenCalledWith('l1');
+    });
+
+    it('offers execute and mark-done for a template line, and runs the execution', async () => {
+      setPlans({ plans: [], lines: [TEMPLATE_LINE] });
+      const { getByTestId, queryByTestId } = await renderSection();
+      await waitFor(() => expect(getByTestId('plan-line-l-tpl')).toBeTruthy());
+      await longPressLine(getByTestId, 'l-tpl');
+
+      expect(getByTestId('plan-action-done')).toBeTruthy();
+      expect(hasMenuAction(queryByTestId, 'undo')).toBe(false);
+      await act(async () => { fireEvent.press(menuAction(getByTestId, 'execute')); });
+
+      await waitFor(() => expect(mockPlans.executeLine).toHaveBeenCalledWith(
+        expect.objectContaining({ id: 'l-tpl' }), 'Rent',
+      ));
+    });
+
+    it('offers undo instead once the template has been executed this month', async () => {
+      setPlans({ plans: [], lines: [{ ...TEMPLATE_LINE, lastExecutedMonth: THIS_MONTH }] });
+      const { getByTestId, queryByTestId } = await renderSection();
+      await waitFor(() => expect(getByTestId('plan-line-l-tpl')).toBeTruthy());
+      await longPressLine(getByTestId, 'l-tpl');
+
+      expect(hasMenuAction(queryByTestId, 'execute')).toBe(false);
+      await act(async () => { fireEvent.press(menuAction(getByTestId, 'undo')); });
+
+      await waitFor(() => expect(mockPlans.unmarkLineExecuted).toHaveBeenCalledWith('l-tpl'));
+    });
+
+    it('offers no execution actions for a month other than the current one', async () => {
+      setPlans({ plans: [], lines: [TEMPLATE_LINE] });
+      const { getByTestId, queryByTestId } = await renderSection();
+      await waitFor(() => expect(getByTestId('plan-line-l-tpl')).toBeTruthy());
+      await act(async () => { fireEvent.press(getByTestId('plan-next-month')); });
+
+      await longPressLine(getByTestId, 'l-tpl');
+
+      expect(hasMenuAction(queryByTestId, 'execute')).toBe(false);
+      expect(hasMenuAction(queryByTestId, 'done')).toBe(false);
+      expect(getByTestId('plan-action-edit')).toBeTruthy();
+    });
+
+    it('names the shortened labels in full for a screen reader', async () => {
+      withLine();
+      const { getByTestId, getByLabelText } = await renderSection();
+      await waitFor(() => expect(getByTestId('plan-line-l1')).toBeTruthy());
+      await longPressLine(getByTestId, 'l1');
+
+      // The bar has room for one word per button; the phrase goes to the label.
+      expect(getByLabelText('edit_allocation')).toBeTruthy();
+      expect(getByLabelText('delete_allocation')).toBeTruthy();
+    });
+  });
+
   describe('Line groups (migration 0022)', () => {
     const GROUP = { id: 'g1', label: 'Car', amount: null, currency: null, sortOrder: 0, isDerived: true };
     const groupedLines = () => ([
@@ -1572,8 +1701,8 @@ describe('MonthlyPlanSection', () => {
       expect(queryByTestId('plan-group-g1')).toBeNull();
     });
 
-    it('opens the group editor from the long-press sheet', async () => {
-      // Editing moved off the tap, which folds the envelope now — the sheet is
+    it('opens the group editor from the long-press action menu', async () => {
+      // Editing moved off the tap, which folds the envelope now — the menu is
       // where every other whole-row action already lived.
       setPlans({
         plans: [{ id: 'p1', month: THIS_MONTH, currency: 'USD', expectedIncome: '0' }],
@@ -1583,9 +1712,44 @@ describe('MonthlyPlanSection', () => {
       const { getByTestId } = await renderSection();
       await waitFor(() => expect(getByTestId('plan-group-g1')).toBeTruthy());
       await longPressGroup(getByTestId, 'g1');
-      await act(async () => { lastDialogAction('edit_group').onPress(); });
+      await act(async () => { fireEvent.press(menuAction(getByTestId, 'edit')); });
       await waitFor(() => expect(getByTestId('plan-group-modal')).toBeTruthy());
       expect(getByTestId('plan-group-name').props.value).toBe('Car');
+    });
+
+    it('confirms before deleting a group from the action menu', async () => {
+      setPlans({
+        plans: [{ id: 'p1', month: THIS_MONTH, currency: 'USD', expectedIncome: '0' }],
+        lines: groupedLines(),
+        groups: [GROUP],
+      });
+      const { getByTestId } = await renderSection();
+      await waitFor(() => expect(getByTestId('plan-group-g1')).toBeTruthy());
+      await longPressGroup(getByTestId, 'g1');
+
+      await act(async () => { fireEvent.press(menuAction(getByTestId, 'delete')); });
+
+      expect(mockShowDialog).toHaveBeenCalledWith(
+        'delete_group', 'delete_group_confirm', expect.anything(),
+      );
+      expect(mockPlans.deleteLineGroup).not.toHaveBeenCalled();
+      const confirm = mockShowDialog.mock.calls.at(-1)[2].find(b => b.style === 'destructive');
+      await act(async () => { confirm.onPress(); });
+      expect(mockPlans.deleteLineGroup).toHaveBeenCalledWith('g1');
+    });
+
+    it('offers no move actions to an only envelope', async () => {
+      setPlans({
+        plans: [{ id: 'p1', month: THIS_MONTH, currency: 'USD', expectedIncome: '0' }],
+        lines: groupedLines(),
+        groups: [GROUP],
+      });
+      const { getByTestId, queryByTestId } = await renderSection();
+      await waitFor(() => expect(getByTestId('plan-group-g1')).toBeTruthy());
+      await longPressGroup(getByTestId, 'g1');
+
+      expect(hasMenuAction(queryByTestId, 'move-up')).toBe(false);
+      expect(hasMenuAction(queryByTestId, 'move-down')).toBe(false);
     });
 
     describe('Folding', () => {

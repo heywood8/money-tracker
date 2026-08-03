@@ -1,9 +1,11 @@
-import React, { memo } from 'react';
+import React, { memo, useRef } from 'react';
 import { View, Text, Pressable, StyleSheet } from 'react-native';
 import PropTypes from 'prop-types';
 import Icon from '@expo/vector-icons/MaterialCommunityIcons';
 import * as Currency from '../../services/currency';
 import PlanProgressBar, { PAIR_COLUMN_WIDTH } from './PlanProgressBar';
+import { useOverlayHost } from '../../contexts/OverlayHostContext';
+import { measureAnchorRect } from '../../utils/overlayGeometry';
 import { BORDER_RADIUS, FONT_SIZE, SPACING } from '../../styles/designTokens';
 
 // Stands in for a figure whose exchange rate is still resolving — same em dash
@@ -53,6 +55,7 @@ const PlanGroupRow = memo(function PlanGroupRow({
   onMove = null,
   onToggle,
   onLongPress,
+  testIDPrefix = 'plan-group',
 }) {
   const isUnconvertible = status?.status === 'unconvertible';
   // A group is "tracked" once its actual is known — which only the async plan
@@ -97,11 +100,23 @@ const PlanGroupRow = memo(function PlanGroupRow({
     ? Currency.formatCompact(status.childAmount)
     : null;
 
+  // Measured on long-press so the host can lift a copy of this row above the
+  // blurred backdrop and anchor its action bar to it — see PlanLineRow for why the
+  // overlay host is the thing being measured against.
+  const rowRef = useRef(null);
+  const { hostRef } = useOverlayHost();
+  const handleLongPress = () => {
+    measureAnchorRect(rowRef.current, hostRef?.current, (layout) => {
+      onLongPress(group, index, listLength, onMove, layout);
+    });
+  };
+
   return (
     <Pressable
+      ref={rowRef}
       style={styles.groupRow}
       onPress={() => onToggle(group)}
-      onLongPress={() => onLongPress(group, index, listLength, onMove)}
+      onLongPress={handleLongPress}
       accessibilityRole="button"
       // Names the envelope and its figures; what the tap DOES is the hint, and
       // whether it is open is the state — a label that said "Edit group" was
@@ -109,14 +124,14 @@ const PlanGroupRow = memo(function PlanGroupRow({
       accessibilityLabel={`${group.label}, ${primaryText}${pairText ? `, ${pairText}` : ''}, ${childCount} ${t('allocations')}`}
       accessibilityHint={collapsed ? t('expand_group') : t('collapse_group')}
       accessibilityState={{ expanded: !collapsed }}
-      testID={`plan-group-${group.id}`}
+      testID={`${testIDPrefix}-${group.id}`}
     >
       {/* The head of the rail that runs down this envelope's children. At full
           strength here and dimmed on them: the header is the thing being
           identified, the rows below it are its parts. */}
       <View
         style={[styles.rail, { backgroundColor: envelopeColor }]}
-        testID={`plan-group-rail-${group.id}`}
+        testID={`${testIDPrefix}-rail-${group.id}`}
       />
       <View style={styles.groupInner}>
         <View style={styles.groupTop}>
@@ -134,7 +149,7 @@ const PlanGroupRow = memo(function PlanGroupRow({
             name={collapsed ? 'folder' : 'folder-open'}
             size={20}
             color={envelopeColor}
-            testID={`plan-group-folder-${group.id}`}
+            testID={`${testIDPrefix}-folder-${group.id}`}
           />
           <View style={styles.groupBody}>
             <Text style={[styles.groupName, { color: colors.text }]} numberOfLines={1}>
@@ -153,7 +168,7 @@ const PlanGroupRow = memo(function PlanGroupRow({
                 <Text
                   style={[styles.groupMeta, { color: colors.mutedText }]}
                   numberOfLines={1}
-                  testID={`plan-group-childsum-${group.id}`}
+                  testID={`${testIDPrefix}-childsum-${group.id}`}
                 >
                   · Σ {childSum}
                 </Text>
@@ -162,7 +177,7 @@ const PlanGroupRow = memo(function PlanGroupRow({
           </View>
           <Text
             style={[styles.groupAmount, { color: overspent ? colors.overspend : colors.text }]}
-            testID={`plan-group-primary-${group.id}`}
+            testID={`${testIDPrefix}-primary-${group.id}`}
           >
             {converting && target == null ? CONVERTING_PLACEHOLDER : primaryText}
           </Text>
@@ -177,14 +192,14 @@ const PlanGroupRow = memo(function PlanGroupRow({
                 fillColor={`${colors.mutedText}${FILL_ALPHA}`}
                 overspendColor={colors.overspend}
                 height={5}
-                testID={`plan-group-bar-${group.id}`}
+                testID={`${testIDPrefix}-bar-${group.id}`}
               />
             </View>
             {pairText && (
               <Text
                 style={[styles.groupPair, { color: colors.mutedText }]}
                 numberOfLines={1}
-                testID={`plan-group-pair-${group.id}`}
+                testID={`${testIDPrefix}-pair-${group.id}`}
               >
                 {pairText}
               </Text>
@@ -196,7 +211,7 @@ const PlanGroupRow = memo(function PlanGroupRow({
           // The group's own budget is in a currency with no rate to the screen's,
           // so the figure above fell back to its children's sum — say why rather
           // than quietly printing a different number than the user typed.
-          <View style={styles.noteRow} testID={`plan-group-unconvertible-${group.id}`}>
+          <View style={styles.noteRow} testID={`${testIDPrefix}-unconvertible-${group.id}`}>
             <Icon name="alert-circle-outline" size={14} color={colors.mutedText} />
             <Text style={[styles.noteText, { color: colors.mutedText }]} numberOfLines={1}>
               {t('graphs_currencies_not_converted')}
@@ -230,6 +245,8 @@ PlanGroupRow.propTypes = {
   onMove: PropTypes.func,
   onToggle: PropTypes.func.isRequired,
   onLongPress: PropTypes.func.isRequired,
+  // See PlanLineRow: the lifted copy renders under its own testID namespace.
+  testIDPrefix: PropTypes.string,
 };
 
 export default PlanGroupRow;

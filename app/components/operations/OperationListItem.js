@@ -5,7 +5,7 @@ import Icon from '@expo/vector-icons/MaterialCommunityIcons';
 import PropTypes from 'prop-types';
 import { getCategoryNames } from '../../utils/categoryUtils';
 import { parseLabels, visibleListLabels, displayLabel } from '../../utils/labelUtils';
-import { anchorRectInHost } from '../../utils/overlayGeometry';
+import { measureAnchorRect } from '../../utils/overlayGeometry';
 import DescriptionSuggestionRow from './DescriptionSuggestionRow';
 import { useOverlayHost } from '../../contexts/OverlayHostContext';
 import { SPACING, FONT_SIZE, FONT_WEIGHT, ICON_SIZE, HEIGHTS } from '../../styles/designTokens';
@@ -51,27 +51,13 @@ const OperationListItem = ({
     onEdit(operation);
   }, [onEdit, operation]);
   const handleLongPress = useCallback(() => {
-    const node = rowRef.current;
-    const host = hostRef?.current;
-    // No host (or no measurement support, as under test): the menu still opens, just
-    // centred instead of anchored.
-    if (!node || !host
-      || typeof node.measureInWindow !== 'function'
-      || typeof host.measureInWindow !== 'function') {
-      onLongPress(operation, null);
-      return;
-    }
     // Both ends are measured in WINDOW coordinates and then subtracted (see
-    // anchorRectInHost) rather than measuring the row against the host directly —
+    // measureAnchorRect) rather than measuring the row against the host directly —
     // `measureLayout` ignores the list's scroll translation, which put the lifted
-    // clone a whole scroll offset below the row it was copying.
-    host.measureInWindow((hostX, hostY) => {
-      node.measureInWindow((x, y, width, height) => {
-        onLongPress(
-          operation,
-          anchorRectInHost({ x, y, width, height }, { x: hostX, y: hostY }),
-        );
-      });
+    // clone a whole scroll offset below the row it was copying. With no host to
+    // measure against the menu still opens, just centred instead of anchored.
+    measureAnchorRect(rowRef.current, hostRef?.current, (layout) => {
+      onLongPress(operation, layout);
     });
   }, [onLongPress, operation, hostRef]);
   const isExpense = operation.type === 'expense';
