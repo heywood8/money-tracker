@@ -1,5 +1,17 @@
 # Changelog
 
+## [0.257.0](https://github.com/heywood8/money-tracker/compare/penny-v0.256.1...penny-v0.257.0) (2026-08-03)
+
+
+### Features
+
+* **budgets:** lift the pressed row on long press instead of a dialog ([#1555](https://github.com/heywood8/money-tracker/issues/1555)) ([381661c](https://github.com/heywood8/money-tracker/commit/381661c1264499cd9eb653d558cf74f50a49e28c))
+
+
+### Code Refactoring
+
+* **accounts:** rename "hidden accounts" to "archived accounts" ([#1553](https://github.com/heywood8/money-tracker/issues/1553)) ([53e0fae](https://github.com/heywood8/money-tracker/commit/53e0faeba6ff76a4b3144643fa1821567316c128))
+
 ## [0.256.1](https://github.com/heywood8/money-tracker/compare/penny-v0.256.0...penny-v0.256.1) (2026-08-03)
 
 
