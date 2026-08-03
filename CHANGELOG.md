@@ -1,5 +1,17 @@
 # Changelog
 
+## [0.258.0](https://github.com/heywood8/money-tracker/compare/penny-v0.257.0...penny-v0.258.0) (2026-08-03)
+
+
+### Features
+
+* **graphs:** scroll the spending trend through the whole history ([#1554](https://github.com/heywood8/money-tracker/issues/1554)) ([e92db94](https://github.com/heywood8/money-tracker/commit/e92db94b86a2c2f2ef7d79e384e8e88d63c00a6b))
+
+
+### Miscellaneous Chores
+
+* **main:** release penny 0.257.0 ([#1557](https://github.com/heywood8/money-tracker/issues/1557)) ([50b992d](https://github.com/heywood8/money-tracker/commit/50b992d0e342b8b19a01b90b3244c1b2776b9ddf))
+
 ## [0.257.0](https://github.com/heywood8/money-tracker/compare/penny-v0.256.1...penny-v0.257.0) (2026-08-03)
 
 
