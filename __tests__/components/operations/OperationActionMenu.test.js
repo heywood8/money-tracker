@@ -1,10 +1,13 @@
 /**
- * Tests for OperationActionMenu — the long-press context menu shown over an
- * operation row (Edit / Repeat / hide-from-charts / Delete on a lifted, blurred
- * backdrop).
+ * Tests for OperationActionMenu — the ACTION LIST an operation row offers on long
+ * press (Edit / Repeat / hide-from-charts / Delete).
+ *
+ * The presentation those actions arrive in — the lifted copy of the row, the
+ * blurred backdrop, dismissal, hardware back — belongs to RowActionMenu and is
+ * covered in __tests__/components/RowActionMenu.test.js.
  */
 import React from 'react';
-import { BackHandler, StyleSheet, Text, View } from 'react-native';
+import { StyleSheet, Text, View } from 'react-native';
 import { render, fireEvent, waitFor } from '@testing-library/react-native';
 import OperationActionMenu from '../../../app/components/operations/OperationActionMenu';
 import {
@@ -59,13 +62,6 @@ const renderMenu = (props) => render(tree(props));
 
 describe('OperationActionMenu', () => {
   beforeEach(() => jest.clearAllMocks());
-
-  it('renders nothing when menu is null', async () => {
-    const { queryByTestId } = await renderMenu({ menu: null, ...baseProps() });
-    await waitFor(() => expect(queryByTestId('overlay-outlet')).toBeNull());
-    expect(queryByTestId('operation-action-edit')).toBeNull();
-    expect(queryByTestId('operation-action-menu-backdrop')).toBeNull();
-  });
 
   it('renders the action buttons and the lifted row when open', async () => {
     const { getByTestId, getByText } = await renderMenu({ menu: makeMenu(), ...baseProps() });
@@ -124,73 +120,16 @@ describe('OperationActionMenu', () => {
     });
   });
 
-  it('dismisses when the backdrop is pressed', async () => {
-    const props = baseProps();
-    const { getByTestId } = await renderMenu({ menu: makeMenu(), ...props });
-    await waitFor(() => expect(getByTestId('operation-action-menu-backdrop')).toBeTruthy());
-    fireEvent.press(getByTestId('operation-action-menu-backdrop'));
-    expect(props.onClose).toHaveBeenCalledTimes(1);
-  });
+  // The reason this component's frame left <Modal> behind: a Modal is a separate
+  // native window, so a row measured in app coordinates and redrawn inside it drifts
+  // by whatever the two origins disagree on. That, and the hardware-back wiring it
+  // forced, are RowActionMenu's now — what stays here is that an operation's row
+  // reaches the overlay at all.
+  it('lifts the pressed row into the overlay layer', async () => {
+    const { getByTestId, getByText } = await renderMenu({ menu: makeMenu(), ...baseProps() });
+    await waitFor(() => expect(getByTestId('overlay-outlet')).toBeTruthy());
 
-  describe('Overlay placement', () => {
-    // The reason this component left <Modal> behind: a Modal is a separate native
-    // window, so a row measured in app coordinates and redrawn inside it drifts by
-    // whatever the two origins disagree on. The overlay shares a parent with the
-    // content, so `layout.y` addresses the same pixel on both sides.
-    it('draws the lifted clone at the measured row position', async () => {
-      const { getByTestId, getByText } = await renderMenu({ menu: makeMenu(), ...baseProps() });
-      await waitFor(() => expect(getByTestId('overlay-outlet')).toBeTruthy());
-
-      const clone = getByText('Groceries').parent;
-      expect(StyleSheet.flatten(clone.props.style)).toMatchObject({ top: 200, left: 16, width: 320 });
-    });
-
-    it('mounts the overlay into the outlet, not in place', async () => {
-      const { getByTestId } = await renderMenu({ menu: makeMenu(), ...baseProps() });
-      const outlet = await waitFor(() => getByTestId('overlay-outlet'));
-      // Walking up from the backdrop must reach the outlet: that is what proves the
-      // content and the menu live under one shared ancestor.
-      let node = getByTestId('operation-action-menu-backdrop').parent;
-      let found = false;
-      while (node) {
-        if (node === outlet) { found = true; break; }
-        node = node.parent;
-      }
-      expect(found).toBe(true);
-    });
-
-    it('unmounts the overlay when the menu closes', async () => {
-      const props = baseProps();
-      const { queryByTestId, rerender } = await renderMenu({ menu: makeMenu(), ...props });
-      await waitFor(() => expect(queryByTestId('operation-action-menu-backdrop')).toBeTruthy());
-
-      rerender(tree({ menu: null, ...props }));
-
-      await waitFor(() => expect(queryByTestId('operation-action-menu-backdrop')).toBeNull());
-    });
-  });
-
-  describe('Regression Tests', () => {
-    // Without a Modal window there is no onRequestClose, so back has to be wired by
-    // hand — otherwise the hardware back button would leave the screen with the menu
-    // still up.
-    it('closes on hardware back while open', async () => {
-      const props = baseProps();
-      const spy = jest.spyOn(BackHandler, 'addEventListener');
-      await renderMenu({ menu: makeMenu(), ...props });
-
-      await waitFor(() => expect(spy).toHaveBeenCalledWith('hardwareBackPress', expect.any(Function)));
-      const handler = spy.mock.calls.at(-1)[1];
-      expect(handler()).toBe(true);
-      expect(props.onClose).toHaveBeenCalledTimes(1);
-      spy.mockRestore();
-    });
-
-    it('does not intercept hardware back while closed', async () => {
-      const spy = jest.spyOn(BackHandler, 'addEventListener');
-      await renderMenu({ menu: null, ...baseProps() });
-      await waitFor(() => expect(spy).not.toHaveBeenCalled());
-      spy.mockRestore();
-    });
+    const clone = getByText('Groceries').parent;
+    expect(StyleSheet.flatten(clone.props.style)).toMatchObject({ top: 200, left: 16, width: 320 });
   });
 });

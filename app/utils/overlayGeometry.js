@@ -29,3 +29,30 @@ export const anchorRectInHost = (rowRect, hostOrigin) => {
     height: rowRect.height,
   };
 };
+
+/**
+ * Measure a row against the overlay host and hand the resulting rect to `callback`.
+ *
+ * Every long-pressable row that lifts itself into an action menu needs the same
+ * three steps — measure the host, measure the row, subtract — and the same
+ * fallback when either end cannot be measured (no host mounted, or a test
+ * renderer whose nodes have no measure methods). The callback is invoked with
+ * `null` in that case: the menu still opens, just centred instead of anchored.
+ *
+ * @param {object|null} node - the row's native node (a ref's current value)
+ * @param {object|null} host - the overlay host's native node
+ * @param {(rect: {x: number, y: number, width: number, height: number}|null) => void} callback
+ */
+export const measureAnchorRect = (node, host, callback) => {
+  if (!node || !host
+    || typeof node.measureInWindow !== 'function'
+    || typeof host.measureInWindow !== 'function') {
+    callback(null);
+    return;
+  }
+  host.measureInWindow((hostX, hostY) => {
+    node.measureInWindow((x, y, width, height) => {
+      callback(anchorRectInHost({ x, y, width, height }, { x: hostX, y: hostY }));
+    });
+  });
+};

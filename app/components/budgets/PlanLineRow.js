@@ -6,9 +6,12 @@ import PropTypes from 'prop-types';
 import Icon from '@expo/vector-icons/MaterialCommunityIcons';
 import * as Currency from '../../services/currency';
 import PlanProgressBar, { PAIR_COLUMN_WIDTH } from './PlanProgressBar';
+import useAnchoredLongPress from '../../hooks/useAnchoredLongPress';
 import { BORDER_RADIUS, FONT_SIZE, SPACING } from '../../styles/designTokens';
 import { ENVELOPE_RAIL_CHILD_ALPHA } from '../../styles/envelopePalette';
 import { SPRING_BADGE_POP } from '../../utils/motion';
+
+const NOOP = () => {};
 
 // Where the badge springs from when its state flips. Not 0: a glyph growing out
 // of nothing reads as an element arriving, and this one was already there — it
@@ -66,12 +69,17 @@ const PlanLineRow = memo(function PlanLineRow({
   envelopeColor = null,
   listLength,
   onMove = null,
-  onPress,
-  onLongPress,
+  onPress = NOOP,
+  onLongPress = NOOP,
   onExecute = null,
   onMarkExecuted = null,
   onUndo = null,
+  lifted = false,
 }) {
+  // The lifted copy answers to its own testIDs: it is drawn on top of the row it
+  // copies, and two nodes under one testID is a query that can no longer name
+  // either of them.
+  const testIDPrefix = lifted ? 'plan-line-lifted' : 'plan-line';
   const lineCurrency = line.currency || planCurrency;
   const isBroken = line.isBroken || status?.broken;
   // The screen shows exactly one currency, so a row prints a bare number in it —
@@ -200,8 +208,15 @@ const PlanLineRow = memo(function PlanLineRow({
     line.hasTemplate ? (executed ? t('done') : t('pending_execution')) : null,
   ].filter(Boolean).join(', ');
 
+  // Measured on long-press so the host can lift a copy of this exact row above the
+  // blurred backdrop and float its action bar over it (see RowActionMenu).
+  const [rowRef, handleLongPress] = useAnchoredLongPress(
+    (layout) => onLongPress(line, index, listLength, onMove, layout),
+  );
+
   const content = (
     <Pressable
+      ref={rowRef}
       style={styles.lineRow}
       onPress={() => onPress(line)}
       // The row renders nothing from `listLength`/`onMove` — it forwards them so
@@ -209,10 +224,10 @@ const PlanLineRow = memo(function PlanLineRow({
       // having the host close over them in an inline callback) is what lets
       // `onLongPress` stay a stable reference, and therefore what keeps this
       // component's memo() from being defeated on every parent render.
-      onLongPress={() => onLongPress(line, index, listLength, onMove)}
+      onLongPress={handleLongPress}
       accessibilityRole="button"
       accessibilityLabel={`${t('edit_allocation')}: ${name}, ${primaryText}, ${stateWords}`}
-      testID={`plan-line-${line.id}`}
+      testID={`${testIDPrefix}-${line.id}`}
     >
       {/* The envelope's rail, continued down past its header through every one
           of its children — one bracket down the side of the group rather than a
@@ -224,7 +239,7 @@ const PlanLineRow = memo(function PlanLineRow({
       {indented && envelopeColor && (
         <View
           style={[styles.rail, { backgroundColor: `${envelopeColor}${ENVELOPE_RAIL_CHILD_ALPHA}` }]}
-          testID={`plan-line-rail-${line.id}`}
+          testID={`${testIDPrefix}-rail-${line.id}`}
         />
       )}
       <View style={[styles.lineInner, indented && styles.lineInnerIndented]}>
@@ -237,14 +252,14 @@ const PlanLineRow = memo(function PlanLineRow({
                 between states. */}
             {executed ? (
               <Animated.View
-                testID={`plan-line-check-${line.id}`}
+                testID={`${testIDPrefix}-check-${line.id}`}
                 style={[styles.checkBadge, { borderColor: colors.surface, backgroundColor: colors.income }, badgeStyle]}
               >
                 <Icon name="check" size={7} color="white" />
               </Animated.View>
             ) : line.hasTemplate ? (
               <Animated.View
-                testID={`plan-line-pending-${line.id}`}
+                testID={`${testIDPrefix}-pending-${line.id}`}
                 style={[styles.checkBadge, { borderColor: colors.surface, backgroundColor: colors.primary }, badgeStyle]}
               >
                 <Icon name="play" size={7} color="white" />
@@ -270,7 +285,7 @@ const PlanLineRow = memo(function PlanLineRow({
                   name="numeric-1-circle-outline"
                   size={13}
                   color={colors.mutedText}
-                  testID={`plan-line-one-time-${line.id}`}
+                  testID={`${testIDPrefix}-one-time-${line.id}`}
                 />
               )}
             </View>
@@ -285,7 +300,7 @@ const PlanLineRow = memo(function PlanLineRow({
           </View>
           <Text
             style={[styles.lineAmount, { color: primaryColor }]}
-            testID={`plan-line-primary-${line.id}`}
+            testID={`${testIDPrefix}-primary-${line.id}`}
           >
             {primaryText}
           </Text>
@@ -304,14 +319,14 @@ const PlanLineRow = memo(function PlanLineRow({
                 trackColor={`${colors.mutedText}${TRACK_ALPHA}`}
                 fillColor={`${colors.mutedText}${FILL_ALPHA}`}
                 overspendColor={colors.overspend}
-                testID={`plan-line-bar-${line.id}`}
+                testID={`${testIDPrefix}-bar-${line.id}`}
               />
             </View>
             {pairText && (
               <Text
                 style={[styles.linePair, { color: colors.mutedText }]}
                 numberOfLines={1}
-                testID={`plan-line-pair-${line.id}`}
+                testID={`${testIDPrefix}-pair-${line.id}`}
               >
                 {pairText}
               </Text>
@@ -320,7 +335,7 @@ const PlanLineRow = memo(function PlanLineRow({
         )}
 
         {isBroken ? (
-          <View style={styles.brokenRow} testID={`plan-line-broken-${line.id}`}>
+          <View style={styles.brokenRow} testID={`${testIDPrefix}-broken-${line.id}`}>
             <Icon name="alert-circle-outline" size={14} color={colors.danger} />
             <Text style={[styles.brokenText, { color: colors.danger }]} numberOfLines={1}>
               {t('relink_target')}
@@ -332,7 +347,7 @@ const PlanLineRow = memo(function PlanLineRow({
           // row explains why it is the one number on screen in a foreign unit.
           // There is deliberately no bar: comparing it against actuals in another
           // currency is exactly the mismatch this branch exists to avoid.
-          <View style={styles.brokenRow} testID={`plan-line-unconvertible-${line.id}`}>
+          <View style={styles.brokenRow} testID={`${testIDPrefix}-unconvertible-${line.id}`}>
             <Icon name="alert-circle-outline" size={14} color={colors.mutedText} />
             <Text style={[styles.brokenText, { color: colors.mutedText }]} numberOfLines={1}>
               {t('graphs_currencies_not_converted')}
@@ -362,7 +377,7 @@ const PlanLineRow = memo(function PlanLineRow({
 
   const rightActions = executed
     ? () => swipeButton({
-      testID: `plan-line-undo-${line.id}`,
+      testID: `${testIDPrefix}-undo-${line.id}`,
       background: colors.mutedText,
       icon: 'undo',
       caption: t('undo'),
@@ -372,7 +387,7 @@ const PlanLineRow = memo(function PlanLineRow({
     : () => (
       <View style={styles.swipeActionsRow}>
         {swipeButton({
-          testID: `plan-line-execute-${line.id}`,
+          testID: `${testIDPrefix}-execute-${line.id}`,
           background: colors.primary,
           icon: 'play',
           caption: t('execute'),
@@ -380,7 +395,7 @@ const PlanLineRow = memo(function PlanLineRow({
           handler: onExecute,
         })}
         {swipeButton({
-          testID: `plan-line-done-${line.id}`,
+          testID: `${testIDPrefix}-done-${line.id}`,
           background: colors.income,
           icon: 'check-bold',
           caption: t('done'),
@@ -435,11 +450,14 @@ PlanLineRow.propTypes = {
   indented: PropTypes.bool,
   envelopeColor: PropTypes.string,
   onMove: PropTypes.func,
-  onPress: PropTypes.func.isRequired,
-  onLongPress: PropTypes.func.isRequired,
+  onPress: PropTypes.func,
+  onLongPress: PropTypes.func,
   onExecute: PropTypes.func,
   onMarkExecuted: PropTypes.func,
   onUndo: PropTypes.func,
+  // Renders the static copy the action menu lifts over the row: its own testID
+  // namespace, and no handlers to wire.
+  lifted: PropTypes.bool,
 };
 
 export default PlanLineRow;

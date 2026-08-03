@@ -565,18 +565,16 @@ const OperationsScreen = () => {
 
   const closeActionMenu = useCallback(() => setActionMenu(null), []);
 
-  // Read the current menu from state (fresh via deps) and run the side effect
-  // outside setState — a state updater must stay pure (StrictMode double-invokes
-  // it, which would fire the action twice).
+  // The menu dismisses itself before running an action (see RowActionMenu), so
+  // these only have to act. They read the pressed operation from the menu state
+  // this render closed over, which is still the open menu's.
   const handleMenuEdit = useCallback(() => {
     const op = actionMenu?.operation;
-    setActionMenu(null);
     if (op) handleEditOperation(op);
   }, [actionMenu, handleEditOperation]);
 
   const handleMenuRepeat = useCallback(() => {
     const op = actionMenu?.operation;
-    setActionMenu(null);
     if (op) handleRepeatOperation(op);
   }, [actionMenu, handleRepeatOperation]);
 
@@ -586,7 +584,6 @@ const OperationsScreen = () => {
   // keep a correction out of the donut and the spending trend.
   const handleMenuToggleCharts = useCallback(async () => {
     const op = actionMenu?.operation;
-    setActionMenu(null);
     if (!op) return;
     // updateOperation surfaces its own failures via dialog (OperationsActionsContext).
     await updateOperation(op.id, { excludeFromCharts: !op.excludeFromCharts });
@@ -594,7 +591,6 @@ const OperationsScreen = () => {
 
   const handleMenuDelete = useCallback(() => {
     const op = actionMenu?.operation;
-    setActionMenu(null);
     if (op) handleDeleteOperation(op);
   }, [actionMenu, handleDeleteOperation]);
 

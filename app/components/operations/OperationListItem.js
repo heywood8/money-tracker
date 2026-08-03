@@ -1,13 +1,12 @@
-import React, { memo, useMemo, useRef, useCallback } from 'react';
+import React, { memo, useMemo, useCallback } from 'react';
 import { View, Text, StyleSheet, ActivityIndicator } from 'react-native';
 import { TouchableRipple } from 'react-native-paper';
 import Icon from '@expo/vector-icons/MaterialCommunityIcons';
 import PropTypes from 'prop-types';
 import { getCategoryNames } from '../../utils/categoryUtils';
 import { parseLabels, visibleListLabels, displayLabel } from '../../utils/labelUtils';
-import { anchorRectInHost } from '../../utils/overlayGeometry';
 import DescriptionSuggestionRow from './DescriptionSuggestionRow';
-import { useOverlayHost } from '../../contexts/OverlayHostContext';
+import useAnchoredLongPress from '../../hooks/useAnchoredLongPress';
 import { SPACING, FONT_SIZE, FONT_WEIGHT, ICON_SIZE, HEIGHTS } from '../../styles/designTokens';
 import currencies from '../../../assets/currencies.json';
 
@@ -36,13 +35,6 @@ const OperationListItem = ({
   onApplySuggestion = () => {},
   onDismissSuggestion = () => {},
 }) => {
-  // Measure the row on long-press so the caller can float an action menu / lifted
-  // clone exactly over it (see OperationActionMenu). Measured against the overlay
-  // host — the shared ancestor of this row and of the layer the clone is drawn in —
-  // rather than the window: same origin on both ends, so the clone cannot land
-  // anywhere but on top of the row it copies.
-  const rowRef = useRef(null);
-  const { hostRef } = useOverlayHost();
   // Bind the operation to the edit handler INSIDE the row so the stable `onEdit`
   // prop can flow down unchanged. This keeps OperationListItem's React.memo
   // compare stable — the list no longer hands each row a fresh inline
@@ -50,30 +42,13 @@ const OperationListItem = ({
   const handlePress = useCallback(() => {
     onEdit(operation);
   }, [onEdit, operation]);
-  const handleLongPress = useCallback(() => {
-    const node = rowRef.current;
-    const host = hostRef?.current;
-    // No host (or no measurement support, as under test): the menu still opens, just
-    // centred instead of anchored.
-    if (!node || !host
-      || typeof node.measureInWindow !== 'function'
-      || typeof host.measureInWindow !== 'function') {
-      onLongPress(operation, null);
-      return;
-    }
-    // Both ends are measured in WINDOW coordinates and then subtracted (see
-    // anchorRectInHost) rather than measuring the row against the host directly —
-    // `measureLayout` ignores the list's scroll translation, which put the lifted
-    // clone a whole scroll offset below the row it was copying.
-    host.measureInWindow((hostX, hostY) => {
-      node.measureInWindow((x, y, width, height) => {
-        onLongPress(
-          operation,
-          anchorRectInHost({ x, y, width, height }, { x: hostX, y: hostY }),
-        );
-      });
-    });
-  }, [onLongPress, operation, hostRef]);
+  // Measure the row on long-press so the caller can float an action menu / lifted
+  // clone exactly over it (see RowActionMenu). The callback is memoized for the
+  // same reason `handlePress` is: a fresh one per render would hand the Pressable
+  // a new prop on every parent render of a memoized row.
+  const [rowRef, handleLongPress] = useAnchoredLongPress(
+    useCallback((layout) => onLongPress(operation, layout), [onLongPress, operation]),
+  );
   const isExpense = operation.type === 'expense';
   const isIncome = operation.type === 'income';
   const isTransfer = operation.type === 'transfer';

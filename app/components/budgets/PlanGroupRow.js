@@ -4,7 +4,10 @@ import PropTypes from 'prop-types';
 import Icon from '@expo/vector-icons/MaterialCommunityIcons';
 import * as Currency from '../../services/currency';
 import PlanProgressBar, { PAIR_COLUMN_WIDTH } from './PlanProgressBar';
+import useAnchoredLongPress from '../../hooks/useAnchoredLongPress';
 import { BORDER_RADIUS, FONT_SIZE, SPACING } from '../../styles/designTokens';
+
+const NOOP = () => {};
 
 // Stands in for a figure whose exchange rate is still resolving — same em dash
 // PlanLineRow uses, for the same reason.
@@ -51,9 +54,13 @@ const PlanGroupRow = memo(function PlanGroupRow({
   listLength,
   collapsed = true,
   onMove = null,
-  onToggle,
-  onLongPress,
+  onToggle = NOOP,
+  onLongPress = NOOP,
+  lifted = false,
 }) {
+  // See PlanLineRow: the copy the action menu lifts over this row needs testIDs
+  // of its own, or a query naming the row matches both.
+  const testIDPrefix = lifted ? 'plan-group-lifted' : 'plan-group';
   const isUnconvertible = status?.status === 'unconvertible';
   // A group is "tracked" once its actual is known — which only the async plan
   // status can supply (per-line actuals are not computed on the client). Until
@@ -97,11 +104,21 @@ const PlanGroupRow = memo(function PlanGroupRow({
     ? Currency.formatCompact(status.childAmount)
     : null;
 
+  // Measured on long-press so the host can lift a copy of this row above the
+  // blurred backdrop and anchor its action bar to it.
+  const [rowRef, handleLongPress] = useAnchoredLongPress(
+    (layout) => onLongPress(group, index, listLength, onMove, layout),
+  );
+
   return (
     <Pressable
-      style={styles.groupRow}
+      ref={rowRef}
+      // The row's top margin is what separates one envelope from whatever is
+      // above it in the list; the lifted copy has nothing to separate from, and
+      // the margin would push it that far below the row it covers.
+      style={[styles.groupRow, lifted && styles.groupRowLifted]}
       onPress={() => onToggle(group)}
-      onLongPress={() => onLongPress(group, index, listLength, onMove)}
+      onLongPress={handleLongPress}
       accessibilityRole="button"
       // Names the envelope and its figures; what the tap DOES is the hint, and
       // whether it is open is the state — a label that said "Edit group" was
@@ -109,14 +126,14 @@ const PlanGroupRow = memo(function PlanGroupRow({
       accessibilityLabel={`${group.label}, ${primaryText}${pairText ? `, ${pairText}` : ''}, ${childCount} ${t('allocations')}`}
       accessibilityHint={collapsed ? t('expand_group') : t('collapse_group')}
       accessibilityState={{ expanded: !collapsed }}
-      testID={`plan-group-${group.id}`}
+      testID={`${testIDPrefix}-${group.id}`}
     >
       {/* The head of the rail that runs down this envelope's children. At full
           strength here and dimmed on them: the header is the thing being
           identified, the rows below it are its parts. */}
       <View
         style={[styles.rail, { backgroundColor: envelopeColor }]}
-        testID={`plan-group-rail-${group.id}`}
+        testID={`${testIDPrefix}-rail-${group.id}`}
       />
       <View style={styles.groupInner}>
         <View style={styles.groupTop}>
@@ -134,7 +151,7 @@ const PlanGroupRow = memo(function PlanGroupRow({
             name={collapsed ? 'folder' : 'folder-open'}
             size={20}
             color={envelopeColor}
-            testID={`plan-group-folder-${group.id}`}
+            testID={`${testIDPrefix}-folder-${group.id}`}
           />
           <View style={styles.groupBody}>
             <Text style={[styles.groupName, { color: colors.text }]} numberOfLines={1}>
@@ -153,7 +170,7 @@ const PlanGroupRow = memo(function PlanGroupRow({
                 <Text
                   style={[styles.groupMeta, { color: colors.mutedText }]}
                   numberOfLines={1}
-                  testID={`plan-group-childsum-${group.id}`}
+                  testID={`${testIDPrefix}-childsum-${group.id}`}
                 >
                   · Σ {childSum}
                 </Text>
@@ -162,7 +179,7 @@ const PlanGroupRow = memo(function PlanGroupRow({
           </View>
           <Text
             style={[styles.groupAmount, { color: overspent ? colors.overspend : colors.text }]}
-            testID={`plan-group-primary-${group.id}`}
+            testID={`${testIDPrefix}-primary-${group.id}`}
           >
             {converting && target == null ? CONVERTING_PLACEHOLDER : primaryText}
           </Text>
@@ -177,14 +194,14 @@ const PlanGroupRow = memo(function PlanGroupRow({
                 fillColor={`${colors.mutedText}${FILL_ALPHA}`}
                 overspendColor={colors.overspend}
                 height={5}
-                testID={`plan-group-bar-${group.id}`}
+                testID={`${testIDPrefix}-bar-${group.id}`}
               />
             </View>
             {pairText && (
               <Text
                 style={[styles.groupPair, { color: colors.mutedText }]}
                 numberOfLines={1}
-                testID={`plan-group-pair-${group.id}`}
+                testID={`${testIDPrefix}-pair-${group.id}`}
               >
                 {pairText}
               </Text>
@@ -196,7 +213,7 @@ const PlanGroupRow = memo(function PlanGroupRow({
           // The group's own budget is in a currency with no rate to the screen's,
           // so the figure above fell back to its children's sum — say why rather
           // than quietly printing a different number than the user typed.
-          <View style={styles.noteRow} testID={`plan-group-unconvertible-${group.id}`}>
+          <View style={styles.noteRow} testID={`${testIDPrefix}-unconvertible-${group.id}`}>
             <Icon name="alert-circle-outline" size={14} color={colors.mutedText} />
             <Text style={[styles.noteText, { color: colors.mutedText }]} numberOfLines={1}>
               {t('graphs_currencies_not_converted')}
@@ -228,8 +245,10 @@ PlanGroupRow.propTypes = {
   t: PropTypes.func.isRequired,
   collapsed: PropTypes.bool,
   onMove: PropTypes.func,
-  onToggle: PropTypes.func.isRequired,
-  onLongPress: PropTypes.func.isRequired,
+  onToggle: PropTypes.func,
+  onLongPress: PropTypes.func,
+  // See PlanLineRow: renders the static copy the action menu lifts over the row.
+  lifted: PropTypes.bool,
 };
 
 export default PlanGroupRow;
@@ -278,6 +297,9 @@ const styles = StyleSheet.create({
     marginTop: SPACING.sm,
     overflow: 'hidden',
     paddingVertical: 7,
+  },
+  groupRowLifted: {
+    marginTop: 0,
   },
   groupTop: {
     alignItems: 'center',

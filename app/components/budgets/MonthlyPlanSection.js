@@ -17,12 +17,16 @@ import BudgetPlanLineModal from './BudgetPlanLineModal';
 import BudgetLineGroupModal from './BudgetLineGroupModal';
 import PlanLineRow from './PlanLineRow';
 import PlanGroupRow from './PlanGroupRow';
+import RowActionMenu, { NO_ACTIONS } from '../RowActionMenu';
 import { currentMonthKey, addMonths, formatMonthLabel } from '../../utils/monthUtils';
 import { CARD_SURFACE, SECTION_HEADING } from '../../styles/componentStyles';
 import EmptyState from '../EmptyState';
 
 const CLOSED_MODAL = { visible: false, line: null, kind: 'expense' };
 const CLOSED_GROUP_MODAL = { visible: false, group: null };
+// The "list" a lifted copy belongs to: it stands alone, so its length is 1 and
+// its index is 0 — a constant rather than a fresh array per press.
+const SINGLE_ROW = { length: 1 };
 
 // Key under which a group's own (override) amount rides along in the shared
 // conversion map — see the `amountSources` memo. Groups and lines have separate
@@ -114,6 +118,11 @@ const MonthlyPlanSection = forwardRef(function MonthlyPlanSection({
   const [expandedGroupIds, setExpandedGroupIds] = useState(() => new Set());
   const [modal, setModal] = useState(CLOSED_MODAL);
   const [groupModal, setGroupModal] = useState(CLOSED_GROUP_MODAL);
+  // The long-press action menu: which row was pressed, where it sits on screen,
+  // and what its move handler is. Null when closed. The actions themselves are
+  // derived from it below rather than stored, so a menu left open across a
+  // reload never offers an action against a stale row.
+  const [actionMenu, setActionMenu] = useState(null);
   const [busy, setBusy] = useState(false);
   // Synchronous double-tap guard (Fix 3, adversarial review round 2): `busy`
   // (React state) only reflects reality AFTER a re-render commits, so two taps
@@ -645,51 +654,19 @@ const MonthlyPlanSection = forwardRef(function MonthlyPlanSection({
     runExecutionAction(() => unmarkLineExecuted(line.id), 'marked_as_pending')
   ), [runExecutionAction, unmarkLineExecuted]);
 
-  // `context` carries the line's position in its own block plus that block's move
-  // handler — reordering used to be a pair of chevrons on every row, which cost
-  // 40dp of horizontal space next to the amount on all of them and took one tap
-  // per position moved. It lives here now, where it is out of the way until asked
-  // for and sits next to the other whole-row actions.
-  const handleLongPressLine = useCallback((line, index, listLength, onMove) => {
-    const executed = line.lastExecutedMonth === month;
-    const executionActions = [];
-    if (line.hasTemplate && isCurrentMonth) {
-      if (executed) {
-        // `undo_execution`, not the bare `undo`: in several languages (Russian
-        // among them) "Undo" and "Cancel" collapse into near-identical words,
-        // and this sheet shows both right next to each other.
-        executionActions.push({ text: t('undo_execution'), onPress: () => handleUndoExecuted(line) });
-      } else {
-        executionActions.push(
-          { text: t('execute'), onPress: () => handleExecute(line) },
-          { text: t('mark_as_executed'), onPress: () => handleMarkExecuted(line) },
-        );
-      }
-    }
-    const moveActions = [];
-    if (onMove) {
-      // Offered only where the move can actually land, so the sheet never shows
-      // an action that silently does nothing.
-      if (index > 0) {
-        moveActions.push({ text: t('move_up'), onPress: () => onMove(index, -1) });
-      }
-      if (index < listLength - 1) {
-        moveActions.push({ text: t('move_down'), onPress: () => onMove(index, 1) });
-      }
-    }
-    showDialog(
-      t('select_action'),
-      lineDisplayName(line),
-      [
-        ...executionActions,
-        { text: t('edit'), onPress: () => openEditLine(line) },
-        ...moveActions,
-        { text: t('delete'), style: 'destructive', onPress: () => confirmDeleteLine(line) },
-        { text: t('cancel'), style: 'cancel' },
-      ],
-    );
-  }, [month, isCurrentMonth, t, showDialog, handleExecute, handleMarkExecuted, handleUndoExecuted,
-    openEditLine, confirmDeleteLine, lineDisplayName]);
+  // Long-pressing a row lifts it above a blurred backdrop and floats an icon bar
+  // over it (RowActionMenu) instead of naming it in a dialog title — the row
+  // itself says which budget the actions apply to, and it stays where the user
+  // was already looking.
+  //
+  // `index`/`listLength`/`onMove` carry the row's position in its own block plus
+  // that block's move handler — reordering used to be a pair of chevrons on every
+  // row, which cost 40dp of horizontal space next to the amount on all of them
+  // and took one tap per position moved. It lives in the menu now, where it is
+  // out of the way until asked for and sits next to the other whole-row actions.
+  const handleLongPressLine = useCallback((line, index, listLength, onMove, layout) => {
+    setActionMenu({ type: 'line', line, index, listLength, onMove, layout });
+  }, []);
 
   /* ── Reordering ──────────────────────────────────────────────────────────── */
 
@@ -758,7 +735,7 @@ const MonthlyPlanSection = forwardRef(function MonthlyPlanSection({
     }
     return groups
       .filter(group => childrenByGroup.has(group.id))
-      .map((group) => {
+      .map((group, groupIndex) => {
         const children = childrenByGroup.get(group.id);
         // The derived figure the group shows until (and unless) the async status
         // lands: the same sum, from the same converted amounts the rows print.
@@ -775,6 +752,12 @@ const MonthlyPlanSection = forwardRef(function MonthlyPlanSection({
           oneOff: children.filter(l => !l.isRecurring),
           displayAmount: group.isDerived ? derived : (override ?? null),
           derived,
+          // Assigned by position, and carried on the view so the header, every
+          // child row and the copy the action menu lifts all read one value —
+          // deriving it a second time at any of those sites is how one envelope
+          // ends up rendering in two colours. See envelopePalette for why colour
+          // identifies an envelope here rather than flagging a status.
+          hue: envelopeHue(groupIndex),
         };
       });
   }, [groups, allocationLines, isGrouped, amountById, planCurrency]);
@@ -882,34 +865,20 @@ const MonthlyPlanSection = forwardRef(function MonthlyPlanSection({
     return created;
   }, [addLineGroup, groups.length]);
 
-  const handleLongPressGroup = useCallback((group, index, listLength, onMove) => {
-    const moveActions = [];
-    if (onMove) {
-      if (index > 0) moveActions.push({ text: t('move_up'), onPress: () => onMove(index, -1) });
-      if (index < listLength - 1) moveActions.push({ text: t('move_down'), onPress: () => onMove(index, 1) });
-    }
+  const confirmDeleteGroup = useCallback((group) => {
     showDialog(
-      t('select_action'),
-      group.label,
+      t('delete_group'),
+      t('delete_group_confirm'),
       [
-        { text: t('edit_group'), onPress: () => openEditGroup(group) },
-        ...moveActions,
-        {
-          text: t('delete_group'),
-          style: 'destructive',
-          onPress: () => showDialog(
-            t('delete_group'),
-            t('delete_group_confirm'),
-            [
-              { text: t('cancel'), style: 'cancel' },
-              { text: t('delete'), style: 'destructive', onPress: () => handleDeleteGroup(group.id) },
-            ],
-          ),
-        },
         { text: t('cancel'), style: 'cancel' },
+        { text: t('delete'), style: 'destructive', onPress: () => handleDeleteGroup(group.id) },
       ],
     );
-  }, [t, showDialog, openEditGroup, handleDeleteGroup]);
+  }, [showDialog, t, handleDeleteGroup]);
+
+  const handleLongPressGroup = useCallback((group, index, listLength, onMove, layout) => {
+    setActionMenu({ type: 'group', group, index, listLength, onMove, layout });
+  }, []);
 
   /* ── Rendering ───────────────────────────────────────────────────────────── */
 
@@ -926,7 +895,14 @@ const MonthlyPlanSection = forwardRef(function MonthlyPlanSection({
 
   // Shared row renderer for every block — each list moves independently (own
   // sort_order sequence), so `list` and `onMove` are passed in per block.
-  const renderLine = useCallback((line, index, list, onMove, indented = false, envelopeColor = null) => {
+  //
+  // `lifted` renders the static copy the action menu floats over the row: same
+  // row, no handlers and no swipe actions (the bar above it offers those), under
+  // its own testID namespace. It goes through this renderer rather than a second
+  // hand-written <PlanLineRow> so the copy cannot drift from the row it covers.
+  const renderLine = useCallback((line, index, list, onMove, {
+    indented = false, envelopeColor = null, lifted = false,
+  } = {}) => {
     const executed = line.lastExecutedMonth === month;
     return (
       <PlanLineRow
@@ -944,13 +920,14 @@ const MonthlyPlanSection = forwardRef(function MonthlyPlanSection({
         colors={colors}
         t={t}
         executed={executed}
-        canExecute={line.hasTemplate && isCurrentMonth && !executed}
-        canUndo={line.hasTemplate && isCurrentMonth && executed}
+        canExecute={!lifted && line.hasTemplate && isCurrentMonth && !executed}
+        canUndo={!lifted && line.hasTemplate && isCurrentMonth && executed}
         showProgress={line.kind !== 'income'}
         listLength={list.length}
-        onMove={onMove}
-        onPress={openEditLine}
-        onLongPress={handleLongPressLine}
+        lifted={lifted}
+        onMove={lifted ? null : onMove}
+        onPress={lifted ? undefined : openEditLine}
+        onLongPress={lifted ? undefined : handleLongPressLine}
         onExecute={handleExecute}
         onMarkExecuted={handleMarkExecuted}
         onUndo={handleUndoExecuted}
@@ -960,7 +937,145 @@ const MonthlyPlanSection = forwardRef(function MonthlyPlanSection({
     openEditLine, handleLongPressLine, lineDisplayName, lineIcon, handleExecute,
     handleMarkExecuted, handleUndoExecuted]);
 
+  // Same idea for an envelope header: one renderer for the list and for the copy.
+  const renderGroupRow = useCallback((view, index, lifted = false) => (
+    <PlanGroupRow
+      group={view.group}
+      index={index}
+      listLength={groupViews.length}
+      status={groupStatusById.get(view.group.id) || null}
+      displayAmount={view.displayAmount}
+      converting={converting}
+      childCount={view.children.length}
+      envelopeColor={view.hue}
+      planCurrency={planCurrency}
+      colors={colors}
+      t={t}
+      collapsed={!expandedGroupIds.has(view.group.id)}
+      lifted={lifted}
+      onMove={lifted ? null : moveGroup}
+      onToggle={lifted ? undefined : toggleGroup}
+      onLongPress={lifted ? undefined : handleLongPressGroup}
+    />
+  ), [groupViews.length, groupStatusById, converting, planCurrency, colors, t,
+    expandedGroupIds, moveGroup, toggleGroup, handleLongPressGroup]);
+
   const hasAnyLines = lines.length > 0;
+
+  /* ── Long-press action menu ──────────────────────────────────────────────── */
+
+  const closeActionMenu = useCallback(() => setActionMenu(null), []);
+
+  // The static copy of the pressed row that the menu lifts above the backdrop.
+  // Rebuilt from the current data rather than captured at press time, so a figure
+  // that lands while the menu is open shows in the copy too.
+  const menuRow = useMemo(() => {
+    if (!actionMenu) return null;
+    if (actionMenu.type === 'group') {
+      const index = groupViews.findIndex(v => v.group.id === actionMenu.group.id);
+      return index < 0 ? null : renderGroupRow(groupViews[index], index, true);
+    }
+    const { line } = actionMenu;
+    // A child row keeps the rail that says which envelope it is in — without it
+    // the copy would read as a loose allocation the moment it is picked up.
+    const hue = groupViews.find(v => v.children.some(c => c.id === line.id))?.hue ?? null;
+    return renderLine(line, 0, SINGLE_ROW, null, {
+      indented: !!hue, envelopeColor: hue, lifted: true,
+    });
+  }, [actionMenu, groupViews, renderGroupRow, renderLine]);
+
+  // Memoized because RowActionMenu is memoized: it draws through an overlay portal
+  // that re-mounts its slot whenever the children change identity, and this
+  // section re-renders on every conversion result while the menu is up.
+  const menu = useMemo(
+    () => (actionMenu ? { layout: actionMenu.layout, row: menuRow } : null),
+    [actionMenu, menuRow],
+  );
+
+  const menuActions = useMemo(() => {
+    // Dismissing is RowActionMenu's job, not each action's — see its docblock.
+    if (!actionMenu) return NO_ACTIONS;
+    const { index, listLength, onMove } = actionMenu;
+    const moveActions = [];
+    if (onMove) {
+      // Offered only where the move can actually land, so the bar never shows an
+      // action that silently does nothing.
+      if (index > 0) {
+        moveActions.push({
+          key: 'move-up', icon: 'arrow-up', label: t('move_up'), onPress: () => onMove(index, -1),
+        });
+      }
+      if (index < listLength - 1) {
+        moveActions.push({
+          key: 'move-down', icon: 'arrow-down', label: t('move_down'), onPress: () => onMove(index, 1),
+        });
+      }
+    }
+
+    if (actionMenu.type === 'group') {
+      const { group } = actionMenu;
+      return [
+        // The bar has room for a word per button, so the buttons say what they do
+        // and the screen reader gets what they do it to.
+        {
+          key: 'edit', icon: 'pencil', label: t('edit'), a11yLabel: t('edit_group'), onPress: () => openEditGroup(group),
+        },
+        ...moveActions,
+        {
+          key: 'delete',
+          icon: 'trash-can-outline',
+          label: t('delete'),
+          a11yLabel: t('delete_group'),
+          tone: 'destructive',
+          onPress: () => confirmDeleteGroup(group),
+        },
+      ];
+    }
+
+    const { line } = actionMenu;
+    const executed = line.lastExecutedMonth === month;
+    const executionActions = [];
+    if (line.hasTemplate && isCurrentMonth) {
+      if (executed) {
+        // `undo_execution` for the screen reader, not the bare `undo`: in several
+        // languages (Russian among them) "Undo" and "Cancel" collapse into
+        // near-identical words.
+        executionActions.push({
+          key: 'undo',
+          icon: 'undo',
+          label: t('undo'),
+          a11yLabel: t('undo_execution'),
+          tone: 'muted',
+          onPress: () => handleUndoExecuted(line),
+        });
+      } else {
+        executionActions.push(
+          { key: 'execute', icon: 'play', label: t('execute'), onPress: () => handleExecute(line) },
+          {
+            key: 'done',
+            icon: 'check-bold',
+            label: t('done'),
+            a11yLabel: t('mark_as_executed'),
+            onPress: () => handleMarkExecuted(line),
+          },
+        );
+      }
+    }
+    return [
+      ...executionActions,
+      { key: 'edit', icon: 'pencil', label: t('edit'), a11yLabel: t('edit_allocation'), onPress: () => openEditLine(line) },
+      ...moveActions,
+      {
+        key: 'delete',
+        icon: 'trash-can-outline',
+        label: t('delete'),
+        a11yLabel: t('delete_allocation'),
+        tone: 'destructive',
+        onPress: () => confirmDeleteLine(line),
+      },
+    ];
+  }, [actionMenu, t, month, isCurrentMonth, openEditGroup, confirmDeleteGroup, openEditLine,
+    confirmDeleteLine, handleExecute, handleMarkExecuted, handleUndoExecuted]);
 
   // Currencies the group editor may price an override in: the same set the line
   // editor offers, for the same reason (a group belongs to no plan, so it needs
@@ -1046,39 +1161,20 @@ const MonthlyPlanSection = forwardRef(function MonthlyPlanSection({
             recurring line next to a one-off one — so it sits above the loose
             ones rather than among them. */}
         {groupViews.map((view, groupIndex) => {
-          // Assigned by position, and handed to the header and every child so
-          // one envelope reads as one object: the folder glyph, the rail beside
-          // the header and the rail beside each row below it are all the same
-          // colour. See envelopePalette for why colour identifies an envelope
-          // here rather than flagging a status.
-          const hue = envelopeHue(groupIndex);
           // Folded is the default, so an envelope shows its children only once
           // the user has said to — see `expandedGroupIds`.
           const expanded = expandedGroupIds.has(view.group.id);
+          // The envelope's colour is carried on the view (see groupViews), so the
+          // header, its children and the lifted copy all read the same one.
+          const childOptions = { indented: true, envelopeColor: view.hue };
           return (
             <React.Fragment key={view.group.id}>
-              <PlanGroupRow
-                group={view.group}
-                index={groupIndex}
-                listLength={groupViews.length}
-                status={groupStatusById.get(view.group.id) || null}
-                displayAmount={view.displayAmount}
-                converting={converting}
-                childCount={view.children.length}
-                envelopeColor={hue}
-                planCurrency={planCurrency}
-                colors={colors}
-                t={t}
-                collapsed={!expanded}
-                onMove={moveGroup}
-                onToggle={toggleGroup}
-                onLongPress={handleLongPressGroup}
-              />
+              {renderGroupRow(view, groupIndex)}
               {expanded && view.recurring.map((line, index) => renderLine(
-                line, index, view.recurring, groupMovers.get(`${view.group.id}|r`), true, hue,
+                line, index, view.recurring, groupMovers.get(`${view.group.id}|r`), childOptions,
               ))}
               {expanded && view.oneOff.map((line, index) => renderLine(
-                line, index, view.oneOff, groupMovers.get(`${view.group.id}|o`), true, hue,
+                line, index, view.oneOff, groupMovers.get(`${view.group.id}|o`), childOptions,
               ))}
             </React.Fragment>
           );
@@ -1209,6 +1305,16 @@ const MonthlyPlanSection = forwardRef(function MonthlyPlanSection({
           onDeleteLine={handleDeleteLine}
           onCreateGroup={handleCreateGroupInline}
           onClose={closeModal}
+        />
+
+        {/* Long-press menu for both kinds of row. It draws into the app-wide
+            overlay layer, so it renders nothing in place here. */}
+        <RowActionMenu
+          menu={menu}
+          actions={menuActions}
+          colors={colors}
+          onClose={closeActionMenu}
+          testIDPrefix="plan-action"
         />
 
         <BudgetLineGroupModal
