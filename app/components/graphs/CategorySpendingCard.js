@@ -1,9 +1,10 @@
-import React, { useMemo, useState, useCallback } from 'react';
+import React, { useMemo, useRef, useState, useCallback } from 'react';
 import { View, Text, StyleSheet, ActivityIndicator, Dimensions, TouchableOpacity, Modal, ScrollView } from 'react-native';
 import PropTypes from 'prop-types';
-import { CartesianChart, Bar, BarGroup, StackedBar, useChartPressState } from 'victory-native';
+import { CartesianChart, Bar, BarGroup, StackedBar } from 'victory-native';
 import { matchFont, Paint, RoundedRect } from '@shopify/react-native-skia';
-import { runOnJS, useAnimatedReaction } from 'react-native-reanimated';
+import { runOnJS } from 'react-native-reanimated';
+import { Gesture, GestureDetector } from 'react-native-gesture-handler';
 import Icon from '@expo/vector-icons/MaterialCommunityIcons';
 import currencies from '../../../assets/currencies.json';
 import useCategoryMonthlySpending, { ALL_EXPENSE_CATEGORIES } from '../../hooks/useCategoryMonthlySpending';
@@ -12,6 +13,7 @@ import { comparisonSeriesColor } from '../../styles/chartPalette';
 import { MONTH_ABBREVIATIONS } from './monthLabels';
 import ModalBlurOverlay from '../ModalBlurOverlay';
 import { useDisplaySettings } from '../../contexts/DisplaySettingsContext';
+import { useSwipeNavigationGesture } from '../../contexts/SwipeNavigationContext';
 import { CARD_SURFACE, SECTION_LABEL } from '../../styles/componentStyles';
 import EmptyState from '../EmptyState';
 
@@ -35,12 +37,60 @@ const BAR_ANIMATION = { type: 'spring' };
 // border: a stroke in the surface colour reads as breathing room, an outline
 // reads as one more piece of chrome. 2px total (1px either side of the seam).
 const STACK_GAP = 2;
-// Press state key sets must match the chart's yKeys, so the canvas remounts
-// (via `key`) whenever the vs-series is added or removed.
-const PRESS_INIT_SINGLE = { x: 0, y: { amount: 0 } };
-const PRESS_INIT_VS = { x: 0, y: { primary: 0, vs: 0 } };
 // TalkBack can still step through months now that the RN hit slots are gone.
 const ACCESSIBILITY_ACTIONS = [{ name: 'increment' }, { name: 'decrement' }];
+
+// The history is as long as the user's, so months are laid out at a fixed pitch
+// and scrolled through rather than squeezed into the card. 48px leaves a 24px
+// bar with 24px of air — the width at which twelve months stopped fitting.
+const DEFAULT_MONTH_WIDTH = 48;
+const MIN_MONTH_WIDTH = 24;
+const MAX_MONTH_WIDTH = 96;
+// Gutter for the pinned y-axis. It sits outside the scroller, so the scale stays
+// readable however far back the user has scrolled.
+const Y_AXIS_WIDTH = 34;
+// The axis canvas draws no series — it exists only to place the y labels, and
+// borrows the plot geometry from the same Victory layout code as the real chart.
+const AXIS_GUIDE_DATA = [{ x: 0, amount: 0 }];
+const AXIS_GUIDE_KEYS = ['amount'];
+const AXIS_GUIDE_PADDING = { left: 0, right: 0, top: TOP_PADDING };
+const renderNothing = () => null;
+// Labels are drawn beside the pinned axis instead, but the space they would take
+// still has to be reserved so both canvases resolve the same plot height.
+const hideYLabel = () => '';
+const spacerXLabel = () => 'Ja';
+
+const clamp = (value, min, max) => Math.min(Math.max(value, min), max);
+
+/**
+ * Where the scroller should sit for a pending move, or null while there is
+ * nothing to move to (no move queued, or the content not measured yet).
+ *
+ * `{ mode: 'end' }` is "open on the current month" — the newest month is the
+ * last one laid out, so the card's resting position is the far right rather
+ * than the twelve-month-old left edge.
+ */
+export const resolveScrollTarget = (pending, contentWidth, viewportWidth) => {
+  if (!pending || !(contentWidth > 0)) return null;
+  const maxX = Math.max(0, contentWidth - viewportWidth);
+  return pending.mode === 'end' ? maxX : clamp(pending.x, 0, maxX);
+};
+
+/**
+ * Which month a tap at `x` (in scroll-content pixels) landed on, or -1 when it
+ * fell outside the plotted months.
+ *
+ * Months are laid out at a fixed pitch with half a slot of domain padding at
+ * either end, so a bar's slot is exactly `[i * pitch, (i + 1) * pitch)` and the
+ * hit test is a division — no Skia hit region, no RN overlay per bar.
+ */
+export const resolveTapIndex = (x, monthWidth, count) => {
+  'worklet';
+  if (!(monthWidth > 0) || count <= 0) return -1;
+  const index = Math.floor(x / monthWidth);
+  if (index < 0 || index >= count) return -1;
+  return index;
+};
 
 export const formatYTick = (value) => {
   const num = Number(value);
@@ -50,33 +100,6 @@ export const formatYTick = (value) => {
 };
 
 export const formatPctTick = (value) => `${Math.round(Number(value))}%`;
-
-/**
- * Which month a chart-press reaction should scrub to, or -1 for "leave the
- * selection alone".
- *
- * The press state starts at x=0 and `useAnimatedReaction` runs its reaction
- * once at mount — so reading x alone made the card select the *oldest* month
- * the moment the chart appeared, silently overriding the "current month"
- * default. Gating on `active` ignores that initial run; the finger has to be
- * down for a press to mean anything.
- *
- * The x-only equality check is kept *inside* an active drag, so scrubbing
- * across a month re-reports it at most once. It deliberately does not span the
- * inactive→active edge: without that, pressing the leftmost bar first (x is
- * already 0) would report nothing at all.
- *
- * Exported because `useAnimatedReaction`'s reaction is a worklet under Jest's
- * no-op mock, so this is the only reachable seam for testing it.
- */
-export const resolveScrubIndex = (current, previous, count) => {
-  'worklet';
-  if (!current.active) return -1;
-  if (previous && previous.active && current.x === previous.x) return -1;
-  const index = Math.round(current.x);
-  if (index < 0 || index >= count) return -1;
-  return index;
-};
 
 // "Nice" y-axis step so ticks land on round numbers.
 const niceStepFor = (max) => {
@@ -99,9 +122,14 @@ const niceStepFor = (max) => {
  *  - grouped: <BarGroup> with primary + vs bars side by side per month
  *  - stacked: <StackedBar> over 100%-normalized shares of primary vs vs
  *
- * Axes are drawn by Victory on the Skia canvas (xAxis/yAxis/frame). Month selection
- * runs through `useChartPressState`, so dragging across the chart scrubs months on
- * the UI thread; the selected month is marked by a translucent column highlight.
+ * The months are laid out at a fixed pitch inside a horizontal scroller and the
+ * y-axis is pinned beside it, so the window opens on the current month and the
+ * whole history is a swipe away instead of twelve bars fighting for one screen.
+ *
+ * Gestures, in the order a finger resolves them: a tap selects the month it
+ * landed on, a horizontal drag scrolls the months (and blocks the screen-swipe
+ * navigation for as long as it can scroll), and a pinch re-pitches the months so
+ * more or fewer fit at once.
  */
 const SpendingBarChart = ({
   data,
@@ -163,21 +191,128 @@ const SpendingBarChart = ({
     }
   }, []);
 
-  // Dragging across the canvas scrubs the selected month. x values are the month
-  // indices themselves, so the pressed x rounds straight to a data index.
-  const { state: pressState } = useChartPressState(
-    hasVs ? PRESS_INIT_VS : PRESS_INIT_SINGLE,
+  // --- Horizontal layout -------------------------------------------------
+  // `monthWidth` is the pitch the user has pinched to; the pitch actually drawn
+  // never goes below "fill the viewport", so a three-month history still spans
+  // the card instead of huddling on the left.
+  const [monthWidth, setMonthWidth] = useState(DEFAULT_MONTH_WIDTH);
+  const viewportWidth = Math.max(width - Y_AXIS_WIDTH, 1);
+  const fillWidth = viewportWidth / Math.max(count, 1);
+  const pitch = Math.max(monthWidth, fillWidth);
+  const contentWidth = pitch * count;
+
+  const scrollRef = useRef(null);
+  const scrollXRef = useRef(0);
+  // Offset to move to once the scroller can act on it — the content has to be
+  // measured before an offset into it means anything.
+  const pendingScrollRef = useRef({ mode: 'end' });
+  const measuredContentRef = useRef(0);
+  const layoutReadyRef = useRef(false);
+  const monthWidthRef = useRef(monthWidth);
+  const pinchBaseRef = useRef(monthWidth);
+
+  // A longer (or shorter) history is a different chart — open it on the current
+  // month, the same way the card opens on mount.
+  const prevCountRef = useRef(count);
+  if (prevCountRef.current !== count) {
+    prevCountRef.current = count;
+    pendingScrollRef.current = { mode: 'end' };
+  }
+
+  const handleScroll = useCallback((event) => {
+    scrollXRef.current = event.nativeEvent.contentOffset.x;
+  }, []);
+
+  // Content size and layout arrive in either order, and a scrollTo issued before
+  // both is dropped — so the move is replayed on each until one sticks.
+  const flushPendingScroll = useCallback(() => {
+    const x = resolveScrollTarget(
+      pendingScrollRef.current,
+      measuredContentRef.current,
+      viewportWidth,
+    );
+    if (x == null) return;
+    scrollRef.current?.scrollTo({ x, y: 0, animated: false });
+    scrollXRef.current = x;
+    if (layoutReadyRef.current) pendingScrollRef.current = null;
+  }, [viewportWidth]);
+
+  const handleContentSizeChange = useCallback((newContentWidth) => {
+    measuredContentRef.current = newContentWidth;
+    flushPendingScroll();
+  }, [flushPendingScroll]);
+
+  const handleLayout = useCallback(() => {
+    layoutReadyRef.current = true;
+    flushPendingScroll();
+  }, [flushPendingScroll]);
+
+  const scrollIndexIntoView = useCallback((index) => {
+    const target = index * pitch + pitch / 2 - viewportWidth / 2;
+    scrollRef.current?.scrollTo({
+      x: clamp(target, 0, Math.max(0, contentWidth - viewportWidth)),
+      y: 0,
+      animated: true,
+    });
+  }, [pitch, viewportWidth, contentWidth]);
+
+  const beginPinch = useCallback(() => {
+    pinchBaseRef.current = monthWidthRef.current;
+  }, []);
+
+  const applyPinch = useCallback((scale) => {
+    const next = clamp(
+      Math.round(pinchBaseRef.current * scale),
+      MIN_MONTH_WIDTH,
+      MAX_MONTH_WIDTH,
+    );
+    const current = monthWidthRef.current;
+    if (next === current) return;
+    // Zoom around the middle of what is on screen, so the months the user is
+    // looking at are the ones that stay put.
+    const from = Math.max(current, fillWidth);
+    const to = Math.max(next, fillWidth);
+    const centreMonths = (scrollXRef.current + viewportWidth / 2) / from;
+    pendingScrollRef.current = { mode: 'x', x: centreMonths * to - viewportWidth / 2 };
+    monthWidthRef.current = next;
+    setMonthWidth(next);
+  }, [fillWidth, viewportWidth]);
+
+  // --- Gestures ----------------------------------------------------------
+  // The screen-swipe Pan owns horizontal drags everywhere else on the tab; the
+  // native scroller claims them over the chart for as long as it has room left.
+  const swipeGesture = useSwipeNavigationGesture();
+  const scrollGesture = useMemo(() => {
+    const native = Gesture.Native();
+    return swipeGesture ? native.blocksExternalGesture(swipeGesture) : native;
+  }, [swipeGesture]);
+
+  const pinchGesture = useMemo(
+    () => Gesture.Pinch()
+      .onStart(() => {
+        runOnJS(beginPinch)();
+      })
+      .onUpdate((event) => {
+        runOnJS(applyPinch)(event.scale);
+      }),
+    [beginPinch, applyPinch],
   );
 
-  useAnimatedReaction(
-    () => ({ active: pressState.isActive.value, x: pressState.x.value.value }),
-    (current, previous) => {
-      const index = resolveScrubIndex(current, previous, count);
+  const containerGesture = useMemo(
+    () => Gesture.Simultaneous(scrollGesture, pinchGesture),
+    [scrollGesture, pinchGesture],
+  );
+
+  // Tap coordinates are relative to the scrolled content, which is exactly the
+  // space the month pitch is measured in.
+  const tapGesture = useMemo(
+    () => Gesture.Tap().onEnd((event) => {
+      const index = resolveTapIndex(event.x, pitch, count);
       if (index >= 0) {
         runOnJS(onBarPress)(index);
       }
-    },
-    [count, onBarPress],
+    }),
+    [pitch, count, onBarPress],
   );
 
   const handleAccessibilityAction = useCallback(
@@ -186,8 +321,9 @@ const SpendingBarChart = ({
       const base = selectedIndex == null ? count - 1 : selectedIndex;
       const next = Math.min(count - 1, Math.max(0, base + step));
       onBarPress(next);
+      scrollIndexIntoView(next);
     },
-    [count, selectedIndex, onBarPress],
+    [count, selectedIndex, onBarPress, scrollIndexIntoView],
   );
 
   // Translucent column behind the selected month — replaces the old dashed RN
@@ -283,6 +419,28 @@ const SpendingBarChart = ({
     ? monthAbbreviations[data[selectedIndex].month]
     : '';
 
+  // Half a slot of padding at either end puts every bar in the middle of its own
+  // slot — which is what keeps the newest month clear of the right edge, and what
+  // makes a tap's slot arithmetic exact.
+  const domainPadding = useMemo(
+    () => ({ left: pitch / 2, right: pitch / 2, top: TOP_PADDING }),
+    [pitch],
+  );
+
+  const formatYLabel = isStacked ? formatPctTick : formatYTick;
+
+  // Twelve months no longer fit in one window, so a bare "Ja" cannot say which
+  // January it is. Each January carries its year, where the pitch has room.
+  const formatXLabel = useCallback((value) => {
+    const item = data[Math.round(value)];
+    if (!item) return '';
+    const abbreviation = monthAbbreviations[item.month] ?? '';
+    if (item.month === 0 && pitch >= 34) {
+      return `${abbreviation}'${String(item.year).slice(2)}`;
+    }
+    return abbreviation;
+  }, [data, monthAbbreviations, pitch]);
+
   return (
     <View
       style={[styles.chartWrap, { width }]}
@@ -292,34 +450,89 @@ const SpendingBarChart = ({
       accessibilityActions={ACCESSIBILITY_ACTIONS}
       onAccessibilityAction={handleAccessibilityAction}
     >
-      <View style={styles.chartCanvas}>
-        <CartesianChart
-          data={chartData}
-          xKey="x"
-          yKeys={yKeys}
-          domain={domain}
-          domainPadding={{ left: 6, right: 6, top: TOP_PADDING }}
-          chartPressState={pressState}
-          xAxis={{
-            font: axisFont,
-            lineWidth: 0,
-            labelColor: colors.mutedText,
-            tickCount: count,
-            formatXLabel: (value) => monthAbbreviations[data[Math.round(value)]?.month] ?? '',
-          }}
-          yAxis={[{
-            font: axisFont,
-            lineColor: colors.border,
-            labelColor: colors.mutedText,
-            tickCount: 5,
-            formatYLabel: isStacked ? formatPctTick : formatYTick,
-            // Solid hairline: a dashed grid reads as a threshold or a projection
-            // when all it is is the grid.
-          }]}
-          frame={{ lineWidth: 0 }}
-        >
-          {renderChart}
-        </CartesianChart>
+      <View style={styles.chartRow}>
+        {/* Pinned scale. Its own canvas, sharing the height, y-domain and x-label
+            metrics of the scrolling one so Victory resolves both plots to the
+            same vertical geometry and the labels line up with the gridlines. */}
+        <View style={styles.axisColumn} pointerEvents="none" testID="spending-chart-axis">
+          <CartesianChart
+            data={AXIS_GUIDE_DATA}
+            xKey="x"
+            yKeys={AXIS_GUIDE_KEYS}
+            domain={domain}
+            domainPadding={AXIS_GUIDE_PADDING}
+            xAxis={{
+              font: axisFont,
+              lineWidth: 0,
+              // Reserves the month-label strip without drawing over it.
+              labelColor: colors.altRow,
+              tickCount: 2,
+              formatXLabel: spacerXLabel,
+            }}
+            yAxis={[{
+              font: axisFont,
+              lineWidth: 0,
+              labelColor: colors.mutedText,
+              tickCount: 5,
+              formatYLabel,
+            }]}
+            frame={{ lineWidth: 0 }}
+          >
+            {renderNothing}
+          </CartesianChart>
+        </View>
+
+        <GestureDetector gesture={containerGesture}>
+          <ScrollView
+            ref={scrollRef}
+            horizontal
+            showsHorizontalScrollIndicator={false}
+            scrollEventThrottle={16}
+            onScroll={handleScroll}
+            onContentSizeChange={handleContentSizeChange}
+            onLayout={handleLayout}
+            style={styles.scrollArea}
+            testID="spending-chart-scroll"
+          >
+            <GestureDetector gesture={tapGesture}>
+              <View
+                style={[styles.chartCanvas, { width: contentWidth }]}
+                testID="spending-chart-canvas"
+              >
+                <CartesianChart
+                  data={chartData}
+                  xKey="x"
+                  yKeys={yKeys}
+                  domain={domain}
+                  domainPadding={domainPadding}
+                  xAxis={{
+                    font: axisFont,
+                    lineWidth: 0,
+                    labelColor: colors.mutedText,
+                    tickCount: count,
+                    formatXLabel,
+                  }}
+                  yAxis={[{
+                    font: axisFont,
+                    lineColor: colors.border,
+                    labelColor: colors.mutedText,
+                    tickCount: 5,
+                    // The labels live on the pinned axis; suppressing them here
+                    // also gives up the gutter Victory would reserve for them,
+                    // so the plot starts at the canvas edge and a month's slot
+                    // is exactly one pitch wide.
+                    formatYLabel: hideYLabel,
+                    // Solid hairline: a dashed grid reads as a threshold or a
+                    // projection when all it is is the grid.
+                  }]}
+                  frame={{ lineWidth: 0 }}
+                >
+                  {renderChart}
+                </CartesianChart>
+              </View>
+            </GestureDetector>
+          </ScrollView>
+        </GestureDetector>
       </View>
     </View>
   );
@@ -676,9 +889,9 @@ const CategorySpendingCard = ({
         />
       ) : (
         <SpendingBarChart
-          // Remount when the vs-series appears/disappears: the chart press state
-          // is keyed by series and cannot change shape in place.
-          key={hasVsData ? 'vs' : 'single'}
+          // No remount when the vs-series appears or disappears: the press state
+          // that used to be keyed by series is gone, and holding the mount keeps
+          // the zoom and scroll position the user has arrived at.
           data={monthlyData}
           vsData={hasVsData ? vsMonthlyData : null}
           stacked={showStackedBar && hasVsData}
@@ -695,7 +908,11 @@ const CategorySpendingCard = ({
 
 SpendingBarChart.propTypes = {
   colors: PropTypes.object.isRequired,
-  data: PropTypes.arrayOf(PropTypes.shape({ total: PropTypes.number, month: PropTypes.number })).isRequired,
+  data: PropTypes.arrayOf(PropTypes.shape({
+    month: PropTypes.number,
+    total: PropTypes.number,
+    year: PropTypes.number,
+  })).isRequired,
   monthAbbreviations: PropTypes.arrayOf(PropTypes.string).isRequired,
   onBarPress: PropTypes.func.isRequired,
   selectedIndex: PropTypes.number,
@@ -719,6 +936,10 @@ const styles = StyleSheet.create({
     alignItems: 'center',
     flexDirection: 'row',
     gap: 5,
+  },
+  axisColumn: {
+    height: CHART_HEIGHT,
+    width: Y_AXIS_WIDTH,
   },
   card: {
     ...CARD_SURFACE,
@@ -747,6 +968,9 @@ const styles = StyleSheet.create({
   },
   chartCanvas: {
     height: CHART_HEIGHT,
+  },
+  chartRow: {
+    flexDirection: 'row',
   },
   chartWrap: {
     marginTop: 12,
@@ -811,6 +1035,9 @@ const styles = StyleSheet.create({
     alignItems: 'center',
     borderBottomWidth: 1,
     flexDirection: 'row',
+  },
+  scrollArea: {
+    flex: 1,
   },
   sectionLabel: SECTION_LABEL,
   seriesDot: {

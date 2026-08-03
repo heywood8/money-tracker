@@ -1067,7 +1067,8 @@ describe('OperationsDB Service', () => {
       ['getIncomeByCategoryAndCurrency', () => OperationsDB.getIncomeByCategoryAndCurrency('USD', '2025-12-01', '2025-12-31')],
       ['getOperationsByCategoryAndCurrency', () => OperationsDB.getOperationsByCategoryAndCurrency('cat1', 'USD', '2025-12-01', '2025-12-31')],
       ['getMonthlySpendingByCategories', () => OperationsDB.getMonthlySpendingByCategories('USD', 2025, ['cat1'])],
-      ['getLast12MonthsSpendingByCategories', () => OperationsDB.getLast12MonthsSpendingByCategories('USD', ['cat1'])],
+      ['getMonthlySpendingHistoryByCategories', () => OperationsDB.getMonthlySpendingHistoryByCategories('USD', ['cat1'])],
+      ['getEarliestExpenseMonth', () => OperationsDB.getEarliestExpenseMonth()],
       ['getSpendingByCategory', () => OperationsDB.getSpendingByCategory('2025-12-01', '2025-12-31')],
       ['getIncomeByCategory', () => OperationsDB.getIncomeByCategory('2025-12-01', '2025-12-31')],
     ])('%s filters out operations hidden from the charts', async (_name, run) => {
@@ -1252,7 +1253,7 @@ describe('OperationsDB Service', () => {
           { year_month: '2025-12', amount: 50, currency: 'EUR' },   // 55
         ]);
 
-        const result = await OperationsDB.getLast12MonthsSpendingByCategories('USD', ['cat1'], true);
+        const result = await OperationsDB.getMonthlySpendingHistoryByCategories('USD', ['cat1'], true);
 
         const sql = queryAll.mock.calls[0][0];
         expect(sql).not.toContain('a.currency = ?');
@@ -3641,11 +3642,11 @@ describe('OperationsDB Service', () => {
     });
   });
 
-  describe('getLast12MonthsSpendingByCategories', () => {
+  describe('getMonthlySpendingHistoryByCategories', () => {
     it('filters by the given category ids', async () => {
       queryAll.mockResolvedValue([]);
 
-      await OperationsDB.getLast12MonthsSpendingByCategories('USD', ['cat-food', 'cat-groceries']);
+      await OperationsDB.getMonthlySpendingHistoryByCategories('USD', ['cat-food', 'cat-groceries']);
 
       const [sql, params] = queryAll.mock.calls[0];
       expect(sql).toContain('o.category_id IN (?,?)');
@@ -3655,7 +3656,7 @@ describe('OperationsDB Service', () => {
     it('drops the category filter entirely when categoryIds is null', async () => {
       queryAll.mockResolvedValue([]);
 
-      await OperationsDB.getLast12MonthsSpendingByCategories('USD', null);
+      await OperationsDB.getMonthlySpendingHistoryByCategories('USD', null);
 
       const [sql, params] = queryAll.mock.calls[0];
       expect(sql).not.toContain('category_id');
@@ -3669,7 +3670,7 @@ describe('OperationsDB Service', () => {
         { year_month: '2026-06', amount: '3', currency: 'USD' },
       ]);
 
-      const result = await OperationsDB.getLast12MonthsSpendingByCategories('USD', null);
+      const result = await OperationsDB.getMonthlySpendingHistoryByCategories('USD', null);
 
       expect(result).toEqual([
         { yearMonth: '2026-06', total: '3' },
@@ -3680,10 +3681,54 @@ describe('OperationsDB Service', () => {
     it('returns an empty result for an empty category list without querying', async () => {
       queryAll.mockResolvedValue([]);
 
-      const result = await OperationsDB.getLast12MonthsSpendingByCategories('USD', []);
+      const result = await OperationsDB.getMonthlySpendingHistoryByCategories('USD', []);
 
       expect(result).toEqual([]);
       expect(queryAll).not.toHaveBeenCalled();
+    });
+
+    it('starts at the given month so the chart can reach back past a year', async () => {
+      queryAll.mockResolvedValue([]);
+
+      await OperationsDB.getMonthlySpendingHistoryByCategories('USD', null, false, '2019-03');
+
+      const [, params] = queryAll.mock.calls[0];
+      expect(params[1]).toBe('2019-03-01');
+    });
+
+    it('falls back to the rolling 12-month window when no start month is given', async () => {
+      queryAll.mockResolvedValue([]);
+
+      await OperationsDB.getMonthlySpendingHistoryByCategories('USD', null);
+
+      const now = new Date();
+      const start = new Date(now.getFullYear(), now.getMonth() - 11, 1);
+      const [, params] = queryAll.mock.calls[0];
+      expect(params[1]).toBe(
+        `${start.getFullYear()}-${String(start.getMonth() + 1).padStart(2, '0')}-01`,
+      );
+    });
+  });
+
+  describe('getEarliestExpenseMonth', () => {
+    it('returns the month of the oldest chart-visible expense', async () => {
+      queryAll.mockResolvedValue([{ year_month: '2021-04' }]);
+
+      const result = await OperationsDB.getEarliestExpenseMonth();
+
+      const [sql] = queryAll.mock.calls[0];
+      expect(sql).toContain("o.type = 'expense'");
+      // No category or currency filter: both trend series have to be built over
+      // the same window or they cannot be compared month against month.
+      expect(sql).not.toContain('category_id');
+      expect(sql).not.toContain('a.currency = ?');
+      expect(result).toBe('2021-04');
+    });
+
+    it('returns null when there are no expenses at all', async () => {
+      queryAll.mockResolvedValue([{ year_month: null }]);
+
+      expect(await OperationsDB.getEarliestExpenseMonth()).toBeNull();
     });
   });
 });

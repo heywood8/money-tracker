@@ -1,6 +1,6 @@
 import React from 'react';
 import { render, fireEvent } from '@testing-library/react-native';
-import CategorySpendingCard, { formatPctTick, formatYTick, resolveScrubIndex } from '../../../app/components/graphs/CategorySpendingCard';
+import CategorySpendingCard, { formatPctTick, formatYTick, resolveScrollTarget, resolveTapIndex } from '../../../app/components/graphs/CategorySpendingCard';
 import useCategoryMonthlySpending from '../../../app/hooks/useCategoryMonthlySpending';
 
 // Mock the hook
@@ -100,7 +100,7 @@ describe('CategorySpendingCard', () => {
         <CategorySpendingCard {...defaultProps} />,
       );
 
-      expect(getByTestId('cartesian-chart')).toBeTruthy();
+      expect(getByTestId('spending-chart-canvas')).toBeTruthy();
       expect(getAllByTestId('vn-bar').length).toBeGreaterThan(0);
     });
 
@@ -133,7 +133,7 @@ describe('CategorySpendingCard', () => {
       );
 
       expect(getByText('no_spending_data')).toBeTruthy();
-      expect(queryByTestId('cartesian-chart')).toBeFalsy();
+      expect(queryByTestId('spending-chart-canvas')).toBeFalsy();
     });
 
     it('renders null when no parent expense categories', async () => {
@@ -397,7 +397,7 @@ describe('CategorySpendingCard', () => {
         <CategorySpendingCard {...defaultProps} />,
       );
 
-      expect(getByTestId('cartesian-chart')).toBeTruthy();
+      expect(getByTestId('spending-chart-canvas')).toBeTruthy();
     });
   });
 
@@ -786,45 +786,101 @@ describe('CategorySpendingCard', () => {
     });
   });
 
-  // `useAnimatedReaction` is a no-op under the Jest reanimated mock, so the
-  // scrub reaction is only reachable through its exported worklet.
-  describe('resolveScrubIndex', () => {
+  // The tap gesture's callback is a worklet under the gesture-handler mock, so
+  // the hit test is only reachable through its exported helper.
+  describe('resolveTapIndex', () => {
+    const PITCH = 48;
     const COUNT = 12;
 
-    it('ignores the mount-time run, so the current month keeps the selection', () => {
-      // useAnimatedReaction fires once on creation with previous === null and
-      // the press state still at its x=0 initial value.
-      expect(resolveScrubIndex({ active: false, x: 0 }, null, COUNT)).toBe(-1);
+    it('maps a tap to the month whose slot it landed in', () => {
+      expect(resolveTapIndex(0, PITCH, COUNT)).toBe(0);
+      expect(resolveTapIndex(47, PITCH, COUNT)).toBe(0);
+      expect(resolveTapIndex(48, PITCH, COUNT)).toBe(1);
+      expect(resolveTapIndex(263, PITCH, COUNT)).toBe(5);
     });
 
-    it('ignores every reading taken with the finger up', () => {
-      expect(resolveScrubIndex({ active: false, x: 7 }, { active: true, x: 3 }, COUNT)).toBe(-1);
+    it('reaches the newest month at the far edge of the content', () => {
+      // Regression: the newest month used to sit half a bar off the canvas, so
+      // the right-hand end of the content had to be reachable.
+      expect(resolveTapIndex(PITCH * COUNT - 1, PITCH, COUNT)).toBe(COUNT - 1);
     });
 
-    it('reports the pressed month once the finger goes down', () => {
-      expect(resolveScrubIndex({ active: true, x: 5 }, { active: false, x: 0 }, COUNT)).toBe(5);
+    it('drops taps that fall outside the plotted months', () => {
+      expect(resolveTapIndex(-1, PITCH, COUNT)).toBe(-1);
+      expect(resolveTapIndex(PITCH * COUNT, PITCH, COUNT)).toBe(-1);
     });
 
-    it('reports the leftmost month even though x never left its initial 0', () => {
-      expect(resolveScrubIndex({ active: true, x: 0 }, { active: false, x: 0 }, COUNT)).toBe(0);
+    it('drops taps when there is nothing laid out yet', () => {
+      expect(resolveTapIndex(10, 0, COUNT)).toBe(-1);
+      expect(resolveTapIndex(10, PITCH, 0)).toBe(-1);
+    });
+  });
+
+  describe('resolveScrollTarget', () => {
+    it('opens on the current month by parking at the far right', () => {
+      // Regression: the card used to squeeze twelve months into one screen; now
+      // that they scroll, opening at offset 0 would show the oldest month.
+      expect(resolveScrollTarget({ mode: 'end' }, 576, 296)).toBe(280);
     });
 
-    it('re-reports nothing while a drag stays inside one month', () => {
-      expect(resolveScrubIndex({ active: true, x: 5 }, { active: true, x: 5 }, COUNT)).toBe(-1);
+    it('has nowhere to go when the months already fit', () => {
+      expect(resolveScrollTarget({ mode: 'end' }, 296, 296)).toBe(0);
     });
 
-    it('follows a drag across months', () => {
-      expect(resolveScrubIndex({ active: true, x: 6 }, { active: true, x: 5 }, COUNT)).toBe(6);
+    it('keeps a zoom anchor inside the scrollable range', () => {
+      expect(resolveScrollTarget({ mode: 'x', x: 120 }, 576, 296)).toBe(120);
+      expect(resolveScrollTarget({ mode: 'x', x: -40 }, 576, 296)).toBe(0);
+      expect(resolveScrollTarget({ mode: 'x', x: 9999 }, 576, 296)).toBe(280);
     });
 
-    it('snaps a fractional press position to the nearest month', () => {
-      expect(resolveScrubIndex({ active: true, x: 4.4 }, { active: true, x: 3 }, COUNT)).toBe(4);
-      expect(resolveScrubIndex({ active: true, x: 4.6 }, { active: true, x: 3 }, COUNT)).toBe(5);
+    it('waits for the content to be measured', () => {
+      expect(resolveScrollTarget({ mode: 'end' }, 0, 296)).toBeNull();
+      expect(resolveScrollTarget(null, 576, 296)).toBeNull();
+    });
+  });
+
+  describe('Horizontal scrolling', () => {
+    it('scrolls the months and pins the scale beside them', async () => {
+      const { getByTestId } = await render(
+        <CategorySpendingCard {...defaultProps} />,
+      );
+
+      // The scale lives on its own canvas outside the scroller, so it stays
+      // readable however far back the months are scrolled.
+      expect(getByTestId('spending-chart-axis')).toBeTruthy();
+      expect(getByTestId('spending-chart-scroll').props.horizontal).toBe(true);
     });
 
-    it('drops positions dragged off either end of the chart', () => {
-      expect(resolveScrubIndex({ active: true, x: -1 }, { active: true, x: 0 }, COUNT)).toBe(-1);
-      expect(resolveScrubIndex({ active: true, x: 12 }, { active: true, x: 11 }, COUNT)).toBe(-1);
+    it('replays the opening scroll on both content size and layout', async () => {
+      // Whichever of the two lands last is the one that can actually move the
+      // scroller, so both have to be wired up.
+      const { getByTestId } = await render(
+        <CategorySpendingCard {...defaultProps} />,
+      );
+
+      const scroller = getByTestId('spending-chart-scroll');
+      expect(scroller.props.onContentSizeChange).toEqual(expect.any(Function));
+      expect(scroller.props.onLayout).toEqual(expect.any(Function));
+
+      await fireEvent(scroller, 'layout', { nativeEvent: { layout: { width: 300, height: 116 } } });
+      await fireEvent(scroller, 'contentSizeChange', 900, 116);
+    });
+
+    it('lays the months out wider than the card so the newest one fits', async () => {
+      const { getByTestId } = await render(
+        <CategorySpendingCard {...defaultProps} />,
+      );
+
+      const canvas = getByTestId('spending-chart-canvas');
+      const style = Array.isArray(canvas.props.style)
+        ? Object.assign({}, ...canvas.props.style)
+        : canvas.props.style;
+
+      // 12 months at the default 48px pitch, or the viewport when that is wider
+      // — a phone gets the scrolling layout, a tablet-width card still fills.
+      const { width: screenWidth } = require('react-native').Dimensions.get('window');
+      const viewport = screenWidth - 64 - 34;
+      expect(style.width).toBeCloseTo(Math.max(12 * 48, viewport), 5);
     });
   });
 
