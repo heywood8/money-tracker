@@ -1,12 +1,13 @@
-import React, { memo, useRef } from 'react';
+import React, { memo } from 'react';
 import { View, Text, Pressable, StyleSheet } from 'react-native';
 import PropTypes from 'prop-types';
 import Icon from '@expo/vector-icons/MaterialCommunityIcons';
 import * as Currency from '../../services/currency';
 import PlanProgressBar, { PAIR_COLUMN_WIDTH } from './PlanProgressBar';
-import { useOverlayHost } from '../../contexts/OverlayHostContext';
-import { measureAnchorRect } from '../../utils/overlayGeometry';
+import useAnchoredLongPress from '../../hooks/useAnchoredLongPress';
 import { BORDER_RADIUS, FONT_SIZE, SPACING } from '../../styles/designTokens';
+
+const NOOP = () => {};
 
 // Stands in for a figure whose exchange rate is still resolving — same em dash
 // PlanLineRow uses, for the same reason.
@@ -53,10 +54,13 @@ const PlanGroupRow = memo(function PlanGroupRow({
   listLength,
   collapsed = true,
   onMove = null,
-  onToggle,
-  onLongPress,
-  testIDPrefix = 'plan-group',
+  onToggle = NOOP,
+  onLongPress = NOOP,
+  lifted = false,
 }) {
+  // See PlanLineRow: the copy the action menu lifts over this row needs testIDs
+  // of its own, or a query naming the row matches both.
+  const testIDPrefix = lifted ? 'plan-group-lifted' : 'plan-group';
   const isUnconvertible = status?.status === 'unconvertible';
   // A group is "tracked" once its actual is known — which only the async plan
   // status can supply (per-line actuals are not computed on the client). Until
@@ -101,20 +105,18 @@ const PlanGroupRow = memo(function PlanGroupRow({
     : null;
 
   // Measured on long-press so the host can lift a copy of this row above the
-  // blurred backdrop and anchor its action bar to it — see PlanLineRow for why the
-  // overlay host is the thing being measured against.
-  const rowRef = useRef(null);
-  const { hostRef } = useOverlayHost();
-  const handleLongPress = () => {
-    measureAnchorRect(rowRef.current, hostRef?.current, (layout) => {
-      onLongPress(group, index, listLength, onMove, layout);
-    });
-  };
+  // blurred backdrop and anchor its action bar to it.
+  const [rowRef, handleLongPress] = useAnchoredLongPress(
+    (layout) => onLongPress(group, index, listLength, onMove, layout),
+  );
 
   return (
     <Pressable
       ref={rowRef}
-      style={styles.groupRow}
+      // The row's top margin is what separates one envelope from whatever is
+      // above it in the list; the lifted copy has nothing to separate from, and
+      // the margin would push it that far below the row it covers.
+      style={[styles.groupRow, lifted && styles.groupRowLifted]}
       onPress={() => onToggle(group)}
       onLongPress={handleLongPress}
       accessibilityRole="button"
@@ -243,10 +245,10 @@ PlanGroupRow.propTypes = {
   t: PropTypes.func.isRequired,
   collapsed: PropTypes.bool,
   onMove: PropTypes.func,
-  onToggle: PropTypes.func.isRequired,
-  onLongPress: PropTypes.func.isRequired,
-  // See PlanLineRow: the lifted copy renders under its own testID namespace.
-  testIDPrefix: PropTypes.string,
+  onToggle: PropTypes.func,
+  onLongPress: PropTypes.func,
+  // See PlanLineRow: renders the static copy the action menu lifts over the row.
+  lifted: PropTypes.bool,
 };
 
 export default PlanGroupRow;
@@ -295,6 +297,9 @@ const styles = StyleSheet.create({
     marginTop: SPACING.sm,
     overflow: 'hidden',
     paddingVertical: 7,
+  },
+  groupRowLifted: {
+    marginTop: 0,
   },
   groupTop: {
     alignItems: 'center',

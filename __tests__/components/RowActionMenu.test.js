@@ -8,9 +8,9 @@
  * row's worth.
  */
 import React from 'react';
-import { StyleSheet, Text, View } from 'react-native';
+import { BackHandler, StyleSheet, Text, View } from 'react-native';
 import { render, fireEvent, waitFor } from '@testing-library/react-native';
-import RowActionMenu, { panelRows } from '../../app/components/RowActionMenu';
+import RowActionMenu from '../../app/components/RowActionMenu';
 import {
   OverlayHostProvider,
   OverlayOutlet,
@@ -88,14 +88,7 @@ describe('RowActionMenu', () => {
 
   describe('Action bar layout', () => {
     // Past four across the labels stop being readable at a row's width, so a
-    // longer list stacks — and the two rows are balanced rather than leaving one
-    // button alone at double width.
-    it.each([
-      [1, 1], [4, 1], [5, 2], [6, 2], [8, 2],
-    ])('lays %i actions out over %i row(s)', (count, rows) => {
-      expect(panelRows(count)).toBe(rows);
-    });
-
+    // longer list stacks into a second row and the bar grows to match.
     it('gives the bar the height of the rows it needs', async () => {
       const oneRow = await renderMenu({ menu: makeMenu(), actions: makeActions(4) });
       const twoRows = await renderMenu({ menu: makeMenu(), actions: makeActions(6) });
@@ -114,7 +107,7 @@ describe('RowActionMenu', () => {
     it('draws a destructive action in the destructive colour, label included', async () => {
       const actions = [
         { key: 'edit', icon: 'pencil', label: 'edit', onPress: jest.fn() },
-        { key: 'delete', icon: 'trash-can-outline', label: 'delete', destructive: true, onPress: jest.fn() },
+        { key: 'delete', icon: 'trash-can-outline', label: 'delete', tone: 'destructive', onPress: jest.fn() },
       ];
       const { getByTestId, getByText } = await renderMenu({ menu: makeMenu(), actions });
       await waitFor(() => expect(getByTestId('row-action-delete')).toBeTruthy());
@@ -132,12 +125,80 @@ describe('RowActionMenu', () => {
     await waitFor(() => expect(getByLabelText('delete_group')).toBeTruthy());
   });
 
-  it('dismisses when the backdrop is pressed', async () => {
-    const onClose = jest.fn();
-    const { getByTestId } = await renderMenu({ menu: makeMenu(), actions: makeActions(2), onClose });
-    await waitFor(() => expect(getByTestId('row-action-menu-backdrop')).toBeTruthy());
+  describe('Dismissal', () => {
+    it('dismisses when the backdrop is pressed', async () => {
+      const onClose = jest.fn();
+      const { getByTestId } = await renderMenu({ menu: makeMenu(), actions: makeActions(2), onClose });
+      await waitFor(() => expect(getByTestId('row-action-menu-backdrop')).toBeTruthy());
 
-    fireEvent.press(getByTestId('row-action-menu-backdrop'));
-    expect(onClose).toHaveBeenCalledTimes(1);
+      fireEvent.press(getByTestId('row-action-menu-backdrop'));
+      expect(onClose).toHaveBeenCalledTimes(1);
+    });
+
+    // Dismissing belongs to the menu, not to each host's handlers: every action
+    // either opens something or asks for a confirmation, and a bar left covering
+    // the screen over a dialog was the failure mode this closes off.
+    it('dismisses itself before running the chosen action', async () => {
+      const order = [];
+      const onClose = jest.fn(() => order.push('close'));
+      const actions = [{
+        key: 'edit', icon: 'pencil', label: 'edit', onPress: () => order.push('action'),
+      }];
+      const { getByTestId } = await renderMenu({ menu: makeMenu(), actions, onClose });
+      await waitFor(() => expect(getByTestId('row-action-edit')).toBeTruthy());
+
+      fireEvent.press(getByTestId('row-action-edit'));
+      expect(order).toEqual(['close', 'action']);
+    });
+
+    it('unmounts the overlay when the menu closes', async () => {
+      const props = { menu: makeMenu(), actions: makeActions(2), colors, onClose: jest.fn(), testIDPrefix: 'row-action' };
+      const { queryByTestId, rerender } = await renderMenu(props);
+      await waitFor(() => expect(queryByTestId('row-action-menu-backdrop')).toBeTruthy());
+
+      rerender(tree({ ...props, menu: null }));
+
+      await waitFor(() => expect(queryByTestId('row-action-menu-backdrop')).toBeNull());
+    });
+  });
+
+  describe('Overlay placement', () => {
+    it('mounts the overlay into the outlet, not in place', async () => {
+      const { getByTestId } = await renderMenu({ menu: makeMenu(), actions: makeActions(2) });
+      const outlet = await waitFor(() => getByTestId('overlay-outlet'));
+      // Walking up from the backdrop must reach the outlet: that is what proves the
+      // content and the menu live under one shared ancestor.
+      let node = getByTestId('row-action-menu-backdrop').parent;
+      let found = false;
+      while (node) {
+        if (node === outlet) { found = true; break; }
+        node = node.parent;
+      }
+      expect(found).toBe(true);
+    });
+  });
+
+  describe('Regression Tests', () => {
+    // Without a Modal window there is no onRequestClose, so back has to be wired by
+    // hand — otherwise the hardware back button would leave the screen with the menu
+    // still up.
+    it('closes on hardware back while open', async () => {
+      const onClose = jest.fn();
+      const spy = jest.spyOn(BackHandler, 'addEventListener');
+      await renderMenu({ menu: makeMenu(), actions: makeActions(2), onClose });
+
+      await waitFor(() => expect(spy).toHaveBeenCalledWith('hardwareBackPress', expect.any(Function)));
+      const handler = spy.mock.calls.at(-1)[1];
+      expect(handler()).toBe(true);
+      expect(onClose).toHaveBeenCalledTimes(1);
+      spy.mockRestore();
+    });
+
+    it('does not intercept hardware back while closed', async () => {
+      const spy = jest.spyOn(BackHandler, 'addEventListener');
+      await renderMenu({ menu: null, actions: makeActions(2) });
+      await waitFor(() => expect(spy).not.toHaveBeenCalled());
+      spy.mockRestore();
+    });
   });
 });

@@ -6,11 +6,12 @@ import PropTypes from 'prop-types';
 import Icon from '@expo/vector-icons/MaterialCommunityIcons';
 import * as Currency from '../../services/currency';
 import PlanProgressBar, { PAIR_COLUMN_WIDTH } from './PlanProgressBar';
-import { useOverlayHost } from '../../contexts/OverlayHostContext';
-import { measureAnchorRect } from '../../utils/overlayGeometry';
+import useAnchoredLongPress from '../../hooks/useAnchoredLongPress';
 import { BORDER_RADIUS, FONT_SIZE, SPACING } from '../../styles/designTokens';
 import { ENVELOPE_RAIL_CHILD_ALPHA } from '../../styles/envelopePalette';
 import { SPRING_BADGE_POP } from '../../utils/motion';
+
+const NOOP = () => {};
 
 // Where the badge springs from when its state flips. Not 0: a glyph growing out
 // of nothing reads as an element arriving, and this one was already there — it
@@ -68,13 +69,17 @@ const PlanLineRow = memo(function PlanLineRow({
   envelopeColor = null,
   listLength,
   onMove = null,
-  onPress,
-  onLongPress,
+  onPress = NOOP,
+  onLongPress = NOOP,
   onExecute = null,
   onMarkExecuted = null,
   onUndo = null,
-  testIDPrefix = 'plan-line',
+  lifted = false,
 }) {
+  // The lifted copy answers to its own testIDs: it is drawn on top of the row it
+  // copies, and two nodes under one testID is a query that can no longer name
+  // either of them.
+  const testIDPrefix = lifted ? 'plan-line-lifted' : 'plan-line';
   const lineCurrency = line.currency || planCurrency;
   const isBroken = line.isBroken || status?.broken;
   // The screen shows exactly one currency, so a row prints a bare number in it —
@@ -204,16 +209,10 @@ const PlanLineRow = memo(function PlanLineRow({
   ].filter(Boolean).join(', ');
 
   // Measured on long-press so the host can lift a copy of this exact row above the
-  // blurred backdrop and float its action bar over it (see RowActionMenu). Measured
-  // against the overlay host — the shared ancestor of this row and of the layer the
-  // copy is drawn in — so the two coordinate spaces cannot disagree.
-  const rowRef = useRef(null);
-  const { hostRef } = useOverlayHost();
-  const handleLongPress = () => {
-    measureAnchorRect(rowRef.current, hostRef?.current, (layout) => {
-      onLongPress(line, index, listLength, onMove, layout);
-    });
-  };
+  // blurred backdrop and float its action bar over it (see RowActionMenu).
+  const [rowRef, handleLongPress] = useAnchoredLongPress(
+    (layout) => onLongPress(line, index, listLength, onMove, layout),
+  );
 
   const content = (
     <Pressable
@@ -451,15 +450,14 @@ PlanLineRow.propTypes = {
   indented: PropTypes.bool,
   envelopeColor: PropTypes.string,
   onMove: PropTypes.func,
-  onPress: PropTypes.func.isRequired,
-  onLongPress: PropTypes.func.isRequired,
+  onPress: PropTypes.func,
+  onLongPress: PropTypes.func,
   onExecute: PropTypes.func,
   onMarkExecuted: PropTypes.func,
   onUndo: PropTypes.func,
-  // Namespaces every testID the row renders. The host overrides it for the static
-  // copy it lifts into the action menu, so the copy and the row it covers don't
-  // answer to the same testID.
-  testIDPrefix: PropTypes.string,
+  // Renders the static copy the action menu lifts over the row: its own testID
+  // namespace, and no handlers to wire.
+  lifted: PropTypes.bool,
 };
 
 export default PlanLineRow;

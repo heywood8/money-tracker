@@ -1,4 +1,4 @@
-import React, { useCallback, useEffect, useRef, useState } from 'react';
+import React, { memo, useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import { BackHandler, View, Text, Pressable, StyleSheet, Animated, Dimensions } from 'react-native';
 import PropTypes from 'prop-types';
 import Icon from '@expo/vector-icons/MaterialCommunityIcons';
@@ -21,8 +21,23 @@ const MAX_PER_ROW = 4;
  * is needed the two are balanced (5 actions read 3 + 2, not 4 + 1) so no single
  * button ends up alone at double width.
  */
-export const panelRows = (count) => Math.max(1, Math.ceil(count / MAX_PER_ROW));
+const panelRows = (count) => Math.max(1, Math.ceil(count / MAX_PER_ROW));
 const perRow = (count) => Math.ceil(count / panelRows(count));
+
+// A closed menu's action list, as one shared value: hosts derive their actions
+// from the pressed row, and a fresh `[]` per render would miss this component's
+// memo on every render of a screen whose menu isn't even open.
+export const NO_ACTIONS = [];
+
+// Icon and label colour per tone. `default` is the accent; `muted` marks an
+// action that undoes or hides rather than does; `destructive` is the one red on
+// the bar, and it carries the label too so the button reads as dangerous at a
+// glance rather than only under its glyph.
+const TONES = {
+  default: (colors) => ({ icon: colors.primary, text: colors.text }),
+  muted: (colors) => ({ icon: colors.mutedText, text: colors.text }),
+  destructive: (colors) => ({ icon: colors.destructive, text: colors.destructive }),
+};
 
 /**
  * The long-press context menu shared by every list row that offers whole-row
@@ -43,11 +58,16 @@ const perRow = (count) => Math.ceil(count / panelRows(count));
  * the same thing on both sides and the clone always lands on the row.
  *
  * The host owns visibility and the action list: pass a `menu` object to open, `null`
- * to close, and the `actions` the pressed row supports. Entrance is animated; closing
- * unmounts immediately (a snappy dismiss is the expected feel for a context menu, and
- * keeping no internal open/close state avoids setState-in-effect churn).
+ * to close, and the `actions` the pressed row supports. Choosing an action dismisses
+ * the menu before it runs — that is this component's job, not each host's, because
+ * every action either opens something or asks for a confirmation, and a menu left
+ * covering the screen over a dialog is the failure mode.
+ *
+ * Entrance is animated; closing unmounts immediately (a snappy dismiss is the
+ * expected feel for a context menu, and keeping no internal open/close state avoids
+ * setState-in-effect churn).
  */
-export default function RowActionMenu({ menu, actions, colors, onClose, testIDPrefix }) {
+function RowActionMenu({ menu, actions, colors, onClose, testIDPrefix }) {
   const insets = useSafeAreaInsets();
   const progress = useRef(new Animated.Value(0)).current;
   // Height of the overlay layer itself, not of the screen: the layer is the box the
@@ -62,10 +82,10 @@ export default function RowActionMenu({ menu, actions, colors, onClose, testIDPr
   }, []);
 
   // Open-ness rather than the `menu` object itself drives both effects below: a
-  // host that rebuilds the object on every render (because the lifted copy tracks
-  // live data) would otherwise re-subscribe to back and restart the entrance
+  // host whose lifted copy tracks live data rebuilds that object while the menu
+  // is up, and keying off it would re-subscribe to back and restart the entrance
   // spring mid-animation.
-  const isOpen = !!menu;
+  const isOpen = !!menu && actions.length > 0;
 
   // The overlay is not a native window, so the hardware back button is ours to handle.
   useEffect(() => {
@@ -96,57 +116,60 @@ export default function RowActionMenu({ menu, actions, colors, onClose, testIDPr
     }
   }, [isOpen, progress]);
 
-  if (!menu || actions.length === 0) return null;
-
-  const { layout, row } = menu;
+  const layout = menu?.layout ?? null;
   const panelHeight = panelRows(actions.length) * PANEL_ROW_HEIGHT;
-  // A percentage rather than flex: it keeps the buttons of a wrapped second row in
-  // the same columns as the first one's, instead of stretching to fill it.
-  const buttonWidth = `${100 / perRow(actions.length)}%`;
 
   // Where the floating icon bar goes. Prefer above the row; fall back to below.
   // Both edges are bounded so the bar never lands under the status bar / notch
   // or under the bottom inset (tab bar / gesture area) for a near-edge row.
-  let panelTop;
-  let panelPlacedAbove = true;
-  if (layout) {
+  const { panelTop, panelPlacedAbove } = useMemo(() => {
+    if (!layout) {
+      // No measurement (rare): center the bar on screen.
+      return { panelTop: layerHeight / 2 - panelHeight / 2, panelPlacedAbove: false };
+    }
     const topLimit = insets.top + SPACING.sm;
     const bottomLimit = layerHeight - insets.bottom - SPACING.sm - panelHeight;
     const above = layout.y - GAP - panelHeight;
     const below = layout.y + layout.height + GAP;
-    if (above >= topLimit) {
-      panelTop = above;
-    } else if (below <= bottomLimit) {
-      panelTop = below;
-      panelPlacedAbove = false;
-    } else {
-      // Neither side fully clears an inset — clamp into the visible area.
-      panelTop = Math.max(topLimit, Math.min(above, bottomLimit));
-    }
-  } else {
-    // No measurement (rare): center the bar on screen.
-    panelTop = layerHeight / 2 - panelHeight / 2;
-    panelPlacedAbove = false;
-  }
+    if (above >= topLimit) return { panelTop: above, panelPlacedAbove: true };
+    if (below <= bottomLimit) return { panelTop: below, panelPlacedAbove: false };
+    // Neither side fully clears an inset — clamp into the visible area.
+    return {
+      panelTop: Math.max(topLimit, Math.min(above, bottomLimit)),
+      panelPlacedAbove: true,
+    };
+  }, [layout, panelHeight, layerHeight, insets.top, insets.bottom]);
 
-  const backdropStyle = { opacity: progress };
-  const cloneStyle = {
-    opacity: progress,
-    transform: [
-      { scale: progress.interpolate({ inputRange: [0, 1], outputRange: [0.97, 1] }) },
-    ],
-  };
-  const panelStyle = {
-    opacity: progress,
-    transform: [
-      {
-        translateY: progress.interpolate({
-          inputRange: [0, 1],
-          outputRange: [panelPlacedAbove ? SPACING.sm : -SPACING.sm, 0],
-        }),
-      },
-    ],
-  };
+  // Built once per placement rather than per render: each `interpolate` call
+  // creates a native animation node, and rebuilding them while the entrance
+  // spring is running tears down and re-creates the node graph under the clone.
+  const { backdropStyle, cloneStyle, panelStyle } = useMemo(() => ({
+    backdropStyle: { opacity: progress },
+    cloneStyle: {
+      opacity: progress,
+      transform: [
+        { scale: progress.interpolate({ inputRange: [0, 1], outputRange: [0.97, 1] }) },
+      ],
+    },
+    panelStyle: {
+      opacity: progress,
+      transform: [
+        {
+          translateY: progress.interpolate({
+            inputRange: [0, 1],
+            outputRange: [panelPlacedAbove ? SPACING.sm : -SPACING.sm, 0],
+          }),
+        },
+      ],
+    },
+  }), [progress, panelPlacedAbove]);
+
+  if (!isOpen) return null;
+
+  const { row } = menu;
+  // A percentage rather than flex: it keeps the buttons of a wrapped second row in
+  // the same columns as the first one's, instead of stretching to fill it.
+  const buttonWidth = `${100 / perRow(actions.length)}%`;
 
   return (
     <>
@@ -199,18 +222,15 @@ export default function RowActionMenu({ menu, actions, colors, onClose, testIDPr
                 : { left: SPACING.lg, right: SPACING.lg },
             ]}
           >
-            <Pressable style={styles.panelRow} onPress={() => {}}>
+            <Pressable style={styles.panelRow} onPress={swallowTap}>
               {actions.map((action) => (
                 <ActionButton
                   key={action.key}
-                  testID={action.testID || `${testIDPrefix}-${action.key}`}
-                  icon={action.icon}
-                  label={action.label}
-                  a11yLabel={action.a11yLabel}
-                  color={action.destructive ? colors.destructive : (action.muted ? colors.mutedText : colors.primary)}
-                  textColor={action.destructive ? colors.destructive : colors.text}
+                  testID={`${testIDPrefix}-${action.key}`}
+                  action={action}
+                  colors={colors}
                   width={buttonWidth}
-                  onPress={action.onPress}
+                  onClose={onClose}
                 />
               ))}
             </Pressable>
@@ -221,47 +241,49 @@ export default function RowActionMenu({ menu, actions, colors, onClose, testIDPr
   );
 }
 
-function ActionButton({ testID, icon, label, a11yLabel, color, textColor, width, onPress }) {
+const swallowTap = () => {};
+
+function ActionButton({ testID, action, colors, width, onClose }) {
+  const { icon: iconColor, text: textColor } = (TONES[action.tone] || TONES.default)(colors);
+  const handlePress = () => {
+    onClose();
+    action.onPress();
+  };
   return (
     <Pressable
       testID={testID}
-      onPress={onPress}
+      onPress={handlePress}
       style={({ pressed }) => [styles.actionButton, { width }, pressed && styles.actionButtonPressed]}
       accessibilityRole="button"
-      accessibilityLabel={a11yLabel || label}
+      accessibilityLabel={action.a11yLabel || action.label}
     >
-      <Icon name={icon} size={ICON_SIZE.md} color={color} />
+      <Icon name={action.icon} size={ICON_SIZE.md} color={iconColor} />
       <Text style={[styles.actionLabel, { color: textColor }]} numberOfLines={1}>
-        {label}
+        {action.label}
       </Text>
     </Pressable>
   );
 }
 
-ActionButton.propTypes = {
-  testID: PropTypes.string,
-  icon: PropTypes.string.isRequired,
-  label: PropTypes.string.isRequired,
-  a11yLabel: PropTypes.string,
-  color: PropTypes.string.isRequired,
-  textColor: PropTypes.string.isRequired,
-  width: PropTypes.string.isRequired,
-  onPress: PropTypes.func.isRequired,
-};
-
-export const actionShape = PropTypes.shape({
-  // Identifies the action and, unless `testID` says otherwise, names its testID.
+const actionShape = PropTypes.shape({
+  // Identifies the action and names its testID under the host's prefix.
   key: PropTypes.string.isRequired,
   icon: PropTypes.string.isRequired,
   label: PropTypes.string.isRequired,
   // The full phrase, for screen readers, when the visible label had to be shortened
   // to fit beside its siblings.
   a11yLabel: PropTypes.string,
-  destructive: PropTypes.bool,
-  muted: PropTypes.bool,
-  testID: PropTypes.string,
+  tone: PropTypes.oneOf(Object.keys(TONES)),
   onPress: PropTypes.func.isRequired,
 });
+
+ActionButton.propTypes = {
+  testID: PropTypes.string,
+  action: actionShape.isRequired,
+  colors: PropTypes.object.isRequired,
+  width: PropTypes.string.isRequired,
+  onClose: PropTypes.func.isRequired,
+};
 
 RowActionMenu.propTypes = {
   menu: PropTypes.shape({
@@ -278,6 +300,12 @@ RowActionMenu.propTypes = {
   onClose: PropTypes.func.isRequired,
   testIDPrefix: PropTypes.string.isRequired,
 };
+
+// Memoized because it renders through OverlayPortal, whose effect re-mounts the
+// overlay slot whenever its children change identity — one host render would
+// otherwise cost a second pass over the whole clone-and-panel subtree. Hosts keep
+// `menu` and `actions` stable (see NO_ACTIONS) for this to hold.
+export default memo(RowActionMenu);
 
 const styles = StyleSheet.create({
   actionButton: {

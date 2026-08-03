@@ -1,6 +1,6 @@
 import React, { useMemo } from 'react';
 import PropTypes from 'prop-types';
-import RowActionMenu from '../RowActionMenu';
+import RowActionMenu, { NO_ACTIONS } from '../RowActionMenu';
 
 /**
  * Context action menu shown on long-pressing an operation row.
@@ -19,7 +19,9 @@ export default function OperationActionMenu({ menu, colors, t, onClose, onEdit, 
   const showChartsAction = operationType === 'expense' || operationType === 'income';
   const hiddenFromCharts = !!menu?.operation?.excludeFromCharts;
 
-  const actions = useMemo(() => [
+  // Memoized (and NO_ACTIONS while closed) because RowActionMenu is memoized: a
+  // fresh array per render of the screen would miss its compare every time.
+  const actions = useMemo(() => (menu ? [
     { key: 'edit', icon: 'pencil', label: t('edit'), onPress: onEdit },
     { key: 'repeat', icon: 'repeat', label: t('repeat'), onPress: onRepeat },
     ...(showChartsAction ? [{
@@ -29,11 +31,11 @@ export default function OperationActionMenu({ menu, colors, t, onClose, onEdit, 
       // the accessibility label.
       label: hiddenFromCharts ? t('show_in_charts') : t('hide_from_charts'),
       a11yLabel: hiddenFromCharts ? t('include_in_charts') : t('exclude_from_charts'),
-      muted: hiddenFromCharts,
+      tone: hiddenFromCharts ? 'muted' : undefined,
       onPress: onToggleCharts,
     }] : []),
-    { key: 'delete', icon: 'trash-can-outline', label: t('delete'), destructive: true, onPress: onDelete },
-  ], [t, onEdit, onRepeat, onToggleCharts, onDelete, showChartsAction, hiddenFromCharts]);
+    { key: 'delete', icon: 'trash-can-outline', label: t('delete'), tone: 'destructive', onPress: onDelete },
+  ] : NO_ACTIONS), [menu, t, onEdit, onRepeat, onToggleCharts, onDelete, showChartsAction, hiddenFromCharts]);
 
   return (
     <RowActionMenu

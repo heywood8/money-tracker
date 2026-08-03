@@ -17,14 +17,16 @@ import BudgetPlanLineModal from './BudgetPlanLineModal';
 import BudgetLineGroupModal from './BudgetLineGroupModal';
 import PlanLineRow from './PlanLineRow';
 import PlanGroupRow from './PlanGroupRow';
-import RowActionMenu from '../RowActionMenu';
+import RowActionMenu, { NO_ACTIONS } from '../RowActionMenu';
 import { currentMonthKey, addMonths, formatMonthLabel } from '../../utils/monthUtils';
 import { CARD_SURFACE, SECTION_HEADING } from '../../styles/componentStyles';
 import EmptyState from '../EmptyState';
 
 const CLOSED_MODAL = { visible: false, line: null, kind: 'expense' };
 const CLOSED_GROUP_MODAL = { visible: false, group: null };
-const NOOP = () => {};
+// The "list" a lifted copy belongs to: it stands alone, so its length is 1 and
+// its index is 0 — a constant rather than a fresh array per press.
+const SINGLE_ROW = { length: 1 };
 
 // Key under which a group's own (override) amount rides along in the shared
 // conversion map — see the `amountSources` memo. Groups and lines have separate
@@ -733,7 +735,7 @@ const MonthlyPlanSection = forwardRef(function MonthlyPlanSection({
     }
     return groups
       .filter(group => childrenByGroup.has(group.id))
-      .map((group) => {
+      .map((group, groupIndex) => {
         const children = childrenByGroup.get(group.id);
         // The derived figure the group shows until (and unless) the async status
         // lands: the same sum, from the same converted amounts the rows print.
@@ -750,6 +752,12 @@ const MonthlyPlanSection = forwardRef(function MonthlyPlanSection({
           oneOff: children.filter(l => !l.isRecurring),
           displayAmount: group.isDerived ? derived : (override ?? null),
           derived,
+          // Assigned by position, and carried on the view so the header, every
+          // child row and the copy the action menu lifts all read one value —
+          // deriving it a second time at any of those sites is how one envelope
+          // ends up rendering in two colours. See envelopePalette for why colour
+          // identifies an envelope here rather than flagging a status.
+          hue: envelopeHue(groupIndex),
         };
       });
   }, [groups, allocationLines, isGrouped, amountById, planCurrency]);
@@ -887,7 +895,14 @@ const MonthlyPlanSection = forwardRef(function MonthlyPlanSection({
 
   // Shared row renderer for every block — each list moves independently (own
   // sort_order sequence), so `list` and `onMove` are passed in per block.
-  const renderLine = useCallback((line, index, list, onMove, indented = false, envelopeColor = null) => {
+  //
+  // `lifted` renders the static copy the action menu floats over the row: same
+  // row, no handlers and no swipe actions (the bar above it offers those), under
+  // its own testID namespace. It goes through this renderer rather than a second
+  // hand-written <PlanLineRow> so the copy cannot drift from the row it covers.
+  const renderLine = useCallback((line, index, list, onMove, {
+    indented = false, envelopeColor = null, lifted = false,
+  } = {}) => {
     const executed = line.lastExecutedMonth === month;
     return (
       <PlanLineRow
@@ -905,13 +920,14 @@ const MonthlyPlanSection = forwardRef(function MonthlyPlanSection({
         colors={colors}
         t={t}
         executed={executed}
-        canExecute={line.hasTemplate && isCurrentMonth && !executed}
-        canUndo={line.hasTemplate && isCurrentMonth && executed}
+        canExecute={!lifted && line.hasTemplate && isCurrentMonth && !executed}
+        canUndo={!lifted && line.hasTemplate && isCurrentMonth && executed}
         showProgress={line.kind !== 'income'}
         listLength={list.length}
-        onMove={onMove}
-        onPress={openEditLine}
-        onLongPress={handleLongPressLine}
+        lifted={lifted}
+        onMove={lifted ? null : onMove}
+        onPress={lifted ? undefined : openEditLine}
+        onLongPress={lifted ? undefined : handleLongPressLine}
         onExecute={handleExecute}
         onMarkExecuted={handleMarkExecuted}
         onUndo={handleUndoExecuted}
@@ -921,24 +937,32 @@ const MonthlyPlanSection = forwardRef(function MonthlyPlanSection({
     openEditLine, handleLongPressLine, lineDisplayName, lineIcon, handleExecute,
     handleMarkExecuted, handleUndoExecuted]);
 
+  // Same idea for an envelope header: one renderer for the list and for the copy.
+  const renderGroupRow = useCallback((view, index, lifted = false) => (
+    <PlanGroupRow
+      group={view.group}
+      index={index}
+      listLength={groupViews.length}
+      status={groupStatusById.get(view.group.id) || null}
+      displayAmount={view.displayAmount}
+      converting={converting}
+      childCount={view.children.length}
+      envelopeColor={view.hue}
+      planCurrency={planCurrency}
+      colors={colors}
+      t={t}
+      collapsed={!expandedGroupIds.has(view.group.id)}
+      lifted={lifted}
+      onMove={lifted ? null : moveGroup}
+      onToggle={lifted ? undefined : toggleGroup}
+      onLongPress={lifted ? undefined : handleLongPressGroup}
+    />
+  ), [groupViews.length, groupStatusById, converting, planCurrency, colors, t,
+    expandedGroupIds, moveGroup, toggleGroup, handleLongPressGroup]);
+
   const hasAnyLines = lines.length > 0;
 
   /* ── Long-press action menu ──────────────────────────────────────────────── */
-
-  // Which envelope (if any) each row belongs to, by colour. The render loop below
-  // assigns a hue per group position; the lifted copy of a row has to be handed
-  // the same one, or a child row would lose the rail that says which envelope it
-  // is in the moment it is picked up.
-  const envelopeHues = useMemo(() => {
-    const byGroup = new Map();
-    const byLine = new Map();
-    groupViews.forEach((view, groupIndex) => {
-      const hue = envelopeHue(groupIndex);
-      byGroup.set(view.group.id, hue);
-      for (const child of view.children) byLine.set(child.id, hue);
-    });
-    return { byGroup, byLine };
-  }, [groupViews]);
 
   const closeActionMenu = useCallback(() => setActionMenu(null), []);
 
@@ -948,78 +972,29 @@ const MonthlyPlanSection = forwardRef(function MonthlyPlanSection({
   const menuRow = useMemo(() => {
     if (!actionMenu) return null;
     if (actionMenu.type === 'group') {
-      const view = groupViews.find(v => v.group.id === actionMenu.group.id);
-      if (!view) return null;
-      return (
-        // PlanGroupRow carries its own top margin — it is what separates one
-        // envelope from the row above it in the list. Inside the lifted copy
-        // there is nothing to separate from, and the margin would push the copy
-        // that far below the row it is supposed to cover.
-        <View style={styles.cloneOffset}>
-          <PlanGroupRow
-            group={view.group}
-            index={0}
-            listLength={1}
-            status={groupStatusById.get(view.group.id) || null}
-            displayAmount={view.displayAmount}
-            converting={converting}
-            childCount={view.children.length}
-            envelopeColor={envelopeHues.byGroup.get(view.group.id)}
-            planCurrency={planCurrency}
-            colors={colors}
-            t={t}
-            collapsed={!expandedGroupIds.has(view.group.id)}
-            onToggle={NOOP}
-            onLongPress={NOOP}
-            testIDPrefix="plan-group-lifted"
-          />
-        </View>
-      );
+      const index = groupViews.findIndex(v => v.group.id === actionMenu.group.id);
+      return index < 0 ? null : renderGroupRow(groupViews[index], index, true);
     }
     const { line } = actionMenu;
-    const hue = envelopeHues.byLine.get(line.id) ?? null;
-    return (
-      <PlanLineRow
-        line={line}
-        index={0}
-        listLength={1}
-        indented={!!hue}
-        envelopeColor={hue}
-        name={lineDisplayName(line)}
-        icon={lineIcon(line)}
-        status={lineStatusById.get(line.id) || null}
-        planCurrency={planCurrency}
-        displayAmount={amountById.get(line.id) ?? null}
-        converting={converting}
-        colors={colors}
-        t={t}
-        executed={line.lastExecutedMonth === month}
-        showProgress={line.kind !== 'income'}
-        // No canExecute/canUndo: the copy is not swipeable, and the actions it
-        // would carry are exactly the ones the bar above it now offers.
-        onPress={NOOP}
-        onLongPress={NOOP}
-        testIDPrefix="plan-line-lifted"
-      />
-    );
-  }, [actionMenu, groupViews, groupStatusById, envelopeHues, expandedGroupIds, lineStatusById,
-    amountById, converting, planCurrency, colors, t, month, lineDisplayName, lineIcon]);
+    // A child row keeps the rail that says which envelope it is in — without it
+    // the copy would read as a loose allocation the moment it is picked up.
+    const hue = groupViews.find(v => v.children.some(c => c.id === line.id))?.hue ?? null;
+    return renderLine(line, 0, SINGLE_ROW, null, {
+      indented: !!hue, envelopeColor: hue, lifted: true,
+    });
+  }, [actionMenu, groupViews, renderGroupRow, renderLine]);
 
-  // Stable while the menu is open (the entrance animation keys off this object),
-  // so it is rebuilt only when the pressed row or its copy actually changes.
+  // Memoized because RowActionMenu is memoized: it draws through an overlay portal
+  // that re-mounts its slot whenever the children change identity, and this
+  // section re-renders on every conversion result while the menu is up.
   const menu = useMemo(
     () => (actionMenu ? { layout: actionMenu.layout, row: menuRow } : null),
     [actionMenu, menuRow],
   );
 
   const menuActions = useMemo(() => {
-    if (!actionMenu) return [];
-    // Every action dismisses the menu first: it covers the screen, and each of
-    // these either opens an editor, moves the row or asks for a confirmation.
-    const run = (action) => () => {
-      setActionMenu(null);
-      action();
-    };
+    // Dismissing is RowActionMenu's job, not each action's — see its docblock.
+    if (!actionMenu) return NO_ACTIONS;
     const { index, listLength, onMove } = actionMenu;
     const moveActions = [];
     if (onMove) {
@@ -1027,12 +1002,12 @@ const MonthlyPlanSection = forwardRef(function MonthlyPlanSection({
       // action that silently does nothing.
       if (index > 0) {
         moveActions.push({
-          key: 'move-up', icon: 'arrow-up', label: t('move_up'), onPress: run(() => onMove(index, -1)),
+          key: 'move-up', icon: 'arrow-up', label: t('move_up'), onPress: () => onMove(index, -1),
         });
       }
       if (index < listLength - 1) {
         moveActions.push({
-          key: 'move-down', icon: 'arrow-down', label: t('move_down'), onPress: run(() => onMove(index, 1)),
+          key: 'move-down', icon: 'arrow-down', label: t('move_down'), onPress: () => onMove(index, 1),
         });
       }
     }
@@ -1043,7 +1018,7 @@ const MonthlyPlanSection = forwardRef(function MonthlyPlanSection({
         // The bar has room for a word per button, so the buttons say what they do
         // and the screen reader gets what they do it to.
         {
-          key: 'edit', icon: 'pencil', label: t('edit'), a11yLabel: t('edit_group'), onPress: run(() => openEditGroup(group)),
+          key: 'edit', icon: 'pencil', label: t('edit'), a11yLabel: t('edit_group'), onPress: () => openEditGroup(group),
         },
         ...moveActions,
         {
@@ -1051,8 +1026,8 @@ const MonthlyPlanSection = forwardRef(function MonthlyPlanSection({
           icon: 'trash-can-outline',
           label: t('delete'),
           a11yLabel: t('delete_group'),
-          destructive: true,
-          onPress: run(() => confirmDeleteGroup(group)),
+          tone: 'destructive',
+          onPress: () => confirmDeleteGroup(group),
         },
       ];
     }
@@ -1070,33 +1045,33 @@ const MonthlyPlanSection = forwardRef(function MonthlyPlanSection({
           icon: 'undo',
           label: t('undo'),
           a11yLabel: t('undo_execution'),
-          muted: true,
-          onPress: run(() => handleUndoExecuted(line)),
+          tone: 'muted',
+          onPress: () => handleUndoExecuted(line),
         });
       } else {
         executionActions.push(
-          { key: 'execute', icon: 'play', label: t('execute'), onPress: run(() => handleExecute(line)) },
+          { key: 'execute', icon: 'play', label: t('execute'), onPress: () => handleExecute(line) },
           {
             key: 'done',
             icon: 'check-bold',
             label: t('done'),
             a11yLabel: t('mark_as_executed'),
-            onPress: run(() => handleMarkExecuted(line)),
+            onPress: () => handleMarkExecuted(line),
           },
         );
       }
     }
     return [
       ...executionActions,
-      { key: 'edit', icon: 'pencil', label: t('edit'), a11yLabel: t('edit_allocation'), onPress: run(() => openEditLine(line)) },
+      { key: 'edit', icon: 'pencil', label: t('edit'), a11yLabel: t('edit_allocation'), onPress: () => openEditLine(line) },
       ...moveActions,
       {
         key: 'delete',
         icon: 'trash-can-outline',
         label: t('delete'),
         a11yLabel: t('delete_allocation'),
-        destructive: true,
-        onPress: run(() => confirmDeleteLine(line)),
+        tone: 'destructive',
+        onPress: () => confirmDeleteLine(line),
       },
     ];
   }, [actionMenu, t, month, isCurrentMonth, openEditGroup, confirmDeleteGroup, openEditLine,
@@ -1186,39 +1161,20 @@ const MonthlyPlanSection = forwardRef(function MonthlyPlanSection({
             recurring line next to a one-off one — so it sits above the loose
             ones rather than among them. */}
         {groupViews.map((view, groupIndex) => {
-          // Assigned by position, and handed to the header and every child so
-          // one envelope reads as one object: the folder glyph, the rail beside
-          // the header and the rail beside each row below it are all the same
-          // colour. See envelopePalette for why colour identifies an envelope
-          // here rather than flagging a status.
-          const hue = envelopeHue(groupIndex);
           // Folded is the default, so an envelope shows its children only once
           // the user has said to — see `expandedGroupIds`.
           const expanded = expandedGroupIds.has(view.group.id);
+          // The envelope's colour is carried on the view (see groupViews), so the
+          // header, its children and the lifted copy all read the same one.
+          const childOptions = { indented: true, envelopeColor: view.hue };
           return (
             <React.Fragment key={view.group.id}>
-              <PlanGroupRow
-                group={view.group}
-                index={groupIndex}
-                listLength={groupViews.length}
-                status={groupStatusById.get(view.group.id) || null}
-                displayAmount={view.displayAmount}
-                converting={converting}
-                childCount={view.children.length}
-                envelopeColor={hue}
-                planCurrency={planCurrency}
-                colors={colors}
-                t={t}
-                collapsed={!expanded}
-                onMove={moveGroup}
-                onToggle={toggleGroup}
-                onLongPress={handleLongPressGroup}
-              />
+              {renderGroupRow(view, groupIndex)}
               {expanded && view.recurring.map((line, index) => renderLine(
-                line, index, view.recurring, groupMovers.get(`${view.group.id}|r`), true, hue,
+                line, index, view.recurring, groupMovers.get(`${view.group.id}|r`), childOptions,
               ))}
               {expanded && view.oneOff.map((line, index) => renderLine(
-                line, index, view.oneOff, groupMovers.get(`${view.group.id}|o`), true, hue,
+                line, index, view.oneOff, groupMovers.get(`${view.group.id}|o`), childOptions,
               ))}
             </React.Fragment>
           );
@@ -1395,10 +1351,6 @@ const styles = StyleSheet.create({
     ...CARD_SURFACE,
     marginBottom: SPACING.md,
     padding: SPACING.md,
-  },
-  cloneOffset: {
-    // Cancels PlanGroupRow's own top margin inside the lifted copy — see menuRow.
-    marginTop: -SPACING.sm,
   },
   convertWarning: {
     alignItems: 'center',
