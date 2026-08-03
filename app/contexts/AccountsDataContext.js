@@ -122,7 +122,12 @@ export const AccountsDataProvider = ({ children }) => {
     return unsubscribe;
   }, [loadAccounts]);
 
-  // Filter accounts based on hidden status
+  // Filter accounts based on hidden status.
+  // Naming note: the UI calls these accounts *archived* ("Archived account",
+  // "Show archived accounts"). The `hidden` column — and therefore the
+  // identifiers derived from it here and in AccountsActionsContext — keep the
+  // original name so existing databases, backups and Sheets exports need no
+  // migration. See docs/DATABASE.md.
   const visibleAccounts = useMemo(() => {
     return accounts.filter(account => !account?.hidden);
   }, [accounts]);

@@ -962,7 +962,7 @@ export default function AccountsScreen({ onBackStateChange }) {
           )}
         </View>
 
-        {/* Show/hide hidden accounts */}
+        {/* Show/hide archived accounts */}
         {hiddenAccounts.length > 0 && (
           <Pressable
             onPress={toggleShowHiddenAccounts}
@@ -970,15 +970,17 @@ export default function AccountsScreen({ onBackStateChange }) {
             style={[styles.showHiddenButton, { backgroundColor: colors.surface, borderColor: colors.border }]}
           >
             <View style={styles.showHiddenContent}>
+              {/* Constant concept glyph: `archive-off` reads as "unarchive",
+                  which this button does not do. The label carries the direction. */}
               <Icon
-                name={showHiddenAccounts ? 'eye-off' : 'eye'}
+                name="archive-outline"
                 size={20}
                 color={colors.selected}
               />
               <Text style={[styles.showHiddenText, { color: colors.text }]}>
                 {showHiddenAccounts
-                  ? (t('hide_hidden_accounts') || 'Hide hidden accounts')
-                  : (t('show_hidden_accounts') || `Show ${hiddenAccounts.length} hidden account${hiddenAccounts.length !== 1 ? 's' : ''}`)}
+                  ? (t('hide_archived_accounts') || 'Hide archived accounts')
+                  : (t('show_archived_accounts') || 'Show archived accounts')}
               </Text>
             </View>
           </Pressable>
@@ -1233,10 +1235,10 @@ export default function AccountsScreen({ onBackStateChange }) {
               <View style={styles.settingItem}>
                 <View style={styles.settingItemText}>
                   <Text style={[styles.settingTitle, { color: colors.text }]}>
-                    {t('hidden_account') || 'Hidden account'}
+                    {t('archived_account') || 'Archived account'}
                   </Text>
                   <Text style={[styles.settingHint, { color: colors.mutedText }]}>
-                    {t('hidden_account_hint') || 'Hide from main list and operations'}
+                    {t('archived_account_hint') || 'Keep this account out of the main list and operations'}
                   </Text>
                 </View>
                 <Switch

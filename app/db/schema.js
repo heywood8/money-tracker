@@ -18,6 +18,8 @@ export const accounts = sqliteTable('accounts', {
   balance: text('balance').notNull().default('0'),
   currency: text('currency').notNull().default('USD'),
   displayOrder: integer('display_order'),
+  // Surfaced in the UI as "archived". The column keeps its original `hidden`
+  // name so existing databases, backups and Sheets exports need no migration.
   hidden: integer('hidden').default(0),
   monthlyTarget: text('monthly_target'),
   // Masked card number (e.g. "4083***7027") used to bind incoming bank
