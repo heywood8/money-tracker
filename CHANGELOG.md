@@ -1,5 +1,12 @@
 # Changelog
 
+## [0.256.1](https://github.com/heywood8/money-tracker/compare/penny-v0.256.0...penny-v0.256.1) (2026-08-03)
+
+
+### Bug Fixes
+
+* **graphs:** default the spending trend to the current month ([#1551](https://github.com/heywood8/money-tracker/issues/1551)) ([bb8d6ac](https://github.com/heywood8/money-tracker/commit/bb8d6acef15b33af5c41b83cb22aa45dbe53126a))
+
 ## [0.256.0](https://github.com/heywood8/money-tracker/compare/penny-v0.255.3...penny-v0.256.0) (2026-08-03)
 
 
