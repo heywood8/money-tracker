@@ -22,7 +22,7 @@ import Icon from '@expo/vector-icons/MaterialCommunityIcons';
 import SimplePicker from '../SimplePicker';
 import currencies from '../../../assets/currencies.json';
 import { useDisplaySettings } from '../../contexts/DisplaySettingsContext';
-import { getPreference, setPreference, PREF_KEYS } from '../../services/PreferencesDB';
+import { getJsonPreference, setJsonPreference, PREF_KEYS } from '../../services/PreferencesDB';
 import { balanceLineColors } from '../../styles/chartPalette';
 import BalanceHistoryCalendarView from './BalanceHistoryCalendarView';
 import { MONTH_ABBREVIATIONS } from './monthLabels';
@@ -160,13 +160,25 @@ export const YEAR_THIRD_LINE_MODES = ['prevYear', 'none'];
 export const thirdLineModesFor = (granularity) =>
   (granularity === 'year' ? YEAR_THIRD_LINE_MODES : THIRD_LINE_MODES);
 
-// The mode the card opens in when nothing has been remembered yet.
-export const DEFAULT_THIRD_LINE_MODE = 'prevMonth';
+// The mode each view opens in when nothing has been remembered for it yet.
+export const defaultThirdLineMode = (granularity) => thirdLineModesFor(granularity)[0];
 
-// A stored mode is only honoured if it is still one this build knows about — a
-// value left behind by an older release must not blank the comparison line.
-export const isThirdLineMode = (mode) =>
-  THIRD_LINE_MODES.includes(mode) || YEAR_THIRD_LINE_MODES.includes(mode);
+// The two views remember their comparison lines separately: they do not offer
+// the same modes, and the one mode they share ('none') would otherwise let a
+// single tap in the year view permanently blank the month view's line.
+export const THIRD_LINE_GRANULARITIES = ['month', 'year'];
+
+// A stored mode is only honoured if the view it was stored for still offers it —
+// a value left behind by an older release must not blank the comparison line.
+export const parseStoredThirdLines = (stored) => {
+  const parsed = {};
+  if (!stored || typeof stored !== 'object') return parsed;
+  THIRD_LINE_GRANULARITIES.forEach((granularity) => {
+    const mode = stored[granularity];
+    if (thirdLineModesFor(granularity).includes(mode)) parsed[granularity] = mode;
+  });
+  return parsed;
+};
 
 export const nextThirdLineMode = (mode, granularity = 'month') => {
   const modes = thirdLineModesFor(granularity);
@@ -883,11 +895,14 @@ const BalanceHistoryCard = ({
   // calendar left open across a period switch would otherwise strand the user in
   // a month grid with no way back to the chart.
   const [showCalendar, setShowCalendar] = useState(false);
-  // Which comparison line rides along with the actual balance: last month, the
-  // 12-month median, or nothing at all (the year view offers last year / nothing).
-  // Persisted, so the choice survives a restart — a reader who turned the
-  // comparison off does not have to turn it off again every launch.
-  const [thirdLine, setThirdLineState] = useState(DEFAULT_THIRD_LINE_MODE);
+  // Which comparison line rides along with the actual balance, per view: the
+  // month view offers last month / the 12-month median / nothing, the year view
+  // last year / nothing. Kept apart and persisted separately, so a tap in one
+  // view never rewrites the other's choice and both survive a restart.
+  const [thirdLines, setThirdLines] = useState(() => ({
+    month: defaultThirdLineMode('month'),
+    year: defaultThirdLineMode('year'),
+  }));
   // The burndown norm ("plain avg") is a second opinion on the same month, not a
   // reading of it — off by default so the chart opens with just the actual line,
   // and switched on from the header when the reader wants the comparison.
@@ -895,30 +910,41 @@ const BalanceHistoryCard = ({
   const [contentHeight, setContentHeight] = useState(340);
   // Day currently under the finger while scrubbing the chart (null when idle).
   const [scrubDay, setScrubDay] = useState(null);
-  // Set once the reader picks a mode by hand. A tap that beats the stored-value
-  // read must win it — restoring afterwards would silently undo their choice.
-  const thirdLinePickedRef = useRef(false);
-  // Restore the remembered comparison mode. The card renders the default until
+  // Views the reader has already picked a mode for by hand. A tap that beats the
+  // stored-value read must win it for that view — restoring over it afterwards
+  // would silently undo the choice they just made.
+  const thirdLinePickedRef = useRef({});
+  // Restore the remembered comparison modes. The card renders the defaults until
   // this resolves; the read is a single indexed row, so the swap lands well
   // before the balance history itself finishes loading.
   useEffect(() => {
     let cancelled = false;
-    getPreference(PREF_KEYS.BALANCE_CHART_COMPARISON, null)
+    getJsonPreference(PREF_KEYS.BALANCE_CHART_COMPARISON, null)
       .then((stored) => {
-        if (cancelled || thirdLinePickedRef.current || !isThirdLineMode(stored)) return;
-        setThirdLineState(stored);
+        if (cancelled) return;
+        const restored = parseStoredThirdLines(stored);
+        setThirdLines((prev) => {
+          const next = { ...prev };
+          Object.entries(restored).forEach(([granularity, mode]) => {
+            if (!thirdLinePickedRef.current[granularity]) next[granularity] = mode;
+          });
+          return next;
+        });
       })
       .catch(() => {});
     return () => { cancelled = true; };
   }, []);
 
-  const setThirdLine = useCallback((mode) => {
-    thirdLinePickedRef.current = true;
-    setThirdLineState(mode);
+  const setThirdLineFor = useCallback((granularity, mode) => {
+    thirdLinePickedRef.current[granularity] = true;
+    // Both views are written every time, so the stored row always holds the pair
+    // rather than only whichever one was last touched.
+    const next = { ...thirdLines, [granularity]: mode };
+    setThirdLines(next);
     // Fire-and-forget: a failed write costs the reader the next restart's
     // default, never the tap they just made.
-    setPreference(PREF_KEYS.BALANCE_CHART_COMPARISON, mode).catch(() => {});
-  }, []);
+    setJsonPreference(PREF_KEYS.BALANCE_CHART_COMPARISON, next).catch(() => {});
+  }, [thirdLines]);
 
   // Comparison-line steps for the current mode — the legend dots below read from
   // the same object, so a swatch can never drift from the line it stands for.
@@ -929,10 +955,11 @@ const BalanceHistoryCard = ({
   const isYearView = selectedMonth === null;
   const granularity = isYearView ? 'year' : 'month';
   const calendarVisible = showCalendar && !isYearView;
-  // The mode is kept across a period switch when it still exists there, and
-  // otherwise falls back to that period's first mode — switching to the year view
-  // must not leave a stale 'yearAvg' selected and no line drawn.
+  // Each period reads its own remembered mode; the fallback still guards a value
+  // that period no longer offers, so a stale 'yearAvg' can never leave the year
+  // view with nothing drawn.
   const thirdLineModes = thirdLineModesFor(granularity);
+  const thirdLine = thirdLines[granularity];
   const effectiveThirdLine = thirdLineModes.includes(thirdLine) ? thirdLine : thirdLineModes[0];
 
   const selectedAccountData = accounts.find(acc => acc.id === selectedAccount);
@@ -1087,7 +1114,7 @@ const BalanceHistoryCard = ({
           <TouchableOpacity
             testID="third-line-toggle-btn"
             style={[styles.calendarToggleBtn, { backgroundColor: colors.surface }]}
-            onPress={() => setThirdLine(nextThirdLineMode(effectiveThirdLine, granularity))}
+            onPress={() => setThirdLineFor(granularity, nextThirdLineMode(effectiveThirdLine, granularity))}
             activeOpacity={0.7}
             accessibilityRole="button"
             accessibilityLabel={thirdLineLabel}

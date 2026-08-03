@@ -21,20 +21,20 @@ jest.mock('../../app/contexts/DisplaySettingsContext', () => ({
   })),
 }));
 
-// Mock PreferencesDB — the card remembers its comparison-line mode there.
+// Mock PreferencesDB — the card remembers its comparison-line modes there.
 jest.mock('../../app/services/PreferencesDB', () => ({
   PREF_KEYS: { BALANCE_CHART_COMPARISON: 'balance_chart_comparison' },
-  getPreference: jest.fn(() => Promise.resolve(null)),
-  setPreference: jest.fn(() => Promise.resolve()),
+  getJsonPreference: jest.fn(() => Promise.resolve(null)),
+  setJsonPreference: jest.fn(() => Promise.resolve()),
 }));
 
-const { getPreference, setPreference, PREF_KEYS } = require('../../app/services/PreferencesDB');
+const { getJsonPreference, setJsonPreference, PREF_KEYS } = require('../../app/services/PreferencesDB');
 
 beforeEach(() => {
-  getPreference.mockReset();
-  getPreference.mockResolvedValue(null);
-  setPreference.mockReset();
-  setPreference.mockResolvedValue(undefined);
+  getJsonPreference.mockReset();
+  getJsonPreference.mockResolvedValue(null);
+  setJsonPreference.mockReset();
+  setJsonPreference.mockResolvedValue(undefined);
 });
 
 // victory-native (CartesianChart → testID "cartesian-chart", Line → testID
@@ -2345,14 +2345,14 @@ describe('BalanceHistoryCard', () => {
 
         await fireEvent.press(getByTestId('third-line-toggle-btn'));
 
-        await waitFor(() => expect(setPreference).toHaveBeenCalledWith(
+        await waitFor(() => expect(setJsonPreference).toHaveBeenCalledWith(
           PREF_KEYS.BALANCE_CHART_COMPARISON,
-          'yearAvg',
+          { month: 'yearAvg', year: 'prevYear' },
         ));
       });
 
       it('restores the stored mode instead of the prev-month default', async () => {
-        getPreference.mockResolvedValue('yearAvg');
+        getJsonPreference.mockResolvedValue({ month: 'yearAvg' });
 
         const { getByText, queryByText } = await renderCard();
 
@@ -2361,7 +2361,7 @@ describe('BalanceHistoryCard', () => {
       });
 
       it('restores "none", leaving the chart without a comparison line', async () => {
-        getPreference.mockResolvedValue('none');
+        getJsonPreference.mockResolvedValue({ month: 'none' });
 
         const { container, queryByText } = await renderCard();
 
@@ -2372,7 +2372,15 @@ describe('BalanceHistoryCard', () => {
       });
 
       it('falls back to the default when the stored mode is unknown', async () => {
-        getPreference.mockResolvedValue('someRetiredMode');
+        getJsonPreference.mockResolvedValue({ month: 'someRetiredMode' });
+
+        const { getByText } = await renderCard();
+
+        await waitFor(() => expect(getByText('Prev Month')).toBeTruthy());
+      });
+
+      it('ignores a stored value that is not the expected shape', async () => {
+        getJsonPreference.mockResolvedValue('yearAvg');
 
         const { getByText } = await renderCard();
 
@@ -2380,7 +2388,7 @@ describe('BalanceHistoryCard', () => {
       });
 
       it('survives a failed read without breaking the toggle', async () => {
-        getPreference.mockRejectedValue(new Error('db closed'));
+        getJsonPreference.mockRejectedValue(new Error('db closed'));
 
         const { getByTestId, getByText } = await renderCard();
 
@@ -2391,14 +2399,58 @@ describe('BalanceHistoryCard', () => {
 
       it('keeps a tap that lands before the stored mode arrives', async () => {
         let resolveRead;
-        getPreference.mockReturnValue(new Promise((resolve) => { resolveRead = resolve; }));
+        getJsonPreference.mockReturnValue(new Promise((resolve) => { resolveRead = resolve; }));
 
         const { getByTestId, getByText } = await renderCard();
 
         await fireEvent.press(getByTestId('third-line-toggle-btn'));
-        await act(async () => { resolveRead('none'); });
+        await act(async () => { resolveRead({ month: 'none' }); });
 
         expect(getByText('Year avg')).toBeTruthy();
+      });
+
+      it('does not let a year-view tap overwrite the month view\'s remembered mode', async () => {
+        getJsonPreference.mockResolvedValue({ month: 'yearAvg', year: 'prevYear' });
+
+        const { getByTestId, getByText, rerender } = await renderCard();
+        await waitFor(() => expect(getByText('Year avg')).toBeTruthy());
+
+        // Switch to the year view and turn its comparison off.
+        const yearProps = {
+          colors: mockColors,
+          t: mockT,
+          selectedAccount: 'acc1',
+          onAccountChange: jest.fn(),
+          accountItems: mockAccountItems,
+          loadingBalanceHistory: false,
+          balanceHistoryData: { ...thirdLineData, prevYear: [900, 890, 880, 870, 860, 850, 840] },
+          selectedYear: 2024,
+          selectedMonth: null,
+          accounts: mockAccounts,
+          isCurrentMonth: false,
+          spendingPrediction: null,
+          balanceHistoryTableData: [],
+          editingBalanceValue: '',
+          onEditingBalanceValueChange: jest.fn(),
+          onEditBalance: jest.fn(),
+          onCancelEdit: jest.fn(),
+          onSaveBalance: jest.fn(),
+          onDeleteBalance: jest.fn(),
+          onShowCalendar: jest.fn(),
+        };
+        await rerender(<BalanceHistoryCard {...yearProps} />);
+        await waitFor(() => expect(getByText('Prev Year')).toBeTruthy());
+        await fireEvent.press(getByTestId('third-line-toggle-btn'));
+
+        // The month slot is untouched, both on disk...
+        await waitFor(() => expect(setJsonPreference).toHaveBeenCalledWith(
+          PREF_KEYS.BALANCE_CHART_COMPARISON,
+          { month: 'yearAvg', year: 'none' },
+        ));
+
+        // ...and on screen when the reader comes back to the month view.
+        await rerender(<BalanceHistoryCard {...yearProps} selectedMonth={0} balanceHistoryData={thirdLineData} />);
+        await waitFor(() => expect(getByText('Year avg')).toBeTruthy());
       });
     });
 
