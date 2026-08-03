@@ -1,5 +1,12 @@
 # Changelog
 
+## [0.259.1](https://github.com/heywood8/money-tracker/compare/penny-v0.259.0...penny-v0.259.1) (2026-08-03)
+
+
+### Bug Fixes
+
+* **budgets:** move the currency chip inside the month arrows ([#1561](https://github.com/heywood8/money-tracker/issues/1561)) ([9a82564](https://github.com/heywood8/money-tracker/commit/9a82564c25b8bd65e40e056a5f7ab483e6e82680))
+
 ## [0.259.0](https://github.com/heywood8/money-tracker/compare/penny-v0.258.0...penny-v0.259.0) (2026-08-03)
 
 
