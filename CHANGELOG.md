@@ -1,5 +1,12 @@
 # Changelog
 
+## [0.259.0](https://github.com/heywood8/money-tracker/compare/penny-v0.258.0...penny-v0.259.0) (2026-08-03)
+
+
+### Features
+
+* **budgets:** pick the currency from a bottom sheet, not dialog buttons ([#1559](https://github.com/heywood8/money-tracker/issues/1559)) ([2547683](https://github.com/heywood8/money-tracker/commit/2547683ceafe3c0d40339779ee98af06f9361e86))
+
 ## [0.258.0](https://github.com/heywood8/money-tracker/compare/penny-v0.257.0...penny-v0.258.0) (2026-08-03)
 
 
