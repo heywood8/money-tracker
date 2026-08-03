@@ -1,5 +1,12 @@
 # Changelog
 
+## [0.256.0](https://github.com/heywood8/money-tracker/compare/penny-v0.255.3...penny-v0.256.0) (2026-08-03)
+
+
+### Features
+
+* **graphs:** remember the balance chart's comparison line ([#1549](https://github.com/heywood8/money-tracker/issues/1549)) ([4da7ab9](https://github.com/heywood8/money-tracker/commit/4da7ab9740c9d58895d6c30831dd2248d962e8de))
+
 ## [0.255.3](https://github.com/heywood8/money-tracker/compare/penny-v0.255.2...penny-v0.255.3) (2026-08-03)
 
 
