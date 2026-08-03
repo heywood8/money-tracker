@@ -24,6 +24,7 @@ import FormInput from '../FormInput';
 import ModalShell from '../ModalShell';
 import CategoryGridSelector from '../CategoryGridSelector';
 import AccountGridSelector from '../AccountGridSelector';
+import CurrencyChipRow from '../CurrencyChipRow';
 import { SPACING, BORDER_RADIUS, FONT_SIZE, ICON_SIZE } from '../../styles/designTokens';
 import * as Currency from '../../services/currency';
 import EmptyState from '../EmptyState';
@@ -31,12 +32,11 @@ import { SECTION_LABEL } from '../../styles/componentStyles';
 
 const KINDS = ['income', 'expense', 'transfer'];
 
-// Accent tints, as hex alpha suffixes on `colors.primary` (a real hex in both
+// Accent tint, as a hex alpha suffix on `colors.primary` (a real hex in both
 // themes — see ThemeColorsContext). A tinted accent reads as "selected" in light
 // and dark alike, which a solid primary fill does not: white-on-#4da3ff sits at
 // ~2.8:1 in the dark theme, and that is what every filled chip in here used to be.
 const TINT = '1F';
-const TINT_STRONG = '33';
 
 // A picker gets a search field once its list stops fitting on one screenful.
 // Below that, the field is one more thing to look past.
@@ -1074,32 +1074,14 @@ export default function BudgetPlanLineModal({
               defaults to the plan's currency (and stores null, i.e. "inherit",
               while it stays on it). */}
           {showCurrencyChips && (
-            <View style={styles.currencyRow}>
-              {currencyOptions.map((code) => {
-                const active = lineCurrency === code;
-                return (
-                  <Pressable
-                    key={code}
-                    style={[
-                      styles.currencyChip,
-                      { borderColor: active ? colors.primary : colors.border },
-                      active && { backgroundColor: colors.primary + TINT_STRONG },
-                    ]}
-                    onPress={() => setLineCurrency(code)}
-                    accessibilityRole="button"
-                    accessibilityState={{ selected: active }}
-                    accessibilityLabel={code}
-                    testID={`plan-line-currency-${code}`}
-                  >
-                    <Text
-                      style={[styles.currencyChipText, { color: active ? colors.primary : colors.mutedText }]}
-                    >
-                      {code}
-                    </Text>
-                  </Pressable>
-                );
-              })}
-            </View>
+            <CurrencyChipRow
+              codes={currencyOptions}
+              selectedCode={lineCurrency}
+              onSelect={setLineCurrency}
+              colors={colors}
+              testIDPrefix="plan-line-currency"
+              style={styles.currencyRow}
+            />
           )}
         </View>
 
@@ -1309,20 +1291,8 @@ const styles = StyleSheet.create({
     fontSize: FONT_SIZE.sm,
     marginBottom: SPACING.xs,
   },
-  currencyChip: {
-    borderRadius: BORDER_RADIUS.md,
-    borderWidth: 1,
-    paddingHorizontal: SPACING.md,
-    paddingVertical: SPACING.xs,
-  },
-  currencyChipText: {
-    fontSize: FONT_SIZE.sm,
-    fontWeight: '700',
-  },
+  // Placement only — the chips themselves are CurrencyChipRow's.
   currencyRow: {
-    flexDirection: 'row',
-    flexWrap: 'wrap',
-    gap: SPACING.sm,
     marginTop: SPACING.md,
   },
   disabled: {
