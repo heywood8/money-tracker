@@ -1,6 +1,6 @@
 import React from 'react';
 import { render, fireEvent } from '@testing-library/react-native';
-import CategorySpendingCard, { formatPctTick, formatYTick } from '../../../app/components/graphs/CategorySpendingCard';
+import CategorySpendingCard, { formatPctTick, formatYTick, resolveScrubIndex } from '../../../app/components/graphs/CategorySpendingCard';
 import useCategoryMonthlySpending from '../../../app/hooks/useCategoryMonthlySpending';
 
 // Mock the hook
@@ -783,6 +783,64 @@ describe('CategorySpendingCard', () => {
         expect(formatPctTick(33.333)).toBe('33%');
         expect(formatPctTick('66.7')).toBe('67%');
       });
+    });
+  });
+
+  // `useAnimatedReaction` is a no-op under the Jest reanimated mock, so the
+  // scrub reaction is only reachable through its exported worklet.
+  describe('resolveScrubIndex', () => {
+    const COUNT = 12;
+
+    it('ignores the mount-time run, so the current month keeps the selection', () => {
+      // useAnimatedReaction fires once on creation with previous === null and
+      // the press state still at its x=0 initial value.
+      expect(resolveScrubIndex({ active: false, x: 0 }, null, COUNT)).toBe(-1);
+    });
+
+    it('ignores every reading taken with the finger up', () => {
+      expect(resolveScrubIndex({ active: false, x: 7 }, { active: true, x: 3 }, COUNT)).toBe(-1);
+    });
+
+    it('reports the pressed month once the finger goes down', () => {
+      expect(resolveScrubIndex({ active: true, x: 5 }, { active: false, x: 0 }, COUNT)).toBe(5);
+    });
+
+    it('reports the leftmost month even though x never left its initial 0', () => {
+      expect(resolveScrubIndex({ active: true, x: 0 }, { active: false, x: 0 }, COUNT)).toBe(0);
+    });
+
+    it('re-reports nothing while a drag stays inside one month', () => {
+      expect(resolveScrubIndex({ active: true, x: 5 }, { active: true, x: 5 }, COUNT)).toBe(-1);
+    });
+
+    it('follows a drag across months', () => {
+      expect(resolveScrubIndex({ active: true, x: 6 }, { active: true, x: 5 }, COUNT)).toBe(6);
+    });
+
+    it('snaps a fractional press position to the nearest month', () => {
+      expect(resolveScrubIndex({ active: true, x: 4.4 }, { active: true, x: 3 }, COUNT)).toBe(4);
+      expect(resolveScrubIndex({ active: true, x: 4.6 }, { active: true, x: 3 }, COUNT)).toBe(5);
+    });
+
+    it('drops positions dragged off either end of the chart', () => {
+      expect(resolveScrubIndex({ active: true, x: -1 }, { active: true, x: 0 }, COUNT)).toBe(-1);
+      expect(resolveScrubIndex({ active: true, x: 12 }, { active: true, x: 11 }, COUNT)).toBe(-1);
+    });
+  });
+
+  describe('Regression Tests', () => {
+    // Guards the resting default only — the reaction that used to override it at
+    // mount is stubbed out here, and is covered by `resolveScrubIndex` above.
+    it('defaults the selection to the current month, not the oldest of the 12', async () => {
+      const { getByText, queryByText } = await render(
+        <CategorySpendingCard {...defaultProps} />,
+      );
+
+      // Last entry of the 12-month window is the current month; its total is 200.
+      expect(getByText('$200.00')).toBeTruthy();
+      expect(getByText('this_month')).toBeTruthy();
+      // The oldest month's total (100) must not be what the card is showing.
+      expect(queryByText('$100.00')).toBeNull();
     });
   });
 });
