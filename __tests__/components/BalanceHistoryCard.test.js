@@ -4,7 +4,7 @@
  */
 
 import React from 'react';
-import { render, fireEvent, waitFor } from '@testing-library/react-native';
+import { act, render, fireEvent, waitFor } from '@testing-library/react-native';
 import BalanceHistoryCard, {
   computeBalanceChart,
   computeYearBalanceChart,
@@ -20,6 +20,22 @@ jest.mock('../../app/contexts/DisplaySettingsContext', () => ({
     hideBalances: false,
   })),
 }));
+
+// Mock PreferencesDB — the card remembers its comparison-line mode there.
+jest.mock('../../app/services/PreferencesDB', () => ({
+  PREF_KEYS: { BALANCE_CHART_COMPARISON: 'balance_chart_comparison' },
+  getPreference: jest.fn(() => Promise.resolve(null)),
+  setPreference: jest.fn(() => Promise.resolve()),
+}));
+
+const { getPreference, setPreference, PREF_KEYS } = require('../../app/services/PreferencesDB');
+
+beforeEach(() => {
+  getPreference.mockReset();
+  getPreference.mockResolvedValue(null);
+  setPreference.mockReset();
+  setPreference.mockResolvedValue(undefined);
+});
 
 // victory-native (CartesianChart → testID "cartesian-chart", Line → testID
 // "vn-line") and @shopify/react-native-skia are virtually mocked in jest.setup.js.
@@ -2321,6 +2337,69 @@ describe('BalanceHistoryCard', () => {
       await fireEvent.press(getByTestId('calendar-toggle-btn'));
 
       await waitFor(() => expect(queryByTestId('third-line-toggle-btn')).toBeNull());
+    });
+
+    describe('persistence across restarts', () => {
+      it('persists the picked mode so the next launch can restore it', async () => {
+        const { getByTestId } = await renderCard();
+
+        await fireEvent.press(getByTestId('third-line-toggle-btn'));
+
+        await waitFor(() => expect(setPreference).toHaveBeenCalledWith(
+          PREF_KEYS.BALANCE_CHART_COMPARISON,
+          'yearAvg',
+        ));
+      });
+
+      it('restores the stored mode instead of the prev-month default', async () => {
+        getPreference.mockResolvedValue('yearAvg');
+
+        const { getByText, queryByText } = await renderCard();
+
+        await waitFor(() => expect(getByText('Year avg')).toBeTruthy());
+        expect(queryByText('Prev Month')).toBeNull();
+      });
+
+      it('restores "none", leaving the chart without a comparison line', async () => {
+        getPreference.mockResolvedValue('none');
+
+        const { container, queryByText } = await renderCard();
+
+        await waitFor(() => expect(queryByText('Prev Month')).toBeNull());
+        expect(queryByText('Year avg')).toBeNull();
+        // actual + zero baseline only
+        expect(container.queryAll(n => n.props.testID === 'vn-line')).toHaveLength(2);
+      });
+
+      it('falls back to the default when the stored mode is unknown', async () => {
+        getPreference.mockResolvedValue('someRetiredMode');
+
+        const { getByText } = await renderCard();
+
+        await waitFor(() => expect(getByText('Prev Month')).toBeTruthy());
+      });
+
+      it('survives a failed read without breaking the toggle', async () => {
+        getPreference.mockRejectedValue(new Error('db closed'));
+
+        const { getByTestId, getByText } = await renderCard();
+
+        expect(getByText('Prev Month')).toBeTruthy();
+        await fireEvent.press(getByTestId('third-line-toggle-btn'));
+        await waitFor(() => expect(getByText('Year avg')).toBeTruthy());
+      });
+
+      it('keeps a tap that lands before the stored mode arrives', async () => {
+        let resolveRead;
+        getPreference.mockReturnValue(new Promise((resolve) => { resolveRead = resolve; }));
+
+        const { getByTestId, getByText } = await renderCard();
+
+        await fireEvent.press(getByTestId('third-line-toggle-btn'));
+        await act(async () => { resolveRead('none'); });
+
+        expect(getByText('Year avg')).toBeTruthy();
+      });
     });
 
     it('builds a yearAvg series and legend values in yearAvg mode', () => {

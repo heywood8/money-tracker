@@ -22,6 +22,7 @@ import Icon from '@expo/vector-icons/MaterialCommunityIcons';
 import SimplePicker from '../SimplePicker';
 import currencies from '../../../assets/currencies.json';
 import { useDisplaySettings } from '../../contexts/DisplaySettingsContext';
+import { getPreference, setPreference, PREF_KEYS } from '../../services/PreferencesDB';
 import { balanceLineColors } from '../../styles/chartPalette';
 import BalanceHistoryCalendarView from './BalanceHistoryCalendarView';
 import { MONTH_ABBREVIATIONS } from './monthLabels';
@@ -158,6 +159,14 @@ export const YEAR_THIRD_LINE_MODES = ['prevYear', 'none'];
 
 export const thirdLineModesFor = (granularity) =>
   (granularity === 'year' ? YEAR_THIRD_LINE_MODES : THIRD_LINE_MODES);
+
+// The mode the card opens in when nothing has been remembered yet.
+export const DEFAULT_THIRD_LINE_MODE = 'prevMonth';
+
+// A stored mode is only honoured if it is still one this build knows about — a
+// value left behind by an older release must not blank the comparison line.
+export const isThirdLineMode = (mode) =>
+  THIRD_LINE_MODES.includes(mode) || YEAR_THIRD_LINE_MODES.includes(mode);
 
 export const nextThirdLineMode = (mode, granularity = 'month') => {
   const modes = thirdLineModesFor(granularity);
@@ -876,7 +885,9 @@ const BalanceHistoryCard = ({
   const [showCalendar, setShowCalendar] = useState(false);
   // Which comparison line rides along with the actual balance: last month, the
   // 12-month median, or nothing at all (the year view offers last year / nothing).
-  const [thirdLine, setThirdLine] = useState('prevMonth');
+  // Persisted, so the choice survives a restart — a reader who turned the
+  // comparison off does not have to turn it off again every launch.
+  const [thirdLine, setThirdLineState] = useState(DEFAULT_THIRD_LINE_MODE);
   // The burndown norm ("plain avg") is a second opinion on the same month, not a
   // reading of it — off by default so the chart opens with just the actual line,
   // and switched on from the header when the reader wants the comparison.
@@ -884,6 +895,31 @@ const BalanceHistoryCard = ({
   const [contentHeight, setContentHeight] = useState(340);
   // Day currently under the finger while scrubbing the chart (null when idle).
   const [scrubDay, setScrubDay] = useState(null);
+  // Set once the reader picks a mode by hand. A tap that beats the stored-value
+  // read must win it — restoring afterwards would silently undo their choice.
+  const thirdLinePickedRef = useRef(false);
+  // Restore the remembered comparison mode. The card renders the default until
+  // this resolves; the read is a single indexed row, so the swap lands well
+  // before the balance history itself finishes loading.
+  useEffect(() => {
+    let cancelled = false;
+    getPreference(PREF_KEYS.BALANCE_CHART_COMPARISON, null)
+      .then((stored) => {
+        if (cancelled || thirdLinePickedRef.current || !isThirdLineMode(stored)) return;
+        setThirdLineState(stored);
+      })
+      .catch(() => {});
+    return () => { cancelled = true; };
+  }, []);
+
+  const setThirdLine = useCallback((mode) => {
+    thirdLinePickedRef.current = true;
+    setThirdLineState(mode);
+    // Fire-and-forget: a failed write costs the reader the next restart's
+    // default, never the tap they just made.
+    setPreference(PREF_KEYS.BALANCE_CHART_COMPARISON, mode).catch(() => {});
+  }, []);
+
   // Comparison-line steps for the current mode — the legend dots below read from
   // the same object, so a swatch can never drift from the line it stands for.
   const chartLineColors = useMemo(() => balanceLineColors(colors), [colors]);

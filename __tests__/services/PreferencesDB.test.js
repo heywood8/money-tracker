@@ -72,6 +72,7 @@ describe('PreferencesDB', () => {
         'SHOW_ACCOUNTS_TAB',
         'SHOW_BUDGET_TAB',
         'BUDGET_EXPANDED_GROUPS',
+        'BALANCE_CHART_COMPARISON',
         'GOOGLE_SHEETS_SPREADSHEET_ID',
         'DEFAULT_ACCOUNT_ID',
         'BANK_NOTIFICATIONS_ENABLED',

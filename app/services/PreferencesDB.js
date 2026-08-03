@@ -20,6 +20,10 @@ export const PREF_KEYS = {
   // JSON array of group ids. Absent means every envelope is folded, which is
   // the default a plan opens in.
   BUDGET_EXPANDED_GROUPS: 'budget_expanded_groups',
+  // Which comparison line the balance chart draws alongside the actual balance
+  // ('prevMonth' | 'yearAvg' | 'prevYear' | 'none'). Remembered across restarts
+  // so the reader's choice of baseline survives leaving the Graphs tab.
+  BALANCE_CHART_COMPARISON: 'balance_chart_comparison',
   GOOGLE_SHEETS_SPREADSHEET_ID: 'google_sheets_spreadsheet_id',
   DEFAULT_ACCOUNT_ID: 'default_account_id',
   // Bank-notification processing
