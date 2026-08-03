@@ -5,15 +5,16 @@ import { Text, Snackbar } from 'react-native-paper';
 import Icon from '@expo/vector-icons/MaterialCommunityIcons';
 import { useThemeColors } from '../contexts/ThemeColorsContext';
 import { useLocalization } from '../contexts/LocalizationContext';
-import { useDialog } from '../contexts/DialogContext';
 import { useBudgetsData } from '../contexts/BudgetsDataContext';
 import { useCategories } from '../contexts/CategoriesContext';
 import { useAccountsData } from '../contexts/AccountsDataContext';
 import MonthlyPlanSection from '../components/budgets/MonthlyPlanSection';
+import CurrencySheet from '../components/CurrencySheet';
 import AddFAB from '../components/AddFAB';
 import LoadingView from '../components/LoadingView';
 import * as Currency from '../services/currency';
 import { BORDER_RADIUS, FONT_SIZE, SPACING } from '../styles/designTokens';
+import currencyMeta from '../../assets/currencies.json';
 import { currentMonthKey, addMonths, formatMonthLabel } from '../utils/monthUtils';
 import { TIMING_ENTER } from '../utils/motion';
 
@@ -60,7 +61,6 @@ const BudgetScreen = () => {
   } = useBudgetsData();
   const { categories } = useCategories();
   const { accounts } = useAccountsData();
-  const { showDialog } = useDialog();
 
   // The whole screen is scoped to one month via a single shared ‹ Month › header;
   // MonthlyPlanSection is controlled from here.
@@ -162,18 +162,23 @@ const BudgetScreen = () => {
   // plan card's bottom rows, with a convert-all badge tucked into its corner —
   // an always-on overlay for a setting changed once in a while, which also
   // forced 260dp of dead scroll padding so the card's own totals could be
-  // scrolled out from under it. It is a header control now: an action sheet,
+  // scrolled out from under it. It is a header control now: a bottom sheet,
   // like every other whole-screen choice in the app.
-  const handleOpenCurrencyPicker = useCallback(() => {
-    showDialog(
-      t('currency'),
-      null,
-      [
-        ...currencies.map(cur => ({ text: cur, onPress: () => setSelectedCurrency(cur) })),
-        { text: t('cancel'), style: 'cancel' },
-      ],
-    );
-  }, [showDialog, t, currencies]);
+  //
+  // The sheet replaced a `showDialog` whose *buttons* were the currencies. It
+  // read as an action row because that is what it was: seven bare codes wrapping
+  // right-aligned across two lines with Cancel among them, no names, and nothing
+  // marking the one currently in force. See CurrencySheet.
+  const [currencySheetVisible, setCurrencySheetVisible] = useState(false);
+  // Blank for anything the catalogue has no symbol for, and blank when the symbol
+  // *is* the code (CHF, and every currency the catalogue lists that way) — a chip
+  // reading "CHF CHF" is worse than one reading "CHF".
+  const selectedSymbol = useMemo(() => {
+    const symbol = currencyMeta[selectedCurrency]?.symbol;
+    return symbol && symbol !== selectedCurrency ? symbol : '';
+  }, [selectedCurrency]);
+  const handleOpenCurrencyPicker = useCallback(() => setCurrencySheetVisible(true), []);
+  const handleCloseCurrencyPicker = useCallback(() => setCurrencySheetVisible(false), []);
 
   // Seed the currency from the first account, and re-seed whenever the selected
   // one stops existing (its last account was deleted). The membership check is not
@@ -313,14 +318,25 @@ const BudgetScreen = () => {
         </View>
         {currencies.length > 1 && (
           <View style={styles.heroControls}>
+            {/* The chip names the unit the whole screen is read in, so it carries
+                the currency's own mark as well as its code — the same symbol the
+                figures beside it are printed with. Tonal while its sheet is open,
+                which is the only state a trigger has to report. */}
             <Pressable
               onPress={handleOpenCurrencyPicker}
-              style={[styles.currencyChip, { borderColor: colors.border }]}
+              style={[styles.currencyChip, {
+                borderColor: currencySheetVisible ? colors.primary : colors.border,
+                backgroundColor: currencySheetVisible ? colors.primary + '1F' : undefined,
+              }]}
+              android_ripple={{ color: colors.primary + '1F' }}
               hitSlop={6}
               accessibilityRole="button"
               accessibilityLabel={`${t('currency')}: ${selectedCurrency}`}
               testID="budget-currency-chip"
             >
+              {!!selectedSymbol && (
+                <Text style={[styles.currencySymbol, { color: colors.mutedText }]}>{selectedSymbol}</Text>
+              )}
               <Text style={[styles.currencyChipText, { color: colors.text }]}>{selectedCurrency}</Text>
               <Icon name="chevron-down" size={14} color={colors.mutedText} />
             </Pressable>
@@ -348,7 +364,8 @@ const BudgetScreen = () => {
     </View>
   ), [colors.background, colors.text, colors.primary, colors.mutedText, colors.border,
     colors.overspend, colors.surface, month, isCurrentMonth, t, language, planTotals,
-    currencies.length, selectedCurrency, convertAllBudgets, handleOpenCurrencyPicker,
+    currencies.length, selectedCurrency, selectedSymbol, currencySheetVisible,
+    convertAllBudgets, handleOpenCurrencyPicker,
     handleToggleConvert, handlePrevMonth, handleNextMonth, handleJumpToCurrentMonth]);
 
   const listHeader = useMemo(() => (
@@ -387,6 +404,18 @@ const BudgetScreen = () => {
         />
       </Animated.View>
 
+      <CurrencySheet
+        visible={currencySheetVisible}
+        codes={currencies}
+        selectedCurrency={selectedCurrency}
+        onSelect={setSelectedCurrency}
+        onClose={handleCloseCurrencyPicker}
+        colors={colors}
+        t={t}
+        title={t('currency')}
+        testIDPrefix="budget-currency"
+      />
+
       <AddFAB
         onPress={handleOpenAddAllocation}
         testID="budget-add-fab"
@@ -422,11 +451,18 @@ const styles = StyleSheet.create({
     borderRadius: BORDER_RADIUS.pill,
     borderWidth: 1,
     flexDirection: 'row',
-    gap: 2,
+    gap: 3,
     height: 28,
+    // The ripple is drawn by the platform on the view's own rectangle, so
+    // without this it spills past the pill's rounded ends.
+    overflow: 'hidden',
     paddingHorizontal: SPACING.sm,
   },
   currencyChipText: {
+    fontSize: 13,
+    fontWeight: '600',
+  },
+  currencySymbol: {
     fontSize: 13,
     fontWeight: '600',
   },

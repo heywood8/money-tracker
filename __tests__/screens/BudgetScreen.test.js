@@ -20,6 +20,8 @@ const COLORS = {
   expense: '#f44336',
   transfer: '#2196f3',
   overspend: '#FF6B6B',
+  scrim: 'rgba(0,0,0,0.32)',
+  glassSurfaceStrong: 'rgba(120,120,120,0.12)',
 };
 
 jest.mock('../../app/contexts/ThemeColorsContext', () => ({
@@ -28,13 +30,6 @@ jest.mock('../../app/contexts/ThemeColorsContext', () => ({
 
 jest.mock('../../app/contexts/LocalizationContext', () => ({
   useLocalization: () => ({ t: (k) => k }),
-}));
-
-// The header's currency chip opens an action sheet rather than parking a wheel
-// picker over the list, so the screen now needs the dialog context.
-const mockShowDialog = jest.fn();
-jest.mock('../../app/contexts/DialogContext', () => ({
-  useDialog: () => ({ showDialog: mockShowDialog }),
 }));
 
 const mockSetConvertAll = jest.fn();
@@ -137,15 +132,14 @@ jest.mock('../../app/components/budgets/MonthlyPlanSection', () => {
 
 // ── Helpers ────────────────────────────────────────────────────────────────
 
-// Currency is picked from the header chip's action sheet now, not a wheel parked
-// over the list. `t` is the identity function here, so an option's text is its
-// currency code.
-const pickCurrency = (getByTestId, code) => {
-  fireEvent.press(getByTestId('budget-currency-chip'));
-  const calls = mockShowDialog.mock.calls;
-  const option = calls[calls.length - 1][2].find(b => b.text === code);
-  if (!option) throw new Error(`No "${code}" option in the currency sheet`);
-  option.onPress();
+// Currency is picked from the header chip's bottom sheet now — a row per
+// currency, not a wheel parked over the list and not a dialog whose action
+// buttons were the currencies.
+// Both presses are awaited: the chip's press is what mounts the sheet, so the
+// option it contains does not exist until that render has been flushed.
+const pickCurrency = async (getByTestId, code) => {
+  await fireEvent.press(getByTestId('budget-currency-chip'));
+  await fireEvent.press(getByTestId(`budget-currency-option-${code}`));
 };
 
 const setBudgetsData = ({ loading = false, convertAll = true } = {}) => {
@@ -220,7 +214,7 @@ describe('BudgetScreen', () => {
     it('hands the picked currency down to the list', async () => {
       const { getByTestId } = await render(<BudgetScreen />);
       await waitFor(() => expect(getByTestId('budget-currency-chip')).toBeTruthy());
-      pickCurrency(getByTestId, 'RUB');
+      await pickCurrency(getByTestId, 'RUB');
       await waitFor(() => expect(capturedSectionProps.currency).toBe('RUB'));
     });
 
@@ -232,7 +226,7 @@ describe('BudgetScreen', () => {
     it('re-seeds when the selected currency loses its last account', async () => {
       const { getByTestId, queryByTestId, rerender } = await render(<BudgetScreen />);
       await waitFor(() => expect(getByTestId('budget-currency-chip')).toBeTruthy());
-      pickCurrency(getByTestId, 'RUB');
+      await pickCurrency(getByTestId, 'RUB');
       await waitFor(() => expect(capturedSectionProps.currency).toBe('RUB'));
 
       setAccounts([{ id: 'a1', name: 'Ameria', currency: 'AMD' }]);
@@ -256,7 +250,7 @@ describe('BudgetScreen', () => {
     it('leaves a still-valid selection alone when an unrelated account is deleted', async () => {
       const { getByTestId, rerender } = await render(<BudgetScreen />);
       await waitFor(() => expect(getByTestId('budget-currency-chip')).toBeTruthy());
-      pickCurrency(getByTestId, 'RUB');
+      await pickCurrency(getByTestId, 'RUB');
       await waitFor(() => expect(capturedSectionProps.currency).toBe('RUB'));
 
       setAccounts([

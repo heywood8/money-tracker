@@ -18,6 +18,7 @@ import useKeyboardOffset from '../../hooks/useKeyboardOffset';
 import FormInput from '../FormInput';
 import ModalBlurOverlay from '../ModalBlurOverlay';
 import ModalHeader from '../ModalHeader';
+import CurrencyChipRow from '../CurrencyChipRow';
 import * as Currency from '../../services/currency';
 import { BUTTON, BUTTON_TEXT, SECTION_LABEL } from '../../styles/componentStyles';
 import { BORDER_RADIUS, FONT_SIZE, SPACING } from '../../styles/designTokens';
@@ -200,25 +201,13 @@ export default function BudgetLineGroupModal({
                   {currencies.length > 0 && (
                     <View style={styles.field}>
                       <Text style={[styles.fieldLabel, { color: colors.mutedText }]}>{t('currency')}</Text>
-                      <View style={styles.currencyRow}>
-                        {currencies.map((code) => (
-                          <Pressable
-                            key={code}
-                            style={[
-                              styles.currencyChip,
-                              { borderColor: colors.border },
-                              groupCurrency === code && { backgroundColor: colors.primary, borderColor: colors.primary },
-                            ]}
-                            onPress={() => setGroupCurrency(code)}
-                            accessibilityRole="button"
-                            accessibilityState={{ selected: groupCurrency === code }}
-                            accessibilityLabel={code}
-                            testID={`plan-group-currency-${code}`}
-                          >
-                            <Text style={[styles.currencyChipText, { color: colors.text }]}>{code}</Text>
-                          </Pressable>
-                        ))}
-                      </View>
+                      <CurrencyChipRow
+                        codes={currencies}
+                        selectedCode={groupCurrency}
+                        onSelect={setGroupCurrency}
+                        colors={colors}
+                        testIDPrefix="plan-group-currency"
+                      />
                     </View>
                   )}
                   <View style={styles.field}>
@@ -324,21 +313,6 @@ const styles = StyleSheet.create({
     paddingTop: 12,
   },
   buttonText: BUTTON_TEXT,
-  currencyChip: {
-    borderRadius: BORDER_RADIUS.md,
-    borderWidth: 1,
-    paddingHorizontal: 14,
-    paddingVertical: 8,
-  },
-  currencyChipText: {
-    fontSize: FONT_SIZE.md,
-    fontWeight: '600',
-  },
-  currencyRow: {
-    flexDirection: 'row',
-    flexWrap: 'wrap',
-    gap: SPACING.sm,
-  },
   deleteRow: {
     alignItems: 'center',
     borderTopWidth: 1,
