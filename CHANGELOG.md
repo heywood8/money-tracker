@@ -1,5 +1,12 @@
 # Changelog
 
+## [0.255.3](https://github.com/heywood8/money-tracker/compare/penny-v0.255.2...penny-v0.255.3) (2026-08-03)
+
+
+### Bug Fixes
+
+* **graphs:** stop the balance chart clipping its own peak ([#1547](https://github.com/heywood8/money-tracker/issues/1547)) ([2109c46](https://github.com/heywood8/money-tracker/commit/2109c46764132f7386470ac9c45632054ce1409a))
+
 ## [0.255.2](https://github.com/heywood8/money-tracker/compare/penny-v0.255.1...penny-v0.255.2) (2026-08-02)
 
 
