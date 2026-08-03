@@ -99,4 +99,26 @@ describe('CurrencySheet', () => {
     const { getByText } = await setup();
     expect(getByText('select_currency')).toBeTruthy();
   });
+
+  describe('Convert-all row', () => {
+    it('stays out of the sheet when the host has no handler for it', async () => {
+      const { queryByTestId } = await setup();
+      expect(queryByTestId('currency-sheet-convert')).toBeNull();
+    });
+
+    it('reports its own state and reports a flip without dismissing', async () => {
+      const onToggleConvert = jest.fn();
+      const onClose = jest.fn();
+      const { getByTestId } = await setup({ convertAll: true, onToggleConvert, onClose });
+
+      const row = getByTestId('currency-sheet-convert');
+      expect(row.props.accessibilityState.checked).toBe(true);
+
+      await press(row);
+
+      expect(onToggleConvert).toHaveBeenCalledTimes(1);
+      // The row is a setting on the choice above it, not a choice of its own.
+      expect(onClose).not.toHaveBeenCalled();
+    });
+  });
 });

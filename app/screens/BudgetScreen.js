@@ -212,17 +212,24 @@ const BudgetScreen = () => {
   // plan content below scrolls. Drives the monthly plan section.
   const monthHeader = useMemo(() => (
     <View style={[styles.monthHeaderContainer, { backgroundColor: colors.background }]} testID="budget-month-header">
+      {/* Three regions, the outer two both `flex: 1`: whatever they hold, the
+          month name between them stays on the screen's centre line. That is what
+          lets the currency chip sit up here on the right — beside the month, the
+          screen's other whole-tab scope — without dragging the title off centre
+          the way appending it to a two-item row would. */}
       <View style={styles.monthHeaderRow}>
-        <Pressable
-          onPress={handlePrevMonth}
-          hitSlop={8}
-          style={styles.navButton}
-          accessibilityRole="button"
-          accessibilityLabel={t('previous_month')}
-          testID="budget-prev-month"
-        >
-          <Icon name="chevron-left" size={26} color={colors.text} />
-        </Pressable>
+        <View style={styles.navSlot}>
+          <Pressable
+            onPress={handlePrevMonth}
+            hitSlop={8}
+            style={styles.navButton}
+            accessibilityRole="button"
+            accessibilityLabel={t('previous_month')}
+            testID="budget-prev-month"
+          >
+            <Icon name="chevron-left" size={26} color={colors.text} />
+          </Pressable>
+        </View>
         {/* Fix 4: the screen never unmounts across tab switches, so a user who
             wanders off-month and returns later needs an explicit, visible way
             back — silently auto-resetting the month would be surprising.
@@ -257,16 +264,43 @@ const BudgetScreen = () => {
             </Pressable>
           )}
         </View>
-        <Pressable
-          onPress={handleNextMonth}
-          hitSlop={8}
-          style={styles.navButton}
-          accessibilityRole="button"
-          accessibilityLabel={t('next_month')}
-          testID="budget-next-month"
-        >
-          <Icon name="chevron-right" size={26} color={colors.text} />
-        </Pressable>
+        <View style={[styles.navSlot, styles.navSlotEnd]}>
+          <Pressable
+            onPress={handleNextMonth}
+            hitSlop={8}
+            style={styles.navButton}
+            accessibilityRole="button"
+            accessibilityLabel={t('next_month')}
+            testID="budget-next-month"
+          >
+            <Icon name="chevron-right" size={26} color={colors.text} />
+          </Pressable>
+          {/* The chip names the unit the whole screen is read in, so it belongs
+              beside the month rather than a row below it, and it is set at the
+              month's own weight — the two together are the scope of everything
+              underneath. It carries the currency's mark as well as its code,
+              and goes tonal while its sheet is open. */}
+          {currencies.length > 1 && (
+            <Pressable
+              onPress={handleOpenCurrencyPicker}
+              style={[styles.currencyChip, {
+                borderColor: currencySheetVisible ? colors.primary : colors.border,
+                backgroundColor: currencySheetVisible ? colors.primary + '1F' : undefined,
+              }]}
+              android_ripple={{ color: colors.primary + '1F' }}
+              hitSlop={6}
+              accessibilityRole="button"
+              accessibilityLabel={`${t('currency')}: ${selectedCurrency}`}
+              testID="budget-currency-chip"
+            >
+              {!!selectedSymbol && (
+                <Text style={[styles.currencySymbol, { color: colors.mutedText }]}>{selectedSymbol}</Text>
+              )}
+              <Text style={[styles.currencyChipText, { color: colors.text }]}>{selectedCurrency}</Text>
+              <Icon name="chevron-down" size={16} color={colors.mutedText} />
+            </Pressable>
+          )}
+        </View>
       </View>
       {/* The month's headline figure. It used to sit at the very bottom of the
           plan card in 14px muted text, below every row and the allocated/actual
@@ -316,57 +350,12 @@ const BudgetScreen = () => {
             </Text>
           )}
         </View>
-        {currencies.length > 1 && (
-          <View style={styles.heroControls}>
-            {/* The chip names the unit the whole screen is read in, so it carries
-                the currency's own mark as well as its code — the same symbol the
-                figures beside it are printed with. Tonal while its sheet is open,
-                which is the only state a trigger has to report. */}
-            <Pressable
-              onPress={handleOpenCurrencyPicker}
-              style={[styles.currencyChip, {
-                borderColor: currencySheetVisible ? colors.primary : colors.border,
-                backgroundColor: currencySheetVisible ? colors.primary + '1F' : undefined,
-              }]}
-              android_ripple={{ color: colors.primary + '1F' }}
-              hitSlop={6}
-              accessibilityRole="button"
-              accessibilityLabel={`${t('currency')}: ${selectedCurrency}`}
-              testID="budget-currency-chip"
-            >
-              {!!selectedSymbol && (
-                <Text style={[styles.currencySymbol, { color: colors.mutedText }]}>{selectedSymbol}</Text>
-              )}
-              <Text style={[styles.currencyChipText, { color: colors.text }]}>{selectedCurrency}</Text>
-              <Icon name="chevron-down" size={14} color={colors.mutedText} />
-            </Pressable>
-            {/* Outlined, not a solid accent disc. Filled, it was the most
-                saturated thing on the screen — a secondary toggle outweighing
-                the month's headline figure right beside it. On state is carried
-                by the icon's colour and the border, which is as much weight as
-                a toggle needs. */}
-            <Pressable
-              onPress={handleToggleConvert}
-              style={[styles.convertToggle, {
-                borderColor: convertAllBudgets ? colors.primary : colors.border,
-              }]}
-              hitSlop={6}
-              accessibilityRole="switch"
-              accessibilityState={{ checked: convertAllBudgets }}
-              accessibilityLabel={t('graphs_convert_currencies')}
-              testID="budget-convert-toggle"
-            >
-              <Icon name="cash-sync" size={16} color={convertAllBudgets ? colors.primary : colors.mutedText} />
-            </Pressable>
-          </View>
-        )}
       </View>
     </View>
   ), [colors.background, colors.text, colors.primary, colors.mutedText, colors.border,
     colors.overspend, colors.surface, month, isCurrentMonth, t, language, planTotals,
     currencies.length, selectedCurrency, selectedSymbol, currencySheetVisible,
-    convertAllBudgets, handleOpenCurrencyPicker,
-    handleToggleConvert, handlePrevMonth, handleNextMonth, handleJumpToCurrentMonth]);
+    handleOpenCurrencyPicker, handlePrevMonth, handleNextMonth, handleJumpToCurrentMonth]);
 
   const listHeader = useMemo(() => (
     <MonthlyPlanSection
@@ -413,6 +402,8 @@ const BudgetScreen = () => {
         colors={colors}
         t={t}
         title={t('currency')}
+        convertAll={convertAllBudgets}
+        onToggleConvert={handleToggleConvert}
         testIDPrefix="budget-currency"
       />
 
@@ -438,38 +429,28 @@ const styles = StyleSheet.create({
   container: {
     flex: 1,
   },
-  convertToggle: {
-    alignItems: 'center',
-    borderRadius: BORDER_RADIUS.pill,
-    borderWidth: 1,
-    height: 28,
-    justifyContent: 'center',
-    width: 28,
-  },
+  // Set against the month title (17/700) rather than against the hero's
+  // sub-labels: the chip sits on that line now and reads as its peer.
   currencyChip: {
     alignItems: 'center',
     borderRadius: BORDER_RADIUS.pill,
     borderWidth: 1,
     flexDirection: 'row',
+    flexShrink: 0,
     gap: 3,
-    height: 28,
+    height: 34,
     // The ripple is drawn by the platform on the view's own rectangle, so
     // without this it spills past the pill's rounded ends.
     overflow: 'hidden',
-    paddingHorizontal: SPACING.sm,
+    paddingHorizontal: SPACING.md,
   },
   currencyChipText: {
-    fontSize: 13,
-    fontWeight: '600',
+    fontSize: 15,
+    fontWeight: '700',
   },
   currencySymbol: {
-    fontSize: 13,
-    fontWeight: '600',
-  },
-  heroControls: {
-    alignItems: 'center',
-    flexDirection: 'row',
-    gap: SPACING.sm,
+    fontSize: 15,
+    fontWeight: '700',
   },
   heroFigure: {
     flexShrink: 1,
@@ -525,15 +506,29 @@ const styles = StyleSheet.create({
     fontSize: 17,
     fontWeight: '700',
   },
+  // Sized by its own content and centred by the equal `flex: 1` slots on either
+  // side of it, not by a flex of its own — a `flex: 1` here would centre the
+  // title in the space the chip leaves over, which is not the screen's centre.
   monthTitleWrap: {
     alignItems: 'center',
-    flex: 1,
     flexDirection: 'row',
+    flexShrink: 1,
     gap: 2,
     justifyContent: 'center',
   },
   navButton: {
     padding: 4,
+  },
+  // The two end regions of the month row. Equal by construction, whatever they
+  // hold: that is what keeps the month name centred with a chip on one side.
+  navSlot: {
+    alignItems: 'center',
+    flex: 1,
+    flexDirection: 'row',
+    gap: SPACING.xs,
+  },
+  navSlotEnd: {
+    justifyContent: 'flex-end',
   },
   // The animated wrapper sits between the screen's column and the FlatList, so
   // it has to pass the remaining height through or the list collapses to nothing.

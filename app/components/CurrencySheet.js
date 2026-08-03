@@ -46,6 +46,8 @@ const CurrencySheet = memo(({
   colors,
   t,
   title,
+  convertAll,
+  onToggleConvert,
   testIDPrefix = 'currency-sheet',
 }) => {
   const handleSelect = useCallback((code) => {
@@ -137,6 +139,43 @@ const CurrencySheet = memo(({
                 );
               })}
             </ScrollView>
+            {/* "Convert the other currencies into this one" is a property of the
+                choice above, not a separate screen control: it only means
+                anything once there is more than one currency, and what it
+                converts *to* is whatever this sheet last picked. It used to be
+                an outlined disc in the header beside the chip, where nothing
+                said which of the two it belonged to. Outside the ScrollView, so
+                it stays put while a long list scrolls, and it deliberately does
+                not dismiss the sheet — it is a setting, not a choice. */}
+            {!!onToggleConvert && (
+              <Pressable
+                onPress={onToggleConvert}
+                android_ripple={{ color: colors.primary + '1F' }}
+                style={[styles.convertRow, { borderTopColor: colors.border }]}
+                accessibilityRole="switch"
+                accessibilityState={{ checked: !!convertAll }}
+                accessibilityLabel={t('graphs_convert_currencies')}
+                testID={`${testIDPrefix}-convert`}
+              >
+                <Icon
+                  name="cash-sync"
+                  size={20}
+                  color={convertAll ? colors.primary : colors.mutedText}
+                />
+                <Text style={[styles.convertLabel, { color: colors.text }]}>
+                  {t('graphs_convert_currencies')}
+                </Text>
+                <View style={[styles.switchTrack, {
+                  backgroundColor: convertAll ? colors.primary : colors.border,
+                }]}
+                >
+                  <View style={[styles.switchThumb, {
+                    transform: [{ translateX: convertAll ? 18 : 2 }],
+                  }]}
+                  />
+                </View>
+              </Pressable>
+            )}
           </Pressable>
         </Pressable>
       </Modal>
@@ -155,6 +194,9 @@ CurrencySheet.propTypes = {
   colors: PropTypes.object.isRequired,
   t: PropTypes.func.isRequired,
   title: PropTypes.string,
+  // Both or neither: the row is only rendered when the host supplies a handler.
+  convertAll: PropTypes.bool,
+  onToggleConvert: PropTypes.func,
   testIDPrefix: PropTypes.string,
 };
 
@@ -162,6 +204,18 @@ const styles = StyleSheet.create({
   code: {
     fontSize: FONT_SIZE.base,
     fontWeight: FONT_WEIGHT.semibold,
+  },
+  convertLabel: {
+    flex: 1,
+    fontSize: FONT_SIZE.md,
+  },
+  convertRow: {
+    alignItems: 'center',
+    borderTopWidth: StyleSheet.hairlineWidth,
+    flexDirection: 'row',
+    gap: SPACING.md,
+    minHeight: 56,
+    paddingHorizontal: SPACING.lg,
   },
   // M3's bottom-sheet drag handle. The sheet is not draggable, but the handle is
   // also what says "this came up from the bottom edge and goes back down there".
@@ -175,7 +229,7 @@ const styles = StyleSheet.create({
   },
   list: {
     gap: SPACING.xs,
-    paddingBottom: SPACING.xxl,
+    paddingBottom: SPACING.sm,
     paddingHorizontal: SPACING.md,
   },
   name: {
@@ -201,13 +255,29 @@ const styles = StyleSheet.create({
   rowText: {
     flex: 1,
   },
+  // Grows no further than its rows, but yields to the convert row below it when
+  // the sheet is up against its own maximum.
   scrollBody: {
     flexGrow: 0,
+    flexShrink: 1,
   },
   sheet: {
     borderTopLeftRadius: BORDER_RADIUS.xl,
     borderTopRightRadius: BORDER_RADIUS.xl,
     maxHeight: SHEET_MAX_HEIGHT,
+    paddingBottom: SPACING.xl,
+  },
+  switchThumb: {
+    backgroundColor: '#fff',
+    borderRadius: BORDER_RADIUS.pill,
+    height: 16,
+    width: 16,
+  },
+  switchTrack: {
+    borderRadius: BORDER_RADIUS.pill,
+    height: 20,
+    justifyContent: 'center',
+    width: 36,
   },
   symbol: {
     fontSize: FONT_SIZE.base,

@@ -306,11 +306,29 @@ describe('BudgetScreen', () => {
   });
 
   describe('Convert toggle', () => {
+    // It lives inside the currency sheet: what it converts *to* is the currency
+    // picked there, and with a single account currency there is nothing to
+    // convert at all.
     it('flips the convert-all mode via the context setter', async () => {
       const { getByTestId } = await render(<BudgetScreen />);
-      await waitFor(() => expect(getByTestId('budget-convert-toggle')).toBeTruthy());
-      fireEvent.press(getByTestId('budget-convert-toggle'));
+      await waitFor(() => expect(getByTestId('budget-currency-chip')).toBeTruthy());
+      await fireEvent.press(getByTestId('budget-currency-chip'));
+
+      await fireEvent.press(getByTestId('budget-currency-convert'));
+
       expect(mockSetConvertAll).toHaveBeenCalledTimes(1);
+    });
+
+    it('keeps the sheet open when the toggle is flipped', async () => {
+      const { getByTestId, queryByTestId } = await render(<BudgetScreen />);
+      await waitFor(() => expect(getByTestId('budget-currency-chip')).toBeTruthy());
+      await fireEvent.press(getByTestId('budget-currency-chip'));
+
+      await fireEvent.press(getByTestId('budget-currency-convert'));
+
+      // A setting, not a choice: dismissing on it would cost the user the sheet
+      // they opened to change the currency.
+      expect(queryByTestId('budget-currency-option-RUB')).toBeTruthy();
     });
   });
 
