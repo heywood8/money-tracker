@@ -48,6 +48,11 @@ Financial accounts (bank accounts, cash, credit cards):
 
 **Indexes**: `display_order`, `hidden`
 
+> **Naming**: the UI calls `hidden = 1` accounts **archived** ("Archived account",
+> "Show archived accounts"). The column, the index and the backup/export column
+> headers keep the original `hidden` name so existing databases, JSON/CSV backups
+> and Google Sheets exports stay readable without a migration.
+
 ### 3. categories
 
 Transaction categories with hierarchical structure:

@@ -524,7 +524,7 @@ describe('AccountsScreen', () => {
       await render(<AccountsScreen />);
     });
 
-    it('handles empty displayed accounts with hidden accounts', async () => {
+    it('handles empty displayed accounts with archived accounts', async () => {
       const AccountsScreen = require('../../app/screens/AccountsScreen').default;
       const { useAccountsData } = require('../../app/contexts/AccountsDataContext');
       const { useAccountsActions } = require('../../app/contexts/AccountsActionsContext');
@@ -727,8 +727,8 @@ describe('AccountsScreen', () => {
     });
   });
 
-  describe('Hidden Accounts Toggle', () => {
-    it('renders show hidden accounts button when hidden accounts exist', async () => {
+  describe('Archived Accounts Toggle', () => {
+    it('renders show archived accounts button when archived accounts exist', async () => {
       const AccountsScreen = require('../../app/screens/AccountsScreen').default;
       const { useAccountsData } = require('../../app/contexts/AccountsDataContext');
       const { useLocalization } = require('../../app/contexts/LocalizationContext');
@@ -739,7 +739,7 @@ describe('AccountsScreen', () => {
       });
 
       const hiddenAccounts = [
-        { id: '1', name: 'Hidden Account', balance: '100', currency: 'USD', hidden: 1 },
+        { id: '1', name: 'Archived Account', balance: '100', currency: 'USD', hidden: 1 },
       ];
 
       useAccountsData.mockReturnValue(createAccountsDataMock({
@@ -751,10 +751,10 @@ describe('AccountsScreen', () => {
       const { getByText } = await render(<AccountsScreen />);
 
       // Should show the toggle button - returns translation key
-      expect(getByText('show_hidden_accounts')).toBeTruthy();
+      expect(getByText('show_archived_accounts')).toBeTruthy();
     });
 
-    it('does not render hidden accounts button when no hidden accounts', async () => {
+    it('does not render archived accounts button when no archived accounts', async () => {
       const AccountsScreen = require('../../app/screens/AccountsScreen').default;
       const { useAccountsData } = require('../../app/contexts/AccountsDataContext');
       const { useLocalization } = require('../../app/contexts/LocalizationContext');
@@ -772,7 +772,7 @@ describe('AccountsScreen', () => {
 
       const { queryByText } = await render(<AccountsScreen />);
 
-      expect(queryByText(/show_hidden_accounts|hide_hidden_accounts/)).toBeNull();
+      expect(queryByText(/show_archived_accounts|hide_archived_accounts/)).toBeNull();
     });
   });
 
@@ -1249,7 +1249,7 @@ describe('AccountsScreen', () => {
   describe('Switch Toggles', () => {
     const { fireEvent, waitFor } = require('@testing-library/react-native');
 
-    it('toggles hidden account switch', async () => {
+    it('toggles archived account switch', async () => {
       const AccountsScreen = require('../../app/screens/AccountsScreen').default;
       const { useAccountsData } = require('../../app/contexts/AccountsDataContext');
       const { useLocalization } = require('../../app/contexts/LocalizationContext');
