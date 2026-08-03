@@ -214,9 +214,14 @@ const BudgetScreen = () => {
     <View style={[styles.monthHeaderContainer, { backgroundColor: colors.background }]} testID="budget-month-header">
       {/* Three regions, the outer two both `flex: 1`: whatever they hold, the
           month name between them stays on the screen's centre line. That is what
-          lets the currency chip sit up here on the right — beside the month, the
-          screen's other whole-tab scope — without dragging the title off centre
-          the way appending it to a two-item row would. */}
+          lets the currency chip sit up here — beside the month, the screen's
+          other whole-tab scope — without dragging the title off centre the way
+          appending it to a two-item row would.
+
+          The chip is inside the month arrows, not outboard of them: the two
+          glyphs are one pager and the row's outer edges are where a user reaches
+          for them, so a control parked past the right arrow makes stepping a
+          month a longer reach and reads as if it belonged to the pager. */}
       <View style={styles.monthHeaderRow}>
         <View style={styles.navSlot}>
           <Pressable
@@ -229,6 +234,31 @@ const BudgetScreen = () => {
           >
             <Icon name="chevron-left" size={26} color={colors.text} />
           </Pressable>
+          {/* The chip names the unit the whole screen is read in, so it belongs
+              on the month's line rather than a row below it, and it is set at
+              the month's own weight — the two together are the scope of
+              everything underneath. It carries the currency's mark as well as
+              its code, and goes tonal while its sheet is open. */}
+          {currencies.length > 1 && (
+            <Pressable
+              onPress={handleOpenCurrencyPicker}
+              style={[styles.currencyChip, {
+                borderColor: currencySheetVisible ? colors.primary : colors.border,
+                backgroundColor: currencySheetVisible ? colors.primary + '1F' : undefined,
+              }]}
+              android_ripple={{ color: colors.primary + '1F' }}
+              hitSlop={6}
+              accessibilityRole="button"
+              accessibilityLabel={`${t('currency')}: ${selectedCurrency}`}
+              testID="budget-currency-chip"
+            >
+              {!!selectedSymbol && (
+                <Text style={[styles.currencySymbol, { color: colors.mutedText }]}>{selectedSymbol}</Text>
+              )}
+              <Text style={[styles.currencyChipText, { color: colors.text }]}>{selectedCurrency}</Text>
+              <Icon name="chevron-down" size={16} color={colors.mutedText} />
+            </Pressable>
+          )}
         </View>
         {/* Fix 4: the screen never unmounts across tab switches, so a user who
             wanders off-month and returns later needs an explicit, visible way
@@ -275,31 +305,6 @@ const BudgetScreen = () => {
           >
             <Icon name="chevron-right" size={26} color={colors.text} />
           </Pressable>
-          {/* The chip names the unit the whole screen is read in, so it belongs
-              beside the month rather than a row below it, and it is set at the
-              month's own weight — the two together are the scope of everything
-              underneath. It carries the currency's mark as well as its code,
-              and goes tonal while its sheet is open. */}
-          {currencies.length > 1 && (
-            <Pressable
-              onPress={handleOpenCurrencyPicker}
-              style={[styles.currencyChip, {
-                borderColor: currencySheetVisible ? colors.primary : colors.border,
-                backgroundColor: currencySheetVisible ? colors.primary + '1F' : undefined,
-              }]}
-              android_ripple={{ color: colors.primary + '1F' }}
-              hitSlop={6}
-              accessibilityRole="button"
-              accessibilityLabel={`${t('currency')}: ${selectedCurrency}`}
-              testID="budget-currency-chip"
-            >
-              {!!selectedSymbol && (
-                <Text style={[styles.currencySymbol, { color: colors.mutedText }]}>{selectedSymbol}</Text>
-              )}
-              <Text style={[styles.currencyChipText, { color: colors.text }]}>{selectedCurrency}</Text>
-              <Icon name="chevron-down" size={16} color={colors.mutedText} />
-            </Pressable>
-          )}
         </View>
       </View>
       {/* The month's headline figure. It used to sit at the very bottom of the

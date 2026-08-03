@@ -142,6 +142,19 @@ const pickCurrency = async (getByTestId, code) => {
   await fireEvent.press(getByTestId(`budget-currency-option-${code}`));
 };
 
+// Every testID in the rendered tree, in the order it is laid out. `toJSON()`
+// carries fiber back-references, so it cannot simply be stringified.
+const collectTestIDs = (node, out = []) => {
+  if (!node || typeof node !== 'object') return out;
+  if (Array.isArray(node)) {
+    node.forEach(child => collectTestIDs(child, out));
+    return out;
+  }
+  if (node.props?.testID) out.push(node.props.testID);
+  (node.children || []).forEach(child => collectTestIDs(child, out));
+  return out;
+};
+
 const setBudgetsData = ({ loading = false, convertAll = true } = {}) => {
   mockBudgetsData = {
     loading,
@@ -189,6 +202,21 @@ describe('BudgetScreen', () => {
       await waitFor(() => expect(getByTestId('budget-month-header')).toBeTruthy());
       expect(getByTestId('budget-prev-month')).toBeTruthy();
       expect(getByTestId('budget-next-month')).toBeTruthy();
+    });
+
+    // The two month glyphs are one pager, and the row's outer edges are where a
+    // thumb reaches for them: the currency chip goes between the left arrow and
+    // the month, never outboard of either arrow.
+    it('keeps the currency chip inside the month arrows, ahead of the month name', async () => {
+      const { getByTestId, toJSON } = await render(<BudgetScreen />);
+      await waitFor(() => expect(getByTestId('budget-currency-chip')).toBeTruthy());
+
+      const rendered = collectTestIDs(toJSON());
+      const order = ['budget-prev-month', 'budget-currency-chip', 'budget-month-label', 'budget-next-month']
+        .map(id => rendered.indexOf(id));
+
+      expect(order.every(i => i >= 0)).toBe(true);
+      expect(order).toEqual([...order].sort((a, b) => a - b));
     });
 
     it('does not show a jump-to-current-month affordance while viewing the current month', async () => {
