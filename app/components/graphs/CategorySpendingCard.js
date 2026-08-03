@@ -51,6 +51,33 @@ export const formatYTick = (value) => {
 
 export const formatPctTick = (value) => `${Math.round(Number(value))}%`;
 
+/**
+ * Which month a chart-press reaction should scrub to, or -1 for "leave the
+ * selection alone".
+ *
+ * The press state starts at x=0 and `useAnimatedReaction` runs its reaction
+ * once at mount — so reading x alone made the card select the *oldest* month
+ * the moment the chart appeared, silently overriding the "current month"
+ * default. Gating on `active` ignores that initial run; the finger has to be
+ * down for a press to mean anything.
+ *
+ * The x-only equality check is kept *inside* an active drag, so scrubbing
+ * across a month re-reports it at most once. It deliberately does not span the
+ * inactive→active edge: without that, pressing the leftmost bar first (x is
+ * already 0) would report nothing at all.
+ *
+ * Exported because `useAnimatedReaction`'s reaction is a worklet under Jest's
+ * no-op mock, so this is the only reachable seam for testing it.
+ */
+export const resolveScrubIndex = (current, previous, count) => {
+  'worklet';
+  if (!current.active) return -1;
+  if (previous && previous.active && current.x === previous.x) return -1;
+  const index = Math.round(current.x);
+  if (index < 0 || index >= count) return -1;
+  return index;
+};
+
 // "Nice" y-axis step so ticks land on round numbers.
 const niceStepFor = (max) => {
   const raw = max / 5;
@@ -143,11 +170,10 @@ const SpendingBarChart = ({
   );
 
   useAnimatedReaction(
-    () => pressState.x.value.value,
+    () => ({ active: pressState.isActive.value, x: pressState.x.value.value }),
     (current, previous) => {
-      if (current === previous) return;
-      const index = Math.round(current);
-      if (index >= 0 && index < count) {
+      const index = resolveScrubIndex(current, previous, count);
+      if (index >= 0) {
         runOnJS(onBarPress)(index);
       }
     },
