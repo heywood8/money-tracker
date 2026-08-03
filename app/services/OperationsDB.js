@@ -2204,7 +2204,36 @@ export const getMonthlySpendingByCategories = async (currency, year, categoryIds
 };
 
 /**
- * Get spending by categories for the last 12 months (rolling)
+ * First month that holds a chart-visible expense, across every account and
+ * category.
+ *
+ * Deliberately unfiltered: the spending-trend card runs two of these series side
+ * by side, and they can only be compared month against month if both are built
+ * over the same window. A per-category earliest month would give the two series
+ * different lengths.
+ *
+ * @returns {Promise<string|null>} 'YYYY-MM', or null when there are no expenses
+ */
+export const getEarliestExpenseMonth = async () => {
+  try {
+    const rows = await queryAll(
+      `SELECT strftime('%Y-%m', MIN(o.date)) as year_month
+       FROM operations o
+       JOIN accounts a ON o.account_id = a.id
+       WHERE o.type = 'expense'
+         AND ${chartVisibleSql()}`,
+      [],
+    );
+    return rows?.[0]?.year_month || null;
+  } catch (error) {
+    console.error('Failed to get earliest expense month:', error);
+    throw error;
+  }
+};
+
+/**
+ * Get spending by categories per month, from `startYearMonth` (inclusive) to the
+ * current month.
  * @param {string} currency - Currency code
  * @param {Array<string>|null} categoryIds - Category IDs to include, or `null`
  *   for every expense (uncategorised operations included). An empty array still
@@ -2212,9 +2241,11 @@ export const getMonthlySpendingByCategories = async (currency, year, categoryIds
  * @param {boolean} [convertAll=false] - When true, include operations from every
  *   currency and convert amounts to `currency` at the current exchange rate.
  *   Past months are converted at today's rate too (a single "current rate" view).
+ * @param {string|null} [startYearMonth=null] - 'YYYY-MM' lower bound; defaults to
+ *   the 12-month rolling window when omitted.
  * @returns {Promise<Array<{yearMonth: string, total: string}>>} Array of {yearMonth: 'YYYY-MM', total as Decimal-safe string}
  */
-export const getLast12MonthsSpendingByCategories = async (currency, categoryIds, convertAll = false) => {
+export const getMonthlySpendingHistoryByCategories = async (currency, categoryIds, convertAll = false, startYearMonth = null) => {
   try {
     const allCategories = categoryIds === null;
 
@@ -2224,10 +2255,11 @@ export const getLast12MonthsSpendingByCategories = async (currency, categoryIds,
 
     const placeholders = allCategories ? '' : categoryIds.map(() => '?').join(',');
 
-    // Calculate date 12 months ago from today
     const now = new Date();
-    const startDate = new Date(now.getFullYear(), now.getMonth() - 11, 1);
-    const startDateStr = `${startDate.getFullYear()}-${String(startDate.getMonth() + 1).padStart(2, '0')}-01`;
+    const defaultStart = new Date(now.getFullYear(), now.getMonth() - 11, 1);
+    const startDateStr = startYearMonth
+      ? `${startYearMonth}-01`
+      : `${defaultStart.getFullYear()}-${String(defaultStart.getMonth() + 1).padStart(2, '0')}-01`;
     const endDateStr = `${now.getFullYear()}-${String(now.getMonth() + 1).padStart(2, '0')}-31`;
 
     // When converting, keep the account currency per row so each amount can be
@@ -2277,7 +2309,7 @@ export const getLast12MonthsSpendingByCategories = async (currency, categoryIds,
       .sort(([a], [b]) => (a < b ? -1 : a > b ? 1 : 0))
       .map(([yearMonth, total]) => ({ yearMonth, total }));
   } catch (error) {
-    console.error('Failed to get last 12 months spending by categories:', error);
+    console.error('Failed to get monthly spending history by categories:', error);
     throw error;
   }
 };
