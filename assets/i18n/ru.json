@@ -595,6 +595,8 @@
   "relink_target": "Цель удалена — привязать заново",
   "previous_month": "Предыдущий месяц",
   "next_month": "Следующий месяц",
+  "previous_year": "Предыдущий год",
+  "next_year": "Следующий год",
   "recurring_allocation": "Повторять каждый месяц",
   "group": "Группа",
   "no_group": "Без группы",

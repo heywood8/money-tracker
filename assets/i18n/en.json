@@ -595,6 +595,8 @@
   "relink_target": "Target deleted — tap to re-link",
   "previous_month": "Previous month",
   "next_month": "Next month",
+  "previous_year": "Previous year",
+  "next_year": "Next year",
   "recurring_allocation": "Recurring",
   "group": "Group",
   "no_group": "No group",

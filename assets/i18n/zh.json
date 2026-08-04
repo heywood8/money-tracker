@@ -592,6 +592,8 @@
   "relink_target": "目标已删除 — 点击重新关联",
   "previous_month": "上个月",
   "next_month": "下个月",
+  "previous_year": "上一年",
+  "next_year": "下一年",
   "recurring_allocation": "重复",
   "group": "分组",
   "no_group": "不分组",

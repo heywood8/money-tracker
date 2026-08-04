@@ -1,5 +1,13 @@
 // __tests__/utils/monthUtils.test.js
-import { currentMonthKey, addMonths, formatMonthLabel } from '../../app/utils/monthUtils';
+import {
+  currentMonthKey,
+  addMonths,
+  formatMonthLabel,
+  monthKeyOf,
+  monthIndexOf,
+  yearOf,
+  monthShortLabels,
+} from '../../app/utils/monthUtils';
 
 describe('monthUtils', () => {
   describe('currentMonthKey', () => {
@@ -49,6 +57,57 @@ describe('monthUtils', () => {
     it('falls back to the device locale when no language is given', () => {
       expect(typeof formatMonthLabel('2026-07')).toBe('string');
       expect(formatMonthLabel('2026-07')).toMatch(/2026/);
+    });
+  });
+
+  // The month grid's arithmetic: it works in (year, 0-based index) pairs and
+  // hands keys back out, so these are the two directions of that conversion.
+  describe('monthKeyOf / yearOf / monthIndexOf', () => {
+    it('pads a single-digit month', () => {
+      expect(monthKeyOf(2026, 0)).toBe('2026-01');
+      expect(monthKeyOf(2026, 8)).toBe('2026-09');
+    });
+
+    it('keeps December at index 11 rather than rolling the year', () => {
+      expect(monthKeyOf(2026, 11)).toBe('2026-12');
+    });
+
+    it('round-trips a key through its parts', () => {
+      const key = '2026-03';
+      expect(monthKeyOf(yearOf(key), monthIndexOf(key))).toBe(key);
+      expect(yearOf(key)).toBe(2026);
+      expect(monthIndexOf(key)).toBe(2);
+    });
+
+    it('returns numbers, not the key strings', () => {
+      expect(yearOf('2026-01')).toBe(2026);
+      // '01' as a string would compare and index wrongly.
+      expect(monthIndexOf('2026-01')).toBe(0);
+    });
+  });
+
+  describe('monthShortLabels', () => {
+    it('returns twelve labels, January first', () => {
+      const labels = monthShortLabels('en');
+      expect(labels).toHaveLength(12);
+      expect(labels[0]).toMatch(/Jan/);
+      expect(labels[11]).toMatch(/Dec/);
+    });
+
+    it('names them in the requested language, not the device locale', () => {
+      expect(monthShortLabels('de')[2]).toMatch(/Mär|Mrz/);
+      expect(monthShortLabels('ru')[0]).not.toBe(monthShortLabels('en')[0]);
+    });
+
+    it('capitalises the first letter for locales that lowercase month names', () => {
+      monthShortLabels('ru').forEach(label => {
+        expect(label[0]).toBe(label[0].toUpperCase());
+      });
+    });
+
+    it('falls back to the device locale when no language is given', () => {
+      expect(monthShortLabels()).toHaveLength(12);
+      expect(monthShortLabels().every(l => typeof l === 'string' && l.length > 0)).toBe(true);
     });
   });
 });

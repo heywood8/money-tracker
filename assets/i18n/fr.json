@@ -592,6 +592,8 @@
   "relink_target": "Cible supprimée — appuyez pour relier à nouveau",
   "previous_month": "Mois précédent",
   "next_month": "Mois suivant",
+  "previous_year": "Année précédente",
+  "next_year": "Année suivante",
   "recurring_allocation": "Récurrent",
   "group": "Groupe",
   "no_group": "Aucun groupe",

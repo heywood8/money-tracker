@@ -592,6 +592,8 @@
   "relink_target": "Objetivo eliminado — toca para volver a vincular",
   "previous_month": "Mes anterior",
   "next_month": "Mes siguiente",
+  "previous_year": "Año anterior",
+  "next_year": "Año siguiente",
   "recurring_allocation": "Recurrente",
   "group": "Grupo",
   "no_group": "Sin grupo",
