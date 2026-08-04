@@ -260,6 +260,7 @@
   "select_date": "Выберите дату",
   "add_operation_hint": "Открывает форму для создания новой операции",
   "select_month": "Выберите месяц",
+  "select_period": "Выберите период",
   "expenses_by_category": "Расходы по категориям",
   "no_expense_data": "Нет данных о расходах за этот период",
   "income_by_category": "Доходы по категориям",

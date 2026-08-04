@@ -138,7 +138,7 @@ jest.mock('../../app/components/budgets/MonthlyPlanSection', () => {
 // Both presses are awaited: the chip's press is what mounts the sheet, so the
 // option it contains does not exist until that render has been flushed.
 const pickCurrency = async (getByTestId, code) => {
-  await fireEvent.press(getByTestId('budget-currency-chip'));
+  await fireEvent.press(getByTestId('budget-month-currency-chip'));
   await fireEvent.press(getByTestId(`budget-currency-option-${code}`));
 };
 
@@ -200,19 +200,19 @@ describe('BudgetScreen', () => {
     it('renders a single shared month header', async () => {
       const { getByTestId } = await render(<BudgetScreen />);
       await waitFor(() => expect(getByTestId('budget-month-header')).toBeTruthy());
-      expect(getByTestId('budget-prev-month')).toBeTruthy();
-      expect(getByTestId('budget-next-month')).toBeTruthy();
+      expect(getByTestId('budget-month-prev')).toBeTruthy();
+      expect(getByTestId('budget-month-next')).toBeTruthy();
     });
 
     // The month row is the pager and nothing else: the currency chip sits on its
     // own line below it, after both arrows, and above the hero figure.
     it('renders the currency chip below the month row and above the hero figure', async () => {
       const { getByTestId, toJSON } = await render(<BudgetScreen />);
-      await waitFor(() => expect(getByTestId('budget-currency-chip')).toBeTruthy());
+      await waitFor(() => expect(getByTestId('budget-month-currency-chip')).toBeTruthy());
 
       const rendered = collectTestIDs(toJSON());
-      const order = ['budget-prev-month', 'budget-month-label', 'budget-next-month',
-        'budget-currency-chip', 'budget-remainder'].map(id => rendered.indexOf(id));
+      const order = ['budget-month-prev', 'budget-month-label', 'budget-month-next',
+        'budget-month-currency-chip', 'budget-remainder'].map(id => rendered.indexOf(id));
 
       expect(order.every(i => i >= 0)).toBe(true);
       expect(order).toEqual([...order].sort((a, b) => a - b));
@@ -221,7 +221,7 @@ describe('BudgetScreen', () => {
     it('does not show a jump-to-current-month affordance while viewing the current month', async () => {
       const { getByTestId, queryByTestId } = await render(<BudgetScreen />);
       await waitFor(() => expect(getByTestId('budget-month-header')).toBeTruthy());
-      expect(queryByTestId('budget-jump-current')).toBeNull();
+      expect(queryByTestId('budget-month-jump-current')).toBeNull();
     });
 
     it('passes expense and income categories to the list (income lines need income categories)', async () => {
@@ -240,7 +240,7 @@ describe('BudgetScreen', () => {
 
     it('hands the picked currency down to the list', async () => {
       const { getByTestId } = await render(<BudgetScreen />);
-      await waitFor(() => expect(getByTestId('budget-currency-chip')).toBeTruthy());
+      await waitFor(() => expect(getByTestId('budget-month-currency-chip')).toBeTruthy());
       await pickCurrency(getByTestId, 'RUB');
       await waitFor(() => expect(capturedSectionProps.currency).toBe('RUB'));
     });
@@ -252,7 +252,7 @@ describe('BudgetScreen', () => {
     // flowing into MonthlyPlanSection as the currency of any plan it creates.
     it('re-seeds when the selected currency loses its last account', async () => {
       const { getByTestId, queryByTestId, rerender } = await render(<BudgetScreen />);
-      await waitFor(() => expect(getByTestId('budget-currency-chip')).toBeTruthy());
+      await waitFor(() => expect(getByTestId('budget-month-currency-chip')).toBeTruthy());
       await pickCurrency(getByTestId, 'RUB');
       await waitFor(() => expect(capturedSectionProps.currency).toBe('RUB'));
 
@@ -261,7 +261,7 @@ describe('BudgetScreen', () => {
 
       await waitFor(() => expect(capturedSectionProps.currency).toBe('AMD'));
       // And the picker really is gone, which is what made this unrecoverable.
-      expect(queryByTestId('budget-currency-chip')).toBeNull();
+      expect(queryByTestId('budget-month-currency-chip')).toBeNull();
     });
 
     it('clears the selection when the last account of any kind is deleted', async () => {
@@ -276,7 +276,7 @@ describe('BudgetScreen', () => {
 
     it('leaves a still-valid selection alone when an unrelated account is deleted', async () => {
       const { getByTestId, rerender } = await render(<BudgetScreen />);
-      await waitFor(() => expect(getByTestId('budget-currency-chip')).toBeTruthy());
+      await waitFor(() => expect(getByTestId('budget-month-currency-chip')).toBeTruthy());
       await pickCurrency(getByTestId, 'RUB');
       await waitFor(() => expect(capturedSectionProps.currency).toBe('RUB'));
 
@@ -309,7 +309,7 @@ describe('BudgetScreen', () => {
       await waitFor(() => expect(getByTestId('mock-report-remainder')).toBeTruthy());
       fireEvent.press(getByTestId('mock-report-remainder'));
       await waitFor(() => expect(getByTestId('budget-remainder')).toHaveTextContent('-85745 AMD'));
-      expect(queryByTestId('budget-currency-chip')).toBeNull();
+      expect(queryByTestId('budget-month-currency-chip')).toBeNull();
     });
 
     it('replaces a negative remainder with the overspend colour', async () => {
@@ -338,8 +338,8 @@ describe('BudgetScreen', () => {
     // convert at all.
     it('flips the convert-all mode via the context setter', async () => {
       const { getByTestId } = await render(<BudgetScreen />);
-      await waitFor(() => expect(getByTestId('budget-currency-chip')).toBeTruthy());
-      await fireEvent.press(getByTestId('budget-currency-chip'));
+      await waitFor(() => expect(getByTestId('budget-month-currency-chip')).toBeTruthy());
+      await fireEvent.press(getByTestId('budget-month-currency-chip'));
 
       await fireEvent.press(getByTestId('budget-currency-convert'));
 
@@ -348,8 +348,8 @@ describe('BudgetScreen', () => {
 
     it('keeps the sheet open when the toggle is flipped', async () => {
       const { getByTestId, queryByTestId } = await render(<BudgetScreen />);
-      await waitFor(() => expect(getByTestId('budget-currency-chip')).toBeTruthy());
-      await fireEvent.press(getByTestId('budget-currency-chip'));
+      await waitFor(() => expect(getByTestId('budget-month-currency-chip')).toBeTruthy());
+      await fireEvent.press(getByTestId('budget-month-currency-chip'));
 
       await fireEvent.press(getByTestId('budget-currency-convert'));
 
@@ -365,18 +365,18 @@ describe('BudgetScreen', () => {
       await waitFor(() => expect(getByTestId('budget-month-header')).toBeTruthy());
       const originalLabel = getByTestId('budget-month-label').props.children;
 
-      fireEvent.press(getByTestId('budget-prev-month'));
-      await waitFor(() => expect(getByTestId('budget-jump-current')).toBeTruthy());
+      fireEvent.press(getByTestId('budget-month-prev'));
+      await waitFor(() => expect(getByTestId('budget-month-jump-current')).toBeTruthy());
       // The month label actually changed away from the current month.
       expect(getByTestId('budget-month-label').props.children).not.toBe(originalLabel);
       // Icon-only, beside the label: the labelled button used to occupy a row of
       // its own and pushed the hero figure and the whole plan down on any month
       // but this one. The wording survives as the accessibility label.
       expect(queryByText('jump_to_current_period')).toBeNull();
-      expect(getByTestId('budget-jump-current').props.accessibilityLabel).toBe('jump_to_current_period');
+      expect(getByTestId('budget-month-jump-current').props.accessibilityLabel).toBe('jump_to_current_period');
 
-      fireEvent.press(getByTestId('budget-jump-current'));
-      await waitFor(() => expect(queryByTestId('budget-jump-current')).toBeNull());
+      fireEvent.press(getByTestId('budget-month-jump-current'));
+      await waitFor(() => expect(queryByTestId('budget-month-jump-current')).toBeNull());
       expect(getByTestId('budget-month-label').props.children).toBe(originalLabel);
     });
 
@@ -384,7 +384,7 @@ describe('BudgetScreen', () => {
       const { getByTestId } = await render(<BudgetScreen />);
       await waitFor(() => expect(capturedSectionProps).toBeTruthy());
       const initialMonth = capturedSectionProps.month;
-      fireEvent.press(getByTestId('budget-prev-month'));
+      fireEvent.press(getByTestId('budget-month-prev'));
       await waitFor(() => expect(capturedSectionProps.month).not.toBe(initialMonth));
     });
   });
@@ -426,7 +426,7 @@ describe('BudgetScreen', () => {
       expect(queryByTestId('budget-month-picker-year')).toBeNull();
       // Off the current month, so the jump-back affordance comes up as it does
       // for the arrows.
-      expect(getByTestId('budget-jump-current')).toBeTruthy();
+      expect(getByTestId('budget-month-jump-current')).toBeTruthy();
     });
 
     it('travels across years from the grid', async () => {
@@ -460,7 +460,7 @@ describe('BudgetScreen', () => {
       expect(capturedSectionProps.month).toBe(month);
       expect(getByTestId('budget-month-label').props.children).toBe(label);
       // Still the current month, so no jump-back affordance appeared.
-      expect(queryByTestId('budget-jump-current')).toBeNull();
+      expect(queryByTestId('budget-month-jump-current')).toBeNull();
     });
   });
 

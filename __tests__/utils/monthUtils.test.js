@@ -7,6 +7,8 @@ import {
   monthIndexOf,
   yearOf,
   monthShortLabels,
+  fullYearKeyOf,
+  isFullYearKey,
 } from '../../app/utils/monthUtils';
 
 describe('monthUtils', () => {
@@ -108,6 +110,28 @@ describe('monthUtils', () => {
     it('falls back to the device locale when no language is given', () => {
       expect(monthShortLabels()).toHaveLength(12);
       expect(monthShortLabels().every(l => typeof l === 'string' && l.length > 0)).toBe(true);
+    });
+  });
+  describe('whole-year period keys', () => {
+    it('builds a YYYY-full key from a year', () => {
+      expect(fullYearKeyOf(2026)).toBe('2026-full');
+    });
+
+    it('recognises a whole-year key and not a month key', () => {
+      expect(isFullYearKey('2026-full')).toBe(true);
+      expect(isFullYearKey('2026-01')).toBe(false);
+      expect(isFullYearKey('2026-12')).toBe(false);
+    });
+
+    it('is safe on absent keys rather than throwing', () => {
+      expect(isFullYearKey(undefined)).toBe(false);
+      expect(isFullYearKey(null)).toBe(false);
+    });
+
+    // The Graphs header reads the year off either kind of key with yearOf, so
+    // the two formats have to agree on where the year lives.
+    it('keeps the year readable with yearOf', () => {
+      expect(yearOf(fullYearKeyOf(2019))).toBe(2019);
     });
   });
 });

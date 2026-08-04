@@ -260,6 +260,7 @@
   "select_date": "Seleziona data",
   "add_operation_hint": "Apre il modulo per creare una nuova operazione",
   "select_month": "Seleziona mese",
+  "select_period": "Seleziona periodo",
   "expenses_by_category": "Uscite per categoria",
   "no_expense_data": "Nessun dato di uscita per questo periodo",
   "income_by_category": "Entrate per categoria",

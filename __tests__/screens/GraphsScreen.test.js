@@ -47,7 +47,6 @@ jest.mock('../../app/contexts/DisplaySettingsContext', () => ({
 jest.mock('../../app/services/OperationsDB', () => ({
   getSpendingByCategoryAndCurrency: jest.fn(() => Promise.resolve([])),
   getIncomeByCategoryAndCurrency: jest.fn(() => Promise.resolve([])),
-  getAvailableMonths: jest.fn(() => Promise.resolve([])),
   getUnconvertibleCurrencies: jest.fn(() => Promise.resolve([])),
 }));
 
@@ -59,16 +58,6 @@ jest.mock('../../app/components/SimplePicker', () => {
   const React = require('react');
   return function MockSimplePicker() {
     return React.createElement('SimplePicker', null);
-  };
-});
-
-jest.mock('@quidone/react-native-wheel-picker', () => {
-  const React = require('react');
-  return {
-    __esModule: true,
-    default: function MockWheelPicker() {
-      return React.createElement('WheelPicker', null);
-    },
   };
 });
 
@@ -136,16 +125,6 @@ describe('GraphsScreen', () => {
       await render(<GraphsScreen />);
 
       // Component should call database service to fetch income data
-      expect(true).toBe(true);
-    });
-
-    it('fetches available months from OperationsDB', async () => {
-      const GraphsScreen = require('../../app/screens/GraphsScreen').default;
-      const { getAvailableMonths } = require('../../app/services/OperationsDB');
-
-      await render(<GraphsScreen />);
-
-      // Component should call database service to fetch available months
       expect(true).toBe(true);
     });
 
@@ -321,191 +300,93 @@ describe('GraphsScreen', () => {
       await render(<GraphsScreen />);
     });
 
-    it('handles available months data', async () => {
-      const GraphsScreen = require('../../app/screens/GraphsScreen').default;
-      const { getAvailableMonths } = require('../../app/services/OperationsDB');
-
-      const mockMonths = [
-        { year: 2024, month: 1 },
-        { year: 2024, month: 2 },
-        { year: 2024, month: 3 },
-      ];
-
-      getAvailableMonths.mockResolvedValue(mockMonths);
-
-      await render(<GraphsScreen />);
-    });
-
-    it('handles multi-year available months data', async () => {
-      const GraphsScreen = require('../../app/screens/GraphsScreen').default;
-      const { getAvailableMonths } = require('../../app/services/OperationsDB');
-
-      const mockMonths = [
-        { year: 2025, month: 0 },
-        { year: 2024, month: 11 },
-        { year: 2024, month: 10 },
-      ];
-
-      getAvailableMonths.mockResolvedValue(mockMonths);
-
-      await render(<GraphsScreen />);
-    });
   });
 
-  describe('Period chevron navigation (QoL-9)', () => {
+  describe('Period header', () => {
     it('reveals jump-to-current after stepping to an older period and hides it back at current', async () => {
       const GraphsScreen = require('../../app/screens/GraphsScreen').default;
-      const { getAvailableMonths } = require('../../app/services/OperationsDB');
-
-      const now = new Date();
-      // Current month must be present so the wheel starts at it; add an older year
-      // so there is at least one older period to step to.
-      getAvailableMonths.mockResolvedValue([
-        { year: now.getFullYear(), month: now.getMonth() },
-        { year: 2020, month: 0 },
-      ]);
 
       const { queryByTestId, getByTestId, findByTestId } = await render(<GraphsScreen />);
 
-      // The wheel and its chevrons mount once available months load.
-      await findByTestId('period-chevron-older');
+      // Starts at the current month → jump-to-current hidden.
+      expect(queryByTestId('graphs-period-jump-current')).toBeNull();
 
-      // Starts at the current period → jump-to-current hidden, newer chevron disabled.
-      expect(queryByTestId('period-jump-current')).toBeNull();
-      expect(getByTestId('period-chevron-newer').props.accessibilityState).toEqual(
-        expect.objectContaining({ disabled: true }),
-      );
-
-      // Step to an older period → jump-to-current appears. The press only flips
-      // internal state, and the pending available-months mount effect defers the
-      // re-render flush, so poll for the button rather than querying synchronously.
-      fireEvent.press(getByTestId('period-chevron-older'));
-      expect(await findByTestId('period-jump-current')).toBeTruthy();
+      fireEvent.press(getByTestId('graphs-period-prev'));
+      expect(await findByTestId('graphs-period-jump-current')).toBeTruthy();
 
       // Jump back to the current period → the button hides again.
-      fireEvent.press(getByTestId('period-jump-current'));
-      await waitFor(() => expect(queryByTestId('period-jump-current')).toBeNull());
-    });
-  });
-
-  describe('Combined Period Picker Logic', () => {
-    describe('Period string parsing', () => {
-      it('parses specific month period correctly', async () => {
-        // Test the parsing logic: "2025-11" should give year=2025, month=11
-        const periodString = '2025-11';
-        const [yearStr, monthStr] = periodString.split('-');
-        const year = parseInt(yearStr, 10);
-        const month = monthStr === 'full' ? null : parseInt(monthStr, 10);
-
-        expect(year).toBe(2025);
-        expect(month).toBe(11);
-      });
-
-      it('parses full year period correctly', async () => {
-        // Test the parsing logic: "2025-full" should give year=2025, month=null
-        const periodString = '2025-full';
-        const [yearStr, monthStr] = periodString.split('-');
-        const year = parseInt(yearStr, 10);
-        const month = monthStr === 'full' ? null : parseInt(monthStr, 10);
-
-        expect(year).toBe(2025);
-        expect(month).toBeNull();
-      });
-
-      it('parses January (month 0) correctly', async () => {
-        // Edge case: month 0 should not be confused with falsy
-        const periodString = '2025-0';
-        const [yearStr, monthStr] = periodString.split('-');
-        const year = parseInt(yearStr, 10);
-        const month = monthStr === 'full' ? null : parseInt(monthStr, 10);
-
-        expect(year).toBe(2025);
-        expect(month).toBe(0);
-      });
+      fireEvent.press(getByTestId('graphs-period-jump-current'));
+      await waitFor(() => expect(queryByTestId('graphs-period-jump-current')).toBeNull());
     });
 
-    describe('Period items generation order', () => {
-      it('generates items in descending date order with Full Year after each years months', async () => {
-        // Simulate the periodItems generation logic
-        const availableYears = [2025, 2024];
-        const availableMonths = [
-          { year: 2025, month: 0 },  // Jan 2025
-          { year: 2025, month: 1 },  // Feb 2025
-          { year: 2024, month: 10 }, // Nov 2024
-          { year: 2024, month: 11 }, // Dec 2024
-        ];
-        const t = (key) => key;
-        const monthKeys = [
-          'month_january', 'month_february', 'month_march', 'month_april',
-          'month_may', 'month_june', 'month_july', 'month_august',
-          'month_september', 'month_october', 'month_november', 'month_december',
-        ];
+    it('steps the month and returns to it, both arrows moving by one month', async () => {
+      const GraphsScreen = require('../../app/screens/GraphsScreen').default;
+      const { useLocalization } = require('../../app/contexts/LocalizationContext');
 
-        const items = [];
-        availableYears.forEach(year => {
-          const monthsForYear = availableMonths
-            .filter(m => m.year === year)
-            .map(m => m.month)
-            .sort((a, b) => b - a); // Dec to Jan
+      useLocalization.mockReturnValue({ t: (key) => key, language: 'en' });
 
-          monthsForYear.forEach(monthIndex => {
-            items.push({
-              label: `${t(monthKeys[monthIndex])} ${year}`,
-              value: `${year}-${monthIndex}`,
-            });
-          });
+      const { getByTestId } = await render(<GraphsScreen />);
 
-          items.push({
-            label: `${t('full_year')} ${year}`,
-            value: `${year}-full`,
-          });
-        });
+      const labelAtCurrent = getByTestId('graphs-period-label').props.children;
 
-        // Expected order for 2025: Feb, Jan, Full Year 2025
-        // Then for 2024: Dec, Nov, Full Year 2024
-        expect(items).toHaveLength(6);
-        expect(items[0].value).toBe('2025-1');  // Feb 2025
-        expect(items[1].value).toBe('2025-0');  // Jan 2025
-        expect(items[2].value).toBe('2025-full'); // Full Year 2025
-        expect(items[3].value).toBe('2024-11'); // Dec 2024
-        expect(items[4].value).toBe('2024-10'); // Nov 2024
-        expect(items[5].value).toBe('2024-full'); // Full Year 2024
+      await act(async () => { fireEvent.press(getByTestId('graphs-period-prev')); });
+      expect(getByTestId('graphs-period-label').props.children).not.toBe(labelAtCurrent);
+
+      await act(async () => { fireEvent.press(getByTestId('graphs-period-next')); });
+      expect(getByTestId('graphs-period-label').props.children).toBe(labelAtCurrent);
+    });
+
+    it('opens the period picker from the title and offers the whole year', async () => {
+      const GraphsScreen = require('../../app/screens/GraphsScreen').default;
+      const { useLocalization } = require('../../app/contexts/LocalizationContext');
+
+      useLocalization.mockReturnValue({ t: (key) => key, language: 'en' });
+
+      const { getByTestId, findByTestId } = await render(<GraphsScreen />);
+
+      await act(async () => { fireEvent.press(getByTestId('graphs-period-picker')); });
+
+      expect(await findByTestId('graphs-period-picker-full-year')).toBeTruthy();
+    });
+
+    // The currency chip replaced the floating wheel; with a single account
+    // currency there is nothing to choose, so it must not be rendered at all.
+    it('shows the currency chip only when more than one account currency exists', async () => {
+      const GraphsScreen = require('../../app/screens/GraphsScreen').default;
+      const { useAccountsData } = require('../../app/contexts/AccountsDataContext');
+
+      useAccountsData.mockReturnValue({
+        accounts: [{ id: 'acc-1', name: 'Cash', currency: 'USD', balance: '10.00', displayOrder: 0 }],
+      });
+      const single = await render(<GraphsScreen />);
+      expect(single.queryByTestId('graphs-period-currency-chip')).toBeNull();
+
+      useAccountsData.mockReturnValue({
+        accounts: [
+          { id: 'acc-1', name: 'Cash', currency: 'USD', balance: '10.00', displayOrder: 0 },
+          { id: 'acc-2', name: 'Euro', currency: 'EUR', balance: '20.00', displayOrder: 1 },
+        ],
+      });
+      const multi = await render(<GraphsScreen />);
+      expect(multi.getByTestId('graphs-period-currency-chip')).toBeTruthy();
+    });
+
+    it('opens the currency sheet from the chip', async () => {
+      const GraphsScreen = require('../../app/screens/GraphsScreen').default;
+      const { useAccountsData } = require('../../app/contexts/AccountsDataContext');
+
+      useAccountsData.mockReturnValue({
+        accounts: [
+          { id: 'acc-1', name: 'Cash', currency: 'USD', balance: '10.00', displayOrder: 0 },
+          { id: 'acc-2', name: 'Euro', currency: 'EUR', balance: '20.00', displayOrder: 1 },
+        ],
       });
 
-      it('includes Full Year option even with single month available', async () => {
-        const availableYears = [2025];
-        const availableMonths = [{ year: 2025, month: 5 }]; // Only June
-        const t = (key) => key;
-        const monthKeys = [
-          'month_january', 'month_february', 'month_march', 'month_april',
-          'month_may', 'month_june', 'month_july', 'month_august',
-          'month_september', 'month_october', 'month_november', 'month_december',
-        ];
+      const { getByTestId, findByTestId } = await render(<GraphsScreen />);
 
-        const items = [];
-        availableYears.forEach(year => {
-          const monthsForYear = availableMonths
-            .filter(m => m.year === year)
-            .map(m => m.month)
-            .sort((a, b) => b - a);
+      await act(async () => { fireEvent.press(getByTestId('graphs-period-currency-chip')); });
 
-          monthsForYear.forEach(monthIndex => {
-            items.push({
-              label: `${t(monthKeys[monthIndex])} ${year}`,
-              value: `${year}-${monthIndex}`,
-            });
-          });
-
-          items.push({
-            label: `${t('full_year')} ${year}`,
-            value: `${year}-full`,
-          });
-        });
-
-        expect(items).toHaveLength(2);
-        expect(items[0].value).toBe('2025-5');    // June 2025
-        expect(items[1].value).toBe('2025-full'); // Full Year 2025
-      });
+      expect(await findByTestId('graphs-currency-option-EUR')).toBeTruthy();
     });
   });
 
@@ -926,27 +807,41 @@ describe('GraphsScreen', () => {
       const GraphsScreen = require('../../app/screens/GraphsScreen').default;
       const { useAccountsData } = require('../../app/contexts/AccountsDataContext');
       const { useLocalization } = require('../../app/contexts/LocalizationContext');
-      const { getAvailableMonths } = require('../../app/services/OperationsDB');
 
       // Earlier cases leave a language mock in place (clearAllMocks keeps
       // implementations), so pin the identity translator this case asserts on.
       useLocalization.mockReturnValue({ t: (key) => key, language: 'en' });
-      useAccountsData.mockReturnValue({
-        accounts: [{ id: 'acc-1', name: 'Cash', currency: 'USD', balance: '100.00', displayOrder: 0 }],
-      });
-      const year = new Date().getFullYear() - 1;
-      getAvailableMonths.mockResolvedValue([{ year, month: 5 }]);
+      useAccountsData.mockReturnValue({ accounts: [] });
 
-      const { getByTestId, findByText } = await render(<GraphsScreen />);
+      const { getByTestId, findByTestId, findByText } = await render(<GraphsScreen />);
 
-      // periodItems are newest-first: current month, then last year's month, then
-      // that year's "Full Year" entry — two steps down lands on the full year.
-      await waitFor(() => expect(getByTestId('period-chevron-older')).toBeTruthy());
-      await act(async () => { fireEvent.press(getByTestId('period-chevron-older')); });
-      await act(async () => { fireEvent.press(getByTestId('period-chevron-older')); });
+      // The whole year is one tap inside the period picker, not a walk down a
+      // list of months.
+      await act(async () => { fireEvent.press(getByTestId('graphs-period-picker')); });
+      const fullYear = await findByTestId('graphs-period-picker-full-year');
+      await act(async () => { fireEvent.press(fullYear); });
 
-      // The card is present and speaking about a year, not a month
+      // The balance region is present and speaking about a year, not a month
       expect(await findByText('no_balance_history_year')).toBeTruthy();
+    });
+
+    it('names the whole year in the header and steps by years while it is selected', async () => {
+      const GraphsScreen = require('../../app/screens/GraphsScreen').default;
+      const { useLocalization } = require('../../app/contexts/LocalizationContext');
+
+      useLocalization.mockReturnValue({ t: (key) => key, language: 'en' });
+
+      const { getByTestId, findByTestId } = await render(<GraphsScreen />);
+
+      await act(async () => { fireEvent.press(getByTestId('graphs-period-picker')); });
+      await act(async () => { fireEvent.press(await findByTestId('graphs-period-picker-full-year')); });
+
+      const thisYear = new Date().getFullYear();
+      expect(getByTestId('graphs-period-label').props.children).toBe(`full_year ${thisYear}`);
+
+      // A year scope steps by a year, not by a month.
+      await act(async () => { fireEvent.press(getByTestId('graphs-period-prev')); });
+      expect(getByTestId('graphs-period-label').props.children).toBe(`full_year ${thisYear - 1}`);
     });
   });
 });

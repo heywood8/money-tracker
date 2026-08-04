@@ -260,6 +260,7 @@
   "select_date": "Selecionar data",
   "add_operation_hint": "Abre formulário para criar nova operação",
   "select_month": "Selecionar mês",
+  "select_period": "Selecionar período",
   "expenses_by_category": "Gastos por categoria",
   "no_expense_data": "Nenhum dado de gasto para este período",
   "income_by_category": "Receitas por categoria",

@@ -260,6 +260,7 @@
   "select_date": "日付を選択",
   "add_operation_hint": "新しい取引を作成するフォームを開く",
   "select_month": "月を選択",
+  "select_period": "期間を選択",
   "expenses_by_category": "カテゴリー別支出",
   "no_expense_data": "この期間の支出データがありません",
   "income_by_category": "カテゴリー別収入",

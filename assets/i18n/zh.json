@@ -260,6 +260,7 @@
   "select_date": "选择日期",
   "add_operation_hint": "打开表单以创建新操作",
   "select_month": "选择月份",
+  "select_period": "选择时间段",
   "expenses_by_category": "按类别支出",
   "no_expense_data": "此期间没有支出数据",
   "income_by_category": "按类别收入",

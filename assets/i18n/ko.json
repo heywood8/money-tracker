@@ -260,6 +260,7 @@
   "select_date": "날짜 선택",
   "add_operation_hint": "새 거래 작성 양식 열기",
   "select_month": "월 선택",
+  "select_period": "기간 선택",
   "expenses_by_category": "카테고리별 지출",
   "no_expense_data": "이 기간의 지출 데이터가 없습니다",
   "income_by_category": "카테고리별 수입",

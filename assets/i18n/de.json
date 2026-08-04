@@ -260,6 +260,7 @@
   "select_date": "Datum auswählen",
   "add_operation_hint": "Öffnet das Formular zum Erstellen eines neuen Vorgangs",
   "select_month": "Monat auswählen",
+  "select_period": "Zeitraum auswählen",
   "expenses_by_category": "Ausgaben nach Kategorie",
   "no_expense_data": "Keine Ausgabendaten für diesen Zeitraum",
   "income_by_category": "Einnahmen nach Kategorie",

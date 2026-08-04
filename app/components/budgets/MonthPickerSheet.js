@@ -5,7 +5,7 @@ import Icon from '@expo/vector-icons/MaterialCommunityIcons';
 import ModalBlurOverlay from '../ModalBlurOverlay';
 import { SPACING, BORDER_RADIUS, FONT_SIZE, FONT_WEIGHT, ICON_SIZE } from '../../styles/designTokens';
 import { MODAL_TITLE } from '../../styles/componentStyles';
-import { currentMonthKey, monthKeyOf, monthIndexOf, yearOf, monthShortLabels } from '../../utils/monthUtils';
+import { currentMonthKey, monthKeyOf, monthIndexOf, yearOf, monthShortLabels, fullYearKeyOf, isFullYearKey } from '../../utils/monthUtils';
 
 /**
  * The Budgets tab's month *jump*: a year of months on one surface, so moving to
@@ -27,6 +27,12 @@ import { currentMonthKey, monthKeyOf, monthIndexOf, yearOf, monthShortLabels } f
  * chosen month is a filled tonal pill, today's month is outlined in the accent
  * when it is not the chosen one, everything else is a plain cell. That survives
  * both themes, where two fills of the same hue at different alphas do not.
+ *
+ * `allowFullYear` adds a thirteenth cell — the whole year the grid is showing —
+ * for hosts whose scope can widen past a month (the Graphs screen). It is a
+ * full-width row *under* the twelve rather than one of them: it is not a
+ * thirteenth month, it is the year those twelve add up to, and the grid's
+ * geometry is what says so. Hosts without it (Budgets) are unchanged.
  */
 
 // Three across, four down. `flexBasis` below 33% with `flexGrow` is what fixes
@@ -42,6 +48,7 @@ const MonthPickerSheet = memo(({
   colors,
   t,
   language,
+  allowFullYear = false,
   testIDPrefix = 'month-picker',
 }) => {
   // The year the grid is showing, which is not the year of the selected month
@@ -64,13 +71,21 @@ const MonthPickerSheet = memo(({
   const todayKey = currentMonthKey();
 
   const selectedYear = yearOf(monthKey);
-  const selectedIndex = monthIndexOf(monthKey);
+  // -1 for a whole-year scope: it matches no cell, which is exactly right —
+  // none of the twelve is the selection then.
+  const selectedIsFullYear = isFullYearKey(monthKey);
+  const selectedIndex = selectedIsFullYear ? -1 : monthIndexOf(monthKey);
 
   const handlePrevYear = useCallback(() => setYear(y => y - 1), []);
   const handleNextYear = useCallback(() => setYear(y => y + 1), []);
 
   const handleSelect = useCallback((index) => {
     onSelect(monthKeyOf(year, index));
+    onClose();
+  }, [year, onSelect, onClose]);
+
+  const handleSelectFullYear = useCallback(() => {
+    onSelect(fullYearKeyOf(year));
     onClose();
   }, [year, onSelect, onClose]);
 
@@ -92,7 +107,9 @@ const MonthPickerSheet = memo(({
           {/* Swallows the press so a tap inside the sheet does not dismiss it. */}
           <Pressable style={[styles.sheet, { backgroundColor: colors.card }]} onPress={() => {}}>
             <View style={[styles.handle, { backgroundColor: colors.border }]} />
-            <Text style={[styles.title, { color: colors.text }]}>{t('select_month')}</Text>
+            <Text style={[styles.title, { color: colors.text }]}>
+              {t(allowFullYear ? 'select_period' : 'select_month')}
+            </Text>
 
             {/* The year stepper mirrors the header's month stepper it was opened
                 from — same glyphs, same places — so the one control the grid
@@ -165,6 +182,36 @@ const MonthPickerSheet = memo(({
                   </Pressable>
                 );
               })}
+              {allowFullYear && (
+                <Pressable
+                  onPress={handleSelectFullYear}
+                  android_ripple={{ color: colors.primary + '1F' }}
+                  style={[
+                    styles.cell,
+                    styles.fullYearCell,
+                    selectedIsFullYear && year === selectedYear && { backgroundColor: colors.primary + '29' },
+                  ]}
+                  accessibilityRole="radio"
+                  accessibilityState={{ selected: selectedIsFullYear && year === selectedYear }}
+                  accessibilityLabel={`${t('full_year')} ${year}`}
+                  testID={`${testIDPrefix}-full-year`}
+                >
+                  <Icon
+                    name="calendar-expand-horizontal"
+                    size={18}
+                    color={selectedIsFullYear && year === selectedYear ? colors.primary : colors.mutedText}
+                  />
+                  <Text
+                    style={[styles.cellText, {
+                      color: selectedIsFullYear && year === selectedYear ? colors.primary : colors.text,
+                      fontWeight: selectedIsFullYear && year === selectedYear ? FONT_WEIGHT.bold : FONT_WEIGHT.medium,
+                    }]}
+                    numberOfLines={1}
+                  >
+                    {`${t('full_year')} ${year}`}
+                  </Text>
+                </Pressable>
+              )}
             </View>
           </Pressable>
         </Pressable>
@@ -177,15 +224,17 @@ MonthPickerSheet.displayName = 'MonthPickerSheet';
 
 MonthPickerSheet.propTypes = {
   visible: PropTypes.bool.isRequired,
-  /** Currently scoped month, YYYY-MM. */
+  /** Currently scoped period: YYYY-MM, or YYYY-full when `allowFullYear`. */
   monthKey: PropTypes.string.isRequired,
-  /** Called with the picked YYYY-MM key. */
+  /** Called with the picked YYYY-MM (or YYYY-full) key. */
   onSelect: PropTypes.func.isRequired,
   onClose: PropTypes.func.isRequired,
   colors: PropTypes.object.isRequired,
   t: PropTypes.func.isRequired,
   /** App language code (not the device locale) for the month names. */
   language: PropTypes.string,
+  /** Offer the whole browsed year as a period alongside its twelve months. */
+  allowFullYear: PropTypes.bool,
   testIDPrefix: PropTypes.string,
 };
 
@@ -208,6 +257,15 @@ const styles = StyleSheet.create({
   },
   cellToday: {
     borderWidth: 1,
+  },
+  // A row of its own under the twelve: the year is what they add up to, not a
+  // thirteenth of them. Shorter than a month cell so it reads as a footer to the
+  // grid rather than a fourth rank of it.
+  fullYearCell: {
+    flexBasis: '100%',
+    flexDirection: 'row',
+    gap: SPACING.sm,
+    height: 44,
   },
   grid: {
     flexDirection: 'row',

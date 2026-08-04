@@ -135,6 +135,59 @@ describe('MonthPickerSheet', () => {
     expect(ru[0]).not.toBe(monthShortLabels('en')[0]);
   });
 
+  describe('whole-year option (allowFullYear)', () => {
+    it('is absent by default, so the Budgets grid stays twelve months', async () => {
+      const { queryByTestId } = await setup();
+      expect(queryByTestId('month-picker-full-year')).toBeNull();
+    });
+
+    it('offers the browsed year and reports it as a YYYY-full key', async () => {
+      const onSelect = jest.fn();
+      const onClose = jest.fn();
+      const { getByTestId } = await setup({ allowFullYear: true, onSelect, onClose });
+
+      await press(getByTestId('month-picker-full-year'));
+
+      expect(onSelect).toHaveBeenCalledWith('2026-full');
+      expect(onClose).toHaveBeenCalledTimes(1);
+    });
+
+    // The stepper above the grid is what widens the browse, and the year cell
+    // must follow it rather than the year of the current selection.
+    it('follows the year stepper', async () => {
+      const onSelect = jest.fn();
+      const { getByTestId } = await setup({ allowFullYear: true, onSelect });
+
+      await press(getByTestId('month-picker-prev-year'));
+      await press(getByTestId('month-picker-full-year'));
+
+      expect(onSelect).toHaveBeenCalledWith('2025-full');
+    });
+
+    it('marks a whole-year scope as the selection, and no month with it', async () => {
+      const { getByTestId } = await setup({ allowFullYear: true, monthKey: '2026-full' });
+
+      expect(getByTestId('month-picker-full-year').props.accessibilityState.selected).toBe(true);
+      expect(getByTestId('month-picker-month-2026-03').props.accessibilityState.selected).toBe(false);
+    });
+
+    it('does not mark the year of a month scope as selected', async () => {
+      const { getByTestId } = await setup({ allowFullYear: true, monthKey: '2026-03' });
+
+      expect(getByTestId('month-picker-full-year').props.accessibilityState.selected).toBe(false);
+      expect(getByTestId('month-picker-month-2026-03').props.accessibilityState.selected).toBe(true);
+    });
+
+    // A year browsed away from the selected one is not the selection either.
+    it('does not mark another year as selected while one year is scoped', async () => {
+      const { getByTestId } = await setup({ allowFullYear: true, monthKey: '2026-full' });
+
+      await press(getByTestId('month-picker-prev-year'));
+
+      expect(getByTestId('month-picker-full-year').props.accessibilityState.selected).toBe(false);
+    });
+  });
+
   it('dismisses on a tap outside the sheet', async () => {
     const onClose = jest.fn();
     const { getByLabelText } = await setup({ onClose });

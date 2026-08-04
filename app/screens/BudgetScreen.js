@@ -1,8 +1,7 @@
 import React, { useState, useEffect, useMemo, useCallback, useRef } from 'react';
-import { View, StyleSheet, FlatList, Pressable } from 'react-native';
+import { View, StyleSheet, FlatList } from 'react-native';
 import Animated, { useSharedValue, useAnimatedStyle, withTiming } from 'react-native-reanimated';
 import { Text, Snackbar } from 'react-native-paper';
-import Icon from '@expo/vector-icons/MaterialCommunityIcons';
 import { useThemeColors } from '../contexts/ThemeColorsContext';
 import { useLocalization } from '../contexts/LocalizationContext';
 import { useBudgetsData } from '../contexts/BudgetsDataContext';
@@ -11,11 +10,11 @@ import { useAccountsData } from '../contexts/AccountsDataContext';
 import MonthlyPlanSection from '../components/budgets/MonthlyPlanSection';
 import MonthPickerSheet from '../components/budgets/MonthPickerSheet';
 import CurrencySheet from '../components/CurrencySheet';
+import PeriodHeader from '../components/PeriodHeader';
 import AddFAB from '../components/AddFAB';
 import LoadingView from '../components/LoadingView';
 import * as Currency from '../services/currency';
-import { BORDER_RADIUS, FONT_SIZE, SPACING } from '../styles/designTokens';
-import currencyMeta from '../../assets/currencies.json';
+import { FONT_SIZE, SPACING } from '../styles/designTokens';
 import { currentMonthKey, addMonths, formatMonthLabel } from '../utils/monthUtils';
 import { TIMING_ENTER } from '../utils/motion';
 
@@ -188,13 +187,6 @@ const BudgetScreen = () => {
   // right-aligned across two lines with Cancel among them, no names, and nothing
   // marking the one currently in force. See CurrencySheet.
   const [currencySheetVisible, setCurrencySheetVisible] = useState(false);
-  // Blank for anything the catalogue has no symbol for, and blank when the symbol
-  // *is* the code (CHF, and every currency the catalogue lists that way) — a chip
-  // reading "CHF CHF" is worse than one reading "CHF".
-  const selectedSymbol = useMemo(() => {
-    const symbol = currencyMeta[selectedCurrency]?.symbol;
-    return symbol && symbol !== selectedCurrency ? symbol : '';
-  }, [selectedCurrency]);
   const handleOpenCurrencyPicker = useCallback(() => setCurrencySheetVisible(true), []);
   const handleCloseCurrencyPicker = useCallback(() => setCurrencySheetVisible(false), []);
 
@@ -226,126 +218,36 @@ const BudgetScreen = () => {
 
   const handleToggleConvert = useCallback(() => setConvertAllBudgets(prev => !prev), [setConvertAllBudgets]);
 
-  // Sticky month header — kept outside the FlatList so it stays visible while the
-  // plan content below scrolls. Drives the monthly plan section.
+  // Sticky month header — kept outside the FlatList so it stays visible while
+  // the plan content below scrolls. The header itself is shared with the Graphs
+  // tab (components/PeriodHeader); what belongs to this screen alone is the
+  // month's headline figure, which rides inside it as its children.
+  //
+  // That figure used to sit at the very bottom of the plan card in 14px muted
+  // text, below every row and the allocated/actual totals — the one number a
+  // person acts on, placed where they would reach it last. Here it is always on
+  // screen, whatever the list is scrolled to.
   const monthHeader = useMemo(() => (
-    <View style={[styles.monthHeaderContainer, { backgroundColor: colors.background }]} testID="budget-month-header">
-      {/* Three regions, the outer two both `flex: 1`: whatever they hold, the
-          month name between them stays on the screen's centre line. The row is
-          the pager and nothing else — both arrows and the month they step, with
-          no third control competing for the thumb that works its outer edges. */}
-      <View style={styles.monthHeaderRow}>
-        <View style={styles.navSlot}>
-          <Pressable
-            onPress={handlePrevMonth}
-            hitSlop={8}
-            style={styles.navButton}
-            accessibilityRole="button"
-            accessibilityLabel={t('previous_month')}
-            testID="budget-prev-month"
-          >
-            <Icon name="chevron-left" size={26} color={colors.text} />
-          </Pressable>
-        </View>
-        {/* Fix 4: the screen never unmounts across tab switches, so a user who
-            wanders off-month and returns later needs an explicit, visible way
-            back — silently auto-resetting the month would be surprising.
-            It used to be a labelled button on a row of its own under the title,
-            which pushed the hero figure and the whole plan down by ~22dp the
-            moment you stepped one month back — the content shifting under the
-            thumb that navigated. Now it is a glyph beside the label, in a slot
-            mirrored on the other side so the month name stays on the same
-            centre line whether or not the button is up. */}
-        <View style={styles.monthTitleWrap}>
-          {!isCurrentMonth && <View style={styles.jumpSlot} />}
-          {/* The month name is the tap target for the year grid. The chevron is
-              what says so — without it the only pressable thing in the header
-              that is not a glyph would look like a caption. It rides inside the
-              same box as the label rather than in a slot of its own, so what the
-              equal end slots centre is the name-plus-chevron the user reaches
-              for, which is how every "tap the title" header is built. */}
-          <Pressable
-            onPress={handleOpenMonthPicker}
-            hitSlop={8}
-            style={styles.monthTitleButton}
-            accessibilityRole="button"
-            accessibilityLabel={`${t('select_month')}: ${formatMonthLabel(month, language)}`}
-            testID="budget-month-picker"
-          >
-            <Text
-              style={[styles.monthTitle, { color: colors.text }]}
-              numberOfLines={1}
-              testID="budget-month-label"
-            >
-              {formatMonthLabel(month, language)}
-            </Text>
-            <Icon
-              name="chevron-down"
-              size={18}
-              color={monthPickerVisible ? colors.primary : colors.mutedText}
-            />
-          </Pressable>
-          {!isCurrentMonth && (
-            <Pressable
-              onPress={handleJumpToCurrentMonth}
-              style={styles.jumpSlot}
-              // The glyph's own box is 26×18; the slop is what brings the target
-              // up to a thumb's worth without widening the slot the label is
-              // centred against.
-              hitSlop={12}
-              accessibilityRole="button"
-              accessibilityLabel={t('jump_to_current_period')}
-              testID="budget-jump-current"
-            >
-              <Icon name="calendar-today" size={18} color={colors.primary} />
-            </Pressable>
-          )}
-        </View>
-        <View style={[styles.navSlot, styles.navSlotEnd]}>
-          <Pressable
-            onPress={handleNextMonth}
-            hitSlop={8}
-            style={styles.navButton}
-            accessibilityRole="button"
-            accessibilityLabel={t('next_month')}
-            testID="budget-next-month"
-          >
-            <Icon name="chevron-right" size={26} color={colors.text} />
-          </Pressable>
-        </View>
-      </View>
-      {/* The chip names the unit the whole screen is read in — the month's
-          co-scope — so it sits directly under the month name on the same centre
-          line, reading as the title's second line rather than as one more thing
-          on the pager row. Centred and at the month's own weight, the two lines
-          are the scope of everything underneath. It carries the currency's mark
-          as well as its code, and goes tonal while its sheet is open. */}
-      {currencies.length > 1 && (
-        <View style={styles.currencyRow}>
-          <Pressable
-            onPress={handleOpenCurrencyPicker}
-            style={[styles.currencyChip, {
-              borderColor: currencySheetVisible ? colors.primary : colors.border,
-              backgroundColor: currencySheetVisible ? colors.primary + '1F' : undefined,
-            }]}
-            android_ripple={{ color: colors.primary + '1F' }}
-            hitSlop={6}
-            accessibilityRole="button"
-            accessibilityLabel={`${t('currency')}: ${selectedCurrency}`}
-            testID="budget-currency-chip"
-          >
-            {!!selectedSymbol && (
-              <Text style={[styles.currencySymbol, { color: colors.mutedText }]}>{selectedSymbol}</Text>
-            )}
-            <Text style={[styles.currencyChipText, { color: colors.text }]}>{selectedCurrency}</Text>
-            <Icon name="chevron-down" size={16} color={colors.mutedText} />
-          </Pressable>
-        </View>
-      )}
-      {/* The month's headline figure. It used to sit at the very bottom of the
-          plan card in 14px muted text, below every row and the allocated/actual
-          totals — the one number a person acts on, placed where they would reach
-          it last. Here it is always on screen, whatever the list is scrolled to. */}
+    <PeriodHeader
+      label={formatMonthLabel(month, language)}
+      onPrev={handlePrevMonth}
+      onNext={handleNextMonth}
+      prevLabel={t('previous_month')}
+      nextLabel={t('next_month')}
+      onPressTitle={handleOpenMonthPicker}
+      titleLabel={`${t('select_month')}: ${formatMonthLabel(month, language)}`}
+      titleActive={monthPickerVisible}
+      showJumpToCurrent={!isCurrentMonth}
+      onJumpToCurrent={handleJumpToCurrentMonth}
+      jumpLabel={t('jump_to_current_period')}
+      currencies={currencies}
+      selectedCurrency={selectedCurrency}
+      onPressCurrency={handleOpenCurrencyPicker}
+      currencyActive={currencySheetVisible}
+      currencyLabel={`${t('currency')}: ${selectedCurrency}`}
+      colors={colors}
+      testIDPrefix="budget-month"
+    >
       <View style={styles.heroRow}>
         <View style={styles.heroFigure}>
           <Text style={[styles.heroLabel, { color: colors.mutedText }]} numberOfLines={1}>
@@ -391,10 +293,9 @@ const BudgetScreen = () => {
           )}
         </View>
       </View>
-    </View>
-  ), [colors.background, colors.text, colors.primary, colors.mutedText, colors.border,
-    colors.overspend, colors.surface, month, isCurrentMonth, t, language, planTotals,
-    currencies.length, selectedCurrency, selectedSymbol, currencySheetVisible,
+    </PeriodHeader>
+  ), [colors, month, isCurrentMonth, t, language, planTotals,
+    currencies, selectedCurrency, currencySheetVisible,
     monthPickerVisible, handleOpenMonthPicker,
     handleOpenCurrencyPicker, handlePrevMonth, handleNextMonth, handleJumpToCurrentMonth]);
 
@@ -481,37 +382,6 @@ const styles = StyleSheet.create({
   container: {
     flex: 1,
   },
-  // Set against the month title (17/700) rather than against the hero's
-  // sub-labels: the chip is the title block's second line, not a caption on it.
-  currencyChip: {
-    alignItems: 'center',
-    borderRadius: BORDER_RADIUS.pill,
-    borderWidth: 1,
-    flexDirection: 'row',
-    flexShrink: 0,
-    gap: 3,
-    height: 34,
-    // The ripple is drawn by the platform on the view's own rectangle, so
-    // without this it spills past the pill's rounded ends.
-    overflow: 'hidden',
-    paddingHorizontal: SPACING.md,
-  },
-  currencyChipText: {
-    fontSize: 15,
-    fontWeight: '700',
-  },
-  // Its own centred row under the pager, mounted only when there is more than
-  // one account currency to pick between — with a single one there is nothing to
-  // choose, and the month row runs straight into the hero figure instead of over
-  // an empty band.
-  currencyRow: {
-    alignItems: 'center',
-    marginTop: SPACING.sm,
-  },
-  currencySymbol: {
-    fontSize: 15,
-    fontWeight: '700',
-  },
   heroFigure: {
     flexShrink: 1,
   },
@@ -535,13 +405,6 @@ const styles = StyleSheet.create({
     fontWeight: '700',
     letterSpacing: -0.5,
   },
-  // Both sides of the label reserve the same box, so mounting the jump button
-  // never moves the month name off centre.
-  jumpSlot: {
-    alignItems: 'center',
-    justifyContent: 'center',
-    width: 26,
-  },
   listContent: {
     flexGrow: 1,
     // Clears the tab bar and the FAB. It was 260 to also clear the floating
@@ -550,51 +413,6 @@ const styles = StyleSheet.create({
     paddingBottom: 180,
     paddingHorizontal: SPACING.md,
     paddingTop: SPACING.md,
-  },
-  monthHeaderContainer: {
-    paddingBottom: SPACING.sm,
-    paddingHorizontal: SPACING.md,
-    paddingTop: SPACING.md,
-  },
-  monthHeaderRow: {
-    alignItems: 'center',
-    flexDirection: 'row',
-    justifyContent: 'space-between',
-  },
-  monthTitle: {
-    flexShrink: 1,
-    fontSize: 17,
-    fontWeight: '700',
-  },
-  monthTitleButton: {
-    alignItems: 'center',
-    flexDirection: 'row',
-    flexShrink: 1,
-    gap: 2,
-  },
-  // Sized by its own content and centred by the equal `flex: 1` slots on either
-  // side of it, not by a flex of its own — a `flex: 1` here would centre the
-  // title in the space the chip leaves over, which is not the screen's centre.
-  monthTitleWrap: {
-    alignItems: 'center',
-    flexDirection: 'row',
-    flexShrink: 1,
-    gap: 2,
-    justifyContent: 'center',
-  },
-  navButton: {
-    padding: 4,
-  },
-  // The two end regions of the month row. Equal by construction, whatever they
-  // hold: that is what keeps the month name on the screen's centre line even
-  // when the two sides' contents are not the same width.
-  navSlot: {
-    alignItems: 'center',
-    flex: 1,
-    flexDirection: 'row',
-  },
-  navSlotEnd: {
-    justifyContent: 'flex-end',
   },
   // The animated wrapper sits between the screen's column and the FlatList, so
   // it has to pass the remaining height through or the list collapses to nothing.
