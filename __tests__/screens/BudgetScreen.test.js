@@ -204,16 +204,15 @@ describe('BudgetScreen', () => {
       expect(getByTestId('budget-next-month')).toBeTruthy();
     });
 
-    // The two month glyphs are one pager, and the row's outer edges are where a
-    // thumb reaches for them: the currency chip goes between the left arrow and
-    // the month, never outboard of either arrow.
-    it('keeps the currency chip inside the month arrows, ahead of the month name', async () => {
+    // The month row is the pager and nothing else: the currency chip sits on its
+    // own line below it, after both arrows, and above the hero figure.
+    it('renders the currency chip below the month row and above the hero figure', async () => {
       const { getByTestId, toJSON } = await render(<BudgetScreen />);
       await waitFor(() => expect(getByTestId('budget-currency-chip')).toBeTruthy());
 
       const rendered = collectTestIDs(toJSON());
-      const order = ['budget-prev-month', 'budget-currency-chip', 'budget-month-label', 'budget-next-month']
-        .map(id => rendered.indexOf(id));
+      const order = ['budget-prev-month', 'budget-month-label', 'budget-next-month',
+        'budget-currency-chip', 'budget-remainder'].map(id => rendered.indexOf(id));
 
       expect(order.every(i => i >= 0)).toBe(true);
       expect(order).toEqual([...order].sort((a, b) => a - b));

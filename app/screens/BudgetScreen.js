@@ -231,15 +231,9 @@ const BudgetScreen = () => {
   const monthHeader = useMemo(() => (
     <View style={[styles.monthHeaderContainer, { backgroundColor: colors.background }]} testID="budget-month-header">
       {/* Three regions, the outer two both `flex: 1`: whatever they hold, the
-          month name between them stays on the screen's centre line. That is what
-          lets the currency chip sit up here — beside the month, the screen's
-          other whole-tab scope — without dragging the title off centre the way
-          appending it to a two-item row would.
-
-          The chip is inside the month arrows, not outboard of them: the two
-          glyphs are one pager and the row's outer edges are where a user reaches
-          for them, so a control parked past the right arrow makes stepping a
-          month a longer reach and reads as if it belonged to the pager. */}
+          month name between them stays on the screen's centre line. The row is
+          the pager and nothing else — both arrows and the month they step, with
+          no third control competing for the thumb that works its outer edges. */}
       <View style={styles.monthHeaderRow}>
         <View style={styles.navSlot}>
           <Pressable
@@ -252,31 +246,6 @@ const BudgetScreen = () => {
           >
             <Icon name="chevron-left" size={26} color={colors.text} />
           </Pressable>
-          {/* The chip names the unit the whole screen is read in, so it belongs
-              on the month's line rather than a row below it, and it is set at
-              the month's own weight — the two together are the scope of
-              everything underneath. It carries the currency's mark as well as
-              its code, and goes tonal while its sheet is open. */}
-          {currencies.length > 1 && (
-            <Pressable
-              onPress={handleOpenCurrencyPicker}
-              style={[styles.currencyChip, {
-                borderColor: currencySheetVisible ? colors.primary : colors.border,
-                backgroundColor: currencySheetVisible ? colors.primary + '1F' : undefined,
-              }]}
-              android_ripple={{ color: colors.primary + '1F' }}
-              hitSlop={6}
-              accessibilityRole="button"
-              accessibilityLabel={`${t('currency')}: ${selectedCurrency}`}
-              testID="budget-currency-chip"
-            >
-              {!!selectedSymbol && (
-                <Text style={[styles.currencySymbol, { color: colors.mutedText }]}>{selectedSymbol}</Text>
-              )}
-              <Text style={[styles.currencyChipText, { color: colors.text }]}>{selectedCurrency}</Text>
-              <Icon name="chevron-down" size={16} color={colors.mutedText} />
-            </Pressable>
-          )}
         </View>
         {/* Fix 4: the screen never unmounts across tab switches, so a user who
             wanders off-month and returns later needs an explicit, visible way
@@ -345,6 +314,34 @@ const BudgetScreen = () => {
           </Pressable>
         </View>
       </View>
+      {/* The chip names the unit the whole screen is read in — the month's
+          co-scope — so it sits directly under the month name on the same centre
+          line, reading as the title's second line rather than as one more thing
+          on the pager row. Centred and at the month's own weight, the two lines
+          are the scope of everything underneath. It carries the currency's mark
+          as well as its code, and goes tonal while its sheet is open. */}
+      {currencies.length > 1 && (
+        <View style={styles.currencyRow}>
+          <Pressable
+            onPress={handleOpenCurrencyPicker}
+            style={[styles.currencyChip, {
+              borderColor: currencySheetVisible ? colors.primary : colors.border,
+              backgroundColor: currencySheetVisible ? colors.primary + '1F' : undefined,
+            }]}
+            android_ripple={{ color: colors.primary + '1F' }}
+            hitSlop={6}
+            accessibilityRole="button"
+            accessibilityLabel={`${t('currency')}: ${selectedCurrency}`}
+            testID="budget-currency-chip"
+          >
+            {!!selectedSymbol && (
+              <Text style={[styles.currencySymbol, { color: colors.mutedText }]}>{selectedSymbol}</Text>
+            )}
+            <Text style={[styles.currencyChipText, { color: colors.text }]}>{selectedCurrency}</Text>
+            <Icon name="chevron-down" size={16} color={colors.mutedText} />
+          </Pressable>
+        </View>
+      )}
       {/* The month's headline figure. It used to sit at the very bottom of the
           plan card in 14px muted text, below every row and the allocated/actual
           totals — the one number a person acts on, placed where they would reach
@@ -367,7 +364,7 @@ const BudgetScreen = () => {
               numberOfLines={1}
               testID="budget-remainder"
             >
-              {/* The code hangs off the hero only when there is no chip beside
+              {/* The code hangs off the hero only when there is no chip above
                   it to carry it — with a chip, printing it here says "RUB" twice
                   a centimetre apart. With a single account currency there is no
                   chip, and then this is the only place the screen names its
@@ -485,7 +482,7 @@ const styles = StyleSheet.create({
     flex: 1,
   },
   // Set against the month title (17/700) rather than against the hero's
-  // sub-labels: the chip sits on that line now and reads as its peer.
+  // sub-labels: the chip is the title block's second line, not a caption on it.
   currencyChip: {
     alignItems: 'center',
     borderRadius: BORDER_RADIUS.pill,
@@ -502,6 +499,14 @@ const styles = StyleSheet.create({
   currencyChipText: {
     fontSize: 15,
     fontWeight: '700',
+  },
+  // Its own centred row under the pager, mounted only when there is more than
+  // one account currency to pick between — with a single one there is nothing to
+  // choose, and the month row runs straight into the hero figure instead of over
+  // an empty band.
+  currencyRow: {
+    alignItems: 'center',
+    marginTop: SPACING.sm,
   },
   currencySymbol: {
     fontSize: 15,
@@ -581,12 +586,12 @@ const styles = StyleSheet.create({
     padding: 4,
   },
   // The two end regions of the month row. Equal by construction, whatever they
-  // hold: that is what keeps the month name centred with a chip on one side.
+  // hold: that is what keeps the month name on the screen's centre line even
+  // when the two sides' contents are not the same width.
   navSlot: {
     alignItems: 'center',
     flex: 1,
     flexDirection: 'row',
-    gap: SPACING.xs,
   },
   navSlotEnd: {
     justifyContent: 'flex-end',
