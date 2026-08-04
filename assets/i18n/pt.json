@@ -592,6 +592,8 @@
   "relink_target": "Destino excluído — toque para revincular",
   "previous_month": "Mês anterior",
   "next_month": "Próximo mês",
+  "previous_year": "Ano anterior",
+  "next_year": "Próximo ano",
   "recurring_allocation": "Recorrente",
   "group": "Grupo",
   "no_group": "Sem grupo",

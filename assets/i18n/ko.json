@@ -592,6 +592,8 @@
   "relink_target": "대상이 삭제됨 — 눌러서 다시 연결",
   "previous_month": "이전 달",
   "next_month": "다음 달",
+  "previous_year": "이전 해",
+  "next_year": "다음 해",
   "recurring_allocation": "반복",
   "group": "그룹",
   "no_group": "그룹 없음",

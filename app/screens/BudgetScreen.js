@@ -9,6 +9,7 @@ import { useBudgetsData } from '../contexts/BudgetsDataContext';
 import { useCategories } from '../contexts/CategoriesContext';
 import { useAccountsData } from '../contexts/AccountsDataContext';
 import MonthlyPlanSection from '../components/budgets/MonthlyPlanSection';
+import MonthPickerSheet from '../components/budgets/MonthPickerSheet';
 import CurrencySheet from '../components/CurrencySheet';
 import AddFAB from '../components/AddFAB';
 import LoadingView from '../components/LoadingView';
@@ -125,6 +126,23 @@ const BudgetScreen = () => {
     const key = currentMonthKey();
     return key === s.key ? s : { key, dir: key > s.key ? 1 : -1 };
   }), []);
+
+  // The arrows are a stepper, which is the right shape for the neighbouring
+  // month and the wrong one for a month half a year off — eight taps, each
+  // re-rendering and re-animating the whole plan on the way past. Tapping the
+  // month name itself opens a grid of the year's twelve; it was the only thing
+  // in that header that did nothing when pressed, and it is what a person
+  // reaches for when they want a different month.
+  //
+  // Direction is read off the keys exactly as the jump does ('YYYY-MM' string
+  // compare orders them), and picking the month already on screen returns the
+  // same state object so the plan neither re-renders nor animates for it.
+  const [monthPickerVisible, setMonthPickerVisible] = useState(false);
+  const handleOpenMonthPicker = useCallback(() => setMonthPickerVisible(true), []);
+  const handleCloseMonthPicker = useCallback(() => setMonthPickerVisible(false), []);
+  const handlePickMonth = useCallback((key) => setMonthState(s => (
+    key === s.key ? s : { key, dir: key > s.key ? 1 : -1 }
+  )), []);
 
   // Month navigation is the Budgets tab's primary axis, and it was the only
   // navigation in the app with no spatial story: the sticky header said a new
@@ -271,13 +289,33 @@ const BudgetScreen = () => {
             centre line whether or not the button is up. */}
         <View style={styles.monthTitleWrap}>
           {!isCurrentMonth && <View style={styles.jumpSlot} />}
-          <Text
-            style={[styles.monthTitle, { color: colors.text }]}
-            numberOfLines={1}
-            testID="budget-month-label"
+          {/* The month name is the tap target for the year grid. The chevron is
+              what says so — without it the only pressable thing in the header
+              that is not a glyph would look like a caption. It rides inside the
+              same box as the label rather than in a slot of its own, so what the
+              equal end slots centre is the name-plus-chevron the user reaches
+              for, which is how every "tap the title" header is built. */}
+          <Pressable
+            onPress={handleOpenMonthPicker}
+            hitSlop={8}
+            style={styles.monthTitleButton}
+            accessibilityRole="button"
+            accessibilityLabel={`${t('select_month')}: ${formatMonthLabel(month, language)}`}
+            testID="budget-month-picker"
           >
-            {formatMonthLabel(month, language)}
-          </Text>
+            <Text
+              style={[styles.monthTitle, { color: colors.text }]}
+              numberOfLines={1}
+              testID="budget-month-label"
+            >
+              {formatMonthLabel(month, language)}
+            </Text>
+            <Icon
+              name="chevron-down"
+              size={18}
+              color={monthPickerVisible ? colors.primary : colors.mutedText}
+            />
+          </Pressable>
           {!isCurrentMonth && (
             <Pressable
               onPress={handleJumpToCurrentMonth}
@@ -360,6 +398,7 @@ const BudgetScreen = () => {
   ), [colors.background, colors.text, colors.primary, colors.mutedText, colors.border,
     colors.overspend, colors.surface, month, isCurrentMonth, t, language, planTotals,
     currencies.length, selectedCurrency, selectedSymbol, currencySheetVisible,
+    monthPickerVisible, handleOpenMonthPicker,
     handleOpenCurrencyPicker, handlePrevMonth, handleNextMonth, handleJumpToCurrentMonth]);
 
   const listHeader = useMemo(() => (
@@ -397,6 +436,17 @@ const BudgetScreen = () => {
           contentContainerStyle={styles.listContent}
         />
       </Animated.View>
+
+      <MonthPickerSheet
+        visible={monthPickerVisible}
+        monthKey={month}
+        onSelect={handlePickMonth}
+        onClose={handleCloseMonthPicker}
+        colors={colors}
+        t={t}
+        language={language}
+        testIDPrefix="budget-month-picker"
+      />
 
       <CurrencySheet
         visible={currencySheetVisible}
@@ -510,6 +560,12 @@ const styles = StyleSheet.create({
     flexShrink: 1,
     fontSize: 17,
     fontWeight: '700',
+  },
+  monthTitleButton: {
+    alignItems: 'center',
+    flexDirection: 'row',
+    flexShrink: 1,
+    gap: 2,
   },
   // Sized by its own content and centred by the equal `flex: 1` slots on either
   // side of it, not by a flex of its own — a `flex: 1` here would centre the

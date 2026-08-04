@@ -390,6 +390,81 @@ describe('BudgetScreen', () => {
     });
   });
 
+  // The arrows are a stepper — right for the neighbouring month, wrong for one
+  // half a year off, which took a tap per month travelled with the whole plan
+  // re-rendering on the way past. The month name is the tap target for a grid
+  // of the year's twelve.
+  describe('Month picker', () => {
+    it('opens a month grid from the month name', async () => {
+      const { getByTestId, queryByTestId } = await render(<BudgetScreen />);
+      await waitFor(() => expect(getByTestId('budget-month-picker')).toBeTruthy());
+      expect(queryByTestId('budget-month-picker-year')).toBeNull();
+
+      fireEvent.press(getByTestId('budget-month-picker'));
+
+      await waitFor(() => expect(getByTestId('budget-month-picker-year')).toBeTruthy());
+      // Seeded on the scoped month's own year, with its cell marked.
+      const month = capturedSectionProps.month;
+      expect(getByTestId(`budget-month-picker-month-${month}`).props.accessibilityState.selected)
+        .toBe(true);
+    });
+
+    it('scopes the screen to the picked month and closes the sheet', async () => {
+      const { getByTestId, queryByTestId } = await render(<BudgetScreen />);
+      await waitFor(() => expect(capturedSectionProps).toBeTruthy());
+      const initialMonth = capturedSectionProps.month;
+      const initialLabel = getByTestId('budget-month-label').props.children;
+      const year = initialMonth.split('-')[0];
+      // A month the stepper would need several taps to reach.
+      const target = initialMonth.endsWith('-01') ? `${year}-09` : `${year}-01`;
+
+      fireEvent.press(getByTestId('budget-month-picker'));
+      await waitFor(() => expect(getByTestId(`budget-month-picker-month-${target}`)).toBeTruthy());
+      fireEvent.press(getByTestId(`budget-month-picker-month-${target}`));
+
+      await waitFor(() => expect(capturedSectionProps.month).toBe(target));
+      expect(getByTestId('budget-month-label').props.children).not.toBe(initialLabel);
+      expect(queryByTestId('budget-month-picker-year')).toBeNull();
+      // Off the current month, so the jump-back affordance comes up as it does
+      // for the arrows.
+      expect(getByTestId('budget-jump-current')).toBeTruthy();
+    });
+
+    it('travels across years from the grid', async () => {
+      const { getByTestId } = await render(<BudgetScreen />);
+      await waitFor(() => expect(capturedSectionProps).toBeTruthy());
+      const year = Number(capturedSectionProps.month.split('-')[0]);
+
+      fireEvent.press(getByTestId('budget-month-picker'));
+      await waitFor(() => expect(getByTestId('budget-month-picker-prev-year')).toBeTruthy());
+      fireEvent.press(getByTestId('budget-month-picker-prev-year'));
+      await waitFor(() => expect(getByTestId(`budget-month-picker-month-${year - 1}-12`)).toBeTruthy());
+      fireEvent.press(getByTestId(`budget-month-picker-month-${year - 1}-12`));
+
+      await waitFor(() => expect(capturedSectionProps.month).toBe(`${year - 1}-12`));
+    });
+
+    // A tap that changes nothing must not send the plan through the month
+    // transition, so re-picking the scoped month has to return the very same
+    // state object rather than an equal one.
+    it('leaves the month alone when the one already on screen is picked', async () => {
+      const { getByTestId, queryByTestId } = await render(<BudgetScreen />);
+      await waitFor(() => expect(capturedSectionProps).toBeTruthy());
+      const month = capturedSectionProps.month;
+      const label = getByTestId('budget-month-label').props.children;
+
+      fireEvent.press(getByTestId('budget-month-picker'));
+      await waitFor(() => expect(getByTestId(`budget-month-picker-month-${month}`)).toBeTruthy());
+      fireEvent.press(getByTestId(`budget-month-picker-month-${month}`));
+
+      await waitFor(() => expect(queryByTestId('budget-month-picker-year')).toBeNull());
+      expect(capturedSectionProps.month).toBe(month);
+      expect(getByTestId('budget-month-label').props.children).toBe(label);
+      // Still the current month, so no jump-back affordance appeared.
+      expect(queryByTestId('budget-jump-current')).toBeNull();
+    });
+  });
+
   describe('Allocation creation (Budgets v3 phase 2)', () => {
     // The old category-picker + BudgetModal flow is gone; the FAB now opens
     // MonthlyPlanSection's own "add allocation" flow via a ref, so it needs no

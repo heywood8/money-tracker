@@ -592,6 +592,8 @@
   "relink_target": "対象が削除されました — タップして再リンク",
   "previous_month": "前の月",
   "next_month": "次の月",
+  "previous_year": "前の年",
+  "next_year": "次の年",
   "recurring_allocation": "繰り返し",
   "group": "グループ",
   "no_group": "グループなし",
