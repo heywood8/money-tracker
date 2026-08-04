@@ -1,5 +1,12 @@
 # Changelog
 
+## [0.261.0](https://github.com/heywood8/money-tracker/compare/penny-v0.260.1...penny-v0.261.0) (2026-08-04)
+
+
+### Features
+
+* **graphs:** swap summary tabs so income sits on the right ([#1567](https://github.com/heywood8/money-tracker/issues/1567)) ([204a036](https://github.com/heywood8/money-tracker/commit/204a036210f06224d55cc582a0e71500680e7c1b))
+
 ## [0.260.1](https://github.com/heywood8/money-tracker/compare/penny-v0.260.0...penny-v0.260.1) (2026-08-04)
 
 
