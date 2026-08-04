@@ -777,6 +777,17 @@ describe('GraphsScreen', () => {
       expect(getByTestId('expense-summary-card')).toBeTruthy();
     });
 
+    // Expense sits on the left, income on the right — the strip reads in the same
+    // order as the rest of the app's money flow, and the layout must not drift back.
+    it('renders the expense tab before the income tab', async () => {
+      const GraphsScreen = require('../../app/screens/GraphsScreen').default;
+      const { getAllByTestId } = await render(<GraphsScreen />);
+
+      const tabOrder = getAllByTestId(/-summary-card$/).map(node => node.props.testID);
+
+      expect(tabOrder).toEqual(['expense-summary-card', 'income-summary-card']);
+    });
+
     it('keeps expense card in tree after pressing income card', async () => {
       const GraphsScreen = require('../../app/screens/GraphsScreen').default;
       const { getByTestId } = await render(<GraphsScreen />);

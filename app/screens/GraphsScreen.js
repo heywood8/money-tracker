@@ -674,8 +674,9 @@ const GraphsScreen = () => {
             </View>
           )}
 
-          {/* Income/expense summary — one panel, two tabs. Collapsed by default:
-              only the tab strip shows, each tab tappable across its full width. */}
+          {/* Expense/income summary — one panel, two tabs (expense left, income
+              right). Collapsed by default: only the tab strip shows, each tab
+              tappable across its full width. */}
           <Animated.View
             style={[
               styles.summaryPanel,
@@ -684,16 +685,6 @@ const GraphsScreen = () => {
             ]}
           >
             <View style={styles.tabsRow}>
-              <IncomeSummaryCard
-                colors={colors}
-                t={t}
-                loadingIncome={loadingIncome}
-                totalIncome={totalIncome}
-                selectedCurrency={selectedCurrency}
-                onPress={handleToggleIncome}
-                expanded={expandedCard === 'income'}
-              />
-              <View style={[styles.tabDivider, { backgroundColor: colors.border }]} />
               <ExpenseSummaryCard
                 colors={colors}
                 t={t}
@@ -702,6 +693,16 @@ const GraphsScreen = () => {
                 selectedCurrency={selectedCurrency}
                 onPress={handleToggleExpense}
                 expanded={expandedCard === 'expense'}
+              />
+              <View style={[styles.tabDivider, { backgroundColor: colors.border }]} />
+              <IncomeSummaryCard
+                colors={colors}
+                t={t}
+                loadingIncome={loadingIncome}
+                totalIncome={totalIncome}
+                selectedCurrency={selectedCurrency}
+                onPress={handleToggleIncome}
+                expanded={expandedCard === 'income'}
               />
             </View>
 
