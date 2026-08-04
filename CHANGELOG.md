@@ -1,5 +1,12 @@
 # Changelog
 
+## [0.260.0](https://github.com/heywood8/money-tracker/compare/penny-v0.259.1...penny-v0.260.0) (2026-08-04)
+
+
+### Features
+
+* **budgets:** open a month grid by tapping the month name ([#1563](https://github.com/heywood8/money-tracker/issues/1563)) ([2f1ca56](https://github.com/heywood8/money-tracker/commit/2f1ca56f6ae3d843202b7e38c1de4ff2486054df))
+
 ## [0.259.1](https://github.com/heywood8/money-tracker/compare/penny-v0.259.0...penny-v0.259.1) (2026-08-03)
 
 
