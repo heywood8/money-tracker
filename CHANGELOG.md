@@ -1,5 +1,12 @@
 # Changelog
 
+## [0.263.0](https://github.com/heywood8/money-tracker/compare/penny-v0.262.0...penny-v0.263.0) (2026-08-05)
+
+
+### Features
+
+* **budgets,graphs:** make the period header glass and move the remainder into the body ([#1571](https://github.com/heywood8/money-tracker/issues/1571)) ([fce2401](https://github.com/heywood8/money-tracker/commit/fce2401c77aed9c84cd03d30b88e64834d8a29e0))
+
 ## [0.262.0](https://github.com/heywood8/money-tracker/compare/penny-v0.261.0...penny-v0.262.0) (2026-08-05)
 
 
