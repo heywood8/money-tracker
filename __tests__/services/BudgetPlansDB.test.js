@@ -797,19 +797,18 @@ describe('BudgetPlansDB', () => {
       });
     });
 
-    // Regression: phase 3 stopped deleting a one-off line on execution (the line
-    // has to survive so the plan keeps measuring what it allocated). That removed
-    // the only thing keeping an executed one-off out of copyPlan, which clones with
-    // last_executed_month = NULL — i.e. re-adds finished business as PENDING,
-    // inflating the new month's allocation and offering a swipe that duplicates the
-    // operation. Executed lines are now filtered out of the copy source.
-    describe('executed lines are not carried into the new month', () => {
-      const executedFridge = {
+    // Regression: copyPlan used to skip any line stamped `last_executed_month`,
+    // left over from when a line could be executed as a one-tap operation. That
+    // feature is gone (operations come from notifications now), so a stamp is
+    // just stale data on a budget target and must not silently drop the target
+    // out of next month's plan.
+    describe('lines with a stale execution stamp are still copied', () => {
+      const stampedFridge = {
         id: 'l-fridge', plan_id: 'src', label: 'Buy fridge', amount: '50000', comment: null,
         category_id: 'c9', to_account_id: null, sort_order: 1, account_id: 'a1',
         last_executed_month: '2026-06',
       };
-      const pendingRent = {
+      const rent = {
         id: 'l-rent', plan_id: 'src', label: 'Rent', amount: '65000', comment: null,
         category_id: 'c1', to_account_id: null, sort_order: 0, account_id: null,
         last_executed_month: null,
@@ -822,38 +821,31 @@ describe('BudgetPlansDB', () => {
         queryAll.mockResolvedValue(lines);
       };
 
-      it('skips a line executed in the source month while still copying the pending ones', async () => {
-        arrangeCopy([pendingRent, executedFridge]);
+      it('copies every one-off line of the source month, stamped or not', async () => {
+        arrangeCopy([rent, stampedFridge]);
 
         await BudgetPlansDB.copyPlan('2026-06', '2026-07');
 
         const lineInserts = mockRunAsync.mock.calls
           .filter(([sql]) => sql.includes('INSERT INTO budget_plan_lines'));
-        expect(lineInserts).toHaveLength(1);
+        expect(lineInserts).toHaveLength(2);
         expect(lineInserts[0][1]).toContain('Rent');
-        expect(lineInserts[0][1]).not.toContain('Buy fridge');
+        expect(lineInserts[1][1]).toContain('Buy fridge');
       });
 
-      it('skips a line stamped with a month other than the source month (executed while browsing back)', async () => {
-        // executeLine stamps currentMonthKey(), not the plan's month, so a June
-        // line can carry a July stamp. Any stamp at all means "already done".
-        arrangeCopy([{ ...executedFridge, last_executed_month: '2026-07' }]);
+      // The retired columns are no longer written at all, so a clone cannot
+      // inherit a stamp (or an execution account) from the row it came from.
+      it('writes neither account_id nor last_executed_month on the clone', async () => {
+        arrangeCopy([stampedFridge]);
 
         await BudgetPlansDB.copyPlan('2026-06', '2026-07');
 
-        expect(mockRunAsync.mock.calls.filter(([sql]) => sql.includes('INSERT INTO budget_plan_lines')))
-          .toHaveLength(0);
-      });
-
-      it('copies a line whose execution was undone (stamp cleared back to NULL)', async () => {
-        arrangeCopy([{ ...executedFridge, last_executed_month: null }]);
-
-        await BudgetPlansDB.copyPlan('2026-06', '2026-07');
-
-        const lineInserts = mockRunAsync.mock.calls
-          .filter(([sql]) => sql.includes('INSERT INTO budget_plan_lines'));
-        expect(lineInserts).toHaveLength(1);
-        expect(lineInserts[0][1]).toContain('Buy fridge');
+        const [sql, params] = mockRunAsync.mock.calls
+          .find(([statement]) => statement.includes('INSERT INTO budget_plan_lines'));
+        expect(sql).not.toContain(', account_id');
+        expect(sql).not.toContain('last_executed_month');
+        expect(params).not.toContain('a1');
+        expect(params).not.toContain('2026-06');
       });
     });
   });
@@ -924,7 +916,7 @@ describe('BudgetPlansDB', () => {
     });
   });
   /* ────────────────────────────────────────────────────────────────────────
-     Budgets v3 phase 3: executable templates + income lines
+     Budgets v3 phase 3: line kinds + income lines
      ──────────────────────────────────────────────────────────────────────── */
 
   describe('Line kinds (phase 3)', () => {
@@ -959,22 +951,22 @@ describe('BudgetPlansDB', () => {
       const [category, transfer] = await BudgetPlansDB.getPlanLines('p1');
       expect(category.kind).toBe('expense');
       expect(transfer.kind).toBe('transfer');
-      // Neither carries a template, so neither is executable.
-      expect(category.hasTemplate).toBe(false);
-      expect(transfer.hasTemplate).toBe(false);
     });
 
-    it('maps the template fields and flags an executable line', async () => {
+    // The executable-template feature is retired: the columns survive in the
+    // schema so backups round-trip, but a mapped line must not surface them —
+    // anything reading `accountId` off a line would be reading a dead field.
+    it('does not surface the retired execution-template columns', async () => {
       queryAll.mockResolvedValue([{
         id: 'l1', plan_id: null, amount: '65000', category_id: 'c1', to_account_id: null,
         is_recurring: 1, currency: 'AMD', kind: 'expense', account_id: 4,
         last_executed_month: '2026-07',
       }]);
       const [line] = await BudgetPlansDB.getRecurringLines();
-      expect(line).toMatchObject({
-        kind: 'expense', accountId: 4, lastExecutedMonth: '2026-07', hasTemplate: true,
-      });
-      expect(BudgetPlansDB.isExecutable(line)).toBe(true);
+      expect(line).toMatchObject({ kind: 'expense', currency: 'AMD' });
+      expect(line).not.toHaveProperty('accountId');
+      expect(line).not.toHaveProperty('lastExecutedMonth');
+      expect(line).not.toHaveProperty('hasTemplate');
     });
 
     it('never marks a targetless income line as broken', async () => {
@@ -985,124 +977,6 @@ describe('BudgetPlansDB', () => {
       const [income, expense] = await BudgetPlansDB.getPlanLines('p1');
       expect(income.isBroken).toBe(false);
       expect(expense.isBroken).toBe(true);
-    });
-  });
-
-  describe('Executing a template (phase 3)', () => {
-    const template = (overrides = {}) => ({
-      id: 'l-tpl', amount: '65000', label: 'Rent', comment: null, kind: 'expense',
-      categoryId: 'cat1', toAccountId: null, accountId: 4, isRecurring: true,
-      lastExecutedMonth: null, hasTemplate: true, ...overrides,
-    });
-
-    it('refuses to execute a line with no execution account', async () => {
-      await expect(BudgetPlansDB.executeLine(template({ accountId: null })))
-        .rejects.toThrow('no account to execute from');
-      expect(executeTransaction).not.toHaveBeenCalled();
-    });
-
-    it('creates the operation and marks the line done in one transaction', async () => {
-      await BudgetPlansDB.executeLine(template());
-
-      expect(createOperationInTx).toHaveBeenCalledWith(
-        expect.anything(),
-        expect.objectContaining({
-          type: 'expense', amount: '65000', accountId: 4, categoryId: 'cat1',
-          toAccountId: null, description: 'Rent',
-        }),
-      );
-      const updates = mockRunAsync.mock.calls.filter(c => c[0].includes('UPDATE budget_plan_lines'));
-      expect(updates).toHaveLength(1);
-      // A recurring template survives its execution.
-      expect(mockRunAsync.mock.calls.some(c => c[0].includes('DELETE FROM budget_plan_lines'))).toBe(false);
-    });
-
-    // Regression: a one-off template used to be DELETED on execution (ported from
-    // the Planned tab). Because the same row is now the month's envelope, that
-    // made `allocated` shrink and the line's actual spending stop counting the
-    // moment the user paid — the month's total spending went DOWN after a payment.
-    it('keeps a one-off template once executed, marking it done instead', async () => {
-      await BudgetPlansDB.executeLine(template({ isRecurring: false }));
-      expect(mockRunAsync.mock.calls.some(c => c[0].includes('DELETE FROM budget_plan_lines'))).toBe(false);
-      const updates = mockRunAsync.mock.calls.filter(c => c[0].includes('UPDATE budget_plan_lines'));
-      expect(updates).toHaveLength(1);
-      expect(updates[0][1]).toEqual(expect.arrayContaining(['l-tpl']));
-    });
-
-    it('keeps a one-off template when marked done by hand', async () => {
-      await BudgetPlansDB.markLineExecuted(template({ isRecurring: false }));
-      expect(mockRunAsync.mock.calls.some(c => c[0].includes('DELETE FROM budget_plan_lines'))).toBe(false);
-    });
-
-    it('falls back to the caller-supplied name when the line has no label', async () => {
-      await BudgetPlansDB.executeLine(template({ label: null, comment: null }), 'Groceries');
-      expect(createOperationInTx).toHaveBeenCalledWith(
-        expect.anything(),
-        expect.objectContaining({ description: 'Groceries' }),
-      );
-    });
-
-    // `operations.description` is the delimited label list owned by labelUtils:
-    // a raw "|" would split one name into two labels, and a system prefix would
-    // hide the operation from the list and make it non-deletable.
-    it('sanitizes the description before persisting it', async () => {
-      await BudgetPlansDB.executeLine(template({ label: 'Rent | Category: rigged' }));
-      expect(createOperationInTx).toHaveBeenCalledWith(
-        expect.anything(),
-        expect.objectContaining({ description: 'Rent Category: rigged' }),
-      );
-    });
-
-    // Regression: the claim above was only half true — sanitizeLabel handled the
-    // "|" but did nothing about the system prefixes, so a real category named
-    // "Category: Groceries" (the shape a MoneyOK import produces) passed straight
-    // through and the created operation became invisible AND undeletable.
-    it('strips a leading system prefix from a real entity name', async () => {
-      await BudgetPlansDB.executeLine(template({ label: null, comment: null }), 'Category: Groceries');
-      expect(createOperationInTx).toHaveBeenCalledWith(
-        expect.anything(),
-        expect.objectContaining({ description: 'Groceries' }),
-      );
-    });
-
-    it('stores no description when the name is nothing but a system prefix', async () => {
-      await BudgetPlansDB.executeLine(template({ label: 'Account:' }));
-      expect(createOperationInTx).toHaveBeenCalledWith(
-        expect.anything(),
-        expect.objectContaining({ description: null }),
-      );
-    });
-
-    it('stores no description when neither the line nor the caller names it', async () => {
-      await BudgetPlansDB.executeLine(template({ label: null, comment: null }));
-      expect(createOperationInTx).toHaveBeenCalledWith(
-        expect.anything(),
-        expect.objectContaining({ description: null }),
-      );
-    });
-
-    it('creates a transfer operation for a transfer template', async () => {
-      await BudgetPlansDB.executeLine(template({
-        kind: 'transfer', categoryId: null, toAccountId: 9, label: 'To savings',
-      }));
-      expect(createOperationInTx).toHaveBeenCalledWith(
-        expect.anything(),
-        expect.objectContaining({ type: 'transfer', accountId: 4, toAccountId: 9 }),
-      );
-    });
-
-    it('marks a template done without creating an operation', async () => {
-      await BudgetPlansDB.markLineExecuted(template());
-      expect(createOperationInTx).not.toHaveBeenCalled();
-      expect(mockRunAsync.mock.calls.some(c => c[0].includes('UPDATE budget_plan_lines'))).toBe(true);
-    });
-
-    it('clears the executed mark on undo', async () => {
-      await BudgetPlansDB.unmarkLineExecuted('l-tpl');
-      expect(executeQuery).toHaveBeenCalledWith(
-        expect.stringContaining('last_executed_month = NULL'),
-        expect.arrayContaining(['l-tpl']),
-      );
     });
   });
 

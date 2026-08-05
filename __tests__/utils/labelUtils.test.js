@@ -47,9 +47,10 @@ describe('labelUtils', () => {
     });
   });
 
-  // Regression: executeLine (Budgets v3 phase 3) writes a plan line's name straight
-  // into operations.description. sanitizeLabel alone only guards the delimiter, so a
-  // real category named "Category: Groceries" (MoneyOK imports produce exactly this
+  // Regression: any caller writing an entity's own name straight into
+  // operations.description (the retired budget-line execution did exactly this)
+  // needs more than sanitizeLabel, which only guards the delimiter — a real
+  // category named "Category: Groceries" (MoneyOK imports produce exactly this
   // shape) became a *system* label: hidden from the operation list by
   // visibleListLabels and non-deletable per isProtectedOperation.
   describe('sanitizeNewLabel', () => {

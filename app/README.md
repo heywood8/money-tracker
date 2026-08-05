@@ -67,7 +67,7 @@ app/
 - `GraphsScreen.js` - Financial visualizations/charts screen
 - `LanguageSelectionScreen.js` - Language selection during onboarding
 - `OperationsScreen.js` - Financial operations/transactions screen
-- `BudgetScreen.js` - Unified Budgets tab: one month-scoped list of income and allocation lines, each optionally an executable template (one-tap execution)
+- `BudgetScreen.js` - Unified Budgets tab: one month-scoped list of income and allocation lines
 
 **Guidelines:**
 - One file per screen

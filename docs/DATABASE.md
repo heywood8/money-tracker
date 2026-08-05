@@ -145,8 +145,7 @@ the app; it exists only for historical/backup continuity.
 
 Templates for recurring or one-time planned expenses/income/transfers.
 **Budgets v3 phase 3** absorbed this model into `budget_plan_lines`: every row
-here is mirrored into a plan line carrying an executable template
-(`kind` / `account_id` / `last_executed_month`) by a one-time, idempotent bridge
+here is mirrored into a plan line by a one-time, idempotent bridge
 (`BudgetPlansDB.migratePlannedOperationsToLines`, gated by the
 `post_migration_m0020_completed` `app_metadata` flag) — recurring templates
 become recurring lines, one-time ones become one-off lines on the current
@@ -228,9 +227,8 @@ that also absorbs the old per-category `budgets` (v1) caps:
 
 - `is_recurring = 0` (one-time): scoped to a single month via `plan_id`
   (the original Budgets v2 line). `currency` is usually NULL — it then inherits
-  the parent plan's currency; since phase 3 a one-off line with a template
-  carries the currency of its execution account. A one-time template is consumed
-  (deleted) by its execution, exactly as a one-time planned operation was.
+  the parent plan's currency; since phase 3 a one-off line may carry a currency
+  of its own.
 - `is_recurring = 1` (recurring): a global template, **not** tied to any one
   month's plan — `plan_id` is NULL. It applies to every calendar month
   automatically (mirroring how v1 `budgets` behaved) and carries its own
@@ -241,23 +239,18 @@ lines (`BudgetPlansDB.getLinesForMonth`) — recurring lines show even for a
 month that has no `budget_plans` row yet.
 
 **Budgets v3 phase 3** (migration 0020) added `kind`, `account_id` and
-`last_executed_month`, which turn a line into an optionally EXECUTABLE template
-— the last of the three planning models folded into this one:
+`last_executed_month` — the last of the three planning models folded into this
+one:
 
 - `kind`: `'income'`, `'expense'` or `'transfer'`. NULL on pre-0020 rows, where
   the effective kind is inferred from the target (`to_account_id` set →
   transfer, otherwise expense).
-- `account_id`: the account an execution touches — same meaning as
-  `operations.account_id` (source for an expense/transfer, destination for
-  income). Set = the line shows the execute action; NULL = a pure analytic
-  target, exactly as before.
-- `last_executed_month`: `YYYY-MM` of the last execution or manual
-  "mark as done", like the old `planned_operations.last_executed_month`.
-
-Executing a line inserts the real operation (dated today), marks the line for the
-current month and — for a ONE-OFF template — deletes it, all in one transaction
-(`BudgetPlansDB.executeLine`, the phase-3 home of the old
-`PlannedOperationsDB.executeAndMark`).
+- `account_id` / `last_executed_month`: **legacy**. They made a line an
+  EXECUTABLE TEMPLATE — a one-tap payable that inserted the real operation and
+  stamped the month it last ran. Operations are captured automatically from bank
+  notifications now, so nothing executes a budget line any more: both columns are
+  append-only, neither read nor written by the app (only round-tripped by backups
+  and the Sheets export), and existing values are left where they are.
 
 Income lines declare the month's expected income: they are excluded from the
 allocation total and have no per-line actual (the income section compares their
@@ -277,8 +270,8 @@ tracking target.
   is_recurring: INTEGER NOT NULL DEFAULT 0,
   currency: TEXT,                   // NULL = inherit the plan's currency
   kind: TEXT,                       // 'income' | 'expense' | 'transfer' (NULL = legacy)
-  account_id: INTEGER REFERENCES accounts(id) ON DELETE SET NULL,  // set = executable
-  last_executed_month: TEXT,        // YYYY-MM of the last execution
+  account_id: INTEGER REFERENCES accounts(id) ON DELETE SET NULL,  // legacy, unused
+  last_executed_month: TEXT,        // legacy, unused
   include_children: INTEGER NOT NULL DEFAULT 1,  // migration 0021, always 1 now
   group_id: TEXT REFERENCES budget_plan_line_groups(id) ON DELETE SET NULL,
   created_at: TEXT NOT NULL,
@@ -314,8 +307,9 @@ combined with logical AND:
 | empty | empty | nothing — the line reads as *broken* |
 
 Not to be confused with either account column on the line itself:
-`to_account_id` is a transfer TARGET, `account_id` is an executable template's
-EXECUTION account. This junction only narrows which operations count.
+`to_account_id` is a transfer TARGET, `account_id` is the legacy execution
+account of the retired executable-template feature. This junction only narrows
+which operations count.
 
 Both FKs cascade, like `budget_plan_line_categories`: deleting the line drops its
 links, and deleting an account merely SHRINKS the filter — an account-only line

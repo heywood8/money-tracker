@@ -191,10 +191,6 @@ const setPlans = ({ plans = [], lines = [], planStatuses = new Map(), groups = [
     updateLineGroup: jest.fn(async () => {}),
     deleteLineGroup: jest.fn(async () => {}),
     reorderLineGroups: jest.fn(async () => {}),
-    // Executable templates (Budgets v3 phase 3)
-    executeLine: jest.fn(async () => ({ id: 99 })),
-    markLineExecuted: jest.fn(async () => {}),
-    unmarkLineExecuted: jest.fn(async () => {}),
   };
 };
 
@@ -202,9 +198,10 @@ const INCOME_CATEGORIES = [
   { id: 'inc1', name: 'Salary', icon: 'cash', categoryType: 'income' },
 ];
 
-// A recurring expense line carrying an executable template (Budgets v3 phase 3):
-// accountId / hasTemplate are what make the execute actions appear.
-const TEMPLATE_LINE = {
+// A line still carrying the retired executable-template columns, as a row read
+// from a database written before that feature was removed. Nothing on the row
+// may key off them any more.
+const LEGACY_TEMPLATE_LINE = {
   id: 'l-tpl', planId: null, amount: '65000', label: 'Rent', comment: null,
   kind: 'expense', categoryId: 'cat1', toAccountId: null, accountId: 1,
   sortOrder: 0, isBroken: false, isRecurring: true, currency: 'USD',
@@ -561,7 +558,7 @@ describe('MonthlyPlanSection', () => {
       // the empty-plan CTAs below it, for income/one-off allocations).
       await waitFor(() => expect(getByTestId('plan-line-l-rec')).toBeTruthy());
       expect(getByTestId('plan-empty-state')).toBeTruthy();
-      expect(queryByTestId('plan-line-execute-l-rec')).toBeNull(); // no template → not executable
+      expect(queryByTestId('plan-line-execute-l-rec')).toBeNull(); // no execute affordance anywhere
       // Monthly repetition is the default, so it carries no glyph — only a
       // one-off line is marked.
       expect(queryByTestId('plan-line-one-time-l-rec')).toBeNull();
@@ -978,24 +975,6 @@ describe('MonthlyPlanSection', () => {
       expect(mockPlans.addPlan).toHaveBeenCalledTimes(1);
     });
 
-    it('ignores a second rapid execute tap while the first execution is still in flight', async () => {
-      // Executing twice would create the operation twice — the exact
-      // double-charge the atomic executeAndMark path exists to prevent.
-      setPlans({
-        plans: [{ id: 'p1', month: THIS_MONTH, currency: 'USD', expectedIncome: '1000' }],
-        lines: [TEMPLATE_LINE],
-      });
-      mockPlans.executeLine = jest.fn().mockResolvedValue({ id: 1 });
-      const { getByTestId } = await renderSection();
-      await waitFor(() => expect(getByTestId('plan-line-execute-l-tpl')).toBeTruthy());
-
-      await act(async () => {
-        fireEvent.press(getByTestId('plan-line-execute-l-tpl'));
-        fireEvent.press(getByTestId('plan-line-execute-l-tpl'));
-      });
-
-      expect(mockPlans.executeLine).toHaveBeenCalledTimes(1);
-    });
   });
 
   describe('Optimistic reorder (Bug 6, adversarial review)', () => {
@@ -1104,6 +1083,8 @@ describe('MonthlyPlanSection', () => {
   });
 
   describe('Row density', () => {
+    // Carries the retired template columns, as a row from a pre-removal
+    // database would: they must change nothing about how it renders.
     const doneLine = {
       id: 'l-done', planId: null, amount: '300', label: 'Rent', comment: 'monthly',
       kind: 'expense', categoryId: 'cat1', toAccountId: null, accountId: 1, sortOrder: 0,
@@ -1124,25 +1105,27 @@ describe('MonthlyPlanSection', () => {
       unconvertible: [],
     }]]);
 
-    it('collapses a done row to a single line — no bar, no comment', async () => {
+    // Regression: a row stamped `last_executed_month` used to collapse to a
+    // single line — no bar, no pair, no comment, plus a check badge — because
+    // "executed" meant its bar read 100% by construction. Nothing executes a
+    // line any more, so a stale stamp is just data: the row is an ordinary
+    // budget target and shows everything an ordinary target shows.
+    it('renders a row carrying a stale execution stamp like any other', async () => {
       setPlans({
         plans: [{ id: 'p1', month: THIS_MONTH, currency: 'USD', expectedIncome: '1000' }],
         lines: [doneLine],
         planStatuses: statusFor('300', '300', false),
       });
-      const { getByTestId, queryByTestId, queryByText } = await renderSection();
+      const { getByTestId, queryByTestId, getByText } = await renderSection();
       await waitFor(() => expect(getByTestId('plan-line-l-done')).toBeTruthy());
-      // A done line's bar reads 100% by construction of "executed" — which is
-      // what the check badge already says.
-      expect(queryByTestId('plan-line-bar-l-done')).toBeNull();
-      // Nor the pair — it would read "300 / 300" by the same construction, and
-      // it is what would make the row two lines tall.
-      expect(queryByTestId('plan-line-pair-l-done')).toBeNull();
-      expect(queryByText('monthly')).toBeNull();
-      expect(getByTestId('plan-line-check-l-done')).toBeTruthy();
+      expect(getByTestId('plan-line-bar-l-done')).toBeTruthy();
+      expect(getByTestId('plan-line-pair-l-done')).toBeTruthy();
+      expect(getByText('monthly')).toBeTruthy();
+      expect(queryByTestId('plan-line-check-l-done')).toBeNull();
+      expect(queryByTestId('plan-line-pending-l-done')).toBeNull();
     });
 
-    it('still shows the bar on a done row that went over target', async () => {
+    it('shows the bar on a row that went over target', async () => {
       setPlans({
         plans: [{ id: 'p1', month: THIS_MONTH, currency: 'USD', expectedIncome: '1000' }],
         lines: [doneLine],
@@ -1318,75 +1301,58 @@ describe('MonthlyPlanSection', () => {
       expect(queryByTestId('plan-line-broken-l-jpy')).toBeNull();
     });
   });
-  describe('Executable templates (Budgets v3 phase 3)', () => {
-    it('offers execute / mark-done on a line with a template and runs the execution', async () => {
-      setPlans({ plans: [], lines: [TEMPLATE_LINE] });
-      const { getByTestId } = await renderSection();
-      await waitFor(() => expect(getByTestId('plan-line-execute-l-tpl')).toBeTruthy());
-      expect(getByTestId('plan-line-done-l-tpl')).toBeTruthy();
-
-      await fireEvent.press(getByTestId('plan-line-execute-l-tpl'));
-      // The row's visible name rides along so the created operation is not blank
-      // when the line carries no explicit label.
-      await waitFor(() => expect(mockPlans.executeLine).toHaveBeenCalledWith(
-        expect.objectContaining({ id: 'l-tpl' }),
-        'Rent',
-      ));
-      // Lines are reloaded so the row picks up its new done state.
-      expect(mockPlans.getLinesForMonth).toHaveBeenCalledTimes(2);
+  // The former Planned tab's mechanics — swipe to execute / mark done / undo, and
+  // the badges that tracked that state — are gone: operations are captured
+  // automatically from bank notifications, so nothing runs a budget line. What
+  // remains is the tracking, and a line still holding the retired columns must
+  // render exactly like one that never had them.
+  describe('Retired executable templates', () => {
+    it('offers no execute, mark-done or undo affordance on any row', async () => {
+      setPlans({ plans: [], lines: [LEGACY_TEMPLATE_LINE] });
+      const { getByTestId, queryByTestId } = await renderSection();
+      await waitFor(() => expect(getByTestId('plan-line-l-tpl')).toBeTruthy());
+      expect(queryByTestId('plan-line-execute-l-tpl')).toBeNull();
+      expect(queryByTestId('plan-line-done-l-tpl')).toBeNull();
+      expect(queryByTestId('plan-line-undo-l-tpl')).toBeNull();
     });
 
-    it('marks a template done without creating an operation', async () => {
-      setPlans({ plans: [], lines: [TEMPLATE_LINE] });
-      const { getByTestId } = await renderSection();
-      await waitFor(() => expect(getByTestId('plan-line-done-l-tpl')).toBeTruthy());
-      await fireEvent.press(getByTestId('plan-line-done-l-tpl'));
-      await waitFor(() => expect(mockPlans.markLineExecuted).toHaveBeenCalled());
-      expect(mockPlans.executeLine).not.toHaveBeenCalled();
-    });
-
-    it('shows a done badge and an undo action once executed this month', async () => {
+    it('draws no template badge, stamped or not', async () => {
       setPlans({
         plans: [],
-        lines: [{ ...TEMPLATE_LINE, lastExecutedMonth: THIS_MONTH }],
+        lines: [
+          LEGACY_TEMPLATE_LINE,
+          { ...LEGACY_TEMPLATE_LINE, id: 'l-stamped', lastExecutedMonth: THIS_MONTH },
+        ],
       });
       const { getByTestId, queryByTestId } = await renderSection();
-      await waitFor(() => expect(getByTestId('plan-line-check-l-tpl')).toBeTruthy());
-      expect(queryByTestId('plan-line-execute-l-tpl')).toBeNull();
-      await fireEvent.press(getByTestId('plan-line-undo-l-tpl'));
-      await waitFor(() => expect(mockPlans.unmarkLineExecuted).toHaveBeenCalledWith('l-tpl'));
+      await waitFor(() => expect(getByTestId('plan-line-l-tpl')).toBeTruthy());
+      expect(queryByTestId('plan-line-pending-l-tpl')).toBeNull();
+      expect(queryByTestId('plan-line-check-l-stamped')).toBeNull();
     });
 
-    it('does not offer execution for a month other than the current one', async () => {
-      setPlans({ plans: [], lines: [TEMPLATE_LINE] });
-      const { getByTestId, queryByTestId } = await renderSection();
-      await waitFor(() => expect(getByTestId('plan-line-execute-l-tpl')).toBeTruthy());
-      await fireEvent.press(getByTestId('plan-next-month'));
-      await waitFor(() => expect(queryByTestId('plan-line-execute-l-tpl')).toBeNull());
-    });
-
-    it('reports execution feedback to the host via onNotify', async () => {
-      setPlans({ plans: [], lines: [TEMPLATE_LINE] });
-      const onNotify = jest.fn();
-      const { getByTestId } = await renderSection(undefined, { onNotify });
-      await waitFor(() => expect(getByTestId('plan-line-execute-l-tpl')).toBeTruthy());
-      await fireEvent.press(getByTestId('plan-line-execute-l-tpl'));
-      await waitFor(() => expect(onNotify).toHaveBeenCalledWith('added_to_operations'));
+    // The accessibility label used to spell out the template state alongside the
+    // scope ("recurring, pending_execution"). Only what the row still shows is
+    // named: its figures and its scope.
+    it('names only the figures and the scope for a screen reader', async () => {
+      setPlans({ plans: [], lines: [LEGACY_TEMPLATE_LINE] });
+      const { getByTestId } = await renderSection();
+      await waitFor(() => expect(getByTestId('plan-line-l-tpl')).toBeTruthy());
+      const label = getByTestId('plan-line-l-tpl').props.accessibilityLabel;
+      expect(label).toContain('recurring');
+      expect(label).not.toContain('pending_execution');
+      expect(label).not.toContain('done');
     });
 
     // The pending-out / done / pending-in strip that used to sit above the card
     // is gone. It was the old Planned tab's header, and on the merged Budgets
-    // screen every figure it carried is already stated below it: each template
-    // row shows its own amount and done badge, and the totals row states the
-    // month's money. Three restatements above the fold, for a screen whose first
-    // job is to show the remainder.
+    // screen every figure it carried is already stated below it.
     it('has no template summary strip above the card', async () => {
       setPlans({
         plans: [],
         lines: [
-          TEMPLATE_LINE,
+          LEGACY_TEMPLATE_LINE,
           {
-            ...TEMPLATE_LINE, id: 'l-inc', kind: 'income', label: 'Salary', amount: '220000',
+            ...LEGACY_TEMPLATE_LINE, id: 'l-inc', kind: 'income', label: 'Salary', amount: '220000',
             categoryId: null, accountId: 2, lastExecutedMonth: THIS_MONTH,
           },
         ],
@@ -1398,35 +1364,6 @@ describe('MonthlyPlanSection', () => {
       expect(queryByTestId('summary-pending-out')).toBeNull();
       expect(queryByTestId('summary-pending-in')).toBeNull();
       expect(queryByTestId('summary-progress-bar')).toBeNull();
-    });
-
-    // Regression: the row's meta line reused the `execute` button caption, so it
-    // read as a command sitting where its sibling branch prints a state ("done")
-    // — and it kept saying so on months where execution is disabled anyway.
-    // The uppercase "RECURRING · PENDING_EXECUTION" line under every row is gone
-    // — it repeated the default on nearly all of them while being the loudest
-    // thing after the amount. Template state is a badge on the category icon,
-    // scope is a glyph beside the name ON ONE-OFF ROWS ONLY, and both are
-    // spelled out in the row's accessibility label, which a screen reader reads
-    // and a glyph cannot say.
-    it('marks a pending template with a badge and names the state for a screen reader', async () => {
-      setPlans({ plans: [], lines: [TEMPLATE_LINE] });
-      const { queryByText, getByTestId, queryByTestId } = await renderSection();
-      await waitFor(() => expect(getByTestId('plan-line-l-tpl')).toBeTruthy());
-      expect(getByTestId('plan-line-pending-l-tpl')).toBeTruthy();
-      expect(queryByTestId('plan-line-one-time-l-tpl')).toBeNull();
-      expect(getByTestId('plan-line-l-tpl').props.accessibilityLabel)
-        .toContain('recurring, pending_execution');
-      expect(queryByText('recurring · pending_execution')).toBeNull();
-    });
-
-    it('marks an executed template as done and drops the pending badge', async () => {
-      setPlans({ plans: [], lines: [{ ...TEMPLATE_LINE, lastExecutedMonth: THIS_MONTH }] });
-      const { queryByTestId, getByTestId } = await renderSection();
-      await waitFor(() => expect(getByTestId('plan-line-l-tpl')).toBeTruthy());
-      expect(getByTestId('plan-line-check-l-tpl')).toBeTruthy();
-      expect(queryByTestId('plan-line-pending-l-tpl')).toBeNull();
-      expect(getByTestId('plan-line-l-tpl').props.accessibilityLabel).toContain('recurring, done');
     });
   });
 
@@ -1565,43 +1502,28 @@ describe('MonthlyPlanSection', () => {
       expect(mockPlans.deleteLine).toHaveBeenCalledWith('l1');
     });
 
-    it('offers execute and mark-done for a template line, and runs the execution', async () => {
-      setPlans({ plans: [], lines: [TEMPLATE_LINE] });
+    // Execute / mark-done / undo are gone from the menu with the feature itself,
+    // on the current month and every other — a line still carrying the retired
+    // columns gets edit, move and delete, the same as any other row.
+    it('offers no execution actions for a line with the retired template columns', async () => {
+      setPlans({ plans: [], lines: [LEGACY_TEMPLATE_LINE] });
       const { getByTestId, queryByTestId } = await renderSection();
       await waitFor(() => expect(getByTestId('plan-line-l-tpl')).toBeTruthy());
-      await longPressLine(getByTestId, 'l-tpl');
-
-      expect(getByTestId('plan-action-done')).toBeTruthy();
-      expect(hasMenuAction(queryByTestId, 'undo')).toBe(false);
-      await act(async () => { fireEvent.press(menuAction(getByTestId, 'execute')); });
-
-      await waitFor(() => expect(mockPlans.executeLine).toHaveBeenCalledWith(
-        expect.objectContaining({ id: 'l-tpl' }), 'Rent',
-      ));
-    });
-
-    it('offers undo instead once the template has been executed this month', async () => {
-      setPlans({ plans: [], lines: [{ ...TEMPLATE_LINE, lastExecutedMonth: THIS_MONTH }] });
-      const { getByTestId, queryByTestId } = await renderSection();
-      await waitFor(() => expect(getByTestId('plan-line-l-tpl')).toBeTruthy());
-      await longPressLine(getByTestId, 'l-tpl');
-
-      expect(hasMenuAction(queryByTestId, 'execute')).toBe(false);
-      await act(async () => { fireEvent.press(menuAction(getByTestId, 'undo')); });
-
-      await waitFor(() => expect(mockPlans.unmarkLineExecuted).toHaveBeenCalledWith('l-tpl'));
-    });
-
-    it('offers no execution actions for a month other than the current one', async () => {
-      setPlans({ plans: [], lines: [TEMPLATE_LINE] });
-      const { getByTestId, queryByTestId } = await renderSection();
-      await waitFor(() => expect(getByTestId('plan-line-l-tpl')).toBeTruthy());
-      await act(async () => { fireEvent.press(getByTestId('plan-next-month')); });
-
       await longPressLine(getByTestId, 'l-tpl');
 
       expect(hasMenuAction(queryByTestId, 'execute')).toBe(false);
       expect(hasMenuAction(queryByTestId, 'done')).toBe(false);
+      expect(hasMenuAction(queryByTestId, 'undo')).toBe(false);
+      expect(getByTestId('plan-action-edit')).toBeTruthy();
+    });
+
+    it('offers no undo for a line stamped as executed this month either', async () => {
+      setPlans({ plans: [], lines: [{ ...LEGACY_TEMPLATE_LINE, lastExecutedMonth: THIS_MONTH }] });
+      const { getByTestId, queryByTestId } = await renderSection();
+      await waitFor(() => expect(getByTestId('plan-line-l-tpl')).toBeTruthy());
+      await longPressLine(getByTestId, 'l-tpl');
+
+      expect(hasMenuAction(queryByTestId, 'undo')).toBe(false);
       expect(getByTestId('plan-action-edit')).toBeTruthy();
     });
 

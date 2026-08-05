@@ -1,7 +1,5 @@
-import React, { memo, useRef, useEffect } from 'react';
+import React, { memo } from 'react';
 import { View, Text, Pressable, StyleSheet } from 'react-native';
-import Animated, { useSharedValue, useAnimatedStyle, withSpring } from 'react-native-reanimated';
-import { Swipeable } from 'react-native-gesture-handler';
 import PropTypes from 'prop-types';
 import Icon from '@expo/vector-icons/MaterialCommunityIcons';
 import * as Currency from '../../services/currency';
@@ -9,14 +7,8 @@ import PlanProgressBar, { PAIR_COLUMN_WIDTH } from './PlanProgressBar';
 import useAnchoredLongPress from '../../hooks/useAnchoredLongPress';
 import { BORDER_RADIUS, FONT_SIZE, SPACING } from '../../styles/designTokens';
 import { ENVELOPE_RAIL_CHILD_ALPHA } from '../../styles/envelopePalette';
-import { SPRING_BADGE_POP } from '../../utils/motion';
 
 const NOOP = () => {};
-
-// Where the badge springs from when its state flips. Not 0: a glyph growing out
-// of nothing reads as an element arriving, and this one was already there — it
-// changed what it says.
-const BADGE_POP_FROM = 0.4;
 
 // Stands in for a foreign-currency amount while its exchange rate resolves — an
 // em dash rather than the stored figure, which would read as a number in the
@@ -32,23 +24,19 @@ const TRACK_ALPHA = '26'; // ~15%
 const FILL_ALPHA = '99'; // ~60%
 
 /**
- * One row of the unified Budgets list (Budgets v3 phase 3).
+ * One row of the unified Budgets list.
  *
- * A row is a monthly target that MAY carry an executable template — the single
- * concept that absorbed the old per-category budget, the plan allocation and the
- * planned operation. It renders:
+ * A row is a monthly target — the single concept that absorbed the old
+ * per-category budget and the plan allocation. It renders:
  *   - what is LEFT of the target (the figure a person acts on), with the
  *     actual/target pair under it as the supporting detail,
  *   - plan-vs-actual progress as a bar for expense/transfer lines (income lines
  *     are compared as a whole against the month's real income, so they get no
- *     bar),
- *   - swipe actions for a line with a template: execute / mark done, or undo
- *     once it is done this month.
+ *     bar).
  *
- * Memoized because a row is nontrivial to build — a Swipeable brings a gesture
- * handler and animated values with it — so rows whose props are unchanged (the
- * common case when an unrelated bit of the section's state flips) skip the
- * rebuild entirely.
+ * Memoized because a row is nontrivial to build, so rows whose props are
+ * unchanged (the common case when an unrelated bit of the section's state
+ * flips) skip the rebuild entirely.
  */
 const PlanLineRow = memo(function PlanLineRow({
   line,
@@ -61,9 +49,6 @@ const PlanLineRow = memo(function PlanLineRow({
   converting = false,
   colors,
   t,
-  executed = false,
-  canExecute = false,
-  canUndo = false,
   showProgress = true,
   indented = false,
   envelopeColor = null,
@@ -71,9 +56,6 @@ const PlanLineRow = memo(function PlanLineRow({
   onMove = null,
   onPress = NOOP,
   onLongPress = NOOP,
-  onExecute = null,
-  onMarkExecuted = null,
-  onUndo = null,
   lifted = false,
 }) {
   // The lifted copy answers to its own testIDs: it is drawn on top of the row it
@@ -94,18 +76,13 @@ const PlanLineRow = memo(function PlanLineRow({
   // honest and an unlabelled one is not.
   const isUnconvertible = status?.status === 'unconvertible'
     || (displayAmount == null && lineCurrency !== planCurrency && !converting);
-  // Both gates are decided by the host (they depend on the month being shown):
-  // execution only makes sense for the current month, and so does undoing it.
-  const swipeEnabled = canExecute || canUndo;
 
-  // A done row collapses to a single line: no bar and no pair. Both would read
-  // 100% by construction of "executed", which is what the check badge already
-  // says. The exception is real overspend — actual above target is news, and
-  // burying it under a state the user set by hand is how a row stops being worth
-  // reading.
-  const tracked = showProgress && !!status && !isBroken && !isUnconvertible;
-  const showMeter = tracked && (!executed || status.isExceeded);
-  const ratio = tracked ? status.percentage / 100 : 0;
+  // Income lines are compared as a whole against the month's real income, so
+  // they carry no per-line meter; neither does a row with nothing to compare
+  // against (broken target, or an amount no rate can express in the screen's
+  // currency).
+  const showMeter = showProgress && !!status && !isBroken && !isUnconvertible;
+  const ratio = showMeter ? status.percentage / 100 : 0;
 
   // The row leads with HOW FULL the budget is, as a percentage.
   //
@@ -159,53 +136,15 @@ const PlanLineRow = memo(function PlanLineRow({
   // because colouring those too is how the previous design ended up with ten
   // tinted rows and no hierarchy.
   const overspent = remaining != null && Currency.isNegative(remaining);
-  let primaryColor = colors.text;
-  if (overspent) primaryColor = colors.overspend;
-  else if (executed) primaryColor = colors.mutedText;
+  const primaryColor = overspent ? colors.overspend : colors.text;
 
-  // Acting on a row leaves the Swipeable open otherwise: the actions are replaced
-  // (execute -> undo) but the row stays dragged aside, so its name and progress
-  // figures remain clipped until the user swipes back by hand.
-  // Not memoized on purpose: RNGH's Swipeable is a plain Component, so it
-  // re-renders with its parent regardless, and `renderRightActions` is rebuilt
-  // every render anyway — a useCallback here would cost a deps compare and save
-  // no allocation.
-  const swipeableRef = useRef(null);
-  const runAndClose = (handler) => () => {
-    swipeableRef.current?.close();
-    handler?.(line);
-  };
-
-  // Executing a line is a swipe, a row that slides back, and then a 13dp glyph
-  // that silently becomes a different glyph — the only evidence on the row that
-  // anything happened at all (the figures move too, but by an amount the user
-  // cannot predict, so they do not read as a confirmation). The pop is that
-  // confirmation.
-  //
-  // Skipped on the first render: rows arrive already done or already pending
-  // when the month loads, and a card full of popping badges on every mount would
-  // announce nothing.
-  const badgeScale = useSharedValue(1);
-  const badgeSettled = useRef(false);
-  useEffect(() => {
-    if (!badgeSettled.current) {
-      badgeSettled.current = true;
-      return;
-    }
-    badgeScale.value = BADGE_POP_FROM;
-    badgeScale.value = withSpring(1, SPRING_BADGE_POP);
-  }, [executed, badgeScale]);
-  const badgeStyle = useAnimatedStyle(() => ({ transform: [{ scale: badgeScale.value }] }));
-
-  // The scope and template state moved from a text line into a glyph and an icon
-  // badge, and the amount pair moved below the figure it supports — none of
-  // which a screen reader conveys by position. They are spelled out here
-  // instead. Sighted density and non-visual completeness are not the same
-  // problem and don't get the same answer.
+  // The scope moved from a text line into a glyph, and the amount pair moved
+  // below the figure it supports — neither of which a screen reader conveys by
+  // position. They are spelled out here instead. Sighted density and non-visual
+  // completeness are not the same problem and don't get the same answer.
   const stateWords = [
     pairText,
     line.isRecurring ? t('recurring') : t('one_time'),
-    line.hasTemplate ? (executed ? t('done') : t('pending_execution')) : null,
   ].filter(Boolean).join(', ');
 
   // Measured on long-press so the host can lift a copy of this exact row above the
@@ -214,7 +153,7 @@ const PlanLineRow = memo(function PlanLineRow({
     (layout) => onLongPress(line, index, listLength, onMove, layout),
   );
 
-  const content = (
+  return (
     <Pressable
       ref={rowRef}
       style={styles.lineRow}
@@ -244,28 +183,7 @@ const PlanLineRow = memo(function PlanLineRow({
       )}
       <View style={[styles.lineInner, indented && styles.lineInnerIndented]}>
         <View style={styles.lineTop}>
-          <View>
-            <Icon name={icon} size={20} color={executed ? colors.mutedText : colors.text} />
-            {/* Template state rides on the category icon instead of a text line:
-                done is a check, still-to-run is a dot in the accent colour. Both
-                occupy the same 13dp corner, so the row height doesn't move
-                between states. */}
-            {executed ? (
-              <Animated.View
-                testID={`${testIDPrefix}-check-${line.id}`}
-                style={[styles.checkBadge, { borderColor: colors.surface, backgroundColor: colors.income }, badgeStyle]}
-              >
-                <Icon name="check" size={7} color="white" />
-              </Animated.View>
-            ) : line.hasTemplate ? (
-              <Animated.View
-                testID={`${testIDPrefix}-pending-${line.id}`}
-                style={[styles.checkBadge, { borderColor: colors.surface, backgroundColor: colors.primary }, badgeStyle]}
-              >
-                <Icon name="play" size={7} color="white" />
-              </Animated.View>
-            ) : null}
-          </View>
+          <Icon name={icon} size={20} color={colors.text} />
           <View style={styles.lineBody}>
             <View style={styles.lineNameRow}>
               <Text
@@ -290,9 +208,8 @@ const PlanLineRow = memo(function PlanLineRow({
               )}
             </View>
             {/* User-authored, so it never repeats what the row already says —
-                unlike the scope/state line it now sits alone under. Hidden on a
-                done row, which collapses to a single line. */}
-            {!!line.comment && !executed && (
+                unlike the scope line it now sits alone under. */}
+            {!!line.comment && (
               <Text style={[styles.lineComment, { color: colors.mutedText }]} numberOfLines={1}>
                 {line.comment}
               </Text>
@@ -358,69 +275,6 @@ const PlanLineRow = memo(function PlanLineRow({
     </Pressable>
   );
 
-  if (!swipeEnabled) {
-    return content;
-  }
-
-  const swipeButton = ({ testID, background, icon, caption, label, handler }) => (
-    <Pressable
-      testID={testID}
-      style={[styles.swipeAction, { backgroundColor: background }]}
-      onPress={runAndClose(handler)}
-      accessibilityRole="button"
-      accessibilityLabel={label}
-    >
-      <Icon name={icon} size={20} color="white" />
-      <Text style={styles.swipeActionText} numberOfLines={1}>{caption}</Text>
-    </Pressable>
-  );
-
-  const rightActions = executed
-    ? () => swipeButton({
-      testID: `${testIDPrefix}-undo-${line.id}`,
-      background: colors.mutedText,
-      icon: 'undo',
-      caption: t('undo'),
-      label: t('undo'),
-      handler: onUndo,
-    })
-    : () => (
-      <View style={styles.swipeActionsRow}>
-        {swipeButton({
-          testID: `${testIDPrefix}-execute-${line.id}`,
-          background: colors.primary,
-          icon: 'play',
-          caption: t('execute'),
-          label: t('execute'),
-          handler: onExecute,
-        })}
-        {swipeButton({
-          testID: `${testIDPrefix}-done-${line.id}`,
-          background: colors.income,
-          icon: 'check-bold',
-          caption: t('done'),
-          label: t('mark_as_executed'),
-          handler: onMarkExecuted,
-        })}
-      </View>
-    );
-
-  return (
-    <Swipeable
-      ref={swipeableRef}
-      renderRightActions={rightActions}
-      overshootRight={false}
-      friction={2}
-      rightThreshold={60}
-      // Only leftward drags reveal actions; leave rightward unrecognized so a
-      // rightward swipe passes through to the tab-strip swipe navigation.
-      dragOffsetFromLeftEdge={Number.MAX_SAFE_INTEGER}
-    >
-      <View style={[styles.swipeRowCover, { backgroundColor: colors.surface }]}>
-        {content}
-      </View>
-    </Swipeable>
-  );
 });
 
 PlanLineRow.propTypes = {
@@ -431,7 +285,6 @@ PlanLineRow.propTypes = {
     currency: PropTypes.string,
     isRecurring: PropTypes.bool,
     isBroken: PropTypes.bool,
-    hasTemplate: PropTypes.bool,
   }).isRequired,
   index: PropTypes.number.isRequired,
   listLength: PropTypes.number.isRequired,
@@ -443,18 +296,12 @@ PlanLineRow.propTypes = {
   converting: PropTypes.bool,
   colors: PropTypes.object.isRequired,
   t: PropTypes.func.isRequired,
-  executed: PropTypes.bool,
-  canExecute: PropTypes.bool,
-  canUndo: PropTypes.bool,
   showProgress: PropTypes.bool,
   indented: PropTypes.bool,
   envelopeColor: PropTypes.string,
   onMove: PropTypes.func,
   onPress: PropTypes.func,
   onLongPress: PropTypes.func,
-  onExecute: PropTypes.func,
-  onMarkExecuted: PropTypes.func,
-  onUndo: PropTypes.func,
   // Renders the static copy the action menu lifts over the row: its own testID
   // namespace, and no handlers to wire.
   lifted: PropTypes.bool,
@@ -472,17 +319,6 @@ const styles = StyleSheet.create({
   brokenText: {
     flex: 1,
     fontSize: FONT_SIZE.sm,
-  },
-  checkBadge: {
-    alignItems: 'center',
-    borderRadius: 7,
-    borderWidth: 1.5,
-    bottom: -4,
-    height: 13,
-    justifyContent: 'center',
-    position: 'absolute',
-    right: -6,
-    width: 13,
   },
   lineAmount: {
     fontSize: 15,
@@ -552,29 +388,5 @@ const styles = StyleSheet.create({
     position: 'absolute',
     top: 0,
     width: 2,
-  },
-  swipeAction: {
-    alignItems: 'center',
-    borderRadius: 10,
-    justifyContent: 'center',
-    marginBottom: SPACING.xs,
-    marginLeft: SPACING.xs,
-    // 72 wide minus 2×12 padding left 48dp of text box — enough for "Execute"
-    // but not for its translations ("Выполнить" wrapped mid-word). 92 minus
-    // 2×4 gives 84dp, which clears the longest caption in every shipped locale.
-    paddingHorizontal: SPACING.xs,
-    width: 92,
-  },
-  swipeActionText: {
-    color: 'white',
-    fontSize: FONT_SIZE.sm,
-    fontWeight: '600',
-    marginTop: 2,
-  },
-  swipeActionsRow: {
-    flexDirection: 'row',
-  },
-  swipeRowCover: {
-    borderRadius: 10,
   },
 });

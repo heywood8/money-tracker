@@ -1,7 +1,7 @@
 import React, { useState, useEffect, useMemo, useCallback, useRef } from 'react';
 import { View, StyleSheet, FlatList } from 'react-native';
 import Animated, { useSharedValue, useAnimatedStyle, withTiming } from 'react-native-reanimated';
-import { Text, Snackbar } from 'react-native-paper';
+import { Text } from 'react-native-paper';
 import { useThemeColors } from '../contexts/ThemeColorsContext';
 import { useLocalization } from '../contexts/LocalizationContext';
 import { useBudgetsData } from '../contexts/BudgetsDataContext';
@@ -78,21 +78,10 @@ const BudgetScreen = () => {
   // plan starts below the glass and scrolls under it.
   const [headerHeight, setHeaderHeight] = useState(0);
 
-  const [snackbarVisible, setSnackbarVisible] = useState(false);
-  const [snackbarMessage, setSnackbarMessage] = useState('');
-
   // Lets the FAB open the "add allocation" flow without lifting that section's
   // modal state up into this screen.
   const monthlyPlanRef = useRef(null);
   const handleOpenAddAllocation = useCallback(() => monthlyPlanRef.current?.openAddLine(), []);
-
-  // Execute / mark-done / undo happen on the rows inside MonthlyPlanSection, but
-  // the Snackbar belongs at the screen's bottom edge rather than inside the card.
-  const handleNotify = useCallback((message) => {
-    setSnackbarMessage(message);
-    setSnackbarVisible(true);
-  }, []);
-  const handleDismissSnackbar = useCallback(() => setSnackbarVisible(false), []);
 
   // The month's remainder, reported up from the plan section so the header can
   // print it. Replaced only when a field actually differs: the section re-reports
@@ -114,12 +103,10 @@ const BudgetScreen = () => {
 
   const handlePrevMonth = useCallback(() => setMonthState(s => ({ key: addMonths(s.key, -1), dir: -1 })), []);
   const handleNextMonth = useCallback(() => setMonthState(s => ({ key: addMonths(s.key, 1), dir: 1 })), []);
-  // Explicit affordance for Fix 4: the screen stays mounted across tab
-  // switches, so a user who navigates away from the current month and comes
-  // back later would otherwise land on a stale month with the executable
-  // templates non-executable (isCurrentMonth === false) and no obvious way
-  // back. Surface a visible "jump to current month" control instead of
-  // silently auto-resetting the month on focus.
+  // The screen stays mounted across tab switches, so a user who navigates away
+  // from the current month and comes back later would otherwise land on a stale
+  // month with no obvious way back. Surface a visible "jump to current month"
+  // control instead of silently auto-resetting the month on focus.
   //
   // The jump can go either way, so the direction is read off the keys. They are
   // 'YYYY-MM', so a plain string compare orders them. Returning the same object
@@ -318,12 +305,11 @@ const BudgetScreen = () => {
         incomeCategories={incomeCategories}
         accounts={accounts}
         month={month}
-        onNotify={handleNotify}
         onTotalsChange={handleTotalsChange}
       />
     </>
   ), [remainderBlock, selectedCurrency, expenseCategories, incomeCategories, accounts, month,
-    handleNotify, handleTotalsChange]);
+    handleTotalsChange]);
 
   // The list starts one gap below the header's solid part and scrolls under it
   // from there. Measured rather than assumed: the header is a row taller when
@@ -387,15 +373,6 @@ const BudgetScreen = () => {
         testID="budget-add-fab"
         accessibilityLabel={t('add_allocation')}
       />
-
-      <Snackbar
-        visible={snackbarVisible}
-        onDismiss={handleDismissSnackbar}
-        duration={2000}
-        style={styles.snackbar}
-      >
-        {snackbarMessage}
-      </Snackbar>
     </View>
   );
 };
@@ -439,9 +416,6 @@ const styles = StyleSheet.create({
   // it has to pass the remaining height through or the list collapses to nothing.
   planLayer: {
     flex: 1,
-  },
-  snackbar: {
-    marginBottom: 100,
   },
 });
 

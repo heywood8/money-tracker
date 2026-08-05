@@ -352,14 +352,15 @@ export const budgetPlans = sqliteTable('budget_plans', {
  * ALTER COLUMN DROP NOT NULL) — see drizzle/0019_recurring_plan_lines.js.
  *
  * Budgets v3 phase 3 (migration 0020) absorbed the standalone `planned_operations`
- * model into this one: a line may now carry an EXECUTABLE TEMPLATE. `kind` says
- * what an execution creates (income / expense / transfer), `account_id` is the
- * account it touches (same meaning as `operations.account_id`: source for an
- * expense/transfer, destination for income), and `last_executed_month` records
- * the last YYYY-MM it ran. A line WITH `account_id` shows the execute action; a
- * line without it is a pure analytic target, exactly as before. `is_recurring`
- * doubles as the old "recurring vs one-time" planned-operation flag: executing a
- * ONE-OFF template deletes it, mirroring `executeAndMark`.
+ * model into this one and added `kind` (income / expense / transfer), which says
+ * what the line budgets.
+ *
+ * That migration also brought `account_id` and `last_executed_month`, which made
+ * a line an EXECUTABLE TEMPLATE — a one-tap payable that created the real
+ * operation and stamped the month it last ran. Operations are captured
+ * automatically from bank notifications now, so nothing executes a budget line
+ * any more: both columns are legacy, append-only, and neither read nor written
+ * by the app.
  *
  * Income lines (`kind` = 'income') are the plan's expected income: their sum
  * replaces the stored `budget_plans.expected_income` (kept, append-only, but no
@@ -387,22 +388,20 @@ export const budgetPlanLines = sqliteTable('budget_plan_lines', {
   toAccountId: integer('to_account_id').references(() => accounts.id, { onDelete: 'set null' }),
   sortOrder: integer('sort_order').notNull().default(0),
   // 0 = one-time (scoped to `plan_id`'s month), 1 = recurring (global, every month).
-  // For a line with an executable template this also carries the old planned-
-  // operation meaning: a one-time template is deleted once executed.
   isRecurring: integer('is_recurring').notNull().default(0),
   // Currency this line's `amount` is expressed in. Required for a recurring line
   // (it has no plan to inherit one from); optional elsewhere — NULL means "inherit
   // the parent plan's currency", which is what every pre-0020 one-off line does.
   currency: text('currency'),
-  // Executable template (migration 0020, Budgets v3 phase 3). NULL `kind` on
+  // What the line budgets (migration 0020, Budgets v3 phase 3). NULL `kind` on
   // legacy rows: inferred from the target (toAccountId → transfer, else expense).
   kind: text('kind', { enum: ['income', 'expense', 'transfer'] }),
-  // Account an execution touches — source for expense/transfer, destination for
-  // income (same semantics as operations.account_id). NULL = no template, i.e. a
-  // pure analytic target with no execute action.
+  // Legacy execution account of the retired executable-template feature — the
+  // account a one-tap execution used to touch. Append-only: kept so backups and
+  // the Sheets export round-trip unchanged, never read or written by the app.
   accountId: integer('account_id').references(() => accounts.id, { onDelete: 'set null' }),
-  // YYYY-MM of the last execution (or manual "mark as done"), like the old
-  // planned_operations.last_executed_month.
+  // Legacy, like accountId: YYYY-MM of the last execution (or manual "mark as
+  // done").
   lastExecutedMonth: text('last_executed_month'),
   // Migration 0021. Legacy since the toggle was dropped: descendant categories
   // ALWAYS roll up into a line's actual (picking a parent category means its
@@ -495,8 +494,9 @@ export const budgetPlanLineCategories = sqliteTable('budget_plan_line_categories
  * unlinked line already reaches — see BudgetPlansDB.mapLineFields.
  *
  * NOT either of the account columns on the line itself: `to_account_id` is a
- * transfer TARGET, `account_id` is an executable template's EXECUTION account.
- * This junction only narrows which operations count toward the actual.
+ * transfer TARGET, `account_id` is the legacy execution account of the retired
+ * executable-template feature. This junction only narrows which operations count
+ * toward the actual.
  *
  * Both FKs cascade, like budgetPlanLineCategories: deleting the line drops its
  * links, deleting an account merely SHRINKS the filter.

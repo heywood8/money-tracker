@@ -1194,9 +1194,8 @@ export const restoreBackup = async (backup, cancelToken) => {
       }
 
       // Bridge planned operations (and any plan's stored expected income) into
-      // plan lines carrying an executable template (Budgets v3 phase 3), so a
-      // backup that predates that consolidation still ends up with a single
-      // source of truth. Runs AFTER the planned_operations insert above — it
+      // plan lines (Budgets v3 phase 3), so a backup that predates that
+      // consolidation still ends up with a single source of truth. Runs AFTER the planned_operations insert above — it
       // reads that table. Idempotent via the same completion flag migration
       // 0020's postMigration handler sets (app_metadata was restored above), so
       // a newer backup is not re-derived into duplicate lines.
