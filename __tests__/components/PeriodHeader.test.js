@@ -1,5 +1,5 @@
 import React from 'react';
-import { Text } from 'react-native';
+import { StyleSheet } from 'react-native';
 import { render, fireEvent, act, within } from '@testing-library/react-native';
 import PeriodHeader from '../../app/components/PeriodHeader';
 
@@ -13,7 +13,7 @@ const press = async (element) => {
 };
 
 const colors = {
-  background: '#fff', text: '#000', mutedText: '#888', border: '#ddd', primary: '#6200ee',
+  background: '#ffffff', text: '#000', mutedText: '#888', border: '#ddd', primary: '#6200ee',
 };
 
 const setup = async (props = {}) => render(
@@ -106,13 +106,53 @@ describe('PeriodHeader', () => {
     });
   });
 
-  it('renders host content under its own two rows', async () => {
-    const { getByTestId, getByText } = await setup({
-      children: <Text testID="scope-hero">remainder</Text>,
+  // The header is glass over the screen's own list, the way the floating tab
+  // bar is glass over its other end — not a band the content begins below.
+  describe('glass overlay', () => {
+    it('sits over the content rather than in the flow', async () => {
+      const { getByTestId } = await setup();
+
+      const overlay = StyleSheet.flatten(getByTestId('scope-header').props.style);
+      expect(overlay.position).toBe('absolute');
+      expect(overlay.top).toBe(0);
     });
 
-    expect(getByText('remainder')).toBeTruthy();
-    expect(within(getByTestId('scope-header')).getByTestId('scope-hero')).toBeTruthy();
+    it('tints toward the theme background at partial opacity', async () => {
+      const { getByTestId } = await setup();
+
+      const surface = StyleSheet.flatten(getByTestId('scope-surface').props.style);
+      // #rrggbbaa on the theme's own background, and not fully opaque — that is
+      // what lets the list show through and what makes it read as a lightening
+      // on the light theme and a darkening on the dark one.
+      expect(surface.backgroundColor).toMatch(/^#ffffff[0-9a-f]{2}$/);
+      expect(surface.backgroundColor).not.toMatch(/ff$/);
+    });
+
+    it('dissolves into the content instead of ending on a hard edge', async () => {
+      const { getByTestId } = await setup();
+
+      const fade = getByTestId('scope-fade');
+      // Purely visual: it extends past the controls and must not swallow taps
+      // meant for the content under it.
+      expect(fade.props.pointerEvents).toBe('none');
+      expect(fade.props.children.length).toBeGreaterThan(1);
+    });
+
+    // The host cannot pad its scroll content correctly without this: the header
+    // is a row taller with the currency chip up, and taller again at a large
+    // font scale.
+    it('reports its measured height to the host', async () => {
+      const onHeightChange = jest.fn();
+      const { getByTestId } = await setup({ onHeightChange });
+
+      await act(async () => {
+        fireEvent(getByTestId('scope-surface'), 'layout', {
+          nativeEvent: { layout: { height: 96 } },
+        });
+      });
+
+      expect(onHeightChange).toHaveBeenCalledWith(96);
+    });
   });
 
   // Both screens address the same header through their own prefix, so every id
