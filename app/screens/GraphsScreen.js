@@ -1,18 +1,25 @@
 import React, { useState, useEffect, useLayoutEffect, useCallback, useMemo, useRef } from 'react';
-import { View, Text, StyleSheet, ScrollView, TouchableOpacity } from 'react-native';
-import Animated, { useSharedValue, useAnimatedStyle, withTiming, withDelay, interpolate, runOnJS, Easing, SlideInLeft, SlideInRight, SlideOutLeft, SlideOutRight } from 'react-native-reanimated';
+import { View, Text, StyleSheet, ScrollView } from 'react-native';
+import Animated, { useSharedValue, useAnimatedStyle, withTiming, withDelay, interpolate, Easing, SlideInLeft, SlideInRight, SlideOutLeft, SlideOutRight } from 'react-native-reanimated';
 import Icon from '@expo/vector-icons/MaterialCommunityIcons';
-import WheelPicker from '@quidone/react-native-wheel-picker';
 import { useThemeColors } from '../contexts/ThemeColorsContext';
 import { useLocalization } from '../contexts/LocalizationContext';
 import { useAccountsData } from '../contexts/AccountsDataContext';
 import { BORDER_RADIUS, FONT_SIZE, SPACING, TOP_CONTENT_SPACING } from '../styles/designTokens';
-import { getAvailableMonths, getUnconvertibleCurrencies } from '../services/OperationsDB';
+import { getUnconvertibleCurrencies } from '../services/OperationsDB';
 import { getAllCategories } from '../services/CategoriesDB';
 import { appEvents, EVENTS } from '../services/eventEmitter';
 import { formatAmount } from '../services/currency';
 import currenciesJson from '../../assets/currencies.json';
 import EmptyState from '../components/EmptyState';
+import MonthPickerSheet from '../components/budgets/MonthPickerSheet';
+import PeriodHeader from '../components/PeriodHeader';
+import CurrencySheet from '../components/CurrencySheet';
+import {
+  currentMonthKey, addMonths, formatMonthLabel, yearOf, monthIndexOf,
+  fullYearKeyOf, isFullYearKey,
+} from '../utils/monthUtils';
+import { TIMING_ENTER } from '../utils/motion';
 import BalanceHistoryCard from '../components/graphs/BalanceHistoryCard';
 import CategoryBackChip from '../components/graphs/CategoryBackChip';
 import { chartTransition, CHART_DROP } from '../components/graphs/chartTransitions';
@@ -35,15 +42,31 @@ const MAX_CHART_HEIGHT = 500;
 const PANEL_OPEN_DURATION = 280;
 const PANEL_CLOSE_DURATION = 220;
 
+// How far the charts travel when the period changes, and for how long. Same
+// values and the same reasoning as the Budgets screen's month transition
+// (BudgetScreen.js): a 20dp directional hint, not a page-width slide that would
+// read as a second pager on the axis the tab strip already swipes along.
+const PERIOD_SHIFT = 20;
+const PERIOD_TRANSITION_DURATION = 280;
+
 const GraphsScreen = () => {
   const { colors } = useThemeColors();
   const { t, language } = useLocalization();
   const { accounts } = useAccountsData();
 
-  // Get current month and year
-  const now = new Date();
-  // Combined period state: "YYYY-MM" for specific month or "YYYY-full" for full year
-  const [selectedPeriod, setSelectedPeriod] = useState(`${now.getFullYear()}-${now.getMonth()}`);
+  // The screen is scoped to one period by the ‹ Period › header, which is the
+  // Budgets tab's month header with one addition: a period here may be a whole
+  // year ("YYYY-full") as well as a month ("YYYY-MM", the shared month-key
+  // format from monthUtils).
+  //
+  // The direction of travel rides along with the key rather than living in its
+  // own state, exactly as on Budgets: it is only meaningful for the render the
+  // new period causes, and two separate setState calls could batch into an order
+  // that animates the wrong way. `dir` is null on the first render, which is what
+  // keeps the screen from animating on mount.
+  const [periodState, setPeriodState] = useState(() => ({ key: currentMonthKey(), dir: null }));
+  const selectedPeriod = periodState.key;
+  const isCurrentPeriod = selectedPeriod === currentMonthKey();
   const [selectedCurrency, setSelectedCurrency] = useState('');
   // When on, operations in other currencies are converted to selectedCurrency at
   // the current rate and folded into the expense/income pie charts and the
@@ -53,16 +76,11 @@ const GraphsScreen = () => {
   // Account currencies that have no rate (offline or live) to selectedCurrency —
   // their operations are silently excluded from converted totals, so warn.
   const [unconvertedCurrencies, setUnconvertedCurrencies] = useState([]);
-  // Long-press hint bubble explaining the convert-currencies corner toggle.
-  const [hintVisible, setHintVisible] = useState(false);
-  const hintOpacity = useSharedValue(0);
-  const hintTimerRef = useRef(null);
   const [selectedCategory, setSelectedCategory] = useState('all');
   const [selectedIncomeCategory, setSelectedIncomeCategory] = useState('all');
   const [categories, setCategories] = useState([]);
   const [topLevelCategories, setTopLevelCategories] = useState([]);
   const [topLevelIncomeCategories, setTopLevelIncomeCategories] = useState([]);
-  const [availableMonths, setAvailableMonths] = useState([]);
   const [selectedCategoryForTrend, setSelectedCategoryForTrend] = useState(null);
 
 
@@ -99,14 +117,12 @@ const GraphsScreen = () => {
   const [expenseDrillReq, setExpenseDrillReq] = useState({ dir: 'in', target: null });
   const [incomeDrillReq, setIncomeDrillReq] = useState({ dir: 'in', target: null });
 
-  // Derive selectedYear and selectedMonth from combined selectedPeriod
-  // This must be defined before the hooks that use these values
-  const { selectedYear, selectedMonth } = useMemo(() => {
-    const [yearStr, monthStr] = selectedPeriod.split('-');
-    const year = parseInt(yearStr, 10);
-    const month = monthStr === 'full' ? null : parseInt(monthStr, 10);
-    return { selectedYear: year, selectedMonth: month };
-  }, [selectedPeriod]);
+  // Derive selectedYear and the 0-based selectedMonth (null for a whole year)
+  // from the period key. This must be defined before the hooks that use them.
+  const { selectedYear, selectedMonth } = useMemo(() => ({
+    selectedYear: yearOf(selectedPeriod),
+    selectedMonth: isFullYearKey(selectedPeriod) ? null : monthIndexOf(selectedPeriod),
+  }), [selectedPeriod]);
 
   // Custom hooks for data management
   const {
@@ -166,22 +182,33 @@ const GraphsScreen = () => {
     await loadBalanceHistoryTable();
   }, [loadBalanceHistoryTable]);
 
-  // Month names translation keys
-  const monthKeys = [
-    'month_january', 'month_february', 'month_march', 'month_april',
-    'month_may', 'month_june', 'month_july', 'month_august',
-    'month_september', 'month_october', 'month_november', 'month_december',
-  ];
+  // Stepping the period. A month steps by a month (crossing the year boundary
+  // as it must), a whole year steps by a year — the arrows always move by the
+  // unit the header currently names, which is the only reading under which
+  // "next" means the same thing to the user in both scopes.
+  const stepPeriod = useCallback((delta) => setPeriodState(s => ({
+    key: isFullYearKey(s.key) ? fullYearKeyOf(yearOf(s.key) + delta) : addMonths(s.key, delta),
+    dir: delta,
+  })), []);
+  const handlePrevPeriod = useCallback(() => stepPeriod(-1), [stepPeriod]);
+  const handleNextPeriod = useCallback(() => stepPeriod(1), [stepPeriod]);
 
-  // Get available years from database (extract unique years from availableMonths)
-  const availableYears = useMemo(() => {
-    if (availableMonths.length === 0) {
-      // If no operations, return current year as fallback
-      return [now.getFullYear()];
-    }
-    const uniqueYears = [...new Set(availableMonths.map(m => m.year))];
-    return uniqueYears.sort((a, b) => b - a); // Sort descending
-  }, [availableMonths]);
+  // The screen stays mounted across tab switches, so a user who wanders
+  // off-period and comes back later needs a visible way home rather than a
+  // silent auto-reset. Direction is read off the keys — they sort as strings,
+  // and returning the same object for a tap that changes nothing keeps the
+  // charts from re-rendering and re-animating for it.
+  const handleJumpToCurrentPeriod = useCallback(() => setPeriodState(s => {
+    const key = currentMonthKey();
+    return key === s.key ? s : { key, dir: key > s.key ? 1 : -1 };
+  }), []);
+
+  const [periodPickerVisible, setPeriodPickerVisible] = useState(false);
+  const handleOpenPeriodPicker = useCallback(() => setPeriodPickerVisible(true), []);
+  const handleClosePeriodPicker = useCallback(() => setPeriodPickerVisible(false), []);
+  const handlePickPeriod = useCallback((key) => setPeriodState(s => (
+    key === s.key ? s : { key, dir: key > s.key ? 1 : -1 }
+  )), []);
 
   // Initialize default currency from first account
   useEffect(() => {
@@ -225,25 +252,10 @@ const GraphsScreen = () => {
     }
   }, []);
 
-  // Load available months function
-  const loadAvailableMonthsData = useCallback(async () => {
-    try {
-      const months = await getAvailableMonths();
-      setAvailableMonths(months);
-    } catch (error) {
-      console.error('Failed to load available months:', error);
-    }
-  }, []);
-
   // Load categories on mount
   useEffect(() => {
     loadCategories();
   }, [loadCategories]);
-
-  // Load available months on mount
-  useEffect(() => {
-    loadAvailableMonthsData();
-  }, [loadAvailableMonthsData]);
 
   // Listen for DATABASE_RESET event to clear data
   useEffect(() => {
@@ -252,7 +264,6 @@ const GraphsScreen = () => {
       setCategories([]);
       setTopLevelCategories([]);
       setTopLevelIncomeCategories([]);
-      setAvailableMonths([]);
       setSelectedCategory('all');
       setSelectedIncomeCategory('all');
     });
@@ -265,11 +276,10 @@ const GraphsScreen = () => {
     const unsubscribe = appEvents.on(EVENTS.RELOAD_ALL, () => {
       console.log('GraphsScreen: Reloading data due to RELOAD_ALL event');
       loadCategories();
-      loadAvailableMonthsData();
     });
 
     return unsubscribe;
-  }, [loadCategories, loadAvailableMonthsData]);
+  }, [loadCategories]);
 
   // Reload data when filters change
   useEffect(() => {
@@ -309,16 +319,10 @@ const GraphsScreen = () => {
     return () => { cancelled = true; };
   }, [convertAllCurrencies, selectedCurrency, currencies]);
 
-  // Prepare picker items
-  const currencyItems = useMemo(() =>
-    currencies.map(cur => ({ label: cur, value: cur })),
-  [currencies],
-  );
-
-  const selectedCurrencySymbol = useMemo(() => {
-    const info = currenciesJson[selectedCurrency];
-    return info ? info.symbol : selectedCurrency;
-  }, [selectedCurrency]);
+  const [currencySheetVisible, setCurrencySheetVisible] = useState(false);
+  const handleOpenCurrencyPicker = useCallback(() => setCurrencySheetVisible(true), []);
+  const handleCloseCurrencyPicker = useCallback(() => setCurrencySheetVisible(false), []);
+  const handleToggleConvert = useCallback(() => setConvertAllCurrencies(v => !v), []);
 
   const accountItems = useMemo(() =>
     accounts
@@ -335,59 +339,14 @@ const GraphsScreen = () => {
   [accounts],
   );
 
-  // Combined period picker items: months and "Full Year" for each year, sorted descending
-  const periodItems = useMemo(() => {
-    const items = [];
-
-    // Group available months by year, sorted descending
-    availableYears.forEach(year => {
-      const monthsForYear = availableMonths
-        .filter(m => m.year === year)
-        .map(m => m.month)
-        .sort((a, b) => b - a); // Dec to Jan
-
-      // If no months available for this year (fallback case), use current month
-      const monthsList = monthsForYear.length > 0 ? monthsForYear : [now.getMonth()];
-
-      monthsList.forEach(monthIndex => {
-        items.push({
-          label: `${t(monthKeys[monthIndex])} ${year}`,
-          value: `${year}-${monthIndex}`,
-        });
-      });
-
-      // Add "Full Year" after all months of this year (before previous year)
-      items.push({
-        label: `${t('full_year')} ${year}`,
-        value: `${year}-full`,
-      });
-    });
-
-    // The picker defaults to the current month, so it must always be present —
-    // early in a new month (no operations yet) the wheel would otherwise display
-    // one period while the charts query another.
-    const currentPeriodValue = `${now.getFullYear()}-${now.getMonth()}`;
-    if (!items.some(item => item.value === currentPeriodValue)) {
-      items.unshift({
-        label: `${t(monthKeys[now.getMonth()])} ${now.getFullYear()}`,
-        value: currentPeriodValue,
-      });
-    }
-
-    return items;
-  }, [availableYears, availableMonths, t, monthKeys]);
-
-  // Human-readable name of the selected period, for surfaces that show the
-  // current scope as text (heatmap header). Falls back to reconstructing the
-  // label for a period not present in periodItems (cannot happen today, but a
-  // blank scope label would be confusing enough to warrant the guard).
-  const selectedPeriodLabel = useMemo(() => {
-    const item = periodItems.find(i => i.value === selectedPeriod);
-    if (item) return item.label;
-    return selectedMonth === null
+  // Human-readable name of the selected period. It is both the header's title
+  // and the scope named by surfaces further down (the heatmap header), so there
+  // is one string and one place it is built.
+  const selectedPeriodLabel = useMemo(() => (
+    isFullYearKey(selectedPeriod)
       ? `${t('full_year')} ${selectedYear}`
-      : `${t(monthKeys[selectedMonth])} ${selectedYear}`;
-  }, [periodItems, selectedPeriod, selectedMonth, selectedYear, t, monthKeys]);
+      : formatMonthLabel(selectedPeriod, language)
+  ), [selectedPeriod, selectedYear, t, language]);
 
   // Use account-specific expenses from balance history for the prediction.
   // totalExpenses from useExpenseData covers all accounts in the currency (by design),
@@ -571,30 +530,26 @@ const GraphsScreen = () => {
   const handleToggleIncome = useCallback(() => toggleCard('income'), [toggleCard]);
   const handleToggleExpense = useCallback(() => toggleCard('expense'), [toggleCard]);
 
-  // Convert-toggle hint bubble: fade in on long-press, auto-dismiss after a beat.
-  const hideToggleHint = useCallback(() => {
-    if (hintTimerRef.current) {
-      clearTimeout(hintTimerRef.current);
-      hintTimerRef.current = null;
-    }
-    hintOpacity.value = withTiming(0, { duration: 180 }, (finished) => {
-      if (finished) runOnJS(setHintVisible)(false);
-    });
-  }, [hintOpacity]);
+  // Changing the period replaces every figure on the screen at once, and until
+  // now it did so with no indication of which way through the calendar the user
+  // had moved. Driven by a shared value rather than a keyed `entering` view, so
+  // the scroll position and the measured chart heights survive the change —
+  // remounting the content would reset both. One value drives the fade and the
+  // travel; `periodDir` is set, never animated, and is which way this arrival
+  // comes from.
+  const periodProgress = useSharedValue(1);
+  const periodDir = useSharedValue(0);
+  useEffect(() => {
+    if (periodState.dir === null) return;
+    periodDir.value = periodState.dir;
+    periodProgress.value = 0;
+    periodProgress.value = withTiming(1, { ...TIMING_ENTER, duration: PERIOD_TRANSITION_DURATION });
+  }, [periodState, periodProgress, periodDir]);
 
-  const showToggleHint = useCallback(() => {
-    if (hintTimerRef.current) clearTimeout(hintTimerRef.current);
-    setHintVisible(true);
-    hintOpacity.value = withTiming(1, { duration: 160 });
-    hintTimerRef.current = setTimeout(hideToggleHint, 2600);
-  }, [hintOpacity, hideToggleHint]);
-
-  useEffect(() => () => {
-    if (hintTimerRef.current) clearTimeout(hintTimerRef.current);
-  }, []);
-
-  const hintAnimStyle = useAnimatedStyle(() => ({ opacity: hintOpacity.value }));
-
+  const periodTransitionStyle = useAnimatedStyle(() => ({
+    opacity: periodProgress.value,
+    transform: [{ translateX: (1 - periodProgress.value) * periodDir.value * PERIOD_SHIFT }],
+  }));
 
   // Chart heights are re-reported by onContentSizeChange whenever the content or
   // the available width changes, so rotation needs no special handling here.
@@ -662,312 +617,250 @@ const GraphsScreen = () => {
 
   return (
     <View style={[styles.container, { backgroundColor: colors.background }]}>
-      <ScrollView style={styles.scrollView} contentContainerStyle={styles.scrollContent}>
-        <View style={styles.content}>
-          {/* Warn when some account currencies can't be converted to the selected one */}
-          {convertAllCurrencies && unconvertedCurrencies.length > 0 && (
-            <View style={[styles.convertWarning, { backgroundColor: colors.altRow, borderColor: colors.border }]}>
-              <Icon name="alert-outline" size={16} color={colors.mutedText} />
-              <Text style={[styles.convertWarningText, { color: colors.mutedText }]}>
-                {`${t('graphs_currencies_not_converted')}: ${unconvertedCurrencies.join(', ')}`}
-              </Text>
-            </View>
-          )}
+      {/* Sticky period header — the same one the Budgets tab wears
+          (components/PeriodHeader), with the whole year added to what a period
+          can be. Kept outside the ScrollView so the scope of everything below
+          stays on screen while the charts scroll, and replacing the two floating
+          wheels that used to state it: those sat over the content permanently,
+          obscured the bottom of the last card, and put the screen's two most
+          consequential controls in the corner farthest from where their effect
+          was read. */}
+      <PeriodHeader
+        label={selectedPeriodLabel}
+        onPrev={handlePrevPeriod}
+        onNext={handleNextPeriod}
+        prevLabel={t('previous_period')}
+        nextLabel={t('next_period')}
+        onPressTitle={handleOpenPeriodPicker}
+        titleLabel={`${t('select_period')}: ${selectedPeriodLabel}`}
+        titleActive={periodPickerVisible}
+        showJumpToCurrent={!isCurrentPeriod}
+        onJumpToCurrent={handleJumpToCurrentPeriod}
+        jumpLabel={t('jump_to_current_period')}
+        currencies={currencies}
+        selectedCurrency={selectedCurrency}
+        onPressCurrency={handleOpenCurrencyPicker}
+        currencyActive={currencySheetVisible}
+        currencyLabel={`${t('currency')}: ${selectedCurrency}`}
+        colors={colors}
+        testIDPrefix="graphs-period"
+      />
 
-          {/* Expense/income summary — one panel, two tabs (expense left, income
-              right). Collapsed by default: only the tab strip shows, each tab
-              tappable across its full width. */}
-          <Animated.View
-            style={[
-              styles.summaryPanel,
-              panelAnimStyle,
-              { backgroundColor: colors.surface, borderColor: colors.border },
-            ]}
-          >
-            <View style={styles.tabsRow}>
-              <ExpenseSummaryCard
-                colors={colors}
-                t={t}
-                loading={loading}
-                totalExpenses={totalExpenses}
-                selectedCurrency={selectedCurrency}
-                onPress={handleToggleExpense}
-                expanded={expandedCard === 'expense'}
-              />
-              <View style={[styles.tabDivider, { backgroundColor: colors.border }]} />
-              <IncomeSummaryCard
-                colors={colors}
-                t={t}
-                loadingIncome={loadingIncome}
-                totalIncome={totalIncome}
-                selectedCurrency={selectedCurrency}
-                onPress={handleToggleIncome}
-                expanded={expandedCard === 'income'}
-              />
-            </View>
+      {/* The scrolling layer as a whole is what belongs to the period, so it is
+          what moves. */}
+      <Animated.View style={[styles.contentLayer, periodTransitionStyle]} testID="graphs-period-transition">
+        <ScrollView style={styles.scrollView} contentContainerStyle={styles.scrollContent}>
+          <View style={styles.content}>
+            {/* Warn when some account currencies can't be converted to the selected one */}
+            {convertAllCurrencies && unconvertedCurrencies.length > 0 && (
+              <View style={[styles.convertWarning, { backgroundColor: colors.altRow, borderColor: colors.border }]}>
+                <Icon name="alert-outline" size={16} color={colors.mutedText} />
+                <Text style={[styles.convertWarningText, { color: colors.mutedText }]}>
+                  {`${t('graphs_currencies_not_converted')}: ${unconvertedCurrencies.join(', ')}`}
+                </Text>
+              </View>
+            )}
 
-            {/* Both charts stay mounted and overlap, so they stay measured and
-                switching tabs fades through instead of remounting. The closed one is
-                pulled out of the accessibility tree too — opacity 0 alone still
-                lets TalkBack read its legend. */}
+            {/* Expense/income summary — one panel, two tabs (expense left, income
+                right). Collapsed by default: only the tab strip shows, each tab
+                tappable across its full width. */}
             <Animated.View
-              testID="income-chart-content"
-              pointerEvents={expandedCard === 'income' ? 'auto' : 'none'}
-              accessibilityElementsHidden={expandedCard !== 'income'}
-              importantForAccessibility={expandedCard === 'income' ? 'auto' : 'no-hide-descendants'}
-              style={[styles.chartContent, incomeChartAnimStyle]}
+              style={[
+                styles.summaryPanel,
+                panelAnimStyle,
+                { backgroundColor: colors.surface, borderColor: colors.border },
+              ]}
             >
-              <ScrollView
-                style={styles.chartScrollView}
-                contentContainerStyle={styles.chartScrollContent}
-                nestedScrollEnabled
-                showsVerticalScrollIndicator={false}
-                onContentSizeChange={(_, h) => handleChartMeasured('income', h)}
+              <View style={styles.tabsRow}>
+                <ExpenseSummaryCard
+                  colors={colors}
+                  t={t}
+                  loading={loading}
+                  totalExpenses={totalExpenses}
+                  selectedCurrency={selectedCurrency}
+                  onPress={handleToggleExpense}
+                  expanded={expandedCard === 'expense'}
+                />
+                <View style={[styles.tabDivider, { backgroundColor: colors.border }]} />
+                <IncomeSummaryCard
+                  colors={colors}
+                  t={t}
+                  loadingIncome={loadingIncome}
+                  totalIncome={totalIncome}
+                  selectedCurrency={selectedCurrency}
+                  onPress={handleToggleIncome}
+                  expanded={expandedCard === 'income'}
+                />
+              </View>
+
+              {/* Both charts stay mounted and overlap, so they stay measured and
+                  switching tabs fades through instead of remounting. The closed one is
+                  pulled out of the accessibility tree too — opacity 0 alone still
+                  lets TalkBack read its legend. */}
+              <Animated.View
+                testID="income-chart-content"
+                pointerEvents={expandedCard === 'income' ? 'auto' : 'none'}
+                accessibilityElementsHidden={expandedCard !== 'income'}
+                importantForAccessibility={expandedCard === 'income' ? 'auto' : 'no-hide-descendants'}
+                style={[styles.chartContent, incomeChartAnimStyle]}
               >
-                <Animated.View
-                  key={selectedIncomeCategory}
-                  entering={incomeDrillReq.dir === 'none' ? undefined : incomeDrillReq.dir === 'in' ? SlideInRight.duration(280) : SlideInLeft.duration(280)}
-                  exiting={incomeDrillReq.dir === 'none' ? undefined : incomeDrillReq.dir === 'in' ? SlideOutLeft.duration(220) : SlideOutRight.duration(220)}
+                <ScrollView
+                  style={styles.chartScrollView}
+                  contentContainerStyle={styles.chartScrollContent}
+                  nestedScrollEnabled
+                  showsVerticalScrollIndicator={false}
+                  onContentSizeChange={(_, h) => handleChartMeasured('income', h)}
                 >
-                  <IncomePieChart
-                    colors={colors}
-                    t={t}
-                    language={language}
-                    loadingIncome={loadingIncome}
-                    incomeChartData={incomeChartData}
-                    selectedCurrency={selectedCurrency}
-                    onLegendItemPress={handleIncomeLegendItemPress}
-                    isLeafCategory={incomeCategoryIsLeaf}
-                    operations={incomeOperations}
-                    loadingOperations={loadingIncomeOperations}
-                    introKey={chartIntro.key}
-                    introDelay={chartIntro.delay}
-                    categoryChip={incomeCategoryChip}
-                  />
-                </Animated.View>
-              </ScrollView>
+                  <Animated.View
+                    key={selectedIncomeCategory}
+                    entering={incomeDrillReq.dir === 'none' ? undefined : incomeDrillReq.dir === 'in' ? SlideInRight.duration(280) : SlideInLeft.duration(280)}
+                    exiting={incomeDrillReq.dir === 'none' ? undefined : incomeDrillReq.dir === 'in' ? SlideOutLeft.duration(220) : SlideOutRight.duration(220)}
+                  >
+                    <IncomePieChart
+                      colors={colors}
+                      t={t}
+                      language={language}
+                      loadingIncome={loadingIncome}
+                      incomeChartData={incomeChartData}
+                      selectedCurrency={selectedCurrency}
+                      onLegendItemPress={handleIncomeLegendItemPress}
+                      isLeafCategory={incomeCategoryIsLeaf}
+                      operations={incomeOperations}
+                      loadingOperations={loadingIncomeOperations}
+                      introKey={chartIntro.key}
+                      introDelay={chartIntro.delay}
+                      categoryChip={incomeCategoryChip}
+                    />
+                  </Animated.View>
+                </ScrollView>
+              </Animated.View>
+
+              <Animated.View
+                testID="expense-chart-content"
+                pointerEvents={expandedCard === 'expense' ? 'auto' : 'none'}
+                accessibilityElementsHidden={expandedCard !== 'expense'}
+                importantForAccessibility={expandedCard === 'expense' ? 'auto' : 'no-hide-descendants'}
+                style={[styles.chartContent, expenseChartAnimStyle]}
+              >
+                <ScrollView
+                  style={styles.chartScrollView}
+                  contentContainerStyle={styles.chartScrollContent}
+                  nestedScrollEnabled
+                  showsVerticalScrollIndicator={false}
+                  onContentSizeChange={(_, h) => handleChartMeasured('expense', h)}
+                >
+                  <Animated.View
+                    key={selectedCategory}
+                    entering={expenseDrillReq.dir === 'none' ? undefined : expenseDrillReq.dir === 'in' ? SlideInRight.duration(280) : SlideInLeft.duration(280)}
+                    exiting={expenseDrillReq.dir === 'none' ? undefined : expenseDrillReq.dir === 'in' ? SlideOutLeft.duration(220) : SlideOutRight.duration(220)}
+                  >
+                    <ExpensePieChart
+                      colors={colors}
+                      t={t}
+                      language={language}
+                      loading={loading}
+                      chartData={chartData}
+                      selectedCurrency={selectedCurrency}
+                      onLegendItemPress={handleExpenseLegendItemPress}
+                      isLeafCategory={expenseCategoryIsLeaf}
+                      operations={expenseOperations}
+                      loadingOperations={loadingExpenseOperations}
+                      introKey={chartIntro.key}
+                      introDelay={chartIntro.delay}
+                      categoryChip={expenseCategoryChip}
+                    />
+                  </Animated.View>
+                </ScrollView>
+              </Animated.View>
             </Animated.View>
 
-            <Animated.View
-              testID="expense-chart-content"
-              pointerEvents={expandedCard === 'expense' ? 'auto' : 'none'}
-              accessibilityElementsHidden={expandedCard !== 'expense'}
-              importantForAccessibility={expandedCard === 'expense' ? 'auto' : 'no-hide-descendants'}
-              style={[styles.chartContent, expenseChartAnimStyle]}
-            >
-              <ScrollView
-                style={styles.chartScrollView}
-                contentContainerStyle={styles.chartScrollContent}
-                nestedScrollEnabled
-                showsVerticalScrollIndicator={false}
-                onContentSizeChange={(_, h) => handleChartMeasured('expense', h)}
-              >
-                <Animated.View
-                  key={selectedCategory}
-                  entering={expenseDrillReq.dir === 'none' ? undefined : expenseDrillReq.dir === 'in' ? SlideInRight.duration(280) : SlideInLeft.duration(280)}
-                  exiting={expenseDrillReq.dir === 'none' ? undefined : expenseDrillReq.dir === 'in' ? SlideOutLeft.duration(220) : SlideOutRight.duration(220)}
-                >
-                  <ExpensePieChart
-                    colors={colors}
-                    t={t}
-                    language={language}
-                    loading={loading}
-                    chartData={chartData}
-                    selectedCurrency={selectedCurrency}
-                    onLegendItemPress={handleExpenseLegendItemPress}
-                    isLeafCategory={expenseCategoryIsLeaf}
-                    operations={expenseOperations}
-                    loadingOperations={loadingExpenseOperations}
-                    introKey={chartIntro.key}
-                    introDelay={chartIntro.delay}
-                    categoryChip={expenseCategoryChip}
-                  />
-                </Animated.View>
-              </ScrollView>
-            </Animated.View>
-          </Animated.View>
+            {/* Balance History Card. A specific month draws the daily line with its
+                burndown norm; a full-year selection draws the same card in its year
+                form (weekly samples, month ticks, no norm — the card derives that
+                from selectedMonth === null). When no account is available, render an
+                explicit empty state instead of silently dropping the card, so the
+                user sees an explanation rather than a blank gap (QoL-11). */}
+            {selectedAccount ? (
+              <BalanceHistoryCard
+                colors={colors}
+                t={t}
+                selectedAccount={selectedAccount}
+                onAccountChange={setSelectedAccount}
+                accountItems={accountItems}
+                loadingBalanceHistory={loadingBalanceHistory}
+                balanceHistoryData={balanceHistoryData}
+                selectedYear={selectedYear}
+                selectedMonth={selectedMonth}
+                accounts={accounts}
+                spendingPrediction={spendingPrediction}
+                isCurrentMonth={isCurrentMonth}
+                closeLabel={t('close')}
+                onShowCalendar={handleShowCalendar}
+                balanceHistoryTableData={balanceHistoryTableData}
+                editingBalanceValue={editingBalanceValue}
+                onEditingBalanceValueChange={setEditingBalanceValue}
+                onEditBalance={handleEditBalance}
+                onCancelEdit={handleCancelEdit}
+                onSaveBalance={handleSaveBalance}
+                onDeleteBalance={handleDeleteBalance}
+              />
+            ) : (
+              <EmptyState
+                icon="chart-line-variant"
+                message={selectedMonth === null ? t('no_balance_history_year') : t('no_balance_history')}
+                testID="balance-history-empty"
+              />
+            )}
 
-          {/* Balance History Card. A specific month draws the daily line with its
-              burndown norm; a full-year selection draws the same card in its year
-              form (weekly samples, month ticks, no norm — the card derives that
-              from selectedMonth === null). When no account is available, render an
-              explicit empty state instead of silently dropping the card, so the
-              user sees an explanation rather than a blank gap (QoL-11). */}
-          {selectedAccount ? (
-            <BalanceHistoryCard
+            {/* Category Spending Trend Card - Last 12 Months */}
+            <CategorySpendingCard
               colors={colors}
               t={t}
-              selectedAccount={selectedAccount}
-              onAccountChange={setSelectedAccount}
-              accountItems={accountItems}
-              loadingBalanceHistory={loadingBalanceHistory}
-              balanceHistoryData={balanceHistoryData}
+              selectedCurrency={selectedCurrency}
+              selectedCategory={selectedCategoryForTrend}
+              onCategoryChange={setSelectedCategoryForTrend}
+              categories={categories}
+              convertAllCurrencies={convertAllCurrencies}
+            />
+
+            {/* Operations location heatmap — an inert row until tapped; the
+                fullscreen map (and its DB/tile loading) mounts only on open. */}
+            <OperationsHeatmapCard
+              colors={colors}
+              t={t}
               selectedYear={selectedYear}
               selectedMonth={selectedMonth}
-              accounts={accounts}
-              spendingPrediction={spendingPrediction}
-              isCurrentMonth={isCurrentMonth}
-              closeLabel={t('close')}
-              onShowCalendar={handleShowCalendar}
-              balanceHistoryTableData={balanceHistoryTableData}
-              editingBalanceValue={editingBalanceValue}
-              onEditingBalanceValueChange={setEditingBalanceValue}
-              onEditBalance={handleEditBalance}
-              onCancelEdit={handleCancelEdit}
-              onSaveBalance={handleSaveBalance}
-              onDeleteBalance={handleDeleteBalance}
+              periodLabel={selectedPeriodLabel}
             />
-          ) : (
-            <EmptyState
-              icon="chart-line-variant"
-              message={selectedMonth === null ? t('no_balance_history_year') : t('no_balance_history')}
-              testID="balance-history-empty"
-            />
-          )}
-
-          {/* Category Spending Trend Card - Last 12 Months */}
-          <CategorySpendingCard
-            colors={colors}
-            t={t}
-            selectedCurrency={selectedCurrency}
-            selectedCategory={selectedCategoryForTrend}
-            onCategoryChange={setSelectedCategoryForTrend}
-            categories={categories}
-            convertAllCurrencies={convertAllCurrencies}
-          />
-
-          {/* Operations location heatmap — an inert row until tapped; the
-              fullscreen map (and its DB/tile loading) mounts only on open. */}
-          <OperationsHeatmapCard
-            colors={colors}
-            t={t}
-            selectedYear={selectedYear}
-            selectedMonth={selectedMonth}
-            periodLabel={selectedPeriodLabel}
-          />
-        </View>
-      </ScrollView>
-
-      {/* Floating currency wheel FAB */}
-      {currencyItems.length > 0 && (
-        <View style={[styles.fabWheel, styles.fabWheelLeft, { backgroundColor: colors.surface + 'DE', borderColor: colors.border + '80' }]}>
-          <WheelPicker
-            data={currencyItems}
-            value={selectedCurrency}
-            onValueChanged={({ item }) => item && setSelectedCurrency(item.value)}
-            itemHeight={28}
-            visibleItemCount={3}
-            itemTextStyle={[styles.wheelItemText, { color: colors.text }]}
-            overlayItemStyle={[styles.wheelOverlayItem, { backgroundColor: colors.selected }]}
-            enableScrollByTapOnItem
-            keyExtractor={(item, index) => `currency-${index}`}
-          />
-        </View>
-      )}
-
-      {/* Convert-other-currencies toggle — a badge tucked into the currency
-          wheel's bottom-right corner. Only useful with more than one currency. */}
-      {currencyItems.length > 1 && (
-        <TouchableOpacity
-          style={[
-            styles.fabToggle,
-            {
-              backgroundColor: convertAllCurrencies ? colors.primary : colors.surface,
-              borderColor: convertAllCurrencies ? colors.primary : colors.border,
-            },
-          ]}
-          onPress={() => {
-            hideToggleHint();
-            setConvertAllCurrencies(v => !v);
-          }}
-          onLongPress={showToggleHint}
-          delayLongPress={280}
-          activeOpacity={0.7}
-          accessibilityRole="switch"
-          accessibilityState={{ checked: convertAllCurrencies }}
-          accessibilityLabel={t('graphs_convert_currencies')}
-        >
-          <Icon
-            name="cash-sync"
-            size={18}
-            color={convertAllCurrencies ? colors.surface : colors.mutedText}
-          />
-        </TouchableOpacity>
-      )}
-
-      {/* Floating period wheel FAB with chevron navigation (QoL-9) */}
-      {periodItems.length > 0 && (() => {
-        const currentIndex = periodItems.findIndex((i) => i.value === selectedPeriod);
-        const currentPeriodValue = `${now.getFullYear()}-${now.getMonth()}`;
-        // periodItems is sorted newest-first, so a newer period is a lower index
-        // and an older one a higher index. Chevron-up steps newer, down steps older.
-        const canGoNewer = currentIndex > 0;
-        const canGoOlder = currentIndex >= 0 && currentIndex < periodItems.length - 1;
-        const isCurrentPeriod = selectedPeriod === currentPeriodValue;
-        return (
-          <View style={[styles.fabWheel, styles.fabWheelRight, { backgroundColor: colors.surface + 'DE', borderColor: colors.border + '80' }]}>
-            <TouchableOpacity
-              style={styles.periodChevron}
-              onPress={() => { if (canGoNewer) setSelectedPeriod(periodItems[currentIndex - 1].value); }}
-              disabled={!canGoNewer}
-              testID="period-chevron-newer"
-              accessibilityRole="button"
-              accessibilityLabel={t('next_period')}
-              accessibilityState={{ disabled: !canGoNewer }}
-            >
-              <Icon name="chevron-up" size={22} color={canGoNewer ? colors.text : colors.mutedText + '55'} />
-            </TouchableOpacity>
-
-            <WheelPicker
-              data={periodItems}
-              value={selectedPeriod}
-              onValueChanged={({ item }) => item && setSelectedPeriod(item.value)}
-              itemHeight={28}
-              visibleItemCount={3}
-              itemTextStyle={[styles.wheelItemText, { color: colors.text }]}
-              overlayItemStyle={[styles.wheelOverlayItem, { backgroundColor: colors.selected }]}
-              enableScrollByTapOnItem
-              keyExtractor={(item, index) => `period-${index}`}
-            />
-
-            <TouchableOpacity
-              style={styles.periodChevron}
-              onPress={() => { if (canGoOlder) setSelectedPeriod(periodItems[currentIndex + 1].value); }}
-              disabled={!canGoOlder}
-              testID="period-chevron-older"
-              accessibilityRole="button"
-              accessibilityLabel={t('previous_period')}
-              accessibilityState={{ disabled: !canGoOlder }}
-            >
-              <Icon name="chevron-down" size={22} color={canGoOlder ? colors.text : colors.mutedText + '55'} />
-            </TouchableOpacity>
-
-            {!isCurrentPeriod && (
-              <TouchableOpacity
-                style={[styles.periodTodayButton, { borderTopColor: colors.border + '80' }]}
-                onPress={() => setSelectedPeriod(currentPeriodValue)}
-                testID="period-jump-current"
-                accessibilityRole="button"
-                accessibilityLabel={t('jump_to_current_period')}
-              >
-                <Icon name="calendar-today" size={16} color={colors.primary} />
-              </TouchableOpacity>
-            )}
           </View>
-        );
-      })()}
+        </ScrollView>
+      </Animated.View>
 
-      {/* Long-press hint for the convert-currencies toggle */}
-      {hintVisible && (
-        <Animated.View
-          pointerEvents="none"
-          style={[styles.toggleHint, hintAnimStyle, { backgroundColor: colors.text }]}
-        >
-          <Text style={[styles.toggleHintText, { color: colors.background }]} numberOfLines={2}>
-            {t('graphs_convert_currencies')}
-          </Text>
-        </Animated.View>
-      )}
+      <MonthPickerSheet
+        visible={periodPickerVisible}
+        monthKey={selectedPeriod}
+        onSelect={handlePickPeriod}
+        onClose={handleClosePeriodPicker}
+        colors={colors}
+        t={t}
+        language={language}
+        allowFullYear
+        testIDPrefix="graphs-period-picker"
+      />
+
+      <CurrencySheet
+        visible={currencySheetVisible}
+        codes={currencies}
+        selectedCurrency={selectedCurrency}
+        onSelect={setSelectedCurrency}
+        onClose={handleCloseCurrencyPicker}
+        colors={colors}
+        t={t}
+        title={t('currency')}
+        convertAll={convertAllCurrencies}
+        onToggleConvert={handleToggleConvert}
+        testIDPrefix="graphs-currency"
+      />
 
     </View>
   );
@@ -997,6 +890,11 @@ const styles = StyleSheet.create({
     padding: TOP_CONTENT_SPACING,
     paddingTop: TOP_CONTENT_SPACING + 4,
   },
+  // The animated wrapper sits between the screen's column and the ScrollView, so
+  // it has to pass the remaining height through or the list collapses to nothing.
+  contentLayer: {
+    flex: 1,
+  },
   convertWarning: {
     alignItems: 'center',
     borderRadius: BORDER_RADIUS.lg,
@@ -1010,57 +908,6 @@ const styles = StyleSheet.create({
   convertWarningText: {
     flex: 1,
     fontSize: FONT_SIZE.sm,
-  },
-  fabToggle: {
-    // A compact badge tucked into the currency wheel's bottom-right corner —
-    // rendered after the wheel with higher elevation/zIndex so it sits on top.
-    alignItems: 'center',
-    borderRadius: BORDER_RADIUS.pill,
-    borderWidth: 1,
-    bottom: 104,
-    elevation: 12,
-    height: 32,
-    justifyContent: 'center',
-    position: 'absolute',
-    right: 146,
-    shadowColor: '#000',
-    shadowOffset: { width: 0, height: 2 },
-    shadowOpacity: 0.35,
-    shadowRadius: 4,
-    width: 32,
-    zIndex: 2,
-  },
-  fabWheel: {
-    ...CARD_SURFACE,
-    bottom: 116,
-    elevation: 8,
-    overflow: 'hidden',
-    position: 'absolute',
-    shadowColor: '#000',
-    shadowOffset: { width: 0, height: 4 },
-    shadowOpacity: 0.3,
-    shadowRadius: 8,
-  },
-  fabWheelLeft: {
-    borderRadius: BORDER_RADIUS.pill,
-    right: 152,
-    width: 80,
-  },
-  fabWheelRight: {
-    borderRadius: 40,
-    right: 16,
-    width: 120,
-  },
-  periodChevron: {
-    alignItems: 'center',
-    justifyContent: 'center',
-    paddingVertical: 2,
-  },
-  periodTodayButton: {
-    alignItems: 'center',
-    borderTopWidth: 1,
-    justifyContent: 'center',
-    paddingVertical: 6,
   },
   scrollContent: {
     paddingBottom: 180,
@@ -1080,31 +927,6 @@ const styles = StyleSheet.create({
   tabsRow: {
     flexDirection: 'row',
     height: CARD_HEADER_HEIGHT,
-  },
-  toggleHint: {
-    borderRadius: 10,
-    bottom: 210,
-    elevation: 14,
-    maxWidth: 240,
-    paddingHorizontal: 12,
-    paddingVertical: 8,
-    position: 'absolute',
-    right: 16,
-    shadowColor: '#000',
-    shadowOffset: { width: 0, height: 2 },
-    shadowOpacity: 0.35,
-    shadowRadius: 6,
-    zIndex: 3,
-  },
-  toggleHintText: {
-    fontSize: 13,
-    fontWeight: '500',
-  },
-  wheelItemText: {
-    fontSize: FONT_SIZE.md,
-  },
-  wheelOverlayItem: {
-    borderRadius: BORDER_RADIUS.md,
   },
 });
 

@@ -260,6 +260,7 @@
   "select_date": "Select Date",
   "add_operation_hint": "Opens form to create new operation",
   "select_month": "Select Month",
+  "select_period": "Select Period",
   "expenses_by_category": "Expenses by Category",
   "no_expense_data": "No expense data for this period",
   "income_by_category": "Income by Category",

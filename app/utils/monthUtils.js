@@ -1,6 +1,11 @@
 /**
  * Month-key helpers shared by the Budgets screen and its monthly-plan section.
  * A "month key" is the local calendar month formatted as `YYYY-MM`.
+ *
+ * The Graphs screen scopes itself to the same keys but may also be scoped to a
+ * whole year, which it names `YYYY-full` — a *period* key. Everything that only
+ * needs the year (`yearOf`, the picker's year stepper) reads both alike; the
+ * two predicates below are what tells them apart where the difference matters.
  */
 
 /** Current month as YYYY-MM (local calendar). */
@@ -18,6 +23,12 @@ export const yearOf = (monthKey) => Number(monthKey.split('-')[0]);
 
 /** The 0-based month index of a YYYY-MM key (January === 0). */
 export const monthIndexOf = (monthKey) => Number(monthKey.split('-')[1]) - 1;
+
+/** Whole-year period key for a calendar year. */
+export const fullYearKeyOf = (year) => `${year}-full`;
+
+/** True for a whole-year period key (`YYYY-full`) rather than a month key. */
+export const isFullYearKey = (key) => typeof key === 'string' && key.endsWith('-full');
 
 /** Shift a YYYY-MM key by `delta` months. */
 export const addMonths = (monthKey, delta) => {
