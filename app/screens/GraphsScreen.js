@@ -67,6 +67,9 @@ const GraphsScreen = () => {
   const [periodState, setPeriodState] = useState(() => ({ key: currentMonthKey(), dir: null }));
   const selectedPeriod = periodState.key;
   const isCurrentPeriod = selectedPeriod === currentMonthKey();
+  // Reported by the header as it lays out; the scroll content pads its top by
+  // this so the charts start below the glass and scroll under it.
+  const [headerHeight, setHeaderHeight] = useState(0);
   const [selectedCurrency, setSelectedCurrency] = useState('');
   // When on, operations in other currencies are converted to selectedCurrency at
   // the current rate and folded into the expense/income pie charts and the
@@ -551,6 +554,14 @@ const GraphsScreen = () => {
     transform: [{ translateX: (1 - periodProgress.value) * periodDir.value * PERIOD_SHIFT }],
   }));
 
+  // The charts start one gap below the header's solid part and scroll under it
+  // from there. Measured rather than assumed: the header is a row taller when
+  // the currency chip is up, and taller again at a large font scale.
+  const scrollContentStyle = useMemo(
+    () => [styles.content, { paddingTop: headerHeight + SPACING.md }],
+    [headerHeight],
+  );
+
   // Chart heights are re-reported by onContentSizeChange whenever the content or
   // the available width changes, so rotation needs no special handling here.
   const panelAnimStyle = useAnimatedStyle(() => ({ height: panelHeight.value }));
@@ -617,40 +628,11 @@ const GraphsScreen = () => {
 
   return (
     <View style={[styles.container, { backgroundColor: colors.background }]}>
-      {/* Sticky period header — the same one the Budgets tab wears
-          (components/PeriodHeader), with the whole year added to what a period
-          can be. Kept outside the ScrollView so the scope of everything below
-          stays on screen while the charts scroll, and replacing the two floating
-          wheels that used to state it: those sat over the content permanently,
-          obscured the bottom of the last card, and put the screen's two most
-          consequential controls in the corner farthest from where their effect
-          was read. */}
-      <PeriodHeader
-        label={selectedPeriodLabel}
-        onPrev={handlePrevPeriod}
-        onNext={handleNextPeriod}
-        prevLabel={t('previous_period')}
-        nextLabel={t('next_period')}
-        onPressTitle={handleOpenPeriodPicker}
-        titleLabel={`${t('select_period')}: ${selectedPeriodLabel}`}
-        titleActive={periodPickerVisible}
-        showJumpToCurrent={!isCurrentPeriod}
-        onJumpToCurrent={handleJumpToCurrentPeriod}
-        jumpLabel={t('jump_to_current_period')}
-        currencies={currencies}
-        selectedCurrency={selectedCurrency}
-        onPressCurrency={handleOpenCurrencyPicker}
-        currencyActive={currencySheetVisible}
-        currencyLabel={`${t('currency')}: ${selectedCurrency}`}
-        colors={colors}
-        testIDPrefix="graphs-period"
-      />
-
       {/* The scrolling layer as a whole is what belongs to the period, so it is
           what moves. */}
       <Animated.View style={[styles.contentLayer, periodTransitionStyle]} testID="graphs-period-transition">
         <ScrollView style={styles.scrollView} contentContainerStyle={styles.scrollContent}>
-          <View style={styles.content}>
+          <View style={scrollContentStyle} testID="graphs-content">
             {/* Warn when some account currencies can't be converted to the selected one */}
             {convertAllCurrencies && unconvertedCurrencies.length > 0 && (
               <View style={[styles.convertWarning, { backgroundColor: colors.altRow, borderColor: colors.border }]}>
@@ -835,6 +817,36 @@ const GraphsScreen = () => {
           </View>
         </ScrollView>
       </Animated.View>
+      {/* Sticky period header — the same one the Budgets tab wears
+          (components/PeriodHeader), with the whole year added to what a period
+          can be. A glass overlay outside the ScrollView, so the scope of
+          everything below stays on screen while the charts scroll under it. It
+          replaced the two floating wheels that used to state that scope: those
+          sat over the content permanently, obscured the bottom of the last card,
+          and put the screen's two most consequential controls in the corner
+          farthest from where their effect was read. Rendered after the scroll
+          layer because it draws over it. */}
+      <PeriodHeader
+        label={selectedPeriodLabel}
+        onPrev={handlePrevPeriod}
+        onNext={handleNextPeriod}
+        prevLabel={t('previous_period')}
+        nextLabel={t('next_period')}
+        onPressTitle={handleOpenPeriodPicker}
+        titleLabel={`${t('select_period')}: ${selectedPeriodLabel}`}
+        titleActive={periodPickerVisible}
+        showJumpToCurrent={!isCurrentPeriod}
+        onJumpToCurrent={handleJumpToCurrentPeriod}
+        jumpLabel={t('jump_to_current_period')}
+        currencies={currencies}
+        selectedCurrency={selectedCurrency}
+        onPressCurrency={handleOpenCurrencyPicker}
+        currencyActive={currencySheetVisible}
+        currencyLabel={`${t('currency')}: ${selectedCurrency}`}
+        colors={colors}
+        onHeightChange={setHeaderHeight}
+        testIDPrefix="graphs-period"
+      />
 
       <MonthPickerSheet
         visible={periodPickerVisible}
@@ -888,7 +900,6 @@ const styles = StyleSheet.create({
   },
   content: {
     padding: TOP_CONTENT_SPACING,
-    paddingTop: TOP_CONTENT_SPACING + 4,
   },
   // The animated wrapper sits between the screen's column and the ScrollView, so
   // it has to pass the remaining height through or the list collapses to nothing.

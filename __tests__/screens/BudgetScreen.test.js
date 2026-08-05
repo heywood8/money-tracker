@@ -1,7 +1,7 @@
 // __tests__/screens/BudgetScreen.test.js
 /* eslint-disable react/prop-types */
 import React from 'react';
-import { render, fireEvent, waitFor } from '@testing-library/react-native';
+import { act, render, fireEvent, waitFor, within } from '@testing-library/react-native';
 import { StyleSheet } from 'react-native';
 import BudgetScreen from '../../app/screens/BudgetScreen';
 
@@ -205,17 +205,46 @@ describe('BudgetScreen', () => {
     });
 
     // The month row is the pager and nothing else: the currency chip sits on its
-    // own line below it, after both arrows, and above the hero figure.
-    it('renders the currency chip below the month row and above the hero figure', async () => {
+    // own line below it, after both arrows.
+    it('renders the currency chip below the month row, after both arrows', async () => {
       const { getByTestId, toJSON } = await render(<BudgetScreen />);
       await waitFor(() => expect(getByTestId('budget-month-currency-chip')).toBeTruthy());
 
       const rendered = collectTestIDs(toJSON());
       const order = ['budget-month-prev', 'budget-month-label', 'budget-month-next',
-        'budget-month-currency-chip', 'budget-remainder'].map(id => rendered.indexOf(id));
+        'budget-month-currency-chip'].map(id => rendered.indexOf(id));
 
       expect(order.every(i => i >= 0)).toBe(true);
       expect(order).toEqual([...order].sort((a, b) => a - b));
+    });
+
+    // The remainder is the month's figure, not part of the scope statement: it
+    // lives in the body and scrolls under the header, which is the same glass
+    // overlay the Graphs tab wears and must stay the same height on both.
+    it('keeps the remainder figure in the body, out of the header', async () => {
+      const { getByTestId } = await render(<BudgetScreen />);
+      await waitFor(() => expect(getByTestId('budget-remainder')).toBeTruthy());
+
+      expect(within(getByTestId('budget-month-header')).queryByTestId('budget-remainder')).toBeNull();
+    });
+
+    // The header floats over the list, so nothing but this padding keeps the
+    // first row out from under the glass — and the header's height is not a
+    // constant (the currency chip adds a row, a large font scale adds more).
+    it('pads the list top by the height the header reports', async () => {
+      const { getByTestId } = await render(<BudgetScreen />);
+      await waitFor(() => expect(getByTestId('budget-month-surface')).toBeTruthy());
+
+      await act(async () => {
+        fireEvent(getByTestId('budget-month-surface'), 'layout', {
+          nativeEvent: { layout: { height: 100 } },
+        });
+      });
+
+      const padding = StyleSheet.flatten(
+        getByTestId('budget-plan-list').props.contentContainerStyle,
+      );
+      expect(padding.paddingTop).toBe(112); // 100 measured + SPACING.md
     });
 
     it('does not show a jump-to-current-month affordance while viewing the current month', async () => {

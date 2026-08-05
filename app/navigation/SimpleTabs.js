@@ -45,14 +45,9 @@ import Header from '../components/Header';
 import SettingsScreen from '../screens/SettingsScreen';
 import { appEvents, EVENTS } from '../services/eventEmitter';
 import { BORDER_RADIUS } from '../styles/designTokens';
+import { withAlpha } from '../utils/colorUtils';
 
 const { width: SCREEN_WIDTH } = Dimensions.get('window');
-
-// Append alpha channel to a hex color (hex 00-FF)
-const withAlpha = (hex, alpha) => {
-  const a = Math.round(alpha * 255).toString(16).padStart(2, '0');
-  return hex + a;
-};
 
 const TAB_ICONS = {
   Operations: 'swap-horizontal',

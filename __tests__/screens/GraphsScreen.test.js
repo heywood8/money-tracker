@@ -336,6 +336,25 @@ describe('GraphsScreen', () => {
       expect(getByTestId('graphs-period-label').props.children).toBe(labelAtCurrent);
     });
 
+    // The header floats over the charts, so nothing but this padding keeps the
+    // first card out from under the glass — and the header's height is not a
+    // constant (the currency chip adds a row, a large font scale adds more).
+    it('pads the scroll content by the height the header reports', async () => {
+      const GraphsScreen = require('../../app/screens/GraphsScreen').default;
+      const { StyleSheet } = require('react-native');
+
+      const { getByTestId } = await render(<GraphsScreen />);
+
+      await act(async () => {
+        fireEvent(getByTestId('graphs-period-surface'), 'layout', {
+          nativeEvent: { layout: { height: 100 } },
+        });
+      });
+
+      const padding = StyleSheet.flatten(getByTestId('graphs-content').props.style);
+      expect(padding.paddingTop).toBe(112); // 100 measured + SPACING.md
+    });
+
     it('opens the period picker from the title and offers the whole year', async () => {
       const GraphsScreen = require('../../app/screens/GraphsScreen').default;
       const { useLocalization } = require('../../app/contexts/LocalizationContext');

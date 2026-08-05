@@ -4,6 +4,7 @@ import Animated, { useSharedValue, useAnimatedStyle, withTiming, Easing } from '
 import Icon from '@expo/vector-icons/MaterialCommunityIcons';
 import PropTypes from 'prop-types';
 import { FONT_SIZE, HORIZONTAL_PADDING, SPACING } from '../../styles/designTokens';
+import { withAlpha } from '../../utils/colorUtils';
 import FilterBadge from './FilterBadge';
 
 const SCREEN_WIDTH = Dimensions.get('window').width;
@@ -17,13 +18,6 @@ const COLLAPSED_WIDTH_RATIO = 0.7;
 const MORPH_DURATION = 260;
 
 // Append an alpha channel to a 6-digit hex color (alpha 0..1).
-// Mirrors the helper used by the bottom tab bar so the search pill picks up the
-// same translucent surface treatment.
-const withAlpha = (hex, alpha) => {
-  const a = Math.round(alpha * 255).toString(16).padStart(2, '0');
-  return hex + a;
-};
-
 const SearchBar = ({
   searchText,
   onSearchTextChange,
