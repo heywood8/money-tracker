@@ -1,5 +1,12 @@
 # Changelog
 
+## [0.262.0](https://github.com/heywood8/money-tracker/compare/penny-v0.261.0...penny-v0.262.0) (2026-08-05)
+
+
+### Features
+
+* **graphs:** give the Graphs tab the Budgets period header ([#1569](https://github.com/heywood8/money-tracker/issues/1569)) ([5ba71f2](https://github.com/heywood8/money-tracker/commit/5ba71f2fb987dcb3fce0b8d8c383ed5aca17d247))
+
 ## [0.261.0](https://github.com/heywood8/money-tracker/compare/penny-v0.260.1...penny-v0.261.0) (2026-08-04)
 
 
