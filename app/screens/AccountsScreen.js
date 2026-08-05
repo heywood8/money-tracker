@@ -7,7 +7,7 @@ import AddFAB from '../components/AddFAB';
 import AccountGridSelector from '../components/AccountGridSelector';
 import LoadingView from '../components/LoadingView';
 import EmptyState from '../components/EmptyState';
-import { NestableScrollContainer, NestableDraggableFlatList } from 'react-native-draggable-flatlist';
+import DraggableFlatList from 'react-native-draggable-flatlist';
 import Icon from '@expo/vector-icons/MaterialCommunityIcons';
 
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
@@ -877,17 +877,39 @@ export default function AccountsScreen({ onBackStateChange }) {
     return `${t('confirm_delete_and_transfer_message') || `This will permanently delete "${sourceAccount.name}" and irreversibly move ${operationCount} transaction(s) to "${destAccount.name}".\n\nThis action cannot be undone.`}`;
   }, [accountToDelete, transferConfirmDestinationId, accounts, operationCount, t]);
 
-  const renderItem = useCallback(({ item, drag, isActive }) => (
-    <AccountRow
-      item={item}
-      colors={colors}
-      onPress={startEdit}
-      t={t}
-      drag={drag}
-      isActive={isActive}
-      isDefault={item.id === defaultAccountId}
-    />
-  ), [colors, startEdit, t, defaultAccountId]);
+  // The card the rows sit in is drawn by the rows themselves — surface and side
+  // borders on every slice, rounded caps on the ends — because the list IS the
+  // screen's scroll view now (see the render block) and there is no wrapper
+  // View left to carry the card. Ends are matched by id rather than the render
+  // callback's index so a reorder mid-drag can't hand out a stale position.
+  const firstAccountId = enhancedAccounts[0]?.id;
+  const lastAccountId = enhancedAccounts[enhancedAccounts.length - 1]?.id;
+
+  const renderItem = useCallback(({ item, drag, isActive }) => {
+    const isFirst = item.id === firstAccountId;
+    const isLast = item.id === lastAccountId;
+    return (
+      <View
+        style={[
+          styles.cardSlice,
+          { backgroundColor: colors.surface, borderColor: colors.border },
+          isFirst && styles.cardSliceFirst,
+          isLast && styles.cardSliceLast,
+        ]}
+      >
+        <AccountRow
+          item={item}
+          colors={colors}
+          onPress={startEdit}
+          t={t}
+          drag={drag}
+          isActive={isActive}
+          isDefault={item.id === defaultAccountId}
+        />
+        {!isLast && <View style={[styles.divider, { backgroundColor: colors.border }]} />}
+      </View>
+    );
+  }, [colors, startEdit, t, defaultAccountId, firstAccountId, lastAccountId]);
 
   const handleDragEnd = useCallback(({ data }) => {
     reorderAccounts(data);
@@ -895,9 +917,40 @@ export default function AccountsScreen({ onBackStateChange }) {
 
   const keyExtractor = useCallback((item) => item.id, []);
 
-  const renderItemSeparator = useCallback(() => (
-    <View style={[styles.divider, { backgroundColor: colors.border }]} />
-  ), [colors.border]);
+  const listHeader = useMemo(() => (
+    <NetWorthCard accounts={accounts} colors={colors} t={t} />
+  ), [accounts, colors, t]);
+
+  const listFooter = useMemo(() => (
+    hiddenAccounts.length > 0 ? (
+      <Pressable
+        onPress={toggleShowHiddenAccounts}
+        android_ripple={{ color: 'rgba(0, 0, 0, .08)', borderless: false }}
+        style={[styles.showHiddenButton, { backgroundColor: colors.surface, borderColor: colors.border }]}
+      >
+        <View style={styles.showHiddenContent}>
+          {/* Constant concept glyph: `archive-off` reads as "unarchive",
+              which this button does not do. The label carries the direction. */}
+          <Icon
+            name="archive-outline"
+            size={20}
+            color={colors.selected}
+          />
+          <Text style={[styles.showHiddenText, { color: colors.text }]}>
+            {showHiddenAccounts
+              ? (t('hide_archived_accounts') || 'Hide archived accounts')
+              : (t('show_archived_accounts') || 'Show archived accounts')}
+          </Text>
+        </View>
+      </Pressable>
+    ) : null
+  ), [hiddenAccounts.length, showHiddenAccounts, toggleShowHiddenAccounts, colors, t]);
+
+  const listEmpty = useMemo(() => (
+    <View style={[styles.accountsCard, { backgroundColor: colors.surface, borderColor: colors.border }]}>
+      <EmptyState icon="bank-outline" message={t('no_accounts') || 'No accounts yet.'} />
+    </View>
+  ), [colors, t]);
 
   // Report internal back capability to an embedding parent (the Settings subpanel)
   // so a swipe / hardware-back pops one level here (currency picker → edit form)
@@ -937,55 +990,35 @@ export default function AccountsScreen({ onBackStateChange }) {
 
   return (
     <View style={[styles.container, { backgroundColor: colors.background }]}>
-      <NestableScrollContainer
+      {/* One scrollable, not two.
+          This used to be a NestableScrollContainer wrapping a
+          NestableDraggableFlatList, which put the list's drag Pan BELOW the
+          scroll view in the view tree. `activationDistance` compiles to
+          `activeOffsetY([-20, 20])` on a Pan that is live at all times — it does
+          not wait for a cell to be picked up — and in gesture-handler a
+          descendant handler beats an ancestor. So every vertical swipe starting
+          over the accounts card raced the scroll view and usually killed it: the
+          list read as frozen until a swipe happened to start on the net-worth
+          card or the footer, which is where the "works after a few tries"
+          came from. Flattening to a single DraggableFlatList puts the Pan back
+          ABOVE its own scroll view, the arrangement the library is built for,
+          where scrolling wins and the Pan only matters once a long-press on a
+          drag handle has actually started a reorder. */}
+      <DraggableFlatList
+        data={enhancedAccounts}
+        renderItem={renderItem}
+        keyExtractor={keyExtractor}
+        onDragEnd={handleDragEnd}
+        activationDistance={20}
+        containerStyle={styles.listContainer}
         contentContainerStyle={styles.scrollContent}
         showsVerticalScrollIndicator={false}
         keyboardShouldPersistTaps="handled"
         style={{ backgroundColor: colors.background }}
-      >
-        {/* Net Worth Summary Card */}
-        <NetWorthCard accounts={accounts} colors={colors} t={t} />
-
-        {/* Accounts Grouped Card */}
-        <View style={[styles.accountsCard, { backgroundColor: colors.surface, borderColor: colors.border }]}>
-          {enhancedAccounts.length === 0 ? (
-            <EmptyState icon="bank-outline" message={t('no_accounts') || 'No accounts yet.'} />
-          ) : (
-            <NestableDraggableFlatList
-              data={enhancedAccounts}
-              renderItem={renderItem}
-              keyExtractor={keyExtractor}
-              onDragEnd={handleDragEnd}
-              activationDistance={20}
-              ItemSeparatorComponent={renderItemSeparator}
-            />
-          )}
-        </View>
-
-        {/* Show/hide archived accounts */}
-        {hiddenAccounts.length > 0 && (
-          <Pressable
-            onPress={toggleShowHiddenAccounts}
-            android_ripple={{ color: 'rgba(0, 0, 0, .08)', borderless: false }}
-            style={[styles.showHiddenButton, { backgroundColor: colors.surface, borderColor: colors.border }]}
-          >
-            <View style={styles.showHiddenContent}>
-              {/* Constant concept glyph: `archive-off` reads as "unarchive",
-                  which this button does not do. The label carries the direction. */}
-              <Icon
-                name="archive-outline"
-                size={20}
-                color={colors.selected}
-              />
-              <Text style={[styles.showHiddenText, { color: colors.text }]}>
-                {showHiddenAccounts
-                  ? (t('hide_archived_accounts') || 'Hide archived accounts')
-                  : (t('show_archived_accounts') || 'Show archived accounts')}
-              </Text>
-            </View>
-          </Pressable>
-        )}
-      </NestableScrollContainer>
+        ListHeaderComponent={listHeader}
+        ListFooterComponent={listFooter}
+        ListEmptyComponent={listEmpty}
+      />
 
       <AddFAB
         testID="accounts-add-fab"
@@ -1438,6 +1471,28 @@ const styles = StyleSheet.create({
     flex: 1,
     fontSize: FONT_SIZE.md,
   },
+  // The accounts card is assembled per row (see renderItem): every slice paints
+  // the surface and the two side borders, and the end slices add the cap border
+  // plus the corner radii. Matches what `accountsCard` drew as one wrapper
+  // before the list became the screen's own scroll view.
+  cardSlice: {
+    borderLeftWidth: CARD_SURFACE.borderWidth,
+    borderRightWidth: CARD_SURFACE.borderWidth,
+    marginHorizontal: SPACING.lg,
+  },
+  cardSliceFirst: {
+    borderTopLeftRadius: CARD_SURFACE.borderRadius,
+    borderTopRightRadius: CARD_SURFACE.borderRadius,
+    borderTopWidth: CARD_SURFACE.borderWidth,
+    marginTop: SPACING.sm,
+    overflow: 'hidden',
+  },
+  cardSliceLast: {
+    borderBottomLeftRadius: CARD_SURFACE.borderRadius,
+    borderBottomRightRadius: CARD_SURFACE.borderRadius,
+    borderBottomWidth: CARD_SURFACE.borderWidth,
+    overflow: 'hidden',
+  },
   centeredBodyMedium: {
     marginBottom: SPACING.lg,
     textAlign: 'center',
@@ -1596,6 +1651,11 @@ const styles = StyleSheet.create({
     height: 36,
     marginTop: SPACING.xs,
     width: 160,
+  },
+  // DraggableFlatList wraps its scroll view in a plain View, so the fill has to
+  // be handed to that wrapper — `style` alone stops at the inner list.
+  listContainer: {
+    flex: 1,
   },
   monthlyChangeRow: {
     marginTop: SPACING.sm,
