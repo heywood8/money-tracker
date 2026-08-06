@@ -586,6 +586,7 @@
   "previous_year": "Anno precedente",
   "next_year": "Anno successivo",
   "recurring_allocation": "Ricorrente",
+  "recurring_from_month_hint": "Vale da {month} in poi. I mesi precedenti mantengono il budget che avevano.",
   "group": "Gruppo",
   "no_group": "Nessun gruppo",
   "new_group": "Nuovo gruppo",

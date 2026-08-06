@@ -274,12 +274,41 @@ tracking target.
   last_executed_month: TEXT,        // legacy, unused
   include_children: INTEGER NOT NULL DEFAULT 1,  // migration 0021, always 1 now
   group_id: TEXT REFERENCES budget_plan_line_groups(id) ON DELETE SET NULL,
+  effective_from: TEXT,             // migration 0026, YYYY-MM; NULL = since forever
+  effective_to: TEXT,               // migration 0026, YYYY-MM inclusive; NULL = open-ended
   created_at: TEXT NOT NULL,
   updated_at: TEXT NOT NULL
 }
 ```
 
 **Indexes**: `plan_id`, `is_recurring`, `kind`, `group_id`
+
+**Migration 0026** bounds the months a RECURRING line speaks for, so that editing
+one stops rewriting history. A recurring line used to apply to every month there
+is, which meant raising a budget in August also claimed that July — already spent
+— had been budgeted at the new figure.
+
+- `effective_from` — first month the line applies to. NULL is "since forever",
+  which is what every pre-0026 recurring line has, so nothing about an existing
+  budget changed on upgrade. A line added (or made recurring) from the Budgets
+  screen now starts at the month it was added in.
+- `effective_to` — last month it applies to, inclusive. NULL is open-ended, the
+  normal state of a live budget.
+
+Editing a recurring line is therefore a **version split**
+(`BudgetPlansDB.updateLine`, given the month being edited): the row is closed at
+the month before the edit and a copy carrying the new values opens at that month,
+inheriting whatever end the original had. Editing a version that was itself
+superseded later only touches ITS months. Deleting works the same way — a line
+with months behind it is closed, not erased — and both fall back to a plain
+update/delete when there is no history to keep (a one-off line, a version that
+already starts at that month, or the import paths, which pass no month at all).
+
+Every per-month read therefore goes through `getRecurringLinesForMonth` rather
+than `getRecurringLines`: the latter still returns superseded versions too, which
+is what exports and management views want.
+
+Both columns stay NULL on a one-off line — its `plan_id` already names its month.
 
 Since **migration 0021** a line tracks a SET of categories via the
 `budget_plan_line_categories` junction (line_id, category_id), which is the

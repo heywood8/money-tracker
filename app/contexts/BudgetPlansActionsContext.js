@@ -116,8 +116,11 @@ export const BudgetPlansActionsProvider = ({ children }) => {
   // Recurring (global template) lines: not tied to any single month's plan — see
   // app/db/schema.js's budgetPlanLines doc comment.
   const addRecurringLine = useCallback((line) => BudgetPlansDB.addRecurringLine(line), []);
-  const updateLine = useCallback((id, updates) => BudgetPlansDB.updateLine(id, updates), []);
-  const deleteLine = useCallback((id) => BudgetPlansDB.deleteLine(id), []);
+  // `options.fromMonth` (migration 0026) is the month the edit/delete takes effect
+  // from: earlier months keep the recurring line exactly as it was, instead of
+  // being re-rendered against a budget that did not exist when they were spent.
+  const updateLine = useCallback((id, updates, options) => BudgetPlansDB.updateLine(id, updates, options), []);
+  const deleteLine = useCallback((id, options) => BudgetPlansDB.deleteLine(id, options), []);
   const reorderLines = useCallback((planId, orderedIds) => BudgetPlansDB.reorderLines(planId, orderedIds), []);
   const reorderRecurringLines = useCallback((orderedIds) => BudgetPlansDB.reorderRecurringLines(orderedIds), []);
   const getPlanLines = useCallback((planId) => BudgetPlansDB.getPlanLines(planId), []);

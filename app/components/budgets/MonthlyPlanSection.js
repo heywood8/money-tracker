@@ -498,12 +498,15 @@ const MonthlyPlanSection = forwardRef(function MonthlyPlanSection({
         if (modal.line) {
           const updates = { ...core, currency: lineCurrency };
           if (scopeChanged) updates.isRecurring = true;
-          await updateLine(modal.line.id, updates);
+          await updateLine(modal.line.id, updates, { fromMonth: month });
         } else {
           await addRecurringLine({
             ...core,
             currency: lineCurrency,
             sortOrder: sameKindLines.filter(l => l.isRecurring).length,
+            // The budget starts in the month it was added in: a recurring line
+            // added in August is not a claim about how July was budgeted.
+            effectiveFrom: month,
           });
         }
       } else {
@@ -514,7 +517,7 @@ const MonthlyPlanSection = forwardRef(function MonthlyPlanSection({
             updates.isRecurring = false;
             updates.planId = targetPlan.id;
           }
-          await updateLine(modal.line.id, updates);
+          await updateLine(modal.line.id, updates, { fromMonth: month });
         } else {
           await addLine(targetPlan.id, {
             ...core,
@@ -540,12 +543,15 @@ const MonthlyPlanSection = forwardRef(function MonthlyPlanSection({
       busyRef.current = false;
       setBusy(false);
     }
-  }, [modal.line, updateLine, addLine, addRecurringLine, incomeLines, allocationLines,
+  }, [modal.line, month, updateLine, addLine, addRecurringLine, incomeLines, allocationLines,
     ensurePlan, reloadLines, refreshPlanStatuses, closeModal, showDialog, t]);
 
   const handleDeleteLine = useCallback(async (lineId) => {
     try {
-      await deleteLine(lineId);
+      // From this month on. A recurring line with months behind it is closed
+      // rather than erased, so those months keep the budget they were spent
+      // against (BudgetPlansDB.deleteLine).
+      await deleteLine(lineId, { fromMonth: month });
       await reloadLines();
       setStatusStale(true);
       refreshPlanStatuses?.();
@@ -554,7 +560,7 @@ const MonthlyPlanSection = forwardRef(function MonthlyPlanSection({
       console.error('Failed to delete plan line:', error);
       showDialog(t('error'), error.message, [{ text: t('ok') }]);
     }
-  }, [deleteLine, reloadLines, refreshPlanStatuses, closeModal, showDialog, t]);
+  }, [deleteLine, month, reloadLines, refreshPlanStatuses, closeModal, showDialog, t]);
 
   const confirmDeleteLine = useCallback((line) => {
     showDialog(
@@ -1196,6 +1202,7 @@ const MonthlyPlanSection = forwardRef(function MonthlyPlanSection({
           line={modal.line}
           initialKind={modal.kind}
           currency={planCurrency}
+          month={month}
           expenseCategories={expenseCategories}
           incomeCategories={incomeCategories}
           accounts={accounts}

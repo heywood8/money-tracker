@@ -586,6 +586,7 @@
   "previous_year": "前の年",
   "next_year": "次の年",
   "recurring_allocation": "繰り返し",
+  "recurring_from_month_hint": "{month}以降に適用されます。それ以前の月は当時の予算のままです。",
   "group": "グループ",
   "no_group": "グループなし",
   "new_group": "新しいグループ",

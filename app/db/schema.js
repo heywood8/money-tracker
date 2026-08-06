@@ -412,6 +412,16 @@ export const budgetPlanLines = sqliteTable('budget_plan_lines', {
   // stands on its own. ON DELETE SET NULL: dropping a group ungroups its lines,
   // it never deletes the budgets inside it.
   groupId: text('group_id').references(() => budgetPlanLineGroups.id, { onDelete: 'set null' }),
+  // Migration 0026. The months a RECURRING line speaks for, so editing one stops
+  // rewriting history: `effective_from` is the first month (YYYY-MM) it applies
+  // to (NULL = since forever, what every pre-0026 recurring line has) and
+  // `effective_to` the last, inclusive (NULL = open-ended). Editing a recurring
+  // line closes the old row at the month before the edit and opens a copy
+  // carrying the new values at the edit's month, so a past month keeps rendering
+  // the budget that was true for it — see BudgetPlansDB.updateLine.
+  // Both stay NULL on a one-off line: `plan_id` already scopes it to one month.
+  effectiveFrom: text('effective_from'),
+  effectiveTo: text('effective_to'),
   createdAt: text('created_at').notNull(),
   updatedAt: text('updated_at').notNull(),
 }, (table) => ({

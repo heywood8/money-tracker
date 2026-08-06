@@ -61,6 +61,36 @@ const currentMonthKey = () => {
 };
 
 /**
+ * A month key when it really is one, else null — the shape every effective-range
+ * argument goes through, so a caller that hands in undefined (or a typo'd month)
+ * gets the pre-0026 "applies to every month" behaviour instead of a range no
+ * comparison can read.
+ * @param {string|null|undefined} month
+ * @returns {string|null}
+ */
+const asMonthKey = (month) => (
+  typeof month === 'string' && MONTH_REGEX.test(month) ? month : null
+);
+
+/** The month before `month` (YYYY-MM), used to close a superseded line. */
+const previousMonthKey = (month) => {
+  const [y, m] = month.split('-').map(Number);
+  const d = new Date(y, m - 2, 1);
+  return `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}`;
+};
+
+/**
+ * The `l`-aliased SQL predicate limiting a RECURRING line to the months it
+ * speaks for (migration 0026), plus its two bind values. Month keys are
+ * zero-padded YYYY-MM, so a plain string comparison orders them correctly.
+ *
+ * NULL on either bound is open on that side: NULL/NULL — every pre-0026 line —
+ * matches every month, exactly as before the columns existed.
+ */
+const EFFECTIVE_IN_MONTH_SQL =
+  '(l.effective_from IS NULL OR l.effective_from <= ?) AND (l.effective_to IS NULL OR l.effective_to >= ?)';
+
+/**
  * Map a budget_plans row (snake_case) to the camelCase shape the app uses.
  * @param {Object|null} row
  * @returns {Object|null}
@@ -157,6 +187,11 @@ export const mapLineFields = (row) => {
     isRecurring: row.is_recurring === 1,
     currency: row.currency ?? null,
     kind,
+    // The months this recurring line speaks for (migration 0026). NULL/NULL —
+    // what every pre-0026 recurring line has — is "every month there is".
+    // Meaningless on a one-off line, whose `plan_id` already names its month.
+    effectiveFrom: row.effective_from ?? null,
+    effectiveTo: row.effective_to ?? null,
     createdAt: row.created_at,
     updatedAt: row.updated_at,
   };
@@ -654,6 +689,13 @@ const insertPlanLine = async (planId, line) => {
       // An income line is never grouped (see mapLineFields), so the column is
       // written NULL for one however the caller asked.
       group_id: (line.kind !== 'income' && isSet(line.groupId)) ? line.groupId : null,
+      // A recurring line starts at the month it was added in (migration 0026) —
+      // a budget created in August is not evidence about July, and back-filling
+      // it into every past month is the same history rewrite that editing one
+      // used to be. Omitted (or on a one-off line, which `plan_id` already scopes
+      // to one month) it stays NULL: "every month there is".
+      effective_from: isRecurring ? asMonthKey(line.effectiveFrom) : null,
+      effective_to: null,
       created_at: now,
       updated_at: now,
     };
@@ -664,12 +706,13 @@ const insertPlanLine = async (planId, line) => {
     // line that lost only its accounts would quietly count the WHOLE category.
     await executeTransaction(async (db) => {
       await db.runAsync(
-        'INSERT INTO budget_plan_lines (id, plan_id, label, amount, comment, category_id, to_account_id, sort_order, is_recurring, currency, kind, include_children, group_id, created_at, updated_at) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)',
+        'INSERT INTO budget_plan_lines (id, plan_id, label, amount, comment, category_id, to_account_id, sort_order, is_recurring, currency, kind, include_children, group_id, effective_from, effective_to, created_at, updated_at) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)',
         [
           row.id, row.plan_id, row.label, row.amount, row.comment, row.category_id,
           row.to_account_id, row.sort_order, row.is_recurring, row.currency,
           row.kind, row.include_children,
-          row.group_id, row.created_at, row.updated_at,
+          row.group_id, row.effective_from, row.effective_to,
+          row.created_at, row.updated_at,
         ],
       );
       await writeLineCategoriesInTx(db, row.id, categoryIds);
@@ -694,17 +737,23 @@ export const addLine = async (planId, line) => insertPlanLine(planId, line);
 
 /**
  * Add a recurring (global template) line: not tied to any single month's plan
- * (`plan_id` NULL) — it applies to every calendar month automatically, mirroring
- * how the legacy per-category `budgets` (v1) behaved. Since it has no plan to
- * inherit a currency from, `line.currency` is required.
- * @param {Object} line - { label?, amount, currency, comment?, categoryId?, toAccountId?, sortOrder? }
+ * (`plan_id` NULL) — it applies to every calendar month from `line.effectiveFrom`
+ * onward, mirroring how the legacy per-category `budgets` (v1) behaved. Since it
+ * has no plan to inherit a currency from, `line.currency` is required.
+ * @param {Object} line - { label?, amount, currency, comment?, categoryId?, toAccountId?,
+ *   sortOrder?, effectiveFrom? } — `effectiveFrom` (YYYY-MM) is the first month the
+ *   budget applies to; omit it only for a line that genuinely describes every
+ *   month there has ever been (the legacy-budget bridge does).
  * @returns {Promise<Object>} The created line (camelCase).
  */
 export const addRecurringLine = async (line) => insertPlanLine(null, line);
 
 /**
- * Get all recurring lines (global templates, not tied to any one month's plan).
- * These apply to every calendar month automatically.
+ * Get all recurring lines (global templates, not tied to any one month's plan),
+ * INCLUDING the superseded versions of edited ones — every row ever closed by an
+ * edit is still a recurring line, it just speaks for months in the past. Callers
+ * rendering or totalling a single month want {@link getRecurringLinesForMonth}
+ * instead; this one is for exports and management views that mean "all of them".
  * @returns {Promise<Array>}
  */
 export const getRecurringLines = async () => {
@@ -720,17 +769,45 @@ export const getRecurringLines = async () => {
 };
 
 /**
- * Get every line that applies to a given month: recurring (global) lines UNION
- * the one-off lines of that month's plan, if one exists. This is what the merged
- * Budgets screen renders — recurring lines show even for a month with no plan
- * created yet.
+ * The recurring lines that apply to ONE month (migration 0026): those whose
+ * effective range covers it. Editing a recurring line splits it into a closed
+ * version and an open one (see {@link updateLine}), so a past month reads the
+ * budget that was true for it while the current month reads the latest — which
+ * is why every per-month read goes through here rather than
+ * {@link getRecurringLines}.
+ * @param {string} month - YYYY-MM
+ * @returns {Promise<Array>}
+ */
+export const getRecurringLinesForMonth = async (month) => {
+  const key = asMonthKey(month);
+  if (!key) {
+    throw new Error('A valid month (YYYY-MM) is required');
+  }
+  try {
+    const rows = await queryAll(
+      `${LINE_SELECT} WHERE l.is_recurring = 1 AND ${EFFECTIVE_IN_MONTH_SQL}
+       ORDER BY l.sort_order ASC, l.created_at ASC`,
+      [key, key],
+    );
+    return (rows || []).map(mapLineFields);
+  } catch (error) {
+    console.error('Failed to get recurring budget plan lines for month:', error);
+    throw error;
+  }
+};
+
+/**
+ * Get every line that applies to a given month: the recurring (global) lines
+ * effective that month UNION the one-off lines of that month's plan, if one
+ * exists. This is what the merged Budgets screen renders — recurring lines show
+ * even for a month with no plan created yet.
  * @param {string} month - YYYY-MM
  * @returns {Promise<Array>}
  */
 export const getLinesForMonth = async (month) => {
   try {
     const [recurringLines, plan] = await Promise.all([
-      getRecurringLines(),
+      getRecurringLinesForMonth(month),
       getPlanByMonth(month),
     ]);
     const oneOffLines = plan ? await getPlanLines(plan.id) : [];
@@ -796,6 +873,62 @@ const convertLineAmount = async (rawAmount, fromCurrency, toCurrency) => {
 };
 
 /**
+ * Every column of `budget_plan_lines` a version split carries over — everything
+ * except the row's own identity (`id`), its effective range (the split is what
+ * sets those) and its timestamps.
+ *
+ * The two legacy template columns (`account_id`, `last_executed_month`) ride
+ * along even though the app never reads them: a split must hand the new version
+ * EVERYTHING the old one held, or editing a line's amount would quietly drop
+ * values backups and the Sheets export still round-trip. A column added to the
+ * table later belongs in this list for the same reason.
+ */
+const CLONE_COLUMNS = [
+  'plan_id', 'label', 'amount', 'comment', 'category_id', 'to_account_id',
+  'sort_order', 'is_recurring', 'currency', 'kind', 'account_id',
+  'last_executed_month', 'include_children', 'group_id',
+];
+
+/**
+ * Open a new version of a recurring line at `fromMonth`, inside an open
+ * transaction: a full copy of `id` under a new id, starting that month and
+ * inheriting whatever end the original had. The caller applies the user's edits
+ * to the copy and closes the original at the month before.
+ *
+ * The copy is made in SQL (INSERT … SELECT over {@link CLONE_COLUMNS}) rather
+ * than by reading the row out and writing its fields back, so the values cross
+ * without ever being re-derived — no mapping, no defaults, nothing to disagree
+ * with what was stored.
+ * @param {Object} db - Transaction-scoped database handle
+ * @param {string} id - The line being superseded
+ * @param {string} newId
+ * @param {string} fromMonth - YYYY-MM the new version starts at
+ * @param {string} now - ISO timestamp
+ * @returns {Promise<void>}
+ */
+const cloneLineVersionInTx = async (db, id, newId, fromMonth, now) => {
+  await db.runAsync(
+    `INSERT INTO budget_plan_lines (id, ${CLONE_COLUMNS.join(', ')}, effective_from, effective_to, created_at, updated_at)
+     SELECT ?, ${CLONE_COLUMNS.join(', ')}, ?, effective_to, ?, ?
+     FROM budget_plan_lines WHERE id = ?`,
+    [newId, fromMonth, now, now, id],
+  );
+  // The junctions travel with the row. Copied unconditionally: an update that
+  // names a new category/account set overwrites them below, and one that says
+  // nothing about either must find the old sets on the new version — a line that
+  // lost its categories to a version split would read as broken and stop
+  // counting anything.
+  await db.runAsync(
+    'INSERT OR IGNORE INTO budget_plan_line_categories (line_id, category_id) SELECT ?, category_id FROM budget_plan_line_categories WHERE line_id = ?',
+    [newId, id],
+  );
+  await db.runAsync(
+    'INSERT OR IGNORE INTO budget_plan_line_accounts (line_id, account_id) SELECT ?, account_id FROM budget_plan_line_accounts WHERE line_id = ?',
+    [newId, id],
+  );
+};
+
+/**
  * Update a line. Partial updates. The "exactly one target" invariant is preserved
  * even for partial updates: (re)assigning one target to a real value implicitly
  * clears the other, so a line can never end up linked to both — a partial update
@@ -825,13 +958,37 @@ const convertLineAmount = async (rawAmount, fromCurrency, toCurrency) => {
  * rule (it narrows expenses rather than naming a target), but assigning a
  * transfer target does clear it — a transfer line tracks incoming transfers, and
  * an inherited expense filter on one would silently mean nothing.
+ *
+ * HISTORY (migration 0026). A recurring line applies to every month from its
+ * `effective_from` onward, so plainly UPDATEing one rewrites the past: raising a
+ * grocery budget in August would re-render every earlier month against a target
+ * that did not exist when the money was spent. Pass `options.fromMonth` — the
+ * month the user is editing in — and the edit becomes a VERSION SPLIT instead:
+ * the row is closed at the month before, and a copy carrying the new values opens
+ * at `fromMonth` (inheriting whatever end the original had, so editing a version
+ * that was itself superseded later only touches ITS months). Every month before
+ * the split keeps rendering the budget that was true for it.
+ *
+ * The split is skipped — a plain in-place update — when it would change nothing:
+ * a one-off line (already scoped to one month by `plan_id`), a recurring line
+ * that already starts at `fromMonth`, or one whose months are entirely behind it.
+ * `options.fromMonth` omitted keeps the pre-0026 behaviour (edit every month at
+ * once), which is what the backup/import paths want.
+ *
+ * A one-off line becoming recurring starts at `fromMonth` for the same reason a
+ * newly added recurring line does: the budget is news about this month forward,
+ * not a claim about months already spent.
  * @param {string} id
  * @param {Object} updates - Partial { label, amount, comment, categoryId, categoryIds,
  *   sourceAccountIds, toAccountId, sortOrder, isRecurring, currency, planId }
- * @returns {Promise<void>}
+ * @param {Object} [options] - { fromMonth?: 'YYYY-MM' } — the month the edit takes
+ *   effect from; earlier months keep the line as it was.
+ * @returns {Promise<string>} The id now carrying the values: `id` itself, or the
+ *   new version's id when the edit split the line.
  */
-export const updateLine = async (id, updates) => {
+export const updateLine = async (id, updates, options = {}) => {
   try {
+    const fromMonth = asMonthKey(options?.fromMonth);
     // `categoryIds` (the whole set) or the legacy single `categoryId`; undefined
     // when the caller mentioned neither, which leaves the existing links alone.
     const requestedCategoryIds = resolveCategoryIds(updates);
@@ -923,11 +1080,18 @@ export const updateLine = async (id, updates) => {
     let amount = updates.amount;
     const changesCurrency = updates.isRecurring !== undefined || updates.currency !== undefined;
 
-    if (changesCurrency) {
-      const row = await queryFirst('SELECT * FROM budget_plan_lines WHERE id = ?', [id]);
+    // The stored row is needed to convert an amount out of the currency it is
+    // presently expressed in, and to tell whether this edit has months behind it
+    // that must keep the old values (migration 0026). One load serves both.
+    let row = null;
+    if (changesCurrency || fromMonth) {
+      row = await queryFirst('SELECT * FROM budget_plan_lines WHERE id = ?', [id]);
       if (!row) {
         throw new Error('Budget plan line not found');
       }
+    }
+
+    if (changesCurrency) {
       const fromCurrency = await currentLineCurrency(row);
       const rawAmount = amount !== undefined ? amount : row.amount;
 
@@ -973,6 +1137,34 @@ export const updateLine = async (id, updates) => {
       values.push(String(amount));
     }
 
+    // Does this edit have months behind it that must keep the line as it is?
+    //
+    // Only a recurring line can: a one-off line is one month by construction.
+    // A version that already STARTS at `fromMonth` is refined in place — editing
+    // the same month twice must not stack a version per correction — and one
+    // already closed BEFORE it has no month left to open a successor for (which
+    // the UI cannot reach anyway: it only ever hands over the version effective in
+    // the month on screen).
+    const splitsHistory = !!fromMonth
+      && !!row
+      && row.is_recurring === 1
+      && (!row.effective_from || row.effective_from < fromMonth)
+      && !(row.effective_to && row.effective_to < fromMonth);
+
+    if (splitsHistory && updates.isRecurring === false) {
+      // The line stops recurring from this month on. Its successor is a one-off
+      // scoped by `plan_id`, so it carries no range of its own — the range the
+      // clone below copies has to be cleared back off it.
+      fields.push('effective_from = ?', 'effective_to = ?');
+      values.push(null, null);
+    } else if (fromMonth && updates.isRecurring === true && row?.is_recurring !== 1) {
+      // A one-off line becoming recurring, which is not a split (it spoke for a
+      // single month until now): like a newly added recurring line, it starts at
+      // the month it was made recurring in rather than at the beginning of time.
+      fields.push('effective_from = ?', 'effective_to = ?');
+      values.push(fromMonth, null);
+    }
+
     // "No columns changed" is not the same as "nothing to do": the source-account
     // filter (migration 0024) lives entirely in a junction and pushes no column of
     // its own, so an update that only narrows a line to one card would otherwise
@@ -980,32 +1172,52 @@ export const updateLine = async (id, updates) => {
     // safe (it also writes the denormalized `category_id` column) but is checked
     // alongside so the two cannot diverge on the next change.
     if (fields.length === 0 && categoryIds === undefined && sourceAccountIds === undefined) {
-      return; // Nothing to update
+      return id; // Nothing to update
     }
 
+    const now = new Date().toISOString();
     fields.push('updated_at = ?');
-    values.push(new Date().toISOString());
-    values.push(id);
+    values.push(now);
+
+    // Where the new values land: the line itself, or a fresh copy of it opening
+    // at `fromMonth` when the months already behind the edit have to keep the old
+    // ones.
+    const targetId = splitsHistory ? uuid.v4() : id;
+    values.push(targetId);
 
     const sql = `UPDATE budget_plan_lines SET ${fields.join(', ')} WHERE id = ?`;
 
-    if (categoryIds === undefined && sourceAccountIds === undefined) {
+    if (!splitsHistory && categoryIds === undefined && sourceAccountIds === undefined) {
       await executeQuery(sql, values);
-      return;
+      return targetId;
     }
 
     // Row and links move together, so a failure can't leave the primary column
     // pointing at a category the junction no longer holds, nor a line counting a
-    // category it was just told to narrow to one account.
+    // category it was just told to narrow to one account. A version split joins
+    // them in the same transaction for the same reason: half of it would leave the
+    // month showing the budget twice, or not at all.
     await executeTransaction(async (db) => {
+      if (splitsHistory) {
+        await cloneLineVersionInTx(db, id, targetId, fromMonth, now);
+      }
       await db.runAsync(sql, values);
       if (categoryIds !== undefined) {
-        await writeLineCategoriesInTx(db, id, categoryIds);
+        await writeLineCategoriesInTx(db, targetId, categoryIds);
       }
       if (sourceAccountIds !== undefined) {
-        await writeLineAccountsInTx(db, id, sourceAccountIds);
+        await writeLineAccountsInTx(db, targetId, sourceAccountIds);
+      }
+      if (splitsHistory) {
+        // Close the superseded version at the month before the edit — the last
+        // month it is the truth for.
+        await db.runAsync(
+          'UPDATE budget_plan_lines SET effective_to = ?, updated_at = ? WHERE id = ?',
+          [previousMonthKey(fromMonth), now, id],
+        );
       }
     });
+    return targetId;
   } catch (error) {
     console.error('Failed to update budget plan line:', error);
     throw error;
@@ -1014,11 +1226,42 @@ export const updateLine = async (id, updates) => {
 
 /**
  * Delete a line.
+ *
+ * HISTORY (migration 0026), the counterpart to {@link updateLine}'s version
+ * split: deleting a recurring line that has months behind it CLOSES it at the
+ * month before `options.fromMonth` instead of erasing it. Dropping the row would
+ * take the budget out of every month it ever applied to, which is the same
+ * history rewrite editing one used to be — the line is over, it was not
+ * imaginary. A recurring line that only ever spoke for `fromMonth` onward (and
+ * any one-off line, which is one month by construction) is deleted outright,
+ * since closing it would leave a row covering no month at all.
+ *
+ * `options.fromMonth` omitted deletes unconditionally — what the import/restore
+ * paths want.
  * @param {string} id
+ * @param {Object} [options] - { fromMonth?: 'YYYY-MM' } — the month being edited.
  * @returns {Promise<void>}
  */
-export const deleteLine = async (id) => {
+export const deleteLine = async (id, options = {}) => {
   try {
+    const fromMonth = asMonthKey(options?.fromMonth);
+    if (fromMonth) {
+      const row = await queryFirst(
+        'SELECT is_recurring, effective_from, effective_to FROM budget_plan_lines WHERE id = ?',
+        [id],
+      );
+      const hasHistory = row
+        && row.is_recurring === 1
+        && (!row.effective_from || row.effective_from < fromMonth)
+        && !(row.effective_to && row.effective_to < fromMonth);
+      if (hasHistory) {
+        await executeQuery(
+          'UPDATE budget_plan_lines SET effective_to = ?, updated_at = ? WHERE id = ?',
+          [previousMonthKey(fromMonth), new Date().toISOString(), id],
+        );
+        return;
+      }
+    }
     await executeQuery('DELETE FROM budget_plan_lines WHERE id = ?', [id]);
   } catch (error) {
     console.error('Failed to delete budget plan line:', error);
@@ -1741,8 +1984,8 @@ const collectPlanSourceCurrencies = async (lines, startDate, endDate, convertAll
  * Compute a plan's full plan-vs-actual status: per-line actuals with the shared
  * budget status bands, income vs expected, and totals — all expressed in
  * `displayCurrency` (defaults to the plan's own currency). Lines include BOTH the
- * plan's one-off lines and every recurring (global) line — see
- * {@link getLinesForMonth}. A recurring line's own `currency` (when it differs
+ * plan's one-off lines and the recurring (global) lines effective in the plan's
+ * month — see {@link getLinesForMonth}. A recurring line's own `currency` (when it differs
  * from the display currency) is converted the same way an account-linked line's
  * destination currency is: always, regardless of `convertAll` — the target
  * amount itself needs a consistent currency to be comparable, unlike the actual
@@ -1769,7 +2012,7 @@ export const calculatePlanStatus = async (planId, displayCurrency = null, conver
     }
     const target = displayCurrency || plan.currency;
     const [oneOffLines, recurringLines, allGroups] = await Promise.all([
-      getPlanLines(planId), getRecurringLines(), getLineGroups(),
+      getPlanLines(planId), getRecurringLinesForMonth(plan.month), getLineGroups(),
     ]);
     const lines = [...recurringLines, ...oneOffLines];
     const { startDate, endDate } = getMonthDateRange(plan.month);

@@ -26,6 +26,7 @@ import CategoryGridSelector from '../CategoryGridSelector';
 import AccountGridSelector from '../AccountGridSelector';
 import CurrencyChipRow from '../CurrencyChipRow';
 import { SPACING, BORDER_RADIUS, FONT_SIZE, ICON_SIZE } from '../../styles/designTokens';
+import { formatMonthLabel } from '../../utils/monthUtils';
 import * as Currency from '../../services/currency';
 import EmptyState from '../EmptyState';
 import { SECTION_LABEL } from '../../styles/componentStyles';
@@ -265,15 +266,17 @@ PanelHeader.propTypes = {
  * lines only — a transfer line tracks incoming transfers and an income line has
  * no per-line spending, so neither has expenses for it to narrow.
  *
- * A recurring line is a global template that applies to every calendar month
- * automatically (like the old v1 per-category budgets); a one-off line belongs to
- * this month's plan only.
+ * A recurring line is a global template that applies to every calendar month from
+ * the month it was added or last edited in onward (migration 0026 — earlier
+ * months keep the budget they were spent against); a one-off line belongs to this
+ * month's plan only.
  */
 export default function BudgetPlanLineModal({
   visible = false,
   line = null,
   initialKind = 'expense',
   currency = 'USD',
+  month = null,
   expenseCategories = [],
   incomeCategories = [],
   accounts = [],
@@ -285,13 +288,21 @@ export default function BudgetPlanLineModal({
   onClose = () => {},
 }) {
   const { colors } = useThemeColors();
-  const { t } = useLocalization();
+  const { t, language } = useLocalization();
   const { showDialog } = useDialog();
   // A subpanel covers the sheet edge to edge, including the strip ModalShell
   // reserves for the system navigation bar — so it pads that back in itself.
   const insets = useSafeAreaInsets();
 
   const isEditingLine = line != null;
+
+  // The month a recurring line's budget starts counting from — the one the sheet
+  // was opened over. Named in full ("August 2026") rather than as a key, since it
+  // is read as prose in the hint under the recurring toggle.
+  const monthLabel = useMemo(
+    () => (month ? formatMonthLabel(month, language) : null),
+    [month, language],
+  );
 
   const [kind, setKind] = useState(initialKind);
   const [amount, setAmount] = useState('');
@@ -1093,6 +1104,17 @@ export default function BudgetPlanLineModal({
           />
         </View>
 
+        {/* "Every month" is only half of what a recurring line does, and the
+            half a person editing one needs is the other: the change starts HERE
+            and the months already behind it keep what they were budgeted at
+            (migration 0026). Shown only while the toggle is on — a one-off line
+            has never been anything but this month. */}
+        {isRecurring && monthLabel && (
+          <Text style={[styles.groupHint, { color: colors.mutedText }]} testID="plan-line-recurring-hint">
+            {t('recurring_from_month_hint').replace('{month}', monthLabel)}
+          </Text>
+        )}
+
         {/* The one thing the rows above cannot say on their own: that the two
             filters INTERSECT. Shown only once a filter is actually set — before
             that there is no ambiguity to resolve. */}
@@ -1155,6 +1177,9 @@ BudgetPlanLineModal.propTypes = {
   }),
   initialKind: PropTypes.oneOf(KINDS),
   currency: PropTypes.string,
+  // The month the sheet was opened over (YYYY-MM) — where a recurring budget
+  // starts applying from.
+  month: PropTypes.string,
   expenseCategories: PropTypes.array,
   incomeCategories: PropTypes.array,
   accounts: PropTypes.array,

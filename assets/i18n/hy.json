@@ -586,6 +586,7 @@
   "previous_year": "Նախորդ տարի",
   "next_year": "Հաջորդ տարի",
   "recurring_allocation": "Կրկնվող",
+  "recurring_from_month_hint": "Գործում է {month}-ից սկսած։ Նախորդ ամիսների բյուջեն մնում է անփոփոխ։",
   "group": "Խումբ",
   "no_group": "Առանց խմբի",
   "new_group": "Նոր խումբ",

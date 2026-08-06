@@ -130,7 +130,10 @@ const TABLE_FIELDS = {
   // `include_children` (migration 0021) says whether descendants of the linked
   // categories roll up into the line's actual.
   // `group_id` (migration 0022) is the envelope the line belongs to, or null.
-  budget_plan_lines: ['id', 'plan_id', 'label', 'amount', 'comment', 'category_id', 'to_account_id', 'sort_order', 'is_recurring', 'currency', 'kind', 'account_id', 'last_executed_month', 'include_children', 'group_id', 'created_at', 'updated_at'],
+  // `effective_from` / `effective_to` (migration 0026) bound the months a
+  // RECURRING line applies to — both null means every month, which is what a
+  // pre-0026 backup restores as.
+  budget_plan_lines: ['id', 'plan_id', 'label', 'amount', 'comment', 'category_id', 'to_account_id', 'sort_order', 'is_recurring', 'currency', 'kind', 'account_id', 'last_executed_month', 'include_children', 'group_id', 'effective_from', 'effective_to', 'created_at', 'updated_at'],
   // The full category set of each line (migration 0021); `category_id` above is
   // only its primary entry.
   budget_plan_line_categories: ['line_id', 'category_id'],
@@ -351,6 +354,19 @@ export const exportBackup = async (format = 'json') => {
 };
 
 const VALID_OPERATION_TYPES = ['expense', 'income', 'transfer'];
+
+/**
+ * A backed-up YYYY-MM month key, or null for anything else — '' (what a CSV
+ * round trip makes of a null), a missing column in a pre-0026 backup, or a value
+ * that isn't a month at all. Used for the effective range of a recurring budget
+ * line, where null legitimately means "unbounded on that side".
+ * @param {*} value
+ * @returns {string|null}
+ */
+const asBackupMonth = (value) => (
+  typeof value === 'string' && /^\d{4}-(0[1-9]|1[0-2])$/.test(value) ? value : null
+);
+
 const VALID_CATEGORY_TYPES = ['folder', 'entry'];
 const VALID_CATEGORY_KINDS = ['expense', 'income'];
 const VALID_BUDGET_PERIODS = ['weekly', 'monthly', 'yearly'];
@@ -990,7 +1006,7 @@ export const restoreBackup = async (backup, cancelToken) => {
             mappedAccountId = accountIdMapping.get(String(line.account_id)) ?? null;
           }
           await db.runAsync(
-            'INSERT INTO budget_plan_lines (id, plan_id, label, amount, comment, category_id, to_account_id, sort_order, is_recurring, currency, kind, account_id, last_executed_month, include_children, group_id, created_at, updated_at) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)',
+            'INSERT INTO budget_plan_lines (id, plan_id, label, amount, comment, category_id, to_account_id, sort_order, is_recurring, currency, kind, account_id, last_executed_month, include_children, group_id, effective_from, effective_to, created_at, updated_at) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)',
             [
               line.id,
               isRecurring ? null : line.plan_id,
@@ -1020,6 +1036,15 @@ export const restoreBackup = async (backup, cancelToken) => {
               // failing its FK and taking the whole import down with it. Absent
               // on every pre-0022 backup, where '' likewise means "no group".
               (line.group_id && restoredGroupIds.has(line.group_id)) ? line.group_id : null,
+              // The months a recurring line applies to (migration 0026). Absent
+              // on every pre-0026 backup — and meaningless on a one-off line,
+              // whose plan_id already names its month — where null restores the
+              // pre-0026 reading: every month there is. A CSV round trip turns a
+              // null into '', so anything that isn't a month key drops to null
+              // rather than landing in the column as a string no comparison can
+              // read.
+              isRecurring ? asBackupMonth(line.effective_from) : null,
+              isRecurring ? asBackupMonth(line.effective_to) : null,
               line.created_at || new Date().toISOString(),
               line.updated_at || new Date().toISOString(),
             ],
