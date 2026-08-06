@@ -5,7 +5,7 @@ import Icon from '@expo/vector-icons/MaterialCommunityIcons';
 import { useDisplaySettings } from '../contexts/DisplaySettingsContext';
 import * as Currency from '../services/currency';
 import currencies from '../../assets/currencies.json';
-import { SPACING, BORDER_RADIUS, FONT_SIZE } from '../styles/designTokens';
+import { SPACING, BORDER_RADIUS, FONT_SIZE, HEIGHTS } from '../styles/designTokens';
 
 // Three across, matching the category grid. An account chip carries a name AND a
 // balance, so the name gets two lines and the balance a smaller size than the
@@ -49,7 +49,6 @@ const symbolOf = (code) => (code ? (currencies[code]?.symbol || code) : '');
  * @param {Function} onSelect          Called with the tapped account id.
  * @param {Object}   colors            Theme colours.
  * @param {Function} t                 Translation function.
- * @param {string}   [icon]            Leading glyph for every chip.
  * @param {string}   [query]           Search text; filters by account name.
  * @param {string}   [testIDPrefix]    Chip testID prefix, so a host can keep the
  *   ids its own tests already know.
@@ -63,7 +62,6 @@ export default function AccountGridSelector({
   onSelect,
   colors,
   t,
-  icon = 'wallet-outline',
   query = '',
   testIDPrefix = DEFAULT_TEST_ID_PREFIX,
   emptyText = null,
@@ -143,7 +141,10 @@ export default function AccountGridSelector({
           pressed && !isSelected && { backgroundColor: colors.selected },
         ]}
       >
-        <Icon name={icon} size={18} color={tone} />
+        {/* No leading glyph: every chip in the grid drew the same wallet/card
+            icon, so it said nothing about which account this one is while
+            costing a whole line of chip height on every picker. Name and
+            balance are the chip. */}
         <Text style={[styles.chipName, { color: tone }]} numberOfLines={2}>
           {account.name}
         </Text>
@@ -210,7 +211,6 @@ AccountGridSelector.propTypes = {
   onSelect: PropTypes.func.isRequired,
   colors: PropTypes.object.isRequired,
   t: PropTypes.func.isRequired,
-  icon: PropTypes.string,
   query: PropTypes.string,
   testIDPrefix: PropTypes.string,
   emptyText: PropTypes.string,
@@ -229,7 +229,7 @@ const styles = StyleSheet.create({
     flex: 1,
     gap: 2,
     justifyContent: 'center',
-    minHeight: 64,
+    minHeight: HEIGHTS.input,
     paddingHorizontal: SPACING.xs,
     paddingVertical: SPACING.sm,
     position: 'relative',

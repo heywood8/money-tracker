@@ -788,7 +788,6 @@ export default function BudgetPlanLineModal({
                 onSelect={handleSelectTransferTargetId}
                 colors={colors}
                 t={t}
-                icon="bank-transfer-in"
                 query={query}
                 testIDPrefix="plan-target-option-acc"
               />
@@ -855,7 +854,6 @@ export default function BudgetPlanLineModal({
               onSelect={handleToggleSourceAccount}
               colors={colors}
               t={t}
-              icon="credit-card-outline"
               query={query}
               testIDPrefix="plan-sources-option"
             />

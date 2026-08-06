@@ -718,7 +718,6 @@ export default function OperationModal({
                   onSelect={handleSelectPickedAccount}
                   colors={colors}
                   t={t}
-                  icon={pickerState.type === 'toAccount' ? 'bank-transfer-in' : 'wallet-outline'}
                 />
               </ScrollView>
             )}
