@@ -1,5 +1,12 @@
 # Changelog
 
+## [0.264.0](https://github.com/heywood8/money-tracker/compare/penny-v0.263.2...penny-v0.264.0) (2026-08-06)
+
+
+### Features
+
+* **accounts:** drop the icon from account picker chips ([#1577](https://github.com/heywood8/money-tracker/issues/1577)) ([09fb24b](https://github.com/heywood8/money-tracker/commit/09fb24b34e3d70a2cf8ebe63efcd50e9ac461b67))
+
 ## [0.263.2](https://github.com/heywood8/money-tracker/compare/penny-v0.263.1...penny-v0.263.2) (2026-08-06)
 
 
