@@ -69,9 +69,11 @@ export const signOut = async () => {
  * Build the 8-sheet data structure from a backup object.
  *
  * The "Planned Operations" sheet is gone as of Budgets v3 phase 3: planned
- * operations are now plan lines carrying an executable template, exported in
- * "Budget Plan Lines" (kind / account / last_executed_month). Spreadsheets
+ * operations are now plan lines, exported in "Budget Plan Lines". Spreadsheets
  * created before this keep a stale tab — it is simply no longer written or read.
+ * That sheet's `execution_account` / `last_executed_month` columns are likewise
+ * legacy: the app stopped executing lines, but they keep round-tripping so an
+ * older spreadsheet restores byte-for-byte.
  * @param {Object} backup - Backup object from createBackup()
  * @returns {Array<{range: string, values: Array<Array>}>}
  */
@@ -483,12 +485,11 @@ export const importFromSheets = async (accessToken, onProgress) => {
       to_account_id: (l.account || l.to_account_id) ? resolveAccountId(l, 'to_account_id', 'account') : null,
       sort_order: (l.sort_order !== '' && l.sort_order != null) ? Number(l.sort_order) : 0,
       is_recurring: isRecurring,
-      // Since migration 0020 a one-off line may carry its own currency too (an
-      // executable template is priced in its account's currency), so this is no
-      // longer gated on is_recurring.
+      // Since migration 0020 a one-off line may carry its own currency too, so
+      // this is no longer gated on is_recurring.
       currency: l.currency || null,
       kind: l.kind || null,
-      // Execution account — present only on a line with a template.
+      // Legacy execution account (see buildSheetsData) — preserved as stored.
       account_id: (l.execution_account || l.account_id)
         ? resolveAccountId(l, 'account_id', 'execution_account')
         : null,

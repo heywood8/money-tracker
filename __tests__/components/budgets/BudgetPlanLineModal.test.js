@@ -240,26 +240,15 @@ describe('BudgetPlanLineModal', () => {
       expect(getByTestId('plan-target-option-acc-group-AMD')).toBeTruthy();
     });
 
-    it('groups execution accounts by currency, and still offers none', async () => {
+    // The execution-account row is gone with the executable-template feature:
+    // operations come from bank notifications now, so a budget line has no
+    // account to run itself from. The two account pickers left are the transfer
+    // TARGET and the spending-account filter.
+    it('offers no execution-account row', async () => {
       const props = { ...baseProps(), accounts: multiCurrency };
-      const { getByTestId } = await render(<BudgetPlanLineModal {...props} />);
-      await fireEvent.press(getByTestId('plan-account-picker'));
-      await waitFor(() => expect(getByTestId('plan-account-option-2')).toBeTruthy());
-      expect(getByTestId('plan-account-option-group-AMD')).toBeTruthy();
-      expect(getByTestId('plan-account-option-none')).toBeTruthy();
-
-      await fireEvent.press(getByTestId('plan-account-option-2'));
-      await fireEvent.changeText(getByTestId('plan-line-amount'), '10');
-      await fireEvent.press(getByTestId('plan-target-picker'));
-      await waitFor(() => expect(getByTestId('plan-target-option-cat-cat1')).toBeTruthy());
-      await fireEvent.press(getByTestId('plan-target-option-cat-cat1'));
-      await fireEvent.press(getByTestId('plan-target-done'));
-      await fireEvent.press(getByTestId('plan-line-save'));
-      expect(props.onSaveLine).toHaveBeenCalledWith(expect.objectContaining({
-        accountId: 2,
-        // An executable line is priced in its account's currency.
-        currency: 'AMD',
-      }));
+      const { getByTestId, queryByTestId } = await render(<BudgetPlanLineModal {...props} />);
+      await waitFor(() => expect(getByTestId('plan-target-picker')).toBeTruthy());
+      expect(queryByTestId('plan-account-picker')).toBeNull();
     });
   });
 
@@ -469,35 +458,11 @@ describe('BudgetPlanLineModal', () => {
     });
   });
 
-  describe('Execution template (Budgets v3 phase 3)', () => {
-    it('saves no execution account by default (analytic target only)', async () => {
-      const props = baseProps();
-      const { getByTestId } = await render(<BudgetPlanLineModal {...props} />);
-      await fireEvent.press(getByTestId('plan-target-picker'));
-      await waitFor(() => expect(getByTestId('plan-target-option-cat-cat1')).toBeTruthy());
-      await fireEvent.press(getByTestId('plan-target-option-cat-cat1'));
-      await fireEvent.changeText(getByTestId('plan-line-amount'), '150');
-      await fireEvent.press(getByTestId('plan-line-save'));
-      expect(props.onSaveLine).toHaveBeenCalledWith(expect.objectContaining({ accountId: null }));
-    });
-
-    it('picking an execution account makes the line executable and prices it in that account currency', async () => {
-      const props = { ...baseProps(), accounts: [{ id: 3, name: 'Card', currency: 'EUR' }] };
-      const { getByTestId } = await render(<BudgetPlanLineModal {...props} />);
-      await fireEvent.press(getByTestId('plan-target-picker'));
-      await waitFor(() => expect(getByTestId('plan-target-option-cat-cat1')).toBeTruthy());
-      await fireEvent.press(getByTestId('plan-target-option-cat-cat1'));
-      await fireEvent.press(getByTestId('plan-account-picker'));
-      await waitFor(() => expect(getByTestId('plan-account-option-3')).toBeTruthy());
-      await fireEvent.press(getByTestId('plan-account-option-3'));
-      await fireEvent.changeText(getByTestId('plan-line-amount'), '65000');
-      await fireEvent.press(getByTestId('plan-line-save'));
-      expect(props.onSaveLine).toHaveBeenCalledWith(expect.objectContaining({
-        accountId: 3, currency: 'EUR',
-      }));
-    });
-
-    it('the None option clears a previously chosen execution account', async () => {
+  describe('Retired execution template', () => {
+    // A saved line carries no execution account any more, and an existing line
+    // that still holds one in the database must not smuggle it back through the
+    // editor — that column is legacy data now, not something this form owns.
+    it('never sends an execution account back to the host', async () => {
       const props = {
         ...baseProps(),
         line: {
@@ -506,12 +471,11 @@ describe('BudgetPlanLineModal', () => {
         },
       };
       const { getByTestId } = await render(<BudgetPlanLineModal {...props} />);
-      await waitFor(() => expect(getByTestId('plan-account-picker')).toBeTruthy());
-      await fireEvent.press(getByTestId('plan-account-picker'));
-      await waitFor(() => expect(getByTestId('plan-account-option-none')).toBeTruthy());
-      await fireEvent.press(getByTestId('plan-account-option-none'));
+      await waitFor(() => expect(getByTestId('plan-line-save')).toBeTruthy());
       await fireEvent.press(getByTestId('plan-line-save'));
-      expect(props.onSaveLine).toHaveBeenCalledWith(expect.objectContaining({ accountId: null }));
+      expect(props.onSaveLine).toHaveBeenCalledWith(
+        expect.not.objectContaining({ accountId: expect.anything() }),
+      );
     });
   });
 
@@ -581,16 +545,6 @@ describe('BudgetPlanLineModal', () => {
       expect(props.onSaveLine).toHaveBeenCalledWith(expect.objectContaining({
         isRecurring: false, currency: null,
       }));
-    });
-
-    it('hides the currency picker once an execution account fixes the currency', async () => {
-      const props = baseProps();
-      const { getByTestId, queryByTestId } = await render(<BudgetPlanLineModal {...props} />);
-      await waitFor(() => expect(getByTestId('plan-account-picker')).toBeTruthy());
-      await fireEvent.press(getByTestId('plan-account-picker'));
-      await waitFor(() => expect(getByTestId('plan-account-option-1')).toBeTruthy());
-      await fireEvent.press(getByTestId('plan-account-option-1'));
-      await waitFor(() => expect(queryByTestId('plan-line-currency-USD')).toBeNull());
     });
 
     it('saves a recurring line with the chosen currency and no plan-specific target requirement change', async () => {

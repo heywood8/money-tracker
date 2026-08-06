@@ -233,19 +233,19 @@ PanelHeader.propTypes = {
 };
 
 /**
- * BudgetPlanLineModal — editor for a single budget line: a monthly target that
- * may also carry an executable template. Built on ModalShell, the app's shared
- * bottom sheet (drag-to-dismiss, keyboard lift, cancel/save row), and following
- * the repo's subpanel pattern (see CLAUDE.md): the target, account and group
- * pickers slide in over the sheet through ModalShell's `overlayPanel` slot —
- * never a nested Modal.
+ * BudgetPlanLineModal — editor for a single budget line: one month's target for
+ * a set of categories, a set of spending accounts, or a transfer destination.
+ * Built on ModalShell, the app's shared bottom sheet (drag-to-dismiss, keyboard
+ * lift, cancel/save row), and following the repo's subpanel pattern (see
+ * CLAUDE.md): the target, account and group pickers slide in over the sheet
+ * through ModalShell's `overlayPanel` slot — never a nested Modal.
  *
  * The form is ordered by what decides what: kind first (it settles what the rest
  * of the sheet means), then the amount as the sheet's one hero figure, then the
- * links (target / execution account / group / scope) grouped into a single card
- * of rows, and finally the free-text label and comment.
+ * links (target / group / scope) grouped into a single card of rows, and finally
+ * the free-text label and comment.
  *
- * `kind` decides what the line means and what an execution would create:
+ * `kind` decides what the line means:
  *   - expense  → tracks spending across ONE OR MORE expense categories and/or
  *     ONE OR MORE source accounts (at least one of the two required); the pickers
  *     toggle them, and spending in a category's descendants always rolls up (a
@@ -265,15 +265,9 @@ PanelHeader.propTypes = {
  * lines only — a transfer line tracks incoming transfers and an income line has
  * no per-line spending, so neither has expenses for it to narrow.
  *
- * Picking an EXECUTION ACCOUNT turns the line into a one-tap payable (the former
- * planned operation): the account is what the created operation touches, so the
- * line's amount is then expressed in that account's currency and the currency
- * picker steps aside. Without an account the line stays a pure analytic target.
- *
  * A recurring line is a global template that applies to every calendar month
- * automatically (like the old v1 per-category budgets, and like a recurring
- * planned operation); a one-off line belongs to this month's plan only, and — when
- * it has a template — is consumed by its execution.
+ * automatically (like the old v1 per-category budgets); a one-off line belongs to
+ * this month's plan only.
  */
 export default function BudgetPlanLineModal({
   visible = false,
@@ -311,8 +305,6 @@ export default function BudgetPlanLineModal({
   // account, which is what every line was before this existed.
   const [sourceAccountIds, setSourceAccountIds] = useState([]);
   const [toAccountId, setToAccountId] = useState(null);
-  // Execution account — set means "this line is executable".
-  const [accountId, setAccountId] = useState(null);
   const [isRecurring, setIsRecurring] = useState(false);
   const [lineCurrency, setLineCurrency] = useState(currency);
   // The envelope this line belongs to (migration 0022), or null for a line that
@@ -331,27 +323,22 @@ export default function BudgetPlanLineModal({
     [expenseCategories, incomeCategories],
   );
 
-  // An executable line's amount lives in its account's currency (that is the
-  // currency the created operation is in), so the picker only applies to a
-  // template-less line — recurring or not (both may be priced in a currency of
-  // their own since migration 0020).
-  const executionCurrency = accountId != null ? accountsById.get(accountId)?.currency : null;
   // A one-off line stores currency: null to mean "inherit the plan's", which is
   // what it did before it had a picker — so only a chip that differs from the
   // plan's currency is written out. A recurring line has no plan to inherit
   // from and always carries its own.
   const oneOffCurrency = lineCurrency && lineCurrency !== currency ? lineCurrency : null;
-  const effectiveCurrency = executionCurrency || (isRecurring ? lineCurrency : oneOffCurrency);
-  // What the amount is actually denominated in. A template-less one-off line stores
-  // currency: null and is priced in the plan's currency, so the field is labelled
-  // with that rather than left bare. (May still be '' if the plan has no currency
-  // yet — no accounts exist.)
+  const effectiveCurrency = isRecurring ? lineCurrency : oneOffCurrency;
+  // What the amount is actually denominated in. A one-off line on the plan's own
+  // currency stores null, so the field is labelled with the plan's rather than
+  // left bare. (May still be '' if the plan has no currency yet — no accounts
+  // exist.)
   const displayCurrency = effectiveCurrency || currency;
 
-  // Currency options for a template-less line: every currency in use across the
-  // user's accounts, the plan's own currency (always offered, even if no
-  // account currently uses it), and — when editing — the line's existing
-  // currency (it may no longer match any account, e.g. the account was closed).
+  // Currency options: every currency in use across the user's accounts, the
+  // plan's own currency (always offered, even if no account currently uses it),
+  // and — when editing — the line's existing currency (it may no longer match any
+  // account, e.g. the account was closed).
   const currencyOptions = useMemo(() => {
     const set = new Set(accounts.map(a => a.currency));
     set.add(currency);
@@ -360,10 +347,10 @@ export default function BudgetPlanLineModal({
   }, [accounts, currency, line]);
   // One option is not a choice: the single chip would be the plan's own currency,
   // permanently selected, saying nothing the amount's own label does not already.
-  const showCurrencyChips = executionCurrency == null && currencyOptions.length > 1;
+  const showCurrencyChips = currencyOptions.length > 1;
 
   // Subpanel navigation for the pickers.
-  const [activeSubPanel, setActiveSubPanel] = useState(null); // null | 'target' | 'sources' | 'account' | 'group'
+  const [activeSubPanel, setActiveSubPanel] = useState(null); // null | 'target' | 'sources' | 'group'
   // Which kind of target the target picker is currently showing.
   const [pickerKind, setPickerKind] = useState('category'); // 'category' | 'account'
   // Filter for the open picker's list. Scoped to the panel, so it resets on open.
@@ -384,7 +371,6 @@ export default function BudgetPlanLineModal({
       setCategoryIds(line.categoryIds ?? (line.categoryId != null ? [line.categoryId] : []));
       setSourceAccountIds(line.sourceAccountIds ?? []);
       setToAccountId(line.toAccountId ?? null);
-      setAccountId(line.accountId ?? null);
       setIsRecurring(!!line.isRecurring);
       setLineCurrency(line.currency || currency);
       setGroupId(line.groupId ?? null);
@@ -396,7 +382,6 @@ export default function BudgetPlanLineModal({
       setCategoryIds([]);
       setSourceAccountIds([]);
       setToAccountId(null);
-      setAccountId(null);
       setIsRecurring(false);
       setLineCurrency(currency);
       setGroupId(null);
@@ -469,7 +454,6 @@ export default function BudgetPlanLineModal({
   }, [kind, toAccountId, openSubPanel]);
 
   const openSourcesPanel = useCallback(() => openSubPanel('sources'), [openSubPanel]);
-  const openAccountPanel = useCallback(() => openSubPanel('account'), [openSubPanel]);
   const openGroupPanel = useCallback(() => openSubPanel('group'), [openSubPanel]);
 
   // Switching the picker's tab is switching lists, so the filter typed for one
@@ -576,13 +560,6 @@ export default function BudgetPlanLineModal({
     setError(null);
   }, []);
 
-  // null clears the template account, turning the line back into a pure target.
-  const handleSelectExecutionAccountId = useCallback((id) => {
-    setAccountId(id ?? null);
-    setError(null);
-    closeSubPanel();
-  }, [closeSubPanel]);
-
   // Normalize a locale decimal comma to a dot — Android decimal-pad keyboards
   // emit "," in many locales and the currency parsing downstream reads a comma
   // string as garbage (parseFloat('1,5') === 1, Decimal treats it as 0). Same
@@ -625,10 +602,6 @@ export default function BudgetPlanLineModal({
       setError(t('amount_must_be_greater_than_zero'));
       return;
     }
-    if (kind === 'transfer' && accountId != null && accountId === toAccountId) {
-      setError(t('accounts_must_be_different'));
-      return;
-    }
     onSaveLine({
       kind,
       amount: String(amount),
@@ -640,17 +613,15 @@ export default function BudgetPlanLineModal({
       // an absent `sourceAccountIds` means "leave it alone" to BudgetPlansDB.
       sourceAccountIds: kind === 'expense' ? sourceAccountIds : [],
       toAccountId: kind === 'transfer' ? (toAccountId ?? null) : null,
-      accountId: accountId ?? null,
       isRecurring,
-      // An executable line is priced in its account's currency; a template-less
-      // one-off line inherits the plan's (null).
+      // A one-off line on the plan's own currency inherits it (null).
       currency: effectiveCurrency,
       // An income line is never grouped — groups aggregate allocations, and the
       // group row is not offered for one (see the picker below).
       groupId: kind === 'income' ? null : groupId,
     });
   }, [saving, kind, amount, amountIsParseable, amountIsPositive, label, comment, categoryIds,
-    sourceAccountIds, toAccountId, accountId,
+    sourceAccountIds, toAccountId,
     isRecurring, effectiveCurrency, groupId, onSaveLine, t]);
 
   const handleDelete = useCallback(() => {
@@ -706,7 +677,6 @@ export default function BudgetPlanLineModal({
     return names.length > 1 ? `${names[0]} +${names.length - 1}` : names[0];
   }, [sourceAccountIds, accountsById, t]);
 
-  const executionAccount = accountId != null ? accountsById.get(accountId) : null;
   const selectedGroup = groupId != null ? groups.find(g => g.id === groupId) : null;
 
   const panelWidth = Dimensions.get('window').width;
@@ -965,53 +935,6 @@ export default function BudgetPlanLineModal({
           />
         </>
       )}
-
-      {activeSubPanel === 'account' && (
-        <>
-          <PanelHeader
-            colors={colors}
-            title={t('template_account')}
-            onBack={closeSubPanel}
-            backLabel={t('back')}
-            backTestID="plan-account-back"
-          />
-
-          {accounts.length >= SEARCH_THRESHOLD && (
-            <FormInput
-              value={query}
-              onChangeText={setQuery}
-              placeholder={t('search')}
-              leftIcon="magnify"
-              testID="plan-account-search"
-            />
-          )}
-
-          <OptionRow
-            colors={colors}
-            icon="close-circle-outline"
-            label={t('no_template_account')}
-            selected={accountId == null}
-            onPress={() => handleSelectExecutionAccountId(null)}
-            testID="plan-account-option-none"
-          />
-
-          <ScrollView
-            style={styles.panelListBody}
-            contentContainerStyle={styles.panelList}
-            keyboardShouldPersistTaps="handled"
-          >
-            <AccountGridSelector
-              accounts={accounts}
-              selectedAccountId={accountId}
-              onSelect={handleSelectExecutionAccountId}
-              colors={colors}
-              t={t}
-              query={query}
-              testIDPrefix="plan-account-option"
-            />
-          </ScrollView>
-        </>
-      )}
     </Animated.View>
   ) : null;
 
@@ -1123,23 +1046,6 @@ export default function BudgetPlanLineModal({
             </>
           )}
 
-          <View style={[styles.divider, { backgroundColor: colors.border }]} />
-
-          {/* Execution account — set one and the line becomes a one-tap payable
-              (the former planned operation). */}
-          <SheetRow
-            colors={colors}
-            icon="wallet-outline"
-            title={`${t('template_account')} · ${t('optional')}`}
-            value={executionAccount
-              ? `${executionAccount.name} · ${executionAccount.currency}`
-              : t('no_template_account')}
-            muted={!executionAccount}
-            onPress={openAccountPanel}
-            accessibilityLabel={t('template_account')}
-            testID="plan-account-picker"
-          />
-
           {/* Group — an envelope this line shares with others (migration 0022).
               Offered for allocations only: an income line declares expected
               income and has no spending for a group to total. */}
@@ -1198,14 +1104,6 @@ export default function BudgetPlanLineModal({
           </Text>
         )}
 
-        {/* Only while it is still an offer — once an account is set, the row
-            above it says so and the hint is spent screen. */}
-        {!executionAccount && (
-          <Text style={[styles.groupHint, { color: colors.mutedText }]}>
-            {t('template_account_hint')}
-          </Text>
-        )}
-
         <Text style={[styles.fieldLabel, { color: colors.mutedText }]}>
           {t('allocation_label')} · {t('optional')}
         </Text>
@@ -1252,7 +1150,6 @@ BudgetPlanLineModal.propTypes = {
     categoryIds: PropTypes.arrayOf(PropTypes.string),
     sourceAccountIds: PropTypes.arrayOf(PropTypes.oneOfType([PropTypes.string, PropTypes.number])),
     toAccountId: PropTypes.oneOfType([PropTypes.string, PropTypes.number]),
-    accountId: PropTypes.oneOfType([PropTypes.string, PropTypes.number]),
     kind: PropTypes.oneOf(KINDS),
     isRecurring: PropTypes.bool,
     currency: PropTypes.string,

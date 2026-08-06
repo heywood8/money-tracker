@@ -2,7 +2,6 @@ import React, { createContext, useContext, useCallback, useMemo } from 'react';
 import PropTypes from 'prop-types';
 import uuid from 'react-native-uuid';
 import * as BudgetPlansDB from '../services/BudgetPlansDB';
-import { appEvents, EVENTS } from '../services/eventEmitter';
 import { useDialog } from './DialogContext';
 import { useLocalization } from './LocalizationContext';
 import { useBudgetPlansData } from './BudgetPlansDataContext';
@@ -163,43 +162,6 @@ export const BudgetPlansActionsProvider = ({ children }) => {
   const getPlanTotals = useCallback((planId) => BudgetPlansDB.getPlanTotals(planId), []);
   const getPlanByMonth = useCallback((month) => BudgetPlansDB.getPlanByMonth(month), []);
 
-  // Executable templates (Budgets v3 phase 3 — the former Planned tab's
-  // mechanics, now living on the line). Errors are surfaced here because the
-  // callers are row-level swipe/menu actions with nowhere else to report.
-  const executeLine = useCallback(async (line, displayName = null) => {
-    try {
-      const created = await BudgetPlansDB.executeLine(line, displayName);
-      // Balances, the operations list and every budget actual just changed.
-      appEvents.emit(EVENTS.OPERATION_CHANGED);
-      appEvents.emit(EVENTS.RELOAD_ALL);
-      return created;
-    } catch (error) {
-      console.error('Failed to execute plan line:', error);
-      reportError(error);
-      throw error;
-    }
-  }, [reportError]);
-
-  const markLineExecuted = useCallback(async (line) => {
-    try {
-      await BudgetPlansDB.markLineExecuted(line);
-    } catch (error) {
-      console.error('Failed to mark plan line as executed:', error);
-      reportError(error);
-      throw error;
-    }
-  }, [reportError]);
-
-  const unmarkLineExecuted = useCallback(async (id) => {
-    try {
-      await BudgetPlansDB.unmarkLineExecuted(id);
-    } catch (error) {
-      console.error('Failed to clear plan line execution mark:', error);
-      reportError(error);
-      throw error;
-    }
-  }, [reportError]);
-
   const value = useMemo(() => ({
     addPlan,
     updatePlan,
@@ -222,9 +184,6 @@ export const BudgetPlansActionsProvider = ({ children }) => {
     reorderLineGroups,
     getPlanTotals,
     getPlanByMonth,
-    executeLine,
-    markLineExecuted,
-    unmarkLineExecuted,
     reloadPlans,
   }), [
     addPlan,
@@ -248,9 +207,6 @@ export const BudgetPlansActionsProvider = ({ children }) => {
     reorderLineGroups,
     getPlanTotals,
     getPlanByMonth,
-    executeLine,
-    markLineExecuted,
-    unmarkLineExecuted,
     reloadPlans,
   ]);
 

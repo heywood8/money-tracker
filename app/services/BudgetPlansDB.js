@@ -13,21 +13,18 @@ import { executeQuery, queryAll, queryFirst, executeTransaction } from './db';
 import * as Currency from './currency';
 import { calculateSpendingForFilters, expandCategoryIds, deriveSpendingStatus } from './BudgetsDB';
 import { formatDate as formatLocalDate } from './BalanceHistoryDB';
-import { sanitizeNewLabel } from '../utils/labelUtils';
 import {
   fetchRatesToTarget,
   convertWithRateMap,
   getTransferTotals,
   getUnconvertibleCurrencies,
-  createOperationInTx,
 } from './OperationsDB';
 
 // YYYY-MM with a real 01–12 month.
 const MONTH_REGEX = /^\d{4}-(0[1-9]|1[0-2])$/;
 
-// The three things a line's executable template can create. A line with no
-// stored `kind` (every pre-0020 row) is a pure analytic target whose effective
-// kind is inferred from its tracking target — see {@link mapLineFields}.
+// What a line budgets. A line with no stored `kind` (every pre-0020 row) has its
+// effective kind inferred from its tracking target — see {@link mapLineFields}.
 const LINE_KINDS = ['income', 'expense', 'transfer'];
 
 /**
@@ -91,11 +88,18 @@ export const mapPlanFields = (row) => {
  * one from); a one-off line inherits the parent plan's currency when its own is
  * null.
  *
- * `kind` / `accountId` / `lastExecutedMonth` were added in migration 0020 (phase
- * 3). `kind` is NULL on legacy rows, so the mapped value falls back to the kind
- * implied by the target (transfer target → 'transfer', otherwise 'expense') —
- * every consumer can then read `line.kind` unconditionally. `hasTemplate` is the
- * computed "this line can be executed" flag the UI keys the execute action off.
+ * `kind` was added in migration 0020 (phase 3) and says what the line budgets:
+ * income, expense or transfer. It is NULL on legacy rows, so the mapped value
+ * falls back to the kind implied by the target (transfer target → 'transfer',
+ * otherwise 'expense') — every consumer can then read `line.kind`
+ * unconditionally.
+ *
+ * That same migration also brought `account_id` / `last_executed_month`, the
+ * executable-template columns the former Planned tab used to run a line as a
+ * one-tap operation. Operations are captured automatically from bank
+ * notifications now, so nothing executes a budget line any more: the two columns
+ * stay in the schema (append-only, still round-tripped by backups and the Sheets
+ * export) but are neither read nor written by the app.
  *
  * `sourceAccountIds` (migration 0024) is the line's SOURCE ACCOUNT filter — the
  * accounts an expense must have been paid from to count. Empty (the default, and
@@ -124,7 +128,6 @@ export const mapLineFields = (row) => {
     ? primary
     : (categoryIds[0] ?? null);
   const toAccountId = row.to_account_id ?? null;
-  const accountId = row.account_id ?? null;
   const kind = LINE_KINDS.includes(row.kind) ? row.kind : (toAccountId !== null ? 'transfer' : 'expense');
   return {
     id: row.id,
@@ -154,9 +157,6 @@ export const mapLineFields = (row) => {
     isRecurring: row.is_recurring === 1,
     currency: row.currency ?? null,
     kind,
-    accountId,
-    lastExecutedMonth: row.last_executed_month ?? null,
-    hasTemplate: accountId !== null,
     createdAt: row.created_at,
     updatedAt: row.updated_at,
   };
@@ -608,7 +608,7 @@ export const getBrokenLines = async (planId) => {
  * validation, defaults) can't silently drift between the two copies.
  * @param {string|null} planId - Plan to scope a one-off line to, or `null` for recurring.
  * @param {Object} line - { label?, amount, currency?, comment?, categoryId?, toAccountId?,
- *   sortOrder?, kind?, accountId? }
+ *   sortOrder?, kind? }
  * @returns {Promise<Object>} The created line (camelCase).
  */
 const insertPlanLine = async (planId, line) => {
@@ -643,13 +643,11 @@ const insertPlanLine = async (planId, line) => {
       to_account_id: isSet(line.toAccountId) ? line.toAccountId : null,
       sort_order: Number.isInteger(line.sortOrder) ? line.sortOrder : 0,
       is_recurring: isRecurring ? 1 : 0,
-      // A one-off line may now carry its own currency too (it just falls back to
-      // the plan's when null) — an executable template's amount is expressed in
-      // its account's currency, which need not match the plan's.
+      // A one-off line may carry its own currency too (it just falls back to the
+      // plan's when null): a budget priced in a foreign account's currency need
+      // not match the plan's.
       currency: line.currency ?? null,
       kind: LINE_KINDS.includes(line.kind) ? line.kind : null,
-      account_id: isSet(line.accountId) ? line.accountId : null,
-      last_executed_month: line.lastExecutedMonth ?? null,
       // Always 1: descendant spending always rolls up (see mapLineFields). The
       // column is kept written so the backup/Sheets shape stays stable.
       include_children: 1,
@@ -666,11 +664,11 @@ const insertPlanLine = async (planId, line) => {
     // line that lost only its accounts would quietly count the WHOLE category.
     await executeTransaction(async (db) => {
       await db.runAsync(
-        'INSERT INTO budget_plan_lines (id, plan_id, label, amount, comment, category_id, to_account_id, sort_order, is_recurring, currency, kind, account_id, last_executed_month, include_children, group_id, created_at, updated_at) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)',
+        'INSERT INTO budget_plan_lines (id, plan_id, label, amount, comment, category_id, to_account_id, sort_order, is_recurring, currency, kind, include_children, group_id, created_at, updated_at) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)',
         [
           row.id, row.plan_id, row.label, row.amount, row.comment, row.category_id,
           row.to_account_id, row.sort_order, row.is_recurring, row.currency,
-          row.kind, row.account_id, row.last_executed_month, row.include_children,
+          row.kind, row.include_children,
           row.group_id, row.created_at, row.updated_at,
         ],
       );
@@ -902,22 +900,12 @@ export const updateLine = async (id, updates) => {
       fields.push('sort_order = ?');
       values.push(Number.isInteger(updates.sortOrder) ? updates.sortOrder : 0);
     }
-    // Executable-template fields (migration 0020). `accountId` set to null drops
-    // the template (the line becomes a pure analytic target again).
     if (updates.kind !== undefined) {
       if (updates.kind !== null && !LINE_KINDS.includes(updates.kind)) {
         throw new Error('A line must be an income, expense or transfer');
       }
       fields.push('kind = ?');
       values.push(updates.kind ?? null);
-    }
-    if (updates.accountId !== undefined) {
-      fields.push('account_id = ?');
-      values.push(isSet(updates.accountId) ? updates.accountId : null);
-    }
-    if (updates.lastExecutedMonth !== undefined) {
-      fields.push('last_executed_month = ?');
-      values.push(updates.lastExecutedMonth ?? null);
     }
     // Group membership (migration 0022). Turning a line into an income line drops
     // it out of its group even when the caller said nothing about groups: income
@@ -955,11 +943,10 @@ export const updateLine = async (id, updates) => {
           if (!updates.planId) {
             throw new Error('A target plan is required to make an allocation one-time');
           }
-          // A one-off line may keep a currency of its own since migration 0020 —
-          // an executable template is priced in its execution account's currency,
+          // A one-off line may keep a currency of its own since migration 0020,
           // and forcing it to the plan's here would convert the amount away from
-          // the currency the operation is actually created in. Without one it
-          // inherits the target plan's currency (the pre-0020 behaviour).
+          // the currency the user priced it in. Without one it inherits the
+          // target plan's currency (the pre-0020 behaviour).
           const toCurrency = updates.currency || await getPlanCurrencyOrThrow(updates.planId);
           amount = await convertLineAmount(rawAmount, fromCurrency, toCurrency);
           fields.push('is_recurring = ?', 'plan_id = ?', 'currency = ?');
@@ -967,8 +954,7 @@ export const updateLine = async (id, updates) => {
         }
       } else {
         // Direct currency edit, no scope change. Since migration 0020 a one-off
-        // line may carry its own currency too (an executable template's amount is
-        // expressed in its account's currency), so this is no longer
+        // line may carry its own currency too, so this is no longer
         // recurring-only: convert from whatever the amount currently means into
         // the new effective currency — clearing it back to NULL on a one-off line
         // means "inherit the plan's currency" and converts into that.
@@ -1402,10 +1388,9 @@ export const getPlanTotals = async (planId) => {
 };
 
 /**
- * Clone a plan and its still-pending lines from one month into a new month. Used
- * by the editor's "start from last month". Lines already executed in the source
- * month are left behind. Fails if the source month has no plan or the target month
- * already has one.
+ * Clone a plan and its lines from one month into a new month. Used by the
+ * editor's "start from last month". Fails if the source month has no plan or the
+ * target month already has one.
  * @param {string} fromMonth - YYYY-MM to copy from
  * @param {string} toMonth - YYYY-MM to copy into
  * @returns {Promise<Object>} The newly created plan (camelCase).
@@ -1426,13 +1411,10 @@ export const copyPlan = async (fromMonth, toMonth) => {
       throw new Error('A plan for this month already exists');
     }
 
-    // Already-executed lines are NOT carried over. getPlanLines only returns the
-    // month's own one-off lines (recurring ones hang off plan_id IS NULL), and a
-    // one-off that already fired is finished business — cloning it would re-add it
-    // as pending (see the last_executed_month note below), inflating the new
-    // month's allocation and offering a swipe that duplicates the operation.
-    const sourceLines = (await getPlanLines(source.id))
-      .filter((line) => !isSet(line.lastExecutedMonth));
+    // getPlanLines only returns the month's own one-off lines — recurring ones
+    // hang off plan_id IS NULL and already apply to every month, so cloning them
+    // here would double them.
+    const sourceLines = await getPlanLines(source.id);
     const now = new Date().toISOString();
     const newPlanId = uuid.v4();
 
@@ -1446,16 +1428,12 @@ export const copyPlan = async (fromMonth, toMonth) => {
         for (let i = 0; i < sourceLines.length; i++) {
           const line = sourceLines[i];
           const clonedId = uuid.v4();
-          // `last_executed_month` is written NULL: every line that reaches here is
-          // pending already (see the filter above), and a clone starts the new
-          // month pending too, exactly like a recurring line does when the month
-          // rolls over.
           await db.runAsync(
-            'INSERT INTO budget_plan_lines (id, plan_id, label, amount, comment, category_id, to_account_id, sort_order, is_recurring, currency, kind, account_id, last_executed_month, include_children, group_id, created_at, updated_at) VALUES (?, ?, ?, ?, ?, ?, ?, ?, 0, ?, ?, ?, NULL, ?, ?, ?, ?)',
+            'INSERT INTO budget_plan_lines (id, plan_id, label, amount, comment, category_id, to_account_id, sort_order, is_recurring, currency, kind, include_children, group_id, created_at, updated_at) VALUES (?, ?, ?, ?, ?, ?, ?, ?, 0, ?, ?, ?, ?, ?, ?)',
             [
               clonedId, newPlanId, line.label, line.amount, line.comment,
               line.categoryId, line.toAccountId, line.sortOrder ?? i,
-              line.currency, line.kind, line.accountId,
+              line.currency, line.kind,
               1, // include_children: always on, see mapLineFields
               // Groups are global, so the clone joins the very same envelope its
               // source belongs to — copying a month must not scatter its groups.
@@ -2052,125 +2030,6 @@ export const calculateAllPlanStatuses = async (convertAll = false, displayCurren
 };
 
 /* -------------------------------------------------------------------------- */
-/* Executable templates (Budgets v3 phase 3)                                   */
-/* -------------------------------------------------------------------------- */
-
-/**
- * True when a line carries an executable template (an account for the operation
- * to touch). A line without one is a pure analytic target — no execute action.
- * @param {Object} line - Plan line (camelCase, see mapLineFields)
- * @returns {boolean}
- */
-export const isExecutable = (line) => !!line && isSet(line.accountId);
-
-/**
- * Mark a line executed for the current month. The line SURVIVES, recurring or
- * not: a one-off line is already scoped to its own month (it hangs off that
- * month's plan via plan_id), and deleting it on execution — as the Planned tab
- * did for a fired one-time operation — silently rewrote the plan the user was
- * measuring against, dropping both its allocation and its actual spending.
- * @param {Object} db - Transaction handle
- * @param {Object} line - Plan line (camelCase)
- * @param {string} month - YYYY-MM
- */
-const markLineInTx = async (db, line, month) => {
-  await db.runAsync(
-    'UPDATE budget_plan_lines SET last_executed_month = ?, updated_at = ? WHERE id = ?',
-    [month, new Date().toISOString(), line.id],
-  );
-};
-
-/**
- * Atomically execute a line's template in a single SQLite transaction: insert the
- * real operation (dated today), adjust account balances, and mark the line
- * executed for the current month.
- *
- * This is the phase-3 home of PlannedOperationsDB.executeAndMark and keeps its
- * guarantee: no partial-failure window where the operation exists but the line
- * still reads as pending (which would invite a silent double-charge).
- *
- * The month is derived here rather than taken from the caller so it can never
- * disagree with the operation's date — executing while browsing another month
- * would otherwise stamp that month while creating a today-dated operation.
- * @param {Object} line - Plan line with a template (camelCase, see mapLineFields)
- * @param {string} [fallbackName] - Name to describe the operation with when the
- *   line carries no label/comment of its own. Resolving the linked category or
- *   account's name needs data this layer does not load, so the caller passes it
- *   in; it must be a real entity name, never a translated UI placeholder.
- * @returns {Promise<Object>} The created operation (snake_case fields)
- */
-export const executeLine = async (line, fallbackName = null) => {
-  try {
-    if (!isExecutable(line)) {
-      throw new Error('This allocation has no account to execute from');
-    }
-    const month = currentMonthKey();
-    // `operations.description` is not free text — it is the delimited label list
-    // owned by labelUtils. An unsanitized name containing "|" would silently
-    // become two labels, and one starting with a system prefix ("Category:", …)
-    // would hide the operation from the list AND mark it non-deletable;
-    // sanitizeNewLabel handles both (plain sanitizeLabel only handles the former).
-    const rawDescription = line.label || line.comment || fallbackName || null;
-    const description = rawDescription ? sanitizeNewLabel(rawDescription) || null : null;
-    const operationData = {
-      type: line.kind || 'expense',
-      amount: line.amount,
-      accountId: line.accountId,
-      categoryId: line.categoryId || null,
-      toAccountId: line.toAccountId || null,
-      date: formatLocalDate(new Date()),
-      description,
-    };
-
-    let createdOperation;
-    await executeTransaction(async (db) => {
-      createdOperation = await createOperationInTx(db, operationData);
-      await markLineInTx(db, line, month);
-    });
-    return createdOperation;
-  } catch (error) {
-    console.error('Failed to execute plan line:', error);
-    throw error;
-  }
-};
-
-/**
- * Mark a line executed for the current month WITHOUT creating an operation (the
- * user already entered it by hand). Like {@link executeLine}, the line survives.
- * @param {Object} line - Plan line (camelCase)
- * @returns {Promise<void>}
- */
-export const markLineExecuted = async (line) => {
-  try {
-    await executeTransaction(async (db) => {
-      await markLineInTx(db, line, currentMonthKey());
-    });
-  } catch (error) {
-    console.error('Failed to mark plan line as executed:', error);
-    throw error;
-  }
-};
-
-/**
- * Clear a line's executed mark (undo). Does not touch any operation that was
- * created by a previous execution — deleting that is the user's call, from the
- * operations list, exactly as it was for planned operations.
- * @param {string} id
- * @returns {Promise<void>}
- */
-export const unmarkLineExecuted = async (id) => {
-  try {
-    await executeQuery(
-      'UPDATE budget_plan_lines SET last_executed_month = NULL, updated_at = ? WHERE id = ?',
-      [new Date().toISOString(), id],
-    );
-  } catch (error) {
-    console.error('Failed to clear plan line execution mark:', error);
-    throw error;
-  }
-};
-
-/* -------------------------------------------------------------------------- */
 /* Legacy budgets (v1) -> recurring plan lines bridge (Budgets v3 phase 2)     */
 /* -------------------------------------------------------------------------- */
 
@@ -2324,21 +2183,21 @@ const ensurePlanForMonthRaw = async (db, month, currency, now) => {
 };
 
 /**
- * Bridge the standalone `planned_operations` model into `budget_plan_lines` as
- * lines carrying an executable template, and each plan's stored `expected_income`
- * into an income line — the two remaining double entries Budgets v3 set out to
- * remove. Idempotent — a no-op once {@link PLANNED_MIGRATION_FLAG_KEY} is set in
+ * Bridge the standalone `planned_operations` model into `budget_plan_lines`, and
+ * each plan's stored `expected_income` into an income line — the two remaining
+ * double entries Budgets v3 set out to remove. Idempotent — a no-op once {@link PLANNED_MIGRATION_FLAG_KEY} is set in
  * `app_metadata`.
  *
  * Mapping:
  *   - recurring template  → recurring line (`plan_id` NULL, applies to every month),
  *   - one-time template   → one-off line on the CURRENT month's plan (created if
  *     the month has none, since a one-off line needs a plan to hang off),
- *   - `name`/`description`→ `label`/`comment`, `type` → `kind`, `account_id` and
- *     `last_executed_month` carry over unchanged, so a template already executed
- *     this month still reads as done afterwards.
- * A line's `currency` is set to its account's currency: an executable template's
- * amount is expressed in the account it is paid from, which need not match the
+ *   - `name`/`description`→ `label`/`comment`, `type` → `kind`. `account_id` and
+ *     `last_executed_month` carry over unchanged into the columns of the same
+ *     name — legacy since the executable-template feature was retired, but the
+ *     migration preserves rather than discards what a template recorded.
+ * A line's `currency` is set to its account's currency: a planned operation's
+ * amount was expressed in the account it was paid from, which need not match the
  * plan's currency (calculatePlanStatus converts it).
  *
  * Expected income is only bridged when there is NO recurring income template —

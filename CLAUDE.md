@@ -8,7 +8,7 @@ This file provides guidance to Claude Code (claude.ai/code) when working with co
 
 ## Project Overview
 
-Penny is a React Native mobile app built with Expo for tracking personal finances. The app targets Android, with features for managing accounts, operations, categories, budgets (a single month-scoped Budgets tab that also holds the recurring/one-time templates the former Planned tab used to own), and viewing graphs. It includes internationalization (11 languages: English, Italian, Russian, Spanish, French, Chinese, German, Armenian, Japanese, Korean, Portuguese) and theme support (light/dark/system). Supports backup/restore (JSON, CSV, SQLite) and Google Sheets export via native Google Sign-In.
+Penny is a React Native mobile app built with Expo for tracking personal finances. The app targets Android, with features for managing accounts, operations, categories, budgets (a single month-scoped Budgets tab holding recurring and one-time allocation targets), and viewing graphs. It includes internationalization (11 languages: English, Italian, Russian, Spanish, French, Chinese, German, Armenian, Japanese, Korean, Portuguese) and theme support (light/dark/system). Supports backup/restore (JSON, CSV, SQLite) and Google Sheets export via native Google Sign-In.
 
 ## Documentation Verification with context7
 
@@ -125,7 +125,7 @@ The app uses React Context API for global state, with primary contexts that wrap
 5. **Other Contexts**
    - `BudgetsContext.js` - Budget management
    - `CategoriesContext.js` - Category management
-   - `BudgetPlansContext.js` - Monthly plans and their lines (targets + executable templates)
+   - `BudgetPlansContext.js` - Monthly plans and their lines (budget targets)
    - `DialogContext.js` - Global dialog/alert system
    - `DisplaySettingsContext.js` - UI preferences (e.g., hide balances)
    - `AppBlurContext.js` - Blur overlay state for security
@@ -593,7 +593,6 @@ describe('ComponentOrService', () => {
 - ✅ Operations management (full CRUD, search, filtering, quick-add, split operations)
 - ✅ Categories management (full CRUD)
 - ✅ Budgets (budget tracking with progress bars)
-- ✅ Recurring/one-time templates with one-tap execution (part of the Budgets tab)
 - ✅ Graphs (expense/income pie charts, balance history, spending prediction, category spending)
 - ✅ Backup/restore (JSON, CSV, SQLite formats)
 - ✅ Google Sheets export (via native Google Sign-In)

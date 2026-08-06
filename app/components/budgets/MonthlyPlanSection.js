@@ -35,9 +35,8 @@ const groupAmountKey = (groupId) => `group:${groupId}`;
 
 /**
  * MonthlyPlanSection — the unified Budgets list: one month-scoped envelope view
- * with an income section (expected vs actual, with one-tap executable income
- * templates), an allocation section (per-category / transfer targets with
- * plan-vs-actual progress bars and their own executable templates), and the
+ * with an income section (expected vs actual), an allocation section
+ * (per-category / transfer targets with plan-vs-actual progress bars), and the
  * month's totals.
  *
  * Month can be controlled by the host (Budgets screen) via the `month` prop so a
@@ -52,13 +51,9 @@ const groupAmountKey = (groupId) => `group:${groupId}`;
  * shown for a month are the union of every recurring line and the month's own
  * one-off lines (see BudgetPlansDB.getLinesForMonth).
  *
- * Phase 3 then absorbed the standalone planned operations: a line may carry an
- * EXECUTABLE TEMPLATE (an account to create the operation in), so "Rent 65 000/mo,
- * recurring, paid from the Ameria card" is declared once and is simultaneously the
- * cap, the allocation and the one-tap payable. Income lines replace the plan's
- * single stored expected-income figure — their sum IS the expected income.
- * Exposes `openAddLine` via ref so a host FAB can open the "add allocation" flow
- * without lifting the modal's state.
+ * Income lines replace the plan's single stored expected-income figure — their
+ * sum IS the expected income. Exposes `openAddLine` via ref so a host FAB can
+ * open the "add allocation" flow without lifting the modal's state.
  */
 const MonthlyPlanSection = forwardRef(function MonthlyPlanSection({
   currency = 'USD',
@@ -66,7 +61,6 @@ const MonthlyPlanSection = forwardRef(function MonthlyPlanSection({
   incomeCategories = [],
   accounts = [],
   month: monthProp = null,
-  onNotify = null,
   onTotalsChange = null,
 }, ref) {
   const { colors } = useThemeColors();
@@ -90,9 +84,6 @@ const MonthlyPlanSection = forwardRef(function MonthlyPlanSection({
     updateLineGroup,
     deleteLineGroup,
     reorderLineGroups,
-    executeLine,
-    markLineExecuted,
-    unmarkLineExecuted,
   } = useBudgetPlans();
 
   // Month is controlled by the host when `monthProp` is provided; otherwise the
@@ -136,18 +127,10 @@ const MonthlyPlanSection = forwardRef(function MonthlyPlanSection({
   // Separate guard for the reorder (move) handlers below, which have no
   // save-in-flight UI to disable and shouldn't be blocked by an unrelated save.
   const moveGuardRef = useRef(false);
-  // And one for the execute/mark/undo actions: executing twice would create the
-  // operation twice, which is precisely the double-charge executeAndMark exists
-  // to prevent.
-  const executeGuardRef = useRef(false);
 
   const plan = useMemo(() => plans.find(p => p.month === month) || null, [plans, month]);
   const prevMonth = useMemo(() => addMonths(month, -1), [month]);
   const prevPlanExists = useMemo(() => plans.some(p => p.month === prevMonth), [plans, prevMonth]);
-  // Execution creates an operation dated today, so it is only offered while the
-  // shown month IS the current one; other months still show the templates and
-  // their (historical) done state.
-  const isCurrentMonth = month === currentMonthKey();
 
   const planId = plan?.id ?? null;
   // The currency the section READS in, which is the one the host's chip names —
@@ -584,7 +567,7 @@ const MonthlyPlanSection = forwardRef(function MonthlyPlanSection({
     );
   }, [showDialog, t, handleDeleteLine]);
 
-  /* ── Executable templates (former Planned tab mechanics) ─────────────────── */
+  /* ── Row naming ──────────────────────────────────────────────────────────── */
 
   // The label a row shows — a line's own `label` is optional, so it is not a
   // usable title on its own. Hoisted above the handlers that consume it.
@@ -610,49 +593,6 @@ const MonthlyPlanSection = forwardRef(function MonthlyPlanSection({
     if (line.kind === 'income') return t('expected_income');
     return t('allocation_unlinked');
   }, [categoriesById, accountsById, t]);
-
-  // Every execution path funnels through here so the double-tap guard, the line
-  // reload and the user feedback can't drift apart between them.
-  const runExecutionAction = useCallback(async (action, notifyKey) => {
-    if (executeGuardRef.current) return;
-    executeGuardRef.current = true;
-    try {
-      await action();
-      await reloadLines();
-      setStatusStale(true);
-      refreshPlanStatuses?.();
-      onNotify?.(t(notifyKey));
-    } catch (error) {
-      // Error dialog already shown by the actions context.
-    } finally {
-      executeGuardRef.current = false;
-    }
-  }, [reloadLines, refreshPlanStatuses, onNotify, t]);
-
-  // The name to persist on the created operation, so it is recognisable in the
-  // operations list instead of landing there blank whenever the line has no
-  // explicit label (the common case — the label field is optional). Deliberately
-  // NOT lineDisplayName: that falls back to translated UI strings, and writing
-  // one into the database would freeze today's language into stored data.
-  const lineOperationName = useCallback((line) => (
-    line.label
-    || (line.categoryId != null ? categoriesById.get(line.categoryId)?.name : null)
-    || (line.toAccountId != null ? accountsById.get(line.toAccountId)?.name : null)
-    || (line.sourceAccountIds?.length ? accountsById.get(line.sourceAccountIds[0])?.name : null)
-    || null
-  ), [categoriesById, accountsById]);
-
-  const handleExecute = useCallback((line) => (
-    runExecutionAction(() => executeLine(line, lineOperationName(line)), 'added_to_operations')
-  ), [runExecutionAction, executeLine, lineOperationName]);
-
-  const handleMarkExecuted = useCallback((line) => (
-    runExecutionAction(() => markLineExecuted(line), 'marked_as_executed')
-  ), [runExecutionAction, markLineExecuted]);
-
-  const handleUndoExecuted = useCallback((line) => (
-    runExecutionAction(() => unmarkLineExecuted(line.id), 'marked_as_pending')
-  ), [runExecutionAction, unmarkLineExecuted]);
 
   // Long-pressing a row lifts it above a blurred backdrop and floats an icon bar
   // over it (RowActionMenu) instead of naming it in a dialog title — the row
@@ -897,45 +837,35 @@ const MonthlyPlanSection = forwardRef(function MonthlyPlanSection({
   // sort_order sequence), so `list` and `onMove` are passed in per block.
   //
   // `lifted` renders the static copy the action menu floats over the row: same
-  // row, no handlers and no swipe actions (the bar above it offers those), under
-  // its own testID namespace. It goes through this renderer rather than a second
-  // hand-written <PlanLineRow> so the copy cannot drift from the row it covers.
+  // row, no handlers, under its own testID namespace. It goes through this
+  // renderer rather than a second hand-written <PlanLineRow> so the copy cannot
+  // drift from the row it covers.
   const renderLine = useCallback((line, index, list, onMove, {
     indented = false, envelopeColor = null, lifted = false,
-  } = {}) => {
-    const executed = line.lastExecutedMonth === month;
-    return (
-      <PlanLineRow
-        key={line.id}
-        line={line}
-        index={index}
-        indented={indented}
-        envelopeColor={envelopeColor}
-        name={lineDisplayName(line)}
-        icon={lineIcon(line)}
-        status={lineStatusById.get(line.id) || null}
-        planCurrency={planCurrency}
-        displayAmount={amountById.get(line.id) ?? null}
-        converting={converting}
-        colors={colors}
-        t={t}
-        executed={executed}
-        canExecute={!lifted && line.hasTemplate && isCurrentMonth && !executed}
-        canUndo={!lifted && line.hasTemplate && isCurrentMonth && executed}
-        showProgress={line.kind !== 'income'}
-        listLength={list.length}
-        lifted={lifted}
-        onMove={lifted ? null : onMove}
-        onPress={lifted ? undefined : openEditLine}
-        onLongPress={lifted ? undefined : handleLongPressLine}
-        onExecute={handleExecute}
-        onMarkExecuted={handleMarkExecuted}
-        onUndo={handleUndoExecuted}
-      />
-    );
-  }, [colors, t, month, isCurrentMonth, lineStatusById, planCurrency, amountById, converting,
-    openEditLine, handleLongPressLine, lineDisplayName, lineIcon, handleExecute,
-    handleMarkExecuted, handleUndoExecuted]);
+  } = {}) => (
+    <PlanLineRow
+      key={line.id}
+      line={line}
+      index={index}
+      indented={indented}
+      envelopeColor={envelopeColor}
+      name={lineDisplayName(line)}
+      icon={lineIcon(line)}
+      status={lineStatusById.get(line.id) || null}
+      planCurrency={planCurrency}
+      displayAmount={amountById.get(line.id) ?? null}
+      converting={converting}
+      colors={colors}
+      t={t}
+      showProgress={line.kind !== 'income'}
+      listLength={list.length}
+      lifted={lifted}
+      onMove={lifted ? null : onMove}
+      onPress={lifted ? undefined : openEditLine}
+      onLongPress={lifted ? undefined : handleLongPressLine}
+    />
+  ), [colors, t, lineStatusById, planCurrency, amountById, converting,
+    openEditLine, handleLongPressLine, lineDisplayName, lineIcon]);
 
   // Same idea for an envelope header: one renderer for the list and for the copy.
   const renderGroupRow = useCallback((view, index, lifted = false) => (
@@ -1033,36 +963,7 @@ const MonthlyPlanSection = forwardRef(function MonthlyPlanSection({
     }
 
     const { line } = actionMenu;
-    const executed = line.lastExecutedMonth === month;
-    const executionActions = [];
-    if (line.hasTemplate && isCurrentMonth) {
-      if (executed) {
-        // `undo_execution` for the screen reader, not the bare `undo`: in several
-        // languages (Russian among them) "Undo" and "Cancel" collapse into
-        // near-identical words.
-        executionActions.push({
-          key: 'undo',
-          icon: 'undo',
-          label: t('undo'),
-          a11yLabel: t('undo_execution'),
-          tone: 'muted',
-          onPress: () => handleUndoExecuted(line),
-        });
-      } else {
-        executionActions.push(
-          { key: 'execute', icon: 'play', label: t('execute'), onPress: () => handleExecute(line) },
-          {
-            key: 'done',
-            icon: 'check-bold',
-            label: t('done'),
-            a11yLabel: t('mark_as_executed'),
-            onPress: () => handleMarkExecuted(line),
-          },
-        );
-      }
-    }
     return [
-      ...executionActions,
       { key: 'edit', icon: 'pencil', label: t('edit'), a11yLabel: t('edit_allocation'), onPress: () => openEditLine(line) },
       ...moveActions,
       {
@@ -1074,8 +975,7 @@ const MonthlyPlanSection = forwardRef(function MonthlyPlanSection({
         onPress: () => confirmDeleteLine(line),
       },
     ];
-  }, [actionMenu, t, month, isCurrentMonth, openEditGroup, confirmDeleteGroup, openEditLine,
-    confirmDeleteLine, handleExecute, handleMarkExecuted, handleUndoExecuted]);
+  }, [actionMenu, t, openEditGroup, confirmDeleteGroup, openEditLine, confirmDeleteLine]);
 
   // Currencies the group editor may price an override in: the same set the line
   // editor offers, for the same reason (a group belongs to no plan, so it needs
@@ -1340,7 +1240,6 @@ MonthlyPlanSection.propTypes = {
   incomeCategories: PropTypes.array,
   accounts: PropTypes.array,
   month: PropTypes.string,
-  onNotify: PropTypes.func,
   onTotalsChange: PropTypes.func,
 };
 

@@ -96,9 +96,7 @@ jest.mock('../../app/components/ModalBlurOverlay', () => () => null);
 // The unified budgets list has its own dedicated test suite; stub it here so the
 // screen-level tests stay focused and don't need the plan contexts. It's a
 // forwardRef component (BudgetScreen's FAB opens its "add allocation" flow via
-// ref), so the mock must be one too. It also exposes a button that fires the
-// host's onNotify, which is how row-level execution feedback reaches the
-// screen's Snackbar.
+// ref), so the mock must be one too.
 const mockOpenAddLine = jest.fn();
 let capturedSectionProps = null;
 jest.mock('../../app/components/budgets/MonthlyPlanSection', () => {
@@ -108,10 +106,6 @@ jest.mock('../../app/components/budgets/MonthlyPlanSection', () => {
     capturedSectionProps = props;
     React.useImperativeHandle(ref, () => ({ openAddLine: mockOpenAddLine }));
     return React.createElement(View, { testID: 'monthly-plan-section' },
-      React.createElement(Pressable, {
-        testID: 'mock-notify',
-        onPress: () => props.onNotify?.('added_to_operations'),
-      }, React.createElement(Text, {}, 'notify')),
       // The section reports the month's remainder up so the header can print it
       // — the figure a person acts on belongs where it is always on screen, not
       // at the bottom of a long scrolling card.
@@ -505,15 +499,14 @@ describe('BudgetScreen', () => {
     });
   });
 
-  describe('Execution feedback (Budgets v3 phase 3)', () => {
-    // Executing a template happens on a row inside the list, but the Snackbar
-    // belongs at the screen's bottom edge — the list reports through onNotify.
-    it('surfaces the message a row reports through onNotify', async () => {
-      const { getByTestId, queryByText, getByText } = await render(<BudgetScreen />);
-      await waitFor(() => expect(getByTestId('mock-notify')).toBeTruthy());
-      expect(queryByText('added_to_operations')).toBeNull();
-      fireEvent.press(getByTestId('mock-notify'));
-      await waitFor(() => expect(getByText('added_to_operations')).toBeTruthy());
+  // The screen's Snackbar existed solely to report a row's execution ("added to
+  // operations"). Executing a budget line is gone, so the screen hands the list
+  // no notify channel at all.
+  describe('Retired execution feedback', () => {
+    it('passes no onNotify to the plan list', async () => {
+      const { getByTestId } = await render(<BudgetScreen />);
+      await waitFor(() => expect(getByTestId('monthly-plan-section')).toBeTruthy());
+      expect(capturedSectionProps.onNotify).toBeUndefined();
     });
   });
 });
