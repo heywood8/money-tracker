@@ -372,7 +372,6 @@ A chip grid grouped by currency. The groups are *not* a hierarchy — there is n
   onSelect={handleSelect}        // called with the chosen account id
   colors={colors}
   t={t}
-  icon="bank-transfer-in"        // optional leading glyph, defaults to wallet-outline
   query={query}                  // optional, filters by account name
   testIDPrefix="plan-account-option"
 />
@@ -382,6 +381,7 @@ A chip grid grouped by currency. The groups are *not* a hierarchy — there is n
 - Group order follows the accounts' own order (first currency to appear wins), so it matches what the user arranged on the Accounts screen; accounts are never reordered within a group.
 - A single-currency set gets **no** headers — one header over everything says nothing. The same applies after a search narrows the set to one currency.
 - The grid reads `hideBalances` from `DisplaySettingsContext` itself rather than taking it as a prop, so a host cannot forget the setting.
+- A chip carries **no** icon. Every account in a grid drew the same wallet/card glyph, so it said nothing about which account a chip is while costing a line of chip height on every picker; the name and balance are the whole chip. There is no `icon` prop.
 
 Hosts: `PickerModal`, `OperationModal`, `BudgetPlanLineModal` (transfer target + execution account + spending-account filter), `AccountsScreen` (transfer-on-delete).
 

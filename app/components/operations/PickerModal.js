@@ -92,7 +92,6 @@ const PickerModal = ({
                     onSelect={handleSelectAccount}
                     colors={colors}
                     t={t}
-                    icon={pickerType === 'toAccount' ? 'bank-transfer-in' : 'wallet-outline'}
                   />
                 </ScrollView>
                 <Pressable style={styles.closeButton} onPress={onClose}>
