@@ -1,5 +1,12 @@
 # Changelog
 
+## [0.263.1](https://github.com/heywood8/money-tracker/compare/penny-v0.263.0...penny-v0.263.1) (2026-08-06)
+
+
+### Bug Fixes
+
+* **accounts:** make the accounts list scrollable again ([#1573](https://github.com/heywood8/money-tracker/issues/1573)) ([7606923](https://github.com/heywood8/money-tracker/commit/76069231897ae230af10aa046fef78e2318a6f84))
+
 ## [0.263.0](https://github.com/heywood8/money-tracker/compare/penny-v0.262.0...penny-v0.263.0) (2026-08-05)
 
 
