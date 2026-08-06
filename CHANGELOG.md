@@ -1,5 +1,12 @@
 # Changelog
 
+## [0.264.1](https://github.com/heywood8/money-tracker/compare/penny-v0.264.0...penny-v0.264.1) (2026-08-06)
+
+
+### Code Refactoring
+
+* **settings:** drive subpanel navigation from a stack reducer ([#1579](https://github.com/heywood8/money-tracker/issues/1579)) ([5a12197](https://github.com/heywood8/money-tracker/commit/5a12197ec9c11cdc5c6fca658153a6019a875632))
+
 ## [0.264.0](https://github.com/heywood8/money-tracker/compare/penny-v0.263.2...penny-v0.264.0) (2026-08-06)
 
 
