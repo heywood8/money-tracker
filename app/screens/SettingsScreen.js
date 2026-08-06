@@ -17,6 +17,7 @@ import Animated, {
 } from 'react-native-reanimated';
 import { GestureDetector } from 'react-native-gesture-handler';
 import { useSwipeDismiss } from '../hooks/useSwipeDismiss';
+import useSettingsPanelStack from '../hooks/useSettingsPanelStack';
 import { useThemeColors } from '../contexts/ThemeColorsContext';
 import { useThemeConfig } from '../contexts/ThemeConfigContext';
 import { useLocalization } from '../contexts/LocalizationContext';
@@ -145,16 +146,32 @@ export default function SettingsScreen({ setSubPanelActive }) {
   const { resetDatabase } = useAccountsActions();
   const { startImport, cancelImport, completeImport, getCancelToken } = useImportProgress();
   const { startDownload, isDownloading, downloadProgress, downloadPhase } = useUpdateDownload();
-  const [activeSubPanel, setActiveSubPanel] = useState(null);
+  // Subpanel navigation. The stack owns which panel is open and how deep into
+  // its nested views the user has stepped, so "can we go back?", the header
+  // title and the back handler all derive from one place instead of from four
+  // parallel conditional chains. The names below read the current step off it,
+  // keeping the render body's existing shape.
+  const panelStack = useSettingsPanelStack();
+  const {
+    open: openStack,
+    swapPanel: swapStackPanel,
+    push: pushStep,
+    replace: replaceStep,
+    pop: popStep,
+    popToRoot: popToRootStep,
+    close: closeStack,
+  } = panelStack;
+  const activeSubPanel = panelStack.panel;
   // Nested view within the notification-processing subpanel: 'main' shows the
   // review queue + feed, 'filters' shows access/toggle/app-filter controls,
   // 'bindings' the learned associations, 'templates' the parser list, and
   // 'templateEditor' the field-marking editor.
-  const [notificationView, setNotificationView] = useState('main');
+  const notificationView = panelStack.stepOf('notificationProcessing');
   // What the template editor is working on: the captured notification a new
   // template is being built from, and/or the existing template being edited.
   // Held here rather than in the panel because the editor is a sibling view —
-  // the panel that launches it unmounts as it opens.
+  // the panel that launches it unmounts as it opens. Where leaving the editor
+  // returns to is the stack's business, not the draft's.
   const [templateDraft, setTemplateDraft] = useState(null);
   // Controls the notification-processing header overflow (three-dots) menu.
   const [notificationMenuVisible, setNotificationMenuVisible] = useState(false);
@@ -170,7 +187,7 @@ export default function SettingsScreen({ setSubPanelActive }) {
   const [storedBackups, setStoredBackups] = useState([]);
   const [backupsLoading, setBackupsLoading] = useState(false);
   const [pendingDeleteUri, setPendingDeleteUri] = useState(null);
-  const [exportStep, setExportStep] = useState('list');
+  const exportStep = panelStack.stepOf('export');
   const [sheetsSteps, setSheetsSteps] = useState(SHEETS_STEPS.map(s => ({ ...s, status: 'pending' })));
   const [sheetsSuccessUrl, setSheetsSuccessUrl] = useState(null);
   const [sheetsError, setSheetsError] = useState(null);
@@ -182,7 +199,7 @@ export default function SettingsScreen({ setSubPanelActive }) {
   const [updateResult, setUpdateResult] = useState(null);
   const [isCheckingUpdate, setIsCheckingUpdate] = useState(false);
   const [downloadedApks, setDownloadedApks] = useState([]);
-  const [importStep, setImportStep] = useState('source');
+  const importStep = panelStack.stepOf('import');
   const [importSelectedBackup, setImportSelectedBackup] = useState(null);
   const [saveLocalBackupLoading, setSaveLocalBackupLoading] = useState(false);
   const [saveLocalBackupSuccess, setSaveLocalBackupSuccess] = useState(false);
@@ -285,22 +302,20 @@ export default function SettingsScreen({ setSubPanelActive }) {
   // Resets all subpanel state and unmounts it. Called once the slide-away
   // animation has played (or immediately when another flow takes over).
   const closeSubPanel = useCallback(() => {
-    setActiveSubPanel(null);
+    closeStack();
     setUpdateResult(null);
-    setImportStep('source');
     setImportSelectedBackup(null);
     setSaveLocalBackupLoading(false);
     setSaveLocalBackupSuccess(false);
-    setExportStep('list');
     setSheetsSteps(SHEETS_STEPS.map(s => ({ ...s, status: 'pending' })));
     setSheetsSuccessUrl(null);
     setSheetsError(null);
     setSheetsImportSteps(SHEETS_IMPORT_STEPS.map(s => ({ ...s, status: 'pending' })));
     setSheetsImportError(null);
     setDownloadedApks([]);
-    setNotificationView('main');
+    setTemplateDraft(null);
     setNotificationMenuVisible(false);
-  }, []);
+  }, [closeStack]);
 
   // Back navigation is locked while a long async step (Sheets export/import) runs,
   // so the swipe-to-dismiss gesture is disabled then too.
@@ -339,12 +354,9 @@ export default function SettingsScreen({ setSubPanelActive }) {
   // than dismiss the whole panel: nested Import/Export steps, or an embedded
   // Accounts/Categories screen that still has an internal level to pop.
   const canSwipeStepBack = useMemo(() => {
-    if (activeSubPanel === 'import') return importStep !== 'source';
-    if (activeSubPanel === 'export') return exportStep !== 'list';
-    if (activeSubPanel === 'notificationProcessing') return notificationView !== 'main';
     if (activeSubPanel === 'accounts' || activeSubPanel === 'categories') return embeddedCanGoBack;
-    return false;
-  }, [activeSubPanel, importStep, exportStep, notificationView, embeddedCanGoBack]);
+    return panelStack.canStepBack;
+  }, [activeSubPanel, embeddedCanGoBack, panelStack.canStepBack]);
 
   // Unified back navigation for the swipe, hardware-back, and the header arrow.
   // The resolver is defined further down (it depends on dismissPanel, which this
@@ -370,22 +382,19 @@ export default function SettingsScreen({ setSubPanelActive }) {
     });
 
   const openSubPanel = useCallback((panel) => {
+    // The panel's starting step comes from the stack itself; only the data each
+    // panel needs on entry is prepared here.
     if (panel === 'import') {
-      setImportStep('source');
       setImportSelectedBackup(null);
       loadStoredBackups();
     }
-    if (panel === 'export') {
-      setExportStep('list');
-    }
     if (panel === 'notificationProcessing') {
-      setNotificationView('main');
       setNotificationMenuVisible(false);
       setTemplateDraft(null);
     }
-    setActiveSubPanel(panel);
+    openStack(panel);
     openPanelAnim();
-  }, [loadStoredBackups, openPanelAnim]);
+  }, [loadStoredBackups, openPanelAnim, openStack]);
 
   useEffect(() => {
     setSubPanelActive(activeSubPanel !== null);
@@ -495,7 +504,7 @@ export default function SettingsScreen({ setSubPanelActive }) {
     setSheetsSteps(SHEETS_STEPS.map(s => ({ ...s, status: 'pending' })));
     setSheetsSuccessUrl(null);
     setSheetsError(null);
-    setExportStep('sheets-progress');
+    pushStep('sheets-progress');
     try {
       updateSheetsStep('auth', 'in_progress');
       let accessToken;
@@ -520,7 +529,7 @@ export default function SettingsScreen({ setSubPanelActive }) {
       setSheetsExportSuccess(true);
     } catch (error) {
       if (error.message === 'sign_in_cancelled') {
-        setExportStep('list');
+        popToRootStep();
         return;
       }
       setSheetsSteps(prev => prev.map(s => s.status === 'in_progress' ? { ...s, status: 'error' } : s));
@@ -540,18 +549,22 @@ export default function SettingsScreen({ setSubPanelActive }) {
     }
   }, [updateSheetsStep, t]);
 
-  const handleExportBack = useCallback(() => {
-    if (exportStep === 'sheets-progress') {
-      const isInProgress = sheetsSteps.some(s => s.status === 'in_progress');
-      if (isInProgress) return;
-      setExportStep('list');
+  // State a nested step owns and must hand back when the user steps out of it.
+  // This is the only place that still keys off (panel, step), and it is about
+  // cleanup alone — where "back" goes is the stack's business, not this map's.
+  const releaseStepState = useCallback((panel, step) => {
+    if (panel === 'export' && step === 'sheets-progress') {
       setSheetsSteps(SHEETS_STEPS.map(s => ({ ...s, status: 'pending' })));
       setSheetsSuccessUrl(null);
       setSheetsError(null);
-    } else {
-      dismissPanel();
+    } else if (panel === 'import' && step === 'sheets-progress') {
+      setSheetsImportError(null);
+    } else if (panel === 'import' && step === 'confirm-local') {
+      setImportSelectedBackup(null);
+    } else if (panel === 'notificationProcessing' && step === 'templateEditor') {
+      setTemplateDraft(null);
     }
-  }, [exportStep, sheetsSteps, dismissPanel]);
+  }, []);
 
   const confirmResetDatabase = useCallback(async () => {
     // Keep the confirm subpanel open with an inline spinner while the wipe runs, then
@@ -581,7 +594,7 @@ export default function SettingsScreen({ setSubPanelActive }) {
     } catch (error) {
       importPickInProgress.current = false;
       if (error.message === 'Import cancelled') {
-        setImportStep('source');
+        popToRootStep();
         return;
       }
       console.error('Import file pick error:', error);
@@ -622,13 +635,11 @@ export default function SettingsScreen({ setSubPanelActive }) {
 
   const handleImportSourceSelect = useCallback((source) => {
     if (source === 'file') {
-      setImportStep('confirm-file');
+      pushStep('confirm-file');
     } else if (source === 'local') {
-      setImportStep('local-list');
-    } else if (source === 'cloud') {
-      setImportStep('cloud');
+      pushStep('local-list');
     }
-  }, []);
+  }, [pushStep]);
 
   const handleGoogleSheetsImport = useCallback(async () => {
     setSheetsImportError(null);
@@ -640,7 +651,7 @@ export default function SettingsScreen({ setSubPanelActive }) {
     }
 
     setSheetsImportSteps(SHEETS_IMPORT_STEPS.map(s => ({ ...s, status: 'pending' })));
-    setImportStep('sheets-progress');
+    pushStep('sheets-progress');
 
     let backup;
     try {
@@ -655,11 +666,11 @@ export default function SettingsScreen({ setSubPanelActive }) {
       });
     } catch (error) {
       if (error.message === 'sign_in_cancelled') {
-        setImportStep('source');
+        popToRootStep();
         return;
       }
       if (error.message === 'no_spreadsheet_configured') {
-        setImportStep('source');
+        popToRootStep();
         setSheetsImportError(t('google_sheets_not_configured') || 'Export to Google Sheets first to set up your spreadsheet.');
         return;
       }
@@ -692,30 +703,13 @@ export default function SettingsScreen({ setSubPanelActive }) {
   // just swap its content instead of re-opening (QoL-13).
   const handleSetupSheetsExport = useCallback(() => {
     setSheetsImportError(null);
-    setExportStep('list');
-    setActiveSubPanel('export');
-  }, []);
+    swapStackPanel('export');
+  }, [swapStackPanel]);
 
   const handleImportLocalBackupSelect = useCallback((item) => {
     setImportSelectedBackup(item);
-    setImportStep('confirm-local');
-  }, []);
-
-  const handleImportBack = useCallback(() => {
-    if (importStep === 'source') {
-      dismissPanel();
-    } else if (importStep === 'local-list') {
-      setImportStep('source');
-    } else if (importStep === 'confirm-file') {
-      setImportStep('source');
-    } else if (importStep === 'confirm-local') {
-      setImportStep('local-list');
-      setImportSelectedBackup(null);
-    } else if (importStep === 'sheets-progress') {
-      setImportStep('source');
-      setSheetsImportError(null);
-    }
-  }, [importStep, dismissPanel]);
+    pushStep('confirm-local');
+  }, [pushStep]);
 
   const confirmRestoreLocalBackup = useCallback(async () => {
     if (!importSelectedBackup) return;
@@ -1048,58 +1042,53 @@ export default function SettingsScreen({ setSubPanelActive }) {
     return '';
   }, [activeSubPanel, exportStep, importStep, isCheckingUpdate, updateResult, notificationView, templateDraft, t]);
 
-  const handleSubPanelBack = useMemo(() => {
-    if (activeSubPanel === 'import') return handleImportBack;
-    if (activeSubPanel === 'export') return handleExportBack;
-    return dismissPanel;
-  }, [activeSubPanel, handleImportBack, handleExportBack, dismissPanel]);
-
   // ─── Notification parse templates ───
   // Build a new template from a notification the user long-pressed in the feed.
   // `recent` rides along so the editor can report how many of the app's other
   // captured notifications the draft also matches.
   const handleCreateTemplate = useCallback((notification, recent = []) => {
-    setTemplateDraft({ notification, template: null, recent, returnTo: 'main' });
-    setNotificationView('templateEditor');
-  }, []);
+    setTemplateDraft({ notification, template: null, recent });
+    pushStep('templateEditor');
+  }, [pushStep]);
 
   // Open an existing template from the templates list.
   const handleEditTemplate = useCallback((template) => {
-    setTemplateDraft({ notification: null, template, recent: [], returnTo: 'templates' });
-    setNotificationView('templateEditor');
-  }, []);
+    setTemplateDraft({ notification: null, template, recent: [] });
+    pushStep('templateEditor');
+  }, [pushStep]);
 
-  // Leaving the editor. A saved template lands on the templates list — that is
-  // where it now lives, and seeing it there confirms the save; a cancel returns
-  // to wherever the editor was opened from.
+  // Leaving the editor. A cancel simply steps back to whichever view opened it —
+  // the stack already knows which. A saved template lands on the templates list:
+  // that is where it now lives, and seeing it there confirms the save, so an
+  // editor opened from the feed replaces itself with the list rather than
+  // popping back to it.
   const handleTemplateEditorDone = useCallback((saved) => {
-    setNotificationView(saved ? 'templates' : (templateDraft?.returnTo || 'main'));
+    if (saved && panelStack.parentStep !== 'templates') {
+      replaceStep('templates');
+    } else {
+      popStep();
+    }
     setTemplateDraft(null);
-  }, [templateDraft]);
+  }, [panelStack.parentStep, replaceStep, popStep]);
 
-  // Resolver behind navigateBack (swipe / hardware-back / header arrow): if an
-  // embedded Accounts/Categories screen can still pop a level (form, picker,
-  // subcategory), defer to it; otherwise step up the Import/Export flow or close
-  // the panel (handleSubPanelBack).
+  // Resolver behind navigateBack — the single answer for all three back paths
+  // (swipe, hardware back, header arrow). An embedded Accounts/Categories screen
+  // that can still pop a level (form, picker, subcategory) gets first refusal;
+  // otherwise a nested step steps up, and the panel's root step dismisses.
+  // Because the stack records how the user got here, the template editor returns
+  // to whichever view opened it without anyone having to remember which.
   subPanelBackRef.current = () => {
+    if (isBackDisabled) return;
     if ((activeSubPanel === 'accounts' || activeSubPanel === 'categories') && embeddedBackRef.current) {
       embeddedBackRef.current();
       return;
     }
-    // The Filters/Bindings/Templates views are nested inside the
-    // notification-processing panel — step back within it rather than closing
-    // the whole panel. The editor returns to whichever view opened it, so
-    // editing a template from the list lands back on the list.
-    if (activeSubPanel === 'notificationProcessing' && notificationView !== 'main') {
-      if (notificationView === 'templateEditor') {
-        setNotificationView(templateDraft?.returnTo || 'main');
-        setTemplateDraft(null);
-        return;
-      }
-      setNotificationView('main');
+    if (panelStack.canStepBack) {
+      releaseStepState(panelStack.panel, panelStack.step);
+      popStep();
       return;
     }
-    handleSubPanelBack();
+    dismissPanel();
   };
 
 
@@ -1135,7 +1124,7 @@ export default function SettingsScreen({ setSubPanelActive }) {
         <Menu.Item
           onPress={() => {
             setNotificationMenuVisible(false);
-            setNotificationView('bindings');
+            pushStep('bindings');
           }}
           title={t('notification_bindings') || 'Bindings'}
           leadingIcon="link-variant"
@@ -1144,7 +1133,7 @@ export default function SettingsScreen({ setSubPanelActive }) {
         <Menu.Item
           onPress={() => {
             setNotificationMenuVisible(false);
-            setNotificationView('templates');
+            pushStep('templates');
           }}
           title={t('notification_templates') || 'Templates'}
           leadingIcon="text-search"
@@ -1153,7 +1142,7 @@ export default function SettingsScreen({ setSubPanelActive }) {
         <Menu.Item
           onPress={() => {
             setNotificationMenuVisible(false);
-            setNotificationView('filters');
+            pushStep('filters');
           }}
           title={t('notification_filters') || 'Filters'}
           leadingIcon="filter-variant"
