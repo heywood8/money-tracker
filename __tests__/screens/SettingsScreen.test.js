@@ -816,6 +816,64 @@ describe('SettingsScreen', () => {
 
       expect(getByText('import_from_file')).toBeTruthy();
     });
+
+    it('back button from local-list returns to the source picker', async () => {
+      const { getByText, getByTestId } = await render(
+        <SettingsScreen setSubPanelActive={mockSetSubPanelActive} />,
+      );
+
+      await act(async () => {
+        await fireEvent.press(getByText('import'));
+      });
+      await act(async () => {
+        await fireEvent.press(getByText('import_from_local'));
+      });
+      await act(async () => {
+        await fireEvent.press(getByTestId('settings-subpanel-back'));
+      });
+
+      expect(getByText('import_from_file')).toBeTruthy();
+    });
+
+    it('walks back out of the deepest import step one level at a time', async () => {
+      // source → local-list → confirm-local. Each back steps up exactly one
+      // level; the confirmation returns to the list it was chosen from rather
+      // than skipping to the source picker or closing the panel outright.
+      mockGetStoredBackups.mockResolvedValueOnce(['file:///backups/manual_2026-01-01_10-30.json']);
+
+      const { getByText, getByTestId, queryByText, getAllByTestId } = await render(
+        <SettingsScreen setSubPanelActive={mockSetSubPanelActive} />,
+      );
+
+      await act(async () => {
+        await fireEvent.press(getByText('import'));
+      });
+      await act(async () => {
+        await fireEvent.press(getByText('import_from_local'));
+      });
+
+      // The list's own restore button — the header also carries a refresh icon,
+      // and it is rendered first.
+      await act(async () => {
+        await fireEvent.press(getAllByTestId('icon-refresh-outline')[1]);
+      });
+
+      expect(getByText('restore_confirm')).toBeTruthy();
+
+      // Back once: onto the local backups list (its delete affordance is back).
+      await act(async () => {
+        await fireEvent.press(getByTestId('settings-subpanel-back'));
+      });
+      expect(getAllByTestId('icon-trash-outline').length).toBeGreaterThan(0);
+      expect(queryByText('restore_confirm')).toBeNull();
+
+      // Back again: onto the source picker, panel still open.
+      await act(async () => {
+        await fireEvent.press(getByTestId('settings-subpanel-back'));
+      });
+      expect(getByText('import_from_file')).toBeTruthy();
+      expect(queryByText('restore_confirm')).toBeNull();
+    });
   });
 
   describe('Save Local Backup', () => {
