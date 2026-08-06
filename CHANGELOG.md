@@ -1,5 +1,12 @@
 # Changelog
 
+## [0.265.0](https://github.com/heywood8/money-tracker/compare/penny-v0.264.1...penny-v0.265.0) (2026-08-06)
+
+
+### Features
+
+* **budgets:** keep past months when a recurring budget is edited ([#1581](https://github.com/heywood8/money-tracker/issues/1581)) ([b62ca45](https://github.com/heywood8/money-tracker/commit/b62ca45d163420251cec211d8ca6c838c1051ab1))
+
 ## [0.264.1](https://github.com/heywood8/money-tracker/compare/penny-v0.264.0...penny-v0.264.1) (2026-08-06)
 
 
