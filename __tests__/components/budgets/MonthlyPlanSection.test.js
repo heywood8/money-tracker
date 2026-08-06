@@ -664,7 +664,7 @@ describe('MonthlyPlanSection', () => {
       await waitFor(() => expect(mockPlans.updateLine).toHaveBeenCalled());
       expect(mockPlans.updateLine).toHaveBeenCalledWith('l-eur', expect.objectContaining({
         amount: '250', isRecurring: false, planId: 'p1',
-      }));
+      }), { fromMonth: THIS_MONTH });
     });
 
     it('forwards the raw amount and new currency when scope changes to recurring, without converting', async () => {
@@ -686,7 +686,7 @@ describe('MonthlyPlanSection', () => {
       await waitFor(() => expect(mockPlans.updateLine).toHaveBeenCalled());
       expect(mockPlans.updateLine).toHaveBeenCalledWith('l-oneoff', expect.objectContaining({
         amount: '100', isRecurring: true, currency: 'EUR',
-      }));
+      }), { fromMonth: THIS_MONTH });
     });
 
     // The sibling path the previous round's fix missed entirely: SAME scope
@@ -713,7 +713,7 @@ describe('MonthlyPlanSection', () => {
       await waitFor(() => expect(mockPlans.updateLine).toHaveBeenCalled());
       expect(mockPlans.updateLine).toHaveBeenCalledWith('l-eur', expect.objectContaining({
         amount: '250', currency: 'USD',
-      }));
+      }), { fromMonth: THIS_MONTH });
       const updates = mockPlans.updateLine.mock.calls[0][1];
       expect(updates.isRecurring).toBeUndefined();
     });
@@ -1499,7 +1499,7 @@ describe('MonthlyPlanSection', () => {
       expect(mockPlans.deleteLine).not.toHaveBeenCalled();
       const confirm = mockShowDialog.mock.calls.at(-1)[2].find(b => b.style === 'destructive');
       await act(async () => { confirm.onPress(); });
-      expect(mockPlans.deleteLine).toHaveBeenCalledWith('l1');
+      expect(mockPlans.deleteLine).toHaveBeenCalledWith('l1', { fromMonth: THIS_MONTH });
     });
 
     // Execute / mark-done / undo are gone from the menu with the feature itself,

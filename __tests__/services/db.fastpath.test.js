@@ -100,6 +100,7 @@ const mockSchemaComplete = (db, storedUserVersion) => {
         { name: 'last_executed_month', type: 'TEXT' },
         { name: 'include_children', type: 'INTEGER' },
         { name: 'group_id', type: 'TEXT' },
+        { name: 'effective_from', type: 'TEXT' }, { name: 'effective_to', type: 'TEXT' },
       ]);
     }
     return Promise.resolve([]);

@@ -586,6 +586,7 @@
   "previous_year": "이전 해",
   "next_year": "다음 해",
   "recurring_allocation": "반복",
+  "recurring_from_month_hint": "{month}부터 적용됩니다. 이전 달은 기존 예산을 그대로 유지합니다.",
   "group": "그룹",
   "no_group": "그룹 없음",
   "new_group": "새 그룹",

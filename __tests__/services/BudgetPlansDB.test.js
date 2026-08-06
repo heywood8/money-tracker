@@ -394,8 +394,11 @@ describe('BudgetPlansDB', () => {
       await BudgetPlansDB.addLine('p1', { amount: '10', categoryId: 'c1', includeChildren: false });
       const [sql, params] = mockRunAsync.mock.calls.find(([s]) => s.includes('INSERT INTO budget_plan_lines'));
       expect(sql).toContain('include_children');
-      // Column order: ..., last_executed_month, include_children, group_id, created_at, updated_at
-      expect(params[params.length - 4]).toBe(1);
+      // Read the position out of the statement's own column list rather than
+      // counting from the end: the insert has grown a column three times now,
+      // and each time this assertion silently started checking a different one.
+      const columns = sql.slice(sql.indexOf('(') + 1, sql.indexOf(')')).split(',').map(c => c.trim());
+      expect(params[columns.indexOf('include_children')]).toBe(1);
     });
 
     // Bug 10 (adversarial review): addLine/addRecurringLine share one insertPlanLine

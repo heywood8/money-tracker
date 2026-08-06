@@ -586,6 +586,7 @@
   "previous_year": "上一年",
   "next_year": "下一年",
   "recurring_allocation": "重复",
+  "recurring_from_month_hint": "自 {month} 起生效。此前的月份保留原有预算。",
   "group": "分组",
   "no_group": "不分组",
   "new_group": "新建分组",

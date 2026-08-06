@@ -323,6 +323,16 @@ const isSchemaComplete = async (rawDb) => {
     // migrate() runs to create it, rather than the fast path skipping migrate()
     // and every template query throwing `no such table`.
 
+    // Check budget_plan_lines has BOTH effective_from and effective_to
+    // (migration 0026 — the recurring line's effective month range). Both are
+    // checked for the same reason as operations' 0009 columns: each is a separate
+    // ADD COLUMN and applyPendingMigrations continues on failure, so a
+    // half-applied 0026 must not read as complete. Without this check, an install
+    // complete through 0025 would skip migrate() and every line query would throw
+    // `no such column: effective_from`.
+    if (!planLineCols.some(c => c.name === 'effective_from')
+      || !planLineCols.some(c => c.name === 'effective_to')) return false;
+
     return true;
   } catch (error) {
     console.warn('[DB] isSchemaComplete check failed:', error.message);
@@ -670,6 +680,14 @@ const detectAppliedMigrations = async (rawDb) => {
     // table's presence is the whole marker and re-running is harmless.
     if (await tableExists('budget_plan_line_accounts')) {
       applied.push(24);
+    }
+
+    // Migration 0026: adds effective_from / effective_to to budget_plan_lines
+    // (a recurring line's effective month range). Require BOTH — a half-applied
+    // 0026 must re-run so the missing column is added.
+    if (planLineCols.some(c => c.name === 'effective_from')
+      && planLineCols.some(c => c.name === 'effective_to')) {
+      applied.push(26);
     }
   }
 

@@ -193,7 +193,7 @@ export const buildSheetsData = (backup) => {
     {
       range: 'Budget Plan Lines!A1',
       values: [
-        ['id', 'plan_id', 'label', 'amount', 'comment', 'category', 'account', 'category_id', 'to_account_id', 'sort_order', 'is_recurring', 'currency', 'kind', 'execution_account', 'account_id', 'last_executed_month', 'categories', 'category_ids', 'include_children', 'group', 'group_id', 'spending_accounts', 'spending_account_ids'],
+        ['id', 'plan_id', 'label', 'amount', 'comment', 'category', 'account', 'category_id', 'to_account_id', 'sort_order', 'is_recurring', 'currency', 'kind', 'execution_account', 'account_id', 'last_executed_month', 'categories', 'category_ids', 'include_children', 'group', 'group_id', 'spending_accounts', 'spending_account_ids', 'effective_from', 'effective_to'],
         ...(budget_plan_lines || []).map(l => {
           const ids = lineCategoryIds(l);
           const sourceIds = accountIdsByLine.get(l.id) || [];
@@ -222,6 +222,11 @@ export const buildSheetsData = (backup) => {
             // IDs for the round trip. Both blank means "any account".
             sourceIds.map(id => accountNames.get(id) || '').join(';'),
             sourceIds.join(';'),
+            // The months a recurring line applies to (migration 0026). Blank on
+            // either side is open-ended — a budget still running, or one that
+            // predates the columns and so speaks for every month.
+            l.effective_from || '',
+            l.effective_to || '',
           ];
         }),
       ],
@@ -367,6 +372,14 @@ export const importFromSheets = async (accessToken, onProgress) => {
     value === '' || value == null ? 1 : (Number(value) === 0 ? 0 : 1)
   );
 
+  // A YYYY-MM cell, or null for a blank one / anything that isn't a month —
+  // the effective bounds of a recurring line, where null means "unbounded".
+  const asSheetMonth = (value) => (
+    typeof value === 'string' && /^\d{4}-(0[1-9]|1[0-2])$/.test(value.trim())
+      ? value.trim()
+      : null
+  );
+
   const resolveCategoryId = (row, idCol, nameCol) => {
     if (row[idCol] !== '' && row[idCol] != null) {
       const byId = categoryIdMap.get(String(row[idCol]));
@@ -504,6 +517,13 @@ export const importFromSheets = async (accessToken, onProgress) => {
       group_id: (l.group_id || l.group)
         ? (groupIdMap.get(String(l.group_id)) ?? groupIdMap.get(String(l.group)) ?? null)
         : null,
+      // The effective month range of a recurring line (migration 0026). Only a
+      // real YYYY-MM survives: a blank cell, a sheet written before the columns
+      // existed, or something a hand-editor typed into them all read as "no
+      // bound on that side", which is how every pre-0026 recurring line behaves.
+      // Meaningless on a one-off line, which its plan_id already scopes.
+      effective_from: isRecurring ? asSheetMonth(l.effective_from) : null,
+      effective_to: isRecurring ? asSheetMonth(l.effective_to) : null,
       created_at: now,
       updated_at: now,
     };

@@ -1678,6 +1678,15 @@ op-2,income,20,acc-1,cat-1`;
         (c) => typeof c[0] === 'string' && c[0].includes(`INSERT INTO ${table}`),
       );
 
+    // One value out of an INSERT call, by the column name the statement itself
+    // lists it under — the plan-line insert has grown a column on four
+    // migrations now, and an index counted from either end silently starts
+    // asserting about a different column every time it does.
+    const insertedValue = (call, column) => {
+      const columns = call[0].slice(call[0].indexOf('(') + 1, call[0].indexOf(')')).split(',').map(c => c.trim());
+      return call[1][columns.indexOf(column)];
+    };
+
     // The 0021 junction is written with INSERT OR IGNORE, which findInsert's
     // `INSERT INTO <table>` match doesn't cover.
     const findLinkInserts = (dbInstance) =>
@@ -1735,14 +1744,14 @@ op-2,income,20,acc-1,cat-1`;
       const catCall = lineInserts.find(c => c[1][0] === 'line-cat');
       expect(catCall[1]).toEqual([
         'line-cat', 'plan-1', 'Groceries', '400.00', NON_ASCII_COMMENT,
-        'cat-1', null, 0, 0, null, null, null, null, 1, null, 'x', 'y',
+        'cat-1', null, 0, 0, null, null, null, null, 1, null, null, null, 'x', 'y',
       ]);
 
       // Transfer line: category_id null, to_account_id remapped 'acc-uuid' -> 42.
       const xferCall = lineInserts.find(c => c[1][0] === 'line-xfer');
       expect(xferCall[1]).toEqual([
         'line-xfer', 'plan-1', 'To savings', '500.00', null,
-        null, REMAPPED_ACCOUNT_ID, 1, 0, null, null, null, null, 1, null, 'x', 'y',
+        null, REMAPPED_ACCOUNT_ID, 1, 0, null, null, null, null, 1, null, null, null, 'x', 'y',
       ]);
 
       // A pre-0021 backup carries no junction, so the category line's link is
@@ -1862,7 +1871,7 @@ op-2,income,20,acc-1,cat-1`;
       expect(lineInserts).toHaveLength(1);
       expect(lineInserts[0][1]).toEqual([
         'line-rec', null, 'Rent', '65000', null,
-        'cat-1', null, 0, 1, 'USD', null, null, null, 1, null, 'x', 'y',
+        'cat-1', null, 0, 1, 'USD', null, null, null, 1, null, null, null, 'x', 'y',
       ]);
     });
 
@@ -1912,8 +1921,7 @@ op-2,income,20,acc-1,cat-1`;
         expect(groupInserts[0][1].slice(0, 4)).toEqual(['grp-1', 'Car', null, null]);
 
         const lineInserts = findInsert(dbInstance, 'budget_plan_lines');
-        // ..., include_children, group_id, created_at, updated_at
-        expect(lineInserts[0][1][lineInserts[0][1].length - 3]).toBe('grp-1');
+        expect(insertedValue(lineInserts[0], 'group_id')).toBe('grp-1');
       });
 
       it('ungroups a line whose group is not in the backup', async () => {
@@ -1926,7 +1934,7 @@ op-2,income,20,acc-1,cat-1`;
         await BackupRestore.restoreBackup(backup);
 
         const lineInserts = findInsert(dbInstance, 'budget_plan_lines');
-        expect(lineInserts[0][1][lineInserts[0][1].length - 3]).toBeNull();
+        expect(insertedValue(lineInserts[0], 'group_id')).toBeNull();
       });
 
       it('reads a CSV-blanked amount back as a derived group, not as an empty string', async () => {

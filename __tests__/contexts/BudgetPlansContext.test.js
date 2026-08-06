@@ -255,8 +255,8 @@ describe('BudgetPlansContext', () => {
 
       await act(async () => {
         await result.current.addLine('p1', { amount: '40', categoryId: 'c1' });
-        await result.current.updateLine('l1', { amount: '50' });
-        await result.current.deleteLine('l1');
+        await result.current.updateLine('l1', { amount: '50' }, { fromMonth: '2026-07' });
+        await result.current.deleteLine('l1', { fromMonth: '2026-07' });
         await result.current.reorderLines('p1', ['l1']);
         await result.current.getPlanTotals('p1');
         await result.current.getPlanLines('p1');
@@ -265,8 +265,10 @@ describe('BudgetPlansContext', () => {
       });
 
       expect(BudgetPlansDB.addLine).toHaveBeenCalledWith('p1', { amount: '40', categoryId: 'c1' });
-      expect(BudgetPlansDB.updateLine).toHaveBeenCalledWith('l1', { amount: '50' });
-      expect(BudgetPlansDB.deleteLine).toHaveBeenCalledWith('l1');
+      // The edit's month rides along (migration 0026), so a recurring line's past
+      // months keep the budget they were spent against.
+      expect(BudgetPlansDB.updateLine).toHaveBeenCalledWith('l1', { amount: '50' }, { fromMonth: '2026-07' });
+      expect(BudgetPlansDB.deleteLine).toHaveBeenCalledWith('l1', { fromMonth: '2026-07' });
       expect(BudgetPlansDB.reorderLines).toHaveBeenCalledWith('p1', ['l1']);
       expect(BudgetPlansDB.getPlanTotals).toHaveBeenCalledWith('p1');
       expect(BudgetPlansDB.getPlanLines).toHaveBeenCalledWith('p1');

@@ -23,7 +23,13 @@ jest.mock('../../../app/contexts/ThemeColorsContext', () => ({
   useThemeColors: () => ({ colors: COLORS }),
 }));
 jest.mock('../../../app/contexts/LocalizationContext', () => ({
-  useLocalization: () => ({ t: (k) => k }),
+  // Keys pass through as themselves, except the one whose real translation
+  // carries a {month} placeholder — a bare key would hide whether the component
+  // fills it in.
+  useLocalization: () => ({
+    t: (k) => (k === 'recurring_from_month_hint' ? 'Applies from {month} onward.' : k),
+    language: 'en',
+  }),
 }));
 jest.mock('../../../app/contexts/DialogContext', () => ({
   useDialog: () => ({ showDialog: jest.fn() }),
@@ -489,6 +495,31 @@ describe('BudgetPlanLineModal', () => {
       await fireEvent.changeText(getByTestId('plan-line-amount'), '150');
       await fireEvent.press(getByTestId('plan-line-save'));
       expect(props.onSaveLine).toHaveBeenCalledWith(expect.objectContaining({ isRecurring: false, currency: null }));
+    });
+
+    // Migration 0026: a recurring budget starts at the month it is set in, and
+    // the months before it keep what they were. The sheet has to say so — "every
+    // month" on its own reads as "including the ones already spent".
+    it('says which month a recurring budget starts applying from', async () => {
+      const props = { ...baseProps(), month: '2026-08' };
+      const { getByTestId, queryByTestId } = await render(<BudgetPlanLineModal {...props} />);
+      await waitFor(() => expect(getByTestId('plan-line-recurring-toggle')).toBeTruthy());
+      // Nothing to say while the line is one-off: it is this month by definition.
+      expect(queryByTestId('plan-line-recurring-hint')).toBeNull();
+
+      await fireEvent.press(getByTestId('plan-line-recurring-toggle'));
+      await waitFor(() => expect(getByTestId('plan-line-recurring-hint')).toBeTruthy());
+      // The month is named in full rather than as a YYYY-MM key.
+      expect(getByTestId('plan-line-recurring-hint').props.children).toContain('2026');
+      expect(getByTestId('plan-line-recurring-hint').props.children).not.toContain('{month}');
+    });
+
+    it('shows no month hint when the sheet was not told a month', async () => {
+      const props = baseProps();
+      const { getByTestId, queryByTestId } = await render(<BudgetPlanLineModal {...props} />);
+      await waitFor(() => expect(getByTestId('plan-line-recurring-toggle')).toBeTruthy());
+      await fireEvent.press(getByTestId('plan-line-recurring-toggle'));
+      expect(queryByTestId('plan-line-recurring-hint')).toBeNull();
     });
 
     it('the currency picker is offered on a one-off line too, not only a recurring one', async () => {

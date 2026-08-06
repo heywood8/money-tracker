@@ -589,6 +589,7 @@
   "previous_year": "Предыдущий год",
   "next_year": "Следующий год",
   "recurring_allocation": "Повторять каждый месяц",
+  "recurring_from_month_hint": "Действует с {month} и далее. В прошлых месяцах бюджет останется прежним.",
   "group": "Группа",
   "no_group": "Без группы",
   "new_group": "Новая группа",
