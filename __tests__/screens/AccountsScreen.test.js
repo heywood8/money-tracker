@@ -37,15 +37,26 @@ jest.mock('react-native-paper', () => {
 });
 /* eslint-enable react/prop-types */
 
+// Props handed to the draggable list on every render, newest last. Lets the
+// scroll-structure regression test below assert how the screen wires the list
+// up (header/footer/content style) without reaching into the rendered tree.
+const mockDraggableProps = [];
+
 jest.mock('react-native-draggable-flatlist', () => {
   const React = require('react');
   const { FlatList, ScrollView } = require('react-native');
-  const Draggable = (props) => React.createElement(FlatList, props);
+  const Draggable = (props) => {
+    mockDraggableProps.push(props);
+    return React.createElement(FlatList, props);
+  };
   return {
     __esModule: true,
     default: Draggable,
     NestableDraggableFlatList: Draggable,
-    NestableScrollContainer: (props) => React.createElement(ScrollView, props),
+    // testID so a re-nesting regression is visible as a rendered node — the
+    // screen must own exactly one scrollable (see the regression test).
+    NestableScrollContainer: (props) =>
+      React.createElement(ScrollView, { testID: 'nestable-scroll-container', ...props }),
   };
 });
 
@@ -1243,6 +1254,58 @@ describe('AccountsScreen', () => {
       // The DraggableFlatList is mocked as a regular FlatList
       // We verify the component renders properly with the reorderAccounts callback available
       expect(mockReorderAccounts).toBeDefined();
+    });
+  });
+
+  describe('Scroll Structure', () => {
+    const mockAccounts = [
+      { id: 'acc-1', name: 'First', balance: '100', currency: 'USD', order: 0 },
+      { id: 'acc-2', name: 'Second', balance: '200', currency: 'USD', order: 1 },
+    ];
+
+    const renderScreen = async (dataOverrides = {}) => {
+      const AccountsScreen = require('../../app/screens/AccountsScreen').default;
+      const { useAccountsData } = require('../../app/contexts/AccountsDataContext');
+      const { useLocalization } = require('../../app/contexts/LocalizationContext');
+
+      useLocalization.mockReturnValue({ t: jest.fn((key) => key), language: 'en' });
+      useAccountsData.mockReturnValue(createAccountsDataMock({
+        accounts: mockAccounts,
+        displayedAccounts: mockAccounts,
+        ...dataOverrides,
+      }));
+
+      mockDraggableProps.length = 0;
+      return render(<AccountsScreen />);
+    };
+
+    // Regression: the screen used to be a NestableScrollContainer wrapping a
+    // NestableDraggableFlatList. That put the list's always-live drag Pan below
+    // the scroll view in the tree, and a descendant gesture handler outranks an
+    // ancestor — so vertical swipes over the accounts card raced the scroll and
+    // usually killed it, leaving the list feeling frozen until a swipe happened
+    // to start on the net-worth card or the footer. One scrollable only.
+    it('renders the accounts list as the only scroll container', async () => {
+      const { queryByTestId } = await renderScreen();
+
+      expect(queryByTestId('nestable-scroll-container')).toBeNull();
+      expect(mockDraggableProps.length).toBeGreaterThan(0);
+    });
+
+    it('hands the net worth card and the archived toggle to the list as header and footer', async () => {
+      await renderScreen({ hiddenAccounts: [{ id: 'acc-3', name: 'Archived' }] });
+
+      const props = mockDraggableProps[mockDraggableProps.length - 1];
+      expect(props.ListHeaderComponent).toBeTruthy();
+      expect(props.ListFooterComponent).toBeTruthy();
+      expect(props.contentContainerStyle).toBeTruthy();
+    });
+
+    it('keeps the archived toggle and the net worth card reachable inside the list', async () => {
+      const { getByText } = await renderScreen({ hiddenAccounts: [{ id: 'acc-3', name: 'Archived' }] });
+
+      expect(getByText('show_archived_accounts')).toBeTruthy();
+      expect(getByText('First')).toBeTruthy();
     });
   });
 
