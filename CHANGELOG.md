@@ -1,5 +1,12 @@
 # Changelog
 
+## [0.263.2](https://github.com/heywood8/money-tracker/compare/penny-v0.263.1...penny-v0.263.2) (2026-08-06)
+
+
+### Code Refactoring
+
+* **budgets:** remove executable templates from budget lines ([#1574](https://github.com/heywood8/money-tracker/issues/1574)) ([9f467bf](https://github.com/heywood8/money-tracker/commit/9f467bf7b846848b31379f9ef143e6f1f98aea2d))
+
 ## [0.263.1](https://github.com/heywood8/money-tracker/compare/penny-v0.263.0...penny-v0.263.1) (2026-08-06)
 
 
