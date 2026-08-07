@@ -78,6 +78,28 @@ describe('PendingNotificationsDB', () => {
       expect(result).toMatchObject({ latitude: '40.1', longitude: '44.2' });
     });
 
+    it('defaults force_added to 0 for a pipeline-queued item', async () => {
+      const result = await PendingNotificationsDB.addPendingNotification({
+        kind: 'PURCHASE', type: 'expense', amount: '10', currency: 'AMD',
+      });
+      expect(mockDb.executeQuery).toHaveBeenCalledWith(
+        expect.stringContaining('force_added'),
+        expect.arrayContaining([0]),
+      );
+      expect(result.forceAdded).toBe(false);
+    });
+
+    it('persists force_added for an explicit user re-add', async () => {
+      const result = await PendingNotificationsDB.addPendingNotification({
+        kind: 'PURCHASE', type: 'expense', amount: '10', currency: 'AMD', forceAdded: true,
+      });
+      expect(mockDb.executeQuery).toHaveBeenCalledWith(
+        expect.stringContaining('force_added'),
+        expect.arrayContaining([1]),
+      );
+      expect(result.forceAdded).toBe(true);
+    });
+
     it('preserves a 0.0 coordinate (does not coerce to null)', async () => {
       const result = await PendingNotificationsDB.addPendingNotification({
         kind: 'PURCHASE', type: 'expense', amount: '10', currency: 'AMD',
@@ -102,6 +124,17 @@ describe('PendingNotificationsDB', () => {
         id: 'p1', cardMask: '4083***7027', merchant: 'NAREK MEHRABYAN', accountId: 5,
         categoryId: null, packageName: 'am.bank',
       });
+    });
+
+    it('reads force_added as a boolean, defaulting a pre-migration row to false', async () => {
+      mockDb.queryAll.mockResolvedValue([
+        { id: 'p1', kind: 'PURCHASE', type: 'expense', amount: '10', currency: 'AMD', force_added: 1, created_at: 'x' },
+        { id: 'p2', kind: 'PURCHASE', type: 'expense', amount: '10', currency: 'AMD', force_added: 0, created_at: 'x' },
+        // A row written before migration 0027 has no column at all.
+        { id: 'p3', kind: 'PURCHASE', type: 'expense', amount: '10', currency: 'AMD', created_at: 'x' },
+      ]);
+      const list = await PendingNotificationsDB.getPendingNotifications();
+      expect(list.map((p) => p.forceAdded)).toEqual([true, false, false]);
     });
   });
 

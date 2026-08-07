@@ -280,6 +280,11 @@ export const pendingNotifications = sqliteTable('pending_notifications', {
   // Both nullable — only populated when the attach-location opt-in was on.
   latitude: text('latitude'),
   longitude: text('longitude'),
+  // 1 when the user explicitly re-added this notification from the recent feed.
+  // That path deliberately bypasses duplicate detection, so the row must also
+  // survive the reconciliation pass that prunes queued items matching an
+  // already-recorded operation — otherwise the re-add is undone immediately.
+  forceAdded: integer('force_added').default(0),
   createdAt: text('created_at').notNull(),
 }, (table) => ({
   createdIdx: index('idx_pending_notifications_created').on(table.createdAt),

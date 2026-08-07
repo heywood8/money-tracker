@@ -373,7 +373,9 @@ const findExistingOperation = async (descriptor, resolution, date, options) => {
  * @param {() => Promise<Object|null>} [getLocation] - best-effort location provider
  *   for auto-created operations; omitted callers book without coordinates.
  * @param {{ checkDuplicate?: boolean }} [options] - when checkDuplicate is false,
- *   book even if a matching operation already exists (explicit re-add).
+ *   book even if a matching operation already exists (explicit re-add); a row
+ *   queued under that flag is marked force-added so the reconciliation pass
+ *   doesn't delete it against the very duplicate the re-add chose to ignore.
  */
 const bookExpenseOrQueue = async (descriptor, resolution, date, allowedPackages, summary, getLocation, options = {}) => {
   // Skip a charge the user has already recorded by hand: neither auto-create nor
@@ -483,6 +485,9 @@ const bookExpenseOrQueue = async (descriptor, resolution, date, allowedPackages,
       // away a binding the user already trained — forcing them to re-pick it on
       // every notification even though it shows up in the bindings list.
       categoryId: resolution.categoryId,
+      // An explicit re-add skipped the duplicate check on the way in; mark the
+      // row so the reconciliation pass doesn't delete it on the way out.
+      forceAdded: options.checkDuplicate === false,
       ...operationLocationFields(location),
     });
     summary.pending += 1;
@@ -504,7 +509,9 @@ const bookExpenseOrQueue = async (descriptor, resolution, date, allowedPackages,
  * @param {() => Promise<Object|null>} [getLocation] - best-effort location provider
  *   for auto-created transfers; omitted callers book without coordinates.
  * @param {{ checkDuplicate?: boolean }} [options] - when checkDuplicate is false,
- *   book even if a matching operation already exists (explicit re-add).
+ *   book even if a matching operation already exists (explicit re-add); a row
+ *   queued under that flag is marked force-added so the reconciliation pass
+ *   doesn't delete it against the very duplicate the re-add chose to ignore.
  */
 const bookTransferOrQueue = async (descriptor, resolution, date, allowedPackages, summary, getLocation, options = {}) => {
   // Skip an ATM withdrawal the user has already recorded by hand, mirroring the
@@ -574,6 +581,8 @@ const bookTransferOrQueue = async (descriptor, resolution, date, allowedPackages
       accountId: resolution.accountId,
       // Transfers carry no category; the target account is chosen at review time.
       categoryId: null,
+      // See bookExpenseOrQueue: an explicit re-add must survive reconciliation.
+      forceAdded: options.checkDuplicate === false,
       ...operationLocationFields(location),
     });
     summary.pending += 1;
@@ -1020,8 +1029,11 @@ const resolvePendingTransfer = async (pending, choices = {}) => {
  * ("Re-add operation" from the recent-notifications feed). Bypasses both the
  * seen-signature dedup and the learn-on-trust allowlist — the user is explicitly
  * asking for this one — so it books the operation when it fully resolves and
- * otherwise enqueues it for review. A no-op (skipped) when the notification does
- * not parse as a bank transaction.
+ * otherwise enqueues it for review. An enqueued item is marked force-added so
+ * reconciliation leaves it in the queue: it was very likely re-added *because*
+ * the automatic pass had skipped it as a duplicate, and pruning it again would
+ * make the re-add report "added to review queue" over an empty queue. A no-op
+ * (skipped) when the notification does not parse as a bank transaction.
  *
  * @param {{ title?: string, text?: string, packageName?: string, postTime?: number }} notification
  * @returns {Promise<{ created: number, pending: number, skipped: number }>}

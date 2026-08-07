@@ -138,6 +138,13 @@ export const reconcilePendingNotifications = async () => {
     // duplicates can't both be pruned against a single recorded operation.
     const claimedOpIds = new Set();
     for (const item of pending) {
+      // An item the user explicitly re-added from the recent feed is never
+      // pruned: that path bypasses duplicate detection on purpose (they may be
+      // recording a second identical charge, or one whose amount happens to
+      // collide with an unrelated operation after the account's rounding). Left
+      // reconcilable, it would be deleted on the very next pass — the queue
+      // reporting "added" and then showing nothing.
+      if (item.forceAdded) continue;
       if (item.accountId == null || !item.date) continue;
       if (!accountCache.has(item.accountId)) {
         accountCache.set(
