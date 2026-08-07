@@ -1,5 +1,12 @@
 # Changelog
 
+## [0.265.1](https://github.com/heywood8/money-tracker/compare/penny-v0.265.0...penny-v0.265.1) (2026-08-07)
+
+
+### Bug Fixes
+
+* **notifications:** keep an explicitly re-added notification in the review queue ([#1583](https://github.com/heywood8/money-tracker/issues/1583)) ([2c073d1](https://github.com/heywood8/money-tracker/commit/2c073d10c4b00c082ba82fe683947b83c1a63bb5))
+
 ## [0.265.0](https://github.com/heywood8/money-tracker/compare/penny-v0.264.1...penny-v0.265.0) (2026-08-06)
 
 
