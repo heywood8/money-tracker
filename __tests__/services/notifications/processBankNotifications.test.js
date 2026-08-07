@@ -535,7 +535,13 @@ describe('processBankNotifications', () => {
     expect(summary).toEqual({ created: 0, pending: 1, skipped: 0 });
     expect(OperationsDB.createOperation).not.toHaveBeenCalled();
     expect(PendingNotificationsDB.addPendingNotification).toHaveBeenCalledWith(
-      expect.objectContaining({ merchant: 'NAREK MEHRABYAN', cardMask: '4083***7027', accountId: 7 }),
+      expect.objectContaining({
+        merchant: 'NAREK MEHRABYAN',
+        cardMask: '4083***7027',
+        accountId: 7,
+        // Normal ingestion stays reconcilable — only an explicit re-add is pinned.
+        forceAdded: false,
+      }),
     );
   });
 
@@ -1170,6 +1176,36 @@ describe('processBankNotifications', () => {
 
       expect(summary).toEqual({ created: 0, pending: 1, skipped: 0 });
       expect(PendingNotificationsDB.addPendingNotification).toHaveBeenCalled();
+    });
+
+    it('marks a queued re-add as force-added so reconciliation cannot prune it', async () => {
+      // Regression: the queued row was deleted again by the next reconcile pass
+      // (it matched an already-recorded operation), so the UI reported "added to
+      // review queue" while the queue stayed empty and the item was unrecoverable.
+      AccountsDB.getAccountByCardMask.mockResolvedValue({ id: 7, currency: 'AMD' });
+      NotificationRulesDB.getMerchantRule.mockResolvedValue(null); // no category → queue
+      OperationsDB.getOperationsByAccountTypeAndDate.mockImplementation(async (accountId, type, date) => [
+        { id: 1, type, accountId, date, amount: '3900', destinationAmount: null },
+      ]);
+
+      const summary = await pipeline.reAddNotification(PURCHASE);
+
+      expect(summary).toEqual({ created: 0, pending: 1, skipped: 0 });
+      expect(PendingNotificationsDB.addPendingNotification).toHaveBeenCalledWith(
+        expect.objectContaining({ forceAdded: true }),
+      );
+    });
+
+    it('marks a queued ATM re-add as force-added too', async () => {
+      AccountsDB.getAccountByCardMask.mockResolvedValue({ id: 7, currency: 'AMD' });
+      PreferencesDB.getNumberPreference.mockResolvedValue(null); // no bound cash account → queue
+
+      const summary = await pipeline.reAddNotification(ATM_CASH);
+
+      expect(summary).toEqual({ created: 0, pending: 1, skipped: 0 });
+      expect(PendingNotificationsDB.addPendingNotification).toHaveBeenCalledWith(
+        expect.objectContaining({ type: 'transfer', forceAdded: true }),
+      );
     });
 
     it('re-creates even when a matching operation already exists (explicit re-add)', async () => {

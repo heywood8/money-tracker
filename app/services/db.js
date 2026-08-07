@@ -262,6 +262,13 @@ const isSchemaComplete = async (rawDb) => {
     const pendingCols = await rawDb.getAllAsync('PRAGMA table_info(pending_notifications)');
     if (!pendingCols.some(c => c.name === 'latitude') || !pendingCols.some(c => c.name === 'longitude')) return false;
 
+    // Check pending_notifications has force_added (migration 0027). Same
+    // reasoning as 0013's check: an install complete through 0026 would otherwise
+    // report "schema complete" and skip migrate(), so the column would never be
+    // added and every enqueue (which writes it) would throw
+    // `table pending_notifications has no column named force_added`.
+    if (!pendingCols.some(c => c.name === 'force_added')) return false;
+
     // Migration 0018: adds the budget_plans and budget_plan_lines tables. Both are
     // covered by the expectedTables check above — a fresh install through 0017 has
     // neither, so its schema reads "incomplete" here and migrate() runs to create
@@ -628,6 +635,11 @@ const detectAppliedMigrations = async (rawDb) => {
     const pnCols = await getColumns('pending_notifications');
     if (pnCols.some(c => c.name === 'latitude') && pnCols.some(c => c.name === 'longitude')) {
       applied.push(17);
+    }
+
+    // Migration 0027: Adds pending_notifications.force_added column.
+    if (pnCols.some(c => c.name === 'force_added')) {
+      applied.push(27);
     }
   }
 

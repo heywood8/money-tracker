@@ -91,7 +91,10 @@ const mockSchemaComplete = (db, storedUserVersion) => {
       return Promise.resolve([{ name: 'label_override', type: 'TEXT' }, { name: 'last_matched_at', type: 'TEXT' }]);
     }
     if (q.includes('table_info(pending_notifications)')) {
-      return Promise.resolve([{ name: 'latitude', type: 'REAL' }, { name: 'longitude', type: 'REAL' }]);
+      return Promise.resolve([
+        { name: 'latitude', type: 'REAL' }, { name: 'longitude', type: 'REAL' },
+        { name: 'force_added', type: 'INTEGER' },
+      ]);
     }
     if (q.includes('table_info(budget_plan_lines)')) {
       return Promise.resolve([

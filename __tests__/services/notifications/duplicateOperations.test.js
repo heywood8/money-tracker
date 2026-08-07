@@ -206,4 +206,30 @@ describe('reconcilePendingNotifications', () => {
     expect(await reconcilePendingNotifications()).toBe(0);
     expect(PendingNotificationsDB.deletePendingNotification).not.toHaveBeenCalled();
   });
+
+  it('never prunes an item the user explicitly re-added', async () => {
+    // The re-add path bypasses duplicate detection on purpose, so its queued row
+    // must survive reconciliation even though a matching operation exists.
+    PendingNotificationsDB.getPendingNotifications.mockResolvedValue([
+      { id: 'p1', ...item(), forceAdded: true },
+    ]);
+    OperationsDB.getOperationsByAccountTypeAndDate.mockResolvedValue([op()]);
+
+    expect(await reconcilePendingNotifications()).toBe(0);
+    expect(PendingNotificationsDB.deletePendingNotification).not.toHaveBeenCalled();
+  });
+
+  it('leaves a force-added item its matching operation to be claimed by a normal item', async () => {
+    // The skipped force-added row must not consume the matching operation: a
+    // regular queued duplicate behind it is still pruned against it.
+    PendingNotificationsDB.getPendingNotifications.mockResolvedValue([
+      { id: 'p1', ...item(), forceAdded: true },
+      { id: 'p2', ...item() },
+    ]);
+    OperationsDB.getOperationsByAccountTypeAndDate.mockResolvedValue([op({ id: 1 })]);
+
+    expect(await reconcilePendingNotifications()).toBe(1);
+    expect(PendingNotificationsDB.deletePendingNotification).toHaveBeenCalledTimes(1);
+    expect(PendingNotificationsDB.deletePendingNotification).toHaveBeenCalledWith('p2');
+  });
 });
