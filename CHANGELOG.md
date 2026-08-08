@@ -1,5 +1,12 @@
 # Changelog
 
+## [0.265.2](https://github.com/heywood8/money-tracker/compare/penny-v0.265.1...penny-v0.265.2) (2026-08-08)
+
+
+### Code Refactoring
+
+* **graphs:** move currency chip from PeriodHeader to the value it scopes ([#1585](https://github.com/heywood8/money-tracker/issues/1585)) ([1e7e748](https://github.com/heywood8/money-tracker/commit/1e7e748898ed965ebbd3b9f5ce928a5d968fa2af))
+
 ## [0.265.1](https://github.com/heywood8/money-tracker/compare/penny-v0.265.0...penny-v0.265.1) (2026-08-07)
 
 
