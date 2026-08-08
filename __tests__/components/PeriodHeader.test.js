@@ -1,6 +1,6 @@
 import React from 'react';
 import { StyleSheet } from 'react-native';
-import { render, fireEvent, act, within } from '@testing-library/react-native';
+import { render, fireEvent, act } from '@testing-library/react-native';
 import PeriodHeader from '../../app/components/PeriodHeader';
 
 // Presses go through act, as they do in the other component suites here: a
@@ -25,10 +25,6 @@ const setup = async (props = {}) => render(
     nextLabel="next"
     onPressTitle={jest.fn()}
     titleLabel="select: July 2026"
-    currencies={['USD', 'EUR']}
-    selectedCurrency="USD"
-    onPressCurrency={jest.fn()}
-    currencyLabel="currency: USD"
     colors={colors}
     testIDPrefix="scope"
     {...props}
@@ -75,37 +71,6 @@ describe('PeriodHeader', () => {
     });
   });
 
-  describe('currency chip', () => {
-    // Nothing to choose between with one account currency, and a chip that
-    // cannot change anything is furniture over the content.
-    it('is absent with a single account currency', async () => {
-      const { queryByTestId } = await setup({ currencies: ['USD'] });
-      expect(queryByTestId('scope-currency-chip')).toBeNull();
-    });
-
-    it('shows the code with its symbol and opens the host sheet', async () => {
-      const onPressCurrency = jest.fn();
-      const { getByTestId } = await setup({ onPressCurrency });
-
-      const chip = getByTestId('scope-currency-chip');
-      expect(within(chip).getByText('USD')).toBeTruthy();
-      expect(within(chip).getByText('$')).toBeTruthy();
-
-      await press(chip);
-      expect(onPressCurrency).toHaveBeenCalledTimes(1);
-    });
-
-    // The catalogue lists the code itself as the symbol for several currencies;
-    // printing both would render "CHF CHF".
-    it('drops the symbol when it is the code', async () => {
-      const { getByTestId } = await setup({ currencies: ['CHF', 'EUR'], selectedCurrency: 'CHF' });
-
-      const chip = getByTestId('scope-currency-chip');
-      expect(within(chip).getByText('CHF')).toBeTruthy();
-      expect(within(chip).queryAllByText('CHF')).toHaveLength(1);
-    });
-  });
-
   // The header is glass over the screen's own list, the way the floating tab
   // bar is glass over its other end — not a band the content begins below.
   describe('glass overlay', () => {
@@ -138,9 +103,8 @@ describe('PeriodHeader', () => {
       expect(fade.props.children.length).toBeGreaterThan(1);
     });
 
-    // The host cannot pad its scroll content correctly without this: the header
-    // is a row taller with the currency chip up, and taller again at a large
-    // font scale.
+    // The host cannot pad its scroll content correctly without this: the
+    // header is taller at a large font scale.
     it('reports its measured height to the host', async () => {
       const onHeightChange = jest.fn();
       const { getByTestId } = await setup({ onHeightChange });
@@ -161,7 +125,7 @@ describe('PeriodHeader', () => {
     const { getByTestId } = await setup({ showJumpToCurrent: true });
 
     ['scope-header', 'scope-prev', 'scope-next', 'scope-picker', 'scope-label',
-      'scope-jump-current', 'scope-currency-chip'].forEach(id => {
+      'scope-jump-current'].forEach(id => {
       expect(getByTestId(id)).toBeTruthy();
     });
   });
