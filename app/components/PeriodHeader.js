@@ -2,18 +2,26 @@ import React, { memo, useCallback, useMemo } from 'react';
 import { View, Text, StyleSheet, Pressable } from 'react-native';
 import PropTypes from 'prop-types';
 import Icon from '@expo/vector-icons/MaterialCommunityIcons';
-import currencyMeta from '../../assets/currencies.json';
-import { BORDER_RADIUS, SPACING } from '../styles/designTokens';
+import { SPACING } from '../styles/designTokens';
 import { withAlpha } from '../utils/colorUtils';
 
 /**
  * The sticky "what am I looking at" header shared by the Budgets and Graphs
- * tabs: a ‹ Period › pager whose title opens a picker, an optional jump back to
- * the current period, and the currency the whole screen is read in.
+ * tabs: a ‹ Period › pager whose title opens a picker, plus an optional jump
+ * back to the current period. That is the whole of it — one line, always.
  *
- * Both tabs are scoped the same way — one period, one currency, everything
- * below read in those two units — so they get one header rather than two that
- * have to be kept looking alike by hand.
+ * The currency the screen is read in used to live here too, as a second row
+ * under the period name. It moved out to sit beside the figure it actually
+ * measures (a hero amount on Budgets, a pair of summary cards on Graphs) —
+ * `components/CurrencyScopeChip.js`, mounted by each host next to its own
+ * numbers. A unit belongs to the value it scopes, not to the pager that
+ * merely steps time; keeping it here also meant this header changed height
+ * depending on how many account currencies existed, for a reason a reader
+ * two screens away from the number could not see.
+ *
+ * Both tabs still share this exact pager, because they are scoped by period
+ * the same way and a hand-kept-in-sync pair of near-identical headers is
+ * worse than one.
  *
  * It is a glass overlay, not a band the content starts below: the screen's list
  * runs underneath it and shows through, and the last few pixels of the header
@@ -28,8 +36,8 @@ import { withAlpha } from '../utils/colorUtils';
  * Because it overlays, the host has to know how tall it is: `onHeightChange`
  * reports the solid part's measured height, and the host pads the top of its
  * scroll content by that plus one gap. Measuring rather than assuming a
- * constant is what keeps it correct at any font scale and with or without the
- * currency chip.
+ * constant is what keeps it correct at any font scale, even though the row
+ * count itself no longer varies.
  *
  * The layout's one rule: the pager row is three regions and the outer two are
  * both `flex: 1`, so whatever they hold — one arrow, or an arrow and a jump
@@ -37,10 +45,9 @@ import { withAlpha } from '../utils/colorUtils';
  * is mirrored by an empty slot of its own width for the same reason: mounting
  * it must not shift the title sideways.
  *
- * What the header does *not* own is the choice surfaces themselves. The host
- * keeps its own MonthPickerSheet and CurrencySheet, because what a period means
- * differs between the tabs (Graphs periods may be a whole year) and the
- * currency sheet carries a convert-all switch only one of them has.
+ * What the header does *not* own is the choice surface itself. The host keeps
+ * its own MonthPickerSheet, because what a period means differs between the
+ * tabs (Graphs periods may be a whole year).
  */
 
 // The glass. 0.88 sits in the same family as the floating tab bar's 0.87 pill
@@ -76,21 +83,10 @@ const PeriodHeader = memo(({
   showJumpToCurrent = false,
   onJumpToCurrent,
   jumpLabel,
-  currencies,
-  selectedCurrency = '',
-  onPressCurrency,
-  currencyActive = false,
-  currencyLabel,
   colors,
   onHeightChange,
   testIDPrefix,
 }) => {
-  // Blank for anything the catalogue has no symbol for, and blank when the
-  // symbol *is* the code (CHF, and every currency the catalogue lists that
-  // way) — a chip reading "CHF CHF" is worse than one reading "CHF".
-  const symbol = currencyMeta[selectedCurrency]?.symbol;
-  const displaySymbol = symbol && symbol !== selectedCurrency ? symbol : '';
-
   const fadeSteps = useMemo(() => buildFadeSteps(colors.background), [colors.background]);
 
   const handleLayout = useCallback((event) => {
@@ -188,37 +184,6 @@ const PeriodHeader = memo(({
             </Pressable>
           </View>
         </View>
-
-        {/* The chip names the unit the whole screen is read in — the period's
-            co-scope — so it sits directly under the period name on the same
-            centre line, reading as the title's second line rather than as one
-            more thing on the pager row. Mounted only when there is more than one
-            account currency to pick between: with a single one there is nothing
-            to choose, and the pager runs straight into the content instead of
-            over an empty band. It carries the currency's mark as well as its
-            code, and goes tonal while its sheet is open. */}
-        {currencies.length > 1 && (
-          <View style={styles.currencyRow}>
-            <Pressable
-              onPress={onPressCurrency}
-              style={[styles.currencyChip, {
-                borderColor: currencyActive ? colors.primary : colors.border,
-                backgroundColor: currencyActive ? colors.primary + '1F' : undefined,
-              }]}
-              android_ripple={{ color: colors.primary + '1F' }}
-              hitSlop={6}
-              accessibilityRole="button"
-              accessibilityLabel={currencyLabel}
-              testID={`${testIDPrefix}-currency-chip`}
-            >
-              {!!displaySymbol && (
-                <Text style={[styles.currencySymbol, { color: colors.mutedText }]}>{displaySymbol}</Text>
-              )}
-              <Text style={[styles.currencyChipText, { color: colors.text }]}>{selectedCurrency}</Text>
-              <Icon name="chevron-down" size={16} color={colors.mutedText} />
-            </Pressable>
-          </View>
-        )}
       </View>
 
       <View style={styles.fade} pointerEvents="none" testID={`${testIDPrefix}-fade`}>
@@ -247,12 +212,6 @@ PeriodHeader.propTypes = {
   showJumpToCurrent: PropTypes.bool,
   onJumpToCurrent: PropTypes.func,
   jumpLabel: PropTypes.string,
-  /** Account currency codes; the chip is mounted only when there are 2+. */
-  currencies: PropTypes.arrayOf(PropTypes.string).isRequired,
-  selectedCurrency: PropTypes.string,
-  onPressCurrency: PropTypes.func,
-  currencyActive: PropTypes.bool,
-  currencyLabel: PropTypes.string,
   colors: PropTypes.object.isRequired,
   /** Measured height of the solid part, for the host's scroll padding. */
   onHeightChange: PropTypes.func,
@@ -260,33 +219,6 @@ PeriodHeader.propTypes = {
 };
 
 const styles = StyleSheet.create({
-  // Set against the title (17/700) rather than against any sub-label: the chip
-  // is the title block's second line, not a caption on it.
-  currencyChip: {
-    alignItems: 'center',
-    borderRadius: BORDER_RADIUS.pill,
-    borderWidth: 1,
-    flexDirection: 'row',
-    flexShrink: 0,
-    gap: 3,
-    height: 34,
-    // The ripple is drawn by the platform on the view's own rectangle, so
-    // without this it spills past the pill's rounded ends.
-    overflow: 'hidden',
-    paddingHorizontal: SPACING.md,
-  },
-  currencyChipText: {
-    fontSize: 15,
-    fontWeight: '700',
-  },
-  currencyRow: {
-    alignItems: 'center',
-    marginTop: SPACING.sm,
-  },
-  currencySymbol: {
-    fontSize: 15,
-    fontWeight: '700',
-  },
   fade: {
     height: FADE_HEIGHT,
   },
