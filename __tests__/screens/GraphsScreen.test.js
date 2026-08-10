@@ -338,7 +338,7 @@ describe('GraphsScreen', () => {
 
     // The header floats over the charts, so nothing but this padding keeps the
     // first card out from under the glass — and the header's height is not a
-    // constant (a large font scale makes it taller).
+    // constant (a large font scale makes its one line taller).
     it('pads the scroll content by the height the header reports', async () => {
       const GraphsScreen = require('../../app/screens/GraphsScreen').default;
       const { StyleSheet } = require('react-native');
@@ -378,7 +378,7 @@ describe('GraphsScreen', () => {
         accounts: [{ id: 'acc-1', name: 'Cash', currency: 'USD', balance: '10.00', displayOrder: 0 }],
       });
       const single = await render(<GraphsScreen />);
-      expect(single.queryByTestId('graphs-currency-chip')).toBeNull();
+      expect(single.queryByTestId('graphs-period-currency-chip')).toBeNull();
 
       useAccountsData.mockReturnValue({
         accounts: [
@@ -387,7 +387,7 @@ describe('GraphsScreen', () => {
         ],
       });
       const multi = await render(<GraphsScreen />);
-      expect(multi.getByTestId('graphs-currency-chip')).toBeTruthy();
+      expect(multi.getByTestId('graphs-period-currency-chip')).toBeTruthy();
     });
 
     it('opens the currency sheet from the chip', async () => {
@@ -403,7 +403,7 @@ describe('GraphsScreen', () => {
 
       const { getByTestId, findByTestId } = await render(<GraphsScreen />);
 
-      await act(async () => { fireEvent.press(getByTestId('graphs-currency-chip')); });
+      await act(async () => { fireEvent.press(getByTestId('graphs-period-currency-chip')); });
 
       expect(await findByTestId('graphs-currency-option-EUR')).toBeTruthy();
     });

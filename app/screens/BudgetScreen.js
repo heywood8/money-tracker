@@ -11,7 +11,6 @@ import MonthlyPlanSection from '../components/budgets/MonthlyPlanSection';
 import MonthPickerSheet from '../components/budgets/MonthPickerSheet';
 import CurrencySheet from '../components/CurrencySheet';
 import PeriodHeader from '../components/PeriodHeader';
-import CurrencyScopeChip from '../components/CurrencyScopeChip';
 import AddFAB from '../components/AddFAB';
 import LoadingView from '../components/LoadingView';
 import * as Currency from '../services/currency';
@@ -227,13 +226,19 @@ const BudgetScreen = () => {
       showJumpToCurrent={!isCurrentMonth}
       onJumpToCurrent={handleJumpToCurrentMonth}
       jumpLabel={t('jump_to_current_period')}
+      currencies={currencies}
+      selectedCurrency={selectedCurrency}
+      onPressCurrency={handleOpenCurrencyPicker}
+      currencyActive={currencySheetVisible}
+      currencyLabel={`${t('currency')}: ${selectedCurrency}`}
       colors={colors}
       onHeightChange={setHeaderHeight}
       testIDPrefix="budget-month"
     />
   ), [colors, month, isCurrentMonth, t, language,
+    currencies, selectedCurrency, currencySheetVisible,
     monthPickerVisible, handleOpenMonthPicker,
-    handlePrevMonth, handleNextMonth, handleJumpToCurrentMonth]);
+    handleOpenCurrencyPicker, handlePrevMonth, handleNextMonth, handleJumpToCurrentMonth]);
 
   // The month's headline figure. It used to sit at the very bottom of the plan
   // card in 14px muted text, below every row and the allocated/actual totals —
@@ -250,47 +255,26 @@ const BudgetScreen = () => {
         </Text>
         {/* An em dash until the section has reported: the label alone would
             read as a value that failed to load, and reserving the line keeps
-            the block from jumping a row taller once the figure arrives. The
-            chip rides in this same row, bottom-aligned with the figure — it
-            names the unit whether the figure itself is a real number or still
-            the placeholder, since it reads off the account currencies rather
-            than off planTotals. The row itself is gated on either half having
-            something to show: a currency with no income basis prints no
-            figure, but the chip is still how this screen's currency gets
-            changed, so it cannot go dark along with the figure. */}
-        {(planTotals?.hasIncomeBasis !== false || currencies.length > 1) && (
-          <View style={styles.heroValueRow}>
-            {planTotals?.hasIncomeBasis !== false && (
-              <Text
-                style={[styles.heroValue, {
-                  color: planTotals && Currency.isNegative(planTotals.remainder)
-                    ? colors.overspend
-                    : colors.text,
-                }]}
-                numberOfLines={1}
-                testID="budget-remainder"
-              >
-                {/* The code hangs off the figure only when there is no chip
-                    beside it to carry it — with a chip, printing it here says
-                    "RUB" twice in the same breath. With a single account
-                    currency there is no chip, and then this is the only place
-                    the screen names its unit at all. */}
-                {planTotals
-                  ? `${Currency.formatAmountTrimmed(planTotals.remainder, planTotals.currency)}${currencies.length > 1 ? '' : ` ${planTotals.currency}`}`
-                  : PENDING_PLACEHOLDER}
-              </Text>
-            )}
-            {currencies.length > 1 && (
-              <CurrencyScopeChip
-                code={selectedCurrency}
-                onPress={handleOpenCurrencyPicker}
-                active={currencySheetVisible}
-                accessibilityLabel={`${t('currency')}: ${selectedCurrency}`}
-                colors={colors}
-                testID="budget-currency-chip"
-              />
-            )}
-          </View>
+            the block from jumping a row taller once the figure arrives. */}
+        {planTotals?.hasIncomeBasis !== false && (
+          <Text
+            style={[styles.heroValue, {
+              color: planTotals && Currency.isNegative(planTotals.remainder)
+                ? colors.overspend
+                : colors.text,
+            }]}
+            numberOfLines={1}
+            testID="budget-remainder"
+          >
+            {/* The code hangs off the figure only when the header has no
+                currency control to carry it — with one up there, printing it
+                here says "RUB" twice on one screen. With a single account
+                currency there is nothing to pick and so no control, and then
+                this is the only place the screen names its unit at all. */}
+            {planTotals
+              ? `${Currency.formatAmountTrimmed(planTotals.remainder, planTotals.currency)}${currencies.length > 1 ? '' : ` ${planTotals.currency}`}`
+              : PENDING_PLACEHOLDER}
+          </Text>
         )}
         {/* The month's two orientation figures, moved up from the very bottom
             of the plan card — on a plan of any length they sat below the fold
@@ -309,7 +293,7 @@ const BudgetScreen = () => {
         )}
       </View>
     </View>
-  ), [colors, t, planTotals, currencies, selectedCurrency, currencySheetVisible, handleOpenCurrencyPicker]);
+  ), [colors.mutedText, colors.text, colors.overspend, t, planTotals, currencies.length]);
 
   const listHeader = useMemo(() => (
     <>
@@ -328,8 +312,8 @@ const BudgetScreen = () => {
     handleTotalsChange]);
 
   // The list starts one gap below the header's solid part and scrolls under it
-  // from there. Measured rather than assumed: the header is taller at a large
-  // font scale.
+  // from there. Measured rather than assumed: the header is one line whatever
+  // it holds, but that line is taller at a large font scale.
   const listContentStyle = useMemo(
     () => [styles.listContent, { paddingTop: headerHeight + SPACING.md }],
     [headerHeight],
@@ -415,19 +399,10 @@ const styles = StyleSheet.create({
     marginTop: 2,
   },
   heroValue: {
-    flexShrink: 1,
     fontSize: FONT_SIZE.xxl,
     fontVariant: ['tabular-nums'],
     fontWeight: '700',
     letterSpacing: -0.5,
-  },
-  // Bottom-aligned with the figure's own baseline, not centred against the
-  // chip's shorter box — the chip is the smaller element riding alongside the
-  // number, not the other way round.
-  heroValueRow: {
-    alignItems: 'flex-end',
-    flexDirection: 'row',
-    gap: SPACING.sm,
   },
   listContent: {
     flexGrow: 1,
