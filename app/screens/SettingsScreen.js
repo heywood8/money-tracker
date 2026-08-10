@@ -4,9 +4,7 @@ import PropTypes from 'prop-types';
 // doesn't apply here.
 // eslint-disable-next-line react-native/split-platform-components
 import { View, StyleSheet, TouchableOpacity, ScrollView, FlatList, Linking, ActivityIndicator, BackHandler, AppState, ToastAndroid } from 'react-native';
-import * as Clipboard from 'expo-clipboard';
 import { BORDER_RADIUS, FONT_SIZE, HORIZONTAL_PADDING, SPACING } from '../styles/designTokens';
-import { DESTRUCTIVE } from '../styles/semanticColors';
 import { Text, Divider, TouchableRipple, Menu } from 'react-native-paper';
 import Ionicons from '@expo/vector-icons/Ionicons';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
@@ -18,18 +16,18 @@ import Animated, {
 import { GestureDetector } from 'react-native-gesture-handler';
 import { useSwipeDismiss } from '../hooks/useSwipeDismiss';
 import useSettingsPanelStack from '../hooks/useSettingsPanelStack';
+import LanguagePanel from '../components/settings/LanguagePanel';
+import LogsPanel from '../components/settings/LogsPanel';
+import ResetPanel from '../components/settings/ResetPanel';
+import { languageLabel } from '../utils/languages';
 import { useThemeColors } from '../contexts/ThemeColorsContext';
 import { useThemeConfig } from '../contexts/ThemeConfigContext';
 import { useLocalization } from '../contexts/LocalizationContext';
 import { useDialog } from '../contexts/DialogContext';
-import { useAccountsActions } from '../contexts/AccountsActionsContext';
 import { useImportProgress } from '../contexts/ImportProgressContext';
 import { exportBackup, pickImportFile, importBackupFromFile, restoreBackup, createBackup, getPreRestoreSnapshots, CancelledImportError } from '../services/BackupRestore';
 import { getStoredBackups, DAILY_BACKUP_DIR } from '../services/DailyBackupService';
-import { useLogEntries } from '../hooks/useLogEntries';
-import { File, Paths } from 'expo-file-system';
 import * as LegacyFileSystem from 'expo-file-system/legacy';
-import * as Sharing from 'expo-sharing';
 import { checkForAppUpdate, listDownloadedApks, installApk, verifyCachedApk } from '../services/AppUpdateService';
 import { getPreference, setPreference, PREF_KEYS } from '../services/PreferencesDB';
 import { appEvents, EVENTS } from '../services/eventEmitter';
@@ -46,7 +44,20 @@ import NotificationTemplatesContentPanel from '../components/NotificationTemplat
 import NotificationTemplateEditorPanel from '../components/NotificationTemplateEditorPanel';
 import AccountsScreen from './AccountsScreen';
 import CategoriesScreen from './CategoriesScreen';
-import { BADGE, BADGE_TEXT, CHIP, CHIP_TEXT, SECTION_LABEL } from '../styles/componentStyles';
+import { SECTION_LABEL } from '../styles/componentStyles';
+import {
+  CONFIRM_BUTTON_DESTRUCTIVE,
+  CONFIRM_BUTTON_TEXT,
+  CONFIRM_CONTENT,
+  CONFIRM_TEXT,
+  CONFIRM_WARNING_ICON,
+  EMPTY_CONTAINER,
+  FLEX_LIST,
+  LIST_CONTAINER,
+  LIST_ITEM,
+  LIST_ITEM_CONTENT,
+  LIST_ITEM_TEXT,
+} from '../components/settings/settingsPanelStyles';
 import EmptyState from '../components/EmptyState';
 
 const SHEETS_STEPS = [
@@ -62,21 +73,6 @@ const SHEETS_IMPORT_STEPS = [
   { id: 'connect', label: 'Connecting to spreadsheet' },
   { id: 'parse', label: 'Reading sheet data' },
 ];
-
-// Log severity is a categorical scale, fixed across both themes like
-// chartPalette — only its red is pinned to the app's one red.
-const LOG_LEVEL_COLORS = {
-  error: DESTRUCTIVE.light,
-  warn: '#fb8c00',
-  info: '#1e88e5',
-  debug: '#757575',
-};
-
-const LOG_FILTERS = ['all', 'error', 'warn', 'info', 'debug'];
-
-// Badge background on a selected (primary-filled) filter chip — translucent
-// white so the count reads on the blue fill.
-const SELECTED_BADGE_BG = 'rgba(255,255,255,0.3)';
 
 const SPRING_CONFIG = { mass: 1, damping: 20, stiffness: 200 };
 
@@ -140,10 +136,9 @@ export default function SettingsScreen({ setSubPanelActive }) {
   const scrollBottomInset = insets.bottom + 80;
   const { colors } = useThemeColors();
   const { colorScheme, setTheme } = useThemeConfig();
-  const { t, language, setLanguage, availableLanguages } = useLocalization();
+  const { t, language } = useLocalization();
   const { hideBalances, setHideBalances, attachLocation, setAttachLocation, showAccountsTab, setShowAccountsTab, showBudgetTab, setShowBudgetTab } = useDisplaySettings();
   const { showDialog } = useDialog();
-  const { resetDatabase } = useAccountsActions();
   const { startImport, cancelImport, completeImport, getCancelToken } = useImportProgress();
   const { startDownload, isDownloading, downloadProgress, downloadPhase } = useUpdateDownload();
   // Subpanel navigation. The stack owns which panel is open and how deep into
@@ -183,7 +178,6 @@ export default function SettingsScreen({ setSubPanelActive }) {
   // Inline hint shown under the "Attach location" row when the OS permission was
   // denied while turning the toggle on. Cleared on a successful grant / toggle off.
   const [locationDenied, setLocationDenied] = useState(false);
-  const [logFilter, setLogFilter] = useState('all');
   const [storedBackups, setStoredBackups] = useState([]);
   const [backupsLoading, setBackupsLoading] = useState(false);
   const [pendingDeleteUri, setPendingDeleteUri] = useState(null);
@@ -210,7 +204,6 @@ export default function SettingsScreen({ setSubPanelActive }) {
   const [csvExportSuccess, setCsvExportSuccess] = useState(false);
   const [jsonExportLoading, setJsonExportLoading] = useState(false);
   const [jsonExportSuccess, setJsonExportSuccess] = useState(false);
-  const [expandedLogIds, setExpandedLogIds] = useState(new Set());
 
   const saveLocalBackupColor = saveLocalBackupSuccess ? '#4caf50' : colors.text;
   const sheetsColor = sheetsExportSuccess ? '#4caf50' : colors.text;
@@ -222,7 +215,6 @@ export default function SettingsScreen({ setSubPanelActive }) {
     setTheme(colorScheme === 'dark' ? 'light' : 'dark');
   }, [colorScheme, setTheme]);
 
-  const { entries, counts, clearLogs, getExportText } = useLogEntries(logFilter);
   const importPickInProgress = useRef(false);
 
   const handleToggleHideBalances = useCallback(async () => {
@@ -316,6 +308,14 @@ export default function SettingsScreen({ setSubPanelActive }) {
     setTemplateDraft(null);
     setNotificationMenuVisible(false);
   }, [closeStack]);
+
+  // The wipe finished: close the panel and say so. The toast lives here rather
+  // than in ResetPanel because acknowledging a completed subpanel is the host's
+  // job — the panel is gone by the time the message shows.
+  const handleResetDone = useCallback(() => {
+    closeSubPanel();
+    ToastAndroid.show(t('database_reset_done') || 'Database reset', ToastAndroid.SHORT);
+  }, [closeSubPanel, t]);
 
   // Back navigation is locked while a long async step (Sheets export/import) runs,
   // so the swipe-to-dismiss gesture is disabled then too.
@@ -444,39 +444,6 @@ export default function SettingsScreen({ setSubPanelActive }) {
     return unsubscribe;
   }, []);
 
-  const handleLanguageSelect = useCallback((lng) => {
-    setLanguage(lng);
-    dismissPanel();
-  }, [setLanguage, dismissPanel]);
-
-  const nativeLanguageNames = {
-    en: 'English',
-    ru: 'Русский',
-    zh: '中文',
-    es: 'Español',
-    fr: 'Français',
-    de: 'Deutsch',
-    it: 'Italiano',
-    hy: 'Հայերեն',
-    ja: '日本語',
-    ko: '한국어',
-    pt: 'Português',
-  };
-
-  const languageFlags = {
-    en: '🇬🇧',
-    ru: '🇷🇺',
-    zh: '🇨🇳',
-    es: '🇪🇸',
-    fr: '🇫🇷',
-    de: '🇩🇪',
-    it: '🇮🇹',
-    hy: '🇦🇲',
-    ja: '🇯🇵',
-    ko: '🇰🇷',
-    pt: '🇵🇹',
-  };
-
   const handleExportFormatSelect = useCallback(async (format) => {
     const setLoading = format === 'sqlite' ? setSqliteExportLoading : format === 'csv' ? setCsvExportLoading : setJsonExportLoading;
     const setSuccess = format === 'sqlite' ? setSqliteExportSuccess : format === 'csv' ? setCsvExportSuccess : setJsonExportSuccess;
@@ -566,24 +533,6 @@ export default function SettingsScreen({ setSubPanelActive }) {
     }
   }, []);
 
-  const confirmResetDatabase = useCallback(async () => {
-    // Keep the confirm subpanel open with an inline spinner while the wipe runs, then
-    // close and toast on success — previously the panel closed immediately and the reset
-    // happened invisibly, leaving the user with no feedback (QoL-13).
-    if (resetInProgress) return;
-    setResetInProgress(true);
-    try {
-      await resetDatabase();
-      setResetInProgress(false);
-      closeSubPanel();
-      ToastAndroid.show(t('database_reset_done') || 'Database reset', ToastAndroid.SHORT);
-    } catch (error) {
-      setResetInProgress(false);
-      console.error('[Settings] Database reset failed:', error);
-      showDialog(t('error') || 'Error', error.message || 'Database reset failed', [{ text: 'OK' }]);
-    }
-  }, [resetInProgress, closeSubPanel, resetDatabase, showDialog, t]);
-
   const confirmImportBackup = useCallback(async () => {
     if (importPickInProgress.current) return;
     importPickInProgress.current = true;
@@ -616,22 +565,6 @@ export default function SettingsScreen({ setSubPanelActive }) {
       showDialog(t('error') || 'Error', error.message || t('restore_error') || 'Failed to restore backup', [{ text: 'OK' }]);
     }
   }, [closeSubPanel, startImport, completeImport, cancelImport, getCancelToken, t, showDialog]);
-
-  const handleShareLogs = useCallback(async () => {
-    try {
-      const text = getExportText();
-      const date = new Date().toISOString().slice(0, 10);
-      const file = new File(Paths.cache, `penny-logs-${date}.txt`);
-      file.write(text);
-      await Sharing.shareAsync(file.uri, { mimeType: 'text/plain' });
-    } catch (error) {
-      console.error('Share logs error:', error);
-    }
-  }, [getExportText]);
-
-  const handleClearLogs = useCallback(() => {
-    clearLogs();
-  }, [clearLogs]);
 
   const handleImportSourceSelect = useCallback((source) => {
     if (source === 'file') {
@@ -964,49 +897,6 @@ export default function SettingsScreen({ setSubPanelActive }) {
     );
   }, [colors, t, formatBackupLabel, handleImportLocalBackupSelect, handleDeleteLocalBackup, handleConfirmDeleteLocalBackup, pendingDeleteUri]);
 
-  const toggleLogExpand = useCallback((id) => {
-    setExpandedLogIds(prev => {
-      const next = new Set(prev);
-      if (next.has(id)) {
-        next.delete(id);
-      } else {
-        next.add(id);
-      }
-      return next;
-    });
-  }, []);
-
-  const renderLogEntry = useCallback(({ item }) => {
-    const isExpanded = expandedLogIds.has(item.id);
-    const levelColor = LOG_LEVEL_COLORS[item.level];
-    // Tint the row background for the two levels that warrant attention so they
-    // stand out while scanning a wall of info/debug lines. `20` = ~12% alpha.
-    const rowBackground = item.level === 'error' || item.level === 'warn'
-      ? `${levelColor}20`
-      : 'transparent';
-    return (
-      <TouchableOpacity
-        onPress={() => toggleLogExpand(item.id)}
-        onLongPress={() => Clipboard.setStringAsync(`${item.timestamp} [${item.level.toUpperCase()}] ${item.message}`)}
-        activeOpacity={0.7}
-        style={[
-          styles.logEntry,
-          { borderLeftColor: levelColor, borderBottomColor: colors.border, backgroundColor: rowBackground },
-        ]}
-      >
-        <Text style={[styles.logTimestamp, { color: colors.mutedText }]}>
-          {isExpanded ? item.timestamp.substring(0, 19).replace('T', ' ') : item.timestamp.substring(11, 19)}
-        </Text>
-        <Text style={[styles.logLevel, { color: levelColor }]}>
-          {item.level.toUpperCase()}
-        </Text>
-        <Text style={[styles.logMessage, { color: colors.text }]} numberOfLines={isExpanded ? undefined : 3}>
-          {item.message}
-        </Text>
-      </TouchableOpacity>
-    );
-  }, [colors, expandedLogIds, toggleLogExpand]);
-
   // ─── Subpanel title resolver ───
   const subPanelTitle = useMemo(() => {
     if (activeSubPanel === 'accounts') return t('accounts') || 'Accounts';
@@ -1200,24 +1090,7 @@ export default function SettingsScreen({ setSubPanelActive }) {
             {activeSubPanel === 'categories' && <CategoriesScreen onBackStateChange={handleEmbeddedBackStateChange} />}
 
             {activeSubPanel === 'language' && (
-              <ScrollView style={styles.listContainer} contentContainerStyle={{ paddingBottom: scrollBottomInset }}>
-                {availableLanguages.map(lng => (
-                  <TouchableRipple
-                    key={lng}
-                    onPress={() => handleLanguageSelect(lng)}
-                    style={styles.listItem}
-                  >
-                    <View style={styles.listItemContent}>
-                      <Text style={[styles.listItemText, { color: colors.text }]}>
-                        {languageFlags[lng] ? `${languageFlags[lng]}  ${nativeLanguageNames[lng] || lng}` : (nativeLanguageNames[lng] || lng)}
-                      </Text>
-                      {language === lng && (
-                        <Ionicons name="checkmark-circle" size={24} color={colors.primary} />
-                      )}
-                    </View>
-                  </TouchableRipple>
-                ))}
-              </ScrollView>
+              <LanguagePanel onSelected={dismissPanel} bottomInset={scrollBottomInset} />
             )}
 
             {activeSubPanel === 'export' && exportStep === 'list' && (
@@ -1403,26 +1276,7 @@ export default function SettingsScreen({ setSubPanelActive }) {
             )}
 
             {activeSubPanel === 'reset' && (
-              <View style={styles.confirmContent}>
-                <Ionicons name="warning-outline" size={48} color={colors.destructive} style={styles.confirmWarningIcon} />
-                <Text style={[styles.confirmText, { color: colors.text }]}>
-                  {t('reset_database_confirm') || 'Are you sure you want to reset the database? This will delete all data and create default accounts.'}
-                </Text>
-                <TouchableRipple
-                  onPress={confirmResetDatabase}
-                  disabled={resetInProgress}
-                  style={[styles.confirmButtonDestructive, { backgroundColor: colors.destructive }, resetInProgress && styles.confirmButtonBusy]}
-                >
-                  {resetInProgress ? (
-                    <View style={styles.confirmButtonBusyRow}>
-                      <ActivityIndicator size="small" color="#fff" />
-                      <Text style={styles.confirmButtonText}>{t('resetting_database') || 'Resetting…'}</Text>
-                    </View>
-                  ) : (
-                    <Text style={styles.confirmButtonText}>{t('reset') || 'Reset'}</Text>
-                  )}
-                </TouchableRipple>
-              </View>
+              <ResetPanel onDone={handleResetDone} onBusyChange={setResetInProgress} />
             )}
 
             {activeSubPanel === 'import' && importStep === 'source' && (
@@ -1576,88 +1430,7 @@ export default function SettingsScreen({ setSubPanelActive }) {
             )}
 
             {activeSubPanel === 'logs' && (
-              <>
-                <View style={styles.filterRow}>
-                  {LOG_FILTERS.map(f => {
-                    const isSelected = f === logFilter;
-                    const filterLabelKey = `log_level_${f}`;
-                    const label = t(filterLabelKey) || f;
-                    // Badge every level chip that has entries (skip "all"); the
-                    // absence of a badge on Error/Warn reads as "none", so a
-                    // zero count needs no badge.
-                    const count = f === 'all' ? 0 : (counts?.[f] || 0);
-                    const badgeColor = f === 'error' || f === 'warn' ? LOG_LEVEL_COLORS[f] : colors.mutedText;
-                    const badgeBackground = isSelected ? SELECTED_BADGE_BG : `${badgeColor}26`;
-                    const badgeTextColor = isSelected ? '#fff' : badgeColor;
-                    return (
-                      <TouchableOpacity
-                        key={f}
-                        onPress={() => setLogFilter(f)}
-                        accessibilityRole="button"
-                        accessibilityState={{ selected: isSelected }}
-                        accessibilityLabel={count > 0 ? `${label}, ${count}` : label}
-                        style={[
-                          styles.filterChip,
-                          { borderColor: colors.border },
-                          isSelected && { backgroundColor: colors.primary },
-                        ]}
-                      >
-                        <Text style={[
-                          styles.filterChipText,
-                          isSelected ? styles.filterChipTextSelected : { color: colors.text },
-                        ]}>
-                          {label}
-                        </Text>
-                        {count > 0 && (
-                          <View style={[
-                            styles.filterChipBadge,
-                            { backgroundColor: badgeBackground },
-                          ]}>
-                            <Text style={[
-                              styles.filterChipBadgeText,
-                              { color: badgeTextColor },
-                            ]}>
-                              {count}
-                            </Text>
-                          </View>
-                        )}
-                      </TouchableOpacity>
-                    );
-                  })}
-                </View>
-
-                <FlatList
-                  data={entries.slice().reverse()}
-                  keyExtractor={(item) => String(item.id)}
-                  renderItem={renderLogEntry}
-                  style={styles.flexList}
-                  inverted
-                  initialNumToRender={20}
-                  maxToRenderPerBatch={20}
-                  windowSize={5}
-                  contentContainerStyle={entries.length === 0 && styles.emptyContainer}
-                  ListEmptyComponent={
-                    <EmptyState message={t('no_logs') || 'No logs yet'} />
-                  }
-                />
-
-                <Divider />
-
-                <View style={[styles.logsActionBar, { paddingBottom: scrollBottomInset }]}>
-                  <TouchableOpacity onPress={handleShareLogs} style={styles.logsActionButton}>
-                    <Ionicons name="share-outline" size={20} color={colors.primary} />
-                    <Text style={[styles.logsActionText, { color: colors.primary }]}>
-                      {t('share_logs') || 'Share Logs'}
-                    </Text>
-                  </TouchableOpacity>
-                  <TouchableOpacity onPress={handleClearLogs} style={styles.logsActionButton}>
-                    <Ionicons name="trash-outline" size={20} color={LOG_LEVEL_COLORS.error} />
-                    <Text style={[styles.logsActionText, { color: colors.destructive }]}>
-                      {t('clear_logs') || 'Clear Logs'}
-                    </Text>
-                  </TouchableOpacity>
-                </View>
-              </>
+              <LogsPanel bottomInset={scrollBottomInset} />
             )}
 
             {activeSubPanel === 'update' && (
@@ -1721,7 +1494,7 @@ export default function SettingsScreen({ setSubPanelActive }) {
               <View style={styles.settingsRowText}>
                 <Text style={[styles.settingsRowLabel, { color: colors.text }]}>{t('language')}</Text>
                 <Text style={[styles.settingsRowValue, { color: colors.mutedText }]}>
-                  {languageFlags[language] ? `${languageFlags[language]}  ${nativeLanguageNames[language] || language}` : (nativeLanguageNames[language] || language)}
+                  {languageLabel(language)}
                 </Text>
               </View>
             </View>
@@ -1970,67 +1743,19 @@ const styles = StyleSheet.create({
   backupItemText: {
     flex: 1,
   },
-  confirmButtonBusy: {
-    opacity: 0.85,
-  },
-  confirmButtonBusyRow: {
-    alignItems: 'center',
-    flexDirection: 'row',
-    gap: SPACING.sm,
-    justifyContent: 'center',
-  },
-  confirmButtonDestructive: {
-    borderRadius: BORDER_RADIUS.md,
-    marginTop: SPACING.xl,
-    paddingHorizontal: SPACING.xl,
-    paddingVertical: SPACING.md,
-  },
-  confirmButtonText: {
-    color: '#fff',
-    fontSize: FONT_SIZE.base,
-    fontWeight: '600',
-    textAlign: 'center',
-  },
-  confirmContent: {
-    alignItems: 'center',
-    flex: 1,
-    justifyContent: 'center',
-    paddingHorizontal: HORIZONTAL_PADDING * 2,
-    paddingVertical: SPACING.xl,
-  },
-  confirmText: {
-    fontSize: 15,
-    lineHeight: 22,
-    textAlign: 'center',
-  },
-  confirmWarningIcon: {
-    marginBottom: SPACING.lg,
-  },
+  confirmButtonDestructive: CONFIRM_BUTTON_DESTRUCTIVE,
+  confirmButtonText: CONFIRM_BUTTON_TEXT,
+  confirmContent: CONFIRM_CONTENT,
+  confirmText: CONFIRM_TEXT,
+  confirmWarningIcon: CONFIRM_WARNING_ICON,
   container: {
     flex: 1,
   },
   divider: {
     marginVertical: SPACING.xs,
   },
-  emptyContainer: {
-    flex: 1,
-  },
-  filterChip: CHIP,
-  filterChipBadge: BADGE,
-  filterChipBadgeText: BADGE_TEXT,
-  filterChipText: CHIP_TEXT,
-  filterChipTextSelected: {
-    color: '#fff',
-  },
-  filterRow: {
-    flexDirection: 'row',
-    gap: SPACING.sm,
-    paddingHorizontal: HORIZONTAL_PADDING,
-    paddingVertical: SPACING.sm,
-  },
-  flexList: {
-    flex: 1,
-  },
+  emptyContainer: EMPTY_CONTAINER,
+  flexList: FLEX_LIST,
   formatDescription: {
     fontSize: FONT_SIZE.sm,
     marginTop: SPACING.xs,
@@ -2045,59 +1770,10 @@ const styles = StyleSheet.create({
     flex: 1,
     flexShrink: 1,
   },
-  listContainer: {
-    paddingVertical: SPACING.sm,
-  },
-  listItem: {
-    paddingHorizontal: HORIZONTAL_PADDING,
-  },
-  listItemContent: {
-    alignItems: 'center',
-    flexDirection: 'row',
-    justifyContent: 'space-between',
-    paddingVertical: SPACING.lg,
-  },
-  listItemText: {
-    fontSize: FONT_SIZE.base,
-  },
-  logEntry: {
-    borderBottomWidth: StyleSheet.hairlineWidth,
-    borderLeftWidth: 3,
-    flexDirection: 'row',
-    gap: 6,
-    paddingHorizontal: HORIZONTAL_PADDING,
-    paddingLeft: HORIZONTAL_PADDING - 3,
-    paddingVertical: 6,
-  },
-  logLevel: {
-    fontFamily: 'monospace',
-    fontSize: 11,
-    fontWeight: '700',
-    width: 42,
-  },
-  logMessage: {
-    flex: 1,
-    fontFamily: 'monospace',
-    fontSize: 11,
-  },
-  logTimestamp: {
-    fontFamily: 'monospace',
-    fontSize: 11,
-  },
-  logsActionBar: {
-    flexDirection: 'row',
-    justifyContent: 'space-around',
-    paddingVertical: SPACING.md,
-  },
-  logsActionButton: {
-    alignItems: 'center',
-    flexDirection: 'row',
-    gap: 6,
-  },
-  logsActionText: {
-    fontSize: FONT_SIZE.md,
-    fontWeight: '600',
-  },
+  listContainer: LIST_CONTAINER,
+  listItem: LIST_ITEM,
+  listItemContent: LIST_ITEM_CONTENT,
+  listItemText: LIST_ITEM_TEXT,
   resetSpacer: {
     height: SPACING.sm,
   },
