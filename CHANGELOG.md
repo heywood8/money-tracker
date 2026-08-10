@@ -1,5 +1,12 @@
 # Changelog
 
+## [0.265.4](https://github.com/heywood8/money-tracker/compare/penny-v0.265.3...penny-v0.265.4) (2026-08-10)
+
+
+### Code Refactoring
+
+* **settings:** extract the language, logs and reset subpanels ([#1590](https://github.com/heywood8/money-tracker/issues/1590)) ([7ba27f1](https://github.com/heywood8/money-tracker/commit/7ba27f199e089da4f629420428bced7a22ee621b))
+
 ## [0.265.3](https://github.com/heywood8/money-tracker/compare/penny-v0.265.2...penny-v0.265.3) (2026-08-10)
 
 
