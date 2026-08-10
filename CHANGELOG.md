@@ -1,5 +1,12 @@
 # Changelog
 
+## [0.265.3](https://github.com/heywood8/money-tracker/compare/penny-v0.265.2...penny-v0.265.3) (2026-08-10)
+
+
+### Code Refactoring
+
+* **graphs:** put the currency back in PeriodHeader, on the pager's own line ([#1591](https://github.com/heywood8/money-tracker/issues/1591)) ([c97d475](https://github.com/heywood8/money-tracker/commit/c97d475d8de2513bbce5c5f85d71f58b6f540041))
+
 ## [0.265.2](https://github.com/heywood8/money-tracker/compare/penny-v0.265.1...penny-v0.265.2) (2026-08-08)
 
 
