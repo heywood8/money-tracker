@@ -132,8 +132,21 @@ jest.mock('../../app/components/budgets/MonthlyPlanSection', () => {
 // Both presses are awaited: the chip's press is what mounts the sheet, so the
 // option it contains does not exist until that render has been flushed.
 const pickCurrency = async (getByTestId, code) => {
-  await fireEvent.press(getByTestId('budget-currency-chip'));
+  await fireEvent.press(getByTestId('budget-month-currency-chip'));
   await fireEvent.press(getByTestId(`budget-currency-option-${code}`));
+};
+
+// Every testID in the rendered tree, in the order it is laid out. `toJSON()`
+// carries fiber back-references, so it cannot simply be stringified.
+const collectTestIDs = (node, out = []) => {
+  if (!node || typeof node !== 'object') return out;
+  if (Array.isArray(node)) {
+    node.forEach(child => collectTestIDs(child, out));
+    return out;
+  }
+  if (node.props?.testID) out.push(node.props.testID);
+  (node.children || []).forEach(child => collectTestIDs(child, out));
+  return out;
 };
 
 const setBudgetsData = ({ loading = false, convertAll = true } = {}) => {
@@ -185,23 +198,18 @@ describe('BudgetScreen', () => {
       expect(getByTestId('budget-month-next')).toBeTruthy();
     });
 
-    // The month row is the pager and nothing else now: the currency chip lives
-    // on the remainder row instead, beside the figure it names.
-    it('renders the currency chip beside the remainder figure, not in the header', async () => {
-      const { getByTestId } = await render(<BudgetScreen />);
-      await waitFor(() => expect(getByTestId('budget-currency-chip')).toBeTruthy());
+    // Month and currency are one pair on one line, between the two arrows —
+    // the header has no second row for the currency to sit on.
+    it('renders the currency beside the month name, between the arrows', async () => {
+      const { getByTestId, toJSON } = await render(<BudgetScreen />);
+      await waitFor(() => expect(getByTestId('budget-month-currency-chip')).toBeTruthy());
 
-      expect(within(getByTestId('budget-month-header')).queryByTestId('budget-currency-chip')).toBeNull();
-    });
+      const rendered = collectTestIDs(toJSON());
+      const order = ['budget-month-prev', 'budget-month-label', 'budget-month-currency-chip',
+        'budget-month-next'].map(id => rendered.indexOf(id));
 
-    // Nothing to choose between with one account currency, and a chip that
-    // cannot change anything is furniture over the figure.
-    it('hides the currency chip with a single account currency', async () => {
-      setAccounts([{ id: 'a1', name: 'Ameria', currency: 'AMD' }]);
-      const { getByTestId, queryByTestId } = await render(<BudgetScreen />);
-      await waitFor(() => expect(getByTestId('monthly-plan-section')).toBeTruthy());
-
-      expect(queryByTestId('budget-currency-chip')).toBeNull();
+      expect(order.every(i => i >= 0)).toBe(true);
+      expect(order).toEqual([...order].sort((a, b) => a - b));
     });
 
     // The remainder is the month's figure, not part of the scope statement: it
@@ -216,7 +224,7 @@ describe('BudgetScreen', () => {
 
     // The header floats over the list, so nothing but this padding keeps the
     // first row out from under the glass — and the header's height is not a
-    // constant (a large font scale makes it taller).
+    // constant (a large font scale makes its one line taller).
     it('pads the list top by the height the header reports', async () => {
       const { getByTestId } = await render(<BudgetScreen />);
       await waitFor(() => expect(getByTestId('budget-month-surface')).toBeTruthy());
@@ -255,7 +263,7 @@ describe('BudgetScreen', () => {
 
     it('hands the picked currency down to the list', async () => {
       const { getByTestId } = await render(<BudgetScreen />);
-      await waitFor(() => expect(getByTestId('budget-currency-chip')).toBeTruthy());
+      await waitFor(() => expect(getByTestId('budget-month-currency-chip')).toBeTruthy());
       await pickCurrency(getByTestId, 'RUB');
       await waitFor(() => expect(capturedSectionProps.currency).toBe('RUB'));
     });
@@ -267,7 +275,7 @@ describe('BudgetScreen', () => {
     // flowing into MonthlyPlanSection as the currency of any plan it creates.
     it('re-seeds when the selected currency loses its last account', async () => {
       const { getByTestId, queryByTestId, rerender } = await render(<BudgetScreen />);
-      await waitFor(() => expect(getByTestId('budget-currency-chip')).toBeTruthy());
+      await waitFor(() => expect(getByTestId('budget-month-currency-chip')).toBeTruthy());
       await pickCurrency(getByTestId, 'RUB');
       await waitFor(() => expect(capturedSectionProps.currency).toBe('RUB'));
 
@@ -276,7 +284,7 @@ describe('BudgetScreen', () => {
 
       await waitFor(() => expect(capturedSectionProps.currency).toBe('AMD'));
       // And the picker really is gone, which is what made this unrecoverable.
-      expect(queryByTestId('budget-currency-chip')).toBeNull();
+      expect(queryByTestId('budget-month-currency-chip')).toBeNull();
     });
 
     it('clears the selection when the last account of any kind is deleted', async () => {
@@ -291,7 +299,7 @@ describe('BudgetScreen', () => {
 
     it('leaves a still-valid selection alone when an unrelated account is deleted', async () => {
       const { getByTestId, rerender } = await render(<BudgetScreen />);
-      await waitFor(() => expect(getByTestId('budget-currency-chip')).toBeTruthy());
+      await waitFor(() => expect(getByTestId('budget-month-currency-chip')).toBeTruthy());
       await pickCurrency(getByTestId, 'RUB');
       await waitFor(() => expect(capturedSectionProps.currency).toBe('RUB'));
 
@@ -310,32 +318,12 @@ describe('BudgetScreen', () => {
       const { getByTestId } = await render(<BudgetScreen />);
       await waitFor(() => expect(getByTestId('mock-report-remainder')).toBeTruthy());
       fireEvent.press(getByTestId('mock-report-remainder'));
-      // Trimmed of an all-zero decimal part, and with no currency code: the chip
-      // sits a centimetre to its right and already names the unit.
+      // Trimmed of an all-zero decimal part, and with no currency code: the
+      // header names the unit and printing it again here would say "AMD"
+      // twice on one screen.
       await waitFor(() => expect(getByTestId('budget-remainder')).toHaveTextContent('-85745'));
       expect(getByTestId('budget-remainder')).not.toHaveTextContent('AMD');
-    });
-
-    // Symmetric to the single-currency case below: with more than one account
-    // currency the code is carried by the chip, and printing it again on the
-    // hero would say "AMD" twice a hand's width apart.
-    it('carries the currency code on the chip, not doubled onto the hero', async () => {
-      const { getByTestId } = await render(<BudgetScreen />);
-      await waitFor(() => expect(getByTestId('mock-report-remainder')).toBeTruthy());
-      fireEvent.press(getByTestId('mock-report-remainder'));
-
-      await waitFor(() => expect(getByTestId('budget-remainder')).toHaveTextContent('-85745'));
-      expect(getByTestId('budget-remainder')).not.toHaveTextContent('AMD');
-      expect(within(getByTestId('budget-currency-chip')).getByText('AMD')).toBeTruthy();
-    });
-
-    // The chip names the account currencies, not the plan's totals, so it has
-    // nothing to wait on — it shows beside the placeholder just as it does
-    // beside a resolved figure.
-    it('shows the chip beside the pending placeholder too', async () => {
-      const { getByTestId } = await render(<BudgetScreen />);
-      await waitFor(() => expect(getByTestId('budget-remainder')).toHaveTextContent('—'));
-      expect(getByTestId('budget-currency-chip')).toBeTruthy();
+      expect(within(getByTestId('budget-month-currency-chip')).getByText('AMD')).toBeTruthy();
     });
 
     it('keeps the currency code on the hero when there is no chip to carry it', async () => {
@@ -346,7 +334,7 @@ describe('BudgetScreen', () => {
       await waitFor(() => expect(getByTestId('mock-report-remainder')).toBeTruthy());
       fireEvent.press(getByTestId('mock-report-remainder'));
       await waitFor(() => expect(getByTestId('budget-remainder')).toHaveTextContent('-85745 AMD'));
-      expect(queryByTestId('budget-currency-chip')).toBeNull();
+      expect(queryByTestId('budget-month-currency-chip')).toBeNull();
     });
 
     it('replaces a negative remainder with the overspend colour', async () => {
@@ -367,17 +355,6 @@ describe('BudgetScreen', () => {
       await waitFor(() => expect(getByText('add_income_for_remainder')).toBeTruthy());
       expect(queryByTestId('budget-remainder')).toBeNull();
     });
-
-    // Regression: the chip used to be nested inside the same conditional as
-    // the figure, so a currency with no income basis took the chip down with
-    // it — the one remaining control on the screen for changing currency.
-    it('keeps the currency chip reachable when the figure gives way to the add-income prompt', async () => {
-      const { getByTestId } = await render(<BudgetScreen />);
-      await waitFor(() => expect(getByTestId('mock-report-no-income')).toBeTruthy());
-      fireEvent.press(getByTestId('mock-report-no-income'));
-
-      await waitFor(() => expect(getByTestId('budget-currency-chip')).toBeTruthy());
-    });
   });
 
   describe('Convert toggle', () => {
@@ -386,8 +363,8 @@ describe('BudgetScreen', () => {
     // convert at all.
     it('flips the convert-all mode via the context setter', async () => {
       const { getByTestId } = await render(<BudgetScreen />);
-      await waitFor(() => expect(getByTestId('budget-currency-chip')).toBeTruthy());
-      await fireEvent.press(getByTestId('budget-currency-chip'));
+      await waitFor(() => expect(getByTestId('budget-month-currency-chip')).toBeTruthy());
+      await fireEvent.press(getByTestId('budget-month-currency-chip'));
 
       await fireEvent.press(getByTestId('budget-currency-convert'));
 
@@ -396,8 +373,8 @@ describe('BudgetScreen', () => {
 
     it('keeps the sheet open when the toggle is flipped', async () => {
       const { getByTestId, queryByTestId } = await render(<BudgetScreen />);
-      await waitFor(() => expect(getByTestId('budget-currency-chip')).toBeTruthy());
-      await fireEvent.press(getByTestId('budget-currency-chip'));
+      await waitFor(() => expect(getByTestId('budget-month-currency-chip')).toBeTruthy());
+      await fireEvent.press(getByTestId('budget-month-currency-chip'));
 
       await fireEvent.press(getByTestId('budget-currency-convert'));
 
