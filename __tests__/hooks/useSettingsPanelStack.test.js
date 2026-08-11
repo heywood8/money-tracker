@@ -4,6 +4,7 @@ import useSettingsPanelStack, {
   selectPanel,
   selectStep,
   selectParentStep,
+  selectParams,
   selectCanStepBack,
   selectStepOf,
   PANEL_ROOT_STEP,
@@ -14,25 +15,25 @@ describe('settingsPanelStackReducer', () => {
   describe('open', () => {
     it('starts a panel with no nested steps at a null step', () => {
       const stack = settingsPanelStackReducer(EMPTY_STACK, { type: 'open', panel: 'logs' });
-      expect(stack).toEqual([{ panel: 'logs', step: null }]);
+      expect(stack).toEqual([{ panel: 'logs', step: null, params: null }]);
     });
 
     it('starts a panel that has nested steps on its root step', () => {
       expect(settingsPanelStackReducer(EMPTY_STACK, { type: 'open', panel: 'import' }))
-        .toEqual([{ panel: 'import', step: 'source' }]);
+        .toEqual([{ panel: 'import', step: 'source', params: null }]);
       expect(settingsPanelStackReducer(EMPTY_STACK, { type: 'open', panel: 'export' }))
-        .toEqual([{ panel: 'export', step: 'list' }]);
+        .toEqual([{ panel: 'export', step: 'list', params: null }]);
       expect(settingsPanelStackReducer(EMPTY_STACK, { type: 'open', panel: 'notificationProcessing' }))
-        .toEqual([{ panel: 'notificationProcessing', step: 'main' }]);
+        .toEqual([{ panel: 'notificationProcessing', step: 'main', params: null }]);
     });
 
     it('discards any previous stack rather than nesting one panel inside another', () => {
       const deep = [
-        { panel: 'import', step: 'source' },
-        { panel: 'import', step: 'local-list' },
+        { panel: 'import', step: 'source', params: null },
+        { panel: 'import', step: 'local-list', params: null },
       ];
       expect(settingsPanelStackReducer(deep, { type: 'open', panel: 'logs' }))
-        .toEqual([{ panel: 'logs', step: null }]);
+        .toEqual([{ panel: 'logs', step: null, params: null }]);
     });
   });
 
@@ -41,8 +42,8 @@ describe('settingsPanelStackReducer', () => {
       const opened = settingsPanelStackReducer(EMPTY_STACK, { type: 'open', panel: 'import' });
       const pushed = settingsPanelStackReducer(opened, { type: 'push', step: 'local-list' });
       expect(pushed).toEqual([
-        { panel: 'import', step: 'source' },
-        { panel: 'import', step: 'local-list' },
+        { panel: 'import', step: 'source', params: null },
+        { panel: 'import', step: 'local-list', params: null },
       ]);
     });
 
@@ -50,23 +51,33 @@ describe('settingsPanelStackReducer', () => {
       expect(settingsPanelStackReducer(EMPTY_STACK, { type: 'push', step: 'local-list' }))
         .toBe(EMPTY_STACK);
     });
+
+    it('carries params describing this visit to the step', () => {
+      const opened = settingsPanelStackReducer(EMPTY_STACK, { type: 'open', panel: 'notificationProcessing' });
+      const pushed = settingsPanelStackReducer(opened, {
+        type: 'push', step: 'templateEditor', params: { editing: true },
+      });
+      expect(selectParams(pushed)).toEqual({ editing: true });
+      // Popping back drops them with the entry.
+      expect(selectParams(settingsPanelStackReducer(pushed, { type: 'pop' }))).toBeNull();
+    });
   });
 
   describe('pop', () => {
     it('steps back one level', () => {
       const stack = [
-        { panel: 'import', step: 'source' },
-        { panel: 'import', step: 'local-list' },
-        { panel: 'import', step: 'confirm-local' },
+        { panel: 'import', step: 'source', params: null },
+        { panel: 'import', step: 'local-list', params: null },
+        { panel: 'import', step: 'confirm-local', params: null },
       ];
       expect(settingsPanelStackReducer(stack, { type: 'pop' })).toEqual([
-        { panel: 'import', step: 'source' },
-        { panel: 'import', step: 'local-list' },
+        { panel: 'import', step: 'source', params: null },
+        { panel: 'import', step: 'local-list', params: null },
       ]);
     });
 
     it('leaves the root entry alone — dismissing the panel is the screen\'s call', () => {
-      const root = [{ panel: 'import', step: 'source' }];
+      const root = [{ panel: 'import', step: 'source', params: null }];
       expect(settingsPanelStackReducer(root, { type: 'pop' })).toBe(root);
     });
   });
@@ -74,12 +85,12 @@ describe('settingsPanelStackReducer', () => {
   describe('popToRoot', () => {
     it('unwinds every nested step back to the panel root', () => {
       const stack = [
-        { panel: 'import', step: 'source' },
-        { panel: 'import', step: 'local-list' },
-        { panel: 'import', step: 'confirm-local' },
+        { panel: 'import', step: 'source', params: null },
+        { panel: 'import', step: 'local-list', params: null },
+        { panel: 'import', step: 'confirm-local', params: null },
       ];
       expect(settingsPanelStackReducer(stack, { type: 'popToRoot' }))
-        .toEqual([{ panel: 'import', step: 'source' }]);
+        .toEqual([{ panel: 'import', step: 'source', params: null }]);
     });
 
     it('is a no-op on an empty stack', () => {
@@ -90,12 +101,12 @@ describe('settingsPanelStackReducer', () => {
   describe('replace', () => {
     it('swaps the current view without deepening the stack', () => {
       const stack = [
-        { panel: 'notificationProcessing', step: 'main' },
-        { panel: 'notificationProcessing', step: 'templateEditor' },
+        { panel: 'notificationProcessing', step: 'main', params: null },
+        { panel: 'notificationProcessing', step: 'templateEditor', params: { editing: true } },
       ];
       expect(settingsPanelStackReducer(stack, { type: 'replace', step: 'templates' })).toEqual([
-        { panel: 'notificationProcessing', step: 'main' },
-        { panel: 'notificationProcessing', step: 'templates' },
+        { panel: 'notificationProcessing', step: 'main', params: null },
+        { panel: 'notificationProcessing', step: 'templates', params: null },
       ]);
     });
   });
@@ -103,32 +114,32 @@ describe('settingsPanelStackReducer', () => {
   describe('swapPanel', () => {
     it('replaces the open panel wholesale, at the new panel\'s root step', () => {
       const stack = [
-        { panel: 'import', step: 'source' },
-        { panel: 'import', step: 'sheets-progress' },
+        { panel: 'import', step: 'source', params: null },
+        { panel: 'import', step: 'sheets-progress', params: null },
       ];
       expect(settingsPanelStackReducer(stack, { type: 'swapPanel', panel: 'export' }))
-        .toEqual([{ panel: 'export', step: 'list' }]);
+        .toEqual([{ panel: 'export', step: 'list', params: null }]);
     });
   });
 
   describe('close', () => {
     it('empties the stack', () => {
-      const stack = [{ panel: 'logs', step: null }];
+      const stack = [{ panel: 'logs', step: null, params: null }];
       expect(settingsPanelStackReducer(stack, { type: 'close' })).toEqual([]);
     });
   });
 
   it('ignores an unknown action', () => {
-    const stack = [{ panel: 'logs', step: null }];
+    const stack = [{ panel: 'logs', step: null, params: null }];
     expect(settingsPanelStackReducer(stack, { type: 'nonsense' })).toBe(stack);
   });
 });
 
 describe('selectors', () => {
   const stack = [
-    { panel: 'import', step: 'source' },
-    { panel: 'import', step: 'local-list' },
-    { panel: 'import', step: 'confirm-local' },
+    { panel: 'import', step: 'source', params: null },
+    { panel: 'import', step: 'local-list', params: null },
+    { panel: 'import', step: 'confirm-local', params: null },
   ];
 
   it('reads the current panel and step off the top entry', () => {
@@ -138,7 +149,7 @@ describe('selectors', () => {
 
   it('reads the step that back will land on', () => {
     expect(selectParentStep(stack)).toBe('local-list');
-    expect(selectParentStep([{ panel: 'import', step: 'source' }])).toBeNull();
+    expect(selectParentStep([{ panel: 'import', step: 'source', params: null }])).toBeNull();
   });
 
   it('reports nothing for an empty stack', () => {
@@ -149,7 +160,7 @@ describe('selectors', () => {
 
   it('can step back only below a nested step', () => {
     expect(selectCanStepBack(stack)).toBe(true);
-    expect(selectCanStepBack([{ panel: 'import', step: 'source' }])).toBe(false);
+    expect(selectCanStepBack([{ panel: 'import', step: 'source', params: null }])).toBe(false);
   });
 
   describe('selectStepOf', () => {
