@@ -1,5 +1,12 @@
 # Changelog
 
+## [0.266.2](https://github.com/heywood8/money-tracker/compare/penny-v0.266.1...penny-v0.266.2) (2026-08-11)
+
+
+### Code Refactoring
+
+* **settings:** extract the update subpanel and the settings list ([#1598](https://github.com/heywood8/money-tracker/issues/1598)) ([cbbad50](https://github.com/heywood8/money-tracker/commit/cbbad50e5228fec95a588bf6d8771ddb57d101a2))
+
 ## [0.266.1](https://github.com/heywood8/money-tracker/compare/penny-v0.266.0...penny-v0.266.1) (2026-08-11)
 
 
