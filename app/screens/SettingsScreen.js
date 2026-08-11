@@ -17,6 +17,7 @@ import { GestureDetector } from 'react-native-gesture-handler';
 import { useSwipeDismiss } from '../hooks/useSwipeDismiss';
 import useSettingsPanelStack from '../hooks/useSettingsPanelStack';
 import LanguagePanel from '../components/settings/LanguagePanel';
+import UpdatePanel from '../components/settings/UpdatePanel';
 import ExportPanel from '../components/settings/ExportPanel';
 import ImportPanel from '../components/settings/ImportPanel';
 import NotificationPanel from '../components/settings/NotificationPanel';
@@ -27,14 +28,12 @@ import { useThemeColors } from '../contexts/ThemeColorsContext';
 import { useThemeConfig } from '../contexts/ThemeConfigContext';
 import { useLocalization } from '../contexts/LocalizationContext';
 import { useDialog } from '../contexts/DialogContext';
-import { checkForAppUpdate, listDownloadedApks, installApk, verifyCachedApk } from '../services/AppUpdateService';
 import { getPreference, setPreference, PREF_KEYS } from '../services/PreferencesDB';
 import { appEvents, EVENTS } from '../services/eventEmitter';
 import { useDisplaySettings } from '../contexts/DisplaySettingsContext';
 import { useUpdateDownload } from '../contexts/UpdateDownloadContext';
 import { authenticateWithBiometrics, BiometricResult } from '../services/BiometricService';
 import { ensureLocationPermission } from '../services/LocationService';
-import UpdateContentPanel from '../components/UpdateContentPanel';
 import AccountsScreen from './AccountsScreen';
 import CategoriesScreen from './CategoriesScreen';
 import { SECTION_LABEL } from '../styles/componentStyles';
@@ -88,8 +87,6 @@ SettingToggleRow.propTypes = {
   testID: PropTypes.string,
 };
 
-// How often to re-poll CI build progress while the update panel shows an in-progress build.
-const BUILD_PROGRESS_POLL_MS = 5000;
 
 
 export default function SettingsScreen({ setSubPanelActive }) {
@@ -137,9 +134,6 @@ export default function SettingsScreen({ setSubPanelActive }) {
   // denied while turning the toggle on. Cleared on a successful grant / toggle off.
   const [locationDenied, setLocationDenied] = useState(false);
   const exportStep = panelStack.stepOf('export');
-  const [updateResult, setUpdateResult] = useState(null);
-  const [isCheckingUpdate, setIsCheckingUpdate] = useState(false);
-  const [downloadedApks, setDownloadedApks] = useState([]);
   const importStep = panelStack.stepOf('import');
 
 
@@ -214,6 +208,13 @@ export default function SettingsScreen({ setSubPanelActive }) {
     panelBackRef.current = typeof fn === 'function' ? fn : null;
   }, []);
 
+  // A panel can name itself in the header when its title depends on something
+  // only it knows — the update panel says whether it found anything.
+  const [panelTitle, setPanelTitle] = useState(null);
+  const registerPanelTitle = useCallback((title) => {
+    setPanelTitle(title ?? null);
+  }, []);
+
   // A panel can offer the subpanel header an action (currently only the import
   // backup list, which gets a refresh button).
   const [panelRefresh, setPanelRefresh] = useState(null);
@@ -230,13 +231,12 @@ export default function SettingsScreen({ setSubPanelActive }) {
     // swallow the next panel's back gesture.
     registerPanelBack(null);
     registerPanelRefresh(null);
+    registerPanelTitle(null);
     setPanelBusy(false);
     setEmbeddedCanGoBack(false);
     // Everything else the panels used to leave behind now unmounts with them.
-    setUpdateResult(null);
-    setDownloadedApks([]);
     setNotificationMenuVisible(false);
-  }, [closeStack, registerPanelBack, registerPanelRefresh]);
+  }, [closeStack, registerPanelBack, registerPanelRefresh, registerPanelTitle]);
 
   // The wipe finished: close the panel and say so. The toast lives here rather
   // than in ResetPanel because acknowledging a completed subpanel is the host's
@@ -360,123 +360,10 @@ export default function SettingsScreen({ setSubPanelActive }) {
     swapStackPanel('export');
   }, [swapStackPanel]);
 
-  const loadDownloadedApks = useCallback(async () => {
-    const apks = await listDownloadedApks();
-    setDownloadedApks(apks);
-  }, []);
-
-  const handleInstallApk = useCallback(async (uri) => {
-    try {
-      await installApk(uri);
-    } catch (error) {
-      console.error('Failed to install APK:', error);
-      showDialog(
-        t('error') || 'Error',
-        t('update_download_failed') || 'Could not install the APK. The file may have been removed.',
-        [{ text: t('ok') || 'OK' }],
-      );
-    }
-  }, [showDialog, t]);
-
-  const runUpdateCheck = useCallback(async ({ silent = false } = {}) => {
-    // A silent re-check (used by the build-progress poller) keeps the current panel content
-    // in place and skips the loading spinner, so the build percentage updates without flicker.
-    if (!silent) {
-      setUpdateResult(null);
-      setIsCheckingUpdate(true);
-    }
-    loadDownloadedApks();
-    try {
-      const result = await checkForAppUpdate();
-      await setPreference(PREF_KEYS.UPDATE_LAST_CHECK_AT, new Date().toISOString());
-
-      if (!result.success) {
-        setUpdateResult({
-          type: 'error',
-          errorCode: result.errorCode,
-          currentVersion: result.currentVersion,
-          releaseNotes: result.releaseNotes || null,
-          recentReleaseNotes: result.recentReleaseNotes || null,
-          releasesUrl: result.releasesUrl || null,
-          buildProgress: result.buildProgress || null,
-        });
-      } else if (!result.isUpdateAvailable) {
-        setUpdateResult({
-          type: 'up_to_date',
-          currentVersion: result.currentVersion,
-          recentReleaseNotes: result.recentReleaseNotes || null,
-          releasesUrl: result.releasesUrl || null,
-        });
-      } else {
-        // Verify any cached APK against the release checksum. A corrupt leftover download is
-        // deleted here so we offer a fresh "Update now" (re-download) instead of an "Install now"
-        // that would launch a broken installer.
-        const cached = await verifyCachedApk(result.downloadUrl, { checksumUrl: result.checksumUrl });
-        // Re-scan the cache so the per-release install buttons reflect reality: a corrupt file just
-        // deleted by verifyCachedApk drops out, and a freshly verified one shows as installable.
-        await loadDownloadedApks();
-        setUpdateResult({
-          type: 'available',
-          latestVersion: result.latestVersion,
-          currentVersion: result.currentVersion,
-          downloadUrl: result.downloadUrl,
-          checksumUrl: result.checksumUrl || null,
-          releaseNotes: result.releaseNotes || null,
-          recentReleaseNotes: result.recentReleaseNotes || null,
-          releasesUrl: result.releasesUrl || null,
-          alreadyDownloaded: cached.exists,
-          localUri: cached.exists ? cached.uri : null,
-          previousDownloadCorrupted: !!cached.corrupted,
-        });
-      }
-    } catch (error) {
-      if (!silent) setUpdateResult({ type: 'error', errorCode: null });
-    } finally {
-      if (!silent) setIsCheckingUpdate(false);
-    }
-  }, [loadDownloadedApks]);
-
-  // While the update panel is open and a release is still waiting on its CI build, poll the
-  // build progress so the "Building N%" chip advances and flips to "Update now" once the APK
-  // is published. Polling stops as soon as the build finishes or the panel closes.
-  useEffect(() => {
-    if (activeSubPanel !== 'update') return undefined;
-    const buildInProgress = updateResult?.errorCode === 'releases_without_apks'
-      && !!updateResult?.buildProgress;
-    if (!buildInProgress) return undefined;
-    const intervalId = setInterval(() => {
-      runUpdateCheck({ silent: true });
-    }, BUILD_PROGRESS_POLL_MS);
-    return () => clearInterval(intervalId);
-  }, [activeSubPanel, updateResult, runUpdateCheck]);
-
-  const handleCheckForUpdates = useCallback(() => {
-    openSubPanel('update');
-    runUpdateCheck();
-  }, [openSubPanel, runUpdateCheck]);
-
-  const handleUpdateFromSettings = useCallback(async (downloadUrl, checksumUrl, version) => {
-    // Record the version actually chosen so the startup reminder doesn't re-nag for it. The
-    // per-release buttons pass their own version; fall back to the highlighted candidate.
-    const promptedVersion = version || updateResult?.latestVersion;
-    if (promptedVersion) {
-      await setPreference(PREF_KEYS.UPDATE_LAST_PROMPTED_VERSION, promptedVersion);
-    }
-    closeSubPanel();
-    startDownload(downloadUrl, {
-      checksumUrl: checksumUrl || null,
-      onError: () => {
-        showDialog(
-          t('error') || 'Error',
-          t('update_download_failed') || 'Could not download the update. Please try again.',
-          [{ text: t('ok') || 'OK' }],
-        );
-      },
-    });
-  }, [updateResult, closeSubPanel, startDownload, showDialog, t]);
-
   // ─── Subpanel title resolver ───
+  // A panel that named itself wins; the rest are named from their panel and step.
   const subPanelTitle = useMemo(() => {
+    if (panelTitle) return panelTitle;
     if (activeSubPanel === 'accounts') return t('accounts') || 'Accounts';
     if (activeSubPanel === 'categories') return t('categories') || 'Categories';
     if (activeSubPanel === 'language') return t('language');
@@ -490,11 +377,6 @@ export default function SettingsScreen({ setSubPanelActive }) {
       return t('restore_database') || 'Restore Database';
     }
     if (activeSubPanel === 'logs') return t('logs') || 'Logs';
-    if (activeSubPanel === 'update') {
-      if (isCheckingUpdate) return t('check_updates') || 'Check for updates';
-      if (updateResult?.type === 'available') return t('update_available_title') || 'Update available';
-      return t('check_updates') || 'Check for updates';
-    }
     if (activeSubPanel === 'notificationProcessing') {
       if (notificationView === 'filters') return t('notification_filters') || 'Filters';
       if (notificationView === 'bindings') return t('notification_bindings') || 'Bindings';
@@ -508,7 +390,7 @@ export default function SettingsScreen({ setSubPanelActive }) {
     }
     if (activeSubPanel === 'reset') return t('reset_database') || 'Reset Database';
     return '';
-  }, [activeSubPanel, exportStep, importStep, isCheckingUpdate, updateResult, notificationView, panelStack.params, t]);
+  }, [panelTitle, activeSubPanel, exportStep, importStep, notificationView, panelStack.params, t]);
 
   // Resolver behind navigateBack — the single answer for all three back paths
   // (swipe, hardware back, header arrow). An embedded Accounts/Categories screen
@@ -676,17 +558,11 @@ export default function SettingsScreen({ setSubPanelActive }) {
             )}
 
             {activeSubPanel === 'update' && (
-              <View style={styles.updatePanelWrapper}>
-                <UpdateContentPanel
-                  isChecking={isCheckingUpdate}
-                  updateResult={updateResult}
-                  downloadedApks={downloadedApks}
-                  onUpdate={handleUpdateFromSettings}
-                  onInstallApk={handleInstallApk}
-                  onRefresh={runUpdateCheck}
-                  bottomInset={scrollBottomInset}
-                />
-              </View>
+              <UpdatePanel
+                onRegisterTitle={registerPanelTitle}
+                onDone={closeSubPanel}
+                bottomInset={scrollBottomInset}
+              />
             )}
 
             {activeSubPanel === 'notificationProcessing' && (
@@ -866,7 +742,7 @@ export default function SettingsScreen({ setSubPanelActive }) {
         </TouchableRipple>
 
         <TouchableRipple
-          onPress={isDownloading ? undefined : handleCheckForUpdates}
+          onPress={isDownloading ? undefined : () => openSubPanel('update')}
           style={[styles.settingsRow, isDownloading && styles.settingsRowDisabled]}
           disabled={isDownloading}
           testID="check-updates-row"
@@ -1023,9 +899,6 @@ const styles = StyleSheet.create({
     height: 24,
     justifyContent: 'center',
     width: 44,
-  },
-  updatePanelWrapper: {
-    flex: 1,
   },
   updateRowRight: {
     alignItems: 'center',
