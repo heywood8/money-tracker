@@ -3,19 +3,16 @@ import PropTypes from 'prop-types';
 // ToastAndroid is intentional: this is an Android-only app, so the platform-split lint rule
 // doesn't apply here.
 // eslint-disable-next-line react-native/split-platform-components
-import { View, StyleSheet, TouchableOpacity, ScrollView, ActivityIndicator, BackHandler, AppState, ToastAndroid } from 'react-native';
-import { BORDER_RADIUS, FONT_SIZE, HORIZONTAL_PADDING, SPACING } from '../styles/designTokens';
-import { Text, Divider, TouchableRipple, Menu } from 'react-native-paper';
+import { View, StyleSheet, TouchableOpacity, BackHandler, AppState, ToastAndroid } from 'react-native';
+import { HORIZONTAL_PADDING, SPACING } from '../styles/designTokens';
+import { Text, Divider, Menu } from 'react-native-paper';
 import Ionicons from '@expo/vector-icons/Ionicons';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
-import Animated, {
-  useSharedValue,
-  useAnimatedStyle,
-  withSpring,
-} from 'react-native-reanimated';
+import Animated from 'react-native-reanimated';
 import { GestureDetector } from 'react-native-gesture-handler';
 import { useSwipeDismiss } from '../hooks/useSwipeDismiss';
 import useSettingsPanelStack from '../hooks/useSettingsPanelStack';
+import SettingsList from '../components/settings/SettingsList';
 import LanguagePanel from '../components/settings/LanguagePanel';
 import UpdatePanel from '../components/settings/UpdatePanel';
 import ExportPanel from '../components/settings/ExportPanel';
@@ -23,71 +20,11 @@ import ImportPanel from '../components/settings/ImportPanel';
 import NotificationPanel from '../components/settings/NotificationPanel';
 import LogsPanel from '../components/settings/LogsPanel';
 import ResetPanel from '../components/settings/ResetPanel';
-import { languageLabel } from '../utils/languages';
 import { useThemeColors } from '../contexts/ThemeColorsContext';
-import { useThemeConfig } from '../contexts/ThemeConfigContext';
 import { useLocalization } from '../contexts/LocalizationContext';
-import { useDialog } from '../contexts/DialogContext';
-import { getPreference, setPreference, PREF_KEYS } from '../services/PreferencesDB';
 import { appEvents, EVENTS } from '../services/eventEmitter';
-import { useDisplaySettings } from '../contexts/DisplaySettingsContext';
-import { useUpdateDownload } from '../contexts/UpdateDownloadContext';
-import { authenticateWithBiometrics, BiometricResult } from '../services/BiometricService';
-import { ensureLocationPermission } from '../services/LocationService';
 import AccountsScreen from './AccountsScreen';
 import CategoriesScreen from './CategoriesScreen';
-import { SECTION_LABEL } from '../styles/componentStyles';
-
-const SPRING_CONFIG = { mass: 1, damping: 20, stiffness: 200 };
-
-/**
- * A settings row with an animated on/off switch. Extracted so the three toggle
- * rows (hide balances, theme, attach location) share one implementation — a
- * future restyle or a11y fix touches one place instead of three. `hintError`
- * renders the hint in the error colour (used for the location "permission
- * denied" state).
- */
-const SettingToggleRow = ({ icon, label, hint, value, onToggle, hintError = false, testID }) => {
-  const { colors } = useThemeColors();
-  const progress = useSharedValue(value ? 1 : 0);
-  useEffect(() => {
-    progress.value = withSpring(value ? 1 : 0, SPRING_CONFIG);
-  }, [value, progress]);
-  const thumbStyle = useAnimatedStyle(() => ({
-    transform: [{ translateX: 2 + progress.value * 20 }],
-  }));
-
-  return (
-    <TouchableRipple onPress={onToggle} style={styles.settingsRow} testID={testID}>
-      <View style={styles.settingsRowContent}>
-        <View style={styles.settingsRowLeft}>
-          <Ionicons name={icon} size={22} color={colors.text} />
-          <View style={styles.settingsRowText}>
-            <Text style={[styles.settingsRowLabel, { color: colors.text }]}>{label}</Text>
-            <Text style={[styles.settingsRowValue, { color: hintError ? colors.destructive : colors.mutedText }]}>
-              {hint}
-            </Text>
-          </View>
-        </View>
-        <View style={[styles.switchTrack, { backgroundColor: value ? colors.primary : colors.border }]}>
-          <Animated.View style={[styles.switchThumb, thumbStyle]} />
-        </View>
-      </View>
-    </TouchableRipple>
-  );
-};
-
-SettingToggleRow.propTypes = {
-  icon: PropTypes.string.isRequired,
-  label: PropTypes.string.isRequired,
-  hint: PropTypes.string,
-  value: PropTypes.bool,
-  onToggle: PropTypes.func.isRequired,
-  hintError: PropTypes.bool,
-  testID: PropTypes.string,
-};
-
-
 
 export default function SettingsScreen({ setSubPanelActive }) {
   const insets = useSafeAreaInsets();
@@ -97,11 +34,7 @@ export default function SettingsScreen({ setSubPanelActive }) {
   // translucent bar exactly like the operations list does.
   const scrollBottomInset = insets.bottom + 80;
   const { colors } = useThemeColors();
-  const { colorScheme, setTheme } = useThemeConfig();
-  const { t, language } = useLocalization();
-  const { hideBalances, setHideBalances, attachLocation, setAttachLocation, showAccountsTab, setShowAccountsTab, showBudgetTab, setShowBudgetTab } = useDisplaySettings();
-  const { showDialog } = useDialog();
-  const { startDownload, isDownloading, downloadProgress, downloadPhase } = useUpdateDownload();
+  const { t } = useLocalization();
   // Subpanel navigation. The stack owns which panel is open and how deep into
   // its nested views the user has stepped, so "can we go back?", the header
   // title and the back handler all derive from one place instead of from four
@@ -130,67 +63,9 @@ export default function SettingsScreen({ setSubPanelActive }) {
   // top+bottom inset stretch, which collapses to zero height under Reanimated 4 /
   // RN 0.85's Yoga (leaving the panel invisible / seemingly not opening).
   const [containerSize, setContainerSize] = useState(null);
-  // Inline hint shown under the "Attach location" row when the OS permission was
-  // denied while turning the toggle on. Cleared on a successful grant / toggle off.
-  const [locationDenied, setLocationDenied] = useState(false);
   const exportStep = panelStack.stepOf('export');
   const importStep = panelStack.stepOf('import');
 
-
-  const handleToggleDarkMode = useCallback(() => {
-    setTheme(colorScheme === 'dark' ? 'light' : 'dark');
-  }, [colorScheme, setTheme]);
-
-
-  const handleToggleHideBalances = useCallback(async () => {
-    if (!hideBalances) {
-      setHideBalances(true);
-      return;
-    }
-    const result = await authenticateWithBiometrics(t('biometric_prompt') || 'Authenticate to show balances');
-    if (result === BiometricResult.SUCCESS) {
-      setHideBalances(false);
-    } else if (result === BiometricResult.NOT_AVAILABLE) {
-      setHideBalances(false);
-    } else if (result === BiometricResult.NOT_ENROLLED) {
-      setHideBalances(false);
-    } else if (result === BiometricResult.FAILED) {
-      showDialog(
-        t('error') || 'Error',
-        t('biometric_failed') || 'Authentication failed',
-        [{ text: t('ok') || 'OK' }],
-      );
-    }
-  }, [hideBalances, setHideBalances, t, showDialog]);
-
-  const handleToggleShowAccountsTab = useCallback(() => {
-    setShowAccountsTab(!showAccountsTab);
-  }, [showAccountsTab, setShowAccountsTab]);
-
-  const handleToggleShowBudgetTab = useCallback(() => {
-    setShowBudgetTab(!showBudgetTab);
-  }, [showBudgetTab, setShowBudgetTab]);
-
-  const handleToggleAttachLocation = useCallback(async () => {
-    // Turning OFF is non-destructive and needs no permission: just persist false.
-    // Coordinates already stored on past operations are left untouched (R1.5).
-    if (attachLocation) {
-      setAttachLocation(false);
-      setLocationDenied(false);
-      return;
-    }
-    // Turning ON: request the OS permission in this clear context. If it isn't
-    // granted, leave the toggle off and show an inline hint — never nag, never
-    // flip the toggle on without permission.
-    const { granted } = await ensureLocationPermission();
-    if (granted) {
-      setLocationDenied(false);
-      setAttachLocation(true);
-    } else {
-      setLocationDenied(true);
-      setAttachLocation(false);
-    }
-  }, [attachLocation, setAttachLocation]);
 
   // Back navigation is locked while the open panel says it is mid-flight — a
   // Sheets export/import stage, or a database wipe. Only one panel is mounted at
@@ -588,207 +463,7 @@ export default function SettingsScreen({ setSubPanelActive }) {
       style={[styles.container, { backgroundColor: colors.background }]}
       onLayout={handleContainerLayout}
     >
-      <ScrollView contentContainerStyle={styles.settingsContent}>
-        <TouchableRipple onPress={() => openSubPanel('language')} style={styles.settingsRow} testID="settings-language-row">
-          <View style={styles.settingsRowContent}>
-            <View style={styles.settingsRowLeft}>
-              <Ionicons name="language-outline" size={22} color={colors.text} />
-              <View style={styles.settingsRowText}>
-                <Text style={[styles.settingsRowLabel, { color: colors.text }]}>{t('language')}</Text>
-                <Text style={[styles.settingsRowValue, { color: colors.mutedText }]}>
-                  {languageLabel(language)}
-                </Text>
-              </View>
-            </View>
-            <Ionicons name="chevron-forward" size={20} color={colors.mutedText} />
-          </View>
-        </TouchableRipple>
-
-        <SettingToggleRow
-          icon="eye-off-outline"
-          label={t('hide_balances') || 'Hide balances'}
-          hint={t('hide_balances_hint') || 'Mask account balances for privacy'}
-          value={hideBalances}
-          onToggle={handleToggleHideBalances}
-        />
-
-        <SettingToggleRow
-          icon="location-outline"
-          label={t('attach_location') || 'Attach location to operations'}
-          hint={locationDenied
-            ? (t('location_permission_denied') || 'Location permission denied. Enable it in system settings.')
-            : (t('attach_location_hint') || 'Suggest labels you used nearby before')}
-          hintError={locationDenied}
-          value={attachLocation}
-          onToggle={handleToggleAttachLocation}
-          testID="settings-location-row"
-        />
-
-        <SettingToggleRow
-          icon={colorScheme === 'dark' ? 'moon-outline' : 'sunny-outline'}
-          label={t('theme') || 'Theme'}
-          hint={colorScheme === 'dark' ? t('theme_dark') : t('theme_light')}
-          value={colorScheme === 'dark'}
-          onToggle={handleToggleDarkMode}
-          testID="settings-theme-row"
-        />
-
-        <TouchableRipple onPress={() => openSubPanel('accounts')} style={styles.settingsRow} testID="settings-accounts-row">
-          <View style={styles.settingsRowContent}>
-            <View style={styles.settingsRowLeft}>
-              <Ionicons name="wallet-outline" size={22} color={colors.text} />
-              <View style={styles.settingsRowText}>
-                <Text style={[styles.settingsRowLabel, { color: colors.text }]}>{t('accounts') || 'Accounts'}</Text>
-                <Text style={[styles.settingsRowValue, { color: colors.mutedText }]}>
-                  {t('accounts_hint') || 'Manage your accounts and balances'}
-                </Text>
-              </View>
-            </View>
-            <Ionicons name="chevron-forward" size={20} color={colors.mutedText} />
-          </View>
-        </TouchableRipple>
-
-        <SettingToggleRow
-          icon="grid-outline"
-          label={t('show_accounts_in_menu') || 'Show accounts in main menu'}
-          hint={t('show_accounts_in_menu_hint') || 'Add an Accounts tab to the bottom navigation'}
-          value={showAccountsTab}
-          onToggle={handleToggleShowAccountsTab}
-          testID="settings-show-accounts-tab-row"
-        />
-
-        <SettingToggleRow
-          icon="pie-chart-outline"
-          label={t('show_budget_in_menu') || 'Show Budget in main menu'}
-          hint={t('show_budget_in_menu_hint') || 'Show the Budget tab in the bottom navigation'}
-          value={showBudgetTab}
-          onToggle={handleToggleShowBudgetTab}
-          testID="settings-show-budget-tab-row"
-        />
-
-        <TouchableRipple onPress={() => openSubPanel('categories')} style={styles.settingsRow} testID="settings-categories-row">
-          <View style={styles.settingsRowContent}>
-            <View style={styles.settingsRowLeft}>
-              <Ionicons name="shapes-outline" size={22} color={colors.text} />
-              <View style={styles.settingsRowText}>
-                <Text style={[styles.settingsRowLabel, { color: colors.text }]}>{t('categories') || 'Categories'}</Text>
-                <Text style={[styles.settingsRowValue, { color: colors.mutedText }]}>
-                  {t('categories_hint') || 'Manage your expense and income categories'}
-                </Text>
-              </View>
-            </View>
-            <Ionicons name="chevron-forward" size={20} color={colors.mutedText} />
-          </View>
-        </TouchableRipple>
-
-        <TouchableRipple
-          onPress={() => openSubPanel('notificationProcessing')}
-          style={styles.settingsRow}
-          testID="settings-notification-processing-row"
-        >
-          <View style={styles.settingsRowContent}>
-            <View style={styles.settingsRowLeft}>
-              <Ionicons name="notifications-outline" size={22} color={colors.text} />
-              <View style={styles.settingsRowText}>
-                <Text style={[styles.settingsRowLabel, { color: colors.text }]}>
-                  {t('notification_processing') || 'Notification processing'}
-                </Text>
-                <Text style={[styles.settingsRowValue, { color: colors.mutedText }]}>
-                  {t('notification_processing_hint') ||
-                    'Read notifications and turn purchases into operations'}
-                </Text>
-              </View>
-            </View>
-            <Ionicons name="chevron-forward" size={20} color={colors.mutedText} />
-          </View>
-        </TouchableRipple>
-
-        <Divider style={styles.divider} />
-
-        <Text variant="labelLarge" style={[styles.sectionLabel, { color: colors.mutedText }]}>{t('database') || 'Database'}</Text>
-
-        <TouchableRipple onPress={() => openSubPanel('export')} style={styles.settingsRow} testID="settings-export-row">
-          <View style={styles.settingsRowContent}>
-            <View style={styles.settingsRowLeft}>
-              <Ionicons name="cloud-upload-outline" size={22} color={colors.text} />
-              <Text style={[styles.settingsRowLabel, { color: colors.text }]}>{t('export') || 'Export'}</Text>
-            </View>
-            <Ionicons name="chevron-forward" size={20} color={colors.mutedText} />
-          </View>
-        </TouchableRipple>
-
-        <TouchableRipple onPress={() => openSubPanel('import')} style={styles.settingsRow}>
-          <View style={styles.settingsRowContent}>
-            <View style={styles.settingsRowLeft}>
-              <Ionicons name="cloud-download-outline" size={22} color={colors.text} />
-              <Text style={[styles.settingsRowLabel, { color: colors.text }]}>{t('import') || 'Import'}</Text>
-            </View>
-            <Ionicons name="chevron-forward" size={20} color={colors.mutedText} />
-          </View>
-        </TouchableRipple>
-
-        <Divider style={styles.divider} />
-
-        <Text variant="labelLarge" style={[styles.sectionLabel, { color: colors.mutedText }]}>{t('developer') || 'Developer'}</Text>
-
-        <TouchableRipple onPress={() => openSubPanel('logs')} style={styles.settingsRow} testID="logs-row">
-          <View style={styles.settingsRowContent}>
-            <View style={styles.settingsRowLeft}>
-              <Ionicons name="terminal-outline" size={22} color={colors.text} />
-              <Text style={[styles.settingsRowLabel, { color: colors.text }]}>{t('logs') || 'Logs'}</Text>
-            </View>
-            <Ionicons name="chevron-forward" size={20} color={colors.mutedText} />
-          </View>
-        </TouchableRipple>
-
-        <TouchableRipple
-          onPress={isDownloading ? undefined : () => openSubPanel('update')}
-          style={[styles.settingsRow, isDownloading && styles.settingsRowDisabled]}
-          disabled={isDownloading}
-          testID="check-updates-row"
-        >
-          <View style={styles.settingsRowContent}>
-            <View style={styles.settingsRowLeft}>
-              <Ionicons name="download-outline" size={22} color={isDownloading ? colors.mutedText : colors.text} />
-              <Text style={[styles.settingsRowLabel, { color: isDownloading ? colors.mutedText : colors.text }]}>
-                {t('check_updates') || 'Check for updates'}
-              </Text>
-            </View>
-            <View style={styles.updateRowRight}>
-              {isDownloading ? (
-                <>
-                  <Text style={[styles.versionLabel, { color: colors.primary }]}>
-                    {downloadPhase === 'verifying'
-                      ? (t('update_phase_verifying') || 'Verifying APK…')
-                      : downloadPhase === 'backing_up'
-                        ? (t('update_phase_backing_up') || 'Backing up…')
-                        : `${Math.round((downloadProgress ?? 0) * 100)}%`}
-                  </Text>
-                  <ActivityIndicator size={16} color={colors.primary} style={styles.updateRowSpinner} />
-                </>
-              ) : (
-                <>
-                  <Text style={[styles.versionLabel, { color: colors.mutedText }]}>
-                    {`v${require('../../package.json').version}`}
-                  </Text>
-                  <Ionicons name="chevron-forward" size={20} color={colors.mutedText} />
-                </>
-              )}
-            </View>
-          </View>
-        </TouchableRipple>
-
-        <View style={styles.resetSpacer} />
-
-        <TouchableRipple onPress={() => openSubPanel('reset')} style={styles.settingsRow}>
-          <View style={styles.settingsRowContent}>
-            <View style={styles.settingsRowLeft}>
-              <Ionicons name="trash-outline" size={22} color={colors.destructive} />
-              <Text style={[styles.settingsRowLabel, { color: colors.destructive }]}>{t('reset_database') || 'Reset Database'}</Text>
-            </View>
-          </View>
-        </TouchableRipple>
-      </ScrollView>
+      <SettingsList onOpenPanel={openSubPanel} />
       {subPanelOverlay}
     </View>
   );
@@ -803,50 +478,6 @@ const styles = StyleSheet.create({
   },
   container: {
     flex: 1,
-  },
-  divider: {
-    marginVertical: SPACING.xs,
-  },
-  resetSpacer: {
-    height: SPACING.sm,
-  },
-  sectionLabel: {
-    ...SECTION_LABEL,
-    paddingHorizontal: HORIZONTAL_PADDING,
-    paddingVertical: SPACING.sm,
-  },
-  settingsContent: {
-    paddingBottom: 96,
-    paddingTop: SPACING.sm,
-  },
-  settingsRow: {
-    paddingHorizontal: HORIZONTAL_PADDING,
-  },
-  settingsRowContent: {
-    alignItems: 'center',
-    flexDirection: 'row',
-    justifyContent: 'space-between',
-    paddingVertical: SPACING.md,
-  },
-  settingsRowDisabled: {
-    opacity: 0.6,
-  },
-  settingsRowLabel: {
-    fontSize: FONT_SIZE.base,
-  },
-  settingsRowLeft: {
-    alignItems: 'center',
-    flex: 1,
-    flexDirection: 'row',
-    gap: SPACING.md,
-  },
-  settingsRowText: {
-    flex: 1,
-    flexShrink: 1,
-  },
-  settingsRowValue: {
-    fontSize: 13,
-    marginTop: 2,
   },
   subPanelBody: {
     flex: 1,
@@ -885,31 +516,6 @@ const styles = StyleSheet.create({
   },
   subPanelTitle: {
     fontWeight: '600',
-  },
-  switchThumb: {
-    backgroundColor: '#fff',
-    borderRadius: BORDER_RADIUS.pill,
-    elevation: 2,
-    height: 20,
-    position: 'absolute',
-    width: 20,
-  },
-  switchTrack: {
-    borderRadius: BORDER_RADIUS.pill,
-    height: 24,
-    justifyContent: 'center',
-    width: 44,
-  },
-  updateRowRight: {
-    alignItems: 'center',
-    flexDirection: 'row',
-    gap: SPACING.xs,
-  },
-  updateRowSpinner: {
-    marginLeft: 2,
-  },
-  versionLabel: {
-    fontSize: 13,
   },
 });
 
