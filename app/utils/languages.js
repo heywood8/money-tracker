@@ -20,6 +20,23 @@ export const NATIVE_LANGUAGE_NAMES = {
   pt: 'Português',
 };
 
+// The English name, shown as a second line only on the first-run picker: at that
+// point the app is in whatever language the list is offering, and someone who
+// picked up a phone set to a script they cannot read needs one line they can.
+export const ENGLISH_LANGUAGE_NAMES = {
+  en: 'English',
+  ru: 'Russian',
+  zh: 'Chinese',
+  es: 'Spanish',
+  fr: 'French',
+  de: 'German',
+  it: 'Italian',
+  hy: 'Armenian',
+  ja: 'Japanese',
+  ko: 'Korean',
+  pt: 'Portuguese',
+};
+
 export const LANGUAGE_FLAGS = {
   en: '🇬🇧',
   ru: '🇷🇺',

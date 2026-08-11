@@ -24,6 +24,13 @@ jest.mock('../../assets/i18n/es.json', () => ({}), { virtual: true });
 jest.mock('../../assets/i18n/fr.json', () => ({}), { virtual: true });
 jest.mock('../../assets/i18n/zh.json', () => ({}), { virtual: true });
 jest.mock('../../assets/i18n/de.json', () => ({}), { virtual: true });
+jest.mock('../../assets/i18n/hy.json', () => ({}), { virtual: true });
+jest.mock('../../assets/i18n/ja.json', () => ({}), { virtual: true });
+jest.mock('../../assets/i18n/ko.json', () => ({
+  welcome_title: 'Penny에 오신 것을 환영합니다',
+  continue: '계속',
+}), { virtual: true });
+jest.mock('../../assets/i18n/pt.json', () => ({}), { virtual: true });
 
 describe('LanguageSelectionScreen', () => {
   let mockOnLanguageSelected;
@@ -273,6 +280,77 @@ describe('LanguageSelectionScreen', () => {
       expect(getByText('Please select your preferred language')).toBeTruthy();
       expect(getByText('Русский')).toBeTruthy();
       expect(getByText('Continue')).toBeTruthy();
+    });
+  });
+
+  describe('The offered languages', () => {
+    // The picker used to keep its own list of seven, four short of what the app
+    // ships and one short of what this very file already loaded. It is built
+    // from the shipped translations now, so it cannot drift again.
+    const SHIPPED = require('fs')
+      .readdirSync(require('path').join(__dirname, '../../assets/i18n'))
+      .filter(f => f.endsWith('.json'))
+      .map(f => f.replace('.json', ''));
+
+    it('offers every language the app ships', async () => {
+      const { getAllByText } = await render(
+        <LanguageSelectionScreen onLanguageSelected={mockOnLanguageSelected} />,
+      );
+
+      const { NATIVE_LANGUAGE_NAMES } = require('../../app/utils/languages');
+      SHIPPED.forEach(code => {
+        // getAllBy: English is its own English name, so it appears on both
+        // lines of its card.
+        expect(getAllByText(NATIVE_LANGUAGE_NAMES[code]).length).toBeGreaterThan(0);
+      });
+    });
+
+    it('does not print English twice on its own card', async () => {
+      const { getAllByText } = await render(
+        <LanguageSelectionScreen onLanguageSelected={mockOnLanguageSelected} />,
+      );
+      // The native and English names are the same word here; the second line is
+      // dropped rather than repeated.
+      expect(getAllByText('English')).toHaveLength(1);
+    });
+
+    it('names each one in its own script and again in English', async () => {
+      const { getByText } = await render(
+        <LanguageSelectionScreen onLanguageSelected={mockOnLanguageSelected} />,
+      );
+
+      // Someone holding a phone set to a script they cannot read needs the
+      // second line; someone looking for their own language needs the first.
+      expect(getByText('日本語')).toBeTruthy();
+      expect(getByText('Japanese')).toBeTruthy();
+      expect(getByText('Հայերեն')).toBeTruthy();
+      expect(getByText('Armenian')).toBeTruthy();
+    });
+
+    it('can select one of the languages that used to be missing', async () => {
+      const { getByText } = await render(
+        <LanguageSelectionScreen onLanguageSelected={mockOnLanguageSelected} />,
+      );
+
+      await fireEvent.press(getByText('한국어'));
+      // The screen switches to the chosen language as soon as it is picked.
+      await fireEvent.press(getByText('계속'));
+
+      expect(mockOnLanguageSelected).toHaveBeenCalledWith('ko');
+    });
+
+    it('puts the list in a scroll view, or the last ones cannot be reached', async () => {
+      // Eleven cards are taller than a phone screen. Without this the bottom of
+      // the list is simply unreachable — which is why the list could not just be
+      // lengthened in place.
+      const { getByTestId } = await render(
+        <LanguageSelectionScreen onLanguageSelected={mockOnLanguageSelected} />,
+      );
+
+      // Assert the host component, not just the testID: a plain View would carry
+      // the same testID and pass, while leaving the bottom of the list
+      // unreachable — which is the whole thing this guards.
+      expect(getByTestId('language-list').type).toBe('RCTScrollView');
     });
   });
 
