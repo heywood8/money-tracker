@@ -1,5 +1,12 @@
 # Changelog
 
+## [0.266.3](https://github.com/heywood8/money-tracker/compare/penny-v0.266.2...penny-v0.266.3) (2026-08-11)
+
+
+### Bug Fixes
+
+* **settings:** offer every shipped language on the first-run picker ([#1600](https://github.com/heywood8/money-tracker/issues/1600)) ([feee18a](https://github.com/heywood8/money-tracker/commit/feee18af1748714e33548dc4d896005bdfff1dc3))
+
 ## [0.266.2](https://github.com/heywood8/money-tracker/compare/penny-v0.266.1...penny-v0.266.2) (2026-08-11)
 
 
