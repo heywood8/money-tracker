@@ -4,34 +4,30 @@ import {
   View,
   Text,
   StyleSheet,
+  ScrollView,
   TouchableOpacity,
   StatusBar,
-  Platform,
 } from 'react-native';
 import Animated, { FadeInDown, Easing, ReduceMotion } from 'react-native-reanimated';
 import { SafeAreaView } from 'react-native-safe-area-context';
-import enTranslations from '../../assets/i18n/en.json';
-import itTranslations from '../../assets/i18n/it.json';
-import ruTranslations from '../../assets/i18n/ru.json';
-import esTranslations from '../../assets/i18n/es.json';
-import frTranslations from '../../assets/i18n/fr.json';
-import zhTranslations from '../../assets/i18n/zh.json';
-import deTranslations from '../../assets/i18n/de.json';
-import hyTranslations from '../../assets/i18n/hy.json';
-import { BORDER_RADIUS, FONT_SIZE, HORIZONTAL_PADDING, TOP_CONTENT_SPACING } from '../styles/designTokens';
+import { availableLanguages, loadTranslations } from '../contexts/LocalizationContext';
+import { NATIVE_LANGUAGE_NAMES, ENGLISH_LANGUAGE_NAMES, LANGUAGE_FLAGS } from '../utils/languages';
+import { BORDER_RADIUS, FONT_SIZE, TOP_CONTENT_SPACING } from '../styles/designTokens';
 
 // This is the only screen in the app a user sees exactly once, and it is where
 // the whole motion budget for first-run lives: everywhere else in Penny is a
 // screen people open every day, which argues for less movement, not more.
 //
-// The gap between cards. Seven of them at 45ms trails ~570ms behind the title,
-// which is longer than anything else in the app is allowed to take — permissible
+// The gap between cards. The last one must still have arrived ~620ms after the
+// title — longer than anything else in the app is allowed to take, permissible
 // only because nothing waits on it: the buttons are laid out and pressable from
-// the first frame, the animation is purely how they arrive.
-const ENTRY_STAGGER = 45;
+// the first frame, the animation is purely how they arrive. That budget is what
+// sets this number, so it came down from 45ms when the list grew from seven
+// languages to eleven; the tail is the same length, the steps are just tighter.
+const ENTRY_STAGGER = 30;
 const ENTRY_DURATION = 260;
 // Rise distance. Small enough that a card never starts outside its own row, so
-// the stagger reads as one list settling rather than as seven things flying in.
+// the stagger reads as one list settling rather than as eleven things flying in.
 const ENTRY_RISE = 12;
 
 const entry = (index) => FadeInDown
@@ -41,30 +37,20 @@ const entry = (index) => FadeInDown
   .withInitialValues({ transform: [{ translateY: ENTRY_RISE }] })
   .reduceMotion(ReduceMotion.System);
 
-// Map language codes to their translation data
-const i18nData = {
-  en: enTranslations,
-  it: itTranslations,
-  ru: ruTranslations,
-  es: esTranslations,
-  fr: frTranslations,
-  zh: zhTranslations,
-  de: deTranslations,
-  hy: hyTranslations,
-};
+// Offered in the order the app lists them, named the way the settings picker
+// names them. Derived from the loader map rather than restated, which is what
+// let this list fall four languages behind the app. Adding a locale still means
+// touching that map and the three tables in utils/languages.js — the tests over
+// assets/i18n/ fail by name if any of them is missed.
+const LANGUAGES = availableLanguages.map((code) => ({
+  code,
+  name: ENGLISH_LANGUAGE_NAMES[code] || code,
+  nativeName: NATIVE_LANGUAGE_NAMES[code] || code,
+  flag: LANGUAGE_FLAGS[code] || '',
+}));
 
 const LanguageSelectionScreen = ({ onLanguageSelected }) => {
   const [selectedLanguage, setSelectedLanguage] = useState(null);
-
-  const languages = [
-    { code: 'en', name: 'English', nativeName: 'English', flag: '🇬🇧' },
-    { code: 'ru', name: 'Russian', nativeName: 'Русский', flag: '🇷🇺' },
-    { code: 'es', name: 'Spanish', nativeName: 'Español', flag: '🇪🇸' },
-    { code: 'fr', name: 'French', nativeName: 'Français', flag: '🇫🇷' },
-    { code: 'zh', name: 'Chinese', nativeName: '中文', flag: '🇨🇳' },
-    { code: 'de', name: 'German', nativeName: 'Deutsch', flag: '🇩🇪' },
-    { code: 'hy', name: 'Armenian', nativeName: 'Հայերեն', flag: '🇦🇲' },
-  ];
 
   const handleLanguageSelect = (code) => {
     setSelectedLanguage(code);
@@ -76,24 +62,33 @@ const LanguageSelectionScreen = ({ onLanguageSelected }) => {
     }
   };
 
-  // Use selected language for UI text, or default to English
+  // Use selected language for UI text, or default to English. Only the language
+  // actually tapped is ever loaded.
   const t = (key) => {
     const lang = selectedLanguage || 'en';
-    return i18nData[lang]?.[key] || key;
+    return loadTranslations(lang)?.[key] || key;
   };
 
   return (
     <SafeAreaView style={styles.safeArea}>
       <StatusBar barStyle="dark-content" backgroundColor="#ffffff" />
       <View style={styles.container}>
-        <View style={styles.content}>
+        {/* Eleven cards do not fit a phone screen, so the list scrolls while the
+            title and the Continue button stay put. The title scrolls with it
+            rather than pinning: on the one screen where the whole point is
+            choosing from a list, the list should get the height. */}
+        <ScrollView
+          testID="language-list"
+          style={styles.content}
+          contentContainerStyle={styles.contentContainer}
+        >
           {/* Title and subtitle lead the stagger at slots 0 and 1, so the cards
               below them read as continuing a movement rather than starting one. */}
           <Animated.Text entering={entry(0)} style={styles.title}>{t('welcome_title')}</Animated.Text>
           <Animated.Text entering={entry(1)} style={styles.subtitle}>{t('welcome_subtitle')}</Animated.Text>
 
           <View style={styles.languagesContainer}>
-            {languages.map((language, index) => (
+            {LANGUAGES.map((language, index) => (
               <Animated.View key={language.code} entering={entry(index + 2)}>
                 <TouchableOpacity
                   style={[
@@ -115,14 +110,18 @@ const LanguageSelectionScreen = ({ onLanguageSelected }) => {
                     >
                       {language.nativeName}
                     </Text>
-                    <Text
-                      style={[
-                        styles.languageEnglishName,
-                        selectedLanguage === language.code && styles.languageEnglishNameSelected,
-                      ]}
-                    >
-                      {language.name}
-                    </Text>
+                    {/* Only where it adds something: English's two names are
+                        the same word, and printing it twice reads as a bug. */}
+                    {language.name !== language.nativeName && (
+                      <Text
+                        style={[
+                          styles.languageEnglishName,
+                          selectedLanguage === language.code && styles.languageEnglishNameSelected,
+                        ]}
+                      >
+                        {language.name}
+                      </Text>
+                    )}
                   </View>
                   {selectedLanguage === language.code && (
                     <View style={styles.checkmark}>
@@ -133,7 +132,7 @@ const LanguageSelectionScreen = ({ onLanguageSelected }) => {
               </Animated.View>
             ))}
           </View>
-        </View>
+        </ScrollView>
 
         <View style={styles.footer}>
           <TouchableOpacity
@@ -181,8 +180,10 @@ const styles = StyleSheet.create({
     flex: 1,
   },
   content: {
-    alignItems: 'center',
     flex: 1,
+  },
+  contentContainer: {
+    alignItems: 'center',
     paddingHorizontal: 24,
     paddingTop: TOP_CONTENT_SPACING,
   },
