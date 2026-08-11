@@ -1,5 +1,12 @@
 # Changelog
 
+## [0.266.1](https://github.com/heywood8/money-tracker/compare/penny-v0.266.0...penny-v0.266.1) (2026-08-11)
+
+
+### Code Refactoring
+
+* **settings:** extract the export, import and notification subpanels ([#1596](https://github.com/heywood8/money-tracker/issues/1596)) ([8f3cd0d](https://github.com/heywood8/money-tracker/commit/8f3cd0d380599f01ceed8153a3906df6669de9f3))
+
 ## [0.266.0](https://github.com/heywood8/money-tracker/compare/penny-v0.265.4...penny-v0.266.0) (2026-08-11)
 
 
