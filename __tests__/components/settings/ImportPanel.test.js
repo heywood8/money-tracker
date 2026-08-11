@@ -22,8 +22,6 @@ const mockStartImport = jest.fn();
 const mockCompleteImport = jest.fn();
 const mockCancelImport = jest.fn();
 
-class MockCancelledImportError extends Error {}
-
 jest.mock('../../../app/contexts/ThemeColorsContext', () => ({
   useThemeColors: () => ({
     colors: { text: '#000', mutedText: '#888', border: '#ddd', primary: '#6200ee', destructive: '#d9534f' },
@@ -48,7 +46,10 @@ jest.mock('../../../app/services/BackupRestore', () => ({
   importBackupFromFile: (...a) => mockImportBackupFromFile(...a),
   restoreBackup: (...a) => mockRestoreBackup(...a),
   getPreRestoreSnapshots: (...a) => mockGetPreRestoreSnapshots(...a),
-  CancelledImportError: MockCancelledImportError,
+  // Declared inside the factory: a `class` in the enclosing scope is still in
+  // its temporal dead zone when the hoisted factory runs, so `instanceof`
+  // against it throws instead of matching.
+  CancelledImportError: class CancelledImportError extends Error {},
 }));
 jest.mock('../../../app/services/DailyBackupService', () => ({
   getStoredBackups: (...a) => mockGetStoredBackups(...a),
@@ -76,7 +77,7 @@ jest.mock('@expo/vector-icons/Ionicons', () => {
 
 const noop = () => {};
 
-const setup = (props = {}) => render(
+const panel = (props = {}) => (
   <ImportPanel
     step="source"
     onPushStep={noop}
@@ -87,8 +88,10 @@ const setup = (props = {}) => render(
     onDone={noop}
     onSetUpSheetsExport={noop}
     {...props}
-  />,
+  />
 );
+
+const setup = (props = {}) => render(panel(props));
 
 describe('ImportPanel', () => {
   beforeEach(() => {
@@ -172,6 +175,37 @@ describe('ImportPanel', () => {
       expect(onDone).not.toHaveBeenCalled();
       expect(mockStartImport).not.toHaveBeenCalled();
     });
+
+    it('reports a file picker that failed for any other reason', async () => {
+      mockPickImportFile.mockImplementationOnce(() => Promise.reject(new Error('no file manager')));
+      const onPopToRoot = jest.fn();
+      const consoleError = jest.spyOn(console, 'error').mockImplementation(() => {});
+      const { getByTestId } = await setup({ step: 'confirm-file', onPopToRoot });
+
+      await act(async () => {
+        fireEvent.press(getByTestId('confirm-import-file-btn'));
+      });
+
+      expect(mockShowDialog).toHaveBeenCalled();
+      // A failure is not a cancel: it stays on the confirmation, not the list.
+      expect(onPopToRoot).not.toHaveBeenCalled();
+      consoleError.mockRestore();
+    });
+
+    it('reports a restore that failed after the file was read', async () => {
+      mockImportBackupFromFile.mockImplementationOnce(() => Promise.reject(new Error('bad backup')));
+      const consoleError = jest.spyOn(console, 'error').mockImplementation(() => {});
+      const { getByTestId } = await setup({ step: 'confirm-file' });
+
+      await act(async () => {
+        fireEvent.press(getByTestId('confirm-import-file-btn'));
+      });
+
+      await waitFor(() => expect(mockCancelImport).toHaveBeenCalled());
+      expect(mockCompleteImport).not.toHaveBeenCalled();
+      expect(mockShowDialog).toHaveBeenCalled();
+      consoleError.mockRestore();
+    });
   });
 
   describe('Google Sheets run', () => {
@@ -237,6 +271,127 @@ describe('ImportPanel', () => {
       const { getByText } = await setup({ step: 'sheets-progress' });
       expect(getByText('Connecting to spreadsheet')).toBeTruthy();
       expect(getByText('Reading sheet data')).toBeTruthy();
+    });
+
+    it.each([
+      ['refresh_failed', 'google_sheets_access_revoked'],
+      ['spreadsheet_not_found', 'google_sheets_not_found'],
+      ['something unexpected', 'google_sheets_import_failed'],
+    ])('stays on the progress view and explains a %s failure', async (thrown, message) => {
+      mockImportFromSheets.mockImplementation(() => Promise.reject(new Error(thrown)));
+      const onPopToRoot = jest.fn();
+      const onDone = jest.fn();
+      const { getByText, rerender } = await setup({ onPopToRoot, onDone });
+
+      await act(async () => {
+        fireEvent.press(getByText('import_from_google_sheets'));
+      });
+
+      // A failure the user can act on keeps the run on screen, unlike the
+      // cancel and not-configured paths that unwind to the list.
+      expect(onPopToRoot).not.toHaveBeenCalled();
+      expect(onDone).not.toHaveBeenCalled();
+
+      await act(async () => {
+        rerender(panel({ step: 'sheets-progress', onPopToRoot, onDone }));
+      });
+      expect(getByText(message)).toBeTruthy();
+    });
+
+    it('unwinds to the source list when the Google sign-in is cancelled', async () => {
+      mockImportFromSheets.mockImplementation(() => Promise.reject(new Error('sign_in_cancelled')));
+      const onPopToRoot = jest.fn();
+      const onDone = jest.fn();
+      const { getByText } = await setup({ onPopToRoot, onDone });
+
+      await act(async () => {
+        fireEvent.press(getByText('import_from_google_sheets'));
+      });
+
+      expect(onPopToRoot).toHaveBeenCalled();
+      expect(onDone).not.toHaveBeenCalled();
+    });
+
+    it('signs in when there is no valid token yet', async () => {
+      mockGetValidAccessToken.mockImplementationOnce(() => Promise.reject(new Error('expired')));
+      const { getByText } = await setup();
+
+      await act(async () => {
+        fireEvent.press(getByText('import_from_google_sheets'));
+      });
+
+      expect(mockImportFromSheets).toHaveBeenCalled();
+    });
+  });
+
+  describe('restoring a local backup', () => {
+    const BACKUP = { uri: 'file:///daily_2026-08-01.json', filename: 'daily_2026-08-01.json', size: 1024 };
+
+    beforeEach(() => {
+      mockGetStoredBackups.mockImplementation(() => Promise.resolve([BACKUP.uri]));
+    });
+
+    it('names the backup being restored on the confirmation', async () => {
+      const onPushStep = jest.fn();
+      const { getAllByTestId, getByText, rerender } = await setup({ step: 'local-list', onPushStep });
+
+      await waitFor(() => expect(getAllByTestId('icon-refresh-outline').length).toBeGreaterThan(0));
+      await act(async () => {
+        fireEvent.press(getAllByTestId('icon-refresh-outline')[0]);
+      });
+      expect(onPushStep).toHaveBeenCalledWith('confirm-local');
+
+      // The host drives the step; the panel keeps the chosen backup across it.
+      await act(async () => {
+        rerender(panel({ step: 'confirm-local', onPushStep }));
+      });
+
+      expect(getByText('restore_confirm')).toBeTruthy();
+      expect(getByText(/2026/)).toBeTruthy();
+    });
+
+    it('reports a failed restore rather than leaving it silent', async () => {
+      mockRestoreBackup.mockImplementationOnce(() => Promise.reject(new Error('corrupt file')));
+      const consoleError = jest.spyOn(console, 'error').mockImplementation(() => {});
+      const { getAllByTestId, getByText, rerender } = await setup({ step: 'local-list' });
+
+      await waitFor(() => expect(getAllByTestId('icon-refresh-outline').length).toBeGreaterThan(0));
+      await act(async () => {
+        fireEvent.press(getAllByTestId('icon-refresh-outline')[0]);
+      });
+      await act(async () => {
+        rerender(panel({ step: 'confirm-local' }));
+      });
+      await act(async () => {
+        fireEvent.press(getByText('restore_database'));
+      });
+
+      await waitFor(() => expect(mockCancelImport).toHaveBeenCalled());
+      expect(mockShowDialog).toHaveBeenCalled();
+      consoleError.mockRestore();
+    });
+
+    it('drops a deleted backup from the list', async () => {
+      const { getAllByTestId, getByText, queryAllByTestId } = await setup({ step: 'local-list' });
+
+      await waitFor(() => expect(getAllByTestId('icon-trash-outline').length).toBe(1));
+      await act(async () => {
+        fireEvent.press(getAllByTestId('icon-trash-outline')[0]);
+      });
+      await act(async () => {
+        fireEvent.press(getByText('delete'));
+      });
+
+      await waitFor(() => expect(queryAllByTestId('icon-trash-outline')).toHaveLength(0));
+    });
+
+    it('shows an empty list rather than crashing when the backups cannot be read', async () => {
+      mockGetStoredBackups.mockImplementation(() => Promise.reject(new Error('no such dir')));
+      const consoleError = jest.spyOn(console, 'error').mockImplementation(() => {});
+      const { getByText } = await setup({ step: 'local-list' });
+
+      await waitFor(() => expect(getByText('local_backups_empty')).toBeTruthy());
+      consoleError.mockRestore();
     });
   });
 
