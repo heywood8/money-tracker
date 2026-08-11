@@ -1,20 +1,19 @@
 import React, { useState, useEffect, useMemo, useCallback, useRef } from 'react';
 import { View, StyleSheet, FlatList } from 'react-native';
 import Animated, { useSharedValue, useAnimatedStyle, withTiming } from 'react-native-reanimated';
-import { Text } from 'react-native-paper';
 import { useThemeColors } from '../contexts/ThemeColorsContext';
 import { useLocalization } from '../contexts/LocalizationContext';
 import { useBudgetsData } from '../contexts/BudgetsDataContext';
 import { useCategories } from '../contexts/CategoriesContext';
 import { useAccountsData } from '../contexts/AccountsDataContext';
 import MonthlyPlanSection from '../components/budgets/MonthlyPlanSection';
+import MonthSummaryCard from '../components/budgets/MonthSummaryCard';
 import MonthPickerSheet from '../components/budgets/MonthPickerSheet';
 import CurrencySheet from '../components/CurrencySheet';
 import PeriodHeader from '../components/PeriodHeader';
 import AddFAB from '../components/AddFAB';
 import LoadingView from '../components/LoadingView';
-import * as Currency from '../services/currency';
-import { FONT_SIZE, SPACING } from '../styles/designTokens';
+import { SPACING } from '../styles/designTokens';
 import { currentMonthKey, addMonths, formatMonthLabel } from '../utils/monthUtils';
 import { TIMING_ENTER } from '../utils/motion';
 
@@ -25,10 +24,6 @@ import { TIMING_ENTER } from '../utils/motion';
 // Module-level so the reference never changes.
 const EMPTY_LIST = [];
 const renderNothing = () => null;
-
-// Stands in for the header's remainder until the plan section has computed and
-// reported one.
-const PENDING_PLACEHOLDER = '—';
 
 // How far the plan travels when the month changes, and for how long.
 //
@@ -96,6 +91,7 @@ const BudgetScreen = () => {
         && prev.currency === next.currency
         && prev.allocated === next.allocated
         && prev.actual === next.actual
+        && prev.expectedIncome === next.expectedIncome
         ? prev
         : next
     ));
@@ -240,64 +236,32 @@ const BudgetScreen = () => {
     monthPickerVisible, handleOpenMonthPicker,
     handleOpenCurrencyPicker, handlePrevMonth, handleNextMonth, handleJumpToCurrentMonth]);
 
-  // The month's headline figure. It used to sit at the very bottom of the plan
-  // card in 14px muted text, below every row and the allocated/actual totals —
-  // the one number a person acts on, placed where they would reach it last. It
-  // then spent a while inside the header, which kept it on screen but made the
-  // two tabs' headers different heights for no reason a reader could see. Here
-  // it is the first thing in the body: still the first figure read, and it
-  // scrolls under the glass with everything else it belongs to.
-  const remainderBlock = useMemo(() => (
-    <View style={styles.heroRow}>
-      <View style={styles.heroFigure}>
-        <Text style={[styles.heroLabel, { color: colors.mutedText }]} numberOfLines={1}>
-          {planTotals?.hasIncomeBasis === false ? t('add_income_for_remainder') : t('remainder')}
-        </Text>
-        {/* An em dash until the section has reported: the label alone would
-            read as a value that failed to load, and reserving the line keeps
-            the block from jumping a row taller once the figure arrives. */}
-        {planTotals?.hasIncomeBasis !== false && (
-          <Text
-            style={[styles.heroValue, {
-              color: planTotals && Currency.isNegative(planTotals.remainder)
-                ? colors.overspend
-                : colors.text,
-            }]}
-            numberOfLines={1}
-            testID="budget-remainder"
-          >
-            {/* The code hangs off the figure only when the header has no
-                currency control to carry it — with one up there, printing it
-                here says "RUB" twice on one screen. With a single account
-                currency there is nothing to pick and so no control, and then
-                this is the only place the screen names its unit at all. */}
-            {planTotals
-              ? `${Currency.formatAmountTrimmed(planTotals.remainder, planTotals.currency)}${currencies.length > 1 ? '' : ` ${planTotals.currency}`}`
-              : PENDING_PLACEHOLDER}
-          </Text>
-        )}
-        {/* The month's two orientation figures, moved up from the very bottom
-            of the plan card — on a plan of any length they sat below the fold
-            with the FAB over them, which is a strange place for the totals of
-            the thing being read. Here they qualify the remainder directly:
-            7490 left OF 443K committed, against 419K actually spent. */}
-        {planTotals?.allocated != null && (
-          <Text
-            style={[styles.heroTotals, { color: colors.mutedText }]}
-            numberOfLines={1}
-            testID="budget-hero-totals"
-          >
-            {t('allocated')} {Currency.formatCompact(planTotals.allocated)}
-            {planTotals.actual != null && ` · ${t('actual')} ${Currency.formatCompact(planTotals.actual)}`}
-          </Text>
-        )}
-      </View>
-    </View>
-  ), [colors.mutedText, colors.text, colors.overspend, t, planTotals, currencies.length]);
+  // The month's headline figure, and the shape of the month around it. It used
+  // to sit at the very bottom of the plan card in 14px muted text, below every
+  // row and the allocated/actual totals — the one number a person acts on,
+  // placed where they would reach it last. It then spent a while inside the
+  // header, which kept it on screen but made the two tabs' headers different
+  // heights for no reason a reader could see. Here it is the first thing in the
+  // body: still the first figure read, and it scrolls under the glass with
+  // everything else it belongs to.
+  //
+  // The card draws the same figures the line "Allocated 1.94M · Actual 1.66M"
+  // used to state — see MonthSummaryCard for why they are a bar now.
+  const summaryCard = useMemo(() => (
+    <MonthSummaryCard
+      totals={planTotals}
+      month={month}
+      // With a single account currency there is no header chip to pick one, and
+      // then the hero figure is the only place the screen names its unit at all.
+      showCurrencyCode={currencies.length <= 1}
+      colors={colors}
+      t={t}
+    />
+  ), [planTotals, month, currencies.length, colors, t]);
 
   const listHeader = useMemo(() => (
     <>
-      {remainderBlock}
+      {summaryCard}
       <MonthlyPlanSection
         ref={monthlyPlanRef}
         currency={selectedCurrency}
@@ -308,7 +272,7 @@ const BudgetScreen = () => {
         onTotalsChange={handleTotalsChange}
       />
     </>
-  ), [remainderBlock, selectedCurrency, expenseCategories, incomeCategories, accounts, month,
+  ), [summaryCard, selectedCurrency, expenseCategories, incomeCategories, accounts, month,
     handleTotalsChange]);
 
   // The list starts one gap below the header's solid part and scrolls under it
@@ -380,29 +344,6 @@ const BudgetScreen = () => {
 const styles = StyleSheet.create({
   container: {
     flex: 1,
-  },
-  heroFigure: {
-    flexShrink: 1,
-  },
-  heroLabel: {
-    fontSize: FONT_SIZE.sm,
-  },
-  heroRow: {
-    alignItems: 'flex-end',
-    flexDirection: 'row',
-    justifyContent: 'space-between',
-    marginBottom: SPACING.md,
-  },
-  heroTotals: {
-    fontSize: FONT_SIZE.sm,
-    fontVariant: ['tabular-nums'],
-    marginTop: 2,
-  },
-  heroValue: {
-    fontSize: FONT_SIZE.xxl,
-    fontVariant: ['tabular-nums'],
-    fontWeight: '700',
-    letterSpacing: -0.5,
   },
   listContent: {
     flexGrow: 1,

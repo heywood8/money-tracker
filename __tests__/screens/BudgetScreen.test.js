@@ -109,10 +109,13 @@ jest.mock('../../app/components/budgets/MonthlyPlanSection', () => {
       // The section reports the month's remainder up so the header can print it
       // — the figure a person acts on belongs where it is always on screen, not
       // at the bottom of a long scrolling card.
+      // Allocated, actual and the expected income ride along with it: the host
+      // draws the month as a bar, and those are its geometry.
       React.createElement(Pressable, {
         testID: 'mock-report-remainder',
         onPress: () => props.onTotalsChange?.({
           remainder: '-85745', hasIncomeBasis: true, currency: 'AMD',
+          expectedIncome: '1000000', allocated: '1085745', actual: '600000',
         }),
       }, React.createElement(Text, {}, 'report')),
       React.createElement(Pressable, {
@@ -344,6 +347,21 @@ describe('BudgetScreen', () => {
       await waitFor(() => expect(getByTestId('budget-remainder')).toBeTruthy());
       expect(StyleSheet.flatten(getByTestId('budget-remainder').props.style).color)
         .toBe(COLORS.overspend);
+    });
+
+    // The line "Allocated 1.94M · Actual 1.66M" that used to sit under the
+    // figure is a bar now: the same three quantities, drawn against each other
+    // instead of listed. See MonthSummaryCard.
+    it('draws the month as a bar with a legend from the reported totals', async () => {
+      const { getByTestId } = await render(<BudgetScreen />);
+      await waitFor(() => expect(getByTestId('mock-report-remainder')).toBeTruthy());
+      fireEvent.press(getByTestId('mock-report-remainder'));
+
+      await waitFor(() => expect(getByTestId('budget-flow-spent')).toBeTruthy());
+      // 600K spent of a 1.09M plan that itself runs 85.7K past the income.
+      expect(getByTestId('budget-legend-spent')).toHaveTextContent(/600K/);
+      expect(getByTestId('budget-legend-over-committed')).toHaveTextContent(/85.7K/);
+      expect(getByTestId('budget-summary-percent')).toHaveTextContent(/55%/);
     });
 
     it('shows the add-income prompt instead of a figure when no income is declared', async () => {
