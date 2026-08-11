@@ -3,7 +3,7 @@ import PropTypes from 'prop-types';
 // ToastAndroid is intentional: this is an Android-only app, so the platform-split lint rule
 // doesn't apply here.
 // eslint-disable-next-line react-native/split-platform-components
-import { View, StyleSheet, TouchableOpacity, ScrollView, FlatList, Linking, ActivityIndicator, BackHandler, AppState, ToastAndroid } from 'react-native';
+import { View, StyleSheet, TouchableOpacity, ScrollView, ActivityIndicator, BackHandler, AppState, ToastAndroid } from 'react-native';
 import { BORDER_RADIUS, FONT_SIZE, HORIZONTAL_PADDING, SPACING } from '../styles/designTokens';
 import { Text, Divider, TouchableRipple, Menu } from 'react-native-paper';
 import Ionicons from '@expo/vector-icons/Ionicons';
@@ -17,6 +17,9 @@ import { GestureDetector } from 'react-native-gesture-handler';
 import { useSwipeDismiss } from '../hooks/useSwipeDismiss';
 import useSettingsPanelStack from '../hooks/useSettingsPanelStack';
 import LanguagePanel from '../components/settings/LanguagePanel';
+import ExportPanel from '../components/settings/ExportPanel';
+import ImportPanel from '../components/settings/ImportPanel';
+import NotificationPanel from '../components/settings/NotificationPanel';
 import LogsPanel from '../components/settings/LogsPanel';
 import ResetPanel from '../components/settings/ResetPanel';
 import { languageLabel } from '../utils/languages';
@@ -24,10 +27,6 @@ import { useThemeColors } from '../contexts/ThemeColorsContext';
 import { useThemeConfig } from '../contexts/ThemeConfigContext';
 import { useLocalization } from '../contexts/LocalizationContext';
 import { useDialog } from '../contexts/DialogContext';
-import { useImportProgress } from '../contexts/ImportProgressContext';
-import { exportBackup, pickImportFile, importBackupFromFile, restoreBackup, createBackup, getPreRestoreSnapshots, CancelledImportError } from '../services/BackupRestore';
-import { getStoredBackups, DAILY_BACKUP_DIR } from '../services/DailyBackupService';
-import * as LegacyFileSystem from 'expo-file-system/legacy';
 import { checkForAppUpdate, listDownloadedApks, installApk, verifyCachedApk } from '../services/AppUpdateService';
 import { getPreference, setPreference, PREF_KEYS } from '../services/PreferencesDB';
 import { appEvents, EVENTS } from '../services/eventEmitter';
@@ -35,44 +34,10 @@ import { useDisplaySettings } from '../contexts/DisplaySettingsContext';
 import { useUpdateDownload } from '../contexts/UpdateDownloadContext';
 import { authenticateWithBiometrics, BiometricResult } from '../services/BiometricService';
 import { ensureLocationPermission } from '../services/LocationService';
-import { getValidAccessToken, signIn as googleSignIn, exportToSheets, importFromSheets } from '../services/GoogleSheetsService';
 import UpdateContentPanel from '../components/UpdateContentPanel';
-import NotificationProcessingContentPanel from '../components/NotificationProcessingContentPanel';
-import NotificationFiltersContentPanel from '../components/NotificationFiltersContentPanel';
-import NotificationBindingsContentPanel from '../components/NotificationBindingsContentPanel';
-import NotificationTemplatesContentPanel from '../components/NotificationTemplatesContentPanel';
-import NotificationTemplateEditorPanel from '../components/NotificationTemplateEditorPanel';
 import AccountsScreen from './AccountsScreen';
 import CategoriesScreen from './CategoriesScreen';
 import { SECTION_LABEL } from '../styles/componentStyles';
-import {
-  CONFIRM_BUTTON_DESTRUCTIVE,
-  CONFIRM_BUTTON_TEXT,
-  CONFIRM_CONTENT,
-  CONFIRM_TEXT,
-  CONFIRM_WARNING_ICON,
-  EMPTY_CONTAINER,
-  FLEX_LIST,
-  LIST_CONTAINER,
-  LIST_ITEM,
-  LIST_ITEM_CONTENT,
-  LIST_ITEM_TEXT,
-} from '../components/settings/settingsPanelStyles';
-import EmptyState from '../components/EmptyState';
-
-const SHEETS_STEPS = [
-  { id: 'auth', label: 'Signing in to Google' },
-  { id: 'backup', label: 'Preparing data' },
-  { id: 'connect', label: 'Connecting to spreadsheet' },
-  { id: 'clear', label: 'Clearing existing data' },
-  { id: 'write', label: 'Uploading data' },
-  { id: 'complete', label: 'Export complete' },
-];
-
-const SHEETS_IMPORT_STEPS = [
-  { id: 'connect', label: 'Connecting to spreadsheet' },
-  { id: 'parse', label: 'Reading sheet data' },
-];
 
 const SPRING_CONFIG = { mass: 1, damping: 20, stiffness: 200 };
 
@@ -139,7 +104,6 @@ export default function SettingsScreen({ setSubPanelActive }) {
   const { t, language } = useLocalization();
   const { hideBalances, setHideBalances, attachLocation, setAttachLocation, showAccountsTab, setShowAccountsTab, showBudgetTab, setShowBudgetTab } = useDisplaySettings();
   const { showDialog } = useDialog();
-  const { startImport, cancelImport, completeImport, getCancelToken } = useImportProgress();
   const { startDownload, isDownloading, downloadProgress, downloadPhase } = useUpdateDownload();
   // Subpanel navigation. The stack owns which panel is open and how deep into
   // its nested views the user has stepped, so "can we go back?", the header
@@ -162,12 +126,6 @@ export default function SettingsScreen({ setSubPanelActive }) {
   // 'bindings' the learned associations, 'templates' the parser list, and
   // 'templateEditor' the field-marking editor.
   const notificationView = panelStack.stepOf('notificationProcessing');
-  // What the template editor is working on: the captured notification a new
-  // template is being built from, and/or the existing template being edited.
-  // Held here rather than in the panel because the editor is a sibling view —
-  // the panel that launches it unmounts as it opens. Where leaving the editor
-  // returns to is the stack's business, not the draft's.
-  const [templateDraft, setTemplateDraft] = useState(null);
   // Controls the notification-processing header overflow (three-dots) menu.
   const [notificationMenuVisible, setNotificationMenuVisible] = useState(false);
   // Measured size of the settings container. The subpanel overlay is sized in
@@ -178,44 +136,17 @@ export default function SettingsScreen({ setSubPanelActive }) {
   // Inline hint shown under the "Attach location" row when the OS permission was
   // denied while turning the toggle on. Cleared on a successful grant / toggle off.
   const [locationDenied, setLocationDenied] = useState(false);
-  const [storedBackups, setStoredBackups] = useState([]);
-  const [backupsLoading, setBackupsLoading] = useState(false);
-  const [pendingDeleteUri, setPendingDeleteUri] = useState(null);
   const exportStep = panelStack.stepOf('export');
-  const [sheetsSteps, setSheetsSteps] = useState(SHEETS_STEPS.map(s => ({ ...s, status: 'pending' })));
-  const [sheetsSuccessUrl, setSheetsSuccessUrl] = useState(null);
-  const [sheetsError, setSheetsError] = useState(null);
-  const [sheetsImportSteps, setSheetsImportSteps] = useState(SHEETS_IMPORT_STEPS.map(s => ({ ...s, status: 'pending' })));
-  const [sheetsImportError, setSheetsImportError] = useState(null);
-  // Reset runs synchronously-invisible otherwise; this drives the inline spinner
-  // that keeps the confirm subpanel open while the wipe is in flight (QoL-13).
-  const [resetInProgress, setResetInProgress] = useState(false);
   const [updateResult, setUpdateResult] = useState(null);
   const [isCheckingUpdate, setIsCheckingUpdate] = useState(false);
   const [downloadedApks, setDownloadedApks] = useState([]);
   const importStep = panelStack.stepOf('import');
-  const [importSelectedBackup, setImportSelectedBackup] = useState(null);
-  const [saveLocalBackupLoading, setSaveLocalBackupLoading] = useState(false);
-  const [saveLocalBackupSuccess, setSaveLocalBackupSuccess] = useState(false);
-  const [sheetsExportSuccess, setSheetsExportSuccess] = useState(false);
-  const [sqliteExportLoading, setSqliteExportLoading] = useState(false);
-  const [sqliteExportSuccess, setSqliteExportSuccess] = useState(false);
-  const [csvExportLoading, setCsvExportLoading] = useState(false);
-  const [csvExportSuccess, setCsvExportSuccess] = useState(false);
-  const [jsonExportLoading, setJsonExportLoading] = useState(false);
-  const [jsonExportSuccess, setJsonExportSuccess] = useState(false);
 
-  const saveLocalBackupColor = saveLocalBackupSuccess ? '#4caf50' : colors.text;
-  const sheetsColor = sheetsExportSuccess ? '#4caf50' : colors.text;
-  const sqliteColor = sqliteExportSuccess ? '#4caf50' : colors.text;
-  const csvColor = csvExportSuccess ? '#4caf50' : colors.text;
-  const jsonColor = jsonExportSuccess ? '#4caf50' : colors.text;
 
   const handleToggleDarkMode = useCallback(() => {
     setTheme(colorScheme === 'dark' ? 'light' : 'dark');
   }, [colorScheme, setTheme]);
 
-  const importPickInProgress = useRef(false);
 
   const handleToggleHideBalances = useCallback(async () => {
     if (!hideBalances) {
@@ -267,47 +198,45 @@ export default function SettingsScreen({ setSubPanelActive }) {
     }
   }, [attachLocation, setAttachLocation]);
 
-  const loadStoredBackups = useCallback(async () => {
-    setBackupsLoading(true);
-    try {
-      const [regularUris, snapshotUris] = await Promise.all([
-        getStoredBackups(),
-        getPreRestoreSnapshots(),
-      ]);
-      const allUris = [...regularUris.reverse(), ...snapshotUris];
-      const infos = await Promise.all(
-        allUris.map(async (uri) => {
-          const filename = uri.split('/').pop();
-          const info = await LegacyFileSystem.getInfoAsync(uri);
-          return { uri, filename, size: info.size || 0 };
-        }),
-      );
-      setStoredBackups(infos);
-    } catch (error) {
-      console.error('Failed to load stored backups:', error);
-      setStoredBackups([]);
-    } finally {
-      setBackupsLoading(false);
-    }
+  // Back navigation is locked while the open panel says it is mid-flight — a
+  // Sheets export/import stage, or a database wipe. Only one panel is mounted at
+  // a time and each releases the flag on unmount, so a single flag is enough and
+  // the screen no longer has to know which panels have long operations.
+  const [panelBusy, setPanelBusy] = useState(false);
+  const isBackDisabled = panelBusy;
+
+  // A panel can hook the back gesture to release state its current step owns
+  // (a finished Sheets run, a chosen backup, a template draft). The hook runs
+  // before the host pops; returning true claims the gesture outright, which is
+  // what the embedded screens do when they still have a level of their own.
+  const panelBackRef = useRef(null);
+  const registerPanelBack = useCallback((fn) => {
+    panelBackRef.current = typeof fn === 'function' ? fn : null;
+  }, []);
+
+  // A panel can offer the subpanel header an action (currently only the import
+  // backup list, which gets a refresh button).
+  const [panelRefresh, setPanelRefresh] = useState(null);
+  const registerPanelRefresh = useCallback((fn) => {
+    setPanelRefresh(() => (typeof fn === 'function' ? fn : null));
   }, []);
 
   // Resets all subpanel state and unmounts it. Called once the slide-away
   // animation has played (or immediately when another flow takes over).
   const closeSubPanel = useCallback(() => {
     closeStack();
+    // Drop whatever the closing panel registered. Panels clear their own hooks
+    // on unmount, but the embedded screens do not, and a stale handler would
+    // swallow the next panel's back gesture.
+    registerPanelBack(null);
+    registerPanelRefresh(null);
+    setPanelBusy(false);
+    setEmbeddedCanGoBack(false);
+    // Everything else the panels used to leave behind now unmounts with them.
     setUpdateResult(null);
-    setImportSelectedBackup(null);
-    setSaveLocalBackupLoading(false);
-    setSaveLocalBackupSuccess(false);
-    setSheetsSteps(SHEETS_STEPS.map(s => ({ ...s, status: 'pending' })));
-    setSheetsSuccessUrl(null);
-    setSheetsError(null);
-    setSheetsImportSteps(SHEETS_IMPORT_STEPS.map(s => ({ ...s, status: 'pending' })));
-    setSheetsImportError(null);
     setDownloadedApks([]);
-    setTemplateDraft(null);
     setNotificationMenuVisible(false);
-  }, [closeStack]);
+  }, [closeStack, registerPanelBack, registerPanelRefresh]);
 
   // The wipe finished: close the panel and say so. The toast lives here rather
   // than in ResetPanel because acknowledging a completed subpanel is the host's
@@ -317,30 +246,17 @@ export default function SettingsScreen({ setSubPanelActive }) {
     ToastAndroid.show(t('database_reset_done') || 'Database reset', ToastAndroid.SHORT);
   }, [closeSubPanel, t]);
 
-  // Back navigation is locked while a long async step (Sheets export/import) runs,
-  // so the swipe-to-dismiss gesture is disabled then too.
-  const isBackDisabled = useMemo(() => {
-    if (activeSubPanel === 'export' && exportStep === 'sheets-progress') {
-      return sheetsSteps.some(s => s.status === 'in_progress');
-    }
-    if (activeSubPanel === 'import' && importStep === 'sheets-progress') {
-      return sheetsImportSteps.some(s => s.status === 'in_progress');
-    }
-    if (activeSubPanel === 'reset') {
-      return resetInProgress;
-    }
-    return false;
-  }, [activeSubPanel, exportStep, importStep, sheetsSteps, sheetsImportSteps, resetInProgress]);
-
   // Embedded screens (Accounts/Categories) report whether they can navigate back
   // one level internally (edit form open, subcategory drill, picker, …) so a swipe
   // / hardware-back steps up there before closing the whole panel.
-  const embeddedBackRef = useRef(null);
   const [embeddedCanGoBack, setEmbeddedCanGoBack] = useState(false);
   const handleEmbeddedBackStateChange = useCallback((goBack) => {
-    embeddedBackRef.current = typeof goBack === 'function' ? goBack : null;
     setEmbeddedCanGoBack(!!goBack);
-  }, []);
+    // Folded into the same registration the extracted panels use. An embedded
+    // screen that can still pop claims the gesture, so the host leaves its own
+    // stack alone.
+    registerPanelBack(typeof goBack === 'function' ? () => { goBack(); return true; } : null);
+  }, [registerPanelBack]);
 
   // Capture the container's pixel size so the subpanel overlay can be sized
   // explicitly (see containerSize above). Only update on real changes to avoid
@@ -382,19 +298,12 @@ export default function SettingsScreen({ setSubPanelActive }) {
     });
 
   const openSubPanel = useCallback((panel) => {
-    // The panel's starting step comes from the stack itself; only the data each
-    // panel needs on entry is prepared here.
-    if (panel === 'import') {
-      setImportSelectedBackup(null);
-      loadStoredBackups();
-    }
-    if (panel === 'notificationProcessing') {
-      setNotificationMenuVisible(false);
-      setTemplateDraft(null);
-    }
+    // Panels own their own entry state now: each mounts fresh at the step the
+    // stack starts it on. Only the header's own menu is reset here.
+    setNotificationMenuVisible(false);
     openStack(panel);
     openPanelAnim();
-  }, [loadStoredBackups, openPanelAnim, openStack]);
+  }, [openPanelAnim, openStack]);
 
   useEffect(() => {
     setSubPanelActive(activeSubPanel !== null);
@@ -444,269 +353,12 @@ export default function SettingsScreen({ setSubPanelActive }) {
     return unsubscribe;
   }, []);
 
-  const handleExportFormatSelect = useCallback(async (format) => {
-    const setLoading = format === 'sqlite' ? setSqliteExportLoading : format === 'csv' ? setCsvExportLoading : setJsonExportLoading;
-    const setSuccess = format === 'sqlite' ? setSqliteExportSuccess : format === 'csv' ? setCsvExportSuccess : setJsonExportSuccess;
-    setLoading(true);
-    try {
-      await exportBackup(format);
-      setSuccess(true);
-    } catch (error) {
-      console.error('Export backup error:', error);
-      showDialog(
-        t('error') || 'Error',
-        t('backup_error') || 'Failed to create backup',
-        [{ text: 'OK' }],
-      );
-    } finally {
-      setLoading(false);
-    }
-  }, [t, showDialog]);
-
-  const updateSheetsStep = useCallback((stepId, status) => {
-    setSheetsSteps(prev => prev.map(s => s.id === stepId ? { ...s, status } : s));
-  }, []);
-
-  const handleGoogleSheetsExport = useCallback(async () => {
-    setSheetsSteps(SHEETS_STEPS.map(s => ({ ...s, status: 'pending' })));
-    setSheetsSuccessUrl(null);
-    setSheetsError(null);
-    pushStep('sheets-progress');
-    try {
-      updateSheetsStep('auth', 'in_progress');
-      let accessToken;
-      try {
-        accessToken = await getValidAccessToken();
-      } catch (authError) {
-        if (authError.message === 'refresh_failed') throw authError;
-        accessToken = await googleSignIn();
-      }
-      updateSheetsStep('auth', 'completed');
-
-      updateSheetsStep('backup', 'in_progress');
-      const backup = await createBackup();
-      updateSheetsStep('backup', 'completed');
-
-      const sheetUrl = await exportToSheets(accessToken, backup, ({ step, status }) => {
-        updateSheetsStep(step, status);
-      });
-
-      updateSheetsStep('complete', 'completed');
-      setSheetsSuccessUrl(sheetUrl);
-      setSheetsExportSuccess(true);
-    } catch (error) {
-      if (error.message === 'sign_in_cancelled') {
-        popToRootStep();
-        return;
-      }
-      setSheetsSteps(prev => prev.map(s => s.status === 'in_progress' ? { ...s, status: 'error' } : s));
-      let errorMsg;
-      if (error.message === 'refresh_failed') {
-        errorMsg = t('google_sheets_access_revoked') || 'Google access was revoked. Please sign in again.';
-      } else if (error.message === 'auth_failed') {
-        errorMsg = t('google_sheets_signin_failed') || 'Google sign-in failed. Please try again.';
-      } else if (error.message === 'quota_exceeded') {
-        errorMsg = t('google_sheets_quota_exceeded') || 'Google Sheets quota exceeded. Try again later.';
-      } else if (error.message === 'Network request failed') {
-        errorMsg = t('google_sheets_no_network') || 'Export failed: no internet connection.';
-      } else {
-        errorMsg = t('google_sheets_export_failed') || 'Export failed. Please try again.';
-      }
-      setSheetsError(errorMsg);
-    }
-  }, [updateSheetsStep, t]);
-
-  // State a nested step owns and must hand back when the user steps out of it.
-  // This is the only place that still keys off (panel, step), and it is about
-  // cleanup alone — where "back" goes is the stack's business, not this map's.
-  const releaseStepState = useCallback((panel, step) => {
-    if (panel === 'export' && step === 'sheets-progress') {
-      setSheetsSteps(SHEETS_STEPS.map(s => ({ ...s, status: 'pending' })));
-      setSheetsSuccessUrl(null);
-      setSheetsError(null);
-    } else if (panel === 'import' && step === 'sheets-progress') {
-      setSheetsImportError(null);
-    } else if (panel === 'import' && step === 'confirm-local') {
-      setImportSelectedBackup(null);
-    } else if (panel === 'notificationProcessing' && step === 'templateEditor') {
-      setTemplateDraft(null);
-    }
-  }, []);
-
-  const confirmImportBackup = useCallback(async () => {
-    if (importPickInProgress.current) return;
-    importPickInProgress.current = true;
-
-    let fileInfo;
-    try {
-      fileInfo = await pickImportFile();
-    } catch (error) {
-      importPickInProgress.current = false;
-      if (error.message === 'Import cancelled') {
-        popToRootStep();
-        return;
-      }
-      console.error('Import file pick error:', error);
-      showDialog(t('error') || 'Error', error.message || t('restore_error') || 'Failed to restore backup', [{ text: 'OK' }]);
-      return;
-    }
-
-    importPickInProgress.current = false;
-    closeSubPanel();
-    startImport();
-    const cancelToken = getCancelToken();
-    try {
-      await importBackupFromFile(fileInfo, cancelToken);
-      completeImport();
-    } catch (error) {
-      cancelImport();
-      if (error instanceof CancelledImportError) return;
-      console.error('Import backup error:', error);
-      showDialog(t('error') || 'Error', error.message || t('restore_error') || 'Failed to restore backup', [{ text: 'OK' }]);
-    }
-  }, [closeSubPanel, startImport, completeImport, cancelImport, getCancelToken, t, showDialog]);
-
-  const handleImportSourceSelect = useCallback((source) => {
-    if (source === 'file') {
-      pushStep('confirm-file');
-    } else if (source === 'local') {
-      pushStep('local-list');
-    }
-  }, [pushStep]);
-
-  const handleGoogleSheetsImport = useCallback(async () => {
-    setSheetsImportError(null);
-
-    const spreadsheetId = await getPreference(PREF_KEYS.GOOGLE_SHEETS_SPREADSHEET_ID);
-    if (!spreadsheetId) {
-      setSheetsImportError(t('google_sheets_not_configured') || 'Export to Google Sheets first to set up your spreadsheet.');
-      return;
-    }
-
-    setSheetsImportSteps(SHEETS_IMPORT_STEPS.map(s => ({ ...s, status: 'pending' })));
-    pushStep('sheets-progress');
-
-    let backup;
-    try {
-      let accessToken;
-      try {
-        accessToken = await getValidAccessToken();
-      } catch {
-        accessToken = await googleSignIn();
-      }
-      backup = await importFromSheets(accessToken, ({ step, status }) => {
-        setSheetsImportSteps(prev => prev.map(s => s.id === step ? { ...s, status } : s));
-      });
-    } catch (error) {
-      if (error.message === 'sign_in_cancelled') {
-        popToRootStep();
-        return;
-      }
-      if (error.message === 'no_spreadsheet_configured') {
-        popToRootStep();
-        setSheetsImportError(t('google_sheets_not_configured') || 'Export to Google Sheets first to set up your spreadsheet.');
-        return;
-      }
-      let msg;
-      if (error.message === 'refresh_failed') msg = t('google_sheets_access_revoked') || 'Google access was revoked. Please sign in again.';
-      else if (error.message === 'spreadsheet_not_found') msg = t('google_sheets_not_found') || 'Spreadsheet not found. Try exporting first.';
-      else msg = t('google_sheets_import_failed') || 'Import failed. Please try again.';
-      setSheetsImportSteps(prev => prev.map(s => s.status === 'in_progress' ? { ...s, status: 'error' } : s));
-      setSheetsImportError(msg);
-      return;
-    }
-
-    closeSubPanel();
-    startImport();
-    const cancelToken = getCancelToken();
-    try {
-      await restoreBackup(backup, cancelToken);
-      completeImport();
-    } catch (restoreError) {
-      cancelImport();
-      if (!(restoreError instanceof CancelledImportError)) {
-        console.error('[SheetsImport] restore error:', restoreError);
-        showDialog(t('error') || 'Error', restoreError.message || t('restore_error') || 'Failed to restore backup', [{ text: 'OK' }]);
-      }
-    }
-  }, [t, closeSubPanel, startImport, completeImport, cancelImport, getCancelToken, showDialog]);
-
   // When Sheets import dead-ends on "no spreadsheet configured", this CTA sends the user
   // straight to the export subpanel to set one up. The subpanel is already slid in, so we
   // just swap its content instead of re-opening (QoL-13).
   const handleSetupSheetsExport = useCallback(() => {
-    setSheetsImportError(null);
     swapStackPanel('export');
   }, [swapStackPanel]);
-
-  const handleImportLocalBackupSelect = useCallback((item) => {
-    setImportSelectedBackup(item);
-    pushStep('confirm-local');
-  }, [pushStep]);
-
-  const confirmRestoreLocalBackup = useCallback(async () => {
-    if (!importSelectedBackup) return;
-    closeSubPanel();
-    startImport();
-    const cancelToken = getCancelToken();
-    try {
-      const content = await LegacyFileSystem.readAsStringAsync(importSelectedBackup.uri);
-      const backup = JSON.parse(content);
-      await restoreBackup(backup, cancelToken);
-      completeImport();
-    } catch (error) {
-      cancelImport();
-      if (error instanceof CancelledImportError) return;
-      console.error('Local backup restore error:', error);
-      showDialog(
-        t('error') || 'Error',
-        error.message || t('restore_error') || 'Failed to restore backup',
-        [{ text: 'OK' }],
-      );
-    }
-  }, [importSelectedBackup, closeSubPanel, startImport, completeImport, cancelImport, getCancelToken, t, showDialog]);
-
-  const handleSaveLocalBackup = useCallback(async () => {
-    setSaveLocalBackupLoading(true);
-    try {
-      const backup = await createBackup();
-      const now = new Date();
-      const pad = (n) => String(n).padStart(2, '0');
-      const dateStr = now.toISOString().split('T')[0];
-      const timeStr = `${pad(now.getHours())}-${pad(now.getMinutes())}-${pad(now.getSeconds())}`;
-      const filename = `manual_${dateStr}_${timeStr}.json`;
-      const dirInfo = await LegacyFileSystem.getInfoAsync(DAILY_BACKUP_DIR);
-      if (!dirInfo.exists) {
-        await LegacyFileSystem.makeDirectoryAsync(DAILY_BACKUP_DIR, { intermediates: true });
-      }
-      const fileUri = `${DAILY_BACKUP_DIR}${filename}`;
-      await LegacyFileSystem.writeAsStringAsync(fileUri, JSON.stringify(backup));
-      setSaveLocalBackupLoading(false);
-      setSaveLocalBackupSuccess(true);
-    } catch (error) {
-      console.error('Save local backup error:', error);
-      setSaveLocalBackupLoading(false);
-      showDialog(
-        t('error') || 'Error',
-        t('backup_error') || 'Failed to create backup',
-        [{ text: 'OK' }],
-      );
-    }
-  }, [t, showDialog]);
-
-  const handleDeleteLocalBackup = useCallback((uri) => {
-    setPendingDeleteUri(uri);
-  }, []);
-
-  const handleConfirmDeleteLocalBackup = useCallback(async (uri) => {
-    setPendingDeleteUri(null);
-    try {
-      await LegacyFileSystem.deleteAsync(uri, { idempotent: true });
-      setStoredBackups(prev => prev.filter(b => b.uri !== uri));
-    } catch (error) {
-      console.error('Failed to delete backup:', error);
-    }
-  }, []);
 
   const loadDownloadedApks = useCallback(async () => {
     const apks = await listDownloadedApks();
@@ -823,80 +475,6 @@ export default function SettingsScreen({ setSubPanelActive }) {
     });
   }, [updateResult, closeSubPanel, startDownload, showDialog, t]);
 
-  const formatBackupLabel = useCallback((filename) => {
-    if (filename.startsWith('daily_')) {
-      const dateStr = filename.replace('daily_', '').replace('.json', '');
-      const [year, month, day] = dateStr.split('-').map(Number);
-      return new Date(year, month - 1, day).toLocaleDateString(undefined, {
-        month: 'short', day: 'numeric', year: 'numeric',
-      });
-    }
-    if (filename.startsWith('weekly_')) {
-      const weekStr = filename.replace('weekly_', '').replace('.json', '');
-      const [year, weekPart] = weekStr.split('-');
-      return `${t('weekly') || 'Weekly'} ${weekPart}, ${year}`;
-    }
-    if (filename.startsWith('manual_')) {
-      const inner = filename.replace('manual_', '').replace('.json', '');
-      const [datePart, timePart] = inner.split('_');
-      if (datePart) {
-        const [year, month, day] = datePart.split('-').map(Number);
-        const dateLabel = new Date(year, month - 1, day).toLocaleDateString(undefined, {
-          month: 'short', day: 'numeric', year: 'numeric',
-        });
-        if (timePart) {
-          const [hh, mm] = timePart.split('-');
-          return `${dateLabel} · ${hh}:${mm}`;
-        }
-        return dateLabel;
-      }
-    }
-    return filename;
-  }, [t]);
-
-  const renderBackupItem = useCallback(({ item }) => {
-    const isDaily = item.filename.startsWith('daily_');
-    const isManual = item.filename.startsWith('manual_');
-    const label = formatBackupLabel(item.filename);
-    const typeLabel = isDaily ? 'Daily' : isManual ? 'Manual' : (t('weekly') || 'Weekly');
-    const sizeKB = item.size ? `${(item.size / 1024).toFixed(1)} KB` : '';
-    const isPending = pendingDeleteUri === item.uri;
-    return (
-      <View style={[styles.backupItem, { borderBottomColor: colors.border }]}>
-        <View style={styles.backupItemLeft}>
-          <Ionicons name={isDaily ? 'calendar-outline' : isManual ? 'save-outline' : 'calendar-number-outline'} size={22} color={isPending ? colors.mutedText : colors.text} />
-          <View style={styles.backupItemText}>
-            <Text style={[styles.backupItemLabel, { color: isPending ? colors.mutedText : colors.text }]}>{label}</Text>
-            <Text style={[styles.backupItemMeta, { color: colors.mutedText }]}>
-              {isPending ? (t('delete_backup_confirm') || 'Delete this backup?') : `${typeLabel}${sizeKB ? ` · ${sizeKB}` : ''}`}
-            </Text>
-          </View>
-        </View>
-        <View style={styles.backupItemActions}>
-          {isPending ? (
-            <>
-              <TouchableOpacity onPress={() => setPendingDeleteUri(null)} style={styles.backupConfirmButton}>
-                <Text style={[styles.backupConfirmButtonText, { color: colors.mutedText }]}>{t('cancel') || 'Cancel'}</Text>
-              </TouchableOpacity>
-              <TouchableOpacity onPress={() => handleConfirmDeleteLocalBackup(item.uri)} style={styles.backupConfirmButton}>
-                <Text style={[styles.backupConfirmButtonDestructiveText, { color: colors.destructive }]}>{t('delete') || 'Delete'}</Text>
-              </TouchableOpacity>
-            </>
-          ) : (
-            <>
-              <TouchableOpacity onPress={() => handleImportLocalBackupSelect(item)} style={styles.backupActionButton}>
-                <Ionicons name="refresh-outline" size={20} color={colors.primary} />
-              </TouchableOpacity>
-              <TouchableOpacity onPress={() => handleDeleteLocalBackup(item.uri)} style={styles.backupActionButton}>
-                <Ionicons name="trash-outline" size={18} color={colors.destructive} />
-              </TouchableOpacity>
-            </>
-          )}
-        </View>
-      </View>
-    );
-  }, [colors, t, formatBackupLabel, handleImportLocalBackupSelect, handleDeleteLocalBackup, handleConfirmDeleteLocalBackup, pendingDeleteUri]);
-
   // ─── Subpanel title resolver ───
   const subPanelTitle = useMemo(() => {
     if (activeSubPanel === 'accounts') return t('accounts') || 'Accounts';
@@ -922,7 +500,7 @@ export default function SettingsScreen({ setSubPanelActive }) {
       if (notificationView === 'bindings') return t('notification_bindings') || 'Bindings';
       if (notificationView === 'templates') return t('notification_templates') || 'Templates';
       if (notificationView === 'templateEditor') {
-        return templateDraft?.template
+        return panelStack.params?.editing
           ? (t('notification_template_edit') || 'Edit template')
           : (t('notification_template_new') || 'New template');
       }
@@ -930,36 +508,7 @@ export default function SettingsScreen({ setSubPanelActive }) {
     }
     if (activeSubPanel === 'reset') return t('reset_database') || 'Reset Database';
     return '';
-  }, [activeSubPanel, exportStep, importStep, isCheckingUpdate, updateResult, notificationView, templateDraft, t]);
-
-  // ─── Notification parse templates ───
-  // Build a new template from a notification the user long-pressed in the feed.
-  // `recent` rides along so the editor can report how many of the app's other
-  // captured notifications the draft also matches.
-  const handleCreateTemplate = useCallback((notification, recent = []) => {
-    setTemplateDraft({ notification, template: null, recent });
-    pushStep('templateEditor');
-  }, [pushStep]);
-
-  // Open an existing template from the templates list.
-  const handleEditTemplate = useCallback((template) => {
-    setTemplateDraft({ notification: null, template, recent: [] });
-    pushStep('templateEditor');
-  }, [pushStep]);
-
-  // Leaving the editor. A cancel simply steps back to whichever view opened it —
-  // the stack already knows which. A saved template lands on the templates list:
-  // that is where it now lives, and seeing it there confirms the save, so an
-  // editor opened from the feed replaces itself with the list rather than
-  // popping back to it.
-  const handleTemplateEditorDone = useCallback((saved) => {
-    if (saved && panelStack.parentStep !== 'templates') {
-      replaceStep('templates');
-    } else {
-      popStep();
-    }
-    setTemplateDraft(null);
-  }, [panelStack.parentStep, replaceStep, popStep]);
+  }, [activeSubPanel, exportStep, importStep, isCheckingUpdate, updateResult, notificationView, panelStack.params, t]);
 
   // Resolver behind navigateBack — the single answer for all three back paths
   // (swipe, hardware back, header arrow). An embedded Accounts/Categories screen
@@ -969,12 +518,11 @@ export default function SettingsScreen({ setSubPanelActive }) {
   // to whichever view opened it without anyone having to remember which.
   subPanelBackRef.current = () => {
     if (isBackDisabled) return;
-    if ((activeSubPanel === 'accounts' || activeSubPanel === 'categories') && embeddedBackRef.current) {
-      embeddedBackRef.current();
-      return;
-    }
+    // The open panel gets first refusal. An embedded Accounts/Categories screen
+    // claims the gesture outright while it still has a level of its own; the
+    // extracted panels only release state and hand navigation back.
+    if (panelBackRef.current?.()) return;
     if (panelStack.canStepBack) {
-      releaseStepState(panelStack.panel, panelStack.step);
       popStep();
       return;
     }
@@ -983,14 +531,15 @@ export default function SettingsScreen({ setSubPanelActive }) {
 
 
   // ─── RENDER ───
-  // Header action slot (opposite the back arrow). The import "local backups" list
-  // gets a refresh button; the notification-processing main view gets a
-  // three-dots overflow menu that opens the Filters view; everything else gets an
-  // empty spacer so the title stays centered.
+  // Header action slot (opposite the back arrow). A panel that wants a refresh
+  // button registers one (the import backup list does, while it is showing); the
+  // notification-processing main view gets a three-dots overflow menu, which is
+  // header chrome and stays here because all it does is push a step. Everything
+  // else gets an empty spacer so the title stays centered.
   let headerRightSlot = <View style={styles.backButton} />;
-  if (activeSubPanel === 'import' && importStep === 'local-list') {
+  if (panelRefresh) {
     headerRightSlot = (
-      <TouchableOpacity onPress={loadStoredBackups} style={styles.backButton}>
+      <TouchableOpacity onPress={panelRefresh} style={styles.backButton}>
         <Ionicons name="refresh-outline" size={22} color={colors.text} />
       </TouchableOpacity>
     );
@@ -1093,340 +642,33 @@ export default function SettingsScreen({ setSubPanelActive }) {
               <LanguagePanel onSelected={dismissPanel} bottomInset={scrollBottomInset} />
             )}
 
-            {activeSubPanel === 'export' && exportStep === 'list' && (
-              <ScrollView style={styles.listContainer} contentContainerStyle={{ paddingBottom: scrollBottomInset }}>
-                <TouchableRipple
-                  onPress={saveLocalBackupSuccess ? null : handleSaveLocalBackup}
-                  style={styles.listItem}
-                  disabled={saveLocalBackupLoading || saveLocalBackupSuccess}
-                  testID="settings-export-save-local-backup"
-                >
-                  <View style={styles.listItemContent}>
-                    <View style={styles.formatItemRow}>
-                      <Ionicons name="archive-outline" size={24} color={saveLocalBackupColor} />
-                      <View style={styles.formatTextContainer}>
-                        <Text style={[styles.listItemText, { color: saveLocalBackupColor }]}>
-                          {t('save_local_backup') || 'Save local backup'}
-                        </Text>
-                        <Text style={[styles.formatDescription, { color: colors.mutedText }]}>
-                          {saveLocalBackupLoading
-                            ? (t('save_local_backup_saving') || 'Saving…')
-                            : saveLocalBackupSuccess
-                              ? (t('save_local_backup_success') || 'Backup saved')
-                              : (t('save_local_backup_description') || 'Save a backup to device storage and share')}
-                        </Text>
-                      </View>
-                    </View>
-                    {saveLocalBackupLoading ? (
-                      <ActivityIndicator size="small" color={colors.primary} />
-                    ) : saveLocalBackupSuccess ? (
-                      <Ionicons name="checkmark-circle" size={22} color="#4caf50" />
-                    ) : (
-                      <Ionicons name="chevron-forward" size={20} color={colors.mutedText} />
-                    )}
-                  </View>
-                </TouchableRipple>
-
-                <TouchableRipple
-                  onPress={handleGoogleSheetsExport}
-                  style={styles.listItem}
-                  testID="settings-export-google-sheets"
-                >
-                  <View style={styles.listItemContent}>
-                    <View style={styles.formatItemRow}>
-                      <Ionicons name="logo-google" size={24} color={sheetsColor} />
-                      <View style={styles.formatTextContainer}>
-                        <Text style={[styles.listItemText, { color: sheetsColor }]}>Google Sheets</Text>
-                        <Text style={[styles.formatDescription, { color: colors.mutedText }]}>
-                          {sheetsExportSuccess
-                            ? (t('export_success') || 'Export complete')
-                            : (t('google_sheets_description') || 'Export to a Google Sheets spreadsheet')}
-                        </Text>
-                      </View>
-                    </View>
-                    {sheetsExportSuccess ? (
-                      <Ionicons name="checkmark-circle" size={22} color="#4caf50" />
-                    ) : (
-                      <Ionicons name="chevron-forward" size={20} color={colors.mutedText} />
-                    )}
-                  </View>
-                </TouchableRipple>
-
-                <TouchableRipple
-                  onPress={sqliteExportLoading ? null : () => handleExportFormatSelect('sqlite')}
-                  style={styles.listItem}
-                  disabled={sqliteExportLoading}
-                >
-                  <View style={styles.listItemContent}>
-                    <View style={styles.formatItemRow}>
-                      <Ionicons name="server-outline" size={24} color={sqliteColor} />
-                      <View style={styles.formatTextContainer}>
-                        <Text style={[styles.listItemText, { color: sqliteColor }]}>Save externally to SQLite</Text>
-                        <Text style={[styles.formatDescription, { color: colors.mutedText }]}>
-                          {sqliteExportLoading
-                            ? (t('exporting') || 'Exporting…')
-                            : sqliteExportSuccess
-                              ? (t('export_success') || 'Export complete')
-                              : (t('sqlite_description') || 'Raw database file, complete backup')}
-                        </Text>
-                      </View>
-                    </View>
-                    {sqliteExportLoading ? (
-                      <ActivityIndicator size="small" color={colors.primary} />
-                    ) : sqliteExportSuccess ? (
-                      <Ionicons name="checkmark-circle" size={22} color="#4caf50" />
-                    ) : (
-                      <Ionicons name="chevron-forward" size={20} color={colors.mutedText} />
-                    )}
-                  </View>
-                </TouchableRipple>
-
-                <TouchableRipple
-                  onPress={csvExportLoading ? null : () => handleExportFormatSelect('csv')}
-                  style={styles.listItem}
-                  disabled={csvExportLoading}
-                >
-                  <View style={styles.listItemContent}>
-                    <View style={styles.formatItemRow}>
-                      <Ionicons name="document-text-outline" size={24} color={csvColor} />
-                      <View style={styles.formatTextContainer}>
-                        <Text style={[styles.listItemText, { color: csvColor }]}>Save externally to CSV</Text>
-                        <Text style={[styles.formatDescription, { color: colors.mutedText }]}>
-                          {csvExportLoading
-                            ? (t('exporting') || 'Exporting…')
-                            : csvExportSuccess
-                              ? (t('export_success') || 'Export complete')
-                              : (t('csv_description') || 'Plain text format, easy to edit')}
-                        </Text>
-                      </View>
-                    </View>
-                    {csvExportLoading ? (
-                      <ActivityIndicator size="small" color={colors.primary} />
-                    ) : csvExportSuccess ? (
-                      <Ionicons name="checkmark-circle" size={22} color="#4caf50" />
-                    ) : (
-                      <Ionicons name="chevron-forward" size={20} color={colors.mutedText} />
-                    )}
-                  </View>
-                </TouchableRipple>
-
-                <TouchableRipple
-                  onPress={jsonExportLoading ? null : () => handleExportFormatSelect('json')}
-                  style={styles.listItem}
-                  disabled={jsonExportLoading}
-                >
-                  <View style={styles.listItemContent}>
-                    <View style={styles.formatItemRow}>
-                      <Ionicons name="code-outline" size={24} color={jsonColor} />
-                      <View style={styles.formatTextContainer}>
-                        <Text style={[styles.listItemText, { color: jsonColor }]}>Save externally to JSON</Text>
-                        <Text style={[styles.formatDescription, { color: colors.mutedText }]}>
-                          {jsonExportLoading
-                            ? (t('exporting') || 'Exporting…')
-                            : jsonExportSuccess
-                              ? (t('export_success') || 'Export complete')
-                              : (t('json_description') || 'Standard format, compatible with all versions')}
-                        </Text>
-                      </View>
-                    </View>
-                    {jsonExportLoading ? (
-                      <ActivityIndicator size="small" color={colors.primary} />
-                    ) : jsonExportSuccess ? (
-                      <Ionicons name="checkmark-circle" size={22} color="#4caf50" />
-                    ) : (
-                      <Ionicons name="chevron-forward" size={20} color={colors.mutedText} />
-                    )}
-                  </View>
-                </TouchableRipple>
-              </ScrollView>
-            )}
-
-            {activeSubPanel === 'export' && exportStep === 'sheets-progress' && (
-              <View style={styles.sheetsProgressContent}>
-                {sheetsSteps.map(step => (
-                  <View key={step.id} style={styles.sheetsProgressStep}>
-                    <View style={styles.sheetsProgressStepIcon}>
-                      {step.status === 'pending' && <Ionicons name="ellipse-outline" size={22} color={colors.mutedText} />}
-                      {step.status === 'in_progress' && <ActivityIndicator size="small" color={colors.primary} />}
-                      {step.status === 'completed' && <Ionicons name="checkmark-circle" size={22} color="#4caf50" />}
-                      {step.status === 'error' && <Ionicons name="close-circle" size={22} color={colors.destructive} />}
-                    </View>
-                    <Text style={[
-                      styles.sheetsProgressStepLabel,
-                      step.status === 'error' ? { color: colors.destructive } :
-                        { color: step.status === 'pending' ? colors.mutedText : colors.text },
-                    ]}>
-                      {step.label}
-                    </Text>
-                  </View>
-                ))}
-                {sheetsError && <Text style={[styles.sheetsErrorText, { color: colors.destructive }]}>{sheetsError}</Text>}
-                {sheetsSuccessUrl && (
-                  <TouchableOpacity
-                    onPress={() => Linking.openURL(sheetsSuccessUrl)}
-                    style={[styles.sheetsOpenButton, { backgroundColor: colors.primary }]}
-                  >
-                    <Ionicons name="open-outline" size={16} color="#fff" />
-                    <Text style={styles.sheetsOpenButtonText}>
-                      {t('google_sheets_open') || 'Open in Google Sheets'}
-                    </Text>
-                  </TouchableOpacity>
-                )}
-              </View>
+            {activeSubPanel === 'export' && (
+              <ExportPanel
+                step={exportStep}
+                onPushStep={pushStep}
+                onPopToRoot={popToRootStep}
+                onBusyChange={setPanelBusy}
+                onRegisterBack={registerPanelBack}
+                bottomInset={scrollBottomInset}
+              />
             )}
 
             {activeSubPanel === 'reset' && (
-              <ResetPanel onDone={handleResetDone} onBusyChange={setResetInProgress} />
+              <ResetPanel onDone={handleResetDone} onBusyChange={setPanelBusy} />
             )}
 
-            {activeSubPanel === 'import' && importStep === 'source' && (
-              <ScrollView style={styles.listContainer} contentContainerStyle={{ paddingBottom: scrollBottomInset }}>
-                <TouchableRipple onPress={() => handleImportSourceSelect('file')} style={styles.listItem}>
-                  <View style={styles.listItemContent}>
-                    <View style={styles.formatItemRow}>
-                      <Ionicons name="logo-google" size={24} color={colors.text} />
-                      <View style={styles.formatTextContainer}>
-                        <Text style={[styles.listItemText, { color: colors.text }]}>
-                          {t('import_from_file') || 'From Google Drive'}
-                        </Text>
-                        <Text style={[styles.formatDescription, { color: colors.mutedText }]}>
-                          {t('import_from_file_description') || 'Pick a backup file from Google Drive'}
-                        </Text>
-                      </View>
-                    </View>
-                    <Ionicons name="chevron-forward" size={20} color={colors.mutedText} />
-                  </View>
-                </TouchableRipple>
-
-                <TouchableRipple onPress={() => handleImportSourceSelect('local')} style={styles.listItem}>
-                  <View style={styles.listItemContent}>
-                    <View style={styles.formatItemRow}>
-                      <Ionicons name="archive-outline" size={24} color={colors.text} />
-                      <View style={styles.formatTextContainer}>
-                        <Text style={[styles.listItemText, { color: colors.text }]}>
-                          {t('import_from_local') || 'From local backup'}
-                        </Text>
-                        <Text style={[styles.formatDescription, { color: colors.mutedText }]}>
-                          {t('import_from_local_description') || 'Restore from a daily or weekly automatic backup'}
-                        </Text>
-                      </View>
-                    </View>
-                    <Ionicons name="chevron-forward" size={20} color={colors.mutedText} />
-                  </View>
-                </TouchableRipple>
-
-                <TouchableRipple
-                  onPress={handleGoogleSheetsImport}
-                  style={styles.listItem}
-                  testID="settings-import-google-sheets"
-                >
-                  <View style={styles.listItemContent}>
-                    <View style={styles.formatItemRow}>
-                      <Ionicons name="logo-google" size={24} color={colors.text} />
-                      <View style={styles.formatTextContainer}>
-                        <Text style={[styles.listItemText, { color: colors.text }]}>
-                          {t('import_from_google_sheets') || 'From Google Sheets'}
-                        </Text>
-                        <Text style={[styles.formatDescription, { color: colors.mutedText }]}>
-                          {t('import_from_google_sheets_description') || 'Import from your Penny spreadsheet'}
-                        </Text>
-                      </View>
-                    </View>
-                    <Ionicons name="chevron-forward" size={20} color={colors.mutedText} />
-                  </View>
-                </TouchableRipple>
-                {sheetsImportError && importStep === 'source' && (
-                  <View style={styles.sheetsSetupCta}>
-                    <Text testID="settings-import-no-spreadsheet" style={[styles.sheetsImportErrorInline, { color: colors.destructive }]}>
-                      {sheetsImportError}
-                    </Text>
-                    <TouchableRipple
-                      testID="settings-import-setup-export"
-                      onPress={handleSetupSheetsExport}
-                      style={[styles.sheetsSetupCtaButton, { borderColor: colors.primary }]}
-                    >
-                      <View style={styles.sheetsSetupCtaRow}>
-                        <Ionicons name="cloud-upload-outline" size={18} color={colors.primary} />
-                        <Text style={[styles.sheetsSetupCtaText, { color: colors.primary }]}>
-                          {t('google_sheets_setup_export_now') || 'Export now to set up'}
-                        </Text>
-                      </View>
-                    </TouchableRipple>
-                  </View>
-                )}
-              </ScrollView>
-            )}
-
-            {activeSubPanel === 'import' && importStep === 'local-list' && (
-              backupsLoading ? (
-                <EmptyState message={'Loading...'} style={styles.emptyContainer} />
-              ) : (
-                <FlatList
-                  data={storedBackups}
-                  keyExtractor={(item) => item.uri}
-                  renderItem={renderBackupItem}
-                  style={styles.flexList}
-                  contentContainerStyle={[
-                    storedBackups.length === 0 && styles.emptyContainer,
-                    { paddingBottom: scrollBottomInset },
-                  ]}
-                  ListEmptyComponent={
-                    <EmptyState message={t('local_backups_empty') || 'No local backups yet'} />
-                  }
-                />
-              )
-            )}
-
-            {activeSubPanel === 'import' && importStep === 'confirm-file' && (
-              <View style={styles.confirmContent}>
-                <Ionicons name="warning-outline" size={48} color={colors.destructive} style={styles.confirmWarningIcon} />
-                <Text style={[styles.confirmText, { color: colors.text }]}>
-                  {t('restore_confirm') || 'Are you sure you want to restore from backup? This will replace all current data.'}
-                </Text>
-                <TouchableRipple testID="confirm-import-file-btn" onPress={confirmImportBackup} style={[styles.confirmButtonDestructive, { backgroundColor: colors.destructive }]}>
-                  <Text style={styles.confirmButtonText}>{t('restore_database') || 'Restore'}</Text>
-                </TouchableRipple>
-              </View>
-            )}
-
-            {activeSubPanel === 'import' && importStep === 'confirm-local' && (
-              <View style={styles.confirmContent}>
-                <Ionicons name="warning-outline" size={48} color={colors.destructive} style={styles.confirmWarningIcon} />
-                {importSelectedBackup && (
-                  <Text style={[styles.confirmText, { color: colors.mutedText }]}>
-                    {formatBackupLabel(importSelectedBackup.filename)}
-                  </Text>
-                )}
-                <Text style={[styles.confirmText, { color: colors.text }]}>
-                  {t('restore_confirm') || 'Are you sure you want to restore from backup? This will replace all current data.'}
-                </Text>
-                <TouchableRipple onPress={confirmRestoreLocalBackup} style={[styles.confirmButtonDestructive, { backgroundColor: colors.destructive }]}>
-                  <Text style={styles.confirmButtonText}>{t('restore_database') || 'Restore'}</Text>
-                </TouchableRipple>
-              </View>
-            )}
-
-            {activeSubPanel === 'import' && importStep === 'sheets-progress' && (
-              <View style={styles.sheetsProgressContent}>
-                {sheetsImportSteps.map(step => (
-                  <View key={step.id} style={styles.sheetsProgressStep}>
-                    <View style={styles.sheetsProgressStepIcon}>
-                      {step.status === 'pending' && <Ionicons name="ellipse-outline" size={22} color={colors.mutedText} />}
-                      {step.status === 'in_progress' && <ActivityIndicator size="small" color={colors.primary} />}
-                      {step.status === 'completed' && <Ionicons name="checkmark-circle" size={22} color="#4caf50" />}
-                      {step.status === 'error' && <Ionicons name="close-circle" size={22} color={colors.destructive} />}
-                    </View>
-                    <Text style={[
-                      styles.sheetsProgressStepLabel,
-                      step.status === 'error' ? { color: colors.destructive } :
-                        { color: step.status === 'pending' ? colors.mutedText : colors.text },
-                    ]}>
-                      {step.label}
-                    </Text>
-                  </View>
-                ))}
-                {sheetsImportError && <Text style={[styles.sheetsErrorText, { color: colors.destructive }]}>{sheetsImportError}</Text>}
-              </View>
+            {activeSubPanel === 'import' && (
+              <ImportPanel
+                step={importStep}
+                onPushStep={pushStep}
+                onPopToRoot={popToRootStep}
+                onBusyChange={setPanelBusy}
+                onRegisterBack={registerPanelBack}
+                onRegisterRefresh={registerPanelRefresh}
+                onDone={closeSubPanel}
+                onSetUpSheetsExport={handleSetupSheetsExport}
+                bottomInset={scrollBottomInset}
+              />
             )}
 
             {activeSubPanel === 'logs' && (
@@ -1448,31 +690,15 @@ export default function SettingsScreen({ setSubPanelActive }) {
             )}
 
             {activeSubPanel === 'notificationProcessing' && (
-              <View style={styles.updatePanelWrapper}>
-                {notificationView === 'filters' ? (
-                  <NotificationFiltersContentPanel bottomInset={scrollBottomInset} />
-                ) : notificationView === 'bindings' ? (
-                  <NotificationBindingsContentPanel bottomInset={scrollBottomInset} />
-                ) : notificationView === 'templates' ? (
-                  <NotificationTemplatesContentPanel
-                    onEdit={handleEditTemplate}
-                    bottomInset={scrollBottomInset}
-                  />
-                ) : notificationView === 'templateEditor' ? (
-                  <NotificationTemplateEditorPanel
-                    notification={templateDraft?.notification}
-                    template={templateDraft?.template}
-                    recentNotifications={templateDraft?.recent || []}
-                    onDone={handleTemplateEditorDone}
-                    bottomInset={scrollBottomInset}
-                  />
-                ) : (
-                  <NotificationProcessingContentPanel
-                    onCreateTemplate={handleCreateTemplate}
-                    bottomInset={scrollBottomInset}
-                  />
-                )}
-              </View>
+              <NotificationPanel
+                step={notificationView}
+                parentStep={panelStack.parentStep}
+                onPushStep={pushStep}
+                onPopStep={popStep}
+                onReplaceStep={replaceStep}
+                onRegisterBack={registerPanelBack}
+                bottomInset={scrollBottomInset}
+              />
             )}
           </View>
         </Animated.View>
@@ -1699,81 +925,12 @@ const styles = StyleSheet.create({
     justifyContent: 'center',
     width: 40,
   },
-  backupActionButton: {
-    padding: 6,
-  },
-  backupConfirmButton: {
-    paddingHorizontal: 10,
-    paddingVertical: 6,
-  },
-  backupConfirmButtonDestructiveText: {
-    fontSize: FONT_SIZE.md,
-    fontWeight: '600',
-  },
-  backupConfirmButtonText: {
-    fontSize: FONT_SIZE.md,
-    fontWeight: '600',
-  },
-  backupItem: {
-    alignItems: 'center',
-    borderBottomWidth: StyleSheet.hairlineWidth,
-    flexDirection: 'row',
-    justifyContent: 'space-between',
-    paddingHorizontal: HORIZONTAL_PADDING,
-    paddingVertical: SPACING.md,
-  },
-  backupItemActions: {
-    alignItems: 'center',
-    flexDirection: 'row',
-    gap: SPACING.xs,
-  },
-  backupItemLabel: {
-    fontSize: 15,
-  },
-  backupItemLeft: {
-    alignItems: 'center',
-    flex: 1,
-    flexDirection: 'row',
-    gap: SPACING.md,
-  },
-  backupItemMeta: {
-    fontSize: FONT_SIZE.sm,
-    marginTop: 2,
-  },
-  backupItemText: {
-    flex: 1,
-  },
-  confirmButtonDestructive: CONFIRM_BUTTON_DESTRUCTIVE,
-  confirmButtonText: CONFIRM_BUTTON_TEXT,
-  confirmContent: CONFIRM_CONTENT,
-  confirmText: CONFIRM_TEXT,
-  confirmWarningIcon: CONFIRM_WARNING_ICON,
   container: {
     flex: 1,
   },
   divider: {
     marginVertical: SPACING.xs,
   },
-  emptyContainer: EMPTY_CONTAINER,
-  flexList: FLEX_LIST,
-  formatDescription: {
-    fontSize: FONT_SIZE.sm,
-    marginTop: SPACING.xs,
-  },
-  formatItemRow: {
-    alignItems: 'center',
-    flex: 1,
-    flexDirection: 'row',
-    gap: SPACING.md,
-  },
-  formatTextContainer: {
-    flex: 1,
-    flexShrink: 1,
-  },
-  listContainer: LIST_CONTAINER,
-  listItem: LIST_ITEM,
-  listItemContent: LIST_ITEM_CONTENT,
-  listItemText: LIST_ITEM_TEXT,
   resetSpacer: {
     height: SPACING.sm,
   },
@@ -1814,73 +971,6 @@ const styles = StyleSheet.create({
   settingsRowValue: {
     fontSize: 13,
     marginTop: 2,
-  },
-  sheetsErrorText: {
-    fontSize: FONT_SIZE.md,
-    lineHeight: 20,
-    marginTop: SPACING.lg,
-    textAlign: 'center',
-  },
-  sheetsImportErrorInline: {
-    fontSize: FONT_SIZE.md,
-    lineHeight: 20,
-    marginBottom: 8,
-    marginHorizontal: 16,
-  },
-  sheetsOpenButton: {
-    alignItems: 'center',
-    borderRadius: BORDER_RADIUS.md,
-    flexDirection: 'row',
-    gap: SPACING.sm,
-    justifyContent: 'center',
-    marginTop: SPACING.xl,
-    paddingHorizontal: SPACING.xl,
-    paddingVertical: SPACING.md,
-  },
-  sheetsOpenButtonText: {
-    color: '#fff',
-    fontSize: FONT_SIZE.base,
-    fontWeight: '600',
-  },
-  sheetsProgressContent: {
-    flex: 1,
-    paddingHorizontal: HORIZONTAL_PADDING,
-    paddingTop: SPACING.lg,
-  },
-  sheetsProgressStep: {
-    alignItems: 'center',
-    flexDirection: 'row',
-    gap: SPACING.md,
-    paddingVertical: SPACING.md,
-  },
-  sheetsProgressStepIcon: {
-    alignItems: 'center',
-    justifyContent: 'center',
-    width: 24,
-  },
-  sheetsProgressStepLabel: {
-    flex: 1,
-    fontSize: 15,
-  },
-  sheetsSetupCta: {
-    marginTop: SPACING.sm,
-  },
-  sheetsSetupCtaButton: {
-    alignSelf: 'flex-start',
-    borderRadius: BORDER_RADIUS.md,
-    borderWidth: 1,
-    marginHorizontal: 16,
-    paddingHorizontal: SPACING.lg,
-    paddingVertical: SPACING.sm,
-  },
-  sheetsSetupCtaRow: {
-    alignItems: 'center',
-    flexDirection: 'row',
-    gap: SPACING.sm,
-  },
-  sheetsSetupCtaText: {
-    fontSize: FONT_SIZE.md,
-    fontWeight: '600',
   },
   subPanelBody: {
     flex: 1,

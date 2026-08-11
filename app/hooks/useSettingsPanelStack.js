@@ -16,9 +16,12 @@ import { useCallback, useMemo, useReducer } from 'react';
 // A stack answers all four questions from one place: the top entry is where the
 // user is, and `length > 1` means there is somewhere to go back to.
 //
-// Entries are `{ panel, step }`. `panel` is constant for the whole stack — a
-// subpanel is only ever swapped wholesale, never stacked on another panel — and
-// `step` is the panel's nested view, or `null` for panels that have none.
+// Entries are `{ panel, step, params }`. `panel` is constant for the whole
+// stack — a subpanel is only ever swapped wholesale, never stacked on another
+// panel — and `step` is the panel's nested view, or `null` for panels that have
+// none. `params` carries whatever else describes *this* visit to the step; the
+// header reads it for a title that a step name alone cannot give (the template
+// editor is "New template" or "Edit template" depending on how it was opened).
 
 // The step each panel starts on. A panel absent from this map has no nested
 // steps and sits at `step: null` for its whole life.
@@ -30,7 +33,7 @@ export const PANEL_ROOT_STEP = {
 
 export const EMPTY_STACK = [];
 
-const rootEntry = (panel) => ({ panel, step: PANEL_ROOT_STEP[panel] ?? null });
+const rootEntry = (panel) => ({ panel, step: PANEL_ROOT_STEP[panel] ?? null, params: null });
 
 export function settingsPanelStackReducer(stack, action) {
   switch (action.type) {
@@ -48,7 +51,7 @@ export function settingsPanelStackReducer(stack, action) {
   // Step into a nested view of the current panel.
   case 'push':
     if (stack.length === 0) return stack;
-    return [...stack, { panel: stack[stack.length - 1].panel, step: action.step }];
+    return [...stack, { panel: stack[stack.length - 1].panel, step: action.step, params: action.params ?? null }];
 
   // Replace the current view without deepening the stack — the step the user
   // lands on takes the place of the one they came from.
@@ -56,7 +59,7 @@ export function settingsPanelStackReducer(stack, action) {
     if (stack.length === 0) return stack;
     return [
       ...stack.slice(0, -1),
-      { panel: stack[stack.length - 1].panel, step: action.step },
+      { panel: stack[stack.length - 1].panel, step: action.step, params: action.params ?? null },
     ];
 
   // Step back one level. Popping the last entry is not this reducer's call:
@@ -83,6 +86,7 @@ export function settingsPanelStackReducer(stack, action) {
 export const selectPanel = (stack) => (stack.length ? stack[stack.length - 1].panel : null);
 export const selectStep = (stack) => (stack.length ? stack[stack.length - 1].step : null);
 export const selectParentStep = (stack) => (stack.length > 1 ? stack[stack.length - 2].step : null);
+export const selectParams = (stack) => (stack.length ? stack[stack.length - 1].params : null);
 
 // Whether a back gesture should step up within the panel rather than dismiss it.
 export const selectCanStepBack = (stack) => stack.length > 1;
@@ -99,8 +103,8 @@ export default function useSettingsPanelStack() {
 
   const open = useCallback((panel) => dispatch({ type: 'open', panel }), []);
   const swapPanel = useCallback((panel) => dispatch({ type: 'swapPanel', panel }), []);
-  const push = useCallback((step) => dispatch({ type: 'push', step }), []);
-  const replace = useCallback((step) => dispatch({ type: 'replace', step }), []);
+  const push = useCallback((step, params) => dispatch({ type: 'push', step, params }), []);
+  const replace = useCallback((step, params) => dispatch({ type: 'replace', step, params }), []);
   const pop = useCallback(() => dispatch({ type: 'pop' }), []);
   const popToRoot = useCallback(() => dispatch({ type: 'popToRoot' }), []);
   const close = useCallback(() => dispatch({ type: 'close' }), []);
@@ -109,6 +113,7 @@ export default function useSettingsPanelStack() {
   const step = selectStep(stack);
   const canStepBack = selectCanStepBack(stack);
   const parentStep = selectParentStep(stack);
+  const params = selectParams(stack);
 
   const stepOf = useCallback((target) => selectStepOf(stack, target), [stack]);
 
@@ -116,6 +121,7 @@ export default function useSettingsPanelStack() {
     stack,
     panel,
     step,
+    params,
     parentStep,
     canStepBack,
     stepOf,
@@ -126,5 +132,5 @@ export default function useSettingsPanelStack() {
     pop,
     popToRoot,
     close,
-  }), [stack, panel, step, parentStep, canStepBack, stepOf, open, swapPanel, push, replace, pop, popToRoot, close]);
+  }), [stack, panel, step, params, parentStep, canStepBack, stepOf, open, swapPanel, push, replace, pop, popToRoot, close]);
 }

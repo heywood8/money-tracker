@@ -75,6 +75,26 @@ export const CONFIRM_BUTTON_TEXT = {
   textAlign: 'center',
 };
 
+// A settings-list row that carries an icon, a title and a description line —
+// the shape the export formats and the import sources both use. Sits inside
+// LIST_ITEM_CONTENT, left of whatever trailing affordance the row shows.
+export const FORMAT_ITEM_ROW = {
+  alignItems: 'center',
+  flex: 1,
+  flexDirection: 'row',
+  gap: SPACING.md,
+};
+
+export const FORMAT_TEXT_CONTAINER = {
+  flex: 1,
+  flexShrink: 1,
+};
+
+export const FORMAT_DESCRIPTION = {
+  fontSize: FONT_SIZE.sm,
+  marginTop: SPACING.xs,
+};
+
 // Convenience bundle for a panel that is nothing but a settings list.
 export const listStyles = StyleSheet.create({
   listContainer: LIST_CONTAINER,
