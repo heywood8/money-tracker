@@ -1,5 +1,12 @@
 # Changelog
 
+## [0.266.0](https://github.com/heywood8/money-tracker/compare/penny-v0.265.4...penny-v0.266.0) (2026-08-11)
+
+
+### Features
+
+* **budgets:** draw the month's totals as a flow bar ([#1594](https://github.com/heywood8/money-tracker/issues/1594)) ([333543b](https://github.com/heywood8/money-tracker/commit/333543bd2739f14f8fb757756262b0a7af8c9e66))
+
 ## [0.265.4](https://github.com/heywood8/money-tracker/compare/penny-v0.265.3...penny-v0.265.4) (2026-08-10)
 
 
