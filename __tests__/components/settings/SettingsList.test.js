@@ -14,6 +14,7 @@ const mockSetHideBalances = jest.fn();
 const mockSetAttachLocation = jest.fn();
 const mockSetShowAccountsTab = jest.fn();
 const mockSetShowBudgetTab = jest.fn();
+const mockSetShowQuickAddPanel = jest.fn();
 const mockAuthenticate = jest.fn();
 const mockEnsureLocationPermission = jest.fn();
 const mockShowDialog = jest.fn();
@@ -23,6 +24,7 @@ const display = {
   attachLocation: false,
   showAccountsTab: false,
   showBudgetTab: true,
+  showQuickAddPanel: true,
 };
 const themeState = { colorScheme: 'light' };
 const downloadState = { isDownloading: false, downloadProgress: 0, downloadPhase: null };
@@ -54,6 +56,8 @@ jest.mock('../../../app/contexts/DisplaySettingsContext', () => ({
     setShowAccountsTab: mockSetShowAccountsTab,
     showBudgetTab: display.showBudgetTab,
     setShowBudgetTab: mockSetShowBudgetTab,
+    showQuickAddPanel: display.showQuickAddPanel,
+    setShowQuickAddPanel: mockSetShowQuickAddPanel,
   }),
 }));
 jest.mock('../../../app/contexts/UpdateDownloadContext', () => ({
@@ -88,6 +92,7 @@ describe('SettingsList', () => {
     display.attachLocation = false;
     display.showAccountsTab = false;
     display.showBudgetTab = true;
+    display.showQuickAddPanel = true;
     themeState.colorScheme = 'light';
     downloadState.isDownloading = false;
     downloadState.downloadProgress = 0;
@@ -141,6 +146,21 @@ describe('SettingsList', () => {
       const { getByTestId } = await setup();
       await act(async () => { fireEvent.press(getByTestId('settings-show-budget-tab-row')); });
       expect(mockSetShowBudgetTab).toHaveBeenCalledWith(false);
+    });
+  });
+
+  describe('quick-add panel', () => {
+    it('collapses the panel behind the + button', async () => {
+      const { getByTestId } = await setup();
+      await act(async () => { fireEvent.press(getByTestId('settings-show-quickadd-panel-row')); });
+      expect(mockSetShowQuickAddPanel).toHaveBeenCalledWith(false);
+    });
+
+    it('pins the panel open again', async () => {
+      display.showQuickAddPanel = false;
+      const { getByTestId } = await setup();
+      await act(async () => { fireEvent.press(getByTestId('settings-show-quickadd-panel-row')); });
+      expect(mockSetShowQuickAddPanel).toHaveBeenCalledWith(true);
     });
   });
 

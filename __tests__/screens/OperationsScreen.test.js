@@ -112,6 +112,8 @@ jest.mock('../../app/components/operations/OperationsList', () => {
       scrollToOffset: jest.fn(),
       scrollToIndex: jest.fn(),
     }));
+    // The header (the quick-add block) is rendered as a child so tests can reach
+    // the form the way the list does, instead of it disappearing into the mock.
     return React.createElement('OperationsList', {
       testID: 'operations-list',
       initialLoading: props.initialLoading,
@@ -121,7 +123,7 @@ jest.mock('../../app/components/operations/OperationsList', () => {
       onContentSizeChange: props.onContentSizeChange,
       onScrollToIndexFailed: props.onScrollToIndexFailed,
       onLoadMore: props.onLoadMore,
-    });
+    }, props.headerComponent);
   });
 });
 
@@ -2592,6 +2594,180 @@ describe('OperationsScreen', () => {
       });
 
       expect(refresh).not.toHaveBeenCalled();
+    });
+  });
+
+  // The "Show Quick add panel on operations screen" setting. On (the default and
+  // the historical behaviour) the form is pinned to the top of the list and there
+  // is no + button at all; off, the form is summoned by the button for one entry
+  // and folds itself away once that entry lands.
+  describe('Quick-add panel setting', () => {
+    const { act, fireEvent } = require('@testing-library/react-native');
+    const { useDisplaySettings } = require('../../app/contexts/DisplaySettingsContext');
+    const { useOperationsActions } = require('../../app/contexts/OperationsActionsContext');
+    const { useLocalization } = require('../../app/contexts/LocalizationContext');
+
+    const { useSearch } = require('../../app/contexts/SearchContext');
+    const searchClosed = () => ({
+      searchMode: 'collapsed',
+      filtersExpanded: false,
+      openSearch: jest.fn(),
+      closeSearch: jest.fn(),
+      reopenSearch: jest.fn(),
+      toggleFilters: jest.fn(),
+      registerSearchHandler: jest.fn(),
+    });
+
+    const setPanelSetting = (showQuickAddPanel) => {
+      useDisplaySettings.mockReturnValue({ attachLocation: false, showQuickAddPanel });
+      // An earlier test in this file may have left search open, which collapses
+      // the panel and hides the button regardless of the setting, or left a
+      // prefixing `t` behind, which would show up in the button's label.
+      useSearch.mockReturnValue(searchClosed());
+      useLocalization.mockReturnValue({ t: (key) => key, language: 'en' });
+    };
+
+    afterEach(() => {
+      // mockReturnValue survives clearAllMocks, so hand the shared mocks back.
+      useDisplaySettings.mockReturnValue({ attachLocation: false });
+      useSearch.mockReturnValue({ registerSearchHandler: jest.fn(), openSearch: jest.fn() });
+      useLocalization.mockReturnValue({ t: (key) => key, language: 'en' });
+      require('../../app/hooks/usePendingOperationSuggestions').default.mockReturnValue({
+        suggestions: [],
+        committingIds: {},
+        saveErrors: {},
+        choices: {},
+        setChoice: jest.fn(),
+        reload: jest.fn(),
+        refresh: jest.fn(),
+        accept: jest.fn(),
+        dismiss: jest.fn(),
+      });
+    });
+
+    it('shows no + button while the panel is pinned open', async () => {
+      const OperationsScreen = require('../../app/screens/OperationsScreen').default;
+      setPanelSetting(true);
+
+      const { queryByTestId } = await render(<OperationsScreen />);
+
+      expect(queryByTestId('quick-add-fab')).toBeNull();
+    });
+
+    it('shows the + button once the panel is collapsed', async () => {
+      const OperationsScreen = require('../../app/screens/OperationsScreen').default;
+      setPanelSetting(false);
+
+      const { getByTestId } = await render(<OperationsScreen />);
+
+      expect(getByTestId('quick-add-fab')).toBeTruthy();
+    });
+
+    it('keeps the historical behaviour when the setting is absent', async () => {
+      const OperationsScreen = require('../../app/screens/OperationsScreen').default;
+      // e.g. rendered without a DisplaySettings provider.
+      setPanelSetting(undefined);
+
+      const { queryByTestId } = await render(<OperationsScreen />);
+
+      expect(queryByTestId('quick-add-fab')).toBeNull();
+    });
+
+    it('the button says what the next tap does', async () => {
+      const OperationsScreen = require('../../app/screens/OperationsScreen').default;
+      setPanelSetting(false);
+
+      const { getByTestId } = await render(<OperationsScreen />);
+      expect(getByTestId('quick-add-fab').props.accessibilityLabel).toBe('add_operation');
+
+      await act(async () => { fireEvent.press(getByTestId('quick-add-fab')); });
+      expect(getByTestId('quick-add-fab').props.accessibilityLabel).toBe('close');
+
+      await act(async () => { fireEvent.press(getByTestId('quick-add-fab')); });
+      expect(getByTestId('quick-add-fab').props.accessibilityLabel).toBe('add_operation');
+    });
+
+    it('folds the summoned form away once the operation lands', async () => {
+      const OperationsScreen = require('../../app/screens/OperationsScreen').default;
+      setPanelSetting(false);
+      useOperationsActions.mockReturnValue({
+        deleteOperation: jest.fn(),
+        addOperation: jest.fn(() => Promise.resolve({ id: 'op-1', description: null })),
+        updateOperation: jest.fn(),
+        validateOperation: jest.fn(() => null),
+        loadMoreOperations: jest.fn(),
+        loadInitialOperations: jest.fn(() => Promise.resolve()),
+        jumpToDate: jest.fn(),
+        setSearchText: jest.fn(),
+        updateSearchFilters: jest.fn(),
+      });
+
+      const { getByTestId } = await render(<OperationsScreen />);
+      await act(async () => { fireEvent.press(getByTestId('quick-add-fab')); });
+      expect(getByTestId('quick-add-fab').props.accessibilityLabel).toBe('close');
+
+      await act(async () => {
+        await getByTestId('quick-add-form').props.handleQuickAdd();
+      });
+
+      expect(getByTestId('quick-add-fab').props.accessibilityLabel).toBe('add_operation');
+    });
+
+    it('keeps a pending suggestion deck out of the collapsed panel', async () => {
+      const OperationsScreen = require('../../app/screens/OperationsScreen').default;
+      const usePendingOperationSuggestions = require('../../app/hooks/usePendingOperationSuggestions').default;
+      setPanelSetting(false);
+      usePendingOperationSuggestions.mockReturnValue({
+        suggestions: [{ id: 's-1', amount: '10', currency: 'USD', type: 'expense', merchant: 'Shop' }],
+        committingIds: {},
+        saveErrors: {},
+        choices: {},
+        setChoice: jest.fn(),
+        reload: jest.fn(),
+        refresh: jest.fn(),
+        accept: jest.fn(),
+        dismiss: jest.fn(),
+      });
+
+      // The deck is laid over the form and clipped with it, so it holds the
+      // panel open on its own — and takes the button's job while it is up.
+      const { queryByTestId } = await render(<OperationsScreen />);
+
+      expect(queryByTestId('quick-add-fab')).toBeNull();
+    });
+
+    it('does not reopen a summoned form behind search', async () => {
+      const OperationsScreen = require('../../app/screens/OperationsScreen').default;
+      setPanelSetting(false);
+
+      const { getByTestId, rerender } = await render(<OperationsScreen />);
+      await act(async () => { fireEvent.press(getByTestId('quick-add-fab')); });
+      expect(getByTestId('quick-add-fab').props.accessibilityLabel).toBe('close');
+
+      useSearch.mockReturnValue({ ...searchClosed(), searchMode: 'open' });
+      await act(async () => { rerender(<OperationsScreen />); });
+      useSearch.mockReturnValue(searchClosed());
+      await act(async () => { rerender(<OperationsScreen />); });
+
+      expect(getByTestId('quick-add-fab').props.accessibilityLabel).toBe('add_operation');
+    });
+
+    it('hides the button while search owns the screen', async () => {
+      const OperationsScreen = require('../../app/screens/OperationsScreen').default;
+      setPanelSetting(false);
+      useSearch.mockReturnValue({
+        searchMode: 'open',
+        filtersExpanded: false,
+        openSearch: jest.fn(),
+        closeSearch: jest.fn(),
+        reopenSearch: jest.fn(),
+        toggleFilters: jest.fn(),
+        registerSearchHandler: jest.fn(),
+      });
+
+      const { queryByTestId } = await render(<OperationsScreen />);
+
+      expect(queryByTestId('quick-add-fab')).toBeNull();
     });
   });
 });

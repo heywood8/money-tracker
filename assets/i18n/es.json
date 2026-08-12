@@ -16,6 +16,8 @@
   "show_accounts_in_menu_hint": "Añade una pestaña Cuentas a la navegación inferior",
   "show_budget_in_menu": "Mostrar Presupuesto en el menú principal",
   "show_budget_in_menu_hint": "Mostrar la pestaña Presupuesto (presupuestos y planificados) en la navegación inferior",
+  "show_quickadd_panel": "Mostrar el panel de añadido rápido en la pantalla de operaciones",
+  "show_quickadd_panel_hint": "Mantiene el formulario abierto; si se desactiva, se abre con el botón +",
   "attach_location": "Adjuntar ubicación a las operaciones",
   "attach_location_hint": "Sugerir etiquetas que usaste cerca",
   "getting_location": "Obteniendo ubicación…",

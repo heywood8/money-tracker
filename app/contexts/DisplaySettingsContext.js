@@ -18,6 +18,10 @@ export const DisplaySettingsProvider = ({ children }) => {
   // Defaults ON (unlike Accounts) because budgets are reachable from nowhere
   // else — hiding it is an explicit opt-out.
   const [showBudgetTab, setShowBudgetTabState] = useState(true);
+  // Global toggle: keep the quick-add panel pinned open on the Operations
+  // screen. Defaults ON — that is how the screen has always behaved; turning it
+  // off collapses the panel until the + button asks for it.
+  const [showQuickAddPanel, setShowQuickAddPanelState] = useState(true);
 
   useEffect(() => {
     getPreference(PREF_KEYS.HIDE_BALANCES, 'false').then(stored => {
@@ -43,6 +47,9 @@ export const DisplaySettingsProvider = ({ children }) => {
     getPreference(PREF_KEYS.SHOW_BUDGET_TAB, 'true').then(stored => {
       setShowBudgetTabState(stored === 'true');
     });
+    getPreference(PREF_KEYS.SHOW_QUICKADD_PANEL, 'true').then(stored => {
+      setShowQuickAddPanelState(stored === 'true');
+    });
   }, []);
 
   const setHideBalances = useCallback(async (value) => {
@@ -65,9 +72,14 @@ export const DisplaySettingsProvider = ({ children }) => {
     await setPreference(PREF_KEYS.SHOW_BUDGET_TAB, value ? 'true' : 'false');
   }, []);
 
+  const setShowQuickAddPanel = useCallback(async (value) => {
+    setShowQuickAddPanelState(value);
+    await setPreference(PREF_KEYS.SHOW_QUICKADD_PANEL, value ? 'true' : 'false');
+  }, []);
+
   const ctxValue = useMemo(
-    () => ({ hideBalances, setHideBalances, attachLocation, setAttachLocation, showAccountsTab, setShowAccountsTab, showBudgetTab, setShowBudgetTab }),
-    [hideBalances, setHideBalances, attachLocation, setAttachLocation, showAccountsTab, setShowAccountsTab, showBudgetTab, setShowBudgetTab],
+    () => ({ hideBalances, setHideBalances, attachLocation, setAttachLocation, showAccountsTab, setShowAccountsTab, showBudgetTab, setShowBudgetTab, showQuickAddPanel, setShowQuickAddPanel }),
+    [hideBalances, setHideBalances, attachLocation, setAttachLocation, showAccountsTab, setShowAccountsTab, showBudgetTab, setShowBudgetTab, showQuickAddPanel, setShowQuickAddPanel],
   );
 
   return (

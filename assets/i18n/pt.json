@@ -16,6 +16,8 @@
   "show_accounts_in_menu_hint": "Adiciona uma aba Contas à navegação inferior",
   "show_budget_in_menu": "Mostrar Orçamento no menu principal",
   "show_budget_in_menu_hint": "Mostra a aba Orçamento (orçamentos e planejados) na navegação inferior",
+  "show_quickadd_panel": "Mostrar o painel de adição rápida na tela de operações",
+  "show_quickadd_panel_hint": "Mantém o formulário aberto; se desativado, abre pelo botão +",
   "attach_location": "Anexar localização às operações",
   "attach_location_hint": "Sugerir etiquetas que você usou por perto",
   "getting_location": "Obtendo localização…",

@@ -16,6 +16,9 @@ export const PREF_KEYS = {
   // Global toggle: show the Budget tab in the bottom navigation. Defaults on
   // (unlike Accounts) because budgets are reachable from nowhere else.
   SHOW_BUDGET_TAB: 'show_budget_tab',
+  // Global toggle: keep the quick-add panel permanently open at the top of the
+  // Operations list. Defaults on — off collapses it behind the + button.
+  SHOW_QUICKADD_PANEL: 'show_quickadd_panel',
   // Which budget envelopes (line groups) are unfolded on the Budgets tab, as a
   // JSON array of group ids. Absent means every envelope is folded, which is
   // the default a plan opens in.
