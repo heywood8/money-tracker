@@ -1,5 +1,12 @@
 # Changelog
 
+## [0.269.0](https://github.com/heywood8/money-tracker/compare/penny-v0.268.0...penny-v0.269.0) (2026-08-12)
+
+
+### Features
+
+* **notifications:** alert on auto-added operations and poll every minute ([#1609](https://github.com/heywood8/money-tracker/issues/1609)) ([e1c82a4](https://github.com/heywood8/money-tracker/commit/e1c82a425f12a8e69e8f58b4cbf891604e98e3ec))
+
 ## [0.268.0](https://github.com/heywood8/money-tracker/compare/penny-v0.267.2...penny-v0.268.0) (2026-08-12)
 
 
