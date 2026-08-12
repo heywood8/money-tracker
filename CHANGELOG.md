@@ -1,5 +1,12 @@
 # Changelog
 
+## [0.268.0](https://github.com/heywood8/money-tracker/compare/penny-v0.267.2...penny-v0.268.0) (2026-08-12)
+
+
+### Features
+
+* **settings:** group preferences into Appearance and Privacy panels ([#1607](https://github.com/heywood8/money-tracker/issues/1607)) ([c7687c2](https://github.com/heywood8/money-tracker/commit/c7687c2ca4d5435e9dd3ce4232e08e58aea26a48))
+
 ## [0.267.2](https://github.com/heywood8/money-tracker/compare/penny-v0.267.1...penny-v0.267.2) (2026-08-12)
 
 
