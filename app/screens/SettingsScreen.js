@@ -3,133 +3,28 @@ import PropTypes from 'prop-types';
 // ToastAndroid is intentional: this is an Android-only app, so the platform-split lint rule
 // doesn't apply here.
 // eslint-disable-next-line react-native/split-platform-components
-import { View, StyleSheet, TouchableOpacity, ScrollView, FlatList, Linking, ActivityIndicator, BackHandler, AppState, ToastAndroid } from 'react-native';
-import * as Clipboard from 'expo-clipboard';
-import { BORDER_RADIUS, FONT_SIZE, HORIZONTAL_PADDING, SPACING } from '../styles/designTokens';
-import { DESTRUCTIVE } from '../styles/semanticColors';
-import { Text, Divider, TouchableRipple, Menu } from 'react-native-paper';
+import { View, StyleSheet, TouchableOpacity, BackHandler, AppState, ToastAndroid } from 'react-native';
+import { HORIZONTAL_PADDING, SPACING } from '../styles/designTokens';
+import { Text, Divider, Menu } from 'react-native-paper';
 import Ionicons from '@expo/vector-icons/Ionicons';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
-import Animated, {
-  useSharedValue,
-  useAnimatedStyle,
-  withSpring,
-} from 'react-native-reanimated';
+import Animated from 'react-native-reanimated';
 import { GestureDetector } from 'react-native-gesture-handler';
 import { useSwipeDismiss } from '../hooks/useSwipeDismiss';
 import useSettingsPanelStack from '../hooks/useSettingsPanelStack';
+import SettingsList from '../components/settings/SettingsList';
+import LanguagePanel from '../components/settings/LanguagePanel';
+import UpdatePanel from '../components/settings/UpdatePanel';
+import ExportPanel from '../components/settings/ExportPanel';
+import ImportPanel from '../components/settings/ImportPanel';
+import NotificationPanel from '../components/settings/NotificationPanel';
+import LogsPanel from '../components/settings/LogsPanel';
+import ResetPanel from '../components/settings/ResetPanel';
 import { useThemeColors } from '../contexts/ThemeColorsContext';
-import { useThemeConfig } from '../contexts/ThemeConfigContext';
 import { useLocalization } from '../contexts/LocalizationContext';
-import { useDialog } from '../contexts/DialogContext';
-import { useAccountsActions } from '../contexts/AccountsActionsContext';
-import { useImportProgress } from '../contexts/ImportProgressContext';
-import { exportBackup, pickImportFile, importBackupFromFile, restoreBackup, createBackup, getPreRestoreSnapshots, CancelledImportError } from '../services/BackupRestore';
-import { getStoredBackups, DAILY_BACKUP_DIR } from '../services/DailyBackupService';
-import { useLogEntries } from '../hooks/useLogEntries';
-import { File, Paths } from 'expo-file-system';
-import * as LegacyFileSystem from 'expo-file-system/legacy';
-import * as Sharing from 'expo-sharing';
-import { checkForAppUpdate, listDownloadedApks, installApk, verifyCachedApk } from '../services/AppUpdateService';
-import { getPreference, setPreference, PREF_KEYS } from '../services/PreferencesDB';
 import { appEvents, EVENTS } from '../services/eventEmitter';
-import { useDisplaySettings } from '../contexts/DisplaySettingsContext';
-import { useUpdateDownload } from '../contexts/UpdateDownloadContext';
-import { authenticateWithBiometrics, BiometricResult } from '../services/BiometricService';
-import { ensureLocationPermission } from '../services/LocationService';
-import { getValidAccessToken, signIn as googleSignIn, exportToSheets, importFromSheets } from '../services/GoogleSheetsService';
-import UpdateContentPanel from '../components/UpdateContentPanel';
-import NotificationProcessingContentPanel from '../components/NotificationProcessingContentPanel';
-import NotificationFiltersContentPanel from '../components/NotificationFiltersContentPanel';
-import NotificationBindingsContentPanel from '../components/NotificationBindingsContentPanel';
-import NotificationTemplatesContentPanel from '../components/NotificationTemplatesContentPanel';
-import NotificationTemplateEditorPanel from '../components/NotificationTemplateEditorPanel';
 import AccountsScreen from './AccountsScreen';
 import CategoriesScreen from './CategoriesScreen';
-import { BADGE, BADGE_TEXT, CHIP, CHIP_TEXT, SECTION_LABEL } from '../styles/componentStyles';
-import EmptyState from '../components/EmptyState';
-
-const SHEETS_STEPS = [
-  { id: 'auth', label: 'Signing in to Google' },
-  { id: 'backup', label: 'Preparing data' },
-  { id: 'connect', label: 'Connecting to spreadsheet' },
-  { id: 'clear', label: 'Clearing existing data' },
-  { id: 'write', label: 'Uploading data' },
-  { id: 'complete', label: 'Export complete' },
-];
-
-const SHEETS_IMPORT_STEPS = [
-  { id: 'connect', label: 'Connecting to spreadsheet' },
-  { id: 'parse', label: 'Reading sheet data' },
-];
-
-// Log severity is a categorical scale, fixed across both themes like
-// chartPalette — only its red is pinned to the app's one red.
-const LOG_LEVEL_COLORS = {
-  error: DESTRUCTIVE.light,
-  warn: '#fb8c00',
-  info: '#1e88e5',
-  debug: '#757575',
-};
-
-const LOG_FILTERS = ['all', 'error', 'warn', 'info', 'debug'];
-
-// Badge background on a selected (primary-filled) filter chip — translucent
-// white so the count reads on the blue fill.
-const SELECTED_BADGE_BG = 'rgba(255,255,255,0.3)';
-
-const SPRING_CONFIG = { mass: 1, damping: 20, stiffness: 200 };
-
-/**
- * A settings row with an animated on/off switch. Extracted so the three toggle
- * rows (hide balances, theme, attach location) share one implementation — a
- * future restyle or a11y fix touches one place instead of three. `hintError`
- * renders the hint in the error colour (used for the location "permission
- * denied" state).
- */
-const SettingToggleRow = ({ icon, label, hint, value, onToggle, hintError = false, testID }) => {
-  const { colors } = useThemeColors();
-  const progress = useSharedValue(value ? 1 : 0);
-  useEffect(() => {
-    progress.value = withSpring(value ? 1 : 0, SPRING_CONFIG);
-  }, [value, progress]);
-  const thumbStyle = useAnimatedStyle(() => ({
-    transform: [{ translateX: 2 + progress.value * 20 }],
-  }));
-
-  return (
-    <TouchableRipple onPress={onToggle} style={styles.settingsRow} testID={testID}>
-      <View style={styles.settingsRowContent}>
-        <View style={styles.settingsRowLeft}>
-          <Ionicons name={icon} size={22} color={colors.text} />
-          <View style={styles.settingsRowText}>
-            <Text style={[styles.settingsRowLabel, { color: colors.text }]}>{label}</Text>
-            <Text style={[styles.settingsRowValue, { color: hintError ? colors.destructive : colors.mutedText }]}>
-              {hint}
-            </Text>
-          </View>
-        </View>
-        <View style={[styles.switchTrack, { backgroundColor: value ? colors.primary : colors.border }]}>
-          <Animated.View style={[styles.switchThumb, thumbStyle]} />
-        </View>
-      </View>
-    </TouchableRipple>
-  );
-};
-
-SettingToggleRow.propTypes = {
-  icon: PropTypes.string.isRequired,
-  label: PropTypes.string.isRequired,
-  hint: PropTypes.string,
-  value: PropTypes.bool,
-  onToggle: PropTypes.func.isRequired,
-  hintError: PropTypes.bool,
-  testID: PropTypes.string,
-};
-
-// How often to re-poll CI build progress while the update panel shows an in-progress build.
-const BUILD_PROGRESS_POLL_MS = 5000;
-
 
 export default function SettingsScreen({ setSubPanelActive }) {
   const insets = useSafeAreaInsets();
@@ -139,13 +34,7 @@ export default function SettingsScreen({ setSubPanelActive }) {
   // translucent bar exactly like the operations list does.
   const scrollBottomInset = insets.bottom + 80;
   const { colors } = useThemeColors();
-  const { colorScheme, setTheme } = useThemeConfig();
-  const { t, language, setLanguage, availableLanguages } = useLocalization();
-  const { hideBalances, setHideBalances, attachLocation, setAttachLocation, showAccountsTab, setShowAccountsTab, showBudgetTab, setShowBudgetTab } = useDisplaySettings();
-  const { showDialog } = useDialog();
-  const { resetDatabase } = useAccountsActions();
-  const { startImport, cancelImport, completeImport, getCancelToken } = useImportProgress();
-  const { startDownload, isDownloading, downloadProgress, downloadPhase } = useUpdateDownload();
+  const { t } = useLocalization();
   // Subpanel navigation. The stack owns which panel is open and how deep into
   // its nested views the user has stepped, so "can we go back?", the header
   // title and the back handler all derive from one place instead of from four
@@ -167,12 +56,6 @@ export default function SettingsScreen({ setSubPanelActive }) {
   // 'bindings' the learned associations, 'templates' the parser list, and
   // 'templateEditor' the field-marking editor.
   const notificationView = panelStack.stepOf('notificationProcessing');
-  // What the template editor is working on: the captured notification a new
-  // template is being built from, and/or the existing template being edited.
-  // Held here rather than in the panel because the editor is a sibling view —
-  // the panel that launches it unmounts as it opens. Where leaving the editor
-  // returns to is the stack's business, not the draft's.
-  const [templateDraft, setTemplateDraft] = useState(null);
   // Controls the notification-processing header overflow (three-dots) menu.
   const [notificationMenuVisible, setNotificationMenuVisible] = useState(false);
   // Measured size of the settings container. The subpanel overlay is sized in
@@ -180,167 +63,75 @@ export default function SettingsScreen({ setSubPanelActive }) {
   // top+bottom inset stretch, which collapses to zero height under Reanimated 4 /
   // RN 0.85's Yoga (leaving the panel invisible / seemingly not opening).
   const [containerSize, setContainerSize] = useState(null);
-  // Inline hint shown under the "Attach location" row when the OS permission was
-  // denied while turning the toggle on. Cleared on a successful grant / toggle off.
-  const [locationDenied, setLocationDenied] = useState(false);
-  const [logFilter, setLogFilter] = useState('all');
-  const [storedBackups, setStoredBackups] = useState([]);
-  const [backupsLoading, setBackupsLoading] = useState(false);
-  const [pendingDeleteUri, setPendingDeleteUri] = useState(null);
   const exportStep = panelStack.stepOf('export');
-  const [sheetsSteps, setSheetsSteps] = useState(SHEETS_STEPS.map(s => ({ ...s, status: 'pending' })));
-  const [sheetsSuccessUrl, setSheetsSuccessUrl] = useState(null);
-  const [sheetsError, setSheetsError] = useState(null);
-  const [sheetsImportSteps, setSheetsImportSteps] = useState(SHEETS_IMPORT_STEPS.map(s => ({ ...s, status: 'pending' })));
-  const [sheetsImportError, setSheetsImportError] = useState(null);
-  // Reset runs synchronously-invisible otherwise; this drives the inline spinner
-  // that keeps the confirm subpanel open while the wipe is in flight (QoL-13).
-  const [resetInProgress, setResetInProgress] = useState(false);
-  const [updateResult, setUpdateResult] = useState(null);
-  const [isCheckingUpdate, setIsCheckingUpdate] = useState(false);
-  const [downloadedApks, setDownloadedApks] = useState([]);
   const importStep = panelStack.stepOf('import');
-  const [importSelectedBackup, setImportSelectedBackup] = useState(null);
-  const [saveLocalBackupLoading, setSaveLocalBackupLoading] = useState(false);
-  const [saveLocalBackupSuccess, setSaveLocalBackupSuccess] = useState(false);
-  const [sheetsExportSuccess, setSheetsExportSuccess] = useState(false);
-  const [sqliteExportLoading, setSqliteExportLoading] = useState(false);
-  const [sqliteExportSuccess, setSqliteExportSuccess] = useState(false);
-  const [csvExportLoading, setCsvExportLoading] = useState(false);
-  const [csvExportSuccess, setCsvExportSuccess] = useState(false);
-  const [jsonExportLoading, setJsonExportLoading] = useState(false);
-  const [jsonExportSuccess, setJsonExportSuccess] = useState(false);
-  const [expandedLogIds, setExpandedLogIds] = useState(new Set());
 
-  const saveLocalBackupColor = saveLocalBackupSuccess ? '#4caf50' : colors.text;
-  const sheetsColor = sheetsExportSuccess ? '#4caf50' : colors.text;
-  const sqliteColor = sqliteExportSuccess ? '#4caf50' : colors.text;
-  const csvColor = csvExportSuccess ? '#4caf50' : colors.text;
-  const jsonColor = jsonExportSuccess ? '#4caf50' : colors.text;
 
-  const handleToggleDarkMode = useCallback(() => {
-    setTheme(colorScheme === 'dark' ? 'light' : 'dark');
-  }, [colorScheme, setTheme]);
+  // Back navigation is locked while the open panel says it is mid-flight — a
+  // Sheets export/import stage, or a database wipe. Only one panel is mounted at
+  // a time and each releases the flag on unmount, so a single flag is enough and
+  // the screen no longer has to know which panels have long operations.
+  const [panelBusy, setPanelBusy] = useState(false);
+  const isBackDisabled = panelBusy;
 
-  const { entries, counts, clearLogs, getExportText } = useLogEntries(logFilter);
-  const importPickInProgress = useRef(false);
+  // A panel can hook the back gesture to release state its current step owns
+  // (a finished Sheets run, a chosen backup, a template draft). The hook runs
+  // before the host pops; returning true claims the gesture outright, which is
+  // what the embedded screens do when they still have a level of their own.
+  const panelBackRef = useRef(null);
+  const registerPanelBack = useCallback((fn) => {
+    panelBackRef.current = typeof fn === 'function' ? fn : null;
+  }, []);
 
-  const handleToggleHideBalances = useCallback(async () => {
-    if (!hideBalances) {
-      setHideBalances(true);
-      return;
-    }
-    const result = await authenticateWithBiometrics(t('biometric_prompt') || 'Authenticate to show balances');
-    if (result === BiometricResult.SUCCESS) {
-      setHideBalances(false);
-    } else if (result === BiometricResult.NOT_AVAILABLE) {
-      setHideBalances(false);
-    } else if (result === BiometricResult.NOT_ENROLLED) {
-      setHideBalances(false);
-    } else if (result === BiometricResult.FAILED) {
-      showDialog(
-        t('error') || 'Error',
-        t('biometric_failed') || 'Authentication failed',
-        [{ text: t('ok') || 'OK' }],
-      );
-    }
-  }, [hideBalances, setHideBalances, t, showDialog]);
+  // A panel can name itself in the header when its title depends on something
+  // only it knows — the update panel says whether it found anything.
+  const [panelTitle, setPanelTitle] = useState(null);
+  const registerPanelTitle = useCallback((title) => {
+    setPanelTitle(title ?? null);
+  }, []);
 
-  const handleToggleShowAccountsTab = useCallback(() => {
-    setShowAccountsTab(!showAccountsTab);
-  }, [showAccountsTab, setShowAccountsTab]);
-
-  const handleToggleShowBudgetTab = useCallback(() => {
-    setShowBudgetTab(!showBudgetTab);
-  }, [showBudgetTab, setShowBudgetTab]);
-
-  const handleToggleAttachLocation = useCallback(async () => {
-    // Turning OFF is non-destructive and needs no permission: just persist false.
-    // Coordinates already stored on past operations are left untouched (R1.5).
-    if (attachLocation) {
-      setAttachLocation(false);
-      setLocationDenied(false);
-      return;
-    }
-    // Turning ON: request the OS permission in this clear context. If it isn't
-    // granted, leave the toggle off and show an inline hint — never nag, never
-    // flip the toggle on without permission.
-    const { granted } = await ensureLocationPermission();
-    if (granted) {
-      setLocationDenied(false);
-      setAttachLocation(true);
-    } else {
-      setLocationDenied(true);
-      setAttachLocation(false);
-    }
-  }, [attachLocation, setAttachLocation]);
-
-  const loadStoredBackups = useCallback(async () => {
-    setBackupsLoading(true);
-    try {
-      const [regularUris, snapshotUris] = await Promise.all([
-        getStoredBackups(),
-        getPreRestoreSnapshots(),
-      ]);
-      const allUris = [...regularUris.reverse(), ...snapshotUris];
-      const infos = await Promise.all(
-        allUris.map(async (uri) => {
-          const filename = uri.split('/').pop();
-          const info = await LegacyFileSystem.getInfoAsync(uri);
-          return { uri, filename, size: info.size || 0 };
-        }),
-      );
-      setStoredBackups(infos);
-    } catch (error) {
-      console.error('Failed to load stored backups:', error);
-      setStoredBackups([]);
-    } finally {
-      setBackupsLoading(false);
-    }
+  // A panel can offer the subpanel header an action (currently only the import
+  // backup list, which gets a refresh button).
+  const [panelRefresh, setPanelRefresh] = useState(null);
+  const registerPanelRefresh = useCallback((fn) => {
+    setPanelRefresh(() => (typeof fn === 'function' ? fn : null));
   }, []);
 
   // Resets all subpanel state and unmounts it. Called once the slide-away
   // animation has played (or immediately when another flow takes over).
   const closeSubPanel = useCallback(() => {
     closeStack();
-    setUpdateResult(null);
-    setImportSelectedBackup(null);
-    setSaveLocalBackupLoading(false);
-    setSaveLocalBackupSuccess(false);
-    setSheetsSteps(SHEETS_STEPS.map(s => ({ ...s, status: 'pending' })));
-    setSheetsSuccessUrl(null);
-    setSheetsError(null);
-    setSheetsImportSteps(SHEETS_IMPORT_STEPS.map(s => ({ ...s, status: 'pending' })));
-    setSheetsImportError(null);
-    setDownloadedApks([]);
-    setTemplateDraft(null);
+    // Drop whatever the closing panel registered. Panels clear their own hooks
+    // on unmount, but the embedded screens do not, and a stale handler would
+    // swallow the next panel's back gesture.
+    registerPanelBack(null);
+    registerPanelRefresh(null);
+    registerPanelTitle(null);
+    setPanelBusy(false);
+    setEmbeddedCanGoBack(false);
+    // Everything else the panels used to leave behind now unmounts with them.
     setNotificationMenuVisible(false);
-  }, [closeStack]);
+  }, [closeStack, registerPanelBack, registerPanelRefresh, registerPanelTitle]);
 
-  // Back navigation is locked while a long async step (Sheets export/import) runs,
-  // so the swipe-to-dismiss gesture is disabled then too.
-  const isBackDisabled = useMemo(() => {
-    if (activeSubPanel === 'export' && exportStep === 'sheets-progress') {
-      return sheetsSteps.some(s => s.status === 'in_progress');
-    }
-    if (activeSubPanel === 'import' && importStep === 'sheets-progress') {
-      return sheetsImportSteps.some(s => s.status === 'in_progress');
-    }
-    if (activeSubPanel === 'reset') {
-      return resetInProgress;
-    }
-    return false;
-  }, [activeSubPanel, exportStep, importStep, sheetsSteps, sheetsImportSteps, resetInProgress]);
+  // The wipe finished: close the panel and say so. The toast lives here rather
+  // than in ResetPanel because acknowledging a completed subpanel is the host's
+  // job — the panel is gone by the time the message shows.
+  const handleResetDone = useCallback(() => {
+    closeSubPanel();
+    ToastAndroid.show(t('database_reset_done') || 'Database reset', ToastAndroid.SHORT);
+  }, [closeSubPanel, t]);
 
   // Embedded screens (Accounts/Categories) report whether they can navigate back
   // one level internally (edit form open, subcategory drill, picker, …) so a swipe
   // / hardware-back steps up there before closing the whole panel.
-  const embeddedBackRef = useRef(null);
   const [embeddedCanGoBack, setEmbeddedCanGoBack] = useState(false);
   const handleEmbeddedBackStateChange = useCallback((goBack) => {
-    embeddedBackRef.current = typeof goBack === 'function' ? goBack : null;
     setEmbeddedCanGoBack(!!goBack);
-  }, []);
+    // Folded into the same registration the extracted panels use. An embedded
+    // screen that can still pop claims the gesture, so the host leaves its own
+    // stack alone.
+    registerPanelBack(typeof goBack === 'function' ? () => { goBack(); return true; } : null);
+  }, [registerPanelBack]);
 
   // Capture the container's pixel size so the subpanel overlay can be sized
   // explicitly (see containerSize above). Only update on real changes to avoid
@@ -382,19 +173,12 @@ export default function SettingsScreen({ setSubPanelActive }) {
     });
 
   const openSubPanel = useCallback((panel) => {
-    // The panel's starting step comes from the stack itself; only the data each
-    // panel needs on entry is prepared here.
-    if (panel === 'import') {
-      setImportSelectedBackup(null);
-      loadStoredBackups();
-    }
-    if (panel === 'notificationProcessing') {
-      setNotificationMenuVisible(false);
-      setTemplateDraft(null);
-    }
+    // Panels own their own entry state now: each mounts fresh at the step the
+    // stack starts it on. Only the header's own menu is reset here.
+    setNotificationMenuVisible(false);
     openStack(panel);
     openPanelAnim();
-  }, [loadStoredBackups, openPanelAnim, openStack]);
+  }, [openPanelAnim, openStack]);
 
   useEffect(() => {
     setSubPanelActive(activeSubPanel !== null);
@@ -444,571 +228,17 @@ export default function SettingsScreen({ setSubPanelActive }) {
     return unsubscribe;
   }, []);
 
-  const handleLanguageSelect = useCallback((lng) => {
-    setLanguage(lng);
-    dismissPanel();
-  }, [setLanguage, dismissPanel]);
-
-  const nativeLanguageNames = {
-    en: 'English',
-    ru: 'Русский',
-    zh: '中文',
-    es: 'Español',
-    fr: 'Français',
-    de: 'Deutsch',
-    it: 'Italiano',
-    hy: 'Հայերեն',
-    ja: '日本語',
-    ko: '한국어',
-    pt: 'Português',
-  };
-
-  const languageFlags = {
-    en: '🇬🇧',
-    ru: '🇷🇺',
-    zh: '🇨🇳',
-    es: '🇪🇸',
-    fr: '🇫🇷',
-    de: '🇩🇪',
-    it: '🇮🇹',
-    hy: '🇦🇲',
-    ja: '🇯🇵',
-    ko: '🇰🇷',
-    pt: '🇵🇹',
-  };
-
-  const handleExportFormatSelect = useCallback(async (format) => {
-    const setLoading = format === 'sqlite' ? setSqliteExportLoading : format === 'csv' ? setCsvExportLoading : setJsonExportLoading;
-    const setSuccess = format === 'sqlite' ? setSqliteExportSuccess : format === 'csv' ? setCsvExportSuccess : setJsonExportSuccess;
-    setLoading(true);
-    try {
-      await exportBackup(format);
-      setSuccess(true);
-    } catch (error) {
-      console.error('Export backup error:', error);
-      showDialog(
-        t('error') || 'Error',
-        t('backup_error') || 'Failed to create backup',
-        [{ text: 'OK' }],
-      );
-    } finally {
-      setLoading(false);
-    }
-  }, [t, showDialog]);
-
-  const updateSheetsStep = useCallback((stepId, status) => {
-    setSheetsSteps(prev => prev.map(s => s.id === stepId ? { ...s, status } : s));
-  }, []);
-
-  const handleGoogleSheetsExport = useCallback(async () => {
-    setSheetsSteps(SHEETS_STEPS.map(s => ({ ...s, status: 'pending' })));
-    setSheetsSuccessUrl(null);
-    setSheetsError(null);
-    pushStep('sheets-progress');
-    try {
-      updateSheetsStep('auth', 'in_progress');
-      let accessToken;
-      try {
-        accessToken = await getValidAccessToken();
-      } catch (authError) {
-        if (authError.message === 'refresh_failed') throw authError;
-        accessToken = await googleSignIn();
-      }
-      updateSheetsStep('auth', 'completed');
-
-      updateSheetsStep('backup', 'in_progress');
-      const backup = await createBackup();
-      updateSheetsStep('backup', 'completed');
-
-      const sheetUrl = await exportToSheets(accessToken, backup, ({ step, status }) => {
-        updateSheetsStep(step, status);
-      });
-
-      updateSheetsStep('complete', 'completed');
-      setSheetsSuccessUrl(sheetUrl);
-      setSheetsExportSuccess(true);
-    } catch (error) {
-      if (error.message === 'sign_in_cancelled') {
-        popToRootStep();
-        return;
-      }
-      setSheetsSteps(prev => prev.map(s => s.status === 'in_progress' ? { ...s, status: 'error' } : s));
-      let errorMsg;
-      if (error.message === 'refresh_failed') {
-        errorMsg = t('google_sheets_access_revoked') || 'Google access was revoked. Please sign in again.';
-      } else if (error.message === 'auth_failed') {
-        errorMsg = t('google_sheets_signin_failed') || 'Google sign-in failed. Please try again.';
-      } else if (error.message === 'quota_exceeded') {
-        errorMsg = t('google_sheets_quota_exceeded') || 'Google Sheets quota exceeded. Try again later.';
-      } else if (error.message === 'Network request failed') {
-        errorMsg = t('google_sheets_no_network') || 'Export failed: no internet connection.';
-      } else {
-        errorMsg = t('google_sheets_export_failed') || 'Export failed. Please try again.';
-      }
-      setSheetsError(errorMsg);
-    }
-  }, [updateSheetsStep, t]);
-
-  // State a nested step owns and must hand back when the user steps out of it.
-  // This is the only place that still keys off (panel, step), and it is about
-  // cleanup alone — where "back" goes is the stack's business, not this map's.
-  const releaseStepState = useCallback((panel, step) => {
-    if (panel === 'export' && step === 'sheets-progress') {
-      setSheetsSteps(SHEETS_STEPS.map(s => ({ ...s, status: 'pending' })));
-      setSheetsSuccessUrl(null);
-      setSheetsError(null);
-    } else if (panel === 'import' && step === 'sheets-progress') {
-      setSheetsImportError(null);
-    } else if (panel === 'import' && step === 'confirm-local') {
-      setImportSelectedBackup(null);
-    } else if (panel === 'notificationProcessing' && step === 'templateEditor') {
-      setTemplateDraft(null);
-    }
-  }, []);
-
-  const confirmResetDatabase = useCallback(async () => {
-    // Keep the confirm subpanel open with an inline spinner while the wipe runs, then
-    // close and toast on success — previously the panel closed immediately and the reset
-    // happened invisibly, leaving the user with no feedback (QoL-13).
-    if (resetInProgress) return;
-    setResetInProgress(true);
-    try {
-      await resetDatabase();
-      setResetInProgress(false);
-      closeSubPanel();
-      ToastAndroid.show(t('database_reset_done') || 'Database reset', ToastAndroid.SHORT);
-    } catch (error) {
-      setResetInProgress(false);
-      console.error('[Settings] Database reset failed:', error);
-      showDialog(t('error') || 'Error', error.message || 'Database reset failed', [{ text: 'OK' }]);
-    }
-  }, [resetInProgress, closeSubPanel, resetDatabase, showDialog, t]);
-
-  const confirmImportBackup = useCallback(async () => {
-    if (importPickInProgress.current) return;
-    importPickInProgress.current = true;
-
-    let fileInfo;
-    try {
-      fileInfo = await pickImportFile();
-    } catch (error) {
-      importPickInProgress.current = false;
-      if (error.message === 'Import cancelled') {
-        popToRootStep();
-        return;
-      }
-      console.error('Import file pick error:', error);
-      showDialog(t('error') || 'Error', error.message || t('restore_error') || 'Failed to restore backup', [{ text: 'OK' }]);
-      return;
-    }
-
-    importPickInProgress.current = false;
-    closeSubPanel();
-    startImport();
-    const cancelToken = getCancelToken();
-    try {
-      await importBackupFromFile(fileInfo, cancelToken);
-      completeImport();
-    } catch (error) {
-      cancelImport();
-      if (error instanceof CancelledImportError) return;
-      console.error('Import backup error:', error);
-      showDialog(t('error') || 'Error', error.message || t('restore_error') || 'Failed to restore backup', [{ text: 'OK' }]);
-    }
-  }, [closeSubPanel, startImport, completeImport, cancelImport, getCancelToken, t, showDialog]);
-
-  const handleShareLogs = useCallback(async () => {
-    try {
-      const text = getExportText();
-      const date = new Date().toISOString().slice(0, 10);
-      const file = new File(Paths.cache, `penny-logs-${date}.txt`);
-      file.write(text);
-      await Sharing.shareAsync(file.uri, { mimeType: 'text/plain' });
-    } catch (error) {
-      console.error('Share logs error:', error);
-    }
-  }, [getExportText]);
-
-  const handleClearLogs = useCallback(() => {
-    clearLogs();
-  }, [clearLogs]);
-
-  const handleImportSourceSelect = useCallback((source) => {
-    if (source === 'file') {
-      pushStep('confirm-file');
-    } else if (source === 'local') {
-      pushStep('local-list');
-    }
-  }, [pushStep]);
-
-  const handleGoogleSheetsImport = useCallback(async () => {
-    setSheetsImportError(null);
-
-    const spreadsheetId = await getPreference(PREF_KEYS.GOOGLE_SHEETS_SPREADSHEET_ID);
-    if (!spreadsheetId) {
-      setSheetsImportError(t('google_sheets_not_configured') || 'Export to Google Sheets first to set up your spreadsheet.');
-      return;
-    }
-
-    setSheetsImportSteps(SHEETS_IMPORT_STEPS.map(s => ({ ...s, status: 'pending' })));
-    pushStep('sheets-progress');
-
-    let backup;
-    try {
-      let accessToken;
-      try {
-        accessToken = await getValidAccessToken();
-      } catch {
-        accessToken = await googleSignIn();
-      }
-      backup = await importFromSheets(accessToken, ({ step, status }) => {
-        setSheetsImportSteps(prev => prev.map(s => s.id === step ? { ...s, status } : s));
-      });
-    } catch (error) {
-      if (error.message === 'sign_in_cancelled') {
-        popToRootStep();
-        return;
-      }
-      if (error.message === 'no_spreadsheet_configured') {
-        popToRootStep();
-        setSheetsImportError(t('google_sheets_not_configured') || 'Export to Google Sheets first to set up your spreadsheet.');
-        return;
-      }
-      let msg;
-      if (error.message === 'refresh_failed') msg = t('google_sheets_access_revoked') || 'Google access was revoked. Please sign in again.';
-      else if (error.message === 'spreadsheet_not_found') msg = t('google_sheets_not_found') || 'Spreadsheet not found. Try exporting first.';
-      else msg = t('google_sheets_import_failed') || 'Import failed. Please try again.';
-      setSheetsImportSteps(prev => prev.map(s => s.status === 'in_progress' ? { ...s, status: 'error' } : s));
-      setSheetsImportError(msg);
-      return;
-    }
-
-    closeSubPanel();
-    startImport();
-    const cancelToken = getCancelToken();
-    try {
-      await restoreBackup(backup, cancelToken);
-      completeImport();
-    } catch (restoreError) {
-      cancelImport();
-      if (!(restoreError instanceof CancelledImportError)) {
-        console.error('[SheetsImport] restore error:', restoreError);
-        showDialog(t('error') || 'Error', restoreError.message || t('restore_error') || 'Failed to restore backup', [{ text: 'OK' }]);
-      }
-    }
-  }, [t, closeSubPanel, startImport, completeImport, cancelImport, getCancelToken, showDialog]);
-
   // When Sheets import dead-ends on "no spreadsheet configured", this CTA sends the user
   // straight to the export subpanel to set one up. The subpanel is already slid in, so we
   // just swap its content instead of re-opening (QoL-13).
   const handleSetupSheetsExport = useCallback(() => {
-    setSheetsImportError(null);
     swapStackPanel('export');
   }, [swapStackPanel]);
 
-  const handleImportLocalBackupSelect = useCallback((item) => {
-    setImportSelectedBackup(item);
-    pushStep('confirm-local');
-  }, [pushStep]);
-
-  const confirmRestoreLocalBackup = useCallback(async () => {
-    if (!importSelectedBackup) return;
-    closeSubPanel();
-    startImport();
-    const cancelToken = getCancelToken();
-    try {
-      const content = await LegacyFileSystem.readAsStringAsync(importSelectedBackup.uri);
-      const backup = JSON.parse(content);
-      await restoreBackup(backup, cancelToken);
-      completeImport();
-    } catch (error) {
-      cancelImport();
-      if (error instanceof CancelledImportError) return;
-      console.error('Local backup restore error:', error);
-      showDialog(
-        t('error') || 'Error',
-        error.message || t('restore_error') || 'Failed to restore backup',
-        [{ text: 'OK' }],
-      );
-    }
-  }, [importSelectedBackup, closeSubPanel, startImport, completeImport, cancelImport, getCancelToken, t, showDialog]);
-
-  const handleSaveLocalBackup = useCallback(async () => {
-    setSaveLocalBackupLoading(true);
-    try {
-      const backup = await createBackup();
-      const now = new Date();
-      const pad = (n) => String(n).padStart(2, '0');
-      const dateStr = now.toISOString().split('T')[0];
-      const timeStr = `${pad(now.getHours())}-${pad(now.getMinutes())}-${pad(now.getSeconds())}`;
-      const filename = `manual_${dateStr}_${timeStr}.json`;
-      const dirInfo = await LegacyFileSystem.getInfoAsync(DAILY_BACKUP_DIR);
-      if (!dirInfo.exists) {
-        await LegacyFileSystem.makeDirectoryAsync(DAILY_BACKUP_DIR, { intermediates: true });
-      }
-      const fileUri = `${DAILY_BACKUP_DIR}${filename}`;
-      await LegacyFileSystem.writeAsStringAsync(fileUri, JSON.stringify(backup));
-      setSaveLocalBackupLoading(false);
-      setSaveLocalBackupSuccess(true);
-    } catch (error) {
-      console.error('Save local backup error:', error);
-      setSaveLocalBackupLoading(false);
-      showDialog(
-        t('error') || 'Error',
-        t('backup_error') || 'Failed to create backup',
-        [{ text: 'OK' }],
-      );
-    }
-  }, [t, showDialog]);
-
-  const handleDeleteLocalBackup = useCallback((uri) => {
-    setPendingDeleteUri(uri);
-  }, []);
-
-  const handleConfirmDeleteLocalBackup = useCallback(async (uri) => {
-    setPendingDeleteUri(null);
-    try {
-      await LegacyFileSystem.deleteAsync(uri, { idempotent: true });
-      setStoredBackups(prev => prev.filter(b => b.uri !== uri));
-    } catch (error) {
-      console.error('Failed to delete backup:', error);
-    }
-  }, []);
-
-  const loadDownloadedApks = useCallback(async () => {
-    const apks = await listDownloadedApks();
-    setDownloadedApks(apks);
-  }, []);
-
-  const handleInstallApk = useCallback(async (uri) => {
-    try {
-      await installApk(uri);
-    } catch (error) {
-      console.error('Failed to install APK:', error);
-      showDialog(
-        t('error') || 'Error',
-        t('update_download_failed') || 'Could not install the APK. The file may have been removed.',
-        [{ text: t('ok') || 'OK' }],
-      );
-    }
-  }, [showDialog, t]);
-
-  const runUpdateCheck = useCallback(async ({ silent = false } = {}) => {
-    // A silent re-check (used by the build-progress poller) keeps the current panel content
-    // in place and skips the loading spinner, so the build percentage updates without flicker.
-    if (!silent) {
-      setUpdateResult(null);
-      setIsCheckingUpdate(true);
-    }
-    loadDownloadedApks();
-    try {
-      const result = await checkForAppUpdate();
-      await setPreference(PREF_KEYS.UPDATE_LAST_CHECK_AT, new Date().toISOString());
-
-      if (!result.success) {
-        setUpdateResult({
-          type: 'error',
-          errorCode: result.errorCode,
-          currentVersion: result.currentVersion,
-          releaseNotes: result.releaseNotes || null,
-          recentReleaseNotes: result.recentReleaseNotes || null,
-          releasesUrl: result.releasesUrl || null,
-          buildProgress: result.buildProgress || null,
-        });
-      } else if (!result.isUpdateAvailable) {
-        setUpdateResult({
-          type: 'up_to_date',
-          currentVersion: result.currentVersion,
-          recentReleaseNotes: result.recentReleaseNotes || null,
-          releasesUrl: result.releasesUrl || null,
-        });
-      } else {
-        // Verify any cached APK against the release checksum. A corrupt leftover download is
-        // deleted here so we offer a fresh "Update now" (re-download) instead of an "Install now"
-        // that would launch a broken installer.
-        const cached = await verifyCachedApk(result.downloadUrl, { checksumUrl: result.checksumUrl });
-        // Re-scan the cache so the per-release install buttons reflect reality: a corrupt file just
-        // deleted by verifyCachedApk drops out, and a freshly verified one shows as installable.
-        await loadDownloadedApks();
-        setUpdateResult({
-          type: 'available',
-          latestVersion: result.latestVersion,
-          currentVersion: result.currentVersion,
-          downloadUrl: result.downloadUrl,
-          checksumUrl: result.checksumUrl || null,
-          releaseNotes: result.releaseNotes || null,
-          recentReleaseNotes: result.recentReleaseNotes || null,
-          releasesUrl: result.releasesUrl || null,
-          alreadyDownloaded: cached.exists,
-          localUri: cached.exists ? cached.uri : null,
-          previousDownloadCorrupted: !!cached.corrupted,
-        });
-      }
-    } catch (error) {
-      if (!silent) setUpdateResult({ type: 'error', errorCode: null });
-    } finally {
-      if (!silent) setIsCheckingUpdate(false);
-    }
-  }, [loadDownloadedApks]);
-
-  // While the update panel is open and a release is still waiting on its CI build, poll the
-  // build progress so the "Building N%" chip advances and flips to "Update now" once the APK
-  // is published. Polling stops as soon as the build finishes or the panel closes.
-  useEffect(() => {
-    if (activeSubPanel !== 'update') return undefined;
-    const buildInProgress = updateResult?.errorCode === 'releases_without_apks'
-      && !!updateResult?.buildProgress;
-    if (!buildInProgress) return undefined;
-    const intervalId = setInterval(() => {
-      runUpdateCheck({ silent: true });
-    }, BUILD_PROGRESS_POLL_MS);
-    return () => clearInterval(intervalId);
-  }, [activeSubPanel, updateResult, runUpdateCheck]);
-
-  const handleCheckForUpdates = useCallback(() => {
-    openSubPanel('update');
-    runUpdateCheck();
-  }, [openSubPanel, runUpdateCheck]);
-
-  const handleUpdateFromSettings = useCallback(async (downloadUrl, checksumUrl, version) => {
-    // Record the version actually chosen so the startup reminder doesn't re-nag for it. The
-    // per-release buttons pass their own version; fall back to the highlighted candidate.
-    const promptedVersion = version || updateResult?.latestVersion;
-    if (promptedVersion) {
-      await setPreference(PREF_KEYS.UPDATE_LAST_PROMPTED_VERSION, promptedVersion);
-    }
-    closeSubPanel();
-    startDownload(downloadUrl, {
-      checksumUrl: checksumUrl || null,
-      onError: () => {
-        showDialog(
-          t('error') || 'Error',
-          t('update_download_failed') || 'Could not download the update. Please try again.',
-          [{ text: t('ok') || 'OK' }],
-        );
-      },
-    });
-  }, [updateResult, closeSubPanel, startDownload, showDialog, t]);
-
-  const formatBackupLabel = useCallback((filename) => {
-    if (filename.startsWith('daily_')) {
-      const dateStr = filename.replace('daily_', '').replace('.json', '');
-      const [year, month, day] = dateStr.split('-').map(Number);
-      return new Date(year, month - 1, day).toLocaleDateString(undefined, {
-        month: 'short', day: 'numeric', year: 'numeric',
-      });
-    }
-    if (filename.startsWith('weekly_')) {
-      const weekStr = filename.replace('weekly_', '').replace('.json', '');
-      const [year, weekPart] = weekStr.split('-');
-      return `${t('weekly') || 'Weekly'} ${weekPart}, ${year}`;
-    }
-    if (filename.startsWith('manual_')) {
-      const inner = filename.replace('manual_', '').replace('.json', '');
-      const [datePart, timePart] = inner.split('_');
-      if (datePart) {
-        const [year, month, day] = datePart.split('-').map(Number);
-        const dateLabel = new Date(year, month - 1, day).toLocaleDateString(undefined, {
-          month: 'short', day: 'numeric', year: 'numeric',
-        });
-        if (timePart) {
-          const [hh, mm] = timePart.split('-');
-          return `${dateLabel} · ${hh}:${mm}`;
-        }
-        return dateLabel;
-      }
-    }
-    return filename;
-  }, [t]);
-
-  const renderBackupItem = useCallback(({ item }) => {
-    const isDaily = item.filename.startsWith('daily_');
-    const isManual = item.filename.startsWith('manual_');
-    const label = formatBackupLabel(item.filename);
-    const typeLabel = isDaily ? 'Daily' : isManual ? 'Manual' : (t('weekly') || 'Weekly');
-    const sizeKB = item.size ? `${(item.size / 1024).toFixed(1)} KB` : '';
-    const isPending = pendingDeleteUri === item.uri;
-    return (
-      <View style={[styles.backupItem, { borderBottomColor: colors.border }]}>
-        <View style={styles.backupItemLeft}>
-          <Ionicons name={isDaily ? 'calendar-outline' : isManual ? 'save-outline' : 'calendar-number-outline'} size={22} color={isPending ? colors.mutedText : colors.text} />
-          <View style={styles.backupItemText}>
-            <Text style={[styles.backupItemLabel, { color: isPending ? colors.mutedText : colors.text }]}>{label}</Text>
-            <Text style={[styles.backupItemMeta, { color: colors.mutedText }]}>
-              {isPending ? (t('delete_backup_confirm') || 'Delete this backup?') : `${typeLabel}${sizeKB ? ` · ${sizeKB}` : ''}`}
-            </Text>
-          </View>
-        </View>
-        <View style={styles.backupItemActions}>
-          {isPending ? (
-            <>
-              <TouchableOpacity onPress={() => setPendingDeleteUri(null)} style={styles.backupConfirmButton}>
-                <Text style={[styles.backupConfirmButtonText, { color: colors.mutedText }]}>{t('cancel') || 'Cancel'}</Text>
-              </TouchableOpacity>
-              <TouchableOpacity onPress={() => handleConfirmDeleteLocalBackup(item.uri)} style={styles.backupConfirmButton}>
-                <Text style={[styles.backupConfirmButtonDestructiveText, { color: colors.destructive }]}>{t('delete') || 'Delete'}</Text>
-              </TouchableOpacity>
-            </>
-          ) : (
-            <>
-              <TouchableOpacity onPress={() => handleImportLocalBackupSelect(item)} style={styles.backupActionButton}>
-                <Ionicons name="refresh-outline" size={20} color={colors.primary} />
-              </TouchableOpacity>
-              <TouchableOpacity onPress={() => handleDeleteLocalBackup(item.uri)} style={styles.backupActionButton}>
-                <Ionicons name="trash-outline" size={18} color={colors.destructive} />
-              </TouchableOpacity>
-            </>
-          )}
-        </View>
-      </View>
-    );
-  }, [colors, t, formatBackupLabel, handleImportLocalBackupSelect, handleDeleteLocalBackup, handleConfirmDeleteLocalBackup, pendingDeleteUri]);
-
-  const toggleLogExpand = useCallback((id) => {
-    setExpandedLogIds(prev => {
-      const next = new Set(prev);
-      if (next.has(id)) {
-        next.delete(id);
-      } else {
-        next.add(id);
-      }
-      return next;
-    });
-  }, []);
-
-  const renderLogEntry = useCallback(({ item }) => {
-    const isExpanded = expandedLogIds.has(item.id);
-    const levelColor = LOG_LEVEL_COLORS[item.level];
-    // Tint the row background for the two levels that warrant attention so they
-    // stand out while scanning a wall of info/debug lines. `20` = ~12% alpha.
-    const rowBackground = item.level === 'error' || item.level === 'warn'
-      ? `${levelColor}20`
-      : 'transparent';
-    return (
-      <TouchableOpacity
-        onPress={() => toggleLogExpand(item.id)}
-        onLongPress={() => Clipboard.setStringAsync(`${item.timestamp} [${item.level.toUpperCase()}] ${item.message}`)}
-        activeOpacity={0.7}
-        style={[
-          styles.logEntry,
-          { borderLeftColor: levelColor, borderBottomColor: colors.border, backgroundColor: rowBackground },
-        ]}
-      >
-        <Text style={[styles.logTimestamp, { color: colors.mutedText }]}>
-          {isExpanded ? item.timestamp.substring(0, 19).replace('T', ' ') : item.timestamp.substring(11, 19)}
-        </Text>
-        <Text style={[styles.logLevel, { color: levelColor }]}>
-          {item.level.toUpperCase()}
-        </Text>
-        <Text style={[styles.logMessage, { color: colors.text }]} numberOfLines={isExpanded ? undefined : 3}>
-          {item.message}
-        </Text>
-      </TouchableOpacity>
-    );
-  }, [colors, expandedLogIds, toggleLogExpand]);
-
   // ─── Subpanel title resolver ───
+  // A panel that named itself wins; the rest are named from their panel and step.
   const subPanelTitle = useMemo(() => {
+    if (panelTitle) return panelTitle;
     if (activeSubPanel === 'accounts') return t('accounts') || 'Accounts';
     if (activeSubPanel === 'categories') return t('categories') || 'Categories';
     if (activeSubPanel === 'language') return t('language');
@@ -1022,17 +252,12 @@ export default function SettingsScreen({ setSubPanelActive }) {
       return t('restore_database') || 'Restore Database';
     }
     if (activeSubPanel === 'logs') return t('logs') || 'Logs';
-    if (activeSubPanel === 'update') {
-      if (isCheckingUpdate) return t('check_updates') || 'Check for updates';
-      if (updateResult?.type === 'available') return t('update_available_title') || 'Update available';
-      return t('check_updates') || 'Check for updates';
-    }
     if (activeSubPanel === 'notificationProcessing') {
       if (notificationView === 'filters') return t('notification_filters') || 'Filters';
       if (notificationView === 'bindings') return t('notification_bindings') || 'Bindings';
       if (notificationView === 'templates') return t('notification_templates') || 'Templates';
       if (notificationView === 'templateEditor') {
-        return templateDraft?.template
+        return panelStack.params?.editing
           ? (t('notification_template_edit') || 'Edit template')
           : (t('notification_template_new') || 'New template');
       }
@@ -1040,36 +265,7 @@ export default function SettingsScreen({ setSubPanelActive }) {
     }
     if (activeSubPanel === 'reset') return t('reset_database') || 'Reset Database';
     return '';
-  }, [activeSubPanel, exportStep, importStep, isCheckingUpdate, updateResult, notificationView, templateDraft, t]);
-
-  // ─── Notification parse templates ───
-  // Build a new template from a notification the user long-pressed in the feed.
-  // `recent` rides along so the editor can report how many of the app's other
-  // captured notifications the draft also matches.
-  const handleCreateTemplate = useCallback((notification, recent = []) => {
-    setTemplateDraft({ notification, template: null, recent });
-    pushStep('templateEditor');
-  }, [pushStep]);
-
-  // Open an existing template from the templates list.
-  const handleEditTemplate = useCallback((template) => {
-    setTemplateDraft({ notification: null, template, recent: [] });
-    pushStep('templateEditor');
-  }, [pushStep]);
-
-  // Leaving the editor. A cancel simply steps back to whichever view opened it —
-  // the stack already knows which. A saved template lands on the templates list:
-  // that is where it now lives, and seeing it there confirms the save, so an
-  // editor opened from the feed replaces itself with the list rather than
-  // popping back to it.
-  const handleTemplateEditorDone = useCallback((saved) => {
-    if (saved && panelStack.parentStep !== 'templates') {
-      replaceStep('templates');
-    } else {
-      popStep();
-    }
-    setTemplateDraft(null);
-  }, [panelStack.parentStep, replaceStep, popStep]);
+  }, [panelTitle, activeSubPanel, exportStep, importStep, notificationView, panelStack.params, t]);
 
   // Resolver behind navigateBack — the single answer for all three back paths
   // (swipe, hardware back, header arrow). An embedded Accounts/Categories screen
@@ -1079,12 +275,11 @@ export default function SettingsScreen({ setSubPanelActive }) {
   // to whichever view opened it without anyone having to remember which.
   subPanelBackRef.current = () => {
     if (isBackDisabled) return;
-    if ((activeSubPanel === 'accounts' || activeSubPanel === 'categories') && embeddedBackRef.current) {
-      embeddedBackRef.current();
-      return;
-    }
+    // The open panel gets first refusal. An embedded Accounts/Categories screen
+    // claims the gesture outright while it still has a level of its own; the
+    // extracted panels only release state and hand navigation back.
+    if (panelBackRef.current?.()) return;
     if (panelStack.canStepBack) {
-      releaseStepState(panelStack.panel, panelStack.step);
       popStep();
       return;
     }
@@ -1093,14 +288,15 @@ export default function SettingsScreen({ setSubPanelActive }) {
 
 
   // ─── RENDER ───
-  // Header action slot (opposite the back arrow). The import "local backups" list
-  // gets a refresh button; the notification-processing main view gets a
-  // three-dots overflow menu that opens the Filters view; everything else gets an
-  // empty spacer so the title stays centered.
+  // Header action slot (opposite the back arrow). A panel that wants a refresh
+  // button registers one (the import backup list does, while it is showing); the
+  // notification-processing main view gets a three-dots overflow menu, which is
+  // header chrome and stays here because all it does is push a step. Everything
+  // else gets an empty spacer so the title stays centered.
   let headerRightSlot = <View style={styles.backButton} />;
-  if (activeSubPanel === 'import' && importStep === 'local-list') {
+  if (panelRefresh) {
     headerRightSlot = (
-      <TouchableOpacity onPress={loadStoredBackups} style={styles.backButton}>
+      <TouchableOpacity onPress={panelRefresh} style={styles.backButton}>
         <Ionicons name="refresh-outline" size={22} color={colors.text} />
       </TouchableOpacity>
     );
@@ -1200,506 +396,60 @@ export default function SettingsScreen({ setSubPanelActive }) {
             {activeSubPanel === 'categories' && <CategoriesScreen onBackStateChange={handleEmbeddedBackStateChange} />}
 
             {activeSubPanel === 'language' && (
-              <ScrollView style={styles.listContainer} contentContainerStyle={{ paddingBottom: scrollBottomInset }}>
-                {availableLanguages.map(lng => (
-                  <TouchableRipple
-                    key={lng}
-                    onPress={() => handleLanguageSelect(lng)}
-                    style={styles.listItem}
-                  >
-                    <View style={styles.listItemContent}>
-                      <Text style={[styles.listItemText, { color: colors.text }]}>
-                        {languageFlags[lng] ? `${languageFlags[lng]}  ${nativeLanguageNames[lng] || lng}` : (nativeLanguageNames[lng] || lng)}
-                      </Text>
-                      {language === lng && (
-                        <Ionicons name="checkmark-circle" size={24} color={colors.primary} />
-                      )}
-                    </View>
-                  </TouchableRipple>
-                ))}
-              </ScrollView>
+              <LanguagePanel onSelected={dismissPanel} bottomInset={scrollBottomInset} />
             )}
 
-            {activeSubPanel === 'export' && exportStep === 'list' && (
-              <ScrollView style={styles.listContainer} contentContainerStyle={{ paddingBottom: scrollBottomInset }}>
-                <TouchableRipple
-                  onPress={saveLocalBackupSuccess ? null : handleSaveLocalBackup}
-                  style={styles.listItem}
-                  disabled={saveLocalBackupLoading || saveLocalBackupSuccess}
-                  testID="settings-export-save-local-backup"
-                >
-                  <View style={styles.listItemContent}>
-                    <View style={styles.formatItemRow}>
-                      <Ionicons name="archive-outline" size={24} color={saveLocalBackupColor} />
-                      <View style={styles.formatTextContainer}>
-                        <Text style={[styles.listItemText, { color: saveLocalBackupColor }]}>
-                          {t('save_local_backup') || 'Save local backup'}
-                        </Text>
-                        <Text style={[styles.formatDescription, { color: colors.mutedText }]}>
-                          {saveLocalBackupLoading
-                            ? (t('save_local_backup_saving') || 'Saving…')
-                            : saveLocalBackupSuccess
-                              ? (t('save_local_backup_success') || 'Backup saved')
-                              : (t('save_local_backup_description') || 'Save a backup to device storage and share')}
-                        </Text>
-                      </View>
-                    </View>
-                    {saveLocalBackupLoading ? (
-                      <ActivityIndicator size="small" color={colors.primary} />
-                    ) : saveLocalBackupSuccess ? (
-                      <Ionicons name="checkmark-circle" size={22} color="#4caf50" />
-                    ) : (
-                      <Ionicons name="chevron-forward" size={20} color={colors.mutedText} />
-                    )}
-                  </View>
-                </TouchableRipple>
-
-                <TouchableRipple
-                  onPress={handleGoogleSheetsExport}
-                  style={styles.listItem}
-                  testID="settings-export-google-sheets"
-                >
-                  <View style={styles.listItemContent}>
-                    <View style={styles.formatItemRow}>
-                      <Ionicons name="logo-google" size={24} color={sheetsColor} />
-                      <View style={styles.formatTextContainer}>
-                        <Text style={[styles.listItemText, { color: sheetsColor }]}>Google Sheets</Text>
-                        <Text style={[styles.formatDescription, { color: colors.mutedText }]}>
-                          {sheetsExportSuccess
-                            ? (t('export_success') || 'Export complete')
-                            : (t('google_sheets_description') || 'Export to a Google Sheets spreadsheet')}
-                        </Text>
-                      </View>
-                    </View>
-                    {sheetsExportSuccess ? (
-                      <Ionicons name="checkmark-circle" size={22} color="#4caf50" />
-                    ) : (
-                      <Ionicons name="chevron-forward" size={20} color={colors.mutedText} />
-                    )}
-                  </View>
-                </TouchableRipple>
-
-                <TouchableRipple
-                  onPress={sqliteExportLoading ? null : () => handleExportFormatSelect('sqlite')}
-                  style={styles.listItem}
-                  disabled={sqliteExportLoading}
-                >
-                  <View style={styles.listItemContent}>
-                    <View style={styles.formatItemRow}>
-                      <Ionicons name="server-outline" size={24} color={sqliteColor} />
-                      <View style={styles.formatTextContainer}>
-                        <Text style={[styles.listItemText, { color: sqliteColor }]}>Save externally to SQLite</Text>
-                        <Text style={[styles.formatDescription, { color: colors.mutedText }]}>
-                          {sqliteExportLoading
-                            ? (t('exporting') || 'Exporting…')
-                            : sqliteExportSuccess
-                              ? (t('export_success') || 'Export complete')
-                              : (t('sqlite_description') || 'Raw database file, complete backup')}
-                        </Text>
-                      </View>
-                    </View>
-                    {sqliteExportLoading ? (
-                      <ActivityIndicator size="small" color={colors.primary} />
-                    ) : sqliteExportSuccess ? (
-                      <Ionicons name="checkmark-circle" size={22} color="#4caf50" />
-                    ) : (
-                      <Ionicons name="chevron-forward" size={20} color={colors.mutedText} />
-                    )}
-                  </View>
-                </TouchableRipple>
-
-                <TouchableRipple
-                  onPress={csvExportLoading ? null : () => handleExportFormatSelect('csv')}
-                  style={styles.listItem}
-                  disabled={csvExportLoading}
-                >
-                  <View style={styles.listItemContent}>
-                    <View style={styles.formatItemRow}>
-                      <Ionicons name="document-text-outline" size={24} color={csvColor} />
-                      <View style={styles.formatTextContainer}>
-                        <Text style={[styles.listItemText, { color: csvColor }]}>Save externally to CSV</Text>
-                        <Text style={[styles.formatDescription, { color: colors.mutedText }]}>
-                          {csvExportLoading
-                            ? (t('exporting') || 'Exporting…')
-                            : csvExportSuccess
-                              ? (t('export_success') || 'Export complete')
-                              : (t('csv_description') || 'Plain text format, easy to edit')}
-                        </Text>
-                      </View>
-                    </View>
-                    {csvExportLoading ? (
-                      <ActivityIndicator size="small" color={colors.primary} />
-                    ) : csvExportSuccess ? (
-                      <Ionicons name="checkmark-circle" size={22} color="#4caf50" />
-                    ) : (
-                      <Ionicons name="chevron-forward" size={20} color={colors.mutedText} />
-                    )}
-                  </View>
-                </TouchableRipple>
-
-                <TouchableRipple
-                  onPress={jsonExportLoading ? null : () => handleExportFormatSelect('json')}
-                  style={styles.listItem}
-                  disabled={jsonExportLoading}
-                >
-                  <View style={styles.listItemContent}>
-                    <View style={styles.formatItemRow}>
-                      <Ionicons name="code-outline" size={24} color={jsonColor} />
-                      <View style={styles.formatTextContainer}>
-                        <Text style={[styles.listItemText, { color: jsonColor }]}>Save externally to JSON</Text>
-                        <Text style={[styles.formatDescription, { color: colors.mutedText }]}>
-                          {jsonExportLoading
-                            ? (t('exporting') || 'Exporting…')
-                            : jsonExportSuccess
-                              ? (t('export_success') || 'Export complete')
-                              : (t('json_description') || 'Standard format, compatible with all versions')}
-                        </Text>
-                      </View>
-                    </View>
-                    {jsonExportLoading ? (
-                      <ActivityIndicator size="small" color={colors.primary} />
-                    ) : jsonExportSuccess ? (
-                      <Ionicons name="checkmark-circle" size={22} color="#4caf50" />
-                    ) : (
-                      <Ionicons name="chevron-forward" size={20} color={colors.mutedText} />
-                    )}
-                  </View>
-                </TouchableRipple>
-              </ScrollView>
-            )}
-
-            {activeSubPanel === 'export' && exportStep === 'sheets-progress' && (
-              <View style={styles.sheetsProgressContent}>
-                {sheetsSteps.map(step => (
-                  <View key={step.id} style={styles.sheetsProgressStep}>
-                    <View style={styles.sheetsProgressStepIcon}>
-                      {step.status === 'pending' && <Ionicons name="ellipse-outline" size={22} color={colors.mutedText} />}
-                      {step.status === 'in_progress' && <ActivityIndicator size="small" color={colors.primary} />}
-                      {step.status === 'completed' && <Ionicons name="checkmark-circle" size={22} color="#4caf50" />}
-                      {step.status === 'error' && <Ionicons name="close-circle" size={22} color={colors.destructive} />}
-                    </View>
-                    <Text style={[
-                      styles.sheetsProgressStepLabel,
-                      step.status === 'error' ? { color: colors.destructive } :
-                        { color: step.status === 'pending' ? colors.mutedText : colors.text },
-                    ]}>
-                      {step.label}
-                    </Text>
-                  </View>
-                ))}
-                {sheetsError && <Text style={[styles.sheetsErrorText, { color: colors.destructive }]}>{sheetsError}</Text>}
-                {sheetsSuccessUrl && (
-                  <TouchableOpacity
-                    onPress={() => Linking.openURL(sheetsSuccessUrl)}
-                    style={[styles.sheetsOpenButton, { backgroundColor: colors.primary }]}
-                  >
-                    <Ionicons name="open-outline" size={16} color="#fff" />
-                    <Text style={styles.sheetsOpenButtonText}>
-                      {t('google_sheets_open') || 'Open in Google Sheets'}
-                    </Text>
-                  </TouchableOpacity>
-                )}
-              </View>
+            {activeSubPanel === 'export' && (
+              <ExportPanel
+                step={exportStep}
+                onPushStep={pushStep}
+                onPopToRoot={popToRootStep}
+                onBusyChange={setPanelBusy}
+                onRegisterBack={registerPanelBack}
+                bottomInset={scrollBottomInset}
+              />
             )}
 
             {activeSubPanel === 'reset' && (
-              <View style={styles.confirmContent}>
-                <Ionicons name="warning-outline" size={48} color={colors.destructive} style={styles.confirmWarningIcon} />
-                <Text style={[styles.confirmText, { color: colors.text }]}>
-                  {t('reset_database_confirm') || 'Are you sure you want to reset the database? This will delete all data and create default accounts.'}
-                </Text>
-                <TouchableRipple
-                  onPress={confirmResetDatabase}
-                  disabled={resetInProgress}
-                  style={[styles.confirmButtonDestructive, { backgroundColor: colors.destructive }, resetInProgress && styles.confirmButtonBusy]}
-                >
-                  {resetInProgress ? (
-                    <View style={styles.confirmButtonBusyRow}>
-                      <ActivityIndicator size="small" color="#fff" />
-                      <Text style={styles.confirmButtonText}>{t('resetting_database') || 'Resetting…'}</Text>
-                    </View>
-                  ) : (
-                    <Text style={styles.confirmButtonText}>{t('reset') || 'Reset'}</Text>
-                  )}
-                </TouchableRipple>
-              </View>
+              <ResetPanel onDone={handleResetDone} onBusyChange={setPanelBusy} />
             )}
 
-            {activeSubPanel === 'import' && importStep === 'source' && (
-              <ScrollView style={styles.listContainer} contentContainerStyle={{ paddingBottom: scrollBottomInset }}>
-                <TouchableRipple onPress={() => handleImportSourceSelect('file')} style={styles.listItem}>
-                  <View style={styles.listItemContent}>
-                    <View style={styles.formatItemRow}>
-                      <Ionicons name="logo-google" size={24} color={colors.text} />
-                      <View style={styles.formatTextContainer}>
-                        <Text style={[styles.listItemText, { color: colors.text }]}>
-                          {t('import_from_file') || 'From Google Drive'}
-                        </Text>
-                        <Text style={[styles.formatDescription, { color: colors.mutedText }]}>
-                          {t('import_from_file_description') || 'Pick a backup file from Google Drive'}
-                        </Text>
-                      </View>
-                    </View>
-                    <Ionicons name="chevron-forward" size={20} color={colors.mutedText} />
-                  </View>
-                </TouchableRipple>
-
-                <TouchableRipple onPress={() => handleImportSourceSelect('local')} style={styles.listItem}>
-                  <View style={styles.listItemContent}>
-                    <View style={styles.formatItemRow}>
-                      <Ionicons name="archive-outline" size={24} color={colors.text} />
-                      <View style={styles.formatTextContainer}>
-                        <Text style={[styles.listItemText, { color: colors.text }]}>
-                          {t('import_from_local') || 'From local backup'}
-                        </Text>
-                        <Text style={[styles.formatDescription, { color: colors.mutedText }]}>
-                          {t('import_from_local_description') || 'Restore from a daily or weekly automatic backup'}
-                        </Text>
-                      </View>
-                    </View>
-                    <Ionicons name="chevron-forward" size={20} color={colors.mutedText} />
-                  </View>
-                </TouchableRipple>
-
-                <TouchableRipple
-                  onPress={handleGoogleSheetsImport}
-                  style={styles.listItem}
-                  testID="settings-import-google-sheets"
-                >
-                  <View style={styles.listItemContent}>
-                    <View style={styles.formatItemRow}>
-                      <Ionicons name="logo-google" size={24} color={colors.text} />
-                      <View style={styles.formatTextContainer}>
-                        <Text style={[styles.listItemText, { color: colors.text }]}>
-                          {t('import_from_google_sheets') || 'From Google Sheets'}
-                        </Text>
-                        <Text style={[styles.formatDescription, { color: colors.mutedText }]}>
-                          {t('import_from_google_sheets_description') || 'Import from your Penny spreadsheet'}
-                        </Text>
-                      </View>
-                    </View>
-                    <Ionicons name="chevron-forward" size={20} color={colors.mutedText} />
-                  </View>
-                </TouchableRipple>
-                {sheetsImportError && importStep === 'source' && (
-                  <View style={styles.sheetsSetupCta}>
-                    <Text testID="settings-import-no-spreadsheet" style={[styles.sheetsImportErrorInline, { color: colors.destructive }]}>
-                      {sheetsImportError}
-                    </Text>
-                    <TouchableRipple
-                      testID="settings-import-setup-export"
-                      onPress={handleSetupSheetsExport}
-                      style={[styles.sheetsSetupCtaButton, { borderColor: colors.primary }]}
-                    >
-                      <View style={styles.sheetsSetupCtaRow}>
-                        <Ionicons name="cloud-upload-outline" size={18} color={colors.primary} />
-                        <Text style={[styles.sheetsSetupCtaText, { color: colors.primary }]}>
-                          {t('google_sheets_setup_export_now') || 'Export now to set up'}
-                        </Text>
-                      </View>
-                    </TouchableRipple>
-                  </View>
-                )}
-              </ScrollView>
-            )}
-
-            {activeSubPanel === 'import' && importStep === 'local-list' && (
-              backupsLoading ? (
-                <EmptyState message={'Loading...'} style={styles.emptyContainer} />
-              ) : (
-                <FlatList
-                  data={storedBackups}
-                  keyExtractor={(item) => item.uri}
-                  renderItem={renderBackupItem}
-                  style={styles.flexList}
-                  contentContainerStyle={[
-                    storedBackups.length === 0 && styles.emptyContainer,
-                    { paddingBottom: scrollBottomInset },
-                  ]}
-                  ListEmptyComponent={
-                    <EmptyState message={t('local_backups_empty') || 'No local backups yet'} />
-                  }
-                />
-              )
-            )}
-
-            {activeSubPanel === 'import' && importStep === 'confirm-file' && (
-              <View style={styles.confirmContent}>
-                <Ionicons name="warning-outline" size={48} color={colors.destructive} style={styles.confirmWarningIcon} />
-                <Text style={[styles.confirmText, { color: colors.text }]}>
-                  {t('restore_confirm') || 'Are you sure you want to restore from backup? This will replace all current data.'}
-                </Text>
-                <TouchableRipple testID="confirm-import-file-btn" onPress={confirmImportBackup} style={[styles.confirmButtonDestructive, { backgroundColor: colors.destructive }]}>
-                  <Text style={styles.confirmButtonText}>{t('restore_database') || 'Restore'}</Text>
-                </TouchableRipple>
-              </View>
-            )}
-
-            {activeSubPanel === 'import' && importStep === 'confirm-local' && (
-              <View style={styles.confirmContent}>
-                <Ionicons name="warning-outline" size={48} color={colors.destructive} style={styles.confirmWarningIcon} />
-                {importSelectedBackup && (
-                  <Text style={[styles.confirmText, { color: colors.mutedText }]}>
-                    {formatBackupLabel(importSelectedBackup.filename)}
-                  </Text>
-                )}
-                <Text style={[styles.confirmText, { color: colors.text }]}>
-                  {t('restore_confirm') || 'Are you sure you want to restore from backup? This will replace all current data.'}
-                </Text>
-                <TouchableRipple onPress={confirmRestoreLocalBackup} style={[styles.confirmButtonDestructive, { backgroundColor: colors.destructive }]}>
-                  <Text style={styles.confirmButtonText}>{t('restore_database') || 'Restore'}</Text>
-                </TouchableRipple>
-              </View>
-            )}
-
-            {activeSubPanel === 'import' && importStep === 'sheets-progress' && (
-              <View style={styles.sheetsProgressContent}>
-                {sheetsImportSteps.map(step => (
-                  <View key={step.id} style={styles.sheetsProgressStep}>
-                    <View style={styles.sheetsProgressStepIcon}>
-                      {step.status === 'pending' && <Ionicons name="ellipse-outline" size={22} color={colors.mutedText} />}
-                      {step.status === 'in_progress' && <ActivityIndicator size="small" color={colors.primary} />}
-                      {step.status === 'completed' && <Ionicons name="checkmark-circle" size={22} color="#4caf50" />}
-                      {step.status === 'error' && <Ionicons name="close-circle" size={22} color={colors.destructive} />}
-                    </View>
-                    <Text style={[
-                      styles.sheetsProgressStepLabel,
-                      step.status === 'error' ? { color: colors.destructive } :
-                        { color: step.status === 'pending' ? colors.mutedText : colors.text },
-                    ]}>
-                      {step.label}
-                    </Text>
-                  </View>
-                ))}
-                {sheetsImportError && <Text style={[styles.sheetsErrorText, { color: colors.destructive }]}>{sheetsImportError}</Text>}
-              </View>
+            {activeSubPanel === 'import' && (
+              <ImportPanel
+                step={importStep}
+                onPushStep={pushStep}
+                onPopToRoot={popToRootStep}
+                onBusyChange={setPanelBusy}
+                onRegisterBack={registerPanelBack}
+                onRegisterRefresh={registerPanelRefresh}
+                onDone={closeSubPanel}
+                onSetUpSheetsExport={handleSetupSheetsExport}
+                bottomInset={scrollBottomInset}
+              />
             )}
 
             {activeSubPanel === 'logs' && (
-              <>
-                <View style={styles.filterRow}>
-                  {LOG_FILTERS.map(f => {
-                    const isSelected = f === logFilter;
-                    const filterLabelKey = `log_level_${f}`;
-                    const label = t(filterLabelKey) || f;
-                    // Badge every level chip that has entries (skip "all"); the
-                    // absence of a badge on Error/Warn reads as "none", so a
-                    // zero count needs no badge.
-                    const count = f === 'all' ? 0 : (counts?.[f] || 0);
-                    const badgeColor = f === 'error' || f === 'warn' ? LOG_LEVEL_COLORS[f] : colors.mutedText;
-                    const badgeBackground = isSelected ? SELECTED_BADGE_BG : `${badgeColor}26`;
-                    const badgeTextColor = isSelected ? '#fff' : badgeColor;
-                    return (
-                      <TouchableOpacity
-                        key={f}
-                        onPress={() => setLogFilter(f)}
-                        accessibilityRole="button"
-                        accessibilityState={{ selected: isSelected }}
-                        accessibilityLabel={count > 0 ? `${label}, ${count}` : label}
-                        style={[
-                          styles.filterChip,
-                          { borderColor: colors.border },
-                          isSelected && { backgroundColor: colors.primary },
-                        ]}
-                      >
-                        <Text style={[
-                          styles.filterChipText,
-                          isSelected ? styles.filterChipTextSelected : { color: colors.text },
-                        ]}>
-                          {label}
-                        </Text>
-                        {count > 0 && (
-                          <View style={[
-                            styles.filterChipBadge,
-                            { backgroundColor: badgeBackground },
-                          ]}>
-                            <Text style={[
-                              styles.filterChipBadgeText,
-                              { color: badgeTextColor },
-                            ]}>
-                              {count}
-                            </Text>
-                          </View>
-                        )}
-                      </TouchableOpacity>
-                    );
-                  })}
-                </View>
-
-                <FlatList
-                  data={entries.slice().reverse()}
-                  keyExtractor={(item) => String(item.id)}
-                  renderItem={renderLogEntry}
-                  style={styles.flexList}
-                  inverted
-                  initialNumToRender={20}
-                  maxToRenderPerBatch={20}
-                  windowSize={5}
-                  contentContainerStyle={entries.length === 0 && styles.emptyContainer}
-                  ListEmptyComponent={
-                    <EmptyState message={t('no_logs') || 'No logs yet'} />
-                  }
-                />
-
-                <Divider />
-
-                <View style={[styles.logsActionBar, { paddingBottom: scrollBottomInset }]}>
-                  <TouchableOpacity onPress={handleShareLogs} style={styles.logsActionButton}>
-                    <Ionicons name="share-outline" size={20} color={colors.primary} />
-                    <Text style={[styles.logsActionText, { color: colors.primary }]}>
-                      {t('share_logs') || 'Share Logs'}
-                    </Text>
-                  </TouchableOpacity>
-                  <TouchableOpacity onPress={handleClearLogs} style={styles.logsActionButton}>
-                    <Ionicons name="trash-outline" size={20} color={LOG_LEVEL_COLORS.error} />
-                    <Text style={[styles.logsActionText, { color: colors.destructive }]}>
-                      {t('clear_logs') || 'Clear Logs'}
-                    </Text>
-                  </TouchableOpacity>
-                </View>
-              </>
+              <LogsPanel bottomInset={scrollBottomInset} />
             )}
 
             {activeSubPanel === 'update' && (
-              <View style={styles.updatePanelWrapper}>
-                <UpdateContentPanel
-                  isChecking={isCheckingUpdate}
-                  updateResult={updateResult}
-                  downloadedApks={downloadedApks}
-                  onUpdate={handleUpdateFromSettings}
-                  onInstallApk={handleInstallApk}
-                  onRefresh={runUpdateCheck}
-                  bottomInset={scrollBottomInset}
-                />
-              </View>
+              <UpdatePanel
+                onRegisterTitle={registerPanelTitle}
+                onDone={closeSubPanel}
+                bottomInset={scrollBottomInset}
+              />
             )}
 
             {activeSubPanel === 'notificationProcessing' && (
-              <View style={styles.updatePanelWrapper}>
-                {notificationView === 'filters' ? (
-                  <NotificationFiltersContentPanel bottomInset={scrollBottomInset} />
-                ) : notificationView === 'bindings' ? (
-                  <NotificationBindingsContentPanel bottomInset={scrollBottomInset} />
-                ) : notificationView === 'templates' ? (
-                  <NotificationTemplatesContentPanel
-                    onEdit={handleEditTemplate}
-                    bottomInset={scrollBottomInset}
-                  />
-                ) : notificationView === 'templateEditor' ? (
-                  <NotificationTemplateEditorPanel
-                    notification={templateDraft?.notification}
-                    template={templateDraft?.template}
-                    recentNotifications={templateDraft?.recent || []}
-                    onDone={handleTemplateEditorDone}
-                    bottomInset={scrollBottomInset}
-                  />
-                ) : (
-                  <NotificationProcessingContentPanel
-                    onCreateTemplate={handleCreateTemplate}
-                    bottomInset={scrollBottomInset}
-                  />
-                )}
-              </View>
+              <NotificationPanel
+                step={notificationView}
+                parentStep={panelStack.parentStep}
+                onPushStep={pushStep}
+                onPopStep={popStep}
+                onReplaceStep={replaceStep}
+                onRegisterBack={registerPanelBack}
+                bottomInset={scrollBottomInset}
+              />
             )}
           </View>
         </Animated.View>
@@ -1713,207 +463,7 @@ export default function SettingsScreen({ setSubPanelActive }) {
       style={[styles.container, { backgroundColor: colors.background }]}
       onLayout={handleContainerLayout}
     >
-      <ScrollView contentContainerStyle={styles.settingsContent}>
-        <TouchableRipple onPress={() => openSubPanel('language')} style={styles.settingsRow} testID="settings-language-row">
-          <View style={styles.settingsRowContent}>
-            <View style={styles.settingsRowLeft}>
-              <Ionicons name="language-outline" size={22} color={colors.text} />
-              <View style={styles.settingsRowText}>
-                <Text style={[styles.settingsRowLabel, { color: colors.text }]}>{t('language')}</Text>
-                <Text style={[styles.settingsRowValue, { color: colors.mutedText }]}>
-                  {languageFlags[language] ? `${languageFlags[language]}  ${nativeLanguageNames[language] || language}` : (nativeLanguageNames[language] || language)}
-                </Text>
-              </View>
-            </View>
-            <Ionicons name="chevron-forward" size={20} color={colors.mutedText} />
-          </View>
-        </TouchableRipple>
-
-        <SettingToggleRow
-          icon="eye-off-outline"
-          label={t('hide_balances') || 'Hide balances'}
-          hint={t('hide_balances_hint') || 'Mask account balances for privacy'}
-          value={hideBalances}
-          onToggle={handleToggleHideBalances}
-        />
-
-        <SettingToggleRow
-          icon="location-outline"
-          label={t('attach_location') || 'Attach location to operations'}
-          hint={locationDenied
-            ? (t('location_permission_denied') || 'Location permission denied. Enable it in system settings.')
-            : (t('attach_location_hint') || 'Suggest labels you used nearby before')}
-          hintError={locationDenied}
-          value={attachLocation}
-          onToggle={handleToggleAttachLocation}
-          testID="settings-location-row"
-        />
-
-        <SettingToggleRow
-          icon={colorScheme === 'dark' ? 'moon-outline' : 'sunny-outline'}
-          label={t('theme') || 'Theme'}
-          hint={colorScheme === 'dark' ? t('theme_dark') : t('theme_light')}
-          value={colorScheme === 'dark'}
-          onToggle={handleToggleDarkMode}
-          testID="settings-theme-row"
-        />
-
-        <TouchableRipple onPress={() => openSubPanel('accounts')} style={styles.settingsRow} testID="settings-accounts-row">
-          <View style={styles.settingsRowContent}>
-            <View style={styles.settingsRowLeft}>
-              <Ionicons name="wallet-outline" size={22} color={colors.text} />
-              <View style={styles.settingsRowText}>
-                <Text style={[styles.settingsRowLabel, { color: colors.text }]}>{t('accounts') || 'Accounts'}</Text>
-                <Text style={[styles.settingsRowValue, { color: colors.mutedText }]}>
-                  {t('accounts_hint') || 'Manage your accounts and balances'}
-                </Text>
-              </View>
-            </View>
-            <Ionicons name="chevron-forward" size={20} color={colors.mutedText} />
-          </View>
-        </TouchableRipple>
-
-        <SettingToggleRow
-          icon="grid-outline"
-          label={t('show_accounts_in_menu') || 'Show accounts in main menu'}
-          hint={t('show_accounts_in_menu_hint') || 'Add an Accounts tab to the bottom navigation'}
-          value={showAccountsTab}
-          onToggle={handleToggleShowAccountsTab}
-          testID="settings-show-accounts-tab-row"
-        />
-
-        <SettingToggleRow
-          icon="pie-chart-outline"
-          label={t('show_budget_in_menu') || 'Show Budget in main menu'}
-          hint={t('show_budget_in_menu_hint') || 'Show the Budget tab in the bottom navigation'}
-          value={showBudgetTab}
-          onToggle={handleToggleShowBudgetTab}
-          testID="settings-show-budget-tab-row"
-        />
-
-        <TouchableRipple onPress={() => openSubPanel('categories')} style={styles.settingsRow} testID="settings-categories-row">
-          <View style={styles.settingsRowContent}>
-            <View style={styles.settingsRowLeft}>
-              <Ionicons name="shapes-outline" size={22} color={colors.text} />
-              <View style={styles.settingsRowText}>
-                <Text style={[styles.settingsRowLabel, { color: colors.text }]}>{t('categories') || 'Categories'}</Text>
-                <Text style={[styles.settingsRowValue, { color: colors.mutedText }]}>
-                  {t('categories_hint') || 'Manage your expense and income categories'}
-                </Text>
-              </View>
-            </View>
-            <Ionicons name="chevron-forward" size={20} color={colors.mutedText} />
-          </View>
-        </TouchableRipple>
-
-        <TouchableRipple
-          onPress={() => openSubPanel('notificationProcessing')}
-          style={styles.settingsRow}
-          testID="settings-notification-processing-row"
-        >
-          <View style={styles.settingsRowContent}>
-            <View style={styles.settingsRowLeft}>
-              <Ionicons name="notifications-outline" size={22} color={colors.text} />
-              <View style={styles.settingsRowText}>
-                <Text style={[styles.settingsRowLabel, { color: colors.text }]}>
-                  {t('notification_processing') || 'Notification processing'}
-                </Text>
-                <Text style={[styles.settingsRowValue, { color: colors.mutedText }]}>
-                  {t('notification_processing_hint') ||
-                    'Read notifications and turn purchases into operations'}
-                </Text>
-              </View>
-            </View>
-            <Ionicons name="chevron-forward" size={20} color={colors.mutedText} />
-          </View>
-        </TouchableRipple>
-
-        <Divider style={styles.divider} />
-
-        <Text variant="labelLarge" style={[styles.sectionLabel, { color: colors.mutedText }]}>{t('database') || 'Database'}</Text>
-
-        <TouchableRipple onPress={() => openSubPanel('export')} style={styles.settingsRow} testID="settings-export-row">
-          <View style={styles.settingsRowContent}>
-            <View style={styles.settingsRowLeft}>
-              <Ionicons name="cloud-upload-outline" size={22} color={colors.text} />
-              <Text style={[styles.settingsRowLabel, { color: colors.text }]}>{t('export') || 'Export'}</Text>
-            </View>
-            <Ionicons name="chevron-forward" size={20} color={colors.mutedText} />
-          </View>
-        </TouchableRipple>
-
-        <TouchableRipple onPress={() => openSubPanel('import')} style={styles.settingsRow}>
-          <View style={styles.settingsRowContent}>
-            <View style={styles.settingsRowLeft}>
-              <Ionicons name="cloud-download-outline" size={22} color={colors.text} />
-              <Text style={[styles.settingsRowLabel, { color: colors.text }]}>{t('import') || 'Import'}</Text>
-            </View>
-            <Ionicons name="chevron-forward" size={20} color={colors.mutedText} />
-          </View>
-        </TouchableRipple>
-
-        <Divider style={styles.divider} />
-
-        <Text variant="labelLarge" style={[styles.sectionLabel, { color: colors.mutedText }]}>{t('developer') || 'Developer'}</Text>
-
-        <TouchableRipple onPress={() => openSubPanel('logs')} style={styles.settingsRow} testID="logs-row">
-          <View style={styles.settingsRowContent}>
-            <View style={styles.settingsRowLeft}>
-              <Ionicons name="terminal-outline" size={22} color={colors.text} />
-              <Text style={[styles.settingsRowLabel, { color: colors.text }]}>{t('logs') || 'Logs'}</Text>
-            </View>
-            <Ionicons name="chevron-forward" size={20} color={colors.mutedText} />
-          </View>
-        </TouchableRipple>
-
-        <TouchableRipple
-          onPress={isDownloading ? undefined : handleCheckForUpdates}
-          style={[styles.settingsRow, isDownloading && styles.settingsRowDisabled]}
-          disabled={isDownloading}
-          testID="check-updates-row"
-        >
-          <View style={styles.settingsRowContent}>
-            <View style={styles.settingsRowLeft}>
-              <Ionicons name="download-outline" size={22} color={isDownloading ? colors.mutedText : colors.text} />
-              <Text style={[styles.settingsRowLabel, { color: isDownloading ? colors.mutedText : colors.text }]}>
-                {t('check_updates') || 'Check for updates'}
-              </Text>
-            </View>
-            <View style={styles.updateRowRight}>
-              {isDownloading ? (
-                <>
-                  <Text style={[styles.versionLabel, { color: colors.primary }]}>
-                    {downloadPhase === 'verifying'
-                      ? (t('update_phase_verifying') || 'Verifying APK…')
-                      : downloadPhase === 'backing_up'
-                        ? (t('update_phase_backing_up') || 'Backing up…')
-                        : `${Math.round((downloadProgress ?? 0) * 100)}%`}
-                  </Text>
-                  <ActivityIndicator size={16} color={colors.primary} style={styles.updateRowSpinner} />
-                </>
-              ) : (
-                <>
-                  <Text style={[styles.versionLabel, { color: colors.mutedText }]}>
-                    {`v${require('../../package.json').version}`}
-                  </Text>
-                  <Ionicons name="chevron-forward" size={20} color={colors.mutedText} />
-                </>
-              )}
-            </View>
-          </View>
-        </TouchableRipple>
-
-        <View style={styles.resetSpacer} />
-
-        <TouchableRipple onPress={() => openSubPanel('reset')} style={styles.settingsRow}>
-          <View style={styles.settingsRowContent}>
-            <View style={styles.settingsRowLeft}>
-              <Ionicons name="trash-outline" size={22} color={colors.destructive} />
-              <Text style={[styles.settingsRowLabel, { color: colors.destructive }]}>{t('reset_database') || 'Reset Database'}</Text>
-            </View>
-          </View>
-        </TouchableRipple>
-      </ScrollView>
+      <SettingsList onOpenPanel={openSubPanel} />
       {subPanelOverlay}
     </View>
   );
@@ -1926,285 +476,8 @@ const styles = StyleSheet.create({
     justifyContent: 'center',
     width: 40,
   },
-  backupActionButton: {
-    padding: 6,
-  },
-  backupConfirmButton: {
-    paddingHorizontal: 10,
-    paddingVertical: 6,
-  },
-  backupConfirmButtonDestructiveText: {
-    fontSize: FONT_SIZE.md,
-    fontWeight: '600',
-  },
-  backupConfirmButtonText: {
-    fontSize: FONT_SIZE.md,
-    fontWeight: '600',
-  },
-  backupItem: {
-    alignItems: 'center',
-    borderBottomWidth: StyleSheet.hairlineWidth,
-    flexDirection: 'row',
-    justifyContent: 'space-between',
-    paddingHorizontal: HORIZONTAL_PADDING,
-    paddingVertical: SPACING.md,
-  },
-  backupItemActions: {
-    alignItems: 'center',
-    flexDirection: 'row',
-    gap: SPACING.xs,
-  },
-  backupItemLabel: {
-    fontSize: 15,
-  },
-  backupItemLeft: {
-    alignItems: 'center',
-    flex: 1,
-    flexDirection: 'row',
-    gap: SPACING.md,
-  },
-  backupItemMeta: {
-    fontSize: FONT_SIZE.sm,
-    marginTop: 2,
-  },
-  backupItemText: {
-    flex: 1,
-  },
-  confirmButtonBusy: {
-    opacity: 0.85,
-  },
-  confirmButtonBusyRow: {
-    alignItems: 'center',
-    flexDirection: 'row',
-    gap: SPACING.sm,
-    justifyContent: 'center',
-  },
-  confirmButtonDestructive: {
-    borderRadius: BORDER_RADIUS.md,
-    marginTop: SPACING.xl,
-    paddingHorizontal: SPACING.xl,
-    paddingVertical: SPACING.md,
-  },
-  confirmButtonText: {
-    color: '#fff',
-    fontSize: FONT_SIZE.base,
-    fontWeight: '600',
-    textAlign: 'center',
-  },
-  confirmContent: {
-    alignItems: 'center',
-    flex: 1,
-    justifyContent: 'center',
-    paddingHorizontal: HORIZONTAL_PADDING * 2,
-    paddingVertical: SPACING.xl,
-  },
-  confirmText: {
-    fontSize: 15,
-    lineHeight: 22,
-    textAlign: 'center',
-  },
-  confirmWarningIcon: {
-    marginBottom: SPACING.lg,
-  },
   container: {
     flex: 1,
-  },
-  divider: {
-    marginVertical: SPACING.xs,
-  },
-  emptyContainer: {
-    flex: 1,
-  },
-  filterChip: CHIP,
-  filterChipBadge: BADGE,
-  filterChipBadgeText: BADGE_TEXT,
-  filterChipText: CHIP_TEXT,
-  filterChipTextSelected: {
-    color: '#fff',
-  },
-  filterRow: {
-    flexDirection: 'row',
-    gap: SPACING.sm,
-    paddingHorizontal: HORIZONTAL_PADDING,
-    paddingVertical: SPACING.sm,
-  },
-  flexList: {
-    flex: 1,
-  },
-  formatDescription: {
-    fontSize: FONT_SIZE.sm,
-    marginTop: SPACING.xs,
-  },
-  formatItemRow: {
-    alignItems: 'center',
-    flex: 1,
-    flexDirection: 'row',
-    gap: SPACING.md,
-  },
-  formatTextContainer: {
-    flex: 1,
-    flexShrink: 1,
-  },
-  listContainer: {
-    paddingVertical: SPACING.sm,
-  },
-  listItem: {
-    paddingHorizontal: HORIZONTAL_PADDING,
-  },
-  listItemContent: {
-    alignItems: 'center',
-    flexDirection: 'row',
-    justifyContent: 'space-between',
-    paddingVertical: SPACING.lg,
-  },
-  listItemText: {
-    fontSize: FONT_SIZE.base,
-  },
-  logEntry: {
-    borderBottomWidth: StyleSheet.hairlineWidth,
-    borderLeftWidth: 3,
-    flexDirection: 'row',
-    gap: 6,
-    paddingHorizontal: HORIZONTAL_PADDING,
-    paddingLeft: HORIZONTAL_PADDING - 3,
-    paddingVertical: 6,
-  },
-  logLevel: {
-    fontFamily: 'monospace',
-    fontSize: 11,
-    fontWeight: '700',
-    width: 42,
-  },
-  logMessage: {
-    flex: 1,
-    fontFamily: 'monospace',
-    fontSize: 11,
-  },
-  logTimestamp: {
-    fontFamily: 'monospace',
-    fontSize: 11,
-  },
-  logsActionBar: {
-    flexDirection: 'row',
-    justifyContent: 'space-around',
-    paddingVertical: SPACING.md,
-  },
-  logsActionButton: {
-    alignItems: 'center',
-    flexDirection: 'row',
-    gap: 6,
-  },
-  logsActionText: {
-    fontSize: FONT_SIZE.md,
-    fontWeight: '600',
-  },
-  resetSpacer: {
-    height: SPACING.sm,
-  },
-  sectionLabel: {
-    ...SECTION_LABEL,
-    paddingHorizontal: HORIZONTAL_PADDING,
-    paddingVertical: SPACING.sm,
-  },
-  settingsContent: {
-    paddingBottom: 96,
-    paddingTop: SPACING.sm,
-  },
-  settingsRow: {
-    paddingHorizontal: HORIZONTAL_PADDING,
-  },
-  settingsRowContent: {
-    alignItems: 'center',
-    flexDirection: 'row',
-    justifyContent: 'space-between',
-    paddingVertical: SPACING.md,
-  },
-  settingsRowDisabled: {
-    opacity: 0.6,
-  },
-  settingsRowLabel: {
-    fontSize: FONT_SIZE.base,
-  },
-  settingsRowLeft: {
-    alignItems: 'center',
-    flex: 1,
-    flexDirection: 'row',
-    gap: SPACING.md,
-  },
-  settingsRowText: {
-    flex: 1,
-    flexShrink: 1,
-  },
-  settingsRowValue: {
-    fontSize: 13,
-    marginTop: 2,
-  },
-  sheetsErrorText: {
-    fontSize: FONT_SIZE.md,
-    lineHeight: 20,
-    marginTop: SPACING.lg,
-    textAlign: 'center',
-  },
-  sheetsImportErrorInline: {
-    fontSize: FONT_SIZE.md,
-    lineHeight: 20,
-    marginBottom: 8,
-    marginHorizontal: 16,
-  },
-  sheetsOpenButton: {
-    alignItems: 'center',
-    borderRadius: BORDER_RADIUS.md,
-    flexDirection: 'row',
-    gap: SPACING.sm,
-    justifyContent: 'center',
-    marginTop: SPACING.xl,
-    paddingHorizontal: SPACING.xl,
-    paddingVertical: SPACING.md,
-  },
-  sheetsOpenButtonText: {
-    color: '#fff',
-    fontSize: FONT_SIZE.base,
-    fontWeight: '600',
-  },
-  sheetsProgressContent: {
-    flex: 1,
-    paddingHorizontal: HORIZONTAL_PADDING,
-    paddingTop: SPACING.lg,
-  },
-  sheetsProgressStep: {
-    alignItems: 'center',
-    flexDirection: 'row',
-    gap: SPACING.md,
-    paddingVertical: SPACING.md,
-  },
-  sheetsProgressStepIcon: {
-    alignItems: 'center',
-    justifyContent: 'center',
-    width: 24,
-  },
-  sheetsProgressStepLabel: {
-    flex: 1,
-    fontSize: 15,
-  },
-  sheetsSetupCta: {
-    marginTop: SPACING.sm,
-  },
-  sheetsSetupCtaButton: {
-    alignSelf: 'flex-start',
-    borderRadius: BORDER_RADIUS.md,
-    borderWidth: 1,
-    marginHorizontal: 16,
-    paddingHorizontal: SPACING.lg,
-    paddingVertical: SPACING.sm,
-  },
-  sheetsSetupCtaRow: {
-    alignItems: 'center',
-    flexDirection: 'row',
-    gap: SPACING.sm,
-  },
-  sheetsSetupCtaText: {
-    fontSize: FONT_SIZE.md,
-    fontWeight: '600',
   },
   subPanelBody: {
     flex: 1,
@@ -2243,34 +516,6 @@ const styles = StyleSheet.create({
   },
   subPanelTitle: {
     fontWeight: '600',
-  },
-  switchThumb: {
-    backgroundColor: '#fff',
-    borderRadius: BORDER_RADIUS.pill,
-    elevation: 2,
-    height: 20,
-    position: 'absolute',
-    width: 20,
-  },
-  switchTrack: {
-    borderRadius: BORDER_RADIUS.pill,
-    height: 24,
-    justifyContent: 'center',
-    width: 44,
-  },
-  updatePanelWrapper: {
-    flex: 1,
-  },
-  updateRowRight: {
-    alignItems: 'center',
-    flexDirection: 'row',
-    gap: SPACING.xs,
-  },
-  updateRowSpinner: {
-    marginLeft: 2,
-  },
-  versionLabel: {
-    fontSize: 13,
   },
 });
 

@@ -35,7 +35,12 @@ const i18nCache = { en: enTranslations };
 // Resolve (and memoize) the translation object for a language code. Returns the
 // language's data, or `undefined` for an unknown code — preserving the original
 // `i18nData[language]?.[key] || key` lookup semantics exactly.
-function loadTranslations(lang) {
+//
+// Exported because the first-run language picker renders before any provider is
+// mounted and has to translate its own three strings. It used to keep a second
+// loader map for that, eagerly importing eight locales at startup; going through
+// this one means only the language the user actually taps is ever evaluated.
+export function loadTranslations(lang) {
   if (i18nCache[lang]) return i18nCache[lang];
   const loader = i18nLoaders[lang];
   if (!loader) return undefined;
@@ -44,7 +49,8 @@ function loadTranslations(lang) {
   return data;
 }
 
-const availableLanguages = Object.keys(i18nLoaders);
+// Every language the app ships translations for.
+export const availableLanguages = Object.keys(i18nLoaders);
 
 const LocalizationContext = createContext({
   t: (key) => key,

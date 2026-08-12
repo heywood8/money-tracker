@@ -72,6 +72,8 @@ jest.mock('../../app/contexts/DisplaySettingsContext', () => ({
     setShowAccountsTab: jest.fn(),
     showBudgetTab: true,
     setShowBudgetTab: jest.fn(),
+    showQuickAddPanel: true,
+    setShowQuickAddPanel: jest.fn(),
   }),
 }));
 

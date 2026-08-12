@@ -372,4 +372,67 @@ describe('DisplaySettingsContext', () => {
       expect(PreferencesDB.setPreference).toHaveBeenCalledWith('show_budget_tab', 'true');
     });
   });
+
+  describe('showQuickAddPanel', () => {
+    it('defaults showQuickAddPanel=true when no pref is stored', async () => {
+      // getPreference echoes its default arg for an unset key; the panel has
+      // always been pinned open, so that stays the behaviour on upgrade.
+      PreferencesDB.getPreference.mockImplementation((key, def) =>
+        Promise.resolve(key === 'show_quickadd_panel' ? def : 'false'),
+      );
+
+      const { result } = await renderHook(() => useDisplaySettings(), { wrapper });
+
+      await waitFor(() => {
+        expect(result.current.showQuickAddPanel).toBe(true);
+      });
+    });
+
+    it('reads stored showQuickAddPanel="false" on mount', async () => {
+      PreferencesDB.getPreference.mockResolvedValue('false');
+
+      const { result } = await renderHook(() => useDisplaySettings(), { wrapper });
+
+      await waitFor(() => {
+        expect(PreferencesDB.getPreference).toHaveBeenCalled();
+      });
+      expect(result.current.showQuickAddPanel).toBe(false);
+    });
+
+    it('setShowQuickAddPanel(false) persists "false"', async () => {
+      PreferencesDB.getPreference.mockImplementation((key, def) =>
+        Promise.resolve(key === 'show_quickadd_panel' ? def : 'false'),
+      );
+
+      const { result } = await renderHook(() => useDisplaySettings(), { wrapper });
+
+      await waitFor(() => {
+        expect(result.current.showQuickAddPanel).toBe(true);
+      });
+
+      await act(async () => {
+        await result.current.setShowQuickAddPanel(false);
+      });
+
+      expect(result.current.showQuickAddPanel).toBe(false);
+      expect(PreferencesDB.setPreference).toHaveBeenCalledWith('show_quickadd_panel', 'false');
+    });
+
+    it('setShowQuickAddPanel(true) persists "true"', async () => {
+      PreferencesDB.getPreference.mockResolvedValue('false');
+
+      const { result } = await renderHook(() => useDisplaySettings(), { wrapper });
+
+      await waitFor(() => {
+        expect(result.current.showQuickAddPanel).toBe(false);
+      });
+
+      await act(async () => {
+        await result.current.setShowQuickAddPanel(true);
+      });
+
+      expect(result.current.showQuickAddPanel).toBe(true);
+      expect(PreferencesDB.setPreference).toHaveBeenCalledWith('show_quickadd_panel', 'true');
+    });
+  });
 });

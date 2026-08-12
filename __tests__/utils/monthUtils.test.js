@@ -9,6 +9,7 @@ import {
   monthShortLabels,
   fullYearKeyOf,
   isFullYearKey,
+  monthElapsedFraction,
 } from '../../app/utils/monthUtils';
 
 describe('monthUtils', () => {
@@ -112,6 +113,32 @@ describe('monthUtils', () => {
       expect(monthShortLabels().every(l => typeof l === 'string' && l.length > 0)).toBe(true);
     });
   });
+  describe('monthElapsedFraction', () => {
+    it('is 1 for a month that has already finished', () => {
+      expect(monthElapsedFraction(addMonths(currentMonthKey(), -1))).toBe(1);
+      expect(monthElapsedFraction('2001-01')).toBe(1);
+    });
+
+    it('is 0 for a month that has not started', () => {
+      expect(monthElapsedFraction(addMonths(currentMonthKey(), 1))).toBe(0);
+      expect(monthElapsedFraction('2999-12')).toBe(0);
+    });
+
+    // Today counts as done — "11 of 31 days" on the 11th — which is what a
+    // person means by how far into the month they are.
+    it('counts today as elapsed in the month in progress', () => {
+      const now = new Date();
+      const daysInMonth = new Date(now.getFullYear(), now.getMonth() + 1, 0).getDate();
+      expect(monthElapsedFraction(currentMonthKey())).toBeCloseTo(now.getDate() / daysInMonth, 10);
+    });
+
+    it('never leaves the unit interval', () => {
+      const fraction = monthElapsedFraction(currentMonthKey());
+      expect(fraction).toBeGreaterThan(0);
+      expect(fraction).toBeLessThanOrEqual(1);
+    });
+  });
+
   describe('whole-year period keys', () => {
     it('builds a YYYY-full key from a year', () => {
       expect(fullYearKeyOf(2026)).toBe('2026-full');

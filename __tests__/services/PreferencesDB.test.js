@@ -71,6 +71,7 @@ describe('PreferencesDB', () => {
         'ATTACH_LOCATION',
         'SHOW_ACCOUNTS_TAB',
         'SHOW_BUDGET_TAB',
+        'SHOW_QUICKADD_PANEL',
         'BUDGET_EXPANDED_GROUPS',
         'BALANCE_CHART_COMPARISON',
         'GOOGLE_SHEETS_SPREADSHEET_ID',

@@ -14,7 +14,6 @@ import currenciesJson from '../../assets/currencies.json';
 import EmptyState from '../components/EmptyState';
 import MonthPickerSheet from '../components/budgets/MonthPickerSheet';
 import PeriodHeader from '../components/PeriodHeader';
-import CurrencyScopeChip from '../components/CurrencyScopeChip';
 import CurrencySheet from '../components/CurrencySheet';
 import {
   currentMonthKey, addMonths, formatMonthLabel, yearOf, monthIndexOf,
@@ -556,8 +555,8 @@ const GraphsScreen = () => {
   }));
 
   // The charts start one gap below the header's solid part and scroll under it
-  // from there. Measured rather than assumed: the header is taller at a large
-  // font scale.
+  // from there. Measured rather than assumed: the header is one line whatever
+  // it holds, but that line is taller at a large font scale.
   const scrollContentStyle = useMemo(
     () => [styles.content, { paddingTop: headerHeight + SPACING.md }],
     [headerHeight],
@@ -634,26 +633,6 @@ const GraphsScreen = () => {
       <Animated.View style={[styles.contentLayer, periodTransitionStyle]} testID="graphs-period-transition">
         <ScrollView style={styles.scrollView} contentContainerStyle={styles.scrollContent}>
           <View style={scrollContentStyle} testID="graphs-content">
-            {/* Names the unit both hero cards below are read in. It cannot live
-                inside SummaryTab (see the note on that component) — a chip
-                nested in the tab's own press target would be a control inside
-                a control — so it sits here instead: its own row, first in the
-                scroll content, left-aligned with the cards so it reads as one
-                caption over both rather than belonging to either. Mounted only
-                when there is more than one account currency to pick between. */}
-            {currencies.length > 1 && (
-              <View style={styles.currencyChipRow}>
-                <CurrencyScopeChip
-                  code={selectedCurrency}
-                  onPress={handleOpenCurrencyPicker}
-                  active={currencySheetVisible}
-                  accessibilityLabel={`${t('currency')}: ${selectedCurrency}`}
-                  colors={colors}
-                  testID="graphs-currency-chip"
-                />
-              </View>
-            )}
-
             {/* Warn when some account currencies can't be converted to the selected one */}
             {convertAllCurrencies && unconvertedCurrencies.length > 0 && (
               <View style={[styles.convertWarning, { backgroundColor: colors.altRow, borderColor: colors.border }]}>
@@ -859,6 +838,11 @@ const GraphsScreen = () => {
         showJumpToCurrent={!isCurrentPeriod}
         onJumpToCurrent={handleJumpToCurrentPeriod}
         jumpLabel={t('jump_to_current_period')}
+        currencies={currencies}
+        selectedCurrency={selectedCurrency}
+        onPressCurrency={handleOpenCurrencyPicker}
+        currencyActive={currencySheetVisible}
+        currencyLabel={`${t('currency')}: ${selectedCurrency}`}
         colors={colors}
         onHeightChange={setHeaderHeight}
         testIDPrefix="graphs-period"
@@ -935,12 +919,6 @@ const styles = StyleSheet.create({
   convertWarningText: {
     flex: 1,
     fontSize: FONT_SIZE.sm,
-  },
-  // flex-start rather than the column's default stretch — without it the chip
-  // would grow to the row's full width instead of shrink-wrapping its content.
-  currencyChipRow: {
-    alignItems: 'flex-start',
-    marginBottom: SPACING.md,
   },
   scrollContent: {
     paddingBottom: 180,

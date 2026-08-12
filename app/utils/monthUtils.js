@@ -30,6 +30,28 @@ export const fullYearKeyOf = (year) => `${year}-full`;
 /** True for a whole-year period key (`YYYY-full`) rather than a month key. */
 export const isFullYearKey = (key) => typeof key === 'string' && key.endsWith('-full');
 
+/**
+ * How much of a month has already happened, as a fraction of its days.
+ *
+ * A finished month is 1 and a month that has not started is 0, so the single
+ * number covers past, present and future without the caller testing which it
+ * has. The current month counts today as done — "11 of 31 days" on the 11th —
+ * which is what a person means when they ask how far into the month they are.
+ *
+ * @param {string} monthKey - YYYY-MM. String comparison orders these, so no
+ *   date parsing is needed to place the key against the current month.
+ * @returns {number} Fraction in [0, 1].
+ */
+export const monthElapsedFraction = (monthKey) => {
+  const current = currentMonthKey();
+  if (monthKey < current) return 1;
+  if (monthKey > current) return 0;
+  const now = new Date();
+  // Day 0 of the next month is the last day of this one.
+  const daysInMonth = new Date(now.getFullYear(), now.getMonth() + 1, 0).getDate();
+  return now.getDate() / daysInMonth;
+};
+
 /** Shift a YYYY-MM key by `delta` months. */
 export const addMonths = (monthKey, delta) => {
   const [y, m] = monthKey.split('-').map(Number);

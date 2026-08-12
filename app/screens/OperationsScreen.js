@@ -1,6 +1,6 @@
 import React, { useState, useMemo, useCallback, useEffect, useRef } from 'react';
 import { View, StyleSheet, FlatList, TouchableOpacity, TextInput, Pressable, Modal, Keyboard, BackHandler } from 'react-native';
-import Animated, { useSharedValue, useAnimatedStyle, withTiming } from 'react-native-reanimated';
+import Animated, { useSharedValue, useAnimatedStyle, withTiming, withSpring } from 'react-native-reanimated';
 import Icon from '@expo/vector-icons/MaterialCommunityIcons';
 import DateTimePicker from '@react-native-community/datetimepicker';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
@@ -39,7 +39,8 @@ import useQuickAddLocation from '../hooks/useQuickAddLocation';
 import usePendingOperationSuggestions from '../hooks/usePendingOperationSuggestions';
 import { useSearch } from '../contexts/SearchContext';
 import { useDisplaySettings } from '../contexts/DisplaySettingsContext';
-import { TIMING_ENTER, TIMING_EXIT, DURATION_ENTER, DURATION_EXIT } from '../utils/motion';
+import { TIMING_ENTER, TIMING_EXIT, DURATION_ENTER, DURATION_EXIT, SPRING_SETTLE } from '../utils/motion';
+import AddFAB, { FAB_BOTTOM_OFFSET } from '../components/AddFAB';
 
 // Note: dynamic createStyles removed to keep linting stable.
 
@@ -98,6 +99,16 @@ const OperationsScreen = () => {
   const { accounts, visibleAccounts } = useAccountsData();
   const { categories } = useCategories();
 
+  // Display preferences. Read defensively: the context has no default value, so
+  // a missing provider (e.g. in unit tests) yields undefined.
+  const displaySettings = useDisplaySettings();
+  // Opt-in geolocation for quick-add.
+  const attachLocation = !!(displaySettings && displaySettings.attachLocation);
+  // Whether the quick-add panel is pinned open at the top of the list. Only an
+  // explicit `false` collapses it, so an absent provider keeps the historical
+  // always-open behaviour.
+  const showQuickAddPanel = !(displaySettings && displaySettings.showQuickAddPanel === false);
+
   const [modalVisible, setModalVisible] = useState(false);
   const [editingOperation, setEditingOperation] = useState(null);
   const [isNew, setIsNew] = useState(false);
@@ -129,6 +140,17 @@ const OperationsScreen = () => {
   const quickAddFlashTokenRef = useRef(0);
 
   const { searchMode, filtersExpanded, openSearch, closeSearch, reopenSearch, toggleFilters } = useSearch();
+  const isSearchOpen = searchMode === 'open';
+  // With the panel setting off, the form lives behind the + button: it is
+  // summoned for one entry and folds itself away again once that entry lands.
+  // Meaningless while the setting is on, where the panel never leaves.
+  const [quickAddExpanded, setQuickAddExpanded] = useState(false);
+  // A summoned form belongs to the entry the user is making; search replaces
+  // that whole context, so what was open behind it should not reappear when
+  // search closes.
+  useEffect(() => {
+    if (isSearchOpen) setQuickAddExpanded(false);
+  }, [isSearchOpen]);
   const scrollOffsetRef = useRef(0);
   const prevFiltersExpandedRef = useRef(false);
   const prevSearchModeRef = useRef(searchMode);
@@ -142,36 +164,61 @@ const OperationsScreen = () => {
     quickAddClipHeightRef.current = Math.round(event.nativeEvent.layout.height);
   }, []);
 
-  // Animate when searchMode changes
-  useEffect(() => {
+  // Drive the clip to `collapsed`. Three motions, because three different things
+  // ask for this move and they do not feel the same:
+  //   'timing'  — search opening or closing. The panel is one element of a
+  //               transition that also moves the search pill and the list, so it
+  //               keeps time with them on the app's shared enter/exit curves.
+  //   'spring'  — the + button, and the fold-away after an entry lands. A direct
+  //               manipulation of this one surface: it travels on the iOS-derived
+  //               spring, arriving at its own pace rather than on a stopwatch.
+  //   'instant' — first paint, and a change of the setting itself (made from the
+  //               settings screen, with this one not in front of the user).
+  //               Nothing to watch, so nothing to animate.
+  const applyQuickAddCollapse = useCallback((collapsed, mode) => {
     // Collapse from the block's REAL height rather than from the 1000 ceiling.
     // Animating 1000 → 0 spends ~93% of its time above the form's ~200dp, where
     // the clip touches nothing: the list below sat still for 300ms and then
     // jumped as the last 20ms cut through the actual content. Starting at the
     // measured height makes every frame of the collapse a frame the eye can see.
     const measured = quickAddClipHeightRef.current || QUICK_ADD_UNCLIPPED;
-    if (searchMode === 'open') {
-      // Outer clip collapses; inner content slides upward within it, travelling
-      // exactly its own height so it clears the boundary as the boundary closes.
-      quickAddMaxHeight.value = measured;
-      quickAddMaxHeight.value = withTiming(0, { ...TIMING_EXIT, duration: DURATION_EXIT });
-      quickAddTranslateY.value = withTiming(-measured, { ...TIMING_EXIT, duration: DURATION_EXIT });
-    } else {
-      // Slide back down — content descends into view as the clip opens.
-      quickAddTranslateY.value = withTiming(0, { ...TIMING_ENTER, duration: DURATION_ENTER });
-      quickAddMaxHeight.value = withTiming(
-        measured,
-        { ...TIMING_ENTER, duration: DURATION_ENTER },
-        (finished) => {
-          'worklet';
-          // Hand the ceiling back once the form is fully open, so it can grow
-          // (transfer fields, suggestion deck) without being clipped at the
-          // height it happened to have when search closed.
-          if (finished) quickAddMaxHeight.value = QUICK_ADD_UNCLIPPED;
-        },
-      );
+    // The slide's travel: exactly the block's own height, so the content clears
+    // the boundary as the boundary closes. Before the first layout there is no
+    // height to travel — the clip alone hides it, and the first expansion then
+    // reads as an uncover rather than as a slide from far above the screen.
+    const slide = quickAddClipHeightRef.current || 0;
+
+    if (mode === 'instant') {
+      quickAddMaxHeight.value = collapsed ? 0 : QUICK_ADD_UNCLIPPED;
+      quickAddTranslateY.value = collapsed ? -slide : 0;
+      return;
     }
-  }, [searchMode]);
+
+    const collapseTo = (value, config) => (mode === 'spring'
+      ? withSpring(value, SPRING_SETTLE)
+      : withTiming(value, config));
+
+    if (collapsed) {
+      // Outer clip collapses; inner content slides upward within it.
+      quickAddMaxHeight.value = measured;
+      quickAddMaxHeight.value = collapseTo(0, { ...TIMING_EXIT, duration: DURATION_EXIT });
+      quickAddTranslateY.value = collapseTo(-slide, { ...TIMING_EXIT, duration: DURATION_EXIT });
+      return;
+    }
+
+    // Slide back down — content descends into view as the clip opens.
+    quickAddTranslateY.value = collapseTo(0, { ...TIMING_ENTER, duration: DURATION_ENTER });
+    // Hand the ceiling back once the form is fully open, so it can grow
+    // (transfer fields, suggestion deck) without being clipped at the height it
+    // happened to have when it was last closed.
+    const release = (finished) => {
+      'worklet';
+      if (finished) quickAddMaxHeight.value = QUICK_ADD_UNCLIPPED;
+    };
+    quickAddMaxHeight.value = mode === 'spring'
+      ? withSpring(measured, SPRING_SETTLE, release)
+      : withTiming(measured, { ...TIMING_ENTER, duration: DURATION_ENTER }, release);
+  }, [quickAddMaxHeight, quickAddTranslateY]);
 
   // Outer view: clips the content as height collapses
   const animatedQuickAddClipStyle = useAnimatedStyle(() => ({
@@ -206,10 +253,6 @@ const OperationsScreen = () => {
     foreignExchangeRate,
   } = useQuickAddForm(visibleAccounts, accounts, categories, t);
 
-  // Opt-in geolocation for quick-add. Read defensively: the context has no default
-  // value, so a missing provider (e.g. in unit tests) yields undefined.
-  const displaySettings = useDisplaySettings();
-  const attachLocation = !!(displaySettings && displaySettings.attachLocation);
   // Best-effort, non-blocking location capture primed as the user starts entering
   // an operation; attached at save time (issue #1091).
   const { getLocation: getQuickAddLocation, prime: primeQuickAddLocation } = useQuickAddLocation(attachLocation);
@@ -272,6 +315,37 @@ const OperationsScreen = () => {
     onOptimisticSettle: replaceOptimisticOperation,
     onOptimisticRemove: removeOptimisticOperation,
   });
+
+  const hasSuggestions = operationSuggestions.length > 0;
+
+  // The single source of truth for the clip. Search always wins: it takes the
+  // top of the screen, and the form (with any suggestion deck over it) has to be
+  // out of the way whether it was pinned or summoned. A deck of pending bank
+  // notifications holds the panel open on its own — the cards are laid over the
+  // form and clipped with it, and nothing else on this screen announces them, so
+  // a collapsed panel would hide the very thing that needs answering.
+  const quickAddCollapsed = isSearchOpen
+    || (!showQuickAddPanel && !quickAddExpanded && !hasSuggestions);
+
+  // Which input moved decides the motion, so the previous values are kept rather
+  // than just the previous collapsed state.
+  const quickAddMotionRef = useRef(null);
+  useEffect(() => {
+    const prev = quickAddMotionRef.current;
+    quickAddMotionRef.current = {
+      collapsed: quickAddCollapsed,
+      search: isSearchOpen,
+      setting: showQuickAddPanel,
+    };
+    // A change that leaves the panel where it is (e.g. the + button pressed with
+    // search open) has nothing to play.
+    if (prev && prev.collapsed === quickAddCollapsed) return;
+
+    let mode = 'spring';
+    if (!prev || prev.setting !== showQuickAddPanel) mode = 'instant';
+    else if (prev.search !== isSearchOpen) mode = 'timing';
+    applyQuickAddCollapse(quickAddCollapsed, mode);
+  }, [quickAddCollapsed, isSearchOpen, showQuickAddPanel, applyQuickAddCollapse]);
 
   // Measured height of the quick-add wrapper — the binding cards pin their frame
   // to it so the deck reads as cards stacked over the form. Rounded, and only
@@ -805,6 +879,10 @@ const OperationsScreen = () => {
       // The amount is cleared; the next entry starts fresh and re-primes location.
       amountWasEmptyRef.current = true;
 
+      // The summoned form has done its job — fold it away. A no-op when the
+      // panel is pinned open by the setting, which is why it is unconditional.
+      setQuickAddExpanded(false);
+
       Keyboard.dismiss();
 
       // Offer quick label tagging for the freshly-created operation. Suggestions are
@@ -985,8 +1063,6 @@ const OperationsScreen = () => {
   }, []);
 
   // Search handlers
-  const isSearchOpen = searchMode === 'open';
-
   const handleCloseSearch = useCallback(() => {
     closeSearch(hasActiveSearch);
   }, [closeSearch, hasActiveSearch]);
@@ -1041,10 +1117,14 @@ const OperationsScreen = () => {
     return () => sub.remove();
   }, [isSearchOpen, filtersExpanded, toggleFilters, handleCloseSearch]);
 
-  const hasSuggestions = operationSuggestions.length > 0;
   const quickAddFormComponent = useMemo(() => (
     <>
-      <Animated.View style={animatedQuickAddClipStyle}>
+      <Animated.View
+        style={animatedQuickAddClipStyle}
+        // A zero-height clip drops touches on Android, but not TalkBack: without
+        // this the whole form stays reachable by screen reader while invisible.
+        importantForAccessibility={quickAddCollapsed ? 'no-hide-descendants' : 'auto'}
+      >
         <Animated.View style={animatedQuickAddSlideStyle} onLayout={handleQuickAddClipLayout}>
           {/* Deck container: the binding cards overlay the quick-add form
               (absolute, sized to the measured wrapper below), with top padding
@@ -1113,7 +1193,7 @@ const OperationsScreen = () => {
       </Animated.View>
       {filtersExpanded && filterPanelHeight > 0 && <View style={{ height: filterPanelHeight }} />}
     </>
-  ), [animatedQuickAddClipStyle, animatedQuickAddSlideStyle, handleQuickAddClipLayout, colors, t, quickAddValues, visibleAccounts, filteredCategories, topCategoriesForType, getCategoryInfo, getAccountName, getAccountBalance, getCategoryName, openPicker, handleQuickAdd, handleAmountChange, handleExchangeRateChange, handleDestinationAmountChange, handleAutoAddWithCategory, topTransferAccountsForForm, handleAutoAddWithAccount, TYPES, rateSource, handleOperationCurrencyChange, foreignRateSource, foreignExchangeRate, filterPanelHeight, filtersExpanded, quickAddFlash, operationSuggestions, hasSuggestions, quickAddHeight, handleQuickAddLayout, accounts, categories, suggestionSaveErrors, suggestionChoices, setSuggestionChoice, acceptSuggestion, dismissSuggestion]);
+  ), [animatedQuickAddClipStyle, animatedQuickAddSlideStyle, handleQuickAddClipLayout, quickAddCollapsed, colors, t, quickAddValues, visibleAccounts, filteredCategories, topCategoriesForType, getCategoryInfo, getAccountName, getAccountBalance, getCategoryName, openPicker, handleQuickAdd, handleAmountChange, handleExchangeRateChange, handleDestinationAmountChange, handleAutoAddWithCategory, topTransferAccountsForForm, handleAutoAddWithAccount, TYPES, rateSource, handleOperationCurrencyChange, foreignRateSource, foreignExchangeRate, filterPanelHeight, filtersExpanded, quickAddFlash, operationSuggestions, hasSuggestions, quickAddHeight, handleQuickAddLayout, accounts, categories, suggestionSaveErrors, suggestionChoices, setSuggestionChoice, acceptSuggestion, dismissSuggestion]);
 
   // Auto-scroll to top when filter panel closes, but only if the user is still
   // near the top (hasn't scrolled into past dates). The threshold is filterPanelHeight:
@@ -1161,6 +1241,43 @@ const OperationsScreen = () => {
     flatListRef.current?.scrollToOffset({ offset: 0, animated: true });
   }, []);
 
+  // The undo bar floats over the same bottom-right corner as the + button, and
+  // it appears on every add — which, with the panel collapsed, is exactly when
+  // the button is on screen. So the button steps up over the bar for as long as
+  // it is there and settles back down after, the way a FAB does on Android.
+  // Measured rather than assumed: the bar's height follows the text it holds.
+  // Seeded with the bar's usual single-line height rather than 0: the first add
+  // of a session shows the bar and measures it in the same frame, and a 0 here
+  // would compute "no overlap" and leave the button sitting on the bar until
+  // onLayout arrived.
+  const [undoAreaHeight, setUndoAreaHeight] = useState(HEIGHTS.listItem);
+  const handleUndoAreaLayout = useCallback((event) => {
+    const measured = Math.round(event.nativeEvent.layout.height);
+    setUndoAreaHeight((prev) => (prev === measured ? prev : measured));
+  }, []);
+  const fabLift = useSharedValue(0);
+  useEffect(() => {
+    const barTop = insets.bottom + HEIGHTS.tabBar + undoAreaHeight + SPACING.sm;
+    const overlap = undoInfo ? Math.max(0, barTop - FAB_BOTTOM_OFFSET) : 0;
+    fabLift.value = withSpring(-overlap, SPRING_SETTLE);
+  }, [undoInfo, undoAreaHeight, insets.bottom, fabLift]);
+  const animatedFabStyle = useAnimatedStyle(() => ({
+    transform: [{ translateY: fabLift.value }],
+  }));
+
+  // The + button, shown only while the panel setting is off. Opening also brings
+  // the list back to the top: the form is the list's header, so summoning it
+  // from halfway down a month of operations would otherwise open it off-screen.
+  const handleToggleQuickAddPanel = useCallback(() => {
+    if (quickAddExpanded) {
+      Keyboard.dismiss();
+      setQuickAddExpanded(false);
+      return;
+    }
+    scrollToTop();
+    setQuickAddExpanded(true);
+  }, [quickAddExpanded, scrollToTop]);
+
   // A tapped "transactions to review" notification lands here (SimpleTabs switches
   // to this tab on the same event): put the suggestion deck in front of the user
   // instead of sending them to settings. Search is closed first — the quick-add
@@ -1171,6 +1288,9 @@ const OperationsScreen = () => {
   const handleOpenPendingSuggestions = useCallback(() => {
     if (isSearchOpen) handleCloseSearch();
     else scrollToTop();
+    // The deck is laid over the quick-add form, so a collapsed panel would swallow
+    // the very cards this event exists to show. No-op when the panel is pinned.
+    setQuickAddExpanded(true);
     refreshSuggestions();
   }, [isSearchOpen, handleCloseSearch, scrollToTop, refreshSuggestions]);
 
@@ -1232,6 +1352,7 @@ const OperationsScreen = () => {
         <View
           style={[styles.floatingUndoArea, { bottom: insets.bottom + HEIGHTS.tabBar }]}
           pointerEvents="box-none"
+          onLayout={handleUndoAreaLayout}
         >
           <UndoSnackbar
             key={undoInfo.token}
@@ -1321,6 +1442,26 @@ const OperationsScreen = () => {
         >
           <Icon name="chevron-up" size={24} color={colors.text} />
         </TouchableOpacity>
+      )}
+
+      {/* Summon/dismiss the quick-add form. Only exists while the panel setting
+          is off — with the panel pinned there is nothing for it to do — and it
+          steps aside while search or a suggestion deck owns the panel (the deck
+          covers the form even when the panel is pinned open, so there is nothing
+          to summon underneath it). The icon states what the next tap does rather
+          than what the button is. */}
+      {!showQuickAddPanel && !isSearchOpen && !hasSuggestions && (
+        // The wrapper is what lifts: translating a full-bleed, touch-transparent
+        // layer moves the button inside it without disturbing anything else.
+        <Animated.View style={[StyleSheet.absoluteFill, animatedFabStyle]} pointerEvents="box-none">
+          <AddFAB
+            testID="quick-add-fab"
+            icon={quickAddExpanded ? 'close' : 'plus'}
+            onPress={handleToggleQuickAddPanel}
+            accessibilityLabel={quickAddExpanded ? (t('close') || 'Close') : (t('add_operation') || 'Add Operation')}
+            accessibilityHint={quickAddExpanded ? undefined : (t('add_operation_hint') || undefined)}
+          />
+        </Animated.View>
       )}
 
       <OperationModal

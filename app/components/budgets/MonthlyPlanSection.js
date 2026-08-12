@@ -404,6 +404,14 @@ const MonthlyPlanSection = forwardRef(function MonthlyPlanSection({
   // length means below the fold and half-covered by the FAB. They are the
   // month's two orientation figures, so they belong beside the one figure the
   // remainder answers with.
+  //
+  // `expectedIncome` completes the set: the host draws the month as a bar
+  // (MonthSummaryCard), and the income is the length of it — allocated and
+  // actual say how much of the month is committed and gone, but only against
+  // what there was to commit. Deriving it host-side from the remainder and the
+  // allocation would be arithmetic on two figures this component may still be
+  // reporting from different sources (a fresh status, a stale-gated estimate),
+  // which is exactly how the two ended up disagreeing before.
   const displayActual = freshPlanStatus ? freshPlanStatus.totals.totalActual : null;
   useEffect(() => {
     onTotalsChange?.({
@@ -412,8 +420,10 @@ const MonthlyPlanSection = forwardRef(function MonthlyPlanSection({
       currency: planCurrency,
       allocated: displayAllocated,
       actual: displayActual,
+      expectedIncome: displayExpectedIncome,
     });
-  }, [onTotalsChange, displayRemainder, hasIncomeBasis, planCurrency, displayAllocated, displayActual]);
+  }, [onTotalsChange, displayRemainder, hasIncomeBasis, planCurrency, displayAllocated,
+    displayActual, displayExpectedIncome]);
 
   // Only invoked from the section's own header, which renders in uncontrolled
   // mode only; in controlled mode the host header drives month navigation.

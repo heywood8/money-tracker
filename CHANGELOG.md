@@ -1,5 +1,61 @@
 # Changelog
 
+## [0.267.1](https://github.com/heywood8/money-tracker/compare/penny-v0.267.0...penny-v0.267.1) (2026-08-12)
+
+
+### Tests
+
+* raise jest coverage thresholds to the measured level ([#1604](https://github.com/heywood8/money-tracker/issues/1604)) ([a2c7948](https://github.com/heywood8/money-tracker/commit/a2c7948b9a7c90a1b5b24048e57ae861b37fe9c2))
+
+## [0.267.0](https://github.com/heywood8/money-tracker/compare/penny-v0.266.3...penny-v0.267.0) (2026-08-12)
+
+
+### Features
+
+* **operations:** add a setting to collapse the quick-add panel ([#1602](https://github.com/heywood8/money-tracker/issues/1602)) ([7f96235](https://github.com/heywood8/money-tracker/commit/7f96235e641c50520c24ff605781e6198241a503))
+
+## [0.266.3](https://github.com/heywood8/money-tracker/compare/penny-v0.266.2...penny-v0.266.3) (2026-08-11)
+
+
+### Bug Fixes
+
+* **settings:** offer every shipped language on the first-run picker ([#1600](https://github.com/heywood8/money-tracker/issues/1600)) ([feee18a](https://github.com/heywood8/money-tracker/commit/feee18af1748714e33548dc4d896005bdfff1dc3))
+
+## [0.266.2](https://github.com/heywood8/money-tracker/compare/penny-v0.266.1...penny-v0.266.2) (2026-08-11)
+
+
+### Code Refactoring
+
+* **settings:** extract the update subpanel and the settings list ([#1598](https://github.com/heywood8/money-tracker/issues/1598)) ([cbbad50](https://github.com/heywood8/money-tracker/commit/cbbad50e5228fec95a588bf6d8771ddb57d101a2))
+
+## [0.266.1](https://github.com/heywood8/money-tracker/compare/penny-v0.266.0...penny-v0.266.1) (2026-08-11)
+
+
+### Code Refactoring
+
+* **settings:** extract the export, import and notification subpanels ([#1596](https://github.com/heywood8/money-tracker/issues/1596)) ([8f3cd0d](https://github.com/heywood8/money-tracker/commit/8f3cd0d380599f01ceed8153a3906df6669de9f3))
+
+## [0.266.0](https://github.com/heywood8/money-tracker/compare/penny-v0.265.4...penny-v0.266.0) (2026-08-11)
+
+
+### Features
+
+* **budgets:** draw the month's totals as a flow bar ([#1594](https://github.com/heywood8/money-tracker/issues/1594)) ([333543b](https://github.com/heywood8/money-tracker/commit/333543bd2739f14f8fb757756262b0a7af8c9e66))
+
+## [0.265.4](https://github.com/heywood8/money-tracker/compare/penny-v0.265.3...penny-v0.265.4) (2026-08-10)
+
+
+### Code Refactoring
+
+* **settings:** extract the language, logs and reset subpanels ([#1590](https://github.com/heywood8/money-tracker/issues/1590)) ([7ba27f1](https://github.com/heywood8/money-tracker/commit/7ba27f199e089da4f629420428bced7a22ee621b))
+
+## [0.265.3](https://github.com/heywood8/money-tracker/compare/penny-v0.265.2...penny-v0.265.3) (2026-08-10)
+
+
+### Code Refactoring
+
+* **graphs:** put the currency back in PeriodHeader, on the pager's own line ([#1591](https://github.com/heywood8/money-tracker/issues/1591)) ([c97d475](https://github.com/heywood8/money-tracker/commit/c97d475d8de2513bbce5c5f85d71f58b6f540041))
+
 ## [0.265.2](https://github.com/heywood8/money-tracker/compare/penny-v0.265.1...penny-v0.265.2) (2026-08-08)
 
 
