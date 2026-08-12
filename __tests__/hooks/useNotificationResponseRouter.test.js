@@ -58,6 +58,22 @@ describe('useNotificationResponseRouter', () => {
     await unmount();
   });
 
+  it('emits the added-operations event for the auto-added receipt', async () => {
+    let listener;
+    Notifications.addNotificationResponseReceivedListener.mockImplementation((cb) => {
+      listener = cb;
+      return { remove: jest.fn() };
+    });
+
+    const { unmount } = await renderHook(() => useNotificationResponseRouter());
+    listener({ notification: { request: { content: { data: { route: 'addedOperations' } } } } });
+
+    // Those operations are already booked, so the review deck must stay closed.
+    expect(emitSpy).toHaveBeenCalledWith(EVENTS.OPEN_ADDED_OPERATIONS);
+    expect(emitSpy).not.toHaveBeenCalledWith(EVENTS.OPEN_PENDING_OPERATIONS);
+    await unmount();
+  });
+
   it('ignores an unrelated notification response', async () => {
     let listener;
     Notifications.addNotificationResponseReceivedListener.mockImplementation((cb) => {

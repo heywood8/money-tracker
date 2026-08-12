@@ -137,7 +137,7 @@ describe('processBankNotifications', () => {
   it('does nothing when disabled', async () => {
     PreferencesDB.getPreference.mockResolvedValue('0');
     const summary = await pipeline.processBankNotifications();
-    expect(summary).toEqual({ created: 0, pending: 0, skipped: 0 });
+    expect(summary).toMatchObject({ created: 0, pending: 0, skipped: 0 });
     expect(NotificationAccess.getRecentNotifications).not.toHaveBeenCalled();
   });
 
@@ -150,7 +150,7 @@ describe('processBankNotifications', () => {
 
     const summary = await pipeline.processBankNotifications();
 
-    expect(summary).toEqual({ created: 1, pending: 0, skipped: 0 });
+    expect(summary).toMatchObject({ created: 1, pending: 0, skipped: 0 });
     expect(OperationsDB.createOperation).toHaveBeenCalledWith(
       expect.objectContaining({
         type: 'expense', amount: '3900.00', accountId: 7,
@@ -158,6 +158,42 @@ describe('processBankNotifications', () => {
       }),
     );
     expect(emitSpy).toHaveBeenCalledWith(EVENTS.RELOAD_ALL);
+  });
+
+  describe('createdItems (what the background "operations added" alert describes)', () => {
+    it('records the booked amount, payee, account and category of an auto-create', async () => {
+      NotificationAccess.getRecentNotifications.mockResolvedValue([PURCHASE]);
+      AccountsDB.getAccountByCardMask.mockResolvedValue({ id: 7, currency: 'AMD' });
+      NotificationRulesDB.getMerchantRule.mockResolvedValue({ categoryId: 'cat-food', labelOverride: 'Groceries' });
+      PreferencesDB.getJsonPreference.mockImplementation((key) => prefs([], [PKG])(key));
+
+      const summary = await pipeline.processBankNotifications();
+
+      expect(summary.createdItems).toEqual([
+        expect.objectContaining({
+          type: 'expense',
+          amount: '3900.00',
+          currency: 'AMD',
+          // The bound display name, not the raw bank string.
+          merchant: 'Groceries',
+          accountId: 7,
+          categoryId: 'cat-food',
+          date: '2026-06-28',
+        }),
+      ]);
+    });
+
+    it('stays empty when the notification was queued rather than booked', async () => {
+      NotificationAccess.getRecentNotifications.mockResolvedValue([PURCHASE]);
+      AccountsDB.getAccountByCardMask.mockResolvedValue({ id: 7, currency: 'AMD' });
+      NotificationRulesDB.getMerchantRule.mockResolvedValue(null);
+      PreferencesDB.getJsonPreference.mockImplementation((key) => prefs([], [PKG])(key));
+
+      const summary = await pipeline.processBankNotifications();
+
+      expect(summary.pending).toBe(1);
+      expect(summary.createdItems).toEqual([]);
+    });
   });
 
   it('queues instead of auto-creating when the merchant has a category but no name binding', async () => {
@@ -173,7 +209,7 @@ describe('processBankNotifications', () => {
 
     const summary = await pipeline.processBankNotifications();
 
-    expect(summary).toEqual({ created: 0, pending: 1, skipped: 0 });
+    expect(summary).toMatchObject({ created: 0, pending: 1, skipped: 0 });
     expect(OperationsDB.createOperation).not.toHaveBeenCalled();
     expect(PendingNotificationsDB.addPendingNotification).toHaveBeenCalledWith(
       expect.objectContaining({ merchant: 'NAREK MEHRABYAN', accountId: 7, categoryId: 'cat-food' }),
@@ -239,7 +275,7 @@ describe('processBankNotifications', () => {
 
       const summary = await pipeline.processBankNotifications();
 
-      expect(summary).toEqual({ created: 0, pending: 1, skipped: 0 });
+      expect(summary).toMatchObject({ created: 0, pending: 1, skipped: 0 });
       expect(OperationsDB.createOperation).not.toHaveBeenCalled();
       expect(PendingNotificationsDB.addPendingNotification).toHaveBeenCalledWith(
         expect.objectContaining({ latitude: '40.1', longitude: '44.2' }),
@@ -343,7 +379,7 @@ describe('processBankNotifications', () => {
 
     const summary = await pipeline.processBankNotifications();
 
-    expect(summary).toEqual({ created: 1, pending: 0, skipped: 0 });
+    expect(summary).toMatchObject({ created: 1, pending: 0, skipped: 0 });
     // 3916 AMD rounded to the nearest 100 → 3900 (AMD has 0 decimals)
     expect(OperationsDB.createOperation).toHaveBeenCalledWith(
       expect.objectContaining({ amount: '3900' }),
@@ -426,7 +462,7 @@ describe('processBankNotifications', () => {
     NotificationRulesDB.getMerchantRule.mockResolvedValue({ categoryId: 'cat-food' });
     // allowlist empty -> not trusted
     const summary = await pipeline.processBankNotifications();
-    expect(summary).toEqual({ created: 0, pending: 1, skipped: 0 });
+    expect(summary).toMatchObject({ created: 0, pending: 1, skipped: 0 });
     expect(OperationsDB.createOperation).not.toHaveBeenCalled();
     expect(PendingNotificationsDB.addPendingNotification).toHaveBeenCalled();
   });
@@ -440,7 +476,7 @@ describe('processBankNotifications', () => {
 
     const summary = await pipeline.processBankNotifications();
 
-    expect(summary).toEqual({ created: 1, pending: 0, skipped: 0 });
+    expect(summary).toMatchObject({ created: 1, pending: 0, skipped: 0 });
     expect(Currency.fetchLiveExchangeRate).toHaveBeenCalledWith('AMD', 'USD');
     expect(OperationsDB.createOperation).toHaveBeenCalledWith(
       expect.objectContaining({
@@ -464,7 +500,7 @@ describe('processBankNotifications', () => {
 
     const summary = await pipeline.processBankNotifications();
 
-    expect(summary).toEqual({ created: 0, pending: 1, skipped: 0 });
+    expect(summary).toMatchObject({ created: 0, pending: 1, skipped: 0 });
     expect(OperationsDB.createOperation).not.toHaveBeenCalled();
     // Account + category are still suggested for the review queue.
     expect(PendingNotificationsDB.addPendingNotification).toHaveBeenCalledWith(
@@ -483,7 +519,7 @@ describe('processBankNotifications', () => {
 
     const summary = await pipeline.processBankNotifications();
 
-    expect(summary).toEqual({ created: 0, pending: 1, skipped: 0 });
+    expect(summary).toMatchObject({ created: 0, pending: 1, skipped: 0 });
     expect(Currency.fetchLiveExchangeRate).not.toHaveBeenCalled();
     expect(OperationsDB.createOperation).not.toHaveBeenCalled();
   });
@@ -496,7 +532,7 @@ describe('processBankNotifications', () => {
 
     const summary = await pipeline.processBankNotifications();
 
-    expect(summary).toEqual({ created: 0, pending: 1, skipped: 0 });
+    expect(summary).toMatchObject({ created: 0, pending: 1, skipped: 0 });
     expect(Currency.fetchLiveExchangeRate).not.toHaveBeenCalled();
   });
 
@@ -509,7 +545,7 @@ describe('processBankNotifications', () => {
 
     const summary = await pipeline.processBankNotifications();
 
-    expect(summary).toEqual({ created: 1, pending: 0, skipped: 0 });
+    expect(summary).toMatchObject({ created: 1, pending: 0, skipped: 0 });
     expect(Currency.fetchLiveExchangeRate).toHaveBeenCalledWith('EUR', 'AMD');
     expect(OperationsDB.createOperation).toHaveBeenCalledWith(
       expect.objectContaining({
@@ -532,7 +568,7 @@ describe('processBankNotifications', () => {
 
     const summary = await pipeline.processBankNotifications();
 
-    expect(summary).toEqual({ created: 0, pending: 1, skipped: 0 });
+    expect(summary).toMatchObject({ created: 0, pending: 1, skipped: 0 });
     expect(OperationsDB.createOperation).not.toHaveBeenCalled();
     expect(PendingNotificationsDB.addPendingNotification).toHaveBeenCalledWith(
       expect.objectContaining({
@@ -572,7 +608,7 @@ describe('processBankNotifications', () => {
 
     const summary = await pipeline.processBankNotifications();
 
-    expect(summary).toEqual({ created: 0, pending: 1, skipped: 0 });
+    expect(summary).toMatchObject({ created: 0, pending: 1, skipped: 0 });
     expect(OperationsDB.createOperation).not.toHaveBeenCalled();
     expect(PendingNotificationsDB.addPendingNotification).toHaveBeenCalledWith(
       expect.objectContaining({
@@ -594,7 +630,7 @@ describe('processBankNotifications', () => {
 
       const summary = await pipeline.processBankNotifications();
 
-      expect(summary).toEqual({ created: 0, pending: 1, skipped: 0 });
+      expect(summary).toMatchObject({ created: 0, pending: 1, skipped: 0 });
       expect(OperationsDB.createOperation).not.toHaveBeenCalled();
       // Queued with the recipient as merchant and the category left blank.
       expect(PendingNotificationsDB.addPendingNotification).toHaveBeenCalledWith(
@@ -616,13 +652,19 @@ describe('processBankNotifications', () => {
 
       const summary = await pipeline.processBankNotifications();
 
-      expect(summary).toEqual({ created: 1, pending: 0, skipped: 0 });
+      expect(summary).toMatchObject({ created: 1, pending: 0, skipped: 0 });
       expect(OperationsDB.createOperation).toHaveBeenCalledWith(
         expect.objectContaining({
           type: 'transfer', amount: '200000', accountId: 7, toAccountId: 9,
           date: '2026-07-01', description: 'Atm 401 Republic 67/1',
         }),
       );
+      // The alert describes a transfer by its cash account, not a category.
+      expect(summary.createdItems).toEqual([
+        expect.objectContaining({
+          type: 'transfer', amount: '200000', accountId: 7, toAccountId: 9, categoryId: null,
+        }),
+      ]);
     });
 
     it('queues the transfer when no cash account is bound yet (first time)', async () => {
@@ -633,7 +675,7 @@ describe('processBankNotifications', () => {
 
       const summary = await pipeline.processBankNotifications();
 
-      expect(summary).toEqual({ created: 0, pending: 1, skipped: 0 });
+      expect(summary).toMatchObject({ created: 0, pending: 1, skipped: 0 });
       expect(OperationsDB.createOperation).not.toHaveBeenCalled();
       expect(PendingNotificationsDB.addPendingNotification).toHaveBeenCalledWith(
         expect.objectContaining({
@@ -652,7 +694,7 @@ describe('processBankNotifications', () => {
 
       const summary = await pipeline.processBankNotifications();
 
-      expect(summary).toEqual({ created: 0, pending: 1, skipped: 0 });
+      expect(summary).toMatchObject({ created: 0, pending: 1, skipped: 0 });
       expect(OperationsDB.createOperation).not.toHaveBeenCalled();
     });
   });
@@ -703,7 +745,7 @@ describe('processBankNotifications', () => {
   it('skips non-transaction notifications but records them as seen', async () => {
     NotificationAccess.getRecentNotifications.mockResolvedValue([NON_TRANSACTION]);
     const summary = await pipeline.processBankNotifications();
-    expect(summary).toEqual({ created: 0, pending: 0, skipped: 1 });
+    expect(summary).toMatchObject({ created: 0, pending: 0, skipped: 1 });
     expect(PreferencesDB.setJsonPreference).toHaveBeenCalled();
   });
 
@@ -715,7 +757,7 @@ describe('processBankNotifications', () => {
     NotificationRulesDB.getMerchantRule.mockResolvedValue({ categoryId: 'cat-food' });
 
     const summary = await pipeline.processBankNotifications();
-    expect(summary).toEqual({ created: 0, pending: 0, skipped: 0 });
+    expect(summary).toMatchObject({ created: 0, pending: 0, skipped: 0 });
     expect(OperationsDB.createOperation).not.toHaveBeenCalled();
   });
 
@@ -727,7 +769,7 @@ describe('processBankNotifications', () => {
     OperationsDB.createOperation.mockRejectedValue(new Error('db down'));
 
     const summary = await pipeline.processBankNotifications();
-    expect(summary).toEqual({ created: 0, pending: 0, skipped: 0 });
+    expect(summary).toMatchObject({ created: 0, pending: 0, skipped: 0 });
     expect(PreferencesDB.setJsonPreference).not.toHaveBeenCalled();
   });
 
@@ -1270,7 +1312,7 @@ describe('processBankNotifications', () => {
 
       const summary = await pipeline.processBankNotifications();
 
-      expect(summary).toEqual({ created: 0, pending: 0, skipped: 1 });
+      expect(summary).toMatchObject({ created: 0, pending: 0, skipped: 1 });
       expect(OperationsDB.createOperation).not.toHaveBeenCalled();
       expect(PendingNotificationsDB.addPendingNotification).not.toHaveBeenCalled();
     });
@@ -1285,7 +1327,7 @@ describe('processBankNotifications', () => {
 
       const summary = await pipeline.processBankNotifications();
 
-      expect(summary).toEqual({ created: 0, pending: 1, skipped: 0 });
+      expect(summary).toMatchObject({ created: 0, pending: 1, skipped: 0 });
       expect(PendingNotificationsDB.addPendingNotification).toHaveBeenCalled();
     });
 
@@ -1307,7 +1349,7 @@ describe('processBankNotifications', () => {
 
       const summary = await pipeline.processBankNotifications();
 
-      expect(summary).toEqual({ created: 1, pending: 0, skipped: 1 });
+      expect(summary).toMatchObject({ created: 1, pending: 0, skipped: 1 });
       expect(OperationsDB.createOperation).toHaveBeenCalledTimes(1);
     });
 
@@ -1326,7 +1368,7 @@ describe('processBankNotifications', () => {
 
       const summary = await pipeline.processBankNotifications();
 
-      expect(summary).toEqual({ created: 0, pending: 0, skipped: 0 });
+      expect(summary).toMatchObject({ created: 0, pending: 0, skipped: 0 });
       expect(PendingNotificationsDB.deletePendingNotification).toHaveBeenCalledWith('p1');
       expect(emitSpy).toHaveBeenCalledWith(EVENTS.RELOAD_ALL);
     });

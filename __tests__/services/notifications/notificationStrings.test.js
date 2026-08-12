@@ -7,7 +7,10 @@
 import enJson from '../../../assets/i18n/en.json';
 import ruJson from '../../../assets/i18n/ru.json';
 import * as PreferencesDB from '../../../app/services/PreferencesDB';
-import { getPendingAlertCopy } from '../../../app/services/notifications/notificationStrings';
+import {
+  getAddedAlertCopy,
+  getPendingAlertCopy,
+} from '../../../app/services/notifications/notificationStrings';
 
 jest.mock('../../../app/services/PreferencesDB', () => ({
   PREF_KEYS: { LANGUAGE: 'app_language' },
@@ -172,5 +175,115 @@ describe('notificationStrings.getPendingAlertCopy', () => {
         enJson.bank_notifications_bg_notification_body_other.replace('{count}', '3'),
       );
     });
+  });
+});
+
+describe('notificationStrings.getAddedAlertCopy', () => {
+  const detail = (overrides = {}) => ({
+    type: 'expense',
+    amount: '1299.00',
+    currency: 'AMD',
+    merchant: 'Sas',
+    date: '2026-07-20',
+    accountName: 'Main card',
+    categoryName: 'Groceries',
+    categoryNameKey: null,
+    targetAccountName: null,
+    ...overrides,
+  });
+
+  beforeEach(() => {
+    jest.clearAllMocks();
+    PreferencesDB.getPreference.mockResolvedValue(null); // default → en
+  });
+
+  it('falls back to a count-only receipt with no details', async () => {
+    const copy = await getAddedAlertCopy(2);
+
+    expect(copy.title).toBe(enJson.bank_notifications_bg_added_title);
+    expect(copy.body).toBe(
+      enJson.bank_notifications_bg_added_body_other.replace('{count}', '2'),
+    );
+    expect(copy.channelName).toBe(enJson.bank_notifications_channel_name);
+  });
+
+  it('treats a zero / invalid count as singular', async () => {
+    expect((await getAddedAlertCopy(0)).body).toBe(enJson.bank_notifications_bg_added_body_one);
+    expect((await getAddedAlertCopy(undefined)).body).toBe(
+      enJson.bank_notifications_bg_added_body_one,
+    );
+  });
+
+  it('puts the amount and payee of a single operation in the title', async () => {
+    const copy = await getAddedAlertCopy(1, [detail()]);
+    const [added, recognized] = copy.body.split('\n');
+
+    expect(copy.title).toBe('1299 AMD · Sas');
+    expect(added).toBe(enJson.bank_notifications_bg_added_body_one);
+    expect(recognized).toContain('Account: Main card');
+    expect(recognized).toContain('Category: Groceries');
+  });
+
+  it('names the cash account a transfer landed in', async () => {
+    const copy = await getAddedAlertCopy(1, [
+      detail({ type: 'transfer', categoryName: null, targetAccountName: 'Cash', merchant: 'Atm 401' }),
+    ]);
+
+    expect(copy.body).toContain('To: Cash');
+    expect(copy.body).not.toContain('Category:');
+  });
+
+  it('translates a built-in category name key', async () => {
+    const copy = await getAddedAlertCopy(1, [detail({ categoryName: null, categoryNameKey: 'food' })]);
+
+    expect(copy.body).toContain(`Category: ${enJson.food}`);
+  });
+
+  it('names an unknown payee', async () => {
+    const copy = await getAddedAlertCopy(1, [detail({ merchant: null })]);
+
+    expect(copy.title).toBe(`1299 AMD · ${enJson.bank_notifications_bg_unknown_merchant}`);
+  });
+
+  it('gives each operation a line with where it landed when several were booked', async () => {
+    const copy = await getAddedAlertCopy(2, [
+      detail(),
+      detail({ type: 'transfer', merchant: 'Atm 401', amount: '20000.00', categoryName: null, targetAccountName: 'Cash' }),
+    ]);
+    const lines = copy.body.split('\n');
+
+    expect(copy.title).toBe(
+      enJson.bank_notifications_bg_added_body_other.replace('{count}', '2'),
+    );
+    expect(lines).toEqual([
+      '1299 AMD · Sas — Category: Groceries',
+      '20000 AMD · Atm 401 — To: Cash',
+    ]);
+  });
+
+  it('falls back to the account when an operation has no category', async () => {
+    const copy = await getAddedAlertCopy(2, [
+      detail({ categoryName: null, categoryNameKey: null }),
+      detail(),
+    ]);
+
+    expect(copy.body.split('\n')[0]).toBe('1299 AMD · Sas — Account: Main card');
+  });
+
+  it('collapses the undescribed remainder into a "+N more" line', async () => {
+    const copy = await getAddedAlertCopy(5, [detail(), detail(), detail()]);
+    const lines = copy.body.split('\n');
+
+    expect(lines).toHaveLength(4);
+    expect(lines[3]).toBe(enJson.bank_notifications_bg_notification_more.replace('{count}', '2'));
+  });
+
+  it('localizes the receipt', async () => {
+    PreferencesDB.getPreference.mockResolvedValue('ru');
+
+    const copy = await getAddedAlertCopy(1, [detail()]);
+
+    expect(copy.body).toContain(ruJson.bank_notifications_bg_added_body_one);
+    expect(copy.body).toContain('Счёт: Main card');
   });
 });

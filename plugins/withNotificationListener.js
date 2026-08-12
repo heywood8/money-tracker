@@ -17,9 +17,10 @@ const path = require('path');
  * the app appear in the system "Notification access" screen, where the user
  * grants the special-access permission.
  *
- * The service records only a tiny rolling window (the latest few notifications)
- * to private SharedPreferences so the "Notification access" settings subpanel
- * can display them. Nothing is uploaded or shared off the device. The companion
+ * The service records only a small rolling window (the latest 50 notifications)
+ * to private SharedPreferences, which both feeds the "Notification access"
+ * settings subpanel and buffers arrivals for the bank-notification ingestion
+ * pass. Nothing is uploaded or shared off the device. The companion
  * native module (PennyNotifications) exposes that window — and the current
  * permission state — to JavaScript.
  */
@@ -60,7 +61,10 @@ class ${SERVICE_CLASS} : NotificationListenerService() {
     companion object {
         const val PREFS_NAME = "penny_notification_access"
         const val KEY_RECENT = "recent_notifications"
-        const val MAX_STORED = 20
+        // The window doubles as the ingestion buffer: a notification that ages
+        // out before the background pass reads it is lost, so it has to cover a
+        // bursty stretch between wakeups, not just what the in-app viewer shows.
+        const val MAX_STORED = 50
 
         @Synchronized
         fun record(

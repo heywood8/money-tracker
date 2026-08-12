@@ -186,7 +186,7 @@ These were chosen up front and drive the architecture:
                                    │ getRecentNotifications()
                                    ▼
                     ┌─────────────────────────────┐
-                    │ Ingestion (poll on foreground)│  ← round 3
+                    │ Ingestion (foreground + background)│  ← round 3
                     └──────────────┬────────────────┘
                                    ▼
                     ┌─────────────────────────────┐
@@ -303,12 +303,65 @@ live on `AccountsDB` (`getAccountByCardMask`, `setAccountCardMask`).
 - `resolvePendingNotification(id, choices)` — creates the operation from a
   reviewed item and learns the card → account and merchant → category bindings.
 - Triggered on app open and on every foreground transition via an `AppState`
-  listener in `app/screens/AppInitializer.js`.
-- **Known limitation:** the native service keeps only the **last 20**
+  listener in `app/screens/AppInitializer.js`, and — when background alerts are
+  on — from the periodic background task (below).
+- **Known limitation:** the native service keeps only the **last 50**
   notifications and is pull-only (no JS events). For lossless capture under
   bursty/backgrounded conditions, extend the Kotlin
   `PennyNotificationListenerService` to persist a durable queue (and optionally
   emit a JS event). The parser, resolver, and pipeline do not depend on this.
+
+### Background processing
+
+`app/services/notifications/backgroundBankTask.js` runs the *same*
+`processBankNotifications()` pipeline while the app is backgrounded or closed —
+including the silent auto-create path, so a fully-matched purchase is booked
+without the app ever being opened. The task is defined at bundle load (imported
+from `index.js`) so the OS can invoke it in a headless JS context, and registered
+with Android WorkManager via `expo-background-task`.
+
+Two gates govern it, and both must be on: bank processing itself, and
+**Background alerts** (`BANK_NOTIFICATIONS_BACKGROUND_ALERTS`, default off) —
+with the latter off the task is unregistered entirely and ingestion happens only
+in the foreground.
+
+Each run reports what it did, via two separate tray notifications (distinct
+identifiers, so one never replaces the other, and a run that both books and
+queues posts both):
+
+| Alert | Posted when | Copy |
+| ----- | ----------- | ---- |
+| **Operations added** | the run auto-created operations (`summary.created > 0`) | amount · payee, plus the account and the category / cash account it landed in |
+| **Transactions to review** | the run queued new items (`summary.pending > 0`) | amount · payee, what resolved, and the field still missing |
+
+Both are posted only from the background task: in the foreground the user is
+already looking at the app, where `RELOAD_ALL` refreshes the lists instead.
+Tapping either opens the Operations tab; only the review alert additionally
+surfaces the suggestion deck.
+
+Supporting modules: `addedAlertItems.js` / `pendingAlertItems.js` resolve
+account and category names for a whole batch in one pass (the pipeline records
+only ids on the booking path), and `notificationStrings.js` renders both alerts
+in the user's language without a React tree.
+
+**Cadence.** `MINIMUM_INTERVAL_MINUTES` is 1, so a purchase is picked up within a
+minute rather than up to a quarter of an hour later. On Android 8+ that is taken
+fairly literally: `expo-background-task` avoids WorkManager's periodic work there
+(whose 15-minute floor would clamp it) and instead chains a one-shot request with
+`setInitialDelay(interval)`, re-enqueueing after each run. Doze still stretches
+wakeups on an idle device and the worker carries a `CONNECTED` network
+constraint, so treat the interval as a ceiling. The cost — a wakeup a minute for
+a run that is usually a no-op — is why the whole thing sits behind the
+background-alerts opt-in.
+
+Because the OS persists the registration (interval included) across restarts and
+app updates, `registerBackgroundBankTaskAsync` records the interval it registered
+with in `BANK_NOTIFICATIONS_TASK_INTERVAL` and re-registers on a mismatch —
+otherwise a cadence change would reach fresh installs only.
+
+Pushing each notification into a headless run from the native listener, instead
+of this pull-based poll, would be both cheaper and faster; it is the natural next
+step, and would also retire the rolling-window loss described above.
 
 ### Round 4 — UI ✅
 
@@ -413,7 +466,7 @@ pending item and is not exported.
 
 - `plugins/withNotificationListener.js` — Expo config plugin that installs the
   Android `NotificationListenerService`, a bridge module, and its package. Stores
-  the latest 20 notifications (`{title, text, packageName, postTime}`) in private
+  the latest 50 notifications (`{title, text, packageName, postTime}`) in private
   SharedPreferences.
 - `app/services/NotificationAccess.js` — JS wrapper: `isNotificationAccessEnabled()`,
   `getRecentNotifications()`, `openNotificationAccessSettings()`.

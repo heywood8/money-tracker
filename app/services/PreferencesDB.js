@@ -36,6 +36,11 @@ export const PREF_KEYS = {
   // Opt-in: run the ingestion pipeline periodically in the background and post a
   // system notification when new transactions land in the review queue.
   BANK_NOTIFICATIONS_BACKGROUND_ALERTS: 'bank_notifications_background_alerts',
+  // Interval (minutes) the background task was last registered with. The OS
+  // stores the registration persistently, so an app update that changes the
+  // requested cadence has to notice the difference and re-register — otherwise
+  // existing installs keep running at whatever they first registered with.
+  BANK_NOTIFICATIONS_TASK_INTERVAL: 'bank_notifications_task_interval',
   // Target "cash" account for ATM-withdrawal transfers, bound the first time an
   // ATM CASH notification is reviewed and reused for subsequent withdrawals.
   BANK_NOTIFICATIONS_ATM_ACCOUNT: 'bank_notifications_atm_account',

@@ -1,5 +1,6 @@
 /**
- * Localized copy for the background "transactions to review" notification.
+ * Localized copy for the background bank notifications — "transactions to
+ * review" and its sibling "operations added" receipt.
  *
  * The background task runs headless — there is no React tree and therefore no
  * LocalizationContext / `t()` available. This module resolves the user's stored
@@ -97,14 +98,20 @@ const needsFor = (language, detail) => translate(
   MISSING_KEYS[detail.missing] || 'bank_notifications_bg_needs_confirm',
 );
 
+/** The category's display name, resolving a built-in category's key. */
+const categoryNameOf = (language, detail) => (detail.categoryNameKey
+  ? translate(language, detail.categoryNameKey)
+  : detail.categoryName);
+
 /**
  * "4083***7027 · Jun 28 · Account: Main · Category: Groceries" — everything the
  * pipeline managed to resolve for one item. Absent parts are dropped.
+ *
+ * A transfer (ATM withdrawal) has no category; its counterpart is the cash
+ * account the money landed in, shown as "To: Cash".
  */
 const recognizedFor = (language, detail) => {
-  const categoryName = detail.categoryNameKey
-    ? translate(language, detail.categoryNameKey)
-    : detail.categoryName;
+  const categoryName = categoryNameOf(language, detail);
   return [
     detail.cardMask,
     formatShortDate(language, detail.date),
@@ -113,6 +120,9 @@ const recognizedFor = (language, detail) => {
       : null,
     categoryName
       ? translate(language, 'bank_notifications_bg_detected_category').replace('{name}', categoryName)
+      : null,
+    detail.targetAccountName
+      ? translate(language, 'bank_notifications_bg_added_to_account').replace('{name}', detail.targetAccountName)
       : null,
   ].filter(Boolean).join(' · ');
 };
@@ -163,6 +173,82 @@ export const getPendingAlertCopy = async (count, details = []) => {
   const lines = items.map(
     (detail) => `${headlineFor(language, detail)} — ${needsFor(language, detail)}`,
   );
+  const hidden = safeCount - items.length;
+  if (hidden > 0) {
+    lines.push(
+      translate(language, 'bank_notifications_bg_notification_more').replace('{count}', String(hidden)),
+    );
+  }
+
+  return {
+    title: countLine,
+    body: lines.join('\n'),
+    channelName,
+  };
+};
+
+/** Where an auto-created operation landed: its category, or a transfer's target. */
+const landedIn = (language, detail) => {
+  if (detail.type === 'transfer' && detail.targetAccountName) {
+    return translate(language, 'bank_notifications_bg_added_to_account')
+      .replace('{name}', detail.targetAccountName);
+  }
+  const categoryName = categoryNameOf(language, detail);
+  if (categoryName) {
+    return translate(language, 'bank_notifications_bg_detected_category')
+      .replace('{name}', categoryName);
+  }
+  return detail.accountName
+    ? translate(language, 'bank_notifications_bg_detected_account').replace('{name}', detail.accountName)
+    : null;
+};
+
+/**
+ * Build the localized title/body/channel-name for the "operations added" alert —
+ * the receipt for operations a background run booked without asking.
+ *
+ * Mirrors getPendingAlertCopy's shape so the two alerts read alike: a single
+ * operation puts the amount + payee in the title and says it was added, with what
+ * was recognized underneath; several get one line each ("amount · payee — where it
+ * landed"), plus a "+N more" line when the batch is longer than the described one.
+ * With no details it degrades to a plain count.
+ *
+ * @param {number} count - how many operations this run auto-created
+ * @param {Array<Object>} [details] - described items (see collectAddedAlertDetails)
+ * @returns {Promise<{ title: string, body: string, channelName: string }>}
+ */
+export const getAddedAlertCopy = async (count, details = []) => {
+  const language = await resolveLanguage();
+  const safeCount = Number.isFinite(count) && count > 0 ? count : 1;
+  const bodyKey = safeCount === 1
+    ? 'bank_notifications_bg_added_body_one'
+    : 'bank_notifications_bg_added_body_other';
+  const countLine = translate(language, bodyKey).replace('{count}', String(safeCount));
+  const channelName = translate(language, 'bank_notifications_channel_name');
+  const items = Array.isArray(details) ? details.filter(Boolean) : [];
+
+  if (items.length === 0) {
+    return {
+      title: translate(language, 'bank_notifications_bg_added_title'),
+      body: countLine,
+      channelName,
+    };
+  }
+
+  if (items.length === 1 && safeCount === 1) {
+    const detail = items[0];
+    return {
+      title: headlineFor(language, detail),
+      body: [countLine, recognizedFor(language, detail)].filter(Boolean).join('\n'),
+      channelName,
+    };
+  }
+
+  const lines = items.map((detail) => {
+    const where = landedIn(language, detail);
+    const headline = headlineFor(language, detail);
+    return where ? `${headline} — ${where}` : headline;
+  });
   const hidden = safeCount - items.length;
   if (hidden > 0) {
     lines.push(
