@@ -16,6 +16,8 @@
   "show_accounts_in_menu_hint": "Add an Accounts tab to the bottom navigation",
   "show_budget_in_menu": "Show Budget in main menu",
   "show_budget_in_menu_hint": "Show the Budget tab (budgets and planned) in the bottom navigation",
+  "show_quickadd_panel": "Show Quick add panel on operations screen",
+  "show_quickadd_panel_hint": "Keep the quick add form open; when off it opens from the + button",
   "attach_location": "Attach location to operations",
   "attach_location_hint": "Suggest labels you used nearby before",
   "getting_location": "Getting location…",

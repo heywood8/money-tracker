@@ -16,6 +16,8 @@
   "show_accounts_in_menu_hint": "하단 내비게이션에 계정 탭 추가",
   "show_budget_in_menu": "메인 메뉴에 예산 표시",
   "show_budget_in_menu_hint": "하단 내비게이션에 예산 탭(예산 및 예정 항목) 표시",
+  "show_quickadd_panel": "작업 화면에 빠른 추가 패널 표시",
+  "show_quickadd_panel_hint": "양식을 항상 열어 둡니다. 끄면 + 버튼으로 엽니다",
   "attach_location": "작업에 위치 첨부",
   "attach_location_hint": "근처에서 사용한 라벨 제안",
   "getting_location": "위치 가져오는 중…",

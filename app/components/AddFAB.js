@@ -5,13 +5,21 @@ import PropTypes from 'prop-types';
 import { useThemeColors } from '../contexts/ThemeColorsContext';
 import { BORDER_RADIUS, SPACING } from '../styles/designTokens';
 
-const AddFAB = ({ onPress, testID, accessibilityLabel, accessibilityHint }) => {
+/**
+ * Distance from the bottom of the FAB's parent to the bottom of the button
+ * (its `bottom` offset plus its own margin). Exported so a screen that floats
+ * something else down there — an undo bar, a banner — can work out whether the
+ * two overlap instead of guessing at the number.
+ */
+export const FAB_BOTTOM_OFFSET = 100 + SPACING.lg;
+
+const AddFAB = ({ onPress, testID, accessibilityLabel, accessibilityHint, icon = 'plus' }) => {
   const { colors } = useThemeColors();
 
   return (
     <FAB
       testID={testID}
-      icon="plus"
+      icon={icon}
       style={[
         styles.fab,
         {
@@ -32,6 +40,10 @@ AddFAB.propTypes = {
   testID: PropTypes.string,
   accessibilityLabel: PropTypes.string,
   accessibilityHint: PropTypes.string,
+  // Defaults to the plus this component is named for; a host that toggles a
+  // surface open and closed with the same button passes 'close' for the open
+  // state, so the button says what the next tap does.
+  icon: PropTypes.string,
 };
 
 const styles = StyleSheet.create({

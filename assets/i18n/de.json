@@ -16,6 +16,8 @@
   "show_accounts_in_menu_hint": "Fügt der unteren Navigation einen Tab „Konten“ hinzu",
   "show_budget_in_menu": "Budget im Hauptmenü anzeigen",
   "show_budget_in_menu_hint": "Zeigt den Tab „Budget“ (Budgets und Planungen) in der unteren Navigation an",
+  "show_quickadd_panel": "Schnellerfassung im Operationen-Bildschirm anzeigen",
+  "show_quickadd_panel_hint": "Formular bleibt geöffnet; ausgeschaltet öffnet es sich über die +-Schaltfläche",
   "attach_location": "Standort an Vorgänge anhängen",
   "attach_location_hint": "Labels vorschlagen, die du in der Nähe genutzt hast",
   "getting_location": "Standort wird ermittelt…",

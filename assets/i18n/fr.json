@@ -16,6 +16,8 @@
   "show_accounts_in_menu_hint": "Ajoute un onglet Comptes à la barre de navigation inférieure",
   "show_budget_in_menu": "Afficher le budget dans le menu principal",
   "show_budget_in_menu_hint": "Affiche l'onglet Budget (budgets et opérations planifiées) dans la barre de navigation inférieure",
+  "show_quickadd_panel": "Afficher le panneau d'ajout rapide sur l'écran des opérations",
+  "show_quickadd_panel_hint": "Garde le formulaire ouvert ; désactivé, il s'ouvre avec le bouton +",
   "attach_location": "Joindre la position aux opérations",
   "attach_location_hint": "Suggérer les étiquettes utilisées à proximité",
   "getting_location": "Obtention de la position…",

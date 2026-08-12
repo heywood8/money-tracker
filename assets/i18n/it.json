@@ -16,6 +16,8 @@
   "show_accounts_in_menu_hint": "Aggiungi una scheda Conti alla navigazione in basso",
   "show_budget_in_menu": "Mostra Budget nel menu principale",
   "show_budget_in_menu_hint": "Mostra la scheda Budget (budget e pianificati) nella navigazione in basso",
+  "show_quickadd_panel": "Mostra il pannello di aggiunta rapida nella schermata delle operazioni",
+  "show_quickadd_panel_hint": "Mantiene il modulo aperto; se disattivato si apre con il pulsante +",
   "attach_location": "Allega posizione alle operazioni",
   "attach_location_hint": "Suggerisci le etichette usate qui vicino",
   "getting_location": "Recupero posizione…",

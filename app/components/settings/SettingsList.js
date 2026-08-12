@@ -84,6 +84,7 @@ export default function SettingsList({ onOpenPanel }) {
     attachLocation, setAttachLocation,
     showAccountsTab, setShowAccountsTab,
     showBudgetTab, setShowBudgetTab,
+    showQuickAddPanel, setShowQuickAddPanel,
   } = useDisplaySettings();
   const { isDownloading, downloadProgress, downloadPhase } = useUpdateDownload();
 
@@ -123,6 +124,10 @@ export default function SettingsList({ onOpenPanel }) {
   const handleToggleShowBudgetTab = useCallback(() => {
     setShowBudgetTab(!showBudgetTab);
   }, [showBudgetTab, setShowBudgetTab]);
+
+  const handleToggleShowQuickAddPanel = useCallback(() => {
+    setShowQuickAddPanel(!showQuickAddPanel);
+  }, [showQuickAddPanel, setShowQuickAddPanel]);
 
   const handleToggleAttachLocation = useCallback(async () => {
     // Turning OFF is non-destructive and needs no permission: just persist false.
@@ -222,6 +227,15 @@ export default function SettingsList({ onOpenPanel }) {
         value={showBudgetTab}
         onToggle={handleToggleShowBudgetTab}
         testID="settings-show-budget-tab-row"
+      />
+
+      <SettingToggleRow
+        icon="flash-outline"
+        label={t('show_quickadd_panel') || 'Show Quick add panel on operations screen'}
+        hint={t('show_quickadd_panel_hint') || 'Keep the quick add form open; off collapses it behind the + button'}
+        value={showQuickAddPanel}
+        onToggle={handleToggleShowQuickAddPanel}
+        testID="settings-show-quickadd-panel-row"
       />
 
       <TouchableRipple onPress={() => onOpenPanel('categories')} style={styles.settingsRow} testID="settings-categories-row">
