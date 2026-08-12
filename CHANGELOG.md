@@ -1,5 +1,12 @@
 # Changelog
 
+## [0.267.0](https://github.com/heywood8/money-tracker/compare/penny-v0.266.3...penny-v0.267.0) (2026-08-12)
+
+
+### Features
+
+* **operations:** add a setting to collapse the quick-add panel ([#1602](https://github.com/heywood8/money-tracker/issues/1602)) ([7f96235](https://github.com/heywood8/money-tracker/commit/7f96235e641c50520c24ff605781e6198241a503))
+
 ## [0.266.3](https://github.com/heywood8/money-tracker/compare/penny-v0.266.2...penny-v0.266.3) (2026-08-11)
 
 
