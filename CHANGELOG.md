@@ -1,5 +1,12 @@
 # Changelog
 
+## [0.270.0](https://github.com/heywood8/money-tracker/compare/penny-v0.269.0...penny-v0.270.0) (2026-08-12)
+
+
+### Features
+
+* **notifications:** swipeable tabs for bindings, templates and filters ([#1611](https://github.com/heywood8/money-tracker/issues/1611)) ([52d3be8](https://github.com/heywood8/money-tracker/commit/52d3be8b878c2b48f5c8910a7c9fb3cfc3e0b6e0))
+
 ## [0.269.0](https://github.com/heywood8/money-tracker/compare/penny-v0.268.0...penny-v0.269.0) (2026-08-12)
 
 
