@@ -408,6 +408,41 @@ describe('SettingsScreen', () => {
       expect(mockSetSubPanelActive).toHaveBeenCalledWith(true);
     });
 
+    // The grouping: the preference toggles are not on the root any more, they
+    // are one tap in behind the Appearance and Privacy rows.
+    it('opens the appearance subpanel with the display toggles', async () => {
+      const { getByTestId, queryByTestId } = await render(
+        <SettingsScreen setSubPanelActive={mockSetSubPanelActive} />,
+      );
+
+      expect(queryByTestId('settings-theme-row')).toBeNull();
+
+      await act(async () => {
+        await fireEvent.press(getByTestId('settings-appearance-row'));
+      });
+
+      expect(getByTestId('settings-theme-row')).toBeTruthy();
+      expect(getByTestId('settings-show-accounts-tab-row')).toBeTruthy();
+      expect(getByTestId('settings-show-budget-tab-row')).toBeTruthy();
+      expect(getByTestId('settings-show-quickadd-panel-row')).toBeTruthy();
+      expect(mockSetSubPanelActive).toHaveBeenCalledWith(true);
+    });
+
+    it('opens the privacy subpanel with the balance and location toggles', async () => {
+      const { getByTestId, queryByTestId } = await render(
+        <SettingsScreen setSubPanelActive={mockSetSubPanelActive} />,
+      );
+
+      expect(queryByTestId('settings-hide-balances-row')).toBeNull();
+
+      await act(async () => {
+        await fireEvent.press(getByTestId('settings-privacy-row'));
+      });
+
+      expect(getByTestId('settings-hide-balances-row')).toBeTruthy();
+      expect(getByTestId('settings-location-row')).toBeTruthy();
+    });
+
     it('renders language row', async () => {
       const { getAllByText } = await render(
         <SettingsScreen setSubPanelActive={mockSetSubPanelActive} />,
@@ -906,33 +941,26 @@ describe('SettingsScreen', () => {
     });
   });
 
+  // The toggle now lives one level in, in the privacy subpanel — these go
+  // through the row that opens it.
   describe('Hide Balances Toggle', () => {
-    it('silently allows unhide and calls setHideBalances(false) when biometrics NOT_AVAILABLE', async () => {
+    it.each([
+      ['NOT_AVAILABLE', 'not_available'],
+      ['NOT_ENROLLED', 'not_enrolled'],
+    ])('silently allows unhide and calls setHideBalances(false) when biometrics %s', async (_name, result) => {
       displaySettingsMockState.hideBalances = true;
-      mockAuthenticateWithBiometrics.mockResolvedValue('not_available');
+      mockAuthenticateWithBiometrics.mockResolvedValue(result);
 
-      const { getByText } = await render(
+      const { getByTestId } = await render(
         <SettingsScreen setSubPanelActive={mockSetSubPanelActive} />,
       );
 
       await act(async () => {
-        await fireEvent.press(getByText('hide_balances'));
+        await fireEvent.press(getByTestId('settings-privacy-row'));
       });
 
-      expect(mockShowDialog).not.toHaveBeenCalled();
-      expect(mockSetHideBalances).toHaveBeenCalledWith(false);
-    });
-
-    it('silently allows unhide and calls setHideBalances(false) when biometrics NOT_ENROLLED', async () => {
-      displaySettingsMockState.hideBalances = true;
-      mockAuthenticateWithBiometrics.mockResolvedValue('not_enrolled');
-
-      const { getByText } = await render(
-        <SettingsScreen setSubPanelActive={mockSetSubPanelActive} />,
-      );
-
       await act(async () => {
-        await fireEvent.press(getByText('hide_balances'));
+        await fireEvent.press(getByTestId('settings-hide-balances-row'));
       });
 
       expect(mockShowDialog).not.toHaveBeenCalled();

@@ -14,6 +14,8 @@ import { useSwipeDismiss } from '../hooks/useSwipeDismiss';
 import useSettingsPanelStack from '../hooks/useSettingsPanelStack';
 import SettingsList from '../components/settings/SettingsList';
 import LanguagePanel from '../components/settings/LanguagePanel';
+import AppearancePanel from '../components/settings/AppearancePanel';
+import PrivacyPanel from '../components/settings/PrivacyPanel';
 import UpdatePanel from '../components/settings/UpdatePanel';
 import ExportPanel from '../components/settings/ExportPanel';
 import ImportPanel from '../components/settings/ImportPanel';
@@ -242,6 +244,8 @@ export default function SettingsScreen({ setSubPanelActive }) {
     if (activeSubPanel === 'accounts') return t('accounts') || 'Accounts';
     if (activeSubPanel === 'categories') return t('categories') || 'Categories';
     if (activeSubPanel === 'language') return t('language');
+    if (activeSubPanel === 'appearance') return t('appearance') || 'Appearance';
+    if (activeSubPanel === 'privacy') return t('privacy') || 'Privacy';
     if (activeSubPanel === 'export') {
       return exportStep === 'sheets-progress' ? 'Google Sheets' : (t('export_format') || 'Export Format');
     }
@@ -397,6 +401,14 @@ export default function SettingsScreen({ setSubPanelActive }) {
 
             {activeSubPanel === 'language' && (
               <LanguagePanel onSelected={dismissPanel} bottomInset={scrollBottomInset} />
+            )}
+
+            {activeSubPanel === 'appearance' && (
+              <AppearancePanel bottomInset={scrollBottomInset} />
+            )}
+
+            {activeSubPanel === 'privacy' && (
+              <PrivacyPanel onBusyChange={setPanelBusy} bottomInset={scrollBottomInset} />
             )}
 
             {activeSubPanel === 'export' && (
