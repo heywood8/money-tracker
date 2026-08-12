@@ -1,5 +1,12 @@
 # Changelog
 
+## [0.267.1](https://github.com/heywood8/money-tracker/compare/penny-v0.267.0...penny-v0.267.1) (2026-08-12)
+
+
+### Tests
+
+* raise jest coverage thresholds to the measured level ([#1604](https://github.com/heywood8/money-tracker/issues/1604)) ([a2c7948](https://github.com/heywood8/money-tracker/commit/a2c7948b9a7c90a1b5b24048e57ae861b37fe9c2))
+
 ## [0.267.0](https://github.com/heywood8/money-tracker/compare/penny-v0.266.3...penny-v0.267.0) (2026-08-12)
 
 
