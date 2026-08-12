@@ -139,4 +139,74 @@ describe('localNotifications', () => {
       ).resolves.toBeUndefined();
     });
   });
+
+  describe('presentAddedOperationsAlert', () => {
+    it('schedules a notification carrying the added-operations deep link', async () => {
+      await localNotifications.presentAddedOperationsAlert({
+        title: '1299 AMD · Sas',
+        body: 'Added automatically',
+        channelName: 'Bank operations',
+      });
+
+      expect(Notifications.setNotificationChannelAsync).toHaveBeenCalled();
+
+      const request = Notifications.scheduleNotificationAsync.mock.calls[0][0];
+      expect(request.content.title).toBe('1299 AMD · Sas');
+      expect(request.content.data).toEqual({ route: 'addedOperations' });
+    });
+
+    it('uses its own identifier so it never replaces the review alert', async () => {
+      await localNotifications.presentPendingOperationsAlert({ title: 'p', body: 'p' });
+      await localNotifications.presentAddedOperationsAlert({ title: 'a', body: 'a' });
+
+      const [pendingRequest] = Notifications.scheduleNotificationAsync.mock.calls[0];
+      const [addedRequest] = Notifications.scheduleNotificationAsync.mock.calls[1];
+      expect(pendingRequest.identifier).toBeTruthy();
+      expect(addedRequest.identifier).toBeTruthy();
+      expect(addedRequest.identifier).not.toBe(pendingRequest.identifier);
+    });
+
+    it('stacks instead of replacing, so an unread receipt is never erased', async () => {
+      // Each run books different operations; reusing one id would let a later
+      // booking silently overwrite the notice of an earlier, unread one.
+      const nowSpy = jest.spyOn(Date, 'now');
+      nowSpy.mockReturnValueOnce(1_000).mockReturnValueOnce(2_000);
+
+      await localNotifications.presentAddedOperationsAlert({ title: 'first', body: 'b' });
+      await localNotifications.presentAddedOperationsAlert({ title: 'second', body: 'b' });
+
+      const [first] = Notifications.scheduleNotificationAsync.mock.calls[0];
+      const [second] = Notifications.scheduleNotificationAsync.mock.calls[1];
+      expect(first.identifier).not.toBe(second.identifier);
+      nowSpy.mockRestore();
+    });
+
+    it('keeps the review alert replace-in-place', async () => {
+      await localNotifications.presentPendingOperationsAlert({ title: 'p1', body: 'b' });
+      await localNotifications.presentPendingOperationsAlert({ title: 'p2', body: 'b' });
+
+      const [first] = Notifications.scheduleNotificationAsync.mock.calls[0];
+      const [second] = Notifications.scheduleNotificationAsync.mock.calls[1];
+      expect(first.identifier).toBe(second.identifier);
+    });
+
+    it('never throws when scheduling fails', async () => {
+      Notifications.scheduleNotificationAsync.mockRejectedValue(new Error('boom'));
+      await expect(
+        localNotifications.presentAddedOperationsAlert({ title: 't', body: 'b' }),
+      ).resolves.toBeUndefined();
+    });
+  });
+
+  describe('isAddedOperationsResponse', () => {
+    it('matches the added-operations deep link only', async () => {
+      const withRoute = (route) => ({
+        notification: { request: { content: { data: { route } } } },
+      });
+      expect(localNotifications.isAddedOperationsResponse(withRoute('addedOperations'))).toBe(true);
+      expect(localNotifications.isAddedOperationsResponse(withRoute('notificationProcessing'))).toBe(false);
+      expect(localNotifications.isAddedOperationsResponse(null)).toBe(false);
+      expect(localNotifications.isAddedOperationsResponse({})).toBe(false);
+    });
+  });
 });

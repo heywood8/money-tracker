@@ -55,4 +55,8 @@ export const EVENTS = {
   // Handled by SimpleTabs (switch to the Operations tab) and OperationsScreen
   // (surface the suggestion deck over the quick-add form).
   OPEN_PENDING_OPERATIONS: 'navigate:pendingOperations',
+  // Emitted when the user taps the background "operations added" notification.
+  // Handled by SimpleTabs only (switch to the Operations tab): the operations
+  // are already booked, so there is nothing to review — the list is the target.
+  OPEN_ADDED_OPERATIONS: 'navigate:addedOperations',
 };

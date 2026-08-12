@@ -67,8 +67,9 @@ const resolvePendingLocation = async (pending) => {
   return captureLocationIfEnabled();
 };
 
-// Cap on remembered signatures. The native side only ever keeps a handful of
-// notifications, so this is comfortably large while bounding storage.
+// Cap on remembered signatures. The native side keeps a rolling window of 50
+// notifications, so twice that is comfortable headroom (the newest 100
+// signatures always cover the newest 50 notifications) while bounding storage.
 const MAX_SIGNATURES = 100;
 
 /**
@@ -359,6 +360,22 @@ const findExistingOperation = async (descriptor, resolution, date, options) => {
 };
 
 /**
+ * Remember what an auto-create just booked, so the background task can tell the
+ * user about it (the silent create is otherwise invisible until they next open
+ * the app). Only ids are recorded — account/category names are resolved in one
+ * batch afterwards (see addedAlertItems) rather than per operation on the hot
+ * path. A caller that passes no `createdItems` array opts out entirely.
+ *
+ * @param {{ createdItems?: Array }} summary
+ * @param {Object} record - { type, amount, currency, merchant, accountId,
+ *   categoryId, toAccountId, date }
+ * @returns {void}
+ */
+const recordCreated = (summary, record) => {
+  if (Array.isArray(summary.createdItems)) summary.createdItems.push(record);
+};
+
+/**
  * Book a parsed expense/income notification: auto-create the operation when the
  * card resolves to an account, the merchant resolves to a category *and* a display
  * name (label) binding, and the source is trusted; otherwise enqueue it for review.
@@ -457,6 +474,17 @@ const bookExpenseOrQueue = async (descriptor, resolution, date, allowedPackages,
     // with a different existing operation rather than re-matching this one.
     if (options.claimedOpIds && created && created.id != null) options.claimedOpIds.add(created.id);
     summary.created += 1;
+    recordCreated(summary, {
+      type: descriptor.type,
+      // The booked amount (converted and rounded), in the account's currency —
+      // what the user will see on the operation, not the raw notification value.
+      amount: currencyFields.amount,
+      currency: resolution.accountCurrency || descriptor.currency,
+      merchant: label || descriptor.merchant || null,
+      accountId: resolution.accountId,
+      categoryId: resolution.categoryId,
+      date,
+    });
 
     // Float the merchant's binding to the top of the bindings list on this
     // auto-create (no-op when no rule exists). Best-effort: a failed bookkeeping
@@ -571,6 +599,18 @@ const bookTransferOrQueue = async (descriptor, resolution, date, allowedPackages
     });
     if (options.claimedOpIds && created && created.id != null) options.claimedOpIds.add(created.id);
     summary.created += 1;
+    recordCreated(summary, {
+      type: 'transfer',
+      amount: transferFields.amount,
+      currency: resolution.accountCurrency || descriptor.currency,
+      merchant: descriptor.merchant ? normalizeMerchantLabel(descriptor.merchant) : null,
+      accountId: resolution.accountId,
+      categoryId: null,
+      // The cash account the withdrawal landed in — a transfer's counterpart to
+      // the category, and the part the user most wants confirmed.
+      toAccountId: target.id,
+      date,
+    });
   } else {
     // Capture the location NOW (at ingestion, near the ATM) and store it on the
     // pending row, mirroring the expense/income queue path.
@@ -600,7 +640,11 @@ let _inFlight = null;
  * are skipped, and overlapping invocations share a single run. Does nothing when
  * the feature is disabled.
  *
- * @returns {Promise<{ created: number, pending: number, skipped: number }>}
+ * `createdItems` describes each operation the run auto-created (see recordCreated);
+ * the background task turns it into the "operations added" alert.
+ *
+ * @returns {Promise<{ created: number, pending: number, skipped: number,
+ *   createdItems: Array<Object> }>}
  */
 export const processBankNotifications = async () => {
   if (_inFlight) return _inFlight;
@@ -629,7 +673,9 @@ const syncPendingOperationsAlert = async () => {
 };
 
 const runProcess = async () => {
-  const summary = { created: 0, pending: 0, skipped: 0 };
+  // `createdItems` describes each auto-created operation for the background
+  // task's "operations added" alert; the counters alone can't say what was booked.
+  const summary = { created: 0, pending: 0, skipped: 0, createdItems: [] };
 
   if (!(await isBankNotificationsEnabled())) {
     return summary;
@@ -1039,6 +1085,8 @@ const resolvePendingTransfer = async (pending, choices = {}) => {
  * @returns {Promise<{ created: number, pending: number, skipped: number }>}
  */
 export const reAddNotification = async (notification) => {
+  // No `createdItems`: a re-add is an explicit foreground action whose result the
+  // UI reports inline, so it must not also raise the background "added" alert.
   const summary = { created: 0, pending: 0, skipped: 0 };
 
   await ensureCustomTemplatesLoaded();

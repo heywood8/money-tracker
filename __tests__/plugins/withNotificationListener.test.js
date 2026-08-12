@@ -125,7 +125,9 @@ describe('withNotificationListener', () => {
     expect(() => mainAppCb(config)).toThrow(/package list/);
   });
 
-  it('records the latest 20 notifications in the listener service', async () => {
+  // The window doubles as the ingestion buffer between background passes, so it
+  // is sized for a bursty stretch rather than for what the viewer shows.
+  it('records the latest 50 notifications in the listener service', async () => {
     const fs = require('fs');
     fs.writeFileSync.mockClear();
     withNotificationListener({});
@@ -136,6 +138,6 @@ describe('withNotificationListener', () => {
         typeof filePath === 'string' && filePath.endsWith('PennyNotificationListenerService.kt'),
     );
     expect(serviceWrite).toBeTruthy();
-    expect(serviceWrite[1]).toContain('const val MAX_STORED = 20');
+    expect(serviceWrite[1]).toContain('const val MAX_STORED = 50');
   });
 });

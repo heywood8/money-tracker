@@ -2,10 +2,17 @@
  * Thin wrapper around expo-notifications for Penny's local (non-push) alerts.
  *
  * Only local, immediately-presented notifications are used — no push tokens and
- * no FCM setup. The single alert this app posts tells the user that new bank
- * transactions have landed in the review queue; tapping it deep-links to the
- * quick-add surface on the operations page, where the queue is stacked as
- * binding cards over the form (see useNotificationResponseRouter).
+ * no FCM setup. Two alerts are posted, both from the background task:
+ *
+ * - **transactions to review** — new items landed in the review queue; tapping
+ *   deep-links to the quick-add surface on the operations page, where the queue
+ *   is stacked as binding cards over the form (see useNotificationResponseRouter).
+ * - **operations added** — the run booked fully-matched operations on its own.
+ *   Without it the silent auto-create path is invisible until the user next opens
+ *   the app; tapping lands on the operations list where the new rows are.
+ *
+ * They are separate notifications (distinct identifiers) because they ask for
+ * different things: one is a task, the other is a receipt.
  */
 
 import { Platform } from 'react-native';
@@ -23,9 +30,24 @@ export const BANK_ALERTS_CHANNEL_ID = 'bank-operations';
 export const NOTIFICATION_ROUTE_KEY = 'route';
 export const ROUTE_PENDING_OPERATIONS = 'notificationProcessing';
 
+/**
+ * Route value for the "operations added" alert. Distinct from the review route:
+ * there is nothing to resolve, so the tap opens the operations list rather than
+ * the suggestion deck.
+ */
+export const ROUTE_ADDED_OPERATIONS = 'addedOperations';
+
 // A fixed identifier so a fresh alert replaces the previous one instead of
 // stacking a new row every background run.
 const PENDING_ALERT_IDENTIFIER = 'penny-pending-operations';
+
+// The auto-added receipt does NOT replace in place: each run's receipt describes
+// different operations, so reusing one identifier would let a later booking
+// silently erase an unread notice of an earlier one — the exact thing this alert
+// exists to prevent. A per-post identifier stacks them instead (Android groups
+// them under the channel once there are several), and the prefix keeps them
+// recognizable as ours.
+const ADDED_ALERT_PREFIX = 'penny-added-operations';
 
 // Foreground presentation: show the alert as a banner + in the tray even while
 // the app is open, but stay quiet (no sound/badge) — it is a low-urgency nudge.
@@ -89,25 +111,27 @@ export const requestNotificationsPermission = async () => {
 };
 
 /**
- * Post (or refresh) the "transactions to review" alert. Uses a fixed identifier
- * so repeated calls update a single notification rather than stacking.
+ * Post one of the bank alerts. Reusing an identifier updates that notification
+ * in place instead of stacking a second row; see each caller for which it wants.
  *
- * The body may be multi-line (one line per queued transaction): expo-notifications
- * wraps the Android notification in a BigTextStyle, so the collapsed row shows the
- * first line and expanding the shade reveals the rest.
+ * The body may be multi-line (one line per transaction): expo-notifications wraps
+ * the Android notification in a BigTextStyle, so the collapsed row shows the first
+ * line and expanding the shade reveals the rest.
  *
+ * @param {string} identifier - notification id
+ * @param {string} route - deep-link route value carried in the payload
  * @param {{ title: string, body: string, channelName?: string }} copy
  * @returns {Promise<void>}
  */
-export const presentPendingOperationsAlert = async ({ title, body, channelName }) => {
+const presentBankAlert = async (identifier, route, { title, body, channelName }) => {
   await ensureBankAlertsChannelAsync(channelName);
   try {
     await Notifications.scheduleNotificationAsync({
-      identifier: PENDING_ALERT_IDENTIFIER,
+      identifier,
       content: {
         title,
         body,
-        data: { [NOTIFICATION_ROUTE_KEY]: ROUTE_PENDING_OPERATIONS },
+        data: { [NOTIFICATION_ROUTE_KEY]: route },
       },
       // `null` presents the notification immediately, but assigns it to the
       // Android channel above (channelId is read from the content on 8.0+).
@@ -119,6 +143,26 @@ export const presentPendingOperationsAlert = async ({ title, body, channelName }
     // Non-fatal: a failed alert must never crash the background task.
   }
 };
+
+/**
+ * Post (or refresh) the "transactions to review" alert.
+ *
+ * @param {{ title: string, body: string, channelName?: string }} copy
+ * @returns {Promise<void>}
+ */
+export const presentPendingOperationsAlert = async (copy) =>
+  presentBankAlert(PENDING_ALERT_IDENTIFIER, ROUTE_PENDING_OPERATIONS, copy);
+
+/**
+ * Post the "operations added" alert — the receipt for operations a background run
+ * booked on its own, which would otherwise happen invisibly. Each call posts its
+ * own notification (see ADDED_ALERT_PREFIX) rather than replacing the last.
+ *
+ * @param {{ title: string, body: string, channelName?: string }} copy
+ * @returns {Promise<void>}
+ */
+export const presentAddedOperationsAlert = async (copy) =>
+  presentBankAlert(`${ADDED_ALERT_PREFIX}-${Date.now()}`, ROUTE_ADDED_OPERATIONS, copy);
 
 /**
  * Dismiss the "transactions to review" alert from the tray.
@@ -140,11 +184,27 @@ export const dismissPendingOperationsAlert = async () => {
 };
 
 /**
+ * The route a tapped notification carries, or null when it is not one of ours.
+ * @param {object|null} response - a Notifications.NotificationResponse
+ * @returns {string|null}
+ */
+const routeOf = (response) => {
+  const data = response?.notification?.request?.content?.data;
+  return data ? data[NOTIFICATION_ROUTE_KEY] || null : null;
+};
+
+/**
  * Whether a tapped-notification response is Penny's review-queue deep link.
  * @param {object|null} response - a Notifications.NotificationResponse
  * @returns {boolean}
  */
-export const isPendingOperationsResponse = (response) => {
-  const data = response?.notification?.request?.content?.data;
-  return !!data && data[NOTIFICATION_ROUTE_KEY] === ROUTE_PENDING_OPERATIONS;
-};
+export const isPendingOperationsResponse = (response) =>
+  routeOf(response) === ROUTE_PENDING_OPERATIONS;
+
+/**
+ * Whether a tapped-notification response is the auto-added receipt's deep link.
+ * @param {object|null} response - a Notifications.NotificationResponse
+ * @returns {boolean}
+ */
+export const isAddedOperationsResponse = (response) =>
+  routeOf(response) === ROUTE_ADDED_OPERATIONS;

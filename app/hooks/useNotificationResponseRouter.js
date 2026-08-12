@@ -1,12 +1,19 @@
 import { useEffect } from 'react';
 import * as Notifications from 'expo-notifications';
 import { appEvents, EVENTS } from '../services/eventEmitter';
-import { isPendingOperationsResponse } from '../services/notifications/localNotifications';
+import {
+  isAddedOperationsResponse,
+  isPendingOperationsResponse,
+} from '../services/notifications/localNotifications';
 
 /**
  * Routes a tapped "transactions to review" notification to the quick-add surface
  * on the operations page, where the queued suggestions are stacked as binding
  * cards over the form — reviewing them is an operations task, not a settings one.
+ *
+ * The sibling "operations added" notification routes to the same page but not to
+ * the deck: those operations are already booked, so the user wants to see them in
+ * the list, not a review surface.
  *
  * Handles both cases:
  *   - Warm: the app is already running when the notification is tapped
@@ -29,6 +36,8 @@ export default function useNotificationResponseRouter() {
     const route = (response) => {
       if (isPendingOperationsResponse(response)) {
         appEvents.emit(EVENTS.OPEN_PENDING_OPERATIONS);
+      } else if (isAddedOperationsResponse(response)) {
+        appEvents.emit(EVENTS.OPEN_ADDED_OPERATIONS);
       }
     };
 

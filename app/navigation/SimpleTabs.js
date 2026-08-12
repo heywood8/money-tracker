@@ -432,6 +432,15 @@ export default function SimpleTabs() {
     return unsubscribe;
   }, [handleTabPress]);
 
+  // A tapped "operations added" notification lands on the same tab, but nothing
+  // else: those operations are already booked, so the list itself is the target.
+  React.useEffect(() => {
+    const unsubscribe = appEvents.on(EVENTS.OPEN_ADDED_OPERATIONS, () => {
+      handleTabPress('Operations');
+    });
+    return unsubscribe;
+  }, [handleTabPress]);
+
   // Android hardware back button navigates to Operations from any other tab
   React.useEffect(() => {
     const subscription = BackHandler.addEventListener('hardwareBackPress', () => {
