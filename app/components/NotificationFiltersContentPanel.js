@@ -32,7 +32,7 @@ import { CARD_SURFACE, SECTION_LABEL } from '../styles/componentStyles';
 import EmptyState from './EmptyState';
 
 /**
- * "Filters" subpanel for notification processing (header three-dots → Filters).
+ * "Filters" page of the notification-processing panel (its rightmost tab).
  *
  * Groups the controls that govern what Penny does with notifications:
  *   1. Notification access: grant/manage the OS notification-listener permission.
@@ -42,7 +42,7 @@ import EmptyState from './EmptyState';
  *      checkbox. Apps are shown by default; unchecking one hides its
  *      notifications from the feed on the main processing page.
  */
-export default function NotificationFiltersContentPanel({ bottomInset = 0 }) {
+export default function NotificationFiltersContentPanel({ active = true, bottomInset = 0 }) {
   const { colors } = useThemeColors();
   const { t } = useLocalization();
 
@@ -95,6 +95,18 @@ export default function NotificationFiltersContentPanel({ bottomInset = 0 }) {
       }
     })();
   }, [reload]);
+
+  // The page stays mounted behind the panel's tab pager, so what it read when
+  // the panel opened would otherwise still be on screen days later. Reload when
+  // it becomes the active tab again — not on the first activation, which the
+  // mount effect above already covered.
+  const wasActiveRef = useRef(active);
+  useEffect(() => {
+    if (active && !wasActiveRef.current) {
+      reload().catch(() => {});
+    }
+    wasActiveRef.current = active;
+  }, [active, reload]);
 
   const handleRefresh = useCallback(async () => {
     setRefreshing(true);
@@ -327,6 +339,9 @@ export default function NotificationFiltersContentPanel({ bottomInset = 0 }) {
 }
 
 NotificationFiltersContentPanel.propTypes = {
+  // Whether this is the panel's showing tab. False keeps the page mounted (so a
+  // swipe reveals it fully drawn) but tells it its data may have gone stale.
+  active: PropTypes.bool,
   bottomInset: PropTypes.number,
 };
 

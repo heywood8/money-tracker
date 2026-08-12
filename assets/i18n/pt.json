@@ -74,6 +74,7 @@
   "notifications_empty": "Nenhuma notificação registrada ainda. Novas notificações aparecerão aqui.",
   "notifications_all_filtered": "Todas as notificações recentes estão ocultas pelos seus filtros de apps.",
   "notification_no_text": "Sem texto",
+  "notification_feed": "Notificações",
   "notification_filters": "Filtros",
   "notification_bindings": "Vínculos",
   "notification_bindings_empty": "Ainda não há vínculos. O Penny os aprende conforme você revisa as notificações.",

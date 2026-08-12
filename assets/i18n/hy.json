@@ -74,6 +74,7 @@
   "notifications_empty": "Դեռ ոչ մի ծանուցում չի գրանցվել։ Նոր ծանուցումները կհայտնվեն այստեղ։",
   "notifications_all_filtered": "Բոլոր վերջին ծանուցումները թաքցված են ձեր հավելվածների զտիչներով։",
   "notification_no_text": "Տեքստ չկա",
+  "notification_feed": "Ծանուցումներ",
   "notification_filters": "Զտիչներ",
   "notification_bindings": "Կապեր",
   "notification_bindings_empty": "Դեռ կապեր չկան։ Penny-ն սովորում է դրանք ծանուցումները մշակելիս։",

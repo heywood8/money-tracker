@@ -19,7 +19,7 @@ import {
 
 /**
  * "Templates" subpanel — every way Penny knows how to read a notification, in
- * one list (header three-dots → Templates).
+ * one list (the notification-processing panel's Templates tab).
  *
  * Two sections, because the two kinds of parser answer different questions:
  *
@@ -34,7 +34,7 @@ import {
  * work is worth keeping while the user figures out what to change, and a
  * disabled template stops affecting ingestion immediately.
  */
-export default function NotificationTemplatesContentPanel({ onEdit = null, bottomInset = 0 }) {
+export default function NotificationTemplatesContentPanel({ active = true, onEdit = null, bottomInset = 0 }) {
   const { colors } = useThemeColors();
   const { t } = useLocalization();
   const { categories } = useCategories();
@@ -71,6 +71,17 @@ export default function NotificationTemplatesContentPanel({ onEdit = null, botto
       }
     })();
   }, [reload]);
+
+  // The page stays mounted behind the panel's tab pager, so returning to it
+  // after saving a template elsewhere has to re-read the list — and re-reading
+  // it is also what brings the parser's cache back in step (see reload above).
+  const wasActiveRef = useRef(active);
+  useEffect(() => {
+    if (active && !wasActiveRef.current) {
+      reload().catch(() => {});
+    }
+    wasActiveRef.current = active;
+  }, [active, reload]);
 
   const handleRefresh = useCallback(async () => {
     setRefreshing(true);
@@ -298,6 +309,9 @@ export default function NotificationTemplatesContentPanel({ onEdit = null, botto
 }
 
 NotificationTemplatesContentPanel.propTypes = {
+  // Whether this is the panel's showing tab. False keeps the page mounted (so a
+  // swipe reveals it fully drawn) but tells it its data may have gone stale.
+  active: PropTypes.bool,
   // Called with a template row to open it in the editor. Omitted when the host
   // has nowhere to open it.
   onEdit: PropTypes.func,

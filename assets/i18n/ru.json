@@ -74,6 +74,7 @@
   "notifications_empty": "Уведомления пока не записаны. Новые уведомления появятся здесь.",
   "notifications_all_filtered": "Все недавние уведомления скрыты фильтрами приложений.",
   "notification_no_text": "Без текста",
+  "notification_feed": "Уведомления",
   "notification_filters": "Фильтры",
   "notification_bindings": "Привязки",
   "notification_bindings_empty": "Пока нет привязок. Penny запоминает их по мере обработки уведомлений.",
