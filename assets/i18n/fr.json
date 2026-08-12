@@ -74,6 +74,7 @@
   "notifications_empty": "Aucune notification enregistrée pour le moment. Les nouvelles notifications apparaîtront ici.",
   "notifications_all_filtered": "Toutes les notifications récentes sont masquées par vos filtres d'applications.",
   "notification_no_text": "Aucun texte",
+  "notification_feed": "Notifications",
   "notification_filters": "Filtres",
   "notification_bindings": "Associations",
   "notification_bindings_empty": "Aucune association pour l'instant. Penny les apprend à mesure que vous traitez les notifications.",

@@ -74,6 +74,7 @@
   "notifications_empty": "Noch keine Benachrichtigungen aufgezeichnet. Neue Benachrichtigungen erscheinen hier.",
   "notifications_all_filtered": "Alle aktuellen Benachrichtigungen sind durch deine App-Filter ausgeblendet.",
   "notification_no_text": "Kein Text",
+  "notification_feed": "Benachrichtigungen",
   "notification_filters": "Filter",
   "notification_bindings": "Zuordnungen",
   "notification_bindings_empty": "Noch keine Zuordnungen. Penny lernt sie, während du Benachrichtigungen prüfst.",

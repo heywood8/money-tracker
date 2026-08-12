@@ -74,6 +74,7 @@
   "notifications_empty": "まだ通知は記録されていません。新しい通知はここに表示されます。",
   "notifications_all_filtered": "最近の通知はすべてアプリフィルターで非表示になっています。",
   "notification_no_text": "テキストなし",
+  "notification_feed": "通知",
   "notification_filters": "フィルター",
   "notification_bindings": "ひも付け",
   "notification_bindings_empty": "まだひも付けはありません。通知を確認するにつれて Penny が学習します。",

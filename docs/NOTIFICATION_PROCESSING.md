@@ -378,10 +378,13 @@ step, and would also retire the rolling-window loss described above.
 
 ### App filters
 
-The notification-processing page (`app/components/NotificationProcessingContentPanel.js`)
-shows the review queue and the recent-notifications feed. Its header overflow menu
-(three-dots → **Filters**) opens a nested **Filters** view
-(`app/components/NotificationFiltersContentPanel.js`) that groups:
+The notification-processing subpanel is a set of four tabs
+(`app/components/settings/NotificationPanel.js`), swiped between Telegram-style
+or picked from the chip strip under the header: **Notifications** (the review
+queue + the recent-notifications feed), **Bindings**, **Templates** and
+**Filters**. A back-swipe on the first tab closes the subpanel and returns to the
+settings list; on any other tab it returns to the first. The **Filters** tab
+(`app/components/NotificationFiltersContentPanel.js`) groups:
 
 - **Notification access** (grant/manage the OS listener permission) and the
   **Process bank notifications** toggle — moved here from the main page.

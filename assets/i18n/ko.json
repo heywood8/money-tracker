@@ -74,6 +74,7 @@
   "notifications_empty": "아직 기록된 알림이 없습니다. 새 알림이 여기에 표시됩니다.",
   "notifications_all_filtered": "최근 알림이 모두 앱 필터로 숨겨졌습니다.",
   "notification_no_text": "텍스트 없음",
+  "notification_feed": "알림",
   "notification_filters": "필터",
   "notification_bindings": "바인딩",
   "notification_bindings_empty": "아직 바인딩이 없습니다. 알림을 검토하면서 Penny가 학습합니다.",

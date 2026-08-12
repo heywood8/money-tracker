@@ -5,7 +5,7 @@ import PropTypes from 'prop-types';
 // eslint-disable-next-line react-native/split-platform-components
 import { View, StyleSheet, TouchableOpacity, BackHandler, AppState, ToastAndroid } from 'react-native';
 import { HORIZONTAL_PADDING, SPACING } from '../styles/designTokens';
-import { Text, Divider, Menu } from 'react-native-paper';
+import { Text, Divider } from 'react-native-paper';
 import Ionicons from '@expo/vector-icons/Ionicons';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import Animated from 'react-native-reanimated';
@@ -47,19 +47,15 @@ export default function SettingsScreen({ setSubPanelActive }) {
     open: openStack,
     swapPanel: swapStackPanel,
     push: pushStep,
-    replace: replaceStep,
     pop: popStep,
     popToRoot: popToRootStep,
     close: closeStack,
   } = panelStack;
   const activeSubPanel = panelStack.panel;
-  // Nested view within the notification-processing subpanel: 'main' shows the
-  // review queue + feed, 'filters' shows access/toggle/app-filter controls,
-  // 'bindings' the learned associations, 'templates' the parser list, and
-  // 'templateEditor' the field-marking editor.
+  // Nested view within the notification-processing subpanel: 'main' is the
+  // tabbed body (feed / bindings / templates / filters, which the panel swipes
+  // between itself), and 'templateEditor' the field-marking editor it pushes.
   const notificationView = panelStack.stepOf('notificationProcessing');
-  // Controls the notification-processing header overflow (three-dots) menu.
-  const [notificationMenuVisible, setNotificationMenuVisible] = useState(false);
   // Measured size of the settings container. The subpanel overlay is sized in
   // explicit pixels from this rather than relying on `absoluteFillObject`'s
   // top+bottom inset stretch, which collapses to zero height under Reanimated 4 /
@@ -99,6 +95,14 @@ export default function SettingsScreen({ setSubPanelActive }) {
     setPanelRefresh(() => (typeof fn === 'function' ? fn : null));
   }, []);
 
+  // A panel with levels of its own that are not stack steps says so here, so a
+  // completed back-swipe steps up inside it instead of closing the whole panel.
+  // The notification tabs use it: any tab but the first steps back to the first.
+  const [panelCanStepBack, setPanelCanStepBack] = useState(false);
+  const registerPanelCanStepBack = useCallback((can) => {
+    setPanelCanStepBack(!!can);
+  }, []);
+
   // Resets all subpanel state and unmounts it. Called once the slide-away
   // animation has played (or immediately when another flow takes over).
   const closeSubPanel = useCallback(() => {
@@ -109,11 +113,10 @@ export default function SettingsScreen({ setSubPanelActive }) {
     registerPanelBack(null);
     registerPanelRefresh(null);
     registerPanelTitle(null);
+    registerPanelCanStepBack(false);
     setPanelBusy(false);
     setEmbeddedCanGoBack(false);
-    // Everything else the panels used to leave behind now unmounts with them.
-    setNotificationMenuVisible(false);
-  }, [closeStack, registerPanelBack, registerPanelRefresh, registerPanelTitle]);
+  }, [closeStack, registerPanelBack, registerPanelRefresh, registerPanelTitle, registerPanelCanStepBack]);
 
   // The wipe finished: close the panel and say so. The toast lives here rather
   // than in ResetPanel because acknowledging a completed subpanel is the host's
@@ -148,8 +151,8 @@ export default function SettingsScreen({ setSubPanelActive }) {
   // Accounts/Categories screen that still has an internal level to pop.
   const canSwipeStepBack = useMemo(() => {
     if (activeSubPanel === 'accounts' || activeSubPanel === 'categories') return embeddedCanGoBack;
-    return panelStack.canStepBack;
-  }, [activeSubPanel, embeddedCanGoBack, panelStack.canStepBack]);
+    return panelStack.canStepBack || panelCanStepBack;
+  }, [activeSubPanel, embeddedCanGoBack, panelCanStepBack, panelStack.canStepBack]);
 
   // Unified back navigation for the swipe, hardware-back, and the header arrow.
   // The resolver is defined further down (it depends on dismissPanel, which this
@@ -176,8 +179,7 @@ export default function SettingsScreen({ setSubPanelActive }) {
 
   const openSubPanel = useCallback((panel) => {
     // Panels own their own entry state now: each mounts fresh at the step the
-    // stack starts it on. Only the header's own menu is reset here.
-    setNotificationMenuVisible(false);
+    // stack starts it on.
     openStack(panel);
     openPanelAnim();
   }, [openPanelAnim, openStack]);
@@ -257,9 +259,8 @@ export default function SettingsScreen({ setSubPanelActive }) {
     }
     if (activeSubPanel === 'logs') return t('logs') || 'Logs';
     if (activeSubPanel === 'notificationProcessing') {
-      if (notificationView === 'filters') return t('notification_filters') || 'Filters';
-      if (notificationView === 'bindings') return t('notification_bindings') || 'Bindings';
-      if (notificationView === 'templates') return t('notification_templates') || 'Templates';
+      // The tabs name themselves in the strip below the header, so only the
+      // pushed editor overrides the panel's own title.
       if (notificationView === 'templateEditor') {
         return panelStack.params?.editing
           ? (t('notification_template_edit') || 'Edit template')
@@ -293,62 +294,16 @@ export default function SettingsScreen({ setSubPanelActive }) {
 
   // ─── RENDER ───
   // Header action slot (opposite the back arrow). A panel that wants a refresh
-  // button registers one (the import backup list does, while it is showing); the
-  // notification-processing main view gets a three-dots overflow menu, which is
-  // header chrome and stays here because all it does is push a step. Everything
-  // else gets an empty spacer so the title stays centered.
+  // button registers one (the import backup list does, while it is showing);
+  // everything else gets an empty spacer so the title stays centered. The
+  // notification panel used to put a three-dots menu here for its other views —
+  // those are tabs inside the panel now.
   let headerRightSlot = <View style={styles.backButton} />;
   if (panelRefresh) {
     headerRightSlot = (
       <TouchableOpacity onPress={panelRefresh} style={styles.backButton}>
         <Ionicons name="refresh-outline" size={22} color={colors.text} />
       </TouchableOpacity>
-    );
-  } else if (activeSubPanel === 'notificationProcessing' && notificationView === 'main') {
-    headerRightSlot = (
-      <Menu
-        visible={notificationMenuVisible}
-        onDismiss={() => setNotificationMenuVisible(false)}
-        anchor={(
-          <TouchableOpacity
-            onPress={() => setNotificationMenuVisible(true)}
-            style={styles.backButton}
-            testID="notification-overflow-button"
-            accessibilityRole="button"
-            accessibilityLabel={t('notification_filters') || 'Filters'}
-          >
-            <Ionicons name="ellipsis-vertical" size={22} color={colors.text} />
-          </TouchableOpacity>
-        )}
-      >
-        <Menu.Item
-          onPress={() => {
-            setNotificationMenuVisible(false);
-            pushStep('bindings');
-          }}
-          title={t('notification_bindings') || 'Bindings'}
-          leadingIcon="link-variant"
-          testID="notification-bindings-menu-item"
-        />
-        <Menu.Item
-          onPress={() => {
-            setNotificationMenuVisible(false);
-            pushStep('templates');
-          }}
-          title={t('notification_templates') || 'Templates'}
-          leadingIcon="text-search"
-          testID="notification-templates-menu-item"
-        />
-        <Menu.Item
-          onPress={() => {
-            setNotificationMenuVisible(false);
-            pushStep('filters');
-          }}
-          title={t('notification_filters') || 'Filters'}
-          leadingIcon="filter-variant"
-          testID="notification-filters-menu-item"
-        />
-      </Menu>
     );
   }
 
@@ -455,11 +410,11 @@ export default function SettingsScreen({ setSubPanelActive }) {
             {activeSubPanel === 'notificationProcessing' && (
               <NotificationPanel
                 step={notificationView}
-                parentStep={panelStack.parentStep}
                 onPushStep={pushStep}
                 onPopStep={popStep}
-                onReplaceStep={replaceStep}
                 onRegisterBack={registerPanelBack}
+                onCanStepBackChange={registerPanelCanStepBack}
+                hostSwipeGesture={swipeGesture}
                 bottomInset={scrollBottomInset}
               />
             )}

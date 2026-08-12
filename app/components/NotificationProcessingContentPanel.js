@@ -80,15 +80,15 @@ const CARD_COLLAPSE_ANIMATION = {
  *   2. Recent notifications: the raw feed the listener has captured, with the
  *      bank-parseable ones highlighted (see NotificationCard). The feed is
  *      filtered by the per-app filters the user manages from the "Filters" menu
- *      (three-dots → Filters), so hidden apps don't clutter the list.
+ *      (the panel's Filters tab), so hidden apps don't clutter the list.
  *
  * The notification-access permission and the "process bank notifications" toggle
  * live on the Filters subpanel (NotificationFiltersContentPanel), reachable from
- * the header overflow menu.
+ * the Filters tab of the same panel (its last one).
  *
  * The panel owns all of its async state so the host screen only has to mount it.
  */
-export default function NotificationProcessingContentPanel({ onCreateTemplate = null, bottomInset = 0 }) {
+export default function NotificationProcessingContentPanel({ active = true, onCreateTemplate = null, bottomInset = 0 }) {
   const { colors } = useThemeColors();
   const { t } = useLocalization();
   const { accounts } = useAccountsData();
@@ -114,7 +114,7 @@ export default function NotificationProcessingContentPanel({ onCreateTemplate = 
   const choicesRef = useRef(choices);
   useEffect(() => { choicesRef.current = choices; }, [choices]);
   // Guards async setters from firing after unmount — the panel is remounted
-  // whenever the user toggles between the main and filters views.
+  // when the notification panel closes or the template editor takes over.
   const mountedRef = useRef(true);
   useEffect(() => () => { mountedRef.current = false; }, []);
   // Keys of recent-feed cards already shown. New keys (notifications captured
@@ -258,11 +258,22 @@ export default function NotificationProcessingContentPanel({ onCreateTemplate = 
 
   // Auto-refresh every AUTO_REFRESH_MS once the initial load has finished, so
   // notifications arriving while the panel is open surface without a manual pull.
+  // Only while this is the showing tab: the page stays mounted behind the
+  // panel's pager, and a feed nobody is looking at should not be re-running the
+  // pipeline every three seconds.
   useEffect(() => {
-    if (loading) return undefined;
+    if (loading || !active) return undefined;
     const intervalId = setInterval(runSilentRefresh, AUTO_REFRESH_MS);
     return () => clearInterval(intervalId);
-  }, [loading, runSilentRefresh]);
+  }, [active, loading, runSilentRefresh]);
+
+  // Coming back to the tab shows whatever the paused timer missed straight
+  // away, rather than after up to another AUTO_REFRESH_MS.
+  const wasActiveRef = useRef(active);
+  useEffect(() => {
+    if (active && !wasActiveRef.current) runSilentRefresh();
+    wasActiveRef.current = active;
+  }, [active, runSilentRefresh]);
 
   const setChoice = useCallback((id, patch) => {
     setChoices((prev) => ({ ...prev, [id]: { ...prev[id], ...patch } }));
@@ -711,6 +722,9 @@ export default function NotificationProcessingContentPanel({ onCreateTemplate = 
 }
 
 NotificationProcessingContentPanel.propTypes = {
+  // Whether this is the panel's showing tab. False keeps the page mounted (so a
+  // swipe reveals it fully drawn) and pauses its auto-refresh.
+  active: PropTypes.bool,
   // Called with (notification, recentNotifications) when the user asks to build
   // a parse template from a card in the feed. Omitted when the host has nowhere
   // to open the editor.

@@ -74,6 +74,7 @@
   "notifications_empty": "No notifications recorded yet. New notifications will appear here.",
   "notifications_all_filtered": "All recent notifications are hidden by your app filters.",
   "notification_no_text": "No text",
+  "notification_feed": "Notifications",
   "notification_filters": "Filters",
   "notification_bindings": "Bindings",
   "notification_bindings_empty": "No bindings yet. Penny learns them as you review notifications.",

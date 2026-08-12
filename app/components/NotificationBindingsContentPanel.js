@@ -30,7 +30,7 @@ import { BUTTON_COMPACT, BUTTON_TEXT, CARD_SURFACE, SECTION_LABEL } from '../sty
 import EmptyState from './EmptyState';
 
 /**
- * "Bindings" subpanel for notification processing (header three-dots → Bindings).
+ * "Bindings" page of the notification-processing panel (its second tab).
  *
  * Surfaces the associations Penny learns while processing bank notifications so
  * the user can review and edit them in one place, grouped by kind:
@@ -51,7 +51,7 @@ import EmptyState from './EmptyState';
  * two-tap: tap the trash, then confirm). A search box filters every section, and
  * the card section can add a binding by hand.
  */
-export default function NotificationBindingsContentPanel({ bottomInset = 0 }) {
+export default function NotificationBindingsContentPanel({ active = true, bottomInset = 0 }) {
   const { colors } = useThemeColors();
   const { t } = useLocalization();
   const { accounts } = useAccountsData();
@@ -77,7 +77,7 @@ export default function NotificationBindingsContentPanel({ bottomInset = 0 }) {
   const [newCardMask, setNewCardMask] = useState('');
 
   // Guards async setters from firing after the panel unmounts (it is remounted
-  // whenever the user toggles between the main/filters/bindings views).
+  // when the notification panel closes or the template editor takes over).
   const mountedRef = useRef(true);
   useEffect(() => () => { mountedRef.current = false; }, []);
 
@@ -123,6 +123,17 @@ export default function NotificationBindingsContentPanel({ bottomInset = 0 }) {
       }
     })();
   }, [reload]);
+
+  // Bindings are learned on the feed tab, one page away — so coming back to
+  // this one has to re-read them. The page stays mounted behind the pager (a
+  // swipe reveals it drawn), which is exactly why the reload has to be explicit.
+  const wasActiveRef = useRef(active);
+  useEffect(() => {
+    if (active && !wasActiveRef.current) {
+      reload().catch(() => {});
+    }
+    wasActiveRef.current = active;
+  }, [active, reload]);
 
   const handleRefresh = useCallback(async () => {
     setRefreshing(true);
@@ -632,6 +643,9 @@ export default function NotificationBindingsContentPanel({ bottomInset = 0 }) {
 }
 
 NotificationBindingsContentPanel.propTypes = {
+  // Whether this is the panel's showing tab. False keeps the page mounted (so a
+  // swipe reveals it fully drawn) but tells it its data may have gone stale.
+  active: PropTypes.bool,
   bottomInset: PropTypes.number,
 };
 
