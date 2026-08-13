@@ -1,5 +1,12 @@
 # Changelog
 
+## [0.271.0](https://github.com/heywood8/money-tracker/compare/penny-v0.270.0...penny-v0.271.0) (2026-08-13)
+
+
+### Features
+
+* **notifications:** add an "Acknowledged" button to the auto-added receipt ([#1613](https://github.com/heywood8/money-tracker/issues/1613)) ([c9e7584](https://github.com/heywood8/money-tracker/commit/c9e758489d9c4486d0e13f6a60e6cd042b3774a7))
+
 ## [0.270.0](https://github.com/heywood8/money-tracker/compare/penny-v0.269.0...penny-v0.270.0) (2026-08-12)
 
 
