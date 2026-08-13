@@ -37,6 +37,21 @@ export const ROUTE_PENDING_OPERATIONS = 'notificationProcessing';
  */
 export const ROUTE_ADDED_OPERATIONS = 'addedOperations';
 
+/**
+ * Category (action-button set) attached to the "operations added" receipt, and
+ * the id of its single action.
+ *
+ * The receipt is a statement, not a task, so its one useful reply is "seen" —
+ * the messenger "mark as read" gesture. The action declares
+ * `opensAppToForeground: false`, so pressing it never launches the app: Android
+ * broadcasts the response, and the handlers below clear the notification.
+ * Pressing an action button does **not** dismiss the notification by itself
+ * (Android's auto-cancel only covers a tap on the body), so the dismissal is
+ * ours to do — see acknowledgeTask.js for the app-not-running path.
+ */
+export const ADDED_ALERT_CATEGORY_ID = 'bank-operations-added';
+export const ACKNOWLEDGE_ACTION_ID = 'acknowledge';
+
 // A fixed identifier so a fresh alert replaces the previous one instead of
 // stacking a new row every background run.
 const PENDING_ALERT_IDENTIFIER = 'penny-pending-operations';
@@ -82,6 +97,46 @@ export const ensureBankAlertsChannelAsync = async (name) => {
 };
 
 /**
+ * Register (or relabel) the category carrying the receipt's "Acknowledged"
+ * button. Safe to call repeatedly — re-setting an existing category overwrites
+ * it, which is how the button follows a language change.
+ *
+ * Best-effort: if it fails the receipt still posts, just without the button.
+ *
+ * @param {string} [buttonTitle] - localized button label
+ * @returns {Promise<void>}
+ */
+export const ensureAddedAlertCategoryAsync = async (buttonTitle) => {
+  try {
+    await Notifications.setNotificationCategoryAsync(ADDED_ALERT_CATEGORY_ID, [
+      {
+        identifier: ACKNOWLEDGE_ACTION_ID,
+        buttonTitle: buttonTitle || 'Acknowledged',
+        // Never launch the app: acknowledging is done with the notification, not
+        // in the app. Android delivers the press as a broadcast instead.
+        options: { opensAppToForeground: false },
+      },
+    ]);
+  } catch (error) {
+    // Non-fatal — the receipt is still worth posting without its button.
+  }
+};
+
+/**
+ * Remove a notification from the tray by id. Best-effort.
+ * @param {string} identifier
+ * @returns {Promise<void>}
+ */
+export const dismissNotificationById = async (identifier) => {
+  if (!identifier) return;
+  try {
+    await Notifications.dismissNotificationAsync(identifier);
+  } catch (error) {
+    // Non-fatal — the user can still swipe the notification away.
+  }
+};
+
+/**
  * Whether the OS notification permission is currently granted.
  * @returns {Promise<boolean>}
  */
@@ -121,9 +176,10 @@ export const requestNotificationsPermission = async () => {
  * @param {string} identifier - notification id
  * @param {string} route - deep-link route value carried in the payload
  * @param {{ title: string, body: string, channelName?: string }} copy
+ * @param {string} [categoryIdentifier] - action-button set to attach
  * @returns {Promise<void>}
  */
-const presentBankAlert = async (identifier, route, { title, body, channelName }) => {
+const presentBankAlert = async (identifier, route, { title, body, channelName }, categoryIdentifier) => {
   await ensureBankAlertsChannelAsync(channelName);
   try {
     await Notifications.scheduleNotificationAsync({
@@ -132,6 +188,7 @@ const presentBankAlert = async (identifier, route, { title, body, channelName })
         title,
         body,
         data: { [NOTIFICATION_ROUTE_KEY]: route },
+        ...(categoryIdentifier ? { categoryIdentifier } : null),
       },
       // `null` presents the notification immediately, but assigns it to the
       // Android channel above (channelId is read from the content on 8.0+).
@@ -156,13 +213,21 @@ export const presentPendingOperationsAlert = async (copy) =>
 /**
  * Post the "operations added" alert — the receipt for operations a background run
  * booked on its own, which would otherwise happen invisibly. Each call posts its
- * own notification (see ADDED_ALERT_PREFIX) rather than replacing the last.
+ * own notification (see ADDED_ALERT_PREFIX) rather than replacing the last, and
+ * carries the "Acknowledged" button that clears it without opening the app.
  *
- * @param {{ title: string, body: string, channelName?: string }} copy
+ * @param {{ title: string, body: string, channelName?: string, actionLabel?: string }} copy
  * @returns {Promise<void>}
  */
-export const presentAddedOperationsAlert = async (copy) =>
-  presentBankAlert(`${ADDED_ALERT_PREFIX}-${Date.now()}`, ROUTE_ADDED_OPERATIONS, copy);
+export const presentAddedOperationsAlert = async (copy) => {
+  await ensureAddedAlertCategoryAsync(copy?.actionLabel);
+  return presentBankAlert(
+    `${ADDED_ALERT_PREFIX}-${Date.now()}`,
+    ROUTE_ADDED_OPERATIONS,
+    copy,
+    ADDED_ALERT_CATEGORY_ID,
+  );
+};
 
 /**
  * Dismiss the "transactions to review" alert from the tray.
@@ -208,3 +273,22 @@ export const isPendingOperationsResponse = (response) =>
  */
 export const isAddedOperationsResponse = (response) =>
   routeOf(response) === ROUTE_ADDED_OPERATIONS;
+
+/**
+ * Whether a tapped-notification response is the "Acknowledged" button rather
+ * than a tap on the notification itself. Checked before the route matchers: the
+ * button means "I've seen it, go away", so it must never also navigate.
+ *
+ * @param {object|null} response - a Notifications.NotificationResponse
+ * @returns {boolean}
+ */
+export const isAcknowledgeResponse = (response) =>
+  response?.actionIdentifier === ACKNOWLEDGE_ACTION_ID;
+
+/**
+ * The tray id of the notification a response belongs to, or null.
+ * @param {object|null} response - a Notifications.NotificationResponse
+ * @returns {string|null}
+ */
+export const responseNotificationId = (response) =>
+  response?.notification?.request?.identifier || null;

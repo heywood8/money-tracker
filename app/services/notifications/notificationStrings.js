@@ -213,9 +213,13 @@ const landedIn = (language, detail) => {
  * landed"), plus a "+N more" line when the batch is longer than the described one.
  * With no details it degrades to a plain count.
  *
+ * `actionLabel` is the receipt's "Acknowledged" button, which clears the
+ * notification without opening the app.
+ *
  * @param {number} count - how many operations this run auto-created
  * @param {Array<Object>} [details] - described items (see collectAddedAlertDetails)
- * @returns {Promise<{ title: string, body: string, channelName: string }>}
+ * @returns {Promise<{ title: string, body: string, channelName: string,
+ *   actionLabel: string }>}
  */
 export const getAddedAlertCopy = async (count, details = []) => {
   const language = await resolveLanguage();
@@ -225,6 +229,7 @@ export const getAddedAlertCopy = async (count, details = []) => {
     : 'bank_notifications_bg_added_body_other';
   const countLine = translate(language, bodyKey).replace('{count}', String(safeCount));
   const channelName = translate(language, 'bank_notifications_channel_name');
+  const actionLabel = translate(language, 'bank_notifications_bg_added_acknowledge');
   const items = Array.isArray(details) ? details.filter(Boolean) : [];
 
   if (items.length === 0) {
@@ -232,6 +237,7 @@ export const getAddedAlertCopy = async (count, details = []) => {
       title: translate(language, 'bank_notifications_bg_added_title'),
       body: countLine,
       channelName,
+      actionLabel,
     };
   }
 
@@ -241,6 +247,7 @@ export const getAddedAlertCopy = async (count, details = []) => {
       title: headlineFor(language, detail),
       body: [countLine, recognizedFor(language, detail)].filter(Boolean).join('\n'),
       channelName,
+      actionLabel,
     };
   }
 
@@ -260,5 +267,6 @@ export const getAddedAlertCopy = async (count, details = []) => {
     title: countLine,
     body: lines.join('\n'),
     channelName,
+    actionLabel,
   };
 };

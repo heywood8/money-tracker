@@ -561,6 +561,7 @@
   "bank_notifications_bg_added_body_one": "Automatisch hinzugefügt",
   "bank_notifications_bg_added_body_other": "{count} Vorgänge automatisch hinzugefügt",
   "bank_notifications_bg_added_to_account": "Auf: {name}",
+  "bank_notifications_bg_added_acknowledge": "Gelesen",
   "bank_notifications_channel_name": "Bankvorgänge",
   "bank_notifications_permission_denied": "Aktiviere Benachrichtigungen in den Systemeinstellungen, um Hintergrundbenachrichtigungen zu erhalten",
   "monthly_plan": "Monatsplan",

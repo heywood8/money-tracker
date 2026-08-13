@@ -286,4 +286,20 @@ describe('notificationStrings.getAddedAlertCopy', () => {
     expect(copy.body).toContain(ruJson.bank_notifications_bg_added_body_one);
     expect(copy.body).toContain('Счёт: Main card');
   });
+
+  it('carries the acknowledge button label in every shape', async () => {
+    const label = enJson.bank_notifications_bg_added_acknowledge;
+
+    expect((await getAddedAlertCopy(2)).actionLabel).toBe(label); // count-only
+    expect((await getAddedAlertCopy(1, [detail()])).actionLabel).toBe(label); // single
+    expect((await getAddedAlertCopy(2, [detail(), detail()])).actionLabel).toBe(label); // list
+  });
+
+  it('localizes the acknowledge button label', async () => {
+    PreferencesDB.getPreference.mockResolvedValue('ru');
+
+    const copy = await getAddedAlertCopy(1, [detail()]);
+
+    expect(copy.actionLabel).toBe(ruJson.bank_notifications_bg_added_acknowledge);
+  });
 });
