@@ -2,8 +2,11 @@ import { useEffect } from 'react';
 import * as Notifications from 'expo-notifications';
 import { appEvents, EVENTS } from '../services/eventEmitter';
 import {
+  dismissNotificationById,
+  isAcknowledgeResponse,
   isAddedOperationsResponse,
   isPendingOperationsResponse,
+  responseNotificationId,
 } from '../services/notifications/localNotifications';
 
 /**
@@ -34,6 +37,13 @@ export default function useNotificationResponseRouter() {
     let active = true;
 
     const route = (response) => {
+      // "Acknowledged" is checked first and navigates nowhere: it means "seen,
+      // dismiss it", so treating it as a tap would yank the user into the app.
+      // Clearing it here covers the running app; acknowledgeTask covers the rest.
+      if (isAcknowledgeResponse(response)) {
+        dismissNotificationById(responseNotificationId(response));
+        return;
+      }
       if (isPendingOperationsResponse(response)) {
         appEvents.emit(EVENTS.OPEN_PENDING_OPERATIONS);
       } else if (isAddedOperationsResponse(response)) {

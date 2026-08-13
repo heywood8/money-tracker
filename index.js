@@ -5,6 +5,10 @@ import { registerRootComponent } from 'expo';
 // TaskManager.defineTask call runs as a side effect of this import.
 import './app/services/notifications/backgroundBankTask';
 
+// Same reason: defines the handler for the receipt's "Acknowledged" button, which
+// the OS invokes headless when the button is pressed with the app not running.
+import './app/services/notifications/acknowledgeTask';
+
 import App from './App';
 
 // registerRootComponent calls AppRegistry.registerComponent('main', () => App);

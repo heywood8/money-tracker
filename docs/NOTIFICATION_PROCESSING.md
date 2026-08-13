@@ -339,6 +339,29 @@ already looking at the app, where `RELOAD_ALL` refreshes the lists instead.
 Tapping either opens the Operations tab; only the review alert additionally
 surfaces the suggestion deck.
 
+**The "Acknowledged" button.** The receipt is a statement, not a task, so its one
+useful reply is "seen" — the messenger *mark as read* gesture. It carries a
+notification action (category `bank-operations-added`, action `acknowledge`)
+declared with `opensAppToForeground: false`, so pressing it never launches the
+app. The review alert deliberately has no such button: its items still need the
+user.
+
+Pressing an action button does **not** clear the notification on its own —
+Android's auto-cancel only covers a tap on the body — so the dismissal is ours,
+and it has to work with the app not running. Two paths cover the states:
+
+| App state | Path |
+| --------- | ---- |
+| running | the response listener in `useNotificationResponseRouter` |
+| backgrounded / killed | `acknowledgeTask.js`, run headless by expo-notifications (`registerTaskAsync`) |
+
+Both may fire for a backgrounded-but-alive app; dismissing an already-dismissed
+notification is a no-op. The router checks the acknowledge action *before* the
+route matchers — the response still carries the added-operations route, and
+treating it as a tap would yank the user into the app, defeating the button.
+The task is defined at bundle load from `index.js` (the OS starts the headless
+context before any screen mounts) and registered from `AppInitializer`.
+
 Supporting modules: `addedAlertItems.js` / `pendingAlertItems.js` resolve
 account and category names for a whole batch in one pass (the pipeline records
 only ids on the booking path), and `notificationStrings.js` renders both alerts

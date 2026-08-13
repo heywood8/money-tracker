@@ -22,6 +22,11 @@ describe('localNotifications', () => {
     Notifications.requestPermissionsAsync.mockResolvedValue({ status: 'granted', granted: true });
     Notifications.scheduleNotificationAsync.mockResolvedValue('id');
     Notifications.setNotificationChannelAsync.mockResolvedValue(null);
+    // Re-stub every mock a test may switch to rejecting: clearAllMocks resets
+    // calls, not implementations, so a leaked rejection would silently run every
+    // later test against the error path.
+    Notifications.setNotificationCategoryAsync.mockResolvedValue(null);
+    Notifications.dismissNotificationAsync.mockResolvedValue();
   });
 
   afterAll(() => {
@@ -195,6 +200,84 @@ describe('localNotifications', () => {
       await expect(
         localNotifications.presentAddedOperationsAlert({ title: 't', body: 'b' }),
       ).resolves.toBeUndefined();
+    });
+
+    it('attaches the acknowledge category, registered with the localized label', async () => {
+      await localNotifications.presentAddedOperationsAlert({
+        title: 'a', body: 'b', actionLabel: 'Прочитано',
+      });
+
+      expect(Notifications.setNotificationCategoryAsync).toHaveBeenCalledWith(
+        localNotifications.ADDED_ALERT_CATEGORY_ID,
+        [
+          expect.objectContaining({
+            identifier: localNotifications.ACKNOWLEDGE_ACTION_ID,
+            buttonTitle: 'Прочитано',
+            // Pressing it must never launch the app.
+            options: { opensAppToForeground: false },
+          }),
+        ],
+      );
+      const [request] = Notifications.scheduleNotificationAsync.mock.calls[0];
+      expect(request.content.categoryIdentifier).toBe(localNotifications.ADDED_ALERT_CATEGORY_ID);
+    });
+
+    it('still posts when the category cannot be registered', async () => {
+      Notifications.setNotificationCategoryAsync.mockRejectedValue(new Error('nope'));
+
+      await localNotifications.presentAddedOperationsAlert({ title: 'a', body: 'b' });
+
+      expect(Notifications.scheduleNotificationAsync).toHaveBeenCalled();
+    });
+
+    it('leaves the review alert without action buttons', async () => {
+      await localNotifications.presentPendingOperationsAlert({ title: 'p', body: 'b' });
+
+      const [request] = Notifications.scheduleNotificationAsync.mock.calls[0];
+      expect(request.content.categoryIdentifier).toBeUndefined();
+    });
+  });
+
+  describe('isAcknowledgeResponse / responseNotificationId', () => {
+    const response = (actionIdentifier) => ({
+      actionIdentifier,
+      notification: { request: { identifier: 'penny-added-operations-1', content: { data: {} } } },
+    });
+
+    it('matches only the acknowledge action', () => {
+      expect(localNotifications.isAcknowledgeResponse(response('acknowledge'))).toBe(true);
+      expect(
+        localNotifications.isAcknowledgeResponse(
+          response('expo.modules.notifications.actions.DEFAULT'),
+        ),
+      ).toBe(false);
+      expect(localNotifications.isAcknowledgeResponse(null)).toBe(false);
+      expect(localNotifications.isAcknowledgeResponse({})).toBe(false);
+    });
+
+    it('reads the tray id a response belongs to', () => {
+      expect(localNotifications.responseNotificationId(response('acknowledge'))).toBe(
+        'penny-added-operations-1',
+      );
+      expect(localNotifications.responseNotificationId(null)).toBeNull();
+      expect(localNotifications.responseNotificationId({})).toBeNull();
+    });
+  });
+
+  describe('dismissNotificationById', () => {
+    it('dismisses by identifier', async () => {
+      await localNotifications.dismissNotificationById('abc');
+      expect(Notifications.dismissNotificationAsync).toHaveBeenCalledWith('abc');
+    });
+
+    it('is a no-op without an identifier', async () => {
+      await localNotifications.dismissNotificationById(null);
+      expect(Notifications.dismissNotificationAsync).not.toHaveBeenCalled();
+    });
+
+    it('never throws when the dismissal fails', async () => {
+      Notifications.dismissNotificationAsync.mockRejectedValue(new Error('boom'));
+      await expect(localNotifications.dismissNotificationById('abc')).resolves.toBeUndefined();
     });
   });
 

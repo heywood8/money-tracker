@@ -74,6 +74,28 @@ describe('useNotificationResponseRouter', () => {
     await unmount();
   });
 
+  it('clears the notification and navigates nowhere on "Acknowledged"', async () => {
+    let listener;
+    Notifications.addNotificationResponseReceivedListener.mockImplementation((cb) => {
+      listener = cb;
+      return { remove: jest.fn() };
+    });
+
+    const { unmount } = await renderHook(() => useNotificationResponseRouter());
+    listener({
+      actionIdentifier: 'acknowledge',
+      notification: {
+        request: { identifier: 'penny-added-operations-1', content: { data: { route: 'addedOperations' } } },
+      },
+    });
+
+    // The button means "seen, dismiss it" — pulling the user into the app would
+    // defeat its purpose, even though the response carries the added route.
+    expect(Notifications.dismissNotificationAsync).toHaveBeenCalledWith('penny-added-operations-1');
+    expect(emitSpy).not.toHaveBeenCalled();
+    await unmount();
+  });
+
   it('ignores an unrelated notification response', async () => {
     let listener;
     Notifications.addNotificationResponseReceivedListener.mockImplementation((cb) => {

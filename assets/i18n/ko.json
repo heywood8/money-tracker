@@ -561,6 +561,7 @@
   "bank_notifications_bg_added_body_one": "자동으로 추가되었습니다",
   "bank_notifications_bg_added_body_other": "거래 {count}건이 자동으로 추가되었습니다",
   "bank_notifications_bg_added_to_account": "입금 계좌: {name}",
+  "bank_notifications_bg_added_acknowledge": "확인함",
   "bank_notifications_channel_name": "은행 거래",
   "bank_notifications_permission_denied": "백그라운드 알림을 받으려면 시스템 설정에서 알림을 켜세요",
   "monthly_plan": "월간 계획",

@@ -561,6 +561,7 @@
   "bank_notifications_bg_added_body_one": "已自动添加",
   "bank_notifications_bg_added_body_other": "已自动添加 {count} 笔交易",
   "bank_notifications_bg_added_to_account": "转入：{name}",
+  "bank_notifications_bg_added_acknowledge": "已知晓",
   "bank_notifications_channel_name": "银行交易",
   "bank_notifications_permission_denied": "在系统设置中开启通知以接收后台提醒",
   "monthly_plan": "月度计划",

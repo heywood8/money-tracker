@@ -12,6 +12,7 @@ import { useUpdateDownload } from '../contexts/UpdateDownloadContext';
 import { useSqliteFileImport } from '../hooks/useSqliteFileImport';
 import useNotificationResponseRouter from '../hooks/useNotificationResponseRouter';
 import { syncBackgroundBankTaskRegistrationAsync } from '../services/notifications/backgroundBankTask';
+import { registerAcknowledgeTaskAsync } from '../services/notifications/acknowledgeTask';
 import { useAppBlur } from '../contexts/AppBlurContext';
 import { getPreference, setPreference, PREF_KEYS } from '../services/PreferencesDB';
 import UpdateAvailableModal from '../modals/UpdateAvailableModal';
@@ -230,6 +231,13 @@ const AppInitializer = () => {
     const handle = requestIdleCallback(() => {
       syncBackgroundBankTaskRegistrationAsync().catch((error) => {
         console.warn('[AppInitializer] Background task sync failed:', error);
+      });
+      // Unconditional and cheap: the handler for the receipt's "Acknowledged"
+      // button only ever fires when such a button is pressed, so it needs no
+      // gate of its own — but without it the button does nothing while the app
+      // is not running.
+      registerAcknowledgeTaskAsync().catch((error) => {
+        console.warn('[AppInitializer] Acknowledge task registration failed:', error);
       });
     });
     return () => cancelIdleCallback(handle);
