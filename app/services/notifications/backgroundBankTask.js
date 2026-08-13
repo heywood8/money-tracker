@@ -104,6 +104,12 @@ export const runBackgroundBankCheck = async () => {
   if (!(await isBankNotificationsEnabled())) return idle;
   if (!(await isBackgroundAlertsEnabled())) return idle;
 
+  // Overlapping callers are handed the same summary, so this wakeup may be
+  // reporting work another caller performed and is also reporting. Reporting it
+  // is still right — the performer is often an app-open ingestion that posts
+  // nothing at all — but each alert has to be idempotent about what it puts in
+  // the tray, or one booking lands there twice. See presentAddedOperationsAlert
+  // (keyed on the operations) and the review alert's fixed identifier.
   const summary = await processBankNotifications();
 
   // Nothing to say: no operation was booked and nothing new needs review. Skip
@@ -123,7 +129,13 @@ export const runBackgroundBankCheck = async () => {
   if (summary.created > 0) {
     const addedDetails = await collectAddedAlertDetails(summary.createdItems);
     const addedCopy = await getAddedAlertCopy(summary.created, addedDetails);
-    await presentAddedOperationsAlert(addedCopy);
+    // Key the receipt on the operations it describes, so a second wakeup handed
+    // this same run's summary lands on the notification already in the tray
+    // instead of stacking an identical copy beside it.
+    await presentAddedOperationsAlert(
+      addedCopy,
+      (summary.createdItems || []).map((item) => item.operationId),
+    );
     notifiedAdded = true;
   }
 

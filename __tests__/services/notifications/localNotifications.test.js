@@ -174,6 +174,15 @@ describe('localNotifications', () => {
     it('stacks instead of replacing, so an unread receipt is never erased', async () => {
       // Each run books different operations; reusing one id would let a later
       // booking silently overwrite the notice of an earlier, unread one.
+      await localNotifications.presentAddedOperationsAlert({ title: 'first', body: 'b' }, [1]);
+      await localNotifications.presentAddedOperationsAlert({ title: 'second', body: 'b' }, [2]);
+
+      const [first] = Notifications.scheduleNotificationAsync.mock.calls[0];
+      const [second] = Notifications.scheduleNotificationAsync.mock.calls[1];
+      expect(first.identifier).not.toBe(second.identifier);
+    });
+
+    it('stacks per batch when the operations cannot be identified', async () => {
       const nowSpy = jest.spyOn(Date, 'now');
       nowSpy.mockReturnValueOnce(1_000).mockReturnValueOnce(2_000);
 
@@ -184,6 +193,49 @@ describe('localNotifications', () => {
       const [second] = Notifications.scheduleNotificationAsync.mock.calls[1];
       expect(first.identifier).not.toBe(second.identifier);
       nowSpy.mockRestore();
+    });
+
+    describe('Regression Tests', () => {
+      it('collapses a repeat report of the same booking onto one notification', async () => {
+        // Two callers observing the same run (a delayed background wakeup
+        // overlapping another) each posted a receipt, so one purchase showed up
+        // in the shade twice. Keyed on the operations, the second lands on the
+        // first instead of stacking.
+        const nowSpy = jest.spyOn(Date, 'now');
+        nowSpy.mockReturnValueOnce(1_000).mockReturnValueOnce(2_000);
+
+        await localNotifications.presentAddedOperationsAlert({ title: 'a', body: 'b' }, [7]);
+        await localNotifications.presentAddedOperationsAlert({ title: 'a', body: 'b' }, [7]);
+
+        const [first] = Notifications.scheduleNotificationAsync.mock.calls[0];
+        const [second] = Notifications.scheduleNotificationAsync.mock.calls[1];
+        expect(first.identifier).toBe(second.identifier);
+        nowSpy.mockRestore();
+      });
+
+      it('ignores the order the operation ids arrive in', async () => {
+        await localNotifications.presentAddedOperationsAlert({ title: 'a', body: 'b' }, [3, 11]);
+        await localNotifications.presentAddedOperationsAlert({ title: 'a', body: 'b' }, [11, 3]);
+
+        const [first] = Notifications.scheduleNotificationAsync.mock.calls[0];
+        const [second] = Notifications.scheduleNotificationAsync.mock.calls[1];
+        expect(first.identifier).toBe(second.identifier);
+      });
+
+      it('falls back to a per-post id when every operation id is missing', async () => {
+        // A batch of unidentifiable operations must not collapse onto a single
+        // shared id — that would erase an earlier unread receipt.
+        const nowSpy = jest.spyOn(Date, 'now');
+        nowSpy.mockReturnValueOnce(1_000).mockReturnValueOnce(2_000);
+
+        await localNotifications.presentAddedOperationsAlert({ title: 'a', body: 'b' }, [null]);
+        await localNotifications.presentAddedOperationsAlert({ title: 'a', body: 'b' }, [null]);
+
+        const [first] = Notifications.scheduleNotificationAsync.mock.calls[0];
+        const [second] = Notifications.scheduleNotificationAsync.mock.calls[1];
+        expect(first.identifier).not.toBe(second.identifier);
+        nowSpy.mockRestore();
+      });
     });
 
     it('keeps the review alert replace-in-place', async () => {

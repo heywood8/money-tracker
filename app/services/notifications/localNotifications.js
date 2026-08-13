@@ -59,10 +59,47 @@ const PENDING_ALERT_IDENTIFIER = 'penny-pending-operations';
 // The auto-added receipt does NOT replace in place: each run's receipt describes
 // different operations, so reusing one identifier would let a later booking
 // silently erase an unread notice of an earlier one — the exact thing this alert
-// exists to prevent. A per-post identifier stacks them instead (Android groups
+// exists to prevent. A per-batch identifier stacks them instead (Android groups
 // them under the channel once there are several), and the prefix keeps them
 // recognizable as ours.
 const ADDED_ALERT_PREFIX = 'penny-added-operations';
+
+/**
+ * Identifier for a receipt describing exactly these operations.
+ *
+ * Two runs that book *different* operations must not share an id, or the later
+ * would erase the earlier, still-unread notice (see ADDED_ALERT_PREFIX). But two
+ * reports of the *same* booking must share one: the ingestion pipeline coalesces
+ * overlapping calls into a single run and hands every caller the same summary, so
+ * two background wakeups landing together (Doze holds wakeups back and releases
+ * several at once) both describe one booking — and minting a fresh id per post is
+ * how a single purchase appeared in the shade twice. Keying the id on the
+ * operations themselves collapses the repeat onto the row already posted.
+ *
+ * This is a guard against reporting one booking twice, not against *making* one
+ * twice: two operations genuinely booked for the same purchase carry different
+ * ids and rightly get their own receipts. Not double-booking is the ingestion
+ * pipeline's job (see findExistingOperation).
+ *
+ * Falls back to a per-post id when no operation ids are known, which keeps the
+ * never-erase-an-unread-receipt property for callers that cannot identify them.
+ *
+ * @param {Array<string|number>} [operationIds] - ids the receipt describes
+ * @returns {string}
+ */
+const addedAlertIdentifier = (operationIds) => {
+  const ids = (Array.isArray(operationIds) ? operationIds : [])
+    .filter((id) => id != null)
+    .map(String)
+    .sort();
+  if (ids.length === 0) return `${ADDED_ALERT_PREFIX}-${Date.now()}`;
+  const key = ids.join(',');
+  let hash = 5381;
+  for (let i = 0; i < key.length; i += 1) {
+    hash = ((hash << 5) + hash + key.charCodeAt(i)) | 0;
+  }
+  return `${ADDED_ALERT_PREFIX}-${hash >>> 0}`;
+};
 
 // Foreground presentation: show the alert as a banner + in the tray even while
 // the app is open, but stay quiet (no sound/badge) — it is a low-urgency nudge.
@@ -212,17 +249,22 @@ export const presentPendingOperationsAlert = async (copy) =>
 
 /**
  * Post the "operations added" alert — the receipt for operations a background run
- * booked on its own, which would otherwise happen invisibly. Each call posts its
- * own notification (see ADDED_ALERT_PREFIX) rather than replacing the last, and
- * carries the "Acknowledged" button that clears it without opening the app.
+ * booked on its own, which would otherwise happen invisibly. A receipt for a new
+ * batch stacks rather than replacing the last (see ADDED_ALERT_PREFIX), while a
+ * repeat report of the same batch lands on the notification already posted (see
+ * addedAlertIdentifier). Carries the "Acknowledged" button that clears it without
+ * opening the app.
  *
  * @param {{ title: string, body: string, channelName?: string, actionLabel?: string }} copy
+ * @param {Array<string|number>} [operationIds] - the operations this receipt
+ *   describes; supplying them makes a duplicate report collapse instead of
+ *   posting a second identical row.
  * @returns {Promise<void>}
  */
-export const presentAddedOperationsAlert = async (copy) => {
+export const presentAddedOperationsAlert = async (copy, operationIds) => {
   await ensureAddedAlertCategoryAsync(copy?.actionLabel);
   return presentBankAlert(
-    `${ADDED_ALERT_PREFIX}-${Date.now()}`,
+    addedAlertIdentifier(operationIds),
     ROUTE_ADDED_OPERATIONS,
     copy,
     ADDED_ALERT_CATEGORY_ID,

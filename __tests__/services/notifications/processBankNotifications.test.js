@@ -171,6 +171,9 @@ describe('processBankNotifications', () => {
 
       expect(summary.createdItems).toEqual([
         expect.objectContaining({
+          // Identifies the booked row, so the alert layer can tell a repeat
+          // report of this booking from a receipt for a different one.
+          operationId: 1,
           type: 'expense',
           amount: '3900.00',
           currency: 'AMD',
@@ -781,6 +784,28 @@ describe('processBankNotifications', () => {
     ]);
     expect(a).toBe(b); // same in-flight promise/result
     expect(NotificationAccess.getRecentNotifications).toHaveBeenCalledTimes(1);
+  });
+
+  it('hands overlapping callers one booking, described identically to both', async () => {
+    // Both callers report to the user independently, so the records they carry
+    // have to be identifiable as the same booking — otherwise one purchase is
+    // announced twice (see presentAddedOperationsAlert, which keys on them).
+    NotificationAccess.getRecentNotifications.mockResolvedValue([PURCHASE]);
+    AccountsDB.getAccountByCardMask.mockResolvedValue({ id: 7, currency: 'AMD' });
+    NotificationRulesDB.getMerchantRule.mockResolvedValue({ categoryId: 'cat-food', labelOverride: 'Groceries' });
+    PreferencesDB.getJsonPreference.mockImplementation((key) => prefs([], [PKG])(key));
+
+    const [a, b] = await Promise.all([
+      pipeline.processBankNotifications(),
+      pipeline.processBankNotifications(),
+    ]);
+
+    // One operation booked, once, and both callers name it the same way.
+    expect(OperationsDB.createOperation).toHaveBeenCalledTimes(1);
+    expect(a.created).toBe(1);
+    expect(b.createdItems.map((i) => i.operationId)).toEqual(
+      a.createdItems.map((i) => i.operationId),
+    );
   });
 
   describe('isBankNotificationsEnabled / setBankNotificationsEnabled', () => {

@@ -244,6 +244,7 @@ describe('backgroundBankTask', () => {
 
   describe('runBackgroundBankCheck — auto-added alert', () => {
     const createdItem = {
+      operationId: 'op-1',
       type: 'expense',
       amount: '1299.00',
       currency: 'AMD',
@@ -265,11 +266,16 @@ describe('backgroundBankTask', () => {
 
       expect(collectAddedAlertDetails).toHaveBeenCalledWith([createdItem]);
       expect(notificationStrings.getAddedAlertCopy).toHaveBeenCalledWith(1, details);
-      expect(localNotifications.presentAddedOperationsAlert).toHaveBeenCalledWith({
-        title: 'Operation added',
-        body: 'Added automatically',
-        channelName: 'Bank operations',
-      });
+      expect(localNotifications.presentAddedOperationsAlert).toHaveBeenCalledWith(
+        {
+          title: 'Operation added',
+          body: 'Added automatically',
+          channelName: 'Bank operations',
+        },
+        // Keyed on the operations, so a repeat report of this same booking
+        // replaces the receipt rather than stacking a second one.
+        ['op-1'],
+      );
       expect(result.notifiedAdded).toBe(true);
       // Nothing was queued, so the review alert stays silent.
       expect(localNotifications.presentPendingOperationsAlert).not.toHaveBeenCalled();
@@ -313,6 +319,43 @@ describe('backgroundBankTask', () => {
       expect(notificationStrings.getAddedAlertCopy).toHaveBeenCalledWith(1, []);
       expect(localNotifications.presentAddedOperationsAlert).toHaveBeenCalled();
       expect(result.notifiedAdded).toBe(true);
+    });
+
+    describe('Regression Tests', () => {
+      it('reports a run it shares with another caller under one receipt id', async () => {
+        // Two wakeups landing together are handed the same run's summary and both
+        // report it — the caller that performed the run is often an app-open
+        // ingestion that posts nothing, so staying quiet would lose the alert.
+        // Keying the receipt on the operations is what stops the second report
+        // from stacking a second identical row in the shade.
+        enableBothGates();
+        processMod.processBankNotifications.mockResolvedValue({
+          created: 1, pending: 0, skipped: 0, createdItems: [createdItem],
+        });
+
+        await backgroundBankTask.runBackgroundBankCheck();
+        await backgroundBankTask.runBackgroundBankCheck();
+
+        const [, firstIds] = localNotifications.presentAddedOperationsAlert.mock.calls[0];
+        const [, secondIds] = localNotifications.presentAddedOperationsAlert.mock.calls[1];
+        expect(firstIds).toEqual(['op-1']);
+        expect(secondIds).toEqual(firstIds);
+      });
+
+      it('reports operations it could not identify rather than dropping them', async () => {
+        enableBothGates();
+        processMod.processBankNotifications.mockResolvedValue({
+          created: 1, pending: 0, skipped: 0, createdItems: [{ ...createdItem, operationId: null }],
+        });
+
+        const result = await backgroundBankTask.runBackgroundBankCheck();
+
+        expect(localNotifications.presentAddedOperationsAlert).toHaveBeenCalledWith(
+          expect.any(Object),
+          [null],
+        );
+        expect(result.notifiedAdded).toBe(true);
+      });
     });
   });
 
