@@ -1,5 +1,12 @@
 # Changelog
 
+## [0.271.1](https://github.com/heywood8/money-tracker/compare/penny-v0.271.0...penny-v0.271.1) (2026-08-14)
+
+
+### Bug Fixes
+
+* **operations:** hold the skeleton until accounts and categories load ([#1616](https://github.com/heywood8/money-tracker/issues/1616)) ([cf75d77](https://github.com/heywood8/money-tracker/commit/cf75d77533923ebfc6fb7b09da263aa9851a4d70))
+
 ## [0.271.0](https://github.com/heywood8/money-tracker/compare/penny-v0.270.0...penny-v0.271.0) (2026-08-13)
 
 
