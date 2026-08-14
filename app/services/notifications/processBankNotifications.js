@@ -366,9 +366,13 @@ const findExistingOperation = async (descriptor, resolution, date, options) => {
  * batch afterwards (see addedAlertItems) rather than per operation on the hot
  * path. A caller that passes no `createdItems` array opts out entirely.
  *
+ * `operationId` identifies the booked row itself, which lets the alert layer key
+ * a receipt on the operations it describes and so recognize a repeat report of
+ * the same booking (see presentAddedOperationsAlert).
+ *
  * @param {{ createdItems?: Array }} summary
- * @param {Object} record - { type, amount, currency, merchant, accountId,
- *   categoryId, toAccountId, date }
+ * @param {Object} record - { operationId, type, amount, currency, merchant,
+ *   accountId, categoryId, toAccountId, date }
  * @returns {void}
  */
 const recordCreated = (summary, record) => {
@@ -475,6 +479,7 @@ const bookExpenseOrQueue = async (descriptor, resolution, date, allowedPackages,
     if (options.claimedOpIds && created && created.id != null) options.claimedOpIds.add(created.id);
     summary.created += 1;
     recordCreated(summary, {
+      operationId: created && created.id != null ? created.id : null,
       type: descriptor.type,
       // The booked amount (converted and rounded), in the account's currency —
       // what the user will see on the operation, not the raw notification value.
@@ -600,6 +605,7 @@ const bookTransferOrQueue = async (descriptor, resolution, date, allowedPackages
     if (options.claimedOpIds && created && created.id != null) options.claimedOpIds.add(created.id);
     summary.created += 1;
     recordCreated(summary, {
+      operationId: created && created.id != null ? created.id : null,
       type: 'transfer',
       amount: transferFields.amount,
       currency: resolution.accountCurrency || descriptor.currency,
@@ -642,6 +648,10 @@ let _inFlight = null;
  *
  * `createdItems` describes each operation the run auto-created (see recordCreated);
  * the background task turns it into the "operations added" alert.
+ *
+ * Note that overlapping callers all receive the *same* summary, describing work
+ * only one of them performed. Anything that reports a summary to the user must
+ * therefore be idempotent in what it posts — see presentAddedOperationsAlert.
  *
  * @returns {Promise<{ created: number, pending: number, skipped: number,
  *   createdItems: Array<Object> }>}

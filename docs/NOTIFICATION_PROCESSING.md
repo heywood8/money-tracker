@@ -339,6 +339,27 @@ already looking at the app, where `RELOAD_ALL` refreshes the lists instead.
 Tapping either opens the Operations tab; only the review alert additionally
 surfaces the suggestion deck.
 
+**One booking, one receipt.** The pipeline coalesces overlapping calls into a
+single run and hands *every* caller the same summary, so a wakeup can find itself
+reporting work another caller performed. That is not something to suppress — the
+performer is often an app-open ingestion or a panel refresh, which post nothing
+at all, so a wakeup that stayed quiet would lose the alert entirely. Instead each
+alert is idempotent in what it puts in the tray:
+
+- the review alert has a fixed identifier, so a repeat refreshes it in place;
+- the receipt's identifier is derived from the ids of the operations it
+  describes, so two wakeups handed the same run's summary land on one tray row.
+  Receipts for *different* bookings still get different identifiers, preserving
+  the never-erase-an-unread-notice property.
+
+Wakeups do arrive together in practice — Doze holds them back and releases
+several at once, often alongside the app-open ingestion — and before the receipt
+was keyed this way, each of them posted its own copy of one purchase.
+
+This keys *reporting*, not booking: two operations genuinely created for one
+purchase carry different ids and rightly get their own receipts. Not
+double-booking them is the ingestion pipeline's job (`findExistingOperation`).
+
 **The "Acknowledged" button.** The receipt is a statement, not a task, so its one
 useful reply is "seen" — the messenger *mark as read* gesture. It carries a
 notification action (category `bank-operations-added`, action `acknowledge`)
