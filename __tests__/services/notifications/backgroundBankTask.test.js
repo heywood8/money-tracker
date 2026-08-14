@@ -16,6 +16,7 @@ import * as localNotifications from '../../../app/services/notifications/localNo
 import * as notificationStrings from '../../../app/services/notifications/notificationStrings';
 import { collectPendingAlertDetails } from '../../../app/services/notifications/pendingAlertItems';
 import { collectAddedAlertDetails } from '../../../app/services/notifications/addedAlertItems';
+import { isAppInForeground } from '../../../app/services/notifications/appForeground';
 import { getPendingCount } from '../../../app/services/PendingNotificationsDB';
 import * as PreferencesDB from '../../../app/services/PreferencesDB';
 
@@ -37,6 +38,9 @@ jest.mock('../../../app/services/notifications/pendingAlertItems', () => ({
 }));
 jest.mock('../../../app/services/notifications/addedAlertItems', () => ({
   collectAddedAlertDetails: jest.fn(),
+}));
+jest.mock('../../../app/services/notifications/appForeground', () => ({
+  isAppInForeground: jest.fn(),
 }));
 jest.mock('../../../app/services/PendingNotificationsDB', () => ({
   getPendingCount: jest.fn(),
@@ -82,6 +86,9 @@ describe('backgroundBankTask', () => {
     getPendingCount.mockResolvedValue(2);
     collectPendingAlertDetails.mockResolvedValue([]);
     collectAddedAlertDetails.mockResolvedValue([]);
+    // The interesting case for the background task is a run the user is not
+    // watching, so default to the app being off screen.
+    isAppInForeground.mockReturnValue(false);
     // No interval recorded → nothing has been registered by this build yet.
     PreferencesDB.getNumberPreference.mockResolvedValue(null);
   });
@@ -319,6 +326,92 @@ describe('backgroundBankTask', () => {
       expect(notificationStrings.getAddedAlertCopy).toHaveBeenCalledWith(1, []);
       expect(localNotifications.presentAddedOperationsAlert).toHaveBeenCalled();
       expect(result.notifiedAdded).toBe(true);
+    });
+
+    describe('app on screen', () => {
+      it('skips the receipt for an operation booked while the app is open', async () => {
+        // The receipt exists to surface an otherwise-invisible auto-create; with
+        // the app on screen the operation is already in the list the user is
+        // looking at, so the tray row would only repeat it.
+        enableBothGates();
+        isAppInForeground.mockReturnValue(true);
+        processMod.processBankNotifications.mockResolvedValue({
+          created: 1, pending: 0, skipped: 0, createdItems: [createdItem],
+        });
+
+        const result = await backgroundBankTask.runBackgroundBankCheck();
+
+        expect(localNotifications.presentAddedOperationsAlert).not.toHaveBeenCalled();
+        expect(result.notifiedAdded).toBe(false);
+        // The booking itself still happened and is still reported to the caller.
+        expect(result.created).toBe(1);
+      });
+
+      it('does not build the receipt copy it is not going to post', async () => {
+        enableBothGates();
+        isAppInForeground.mockReturnValue(true);
+        processMod.processBankNotifications.mockResolvedValue({
+          created: 1, pending: 0, skipped: 0, createdItems: [createdItem],
+        });
+
+        await backgroundBankTask.runBackgroundBankCheck();
+
+        expect(collectAddedAlertDetails).not.toHaveBeenCalled();
+        expect(notificationStrings.getAddedAlertCopy).not.toHaveBeenCalled();
+        // Nothing is being posted, so permission is not worth asking about.
+        expect(localNotifications.areNotificationsGranted).not.toHaveBeenCalled();
+      });
+
+      it('still raises the review alert for items queued while the app is open', async () => {
+        // A queued item is a task the user has to come back to, not a receipt for
+        // something already done, so it is worth a tray row either way.
+        enableBothGates();
+        isAppInForeground.mockReturnValue(true);
+        processMod.processBankNotifications.mockResolvedValue({
+          created: 1, pending: 1, skipped: 0, createdItems: [createdItem],
+        });
+
+        const result = await backgroundBankTask.runBackgroundBankCheck();
+
+        expect(localNotifications.presentPendingOperationsAlert).toHaveBeenCalled();
+        expect(localNotifications.presentAddedOperationsAlert).not.toHaveBeenCalled();
+        expect(result).toMatchObject({ notified: true, notifiedAdded: false });
+      });
+
+      it('reads the state at reporting time, not at run start', async () => {
+        // The case this feature is really about: a wakeup starts while the app is
+        // backgrounded and finishes under an app the user has since opened. The
+        // state flips mid-run, so checking it before the pipeline would post a
+        // receipt for an operation the user just watched land.
+        enableBothGates();
+        isAppInForeground.mockReturnValue(false);
+        processMod.processBankNotifications.mockImplementation(async () => {
+          isAppInForeground.mockReturnValue(true); // user opened the app mid-run
+          return { created: 1, pending: 0, skipped: 0, createdItems: [createdItem] };
+        });
+
+        const result = await backgroundBankTask.runBackgroundBankCheck();
+
+        expect(localNotifications.presentAddedOperationsAlert).not.toHaveBeenCalled();
+        expect(result.notifiedAdded).toBe(false);
+      });
+
+      it('posts the receipt when the app is backgrounded again by reporting time', async () => {
+        // The mirror case: on screen when the run started, gone by the time it
+        // reports — the user has not seen the operation land, so the receipt is
+        // still the only way they learn about it.
+        enableBothGates();
+        isAppInForeground.mockReturnValue(true);
+        processMod.processBankNotifications.mockImplementation(async () => {
+          isAppInForeground.mockReturnValue(false); // user left the app mid-run
+          return { created: 1, pending: 0, skipped: 0, createdItems: [createdItem] };
+        });
+
+        const result = await backgroundBankTask.runBackgroundBankCheck();
+
+        expect(localNotifications.presentAddedOperationsAlert).toHaveBeenCalled();
+        expect(result.notifiedAdded).toBe(true);
+      });
     });
 
     describe('Regression Tests', () => {
