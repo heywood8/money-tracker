@@ -232,13 +232,17 @@ describe('useQuickAddForm', () => {
       expect(name).toBe('Checking');
     });
 
-    it('should return "Unknown" for invalid account ID', async () => {
+    // A neutral dash, not the word "Unknown": the accounts arrive asynchronously,
+    // so this fallback is what the form shows while they are still loading, and
+    // an untranslated English word there reads as a data error rather than as a
+    // value that has not landed yet.
+    it('should return a neutral placeholder for an invalid account ID', async () => {
       const { result } = await renderHook(() =>
         useQuickAddForm(mockAccounts, mockAccounts, mockCategories, mockT),
       );
 
       const name = result.current.getAccountName('non-existent');
-      expect(name).toBe('Unknown');
+      expect(name).toBe('—');
     });
   });
 

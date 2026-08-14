@@ -17,7 +17,10 @@ const ROW_WIDTHS = [
   { title: '58%', subtitle: '45%', amount: 54 },
 ];
 
-const OperationsListPlaceholder = ({ colors }) => {
+// Hoisted so the object identity is stable across renders.
+const ACCESSIBILITY_BUSY = { busy: true };
+
+const OperationsListPlaceholder = ({ colors, t }) => {
   const pulse = useRef(new Animated.Value(0)).current;
 
   useEffect(() => {
@@ -35,7 +38,17 @@ const OperationsListPlaceholder = ({ colors }) => {
   const barStyle = { backgroundColor: colors.border };
 
   return (
-    <View style={styles.groupContainer}>
+    // The bars carry no information, so they are collapsed into a single node
+    // for TalkBack: without this the reader walks 30-odd nameless views. The
+    // busy state is what a screen reader user actually needs to hear here.
+    <View
+      style={styles.groupContainer}
+      accessible
+      accessibilityRole="progressbar"
+      accessibilityLabel={t('loading_operations')}
+      accessibilityState={ACCESSIBILITY_BUSY}
+      testID="operations-list-placeholder"
+    >
       {/* Date separator placeholder */}
       <View style={styles.separatorRow}>
         <Animated.View style={[styles.dateBar, barStyle, { opacity }]} />
@@ -81,6 +94,7 @@ OperationsListPlaceholder.propTypes = {
     border: PropTypes.string.isRequired,
     surface: PropTypes.string.isRequired,
   }).isRequired,
+  t: PropTypes.func.isRequired,
 };
 
 const BAR_RADIUS = BORDER_RADIUS.sm;

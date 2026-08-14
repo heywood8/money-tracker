@@ -96,8 +96,28 @@ const OperationsScreen = () => {
     updateSearchFilters,
     loadInitialOperations,
   } = useOperationsActions();
-  const { accounts, visibleAccounts } = useAccountsData();
-  const { categories } = useCategories();
+  const { accounts, visibleAccounts, loading: accountsLoading } = useAccountsData();
+  const { categories, loading: categoriesLoading } = useCategories();
+
+  // Accounts and categories are fetched by their own providers, independently of
+  // the operations query, and routinely settle after it. A row rendered in that
+  // window resolves its category to "Unknown" with a question-mark icon and its
+  // per-day totals to nothing — the list looks broken rather than busy. Treat
+  // the window as part of the list's loading state and let the skeleton hold it.
+  //
+  // Gated on the array still being EMPTY, not on `loading` alone: both providers
+  // re-raise `loading` for background reloads (RELOAD_ALL after an import, a
+  // language switch), and those keep the previously loaded data on hand. Without
+  // the length check a finished list would blink back to a skeleton every time.
+  const referenceDataLoading = Boolean(
+    (categoriesLoading && categories.length === 0)
+    || (accountsLoading && accounts.length === 0),
+  );
+
+  // What the list can actually paint. Everything that waits for "the list has
+  // real rows" keys off this rather than off operationsLoading alone, so a
+  // pending scroll target is not consumed against a skeleton.
+  const listLoading = operationsLoading || referenceDataLoading;
 
   // Display preferences. Read defensively: the context has no default value, so
   // a missing provider (e.g. in unit tests) yields undefined.
@@ -426,7 +446,7 @@ const OperationsScreen = () => {
 
   // Scroll to date after operations are loaded
   useEffect(() => {
-    if (scrollToDateString && !operationsLoading) {
+    if (scrollToDateString && !listLoading) {
       const separatorIndex = groupedOperations.findIndex(
         item => item.type === 'dateGroup' && item.date === scrollToDateString,
       );
@@ -441,7 +461,7 @@ const OperationsScreen = () => {
         setPendingScroll(false);
       }
     }
-  }, [scrollToDateString, operationsLoading, groupedOperations]);
+  }, [scrollToDateString, listLoading, groupedOperations]);
 
   // Handle content size change - this fires after FlatList has laid out content
   // Wait for interactions/layout to finish, then perform a fast, graceful scroll to the target
@@ -452,7 +472,7 @@ const OperationsScreen = () => {
     // scroll and cause snap-back whenever the user tries to scroll away.
     if (scrollScheduledRef.current) return;
 
-    if (pendingScroll && scrollToDateString && !operationsLoading) {
+    if (pendingScroll && scrollToDateString && !listLoading) {
       const separatorIndex = groupedOperations.findIndex(
         item => item.type === 'dateGroup' && item.date === scrollToDateString,
       );
@@ -489,7 +509,7 @@ const OperationsScreen = () => {
         setPendingScroll(false);
       }
     }
-  }, [pendingScroll, scrollToDateString, operationsLoading, groupedOperations]);
+  }, [pendingScroll, scrollToDateString, listLoading, groupedOperations]);
 
   // Clear a stale exchange rate when the transfer's currency PAIR changes (e.g.
   // destination switched from a EUR account to an AMD account). The auto-populate
@@ -1326,6 +1346,7 @@ const OperationsScreen = () => {
         colors={colors}
         t={t}
         initialLoading={operationsLoading}
+        referenceDataLoading={referenceDataLoading}
         loadingMore={loadingMore}
         hasMoreOperations={hasMoreOperations}
         onLoadMore={loadMoreOperations}
@@ -1425,7 +1446,7 @@ const OperationsScreen = () => {
       />
 
       {/* Scroll to Top Button - only show when scrolled down */}
-      {showScrollToTop && !operationsLoading && (
+      {showScrollToTop && !listLoading && (
         <TouchableOpacity
           style={[
             styles.scrollToTopButton,

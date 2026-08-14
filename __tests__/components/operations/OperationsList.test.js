@@ -149,6 +149,49 @@ describe('OperationsList', () => {
     });
   });
 
+  // ── referenceDataLoading: accounts/categories not yet available ────────────
+
+  describe('referenceDataLoading prop', () => {
+    const group = makeGroup(TODAY, [
+      { id: 'op-ref', type: 'expense', amount: '10.00', accountId: 'acc-usd', categoryId: 'cat-1' },
+    ]);
+
+    it('withholds the rows while the reference data is still loading', async () => {
+      const { sp } = await getSectionListProps({
+        groupedOperations: [group],
+        referenceDataLoading: true,
+      });
+
+      // No half-resolved rows: an operation whose category cannot be resolved
+      // yet would render as "unknown_category" with a question-mark icon.
+      expect(sp.sections).toEqual([]);
+    });
+
+    it('shows the skeleton rather than the empty state while reference data loads', async () => {
+      const { sp } = await getSectionListProps({
+        groupedOperations: [group],
+        referenceDataLoading: true,
+      });
+      const { getByTestId } = await render(sp.ListEmptyComponent);
+      expect(getByTestId('operations-list-placeholder')).toBeTruthy();
+    });
+
+    it('renders the rows once the reference data has arrived', async () => {
+      const { sp } = await getSectionListProps({
+        groupedOperations: [group],
+        referenceDataLoading: false,
+      });
+
+      expect(sp.sections).toHaveLength(1);
+      expect(sp.sections[0].data).toHaveLength(1);
+    });
+
+    it('defaults to rendering rows when the prop is omitted', async () => {
+      const { sp } = await getSectionListProps({ groupedOperations: [group] });
+      expect(sp.sections).toHaveLength(1);
+    });
+  });
+
   // ── renderItem callbacks ──────────────────────────────────────────────────
 
   describe('renderItem — date label', () => {
@@ -314,6 +357,36 @@ describe('OperationsList', () => {
     it('does NOT call onLoadMore when hasMoreOperations=false', async () => {
       const mockLoadMore = jest.fn();
       const { sp } = await getSectionListProps({ onLoadMore: mockLoadMore, hasMoreOperations: false, loadingMore: false });
+      await act(async () => { sp.onEndReached(); });
+      expect(mockLoadMore).not.toHaveBeenCalled();
+    });
+
+    // A skeleton list is an empty list, so VirtualizedList reports the end
+    // reached straight away — without this guard the screen would prefetch
+    // further weeks before the first page had been painted.
+    it('does NOT call onLoadMore while the initial-loading skeleton is up', async () => {
+      const mockLoadMore = jest.fn();
+      const { sp } = await getSectionListProps({
+        onLoadMore: mockLoadMore,
+        hasMoreOperations: true,
+        loadingMore: false,
+        initialLoading: true,
+      });
+      await act(async () => { sp.onEndReached(); });
+      expect(mockLoadMore).not.toHaveBeenCalled();
+    });
+
+    it('does NOT call onLoadMore while the reference data is still loading', async () => {
+      const mockLoadMore = jest.fn();
+      const { sp } = await getSectionListProps({
+        groupedOperations: [makeGroup(TODAY, [
+          { id: 'op-end', type: 'expense', amount: '10.00', accountId: 'acc-usd', categoryId: 'cat-1' },
+        ])],
+        onLoadMore: mockLoadMore,
+        hasMoreOperations: true,
+        loadingMore: false,
+        referenceDataLoading: true,
+      });
       await act(async () => { sp.onEndReached(); });
       expect(mockLoadMore).not.toHaveBeenCalled();
     });
