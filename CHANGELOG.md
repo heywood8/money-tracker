@@ -1,5 +1,12 @@
 # Changelog
 
+## [0.271.2](https://github.com/heywood8/money-tracker/compare/penny-v0.271.1...penny-v0.271.2) (2026-08-14)
+
+
+### Bug Fixes
+
+* **notifications:** skip the auto-added receipt when the app is on screen ([#1618](https://github.com/heywood8/money-tracker/issues/1618)) ([23165c5](https://github.com/heywood8/money-tracker/commit/23165c5345cc22ced046c7c161e1b2bd2226e478))
+
 ## [0.271.1](https://github.com/heywood8/money-tracker/compare/penny-v0.271.0...penny-v0.271.1) (2026-08-14)
 
 
