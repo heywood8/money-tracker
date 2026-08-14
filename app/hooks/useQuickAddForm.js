@@ -117,10 +117,11 @@ const useQuickAddForm = (visibleAccounts, accounts, categories, t) => {
     return () => { cancelled = true; };
   }, [quickAddValues.operationCurrency, quickAddValues.accountId, accounts]);
 
-  // Get account name
+  // Get account name. Falls back to a neutral dash rather than an untranslated
+  // "Unknown", which the accounts still being loaded would otherwise print.
   const getAccountName = useCallback((accountId) => {
     const account = accounts.find(acc => acc.id === accountId);
-    return account ? account.name : 'Unknown';
+    return account ? account.name : '—';
   }, [accounts]);
 
   // Get account balance with currency symbol

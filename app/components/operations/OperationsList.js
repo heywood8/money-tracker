@@ -49,6 +49,11 @@ const SECTION_HEADER_HEIGHT_FALLBACK = SPACING.sm + 17 + SPACING.xs + BORDER_RAD
 // identity and defeat the list's row memoization.
 const NOOP = () => {};
 const NO_SUGGESTIONS = [];
+const NO_SECTIONS = [];
+
+// Shown where a reference cannot be resolved to a name. An em dash is
+// language-neutral and reads as "not available", which is what it means.
+const UNRESOLVED_PLACEHOLDER = '—';
 
 /**
  * OperationsList Component
@@ -65,6 +70,7 @@ const OperationsList = forwardRef(({
   colors,
   t,
   initialLoading = false,
+  referenceDataLoading = false,
   loadingMore = false,
   hasMoreOperations = false,
   onLoadMore,
@@ -156,18 +162,29 @@ const OperationsList = forwardRef(({
     };
   }, [categories, t]);
 
-  // Get account name
+  // Get account name. The fallback is a neutral dash rather than a word: a row
+  // that cannot resolve its account should read as "nothing here yet", not as a
+  // label the user might mistake for an account actually called "Unknown".
   const getAccountName = useCallback((accountId) => {
     const account = accounts.find(acc => acc.id === accountId);
-    return account ? account.name : 'Unknown';
+    return account ? account.name : UNRESOLVED_PLACEHOLDER;
   }, [accounts]);
 
-  // Handle end reached for lazy loading
+  // The list has nothing trustworthy to paint: either the operations query is
+  // still running with no rows yet, or the reference data has not arrived (see
+  // `sections` below, which withholds the rows for the latter).
+  const showPlaceholder = initialLoading || referenceDataLoading;
+
+  // Handle end reached for lazy loading.
+  //
+  // Suppressed while the placeholder is up: the skeleton means the list is
+  // empty, so VirtualizedList reports the end reached immediately and would
+  // prefetch further weeks before the first page has even been painted.
   const handleEndReached = useCallback(() => {
-    if (!loadingMore && hasMoreOperations) {
+    if (!showPlaceholder && !loadingMore && hasMoreOperations) {
       onLoadMore();
     }
-  }, [loadingMore, hasMoreOperations, onLoadMore]);
+  }, [showPlaceholder, loadingMore, hasMoreOperations, onLoadMore]);
 
   // Footer component showing loading indicator
   const renderFooter = useCallback(() => {
@@ -207,12 +224,23 @@ const OperationsList = forwardRef(({
     }
   }, []);
 
-  // Convert groupedOperations array into SectionList sections
-  const sections = useMemo(() => groupedOperations.map(group => ({
-    title: group.date,
-    spendingSums: group.spendingSums,
-    data: group.operations,
-  })), [groupedOperations]);
+  // Convert groupedOperations array into SectionList sections.
+  //
+  // While the reference data (accounts, categories) is still on its FIRST load,
+  // the rows are deliberately withheld. Operations come from their own query and
+  // routinely arrive first, and a row rendered against an empty categories array
+  // resolves its title to t('unknown_category') and its icon to a question mark
+  // — content that reads as data loss rather than as loading, and that the next
+  // frame contradicts. The skeleton below stands in for that window instead.
+  const sections = useMemo(() => (
+    referenceDataLoading
+      ? NO_SECTIONS
+      : groupedOperations.map(group => ({
+        title: group.date,
+        spendingSums: group.spendingSums,
+        data: group.operations,
+      }))
+  ), [groupedOperations, referenceDataLoading]);
 
   // Cumulative geometry per section, recomputed only when the sections change.
   // Keeps getItemLayout to an O(log n) binary search instead of an O(items) walk.
@@ -426,8 +454,8 @@ const OperationsList = forwardRef(({
       }
       ListFooterComponent={renderFooter}
       ListEmptyComponent={
-        initialLoading ? (
-          <OperationsListPlaceholder colors={colors} />
+        showPlaceholder ? (
+          <OperationsListPlaceholder colors={colors} t={t} />
         ) : (
           <EmptyState
             icon="cash-multiple"
@@ -438,7 +466,7 @@ const OperationsList = forwardRef(({
         )
       }
       contentContainerStyle={
-        initialLoading
+        showPlaceholder
           ? styles.listContent
           : sections.length === 0
             ? styles.emptyList
@@ -484,6 +512,7 @@ OperationsList.propTypes = {
   colors: PropTypes.object.isRequired,
   t: PropTypes.func.isRequired,
   initialLoading: PropTypes.bool,
+  referenceDataLoading: PropTypes.bool,
   loadingMore: PropTypes.bool,
   hasMoreOperations: PropTypes.bool,
   onLoadMore: PropTypes.func.isRequired,

@@ -117,6 +117,7 @@ jest.mock('../../app/components/operations/OperationsList', () => {
     return React.createElement('OperationsList', {
       testID: 'operations-list',
       initialLoading: props.initialLoading,
+      referenceDataLoading: props.referenceDataLoading,
       onEditOperation: props.onEditOperation,
       onDateSeparatorPress: props.onDateSeparatorPress,
       onScroll: props.onScroll,
@@ -2080,6 +2081,10 @@ describe('OperationsScreen', () => {
 
       // Screen pre-renders; no full-screen loading blocker while accounts load
       expect(getByTestId('operations-list')).toBeTruthy();
+
+      // ...but the list is told to hold the skeleton: rows rendered against an
+      // empty accounts array would show a dash where the account name belongs.
+      expect(getByTestId('operations-list').props.referenceDataLoading).toBe(true);
     });
 
     it('pre-renders screen normally when categories are loading', async () => {
@@ -2117,6 +2122,98 @@ describe('OperationsScreen', () => {
 
       // Screen pre-renders; no full-screen loading blocker while categories load
       expect(getByTestId('operations-list')).toBeTruthy();
+
+      // Rows stay withheld: without the categories every row would title itself
+      // "unknown_category" and draw a question mark for its icon.
+      expect(getByTestId('operations-list').props.referenceDataLoading).toBe(true);
+    });
+
+    it('releases the rows once the reference data has loaded', async () => {
+      const OperationsScreen = require('../../app/screens/OperationsScreen').default;
+      const { useAccountsData } = require('../../app/contexts/AccountsDataContext');
+      const { useCategories } = require('../../app/contexts/CategoriesContext');
+      const { useOperationsData } = require('../../app/contexts/OperationsDataContext');
+      const { useOperationsActions } = require('../../app/contexts/OperationsActionsContext');
+
+      useAccountsData.mockReturnValue({
+        accounts: [],
+        visibleAccounts: [],
+        loading: false,
+      });
+
+      useCategories.mockReturnValue({
+        categories: [],
+        loading: false,
+      });
+
+      useOperationsData.mockReturnValue({
+        operations: [],
+        loading: false,
+        loadingMore: false,
+        hasMoreOperations: false,
+        activeFilters: {},
+        filtersActive: false,
+      });
+
+      useOperationsActions.mockReturnValue({
+        deleteOperation: jest.fn(),
+        addOperation: jest.fn(),
+        validateOperation: jest.fn(() => null),
+        loadMoreOperations: jest.fn(),
+        jumpToDate: jest.fn(),
+        updateFilters: jest.fn(),
+        clearFilters: jest.fn(),
+        getActiveFilterCount: jest.fn(() => 0),
+      });
+
+      const { getByTestId } = await render(<OperationsScreen />);
+
+      expect(getByTestId('operations-list').props.referenceDataLoading).toBe(false);
+    });
+
+    it('does not fall back to the skeleton when a background reload re-raises loading', async () => {
+      const OperationsScreen = require('../../app/screens/OperationsScreen').default;
+      const { useAccountsData } = require('../../app/contexts/AccountsDataContext');
+      const { useCategories } = require('../../app/contexts/CategoriesContext');
+      const { useOperationsData } = require('../../app/contexts/OperationsDataContext');
+      const { useOperationsActions } = require('../../app/contexts/OperationsActionsContext');
+
+      // RELOAD_ALL (import, language switch) re-raises `loading` while keeping
+      // the previously loaded arrays. The list must keep showing them.
+      useAccountsData.mockReturnValue({
+        accounts: [{ id: 'acc-1', name: 'Cash', currency: 'USD', balance: '100' }],
+        visibleAccounts: [{ id: 'acc-1', name: 'Cash', currency: 'USD', balance: '100' }],
+        loading: true,
+      });
+
+      useCategories.mockReturnValue({
+        categories: [{ id: 'cat-1', name: 'Food', icon: 'food', categoryType: 'expense' }],
+        loading: true,
+      });
+
+      useOperationsData.mockReturnValue({
+        operations: [],
+        loading: false,
+        loadingMore: false,
+        hasMoreOperations: false,
+        activeFilters: {},
+        filtersActive: false,
+      });
+
+      useOperationsActions.mockReturnValue({
+        deleteOperation: jest.fn(),
+        addOperation: jest.fn(),
+        validateOperation: jest.fn(() => null),
+        loadMoreOperations: jest.fn(),
+        jumpToDate: jest.fn(),
+        updateFilters: jest.fn(),
+        clearFilters: jest.fn(),
+        getActiveFilterCount: jest.fn(() => 0),
+      });
+
+      const { getByTestId } = await render(<OperationsScreen />);
+
+      expect(getByTestId('operations-list').props.referenceDataLoading).toBe(false);
     });
   });
 
