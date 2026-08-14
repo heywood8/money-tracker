@@ -9,10 +9,14 @@
  *   alert, deep-linking into the review surface;
  * - fully-matched transactions the run booked on its own → the "operations added"
  *   alert, so the silent auto-create path is no longer invisible until the user
- *   next opens the app.
+ *   next opens the app. Skipped when the app is on screen at reporting time: the
+ *   create was not silent then, and the receipt would only repeat the row
+ *   RELOAD_ALL has already put in front of the user.
  *
  * Both are posted only from here (the foreground pipeline runs while the user is
- * already looking at the app, where RELOAD_ALL refreshes the lists instead).
+ * already looking at the app, where RELOAD_ALL refreshes the lists instead) — but
+ * a run that *started* backgrounded can still *finish* under an open app, which
+ * is what the on-screen check above is about (see appForeground.js).
  *
  * The task definition must be registered at module load — before the OS spins up
  * the headless JS context — so this module is imported from the app entry point
@@ -33,6 +37,7 @@ import {
 import { getAddedAlertCopy, getPendingAlertCopy } from './notificationStrings';
 import { collectPendingAlertDetails } from './pendingAlertItems';
 import { collectAddedAlertDetails } from './addedAlertItems';
+import { isAppInForeground } from './appForeground';
 
 /** Task identifier, also used as the WorkManager unique work name. */
 export const BACKGROUND_BANK_TASK = 'penny-background-bank-notifications';
@@ -86,8 +91,10 @@ export const setBackgroundAlertsEnabled = async (enabled) => {
  * Ingests any newly-captured bank notifications and reports the outcome, as long
  * as the OS notification permission is granted:
  *
- * - `notifiedAdded` — this run auto-created operations, so the "operations added"
- *   receipt was posted describing what was booked and where it landed.
+ * - `notifiedAdded` — this run auto-created operations *and* the app was not on
+ *   screen, so the "operations added" receipt was posted describing what was
+ *   booked and where it landed. False for a booking made under an open app,
+ *   which the user watches land in the list instead.
  * - `notified` — this run queued new items for review, so the pending alert was
  *   posted/refreshed with the current queue size plus what each item still needs.
  *
@@ -112,9 +119,18 @@ export const runBackgroundBankCheck = async () => {
   // (keyed on the operations) and the review alert's fixed identifier.
   const summary = await processBankNotifications();
 
-  // Nothing to say: no operation was booked and nothing new needs review. Skip
-  // the permission check too — it is only needed to post.
-  if (summary.created <= 0 && summary.pending <= 0) {
+  // The receipt exists because an auto-create is otherwise invisible until the
+  // app is next opened — which is not true when the app is open by the time the
+  // run reports: the booking emitted RELOAD_ALL into a live app, so the operation
+  // is already in its lists. Read *here*, after the run, rather than before it:
+  // a wakeup that starts backgrounded and finishes under an app the user has
+  // since opened is the case worth suppressing, and only the state at reporting
+  // time can see it (see appForeground.js).
+  const reportAdded = summary.created > 0 && !isAppInForeground();
+
+  // Nothing to say: nothing worth reporting was booked and nothing new needs
+  // review. Skip the permission check too — it is only needed to post.
+  if (!reportAdded && summary.pending <= 0) {
     return { ...summary, notified: false, notifiedAdded: false };
   }
   if (!(await areNotificationsGranted())) {
@@ -122,11 +138,10 @@ export const runBackgroundBankCheck = async () => {
   }
 
   let notifiedAdded = false;
-  // Tell the user about operations booked without asking — otherwise the silent
-  // auto-create path is invisible until the app is next opened. Describes what
-  // was booked (amount, payee, account, category / cash account); an empty list
+  // Tell the user about operations booked without asking. Describes what was
+  // booked (amount, payee, account, category / cash account); an empty list
   // degrades to the plain count-only copy.
-  if (summary.created > 0) {
+  if (reportAdded) {
     const addedDetails = await collectAddedAlertDetails(summary.createdItems);
     const addedCopy = await getAddedAlertCopy(summary.created, addedDetails);
     // Key the receipt on the operations it describes, so a second wakeup handed

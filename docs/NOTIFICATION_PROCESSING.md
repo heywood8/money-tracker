@@ -331,13 +331,35 @@ queues posts both):
 
 | Alert | Posted when | Copy |
 | ----- | ----------- | ---- |
-| **Operations added** | the run auto-created operations (`summary.created > 0`) | amount · payee, plus the account and the category / cash account it landed in |
+| **Operations added** | the run auto-created operations (`summary.created > 0`) **and the app is not on screen** | amount · payee, plus the account and the category / cash account it landed in |
 | **Transactions to review** | the run queued new items (`summary.pending > 0`) | amount · payee, what resolved, and the field still missing |
 
 Both are posted only from the background task: in the foreground the user is
 already looking at the app, where `RELOAD_ALL` refreshes the lists instead.
 Tapping either opens the Operations tab; only the review alert additionally
 surfaces the suggestion deck.
+
+**The receipt is skipped under an open app.** A wakeup never *starts* while the
+app is foregrounded — `expo-background-task`'s scheduler bails out and
+re-enqueues — but it routinely *finishes* under one: a run released from Doze, or
+one already in flight as the user launches the app, reports after the app is in
+front of them. Opening the app also kicks off an ingestion of its own, so such a
+wakeup is often reporting a booking the user just watched appear. The receipt
+exists because an auto-create is invisible until the app is next opened, which is
+exactly what is no longer true here: the booking emitted `RELOAD_ALL` into a live
+app, so a tray row only repeats what the lists already hold.
+
+`appForeground.js` reads `AppState.currentState` (a headless run reports
+`'background'`; one whose app has come to the front reports `'active'`;
+transitional `'inactive'` counts as backgrounded, so an uncertain state still
+posts). It is read at *reporting* time, after the pipeline, since a run that
+started backgrounded and ended foregrounded is the whole case.
+
+The trade-off is deliberate: "app open" is taken as "the user can find the
+operation", even when they are on another tab or the operations list is filtered.
+The review alert is not skipped this way — a queued item is a task to come back
+to, not a receipt for something already done, so it is worth a tray row either
+way.
 
 **One booking, one receipt.** The pipeline coalesces overlapping calls into a
 single run and hands *every* caller the same summary, so a wakeup can find itself
