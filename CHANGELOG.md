@@ -1,5 +1,17 @@
 # Changelog
 
+## [0.271.3](https://github.com/heywood8/money-tracker/compare/penny-v0.271.2...penny-v0.271.3) (2026-08-18)
+
+
+### Bug Fixes
+
+* **operations:** space the notification binding card's category grid off the account picker ([#1620](https://github.com/heywood8/money-tracker/issues/1620)) ([6621b27](https://github.com/heywood8/money-tracker/commit/6621b274bad222eb0f5b517af439f4ad8aabdf99))
+
+
+### Miscellaneous Chores
+
+* **deps:** bump @sentry/react-native from 8.22.0 to 8.23.0 ([#1621](https://github.com/heywood8/money-tracker/issues/1621)) ([bcea4ce](https://github.com/heywood8/money-tracker/commit/bcea4ce3bd2640bf2d8da6493bc1f760d39d41ca))
+
 ## [0.271.2](https://github.com/heywood8/money-tracker/compare/penny-v0.271.1...penny-v0.271.2) (2026-08-14)
 
 
