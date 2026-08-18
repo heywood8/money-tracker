@@ -6,6 +6,7 @@
  */
 
 import React from 'react';
+import { StyleSheet } from 'react-native';
 import { render, fireEvent } from '@testing-library/react-native';
 import NotificationBindingStack, {
   MAX_DECK,
@@ -57,6 +58,13 @@ const TRANSFER = {
   id: 'p2', kind: 'ATM CASH', type: 'transfer', amount: '50000.00', currency: 'AMD',
   cardMask: '4083***7027', merchant: 'ATM YEREVAN', date: '2026-06-28',
   accountId: 1, categoryId: null, packageName: 'am.bank',
+};
+
+// A top-up: income arrives unbound, so no category is preselected on its card.
+const INCOME = {
+  id: 'p3', kind: 'INCOME', type: 'income', amount: '10000.00', currency: 'RUB',
+  cardMask: null, merchant: 'ALFA-BANK', date: '2026-06-28',
+  accountId: 1, categoryId: null, packageName: 'ru.bank',
 };
 
 const makeSuggestions = (count) =>
@@ -243,5 +251,37 @@ describe('NotificationBindingStack', () => {
       choices: { p1: { accountId: 1, categoryId: 'c1' } },
     });
     expect(queryByText(/^\+\d+$/)).toBeNull();
+  });
+
+  describe('Regression Tests', () => {
+    // An income notification arrives with nothing bound, so the selected-category
+    // row is absent — and that row used to be the only thing spacing the category
+    // grid off the account picker, leaving income chips flush against it.
+    it('keeps the category grid spaced off the account picker with no category bound', async () => {
+      const { getByTestId } = await renderStack({
+        suggestions: [INCOME],
+        choices: { p3: { accountId: 1, categoryId: null, toAccountId: null, labelOverride: '' } },
+      });
+      const section = StyleSheet.flatten(getByTestId('binding-card-category-section').props.style);
+
+      expect(section.marginTop).toBeGreaterThan(0);
+      // The income shortcuts still render inside that section.
+      expect(getByTestId('category-grid-c2')).toBeTruthy();
+    });
+
+    // The spacing lives on the section alone; a margin back on the selected row
+    // would stack on top of it and push the bound case further down than the
+    // unbound one — the asymmetry this fix removed.
+    it('leaves the vertical spacing to the section when a category is bound', async () => {
+      const { getByTestId } = await renderStack({
+        choices: { p1: { accountId: 1, categoryId: 'c1', toAccountId: null, labelOverride: '' } },
+      });
+      const section = StyleSheet.flatten(getByTestId('binding-card-category-section').props.style);
+      const row = StyleSheet.flatten(getByTestId('binding-card-selected-category').props.style);
+
+      expect(section.marginTop).toBeGreaterThan(0);
+      expect(row.marginTop).toBeUndefined();
+      expect(row.marginBottom).toBeUndefined();
+    });
   });
 });

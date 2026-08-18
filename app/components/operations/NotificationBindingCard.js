@@ -182,9 +182,13 @@ const NotificationBindingCard = ({
             </View>
           </>
         ) : (
-          <>
+          /* The section owns the gap under the account picker so the grid keeps
+             its distance whether or not a category is already bound — an income
+             notification arrives unbound, and the selected-category row used to
+             be the only thing holding the chips off the picker. */
+          <View testID="binding-card-category-section" style={styles.categorySection}>
             {choice.categoryId ? (
-              <View style={styles.selectedCategoryRow}>
+              <View testID="binding-card-selected-category" style={styles.selectedCategoryRow}>
                 <Ionicons name="pricetag" size={12} color={colors.primary} />
                 <Text style={[styles.selectedCategoryText, { color: colors.text }]} numberOfLines={1}>
                   {getCategoryDisplayName(choice.categoryId, categories, t)}
@@ -200,7 +204,7 @@ const NotificationBindingCard = ({
               t={t}
               topCategoryIds={topCategoryIds}
             />
-          </>
+          </View>
         )}
       </ScrollView>
 
@@ -309,6 +313,10 @@ const styles = StyleSheet.create({
     gap: SPACING.xs,
     marginRight: SPACING.sm,
   },
+  categorySection: {
+    gap: SPACING.xs,
+    marginTop: SPACING.sm,
+  },
   conversionText: {
     fontSize: FONT_SIZE.sm,
     fontStyle: 'italic',
@@ -341,8 +349,6 @@ const styles = StyleSheet.create({
     flexDirection: 'row',
     flexShrink: 1,
     gap: SPACING.xs,
-    marginBottom: SPACING.xs,
-    marginTop: SPACING.sm,
   },
   selectedCategoryText: {
     fontSize: FONT_SIZE.sm,
