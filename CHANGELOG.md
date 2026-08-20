@@ -1,5 +1,12 @@
 # Changelog
 
+## [0.272.0](https://github.com/heywood8/money-tracker/compare/penny-v0.271.3...penny-v0.272.0) (2026-08-20)
+
+
+### Features
+
+* **budgets:** track income lines by operation label ([#1623](https://github.com/heywood8/money-tracker/issues/1623)) ([d66427e](https://github.com/heywood8/money-tracker/commit/d66427ea5f9b745a611914b8c04173320ef269a4))
+
 ## [0.271.3](https://github.com/heywood8/money-tracker/compare/penny-v0.271.2...penny-v0.271.3) (2026-08-18)
 
 
