@@ -1,6 +1,7 @@
 import { GoogleSignin, statusCodes } from '@react-native-google-signin/google-signin';
 import { getPreference, setPreference, PREF_KEYS } from './PreferencesDB';
 import { queryAll } from './db';
+import { parseLabels, serializeLabels } from '../utils/labelUtils';
 
 const SHEETS_API = 'https://sheets.googleapis.com/v4/spreadsheets';
 
@@ -81,7 +82,7 @@ export const buildSheetsData = (backup) => {
   const {
     accounts, categories, operations, budgets, balance_history,
     budget_plans, budget_plan_lines, budget_plan_line_categories,
-    budget_plan_line_groups, budget_plan_line_accounts,
+    budget_plan_line_groups, budget_plan_line_accounts, budget_plan_line_labels,
   } = backup.data;
 
   const accountNames = new Map(accounts.map(a => [a.id, a.name]));
@@ -114,6 +115,20 @@ export const buildSheetsData = (backup) => {
     const current = accountIdsByLine.get(link.line_id);
     if (current) current.push(link.account_id);
     else accountIdsByLine.set(link.line_id, [link.account_id]);
+  }
+
+  // A line's label filter (migration 0028). ONE column, unlike the two above:
+  // there is no id to carry alongside the readable name — the label IS both,
+  // which also means a mis-split cell has nothing to fall back on. So this is
+  // the one list NOT joined on ';' (a label may contain one) but on the label
+  // delimiter itself — the character labelUtils guarantees no label holds, and
+  // the same one an operation's own description is written with.
+  const labelsByLine = new Map();
+  for (const link of budget_plan_line_labels || []) {
+    if (!link.line_id || link.label == null || link.label === '') continue;
+    const current = labelsByLine.get(link.line_id);
+    if (current) current.push(String(link.label));
+    else labelsByLine.set(link.line_id, [String(link.label)]);
   }
 
   return [
@@ -193,10 +208,11 @@ export const buildSheetsData = (backup) => {
     {
       range: 'Budget Plan Lines!A1',
       values: [
-        ['id', 'plan_id', 'label', 'amount', 'comment', 'category', 'account', 'category_id', 'to_account_id', 'sort_order', 'is_recurring', 'currency', 'kind', 'execution_account', 'account_id', 'last_executed_month', 'categories', 'category_ids', 'include_children', 'group', 'group_id', 'spending_accounts', 'spending_account_ids', 'effective_from', 'effective_to'],
+        ['id', 'plan_id', 'label', 'amount', 'comment', 'category', 'account', 'category_id', 'to_account_id', 'sort_order', 'is_recurring', 'currency', 'kind', 'execution_account', 'account_id', 'last_executed_month', 'categories', 'category_ids', 'include_children', 'group', 'group_id', 'spending_accounts', 'spending_account_ids', 'effective_from', 'effective_to', 'tracked_labels'],
         ...(budget_plan_lines || []).map(l => {
           const ids = lineCategoryIds(l);
           const sourceIds = accountIdsByLine.get(l.id) || [];
+          const trackedLabels = labelsByLine.get(l.id) || [];
           return [
             l.id, l.plan_id || '', l.label || '', l.amount, l.comment || '',
             categoryNames.get(l.category_id) || '',
@@ -227,6 +243,9 @@ export const buildSheetsData = (backup) => {
             // predates the columns and so speaks for every month.
             l.effective_from || '',
             l.effective_to || '',
+            // The label filter (migration 0028): which operations an income line
+            // counts. Blank means "not tracked by label".
+            serializeLabels(trackedLabels),
           ];
         }),
       ],
@@ -579,6 +598,25 @@ export const importFromSheets = async (accessToken, onProgress) => {
     }
   }
 
+  // Label filter (migration 0028). One column, not the two the references above
+  // need: a label is its own identity, so there is nothing to map — the cell's
+  // text IS what gets stored and matched against operations. A sheet without the
+  // column was written before 0028 and its lines were tracked by nothing.
+  // A hand-typed cell reads the same way an operation's description does, so
+  // "Аванс | Advance" is two labels however the person spaced it.
+  const budget_plan_line_labels = [];
+  for (let i = 0; i < budgetPlanLineRows.length; i++) {
+    const row = budgetPlanLineRows[i];
+    const line = budget_plan_lines[i];
+    if (!line.id) continue;
+    // parseLabels, not splitList: the cell is written with the label delimiter
+    // (see buildSheetsData) precisely so a label containing a semicolon survives
+    // the round trip, and it de-duplicates case-insensitively on the way in.
+    for (const label of parseLabels(row.tracked_labels)) {
+      budget_plan_line_labels.push({ line_id: line.id, label });
+    }
+  }
+
   // Preserve current app preferences (language, theme, etc.) so they survive the restore.
   // Do NOT catch DB errors here — a locked or corrupted DB must abort the import loudly
   // rather than silently overwriting all user preferences with an empty set (#747).
@@ -605,6 +643,7 @@ export const importFromSheets = async (accessToken, onProgress) => {
       budget_plan_line_categories,
       budget_plan_line_groups,
       budget_plan_line_accounts,
+      budget_plan_line_labels,
     },
   };
 };

@@ -590,6 +590,16 @@ const MonthlyPlanSection = forwardRef(function MonthlyPlanSection({
   const lineDisplayName = useCallback((line) => {
     if (line.label) return line.label;
     const categoryIds = line.categoryIds ?? (line.categoryId != null ? [line.categoryId] : []);
+    // An income line names its LABELS ahead of its category, because the labels
+    // are what tell it apart: a salary and its advance necessarily share one
+    // income category, so naming both rows after it puts two identical titles on
+    // the screen — the very ambiguity the label filter exists to remove.
+    const trackedLabels = line.trackedLabels ?? [];
+    if (line.kind === 'income' && trackedLabels.length > 0) {
+      return trackedLabels.length > 1
+        ? `${trackedLabels[0]} +${trackedLabels.length - 1}`
+        : trackedLabels[0];
+    }
     if (categoryIds.length > 0) {
       const first = categoriesById.get(categoryIds[0])?.name || t('allocation_unlinked');
       // A multi-category line names its first category and counts the rest, the
@@ -841,6 +851,10 @@ const MonthlyPlanSection = forwardRef(function MonthlyPlanSection({
   const lineIcon = useCallback((line) => {
     if (line.isBroken) return 'link-off';
     if (line.toAccountId != null) return 'bank-transfer';
+    // Ahead of the category icon, for the reason lineDisplayName prefers the
+    // labels: two same-category income rows would otherwise draw the same glyph
+    // next to the same name.
+    if (line.kind === 'income' && line.trackedLabels?.length) return 'tag-outline';
     const categoryIcon = categoriesById.get(line.categoryId)?.icon;
     if (categoryIcon) return categoryIcon;
     // An account-only line has no category icon to show; the card glyph says at
@@ -873,7 +887,11 @@ const MonthlyPlanSection = forwardRef(function MonthlyPlanSection({
       converting={converting}
       colors={colors}
       t={t}
-      showProgress={line.kind !== 'income'}
+      // An income line earns a meter once it tracks something of its own
+      // (migration 0028) — `tracked` on its status says whether it does. One
+      // that merely declares expected income has no per-line actual to draw.
+      showProgress={line.kind !== 'income' || !!lineStatusById.get(line.id)?.tracked}
+      overflowIsPositive={line.kind === 'income'}
       listLength={list.length}
       lifted={lifted}
       onMove={lifted ? null : onMove}

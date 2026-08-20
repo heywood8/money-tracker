@@ -13,6 +13,7 @@ import { executeQuery, queryAll, queryFirst, executeTransaction } from './db';
 import * as Currency from './currency';
 import { calculateSpendingForFilters, expandCategoryIds, deriveSpendingStatus } from './BudgetsDB';
 import { formatDate as formatLocalDate } from './BalanceHistoryDB';
+import { normalizeLabel, matchesAnyLabel } from '../utils/labelUtils';
 import {
   fetchRatesToTarget,
   convertWithRateMap,
@@ -27,12 +28,22 @@ const MONTH_REGEX = /^\d{4}-(0[1-9]|1[0-2])$/;
 // effective kind inferred from its tracking target — see {@link mapLineFields}.
 const LINE_KINDS = ['income', 'expense', 'transfer'];
 
+// What {@link LINE_SELECT} joins a line's tracked labels with: ASCII UNIT
+// SEPARATOR. Not a comma — a label is free text and may contain one.
+const LABEL_CONCAT_SEPARATOR = '\u001F';
+
 /**
  * Every line SELECT goes through this, so the category set (migration 0021's
- * budget_plan_line_categories) and the source-account filter (migration 0024's
- * budget_plan_line_accounts) always travel with the row instead of costing two
- * follow-up queries per line. GROUP_CONCAT joins with ','; category IDs are
+ * budget_plan_line_categories), the source-account filter (migration 0024's
+ * budget_plan_line_accounts) and the label filter (migration 0028's
+ * budget_plan_line_labels) always travel with the row instead of costing a
+ * follow-up query per line. GROUP_CONCAT joins with ','; category IDs are
  * UUIDs and account IDs are integers, so splitting back is unambiguous for both.
+ *
+ * Labels are the exception: a label is free text the user typed and may well
+ * contain a comma, so the label list is joined with the ASCII UNIT SEPARATOR
+ * (char(31)) instead — a character no stored label can hold, because
+ * {@link cleanTrackedLabel} strips every control character out of one on write.
  *
  * Deliberately plain correlated SCALAR subqueries: SQLite has no LATERAL, so a
  * derived table in FROM cannot reference `l.id` — the tidier
@@ -51,7 +62,11 @@ const LINE_SELECT = `SELECT l.*, (
       SELECT GROUP_CONCAT(la.account_id)
       FROM budget_plan_line_accounts la
       WHERE la.line_id = l.id
-    ) AS source_account_ids
+    ) AS source_account_ids, (
+      SELECT GROUP_CONCAT(ll.label, char(31))
+      FROM budget_plan_line_labels ll
+      WHERE ll.line_id = l.id
+    ) AS tracked_labels
     FROM budget_plan_lines l`;
 
 /** Current month as YYYY-MM (local calendar) — mirrors utils/monthUtils. */
@@ -138,10 +153,16 @@ export const mapPlanFields = (row) => {
  * also why it participates in `isBroken`: an account-only line tracks something
  * real, and a line whose last account AND last category are gone tracks nothing.
  *
+ * `trackedLabels` (migration 0028) is the line's LABEL filter — the operation
+ * labels whose income counts toward it. Empty (the default, and what every
+ * pre-0028 line has) means "not tracked by label". Offered on INCOME lines only:
+ * it is what lets a salary and its advance, which necessarily share one income
+ * category, each track their own actual.
+ *
  * NOTE the `isBroken` invariant only applies to expense/transfer lines: an income
- * line needs no tracking target (it declares expected income, and the income
- * section compares the month's real income against the total), so it is never
- * "broken" for lacking one.
+ * line needs no tracking target (with neither categories nor labels it simply
+ * declares expected income, and the income section compares the month's real
+ * income against the total), so it is never "broken" for lacking one.
  * @param {Object|null} row
  * @returns {Object|null}
  */
@@ -149,6 +170,7 @@ export const mapLineFields = (row) => {
   if (!row) return null;
   const categoryIds = readCategoryIds(row);
   const sourceAccountIds = readSourceAccountIds(row);
+  const trackedLabels = readTrackedLabels(row);
   const primary = row.category_id ?? null;
   // The junction wins: when the row's denormalized primary category has been
   // deleted (its FK nulled, or it simply is not linked any more) but other
@@ -169,6 +191,9 @@ export const mapLineFields = (row) => {
     categoryIds,
     // The source-account filter (migration 0024). Empty = any account.
     sourceAccountIds,
+    // The label filter (migration 0028). Empty = not tracked by label, which is
+    // what every pre-0028 line is.
+    trackedLabels,
     // NOTE: `include_children` is deliberately NOT surfaced. Descendant spending
     // always rolls up now — picking a parent category means its subtree, and a
     // leaf category has no subtree, so the flag never expressed a real choice.
@@ -335,6 +360,95 @@ const writeLineCategoriesInTx = async (db, lineId, categoryIds) => {
 };
 
 /**
+ * Normalize one tracked label for storage: control characters out (they would
+ * collide with the ASCII unit separator {@link LINE_SELECT} joins the set with),
+ * whitespace collapsed, ends trimmed — the same shape
+ * {@link normalizeLabel} gives an operation's own labels, so a line's label and
+ * the label on the operation it means are compared like for like.
+ * @param {*} label
+ * @returns {string} The cleaned label, or '' when there is nothing usable left.
+ */
+const cleanTrackedLabel = (label) => {
+  if (typeof label !== 'string' && typeof label !== 'number') return '';
+  // Spelled out per character rather than as a regex class: a control-character
+  // range in a literal is exactly what `no-control-regex` exists to flag, and the
+  // rule is right — this is the one place that genuinely means it.
+  const stripped = Array.from(String(label), (char) => {
+    const code = char.charCodeAt(0);
+    return code < 0x20 || code === 0x7f ? ' ' : char;
+  }).join('');
+  return normalizeLabel(stripped);
+};
+
+/**
+ * De-duplicated list of tracked labels, order preserved. De-duplication is
+ * CASE-INSENSITIVE (the first spelling wins) because matching is: without it,
+ * "Аванс" and "аванс" would be two rows of the composite primary key that count
+ * exactly the same operations.
+ * @param {Array|null|undefined} labels
+ * @returns {Array<string>}
+ */
+const uniqueLabels = (labels) => {
+  const out = [];
+  const seen = new Set();
+  for (const raw of labels || []) {
+    const label = cleanTrackedLabel(raw);
+    if (!label) continue;
+    const key = label.toLowerCase();
+    if (seen.has(key)) continue;
+    seen.add(key);
+    out.push(label);
+  }
+  return out;
+};
+
+/**
+ * Parse the `tracked_labels` GROUP_CONCAT column produced by
+ * {@link LINE_SELECT} (migration 0028). A row selected without it (an insert's
+ * in-memory row, a hand-built test row, a legacy `SELECT *`) has no label filter
+ * at all — the pre-0028 behaviour — so it reads as empty.
+ * @param {Object} row - Raw budget_plan_lines row
+ * @returns {Array<string>}
+ */
+const readTrackedLabels = (row) => {
+  const raw = row.tracked_labels;
+  if (Array.isArray(raw)) return uniqueLabels(raw);
+  return typeof raw === 'string' && raw.length > 0
+    ? uniqueLabels(raw.split(LABEL_CONCAT_SEPARATOR))
+    : [];
+};
+
+/**
+ * The label filter a caller means (migration 0028). Returns `undefined` when the
+ * caller did not mention `trackedLabels` at all — which for an update means
+ * "leave the filter alone", as distinct from `[]` ("stop tracking by label").
+ * @param {Object} line
+ * @returns {Array<string>|undefined}
+ */
+const resolveTrackedLabels = (line) => {
+  if (Array.isArray(line?.trackedLabels)) return uniqueLabels(line.trackedLabels);
+  return undefined;
+};
+
+/**
+ * Rewrite a line's label links inside an open transaction: drop what's there,
+ * insert the new set. The label-side twin of {@link writeLineCategoriesInTx}.
+ * @param {Object} db - Transaction-scoped database handle
+ * @param {string} lineId
+ * @param {Array<string>} labels - Already normalized (see {@link uniqueLabels})
+ * @returns {Promise<void>}
+ */
+const writeLineLabelsInTx = async (db, lineId, labels) => {
+  await db.runAsync('DELETE FROM budget_plan_line_labels WHERE line_id = ?', [lineId]);
+  for (const label of labels) {
+    await db.runAsync(
+      'INSERT OR IGNORE INTO budget_plan_line_labels (line_id, label) VALUES (?, ?)',
+      [lineId, label],
+    );
+  }
+};
+
+/**
  * Validate a plan.
  * @param {Object} plan
  * @returns {string|null} Error message or null if valid.
@@ -360,10 +474,16 @@ export const validatePlan = (plan) => {
  * Validate a plan line, including the "exactly one target" invariant.
  *
  * An INCOME line (`kind` === 'income') is exempt from that invariant: it declares
- * part of the month's expected income, which is compared against the month's real
- * income as a whole, so it may carry an income category for context or no target
- * at all. It must not link a transfer target, though — that would silently make
+ * part of the month's expected income, so it may carry income categories, a label
+ * filter (migration 0028), both, or no target at all — with none it simply has no
+ * per-line actual and the section compares the month's real income against the
+ * total. It must not link a transfer target, though — that would silently make
  * it track incoming transfers.
+ *
+ * The LABEL filter (migration 0028) is offered on income lines ONLY, and rejected
+ * elsewhere rather than silently dropped: it exists to separate incomes that
+ * share one category (a salary and its advance), which is a question no expense
+ * or transfer line asks.
  *
  * The SOURCE-ACCOUNT filter (migration 0024) is NOT a third kind of target and is
  * not part of the exclusivity rule: it narrows which expenses count, and combines
@@ -384,6 +504,7 @@ export const validatePlanLine = (line) => {
   const hasCategory = (resolveCategoryIds(line) || []).length > 0;
   const hasAccount = isSet(line.toAccountId);
   const hasSourceAccounts = (resolveSourceAccountIds(line) || []).length > 0;
+  const hasLabels = (resolveTrackedLabels(line) || []).length > 0;
   if (line.kind === 'income') {
     if (hasAccount) {
       return 'An income line cannot link to a transfer target';
@@ -392,6 +513,9 @@ export const validatePlanLine = (line) => {
       return 'An income line cannot filter by spending account';
     }
     return null;
+  }
+  if (hasLabels) {
+    return 'Only an income line can filter by label';
   }
   if (hasCategory && hasAccount) {
     return 'A line must link to either a category or an account, not both';
@@ -665,6 +789,9 @@ const insertPlanLine = async (planId, line) => {
     const sourceAccountIds = line.kind === 'transfer' || line.kind === 'income'
       ? []
       : (resolveSourceAccountIds(line) || []);
+    // The mirror image (migration 0028): only an income line tracks by label —
+    // validatePlanLine has already rejected a caller that asked for one elsewhere.
+    const trackedLabels = line.kind === 'income' ? (resolveTrackedLabels(line) || []) : [];
     const row = {
       id: line.id || uuid.v4(),
       plan_id: planId,
@@ -675,6 +802,7 @@ const insertPlanLine = async (planId, line) => {
       category_id: categoryIds[0] ?? null,
       category_ids: categoryIds,
       source_account_ids: sourceAccountIds,
+      tracked_labels: trackedLabels,
       to_account_id: isSet(line.toAccountId) ? line.toAccountId : null,
       sort_order: Number.isInteger(line.sortOrder) ? line.sortOrder : 0,
       is_recurring: isRecurring ? 1 : 0,
@@ -700,10 +828,12 @@ const insertPlanLine = async (planId, line) => {
       updated_at: now,
     };
 
-    // The row and its category/account links go in together: a line that
+    // The row and its category/account/label links go in together: a line that
     // committed without its links would read as broken (empty sets, no transfer
     // target) and silently stop tracking anything — or worse, an account-filtered
-    // line that lost only its accounts would quietly count the WHOLE category.
+    // line that lost only its accounts would quietly count the WHOLE category,
+    // and a label-filtered income line that lost only its labels would count the
+    // whole income category its sibling line also tracks.
     await executeTransaction(async (db) => {
       await db.runAsync(
         'INSERT INTO budget_plan_lines (id, plan_id, label, amount, comment, category_id, to_account_id, sort_order, is_recurring, currency, kind, include_children, group_id, effective_from, effective_to, created_at, updated_at) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)',
@@ -717,6 +847,7 @@ const insertPlanLine = async (planId, line) => {
       );
       await writeLineCategoriesInTx(db, row.id, categoryIds);
       await writeLineAccountsInTx(db, row.id, sourceAccountIds);
+      await writeLineLabelsInTx(db, row.id, trackedLabels);
     });
 
     return mapLineFields(row);
@@ -926,6 +1057,10 @@ const cloneLineVersionInTx = async (db, id, newId, fromMonth, now) => {
     'INSERT OR IGNORE INTO budget_plan_line_accounts (line_id, account_id) SELECT ?, account_id FROM budget_plan_line_accounts WHERE line_id = ?',
     [newId, id],
   );
+  await db.runAsync(
+    'INSERT OR IGNORE INTO budget_plan_line_labels (line_id, label) SELECT ?, label FROM budget_plan_line_labels WHERE line_id = ?',
+    [newId, id],
+  );
 };
 
 /**
@@ -980,7 +1115,8 @@ const cloneLineVersionInTx = async (db, id, newId, fromMonth, now) => {
  * not a claim about months already spent.
  * @param {string} id
  * @param {Object} updates - Partial { label, amount, comment, categoryId, categoryIds,
- *   sourceAccountIds, toAccountId, sortOrder, isRecurring, currency, planId }
+ *   sourceAccountIds, trackedLabels, toAccountId, sortOrder, isRecurring, currency,
+ *   planId }
  * @param {Object} [options] - { fromMonth?: 'YYYY-MM' } — the month the edit takes
  *   effect from; earlier months keep the line as it was.
  * @returns {Promise<string>} The id now carrying the values: `id` itself, or the
@@ -993,6 +1129,7 @@ export const updateLine = async (id, updates, options = {}) => {
     // when the caller mentioned neither, which leaves the existing links alone.
     const requestedCategoryIds = resolveCategoryIds(updates);
     const requestedSourceAccountIds = resolveSourceAccountIds(updates);
+    const requestedTrackedLabels = resolveTrackedLabels(updates);
 
     // Reject setting both targets in a single update outright.
     if ((requestedCategoryIds || []).length > 0 && isSet(updates.toAccountId)) {
@@ -1008,6 +1145,14 @@ export const updateLine = async (id, updates, options = {}) => {
         ? 'An income line cannot filter by spending account'
         : 'A transfer line cannot filter by spending account');
     }
+    // ...and the same for a label filter on a line this update turns into an
+    // allocation. Only an income line separates same-category incomes by label
+    // (see validatePlanLine), so asking for both at once is a contradiction, not
+    // something to resolve silently.
+    if ((requestedTrackedLabels || []).length > 0
+      && (isSet(updates.toAccountId) || updates.kind === 'expense' || updates.kind === 'transfer')) {
+      throw new Error('Only an income line can filter by label');
+    }
     if (updates.amount !== undefined
       && (!Currency.isValid(updates.amount) || Currency.compare(updates.amount, '0') <= 0)) {
       throw new Error('Amount must be greater than zero');
@@ -1019,6 +1164,7 @@ export const updateLine = async (id, updates, options = {}) => {
     let categoryIds = requestedCategoryIds;
     let toAccountId = updates.toAccountId;
     let sourceAccountIds = requestedSourceAccountIds;
+    let trackedLabels = requestedTrackedLabels;
     if ((categoryIds || []).length > 0) {
       toAccountId = null;
     } else if (isSet(updates.toAccountId)) {
@@ -1031,6 +1177,14 @@ export const updateLine = async (id, updates, options = {}) => {
     // the caller ASKED for alongside such a change was rejected above.)
     if (isSet(updates.toAccountId) || updates.kind === 'transfer' || updates.kind === 'income') {
       sourceAccountIds = [];
+    }
+    // The mirror image: a line that stops being an income line keeps no label
+    // filter, for the same reason — an allocation has no same-category sibling
+    // for labels to tell it apart from, so a stale filter would sit in the editor
+    // as a setting that changes nothing. (A filter the caller ASKED for alongside
+    // such a change was rejected above.)
+    if (isSet(updates.toAccountId) || updates.kind === 'expense' || updates.kind === 'transfer') {
+      trackedLabels = [];
     }
 
     const fields = [];
@@ -1166,12 +1320,14 @@ export const updateLine = async (id, updates, options = {}) => {
     }
 
     // "No columns changed" is not the same as "nothing to do": the source-account
-    // filter (migration 0024) lives entirely in a junction and pushes no column of
-    // its own, so an update that only narrows a line to one card would otherwise
-    // return here and silently discard the change. The category set happens to be
-    // safe (it also writes the denormalized `category_id` column) but is checked
-    // alongside so the two cannot diverge on the next change.
-    if (fields.length === 0 && categoryIds === undefined && sourceAccountIds === undefined) {
+    // filter (migration 0024) and the label filter (migration 0028) live entirely
+    // in a junction and push no column of their own, so an update that only
+    // narrows a line to one card — or to one label — would otherwise return here
+    // and silently discard the change. The category set happens to be safe (it
+    // also writes the denormalized `category_id` column) but is checked alongside
+    // so they cannot diverge on the next change.
+    if (fields.length === 0 && categoryIds === undefined && sourceAccountIds === undefined
+      && trackedLabels === undefined) {
       return id; // Nothing to update
     }
 
@@ -1187,7 +1343,8 @@ export const updateLine = async (id, updates, options = {}) => {
 
     const sql = `UPDATE budget_plan_lines SET ${fields.join(', ')} WHERE id = ?`;
 
-    if (!splitsHistory && categoryIds === undefined && sourceAccountIds === undefined) {
+    if (!splitsHistory && categoryIds === undefined && sourceAccountIds === undefined
+      && trackedLabels === undefined) {
       await executeQuery(sql, values);
       return targetId;
     }
@@ -1207,6 +1364,9 @@ export const updateLine = async (id, updates, options = {}) => {
       }
       if (sourceAccountIds !== undefined) {
         await writeLineAccountsInTx(db, targetId, sourceAccountIds);
+      }
+      if (trackedLabels !== undefined) {
+        await writeLineLabelsInTx(db, targetId, trackedLabels);
       }
       if (splitsHistory) {
         // Close the superseded version at the month before the edit — the last
@@ -1687,8 +1847,12 @@ export const copyPlan = async (fromMonth, toMonth) => {
           // The clone must track the same SET of categories, not just the primary
           // one the column carries — and the same source-account filter, or a
           // "card only" budget would silently widen to every account next month.
+          // The label filter travels for the same reason: an "Аванс" income line
+          // copied without it would start counting the whole salary category,
+          // which its sibling line already counts.
           await writeLineCategoriesInTx(db, clonedId, line.categoryIds || []);
           await writeLineAccountsInTx(db, clonedId, line.sourceAccountIds || []);
+          await writeLineLabelsInTx(db, clonedId, line.trackedLabels || []);
         }
       });
     } catch (txError) {
@@ -1743,6 +1907,119 @@ export const getMonthDateRange = (month) => {
 };
 
 /**
+ * Income actually received in a month that matches ONE line's income filters,
+ * expressed in `currency`. The income-side counterpart of
+ * {@link calculateSpendingForFilters}, and what gives an income line a per-line
+ * actual (migration 0028).
+ *
+ * The two filters combine by AND, each empty set meaning "any":
+ *   - `categoryIds` — income in these income categories, descendants included
+ *     (the same rule an expense line follows: a parent category IS its subtree),
+ *   - `labels` — income carrying ANY of these labels (OR within the set, see
+ *     {@link matchesAnyLabel}). This is the dimension that separates a salary
+ *     from its advance: they are necessarily the same category, and only the
+ *     label on the operation tells them apart.
+ * Both empty means the line tracks nothing per-line and this returns '0' — the
+ * caller ({@link calculateLineActual}) skips it rather than reporting a zero,
+ * since "no filter" must never be read as "the user's entire income".
+ *
+ * The label test runs in JS, not SQL: labels live delimited inside
+ * `operations.description` (see app/utils/labelUtils.js), so a LIKE would match
+ * "Аванс" inside "Авансовый отчёт". The scan is bounded by the month AND by the
+ * category filter, so it reads one month of income rows at most.
+ *
+ * With `convertAll` on, income from accounts in any currency is converted at the
+ * current rate (offline table first, live fallback) and currencies with no
+ * available rate are dropped; with it off, only income into accounts of
+ * `currency` counts. Same rule as {@link calculateActualIncome}, so a line's
+ * actual and the month's income total answer to the same toggle.
+ *
+ * @param {Object} params
+ * @param {Array<string>} [params.categoryIds] - Income categories to count
+ * @param {Array<string>} [params.labels] - Operation labels to count
+ * @param {string} params.currency - Currency to express the total in
+ * @param {string} params.startDate - Period start (YYYY-MM-DD)
+ * @param {string} params.endDate - Period end (YYYY-MM-DD)
+ * @param {boolean} [params.convertAll=false] - Count income in any currency, converted
+ * @returns {Promise<string>} Total income (decimal string)
+ */
+export const calculateIncomeForFilters = async ({
+  categoryIds = [],
+  labels = [],
+  currency,
+  startDate,
+  endDate,
+  convertAll = false,
+}) => {
+  try {
+    const expandedIds = await expandCategoryIds(categoryIds, true);
+    const filterLabels = uniqueLabels(labels);
+    // Nothing to filter on: summing without a filter would report the month's
+    // whole income as this one line's actual.
+    if (expandedIds.length === 0 && filterLabels.length === 0) return '0';
+
+    const conditions = ["o.type = 'income'", 'o.date >= ?', 'o.date <= ?'];
+    const params = [startDate, endDate];
+    if (expandedIds.length > 0) {
+      conditions.push(`o.category_id IN (${expandedIds.map(() => '?').join(',')})`);
+      params.push(...expandedIds);
+    }
+    if (!convertAll) {
+      conditions.push('a.currency = ?');
+      params.push(currency);
+    }
+    if (filterLabels.length > 0) {
+      // A label-filtered line can never count an unlabelled operation, so those
+      // rows are dropped in SQL rather than parsed and rejected in JS.
+      conditions.push("o.description IS NOT NULL AND o.description != ''");
+    }
+
+    const rows = await queryAll(
+      `SELECT o.amount AS amount, o.description AS description, a.currency AS currency
+       FROM operations o
+       JOIN accounts a ON o.account_id = a.id
+       WHERE ${conditions.join(' AND ')}`,
+      params,
+    );
+
+    // Summed per source currency first, then converted once per currency —
+    // one rate lookup for the whole set, like every other total here.
+    const totalByCurrency = new Map();
+    for (const row of rows || []) {
+      if (filterLabels.length > 0 && !matchesAnyLabel(row.description, filterLabels)) continue;
+      const rowCurrency = row.currency;
+      totalByCurrency.set(
+        rowCurrency,
+        Currency.add(totalByCurrency.get(rowCurrency) || '0', String(row.amount ?? '0')),
+      );
+    }
+
+    const foreignCurrencies = [...totalByCurrency.keys()].filter(c => c !== currency);
+    const rateByCurrency = foreignCurrencies.length > 0
+      ? await fetchRatesToTarget(foreignCurrencies, currency)
+      : new Map();
+
+    let total = '0';
+    for (const [rowCurrency, sum] of totalByCurrency) {
+      if (rowCurrency === currency) {
+        total = Currency.add(total, sum);
+        continue;
+      }
+      const converted = convertWithRateMap(sum, rowCurrency, currency, rateByCurrency);
+      // No rate: the amount cannot be expressed in the display currency, so it is
+      // dropped — the same rule calculateActualIncome follows, so the line and
+      // the month's total never disagree about which operations they could count.
+      if (converted === null) continue;
+      total = Currency.add(total, converted);
+    }
+    return total;
+  } catch (error) {
+    console.error('Failed to calculate income for filters:', error);
+    throw error;
+  }
+};
+
+/**
  * Compute the actual amount tracked by one plan line for a month.
  *
  * - Category- and/or account-filtered line: expense spending matching BOTH
@@ -1757,6 +2034,10 @@ export const getMonthDateRange = (month) => {
  *   ({@link getTransferTotals}; values are in the destination account's currency),
  *   converted into `displayCurrency` regardless of the toggle — a transfer target
  *   in another currency is still part of the plan.
+ * - Income line: the month's income matching its label filter (migration 0028)
+ *   and/or its income categories, via {@link calculateIncomeForFilters}. A line
+ *   with neither tracks nothing per-line and comes back `{ skipped: true }` —
+ *   NOT an actual of zero.
  * - Broken line (every target and filter deleted): `{ broken: true }`.
  *
  * @param {Object} line - Plan line (camelCase, see mapLineFields)
@@ -1772,16 +2053,30 @@ export const calculateLineActual = async (line, month, displayCurrency, convertA
   try {
     const { startDate, endDate } = getMonthDateRange(month);
 
-    // Income lines have no per-line actual: the income section compares the
-    // month's total real income against the sum of the income lines (an income
-    // category, when set, is only context for the row). Reporting a category
-    // "spending" figure for one would be meaningless — and summing them would
-    // double-count against actualIncome.
+    const categoryIds = line.categoryIds ?? (isSet(line.categoryId) ? [line.categoryId] : []);
+
+    // An income line's actual is the income it MATCHES — by label, by income
+    // category, or by both (migration 0028; see calculateIncomeForFilters). A
+    // line with neither still tracks nothing per-line: it only declares part of
+    // the expected income, and the section compares the month's real income
+    // against the sum of those declarations. `skipped` says which of the two it
+    // is, so a caller never reads "no filter" as an actual of zero.
     if (line.kind === 'income') {
-      return { broken: false, actual: '0', skipped: true };
+      const trackedLabels = line.trackedLabels ?? [];
+      if (categoryIds.length === 0 && trackedLabels.length === 0) {
+        return { broken: false, actual: '0', skipped: true };
+      }
+      const actual = await calculateIncomeForFilters({
+        categoryIds,
+        labels: trackedLabels,
+        currency: displayCurrency,
+        startDate,
+        endDate,
+        convertAll,
+      });
+      return { broken: false, actual: String(actual) };
     }
 
-    const categoryIds = line.categoryIds ?? (isSet(line.categoryId) ? [line.categoryId] : []);
     const sourceAccountIds = line.sourceAccountIds ?? [];
     // Either filter alone is a complete budget, and together they intersect —
     // which is why this is one branch rather than a category branch that an
@@ -1995,7 +2290,9 @@ const collectPlanSourceCurrencies = async (lines, startDate, endDate, convertAll
  * @param {boolean} [convertAll=false] - Count operations in any currency, converted
  * @returns {Promise<Object>} {
  *   planId, month, currency, convertAll,
- *   lines: Array<{ lineId, broken, amount, actual, remaining, percentage, isExceeded, status }>,
+ *   lines: Array<{ lineId, broken, amount, actual, remaining, percentage, isExceeded, status }>
+ *     — an income line also carries `tracked`, true when it has a label/category
+ *     filter of its own and therefore a real per-line actual (migration 0028),
  *   groups: Array<{ groupId, amount, childAmount, actual, remaining, percentage, isExceeded,
  *     status, overrideApplied, lineCount }> — one per group with at least one line in
  *     this month (migration 0022). `amount` is the group's override when it has one
@@ -2086,19 +2383,48 @@ export const calculatePlanStatus = async (planId, displayCurrency = null, conver
       }
 
       // Income lines feed the expected-income figure instead of the allocation
-      // total, and have no per-line actual (see calculateLineActual) — the
-      // income section compares actualIncome against their sum as a whole.
+      // total: the section compares actualIncome against their SUM, so their
+      // actuals are deliberately kept out of `totalActual` — a line's actual is
+      // a subset of the month's income, and adding both would count it twice.
+      //
+      // A line that tracks by label and/or income category (migration 0028) does
+      // carry its own actual, which is what lets a salary and its advance each
+      // show how far they have been paid. `tracked` says whether this row has
+      // one; a line with no filter keeps the pre-0028 shape (zero actual, no
+      // progress) and the UI shows it no meter.
       if (line.kind === 'income') {
         hasIncomeLine = true;
         expectedFromLines = Currency.add(expectedFromLines, amount, target);
+        const { actual, skipped } = await calculateLineActual(line, plan.month, target, convertAll);
+        if (skipped) {
+          lineStatuses.push({
+            lineId: line.id,
+            broken: false,
+            amount,
+            actual: '0',
+            remaining: amount,
+            percentage: 0,
+            isExceeded: false,
+            tracked: false,
+            status: 'income',
+          });
+          continue;
+        }
+        // deriveSpendingStatus' arithmetic is direction-agnostic (how much of the
+        // target the figure covers), but its BANDS are not — "danger" at 90% of
+        // an expense budget is 90% of a salary arrived, which is good news. So
+        // the percentage is kept and the band is not: an income row stays
+        // `status: 'income'` and the UI colours a full one as the win it is.
+        const { isExceeded, percentage } = deriveSpendingStatus(actual, amount);
         lineStatuses.push({
           lineId: line.id,
           broken: false,
           amount,
-          actual: '0',
-          remaining: amount,
-          percentage: 0,
-          isExceeded: false,
+          actual,
+          remaining: Currency.subtract(amount, actual, target),
+          percentage,
+          isExceeded,
+          tracked: true,
           status: 'income',
         });
         continue;

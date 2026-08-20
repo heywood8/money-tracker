@@ -24,6 +24,9 @@ import FormInput from '../FormInput';
 import ModalShell from '../ModalShell';
 import CategoryGridSelector from '../CategoryGridSelector';
 import AccountGridSelector from '../AccountGridSelector';
+import LabelInput from '../operations/LabelInput';
+import { parseLabels, serializeLabels, MAX_LABEL_LENGTH } from '../../utils/labelUtils';
+import { getDistinctLabels } from '../../services/OperationsDB';
 import CurrencyChipRow from '../CurrencyChipRow';
 import { SPACING, BORDER_RADIUS, FONT_SIZE, ICON_SIZE } from '../../styles/designTokens';
 import { formatMonthLabel } from '../../utils/monthUtils';
@@ -252,9 +255,12 @@ PanelHeader.propTypes = {
  *     toggle them, and spending in a category's descendants always rolls up (a
  *     parent category IS its subtree — nothing to configure),
  *   - transfer → tracks incoming transfers into ONE destination account (required),
- *   - income   → declares part of the month's expected income; categories are
- *     optional context (income is compared against the month's real income as a
- *     whole, see BudgetPlansDB.calculateLineActual).
+ *   - income   → declares part of the month's expected income, and optionally
+ *     tracks its own actual by income CATEGORY and/or by operation LABEL
+ *     (migration 0028). The label filter is what separates incomes that share a
+ *     category — a salary and its advance — since the category cannot. With
+ *     neither the line has no per-line actual and only feeds the expected-income
+ *     total (see BudgetPlansDB.calculateLineActual).
  * A line links to categories OR a transfer target, never both — enforced here and
  * again in BudgetPlansDB.
  *
@@ -316,6 +322,17 @@ export default function BudgetPlanLineModal({
   // account, which is what every line was before this existed.
   const [sourceAccountIds, setSourceAccountIds] = useState([]);
   const [toAccountId, setToAccountId] = useState(null);
+  // The operation labels an INCOME line counts (migration 0028). Held in
+  // LabelInput's own contract — the serialized description string — and parsed
+  // back into a list only when the line is saved.
+  const [trackedLabelsText, setTrackedLabelsText] = useState('');
+  const [labelSuggestions, setLabelSuggestions] = useState([]);
+  // Ref to the label editor so Save can flush a half-typed label synchronously.
+  // Tapping Save does not reliably blur the field first, and even when it does
+  // the blur's onChangeText lands after this closure has read its state — so a
+  // label typed and not committed would be dropped and the line would save
+  // tracking nothing at all. Same fix, same reason, as OperationModal's.
+  const labelInputRef = useRef(null);
   const [isRecurring, setIsRecurring] = useState(false);
   const [lineCurrency, setLineCurrency] = useState(currency);
   // The envelope this line belongs to (migration 0022), or null for a line that
@@ -381,6 +398,7 @@ export default function BudgetPlanLineModal({
       // Older callers (and stored lines read before 0021) only carry categoryId.
       setCategoryIds(line.categoryIds ?? (line.categoryId != null ? [line.categoryId] : []));
       setSourceAccountIds(line.sourceAccountIds ?? []);
+      setTrackedLabelsText(serializeLabels(line.trackedLabels ?? []));
       setToAccountId(line.toAccountId ?? null);
       setIsRecurring(!!line.isRecurring);
       setLineCurrency(line.currency || currency);
@@ -392,6 +410,7 @@ export default function BudgetPlanLineModal({
       setComment('');
       setCategoryIds([]);
       setSourceAccountIds([]);
+      setTrackedLabelsText('');
       setToAccountId(null);
       setIsRecurring(false);
       setLineCurrency(currency);
@@ -399,6 +418,29 @@ export default function BudgetPlanLineModal({
     }
     setNewGroupName('');
   }, [visible, line, initialKind, currency]);
+
+  // Label suggestions for an income line's filter — the labels already in use on
+  // real operations, so the filter is picked from what exists rather than typed
+  // from memory and silently matching nothing. Ranked with the labels used in the
+  // line's own income category first, exactly as the operation editor ranks them.
+  // A transient DB error leaves the previous list in place (no setState in catch)
+  // rather than emptying the strip.
+  useEffect(() => {
+    if (!visible || kind !== 'income') return undefined;
+    let cancelled = false;
+    getDistinctLabels(50, categoryIds[0] ?? null)
+      // A label longer than the cap would be clamped by the editor on the way in
+      // (sanitizeLabel), while the stored one on the operation is deliberately
+      // left full length — so the truncated copy could never match anything and
+      // the line would sit at 0% with no way to see why. Legacy imported
+      // descriptions are the ones that reach that length; they are simply not
+      // offered rather than offered as a filter that cannot work.
+      .then(results => {
+        if (!cancelled) setLabelSuggestions(results.filter(l => l.length <= MAX_LABEL_LENGTH));
+      })
+      .catch(() => {});
+    return () => { cancelled = true; };
+  }, [visible, kind, categoryIds]);
 
   // Reset subpanel + animations whenever the modal is hidden.
   useEffect(() => {
@@ -511,6 +553,11 @@ export default function BudgetPlanLineModal({
     if (next !== 'expense') {
       setSourceAccountIds([]);
     }
+    // The mirror image: only an income line separates same-category incomes by
+    // label, so an allocation carries no label filter (BudgetPlansDB rejects one).
+    if (next !== 'income') {
+      setTrackedLabelsText('');
+    }
     if (next === 'transfer') {
       setCategoryIds([]);
     } else {
@@ -545,8 +592,9 @@ export default function BudgetPlanLineModal({
     setToAccountId(id);
     setCategoryIds([]);
     // A transfer line tracks incoming transfers, not expenses — same reason
-    // handleSelectKind clears it.
+    // handleSelectKind clears it, and the same for the label filter.
     setSourceAccountIds([]);
+    setTrackedLabelsText('');
     setKind('transfer');
     setError(null);
     closeSubPanel();
@@ -613,6 +661,10 @@ export default function BudgetPlanLineModal({
       setError(t('amount_must_be_greater_than_zero'));
       return;
     }
+    // The editor's own text wins over this component's state — see labelInputRef.
+    const flushedLabels = kind === 'income'
+      ? (labelInputRef.current?.flush() ?? trackedLabelsText)
+      : '';
     onSaveLine({
       kind,
       amount: String(amount),
@@ -623,6 +675,10 @@ export default function BudgetPlanLineModal({
       // omitted) so clearing the filter on an existing line actually clears it:
       // an absent `sourceAccountIds` means "leave it alone" to BudgetPlansDB.
       sourceAccountIds: kind === 'expense' ? sourceAccountIds : [],
+      // Income lines only, and always sent for the same reason as the filter
+      // above: an absent `trackedLabels` means "leave it alone" to BudgetPlansDB,
+      // so clearing the last label off an existing line has to say so explicitly.
+      trackedLabels: kind === 'income' ? parseLabels(flushedLabels) : [],
       toAccountId: kind === 'transfer' ? (toAccountId ?? null) : null,
       isRecurring,
       // A one-off line on the plan's own currency inherits it (null).
@@ -632,7 +688,7 @@ export default function BudgetPlanLineModal({
       groupId: kind === 'income' ? null : groupId,
     });
   }, [saving, kind, amount, amountIsParseable, amountIsPositive, label, comment, categoryIds,
-    sourceAccountIds, toAccountId,
+    sourceAccountIds, trackedLabelsText, toAccountId,
     isRecurring, effectiveCurrency, groupId, onSaveLine, t]);
 
   const handleDelete = useCallback(() => {
@@ -689,6 +745,9 @@ export default function BudgetPlanLineModal({
   }, [sourceAccountIds, accountsById, t]);
 
   const selectedGroup = groupId != null ? groups.find(g => g.id === groupId) : null;
+  // How many labels the income filter currently holds — the hint under it is
+  // only true once there is at least one.
+  const trackedLabelCount = useMemo(() => parseLabels(trackedLabelsText).length, [trackedLabelsText]);
 
   const panelWidth = Dimensions.get('window').width;
   const subPanelTranslateX = subPanelAnim.interpolate({ inputRange: [0, 1], outputRange: [panelWidth, 0] });
@@ -1122,6 +1181,40 @@ export default function BudgetPlanLineModal({
           <Text style={[styles.groupHint, { color: colors.mutedText }]} testID="plan-sources-hint">
             {categoryIds.length > 0 ? t('spending_accounts_hint_with_categories') : t('spending_accounts_hint')}
           </Text>
+        )}
+
+        {/* WHICH operations an income line counts (migration 0028). A salary and
+            its advance are necessarily the same income category, so the category
+            alone cannot tell them apart — the label on the operation can, and
+            this is where the line says which labels are its own. Left empty the
+            line behaves exactly as before: it declares part of the expected
+            income and has no per-line actual. */}
+        {kind === 'income' && (
+          <View testID="plan-tracked-labels">
+            <Text style={[styles.fieldLabel, { color: colors.mutedText }]}>
+              {t('tracked_labels')} · {t('optional')}
+            </Text>
+            <LabelInput
+              ref={labelInputRef}
+              value={trackedLabelsText}
+              onChangeText={setTrackedLabelsText}
+              suggestions={labelSuggestions}
+              placeholder={t('add_label_placeholder')}
+              colors={colors}
+              t={t}
+            />
+            {/* Only once labels are actually set: before that there is nothing
+                the hint could describe, and the AND wording would be a claim
+                about a filter the line does not have. */}
+            {trackedLabelCount > 0 && (
+              <Text
+                style={[styles.groupHint, { color: colors.mutedText }]}
+                testID="plan-tracked-labels-hint"
+              >
+                {categoryIds.length > 0 ? t('tracked_labels_hint_with_categories') : t('tracked_labels_hint')}
+              </Text>
+            )}
+          </View>
         )}
 
         <Text style={[styles.fieldLabel, { color: colors.mutedText }]}>

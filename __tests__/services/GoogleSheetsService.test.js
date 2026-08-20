@@ -645,7 +645,7 @@ describe('GoogleSheetsService', () => {
       const sheets = buildSheetsData(mockBackup);
       const lines = sheets.find(s => s.range === 'Budget Plan Lines!A1');
       const header = lines.values[0];
-      expect(header).toEqual(['id', 'plan_id', 'label', 'amount', 'comment', 'category', 'account', 'category_id', 'to_account_id', 'sort_order', 'is_recurring', 'currency', 'kind', 'execution_account', 'account_id', 'last_executed_month', 'categories', 'category_ids', 'include_children', 'group', 'group_id', 'spending_accounts', 'spending_account_ids', 'effective_from', 'effective_to']);
+      expect(header).toEqual(['id', 'plan_id', 'label', 'amount', 'comment', 'category', 'account', 'category_id', 'to_account_id', 'sort_order', 'is_recurring', 'currency', 'kind', 'execution_account', 'account_id', 'last_executed_month', 'categories', 'category_ids', 'include_children', 'group', 'group_id', 'spending_accounts', 'spending_account_ids', 'effective_from', 'effective_to', 'tracked_labels']);
 
       const catRow = lines.values.find(r => r[0] === 'line-cat');
       expect(catRow[header.indexOf('category')]).toBe('Food');
@@ -771,6 +771,83 @@ describe('GoogleSheetsService', () => {
         { line_id: 'line-ids', account_id: '2' },
         { line_id: 'line-names', account_id: '2' },
       ]);
+    });
+
+    // Migration 0028: the income line's label filter — one column, written with
+    // the label delimiter rather than the semicolon the two-column references use.
+    it('round-trips a label filter, including a label containing a semicolon', () => {
+      const backup = {
+        ...mockBackup,
+        data: {
+          ...mockBackup.data,
+          budget_plan_line_labels: [
+            { line_id: 'line-cat', label: 'Аванс' },
+            { line_id: 'line-cat', label: 'Bonus; Q3' },
+          ],
+        },
+      };
+      const sheets = buildSheetsData(backup);
+      const lines = sheets.find(s => s.range === 'Budget Plan Lines!A1');
+      const header = lines.values[0];
+      const row = lines.values.find(r => r[0] === 'line-cat');
+      expect(row[header.indexOf('tracked_labels')]).toBe('Аванс | Bonus; Q3');
+      // A line with no filter exports a blank cell — "not tracked by label".
+      const xfer = lines.values.find(r => r[0] === 'line-xfer');
+      expect(xfer[header.indexOf('tracked_labels')]).toBe('');
+    });
+
+    it('reads a label filter back, splitting on the delimiter and not on semicolons', async () => {
+      getPreference.mockResolvedValue('sheet-id-123');
+      mockFetch.mockResolvedValue({
+        ok: true,
+        json: async () => ({
+          valueRanges: [
+            { range: 'Accounts!A1:D2', values: [['id', 'name', 'balance', 'currency'], ['1', 'Savings', '0', 'USD']] },
+            { range: 'Categories!A1:B2', values: [['id', 'name', 'type', 'category_type', 'icon', 'parent_id', 'color', 'is_shadow'], ['inc-1', 'Salary', 'entry', 'income', 'cash', '', '', '0']] },
+            { range: 'Budget Plans!A1:D2', values: [['id', 'month', 'currency', 'expected_income'], ['plan-1', '2026-07', 'USD', '3000.00']] },
+            {
+              range: 'Budget Plan Lines!A1:Z3',
+              values: [
+                ['id', 'plan_id', 'label', 'amount', 'comment', 'category', 'account', 'category_id', 'to_account_id', 'sort_order', 'is_recurring', 'currency', 'kind', 'execution_account', 'account_id', 'last_executed_month', 'categories', 'category_ids', 'include_children', 'group', 'group_id', 'spending_accounts', 'spending_account_ids', 'effective_from', 'effective_to', 'tracked_labels'],
+                ['line-adv', 'plan-1', 'Advance', '220000', '', '', '', '', '', '0', '0', '', 'income', '', '', '', '', '', '', '', '', '', '', '', '', 'Аванс | Bonus; Q3'],
+                ['line-plain', 'plan-1', 'Salary', '240000', '', '', '', '', '', '1', '0', '', 'income', '', '', '', '', '', '', '', '', '', '', '', '', ''],
+              ],
+            },
+          ],
+        }),
+      });
+
+      const backup = await importFromSheets('token');
+
+      expect(backup.data.budget_plan_line_labels).toEqual([
+        { line_id: 'line-adv', label: 'Аванс' },
+        { line_id: 'line-adv', label: 'Bonus; Q3' },
+      ]);
+    });
+
+    it('yields no label filters for a pre-0028 spreadsheet', async () => {
+      getPreference.mockResolvedValue('sheet-id-123');
+      mockFetch.mockResolvedValue({
+        ok: true,
+        json: async () => ({
+          valueRanges: [
+            { range: 'Accounts!A1:D2', values: [['id', 'name', 'balance', 'currency'], ['1', 'Savings', '0', 'USD']] },
+            { range: 'Categories!A1:B2', values: [['id', 'name', 'type', 'category_type', 'icon', 'parent_id', 'color', 'is_shadow'], ['cat-1', 'Food', 'entry', 'expense', 'food', '', '', '0']] },
+            { range: 'Budget Plans!A1:D2', values: [['id', 'month', 'currency', 'expected_income'], ['plan-1', '2026-07', 'USD', '3000.00']] },
+            {
+              range: 'Budget Plan Lines!A1:L2',
+              values: [
+                ['id', 'plan_id', 'label', 'amount', 'comment', 'category', 'account', 'category_id', 'to_account_id', 'sort_order', 'is_recurring', 'currency'],
+                ['line-cat', 'plan-1', 'Groceries', '400', '', 'Food', '', 'cat-1', '', '0', '0', ''],
+              ],
+            },
+          ],
+        }),
+      });
+
+      const backup = await importFromSheets('token');
+
+      expect(backup.data.budget_plan_line_labels).toEqual([]);
     });
 
     it('yields no spending-account filters for a pre-0024 spreadsheet', async () => {

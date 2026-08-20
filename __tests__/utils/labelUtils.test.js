@@ -12,6 +12,7 @@ import {
   addLabel,
   removeLabel,
   matchesAllLabels,
+  matchesAnyLabel,
   isSystemLabel,
   isHiddenLabel,
   visibleListLabels,
@@ -269,6 +270,34 @@ describe('labelUtils', () => {
     it('matches a legacy [MoneyOK] segment as a filterable label', () => {
       expect(matchesAllLabels('[MoneyOK] | groceries', ['[MoneyOK]'])).toBe(true);
       expect(matchesAllLabels('[MoneyOK] | groceries', ['groceries'])).toBe(true);
+    });
+  });
+
+  describe('matchesAnyLabel', () => {
+    it('matches when at least one filter label is present (OR)', () => {
+      expect(matchesAnyLabel('salary | november', ['advance', 'salary'])).toBe(true);
+    });
+    it('does not match when none of the filter labels are present', () => {
+      expect(matchesAnyLabel('salary | november', ['advance', 'bonus'])).toBe(false);
+    });
+    it('is case-insensitive', () => {
+      expect(matchesAnyLabel('Аванс | ноябрь', ['аванс'])).toBe(true);
+    });
+    it('matches NOTHING for an empty filter (unlike matchesAllLabels)', () => {
+      expect(matchesAnyLabel('salary', [])).toBe(false);
+      expect(matchesAnyLabel('salary', null)).toBe(false);
+    });
+    it('does not match an operation with no labels', () => {
+      expect(matchesAnyLabel('', ['salary'])).toBe(false);
+      expect(matchesAnyLabel(null, ['salary'])).toBe(false);
+    });
+    it('normalizes the filter label before comparing', () => {
+      expect(matchesAnyLabel('salary advance', ['  salary   advance '])).toBe(true);
+    });
+    it('does not match a label that merely contains the filter as a substring', () => {
+      // The whole point of parsing labels instead of running a LIKE over the
+      // description: "Аванс" must not be found inside "Авансовый отчёт".
+      expect(matchesAnyLabel('Авансовый отчёт', ['Аванс'])).toBe(false);
     });
   });
 
