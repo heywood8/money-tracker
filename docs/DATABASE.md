@@ -264,6 +264,12 @@ already counts whole — but the row gets its own progress. That is what lets a
 salary and its advance, which necessarily share one income category, each show
 how far they have been paid.
 
+Note what this changed for lines that already existed: a category on an income
+line used to be context nothing counted, and now it tracks that category's
+income. Such a line starts showing a per-line actual after the upgrade, and two
+of them sharing one category each report the whole category's income until they
+are separated by label. An income line with no category is untouched.
+
 ```javascript
 {
   id: TEXT PRIMARY KEY,

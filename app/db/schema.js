@@ -370,8 +370,15 @@ export const budgetPlans = sqliteTable('budget_plans', {
  * Income lines (`kind` = 'income') are the plan's expected income: their sum
  * replaces the stored `budget_plans.expected_income` (kept, append-only, but no
  * longer written or read by the app after migration 0020 bridges it into lines).
- * They are NOT counted in `allocated` and get no per-line actual — the income
- * section compares the month's real income against their total.
+ * They are never counted in `allocated`, and the income section compares the
+ * month's real income against their total.
+ *
+ * Since migration 0028 an income line may ALSO carry a per-line actual, tracking
+ * income by its categories and/or its labels (`budget_plan_line_labels`). That
+ * actual stays out of the plan's `totalActual` — it is a subset of the month's
+ * income, which the section already counts whole — and only feeds the row's own
+ * progress. A line with neither filter has no actual at all, which is what every
+ * income line was before 0028.
  */
 export const budgetPlanLines = sqliteTable('budget_plan_lines', {
   id: text('id').primaryKey(),

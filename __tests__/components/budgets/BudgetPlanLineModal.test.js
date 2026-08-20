@@ -423,6 +423,46 @@ describe('BudgetPlanLineModal', () => {
       }));
     });
 
+    it('keeps a label typed but not committed when Save is tapped', async () => {
+      // Tapping Save does not reliably blur the field first, so a label left
+      // half-typed used to vanish and the line saved tracking nothing.
+      const props = { ...baseProps(), initialKind: 'income' };
+      const { getByTestId } = await render(<BudgetPlanLineModal {...props} />);
+      await waitFor(() => expect(getByTestId('label-input-field')).toBeTruthy());
+      await fireEvent.changeText(getByTestId('label-input-field'), 'Аванс');
+      await fireEvent.changeText(getByTestId('plan-line-amount'), '220000');
+      await fireEvent.press(getByTestId('plan-line-save'));
+
+      expect(props.onSaveLine).toHaveBeenCalledWith(expect.objectContaining({
+        trackedLabels: ['Аванс'],
+      }));
+    });
+
+    it('explains the AND only once labels are actually set', async () => {
+      const props = { ...baseProps(), initialKind: 'income' };
+      const { getByTestId, queryByTestId } = await render(<BudgetPlanLineModal {...props} />);
+      await waitFor(() => expect(getByTestId('label-input-field')).toBeTruthy());
+      // An empty filter has nothing for the hint to describe.
+      expect(queryByTestId('plan-tracked-labels-hint')).toBeNull();
+      await fireEvent.changeText(getByTestId('label-input-field'), 'Аванс');
+      await fireEvent(getByTestId('label-input-field'), 'submitEditing');
+      await waitFor(() => expect(getByTestId('plan-tracked-labels-hint')).toBeTruthy());
+    });
+
+    it('does not offer a suggestion too long to survive the editor', async () => {
+      // A stored label longer than the cap is left full length on the operation,
+      // but sanitizeLabel clamps it on the way into a filter — so the clamped
+      // copy could never match and the line would sit at 0% with no clue why.
+      const tooLong = 'x'.repeat(61);
+      mockGetDistinctLabels.mockResolvedValueOnce(['Аванс', tooLong]);
+      const props = { ...baseProps(), initialKind: 'income' };
+      const { getByTestId, queryByTestId } = await render(<BudgetPlanLineModal {...props} />);
+      await waitFor(() => expect(getByTestId('label-input-field')).toBeTruthy());
+      await fireEvent(getByTestId('label-input-field'), 'focus');
+      await waitFor(() => expect(getByTestId('label-suggestion-Аванс')).toBeTruthy());
+      expect(queryByTestId(`label-suggestion-${tooLong}`)).toBeNull();
+    });
+
     it('opens an existing line on the labels it already tracks', async () => {
       const props = {
         ...baseProps(),

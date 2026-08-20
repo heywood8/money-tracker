@@ -1,6 +1,7 @@
 import { GoogleSignin, statusCodes } from '@react-native-google-signin/google-signin';
 import { getPreference, setPreference, PREF_KEYS } from './PreferencesDB';
 import { queryAll } from './db';
+import { parseLabels, serializeLabels } from '../utils/labelUtils';
 
 const SHEETS_API = 'https://sheets.googleapis.com/v4/spreadsheets';
 
@@ -116,9 +117,12 @@ export const buildSheetsData = (backup) => {
     else accountIdsByLine.set(link.line_id, [link.account_id]);
   }
 
-  // A line's label filter (migration 0028), same shape and same semicolon join.
-  // Labels are plain text, so unlike the two above there is only ONE column —
-  // there is no id to carry alongside the readable name; the label IS both.
+  // A line's label filter (migration 0028). ONE column, unlike the two above:
+  // there is no id to carry alongside the readable name — the label IS both,
+  // which also means a mis-split cell has nothing to fall back on. So this is
+  // the one list NOT joined on ';' (a label may contain one) but on the label
+  // delimiter itself — the character labelUtils guarantees no label holds, and
+  // the same one an operation's own description is written with.
   const labelsByLine = new Map();
   for (const link of budget_plan_line_labels || []) {
     if (!link.line_id || link.label == null || link.label === '') continue;
@@ -241,7 +245,7 @@ export const buildSheetsData = (backup) => {
             l.effective_to || '',
             // The label filter (migration 0028): which operations an income line
             // counts. Blank means "not tracked by label".
-            trackedLabels.join(';'),
+            serializeLabels(trackedLabels),
           ];
         }),
       ],
@@ -598,16 +602,17 @@ export const importFromSheets = async (accessToken, onProgress) => {
   // need: a label is its own identity, so there is nothing to map — the cell's
   // text IS what gets stored and matched against operations. A sheet without the
   // column was written before 0028 and its lines were tracked by nothing.
+  // A hand-typed cell reads the same way an operation's description does, so
+  // "Аванс | Advance" is two labels however the person spaced it.
   const budget_plan_line_labels = [];
   for (let i = 0; i < budgetPlanLineRows.length; i++) {
     const row = budgetPlanLineRows[i];
     const line = budget_plan_lines[i];
     if (!line.id) continue;
-    const seen = new Set();
-    for (const label of splitList(row.tracked_labels)) {
-      const key = label.toLowerCase();
-      if (seen.has(key)) continue;
-      seen.add(key);
+    // parseLabels, not splitList: the cell is written with the label delimiter
+    // (see buildSheetsData) precisely so a label containing a semicolon survives
+    // the round trip, and it de-duplicates case-insensitively on the way in.
+    for (const label of parseLabels(row.tracked_labels)) {
       budget_plan_line_labels.push({ line_id: line.id, label });
     }
   }

@@ -30,8 +30,17 @@
  * renaming a label on an operation simply stops that operation from counting.
  *
  * No backfill: no line could carry labels before, so every existing line starts
- * with an empty set, which means "not tracked by label" — its actual is
- * unchanged.
+ * with an empty set, which means "not tracked by label".
+ *
+ * That is NOT the same as "nothing changes for an existing line". This migration
+ * also gives an income line's CATEGORY set a meaning it did not have — until now
+ * a category on an income line was context for the row and nothing counted it,
+ * and from here it tracks that category's income the way an expense line tracks
+ * its own. So an income line already carrying a category starts showing a
+ * per-line actual after the upgrade, and two such lines sharing one category
+ * (the salary/advance case this feature exists for) each report the whole
+ * category's income until the user separates them by label. An income line with
+ * no category is untouched: it still only declares expected income.
  *
  * Append-only: never edit or revert an existing migration. This migration is also
  * registered in app/services/db.js (isSchemaComplete + detectAppliedMigrations),

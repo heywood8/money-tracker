@@ -590,6 +590,16 @@ const MonthlyPlanSection = forwardRef(function MonthlyPlanSection({
   const lineDisplayName = useCallback((line) => {
     if (line.label) return line.label;
     const categoryIds = line.categoryIds ?? (line.categoryId != null ? [line.categoryId] : []);
+    // An income line names its LABELS ahead of its category, because the labels
+    // are what tell it apart: a salary and its advance necessarily share one
+    // income category, so naming both rows after it puts two identical titles on
+    // the screen — the very ambiguity the label filter exists to remove.
+    const trackedLabels = line.trackedLabels ?? [];
+    if (line.kind === 'income' && trackedLabels.length > 0) {
+      return trackedLabels.length > 1
+        ? `${trackedLabels[0]} +${trackedLabels.length - 1}`
+        : trackedLabels[0];
+    }
     if (categoryIds.length > 0) {
       const first = categoriesById.get(categoryIds[0])?.name || t('allocation_unlinked');
       // A multi-category line names its first category and counts the rest, the
@@ -605,15 +615,6 @@ const MonthlyPlanSection = forwardRef(function MonthlyPlanSection({
     if (sourceAccountIds.length > 0) {
       const first = accountsById.get(sourceAccountIds[0])?.name || t('allocation_unlinked');
       return sourceAccountIds.length > 1 ? `${first} +${sourceAccountIds.length - 1}` : first;
-    }
-    // An income line tracked purely by label has no category or account to
-    // borrow a name from, so it names its labels — which is exactly what the
-    // user typed to tell it apart from its same-category sibling.
-    const trackedLabels = line.trackedLabels ?? [];
-    if (trackedLabels.length > 0) {
-      return trackedLabels.length > 1
-        ? `${trackedLabels[0]} +${trackedLabels.length - 1}`
-        : trackedLabels[0];
     }
     if (line.kind === 'income') return t('expected_income');
     return t('allocation_unlinked');
@@ -850,14 +851,15 @@ const MonthlyPlanSection = forwardRef(function MonthlyPlanSection({
   const lineIcon = useCallback((line) => {
     if (line.isBroken) return 'link-off';
     if (line.toAccountId != null) return 'bank-transfer';
+    // Ahead of the category icon, for the reason lineDisplayName prefers the
+    // labels: two same-category income rows would otherwise draw the same glyph
+    // next to the same name.
+    if (line.kind === 'income' && line.trackedLabels?.length) return 'tag-outline';
     const categoryIcon = categoriesById.get(line.categoryId)?.icon;
     if (categoryIcon) return categoryIcon;
     // An account-only line has no category icon to show; the card glyph says at
     // a glance that this row is scoped to where the money left from.
     if (line.sourceAccountIds?.length) return 'credit-card-outline';
-    // Nor has a label-tracked income line; the tag glyph says what this row
-    // counts by, the way the card glyph does for an account-scoped one.
-    if (line.trackedLabels?.length) return 'tag-outline';
     return line.kind === 'income' ? 'cash-plus' : 'shape-outline';
   }, [categoriesById]);
 

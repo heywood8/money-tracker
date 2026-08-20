@@ -455,6 +455,22 @@ describe('MonthlyPlanSection', () => {
       const { getByText } = await renderSection();
       await waitFor(() => expect(getByText('Аванс +1')).toBeTruthy());
     });
+
+    it('names two same-category lines after their labels, not the shared category', async () => {
+      // The whole point: naming both rows after the income category they must
+      // share puts two identical titles on the screen.
+      setIncomePlan(
+        [
+          incomeLine('adv', '220', { categoryIds: ['inc1'], categoryId: 'inc1', trackedLabels: ['Аванс'] }),
+          incomeLine('sal', '240', { categoryIds: ['inc1'], categoryId: 'inc1', trackedLabels: ['Зарплата'], sortOrder: 1 }),
+        ],
+        [],
+      );
+      const { getByText, queryByText } = await renderSection();
+      await waitFor(() => expect(getByText('Аванс')).toBeTruthy());
+      expect(getByText('Зарплата')).toBeTruthy();
+      expect(queryByText('Salary')).toBeNull();
+    });
   });
 
   describe('Plan vs actual', () => {

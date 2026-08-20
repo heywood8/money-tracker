@@ -25,7 +25,7 @@ import ModalShell from '../ModalShell';
 import CategoryGridSelector from '../CategoryGridSelector';
 import AccountGridSelector from '../AccountGridSelector';
 import LabelInput from '../operations/LabelInput';
-import { parseLabels, serializeLabels } from '../../utils/labelUtils';
+import { parseLabels, serializeLabels, MAX_LABEL_LENGTH } from '../../utils/labelUtils';
 import { getDistinctLabels } from '../../services/OperationsDB';
 import CurrencyChipRow from '../CurrencyChipRow';
 import { SPACING, BORDER_RADIUS, FONT_SIZE, ICON_SIZE } from '../../styles/designTokens';
@@ -327,6 +327,12 @@ export default function BudgetPlanLineModal({
   // back into a list only when the line is saved.
   const [trackedLabelsText, setTrackedLabelsText] = useState('');
   const [labelSuggestions, setLabelSuggestions] = useState([]);
+  // Ref to the label editor so Save can flush a half-typed label synchronously.
+  // Tapping Save does not reliably blur the field first, and even when it does
+  // the blur's onChangeText lands after this closure has read its state — so a
+  // label typed and not committed would be dropped and the line would save
+  // tracking nothing at all. Same fix, same reason, as OperationModal's.
+  const labelInputRef = useRef(null);
   const [isRecurring, setIsRecurring] = useState(false);
   const [lineCurrency, setLineCurrency] = useState(currency);
   // The envelope this line belongs to (migration 0022), or null for a line that
@@ -423,7 +429,15 @@ export default function BudgetPlanLineModal({
     if (!visible || kind !== 'income') return undefined;
     let cancelled = false;
     getDistinctLabels(50, categoryIds[0] ?? null)
-      .then(results => { if (!cancelled) setLabelSuggestions(results); })
+      // A label longer than the cap would be clamped by the editor on the way in
+      // (sanitizeLabel), while the stored one on the operation is deliberately
+      // left full length — so the truncated copy could never match anything and
+      // the line would sit at 0% with no way to see why. Legacy imported
+      // descriptions are the ones that reach that length; they are simply not
+      // offered rather than offered as a filter that cannot work.
+      .then(results => {
+        if (!cancelled) setLabelSuggestions(results.filter(l => l.length <= MAX_LABEL_LENGTH));
+      })
       .catch(() => {});
     return () => { cancelled = true; };
   }, [visible, kind, categoryIds]);
@@ -647,6 +661,10 @@ export default function BudgetPlanLineModal({
       setError(t('amount_must_be_greater_than_zero'));
       return;
     }
+    // The editor's own text wins over this component's state — see labelInputRef.
+    const flushedLabels = kind === 'income'
+      ? (labelInputRef.current?.flush() ?? trackedLabelsText)
+      : '';
     onSaveLine({
       kind,
       amount: String(amount),
@@ -660,7 +678,7 @@ export default function BudgetPlanLineModal({
       // Income lines only, and always sent for the same reason as the filter
       // above: an absent `trackedLabels` means "leave it alone" to BudgetPlansDB,
       // so clearing the last label off an existing line has to say so explicitly.
-      trackedLabels: kind === 'income' ? parseLabels(trackedLabelsText) : [],
+      trackedLabels: kind === 'income' ? parseLabels(flushedLabels) : [],
       toAccountId: kind === 'transfer' ? (toAccountId ?? null) : null,
       isRecurring,
       // A one-off line on the plan's own currency inherits it (null).
@@ -727,6 +745,9 @@ export default function BudgetPlanLineModal({
   }, [sourceAccountIds, accountsById, t]);
 
   const selectedGroup = groupId != null ? groups.find(g => g.id === groupId) : null;
+  // How many labels the income filter currently holds — the hint under it is
+  // only true once there is at least one.
+  const trackedLabelCount = useMemo(() => parseLabels(trackedLabelsText).length, [trackedLabelsText]);
 
   const panelWidth = Dimensions.get('window').width;
   const subPanelTranslateX = subPanelAnim.interpolate({ inputRange: [0, 1], outputRange: [panelWidth, 0] });
@@ -1174,6 +1195,7 @@ export default function BudgetPlanLineModal({
               {t('tracked_labels')} · {t('optional')}
             </Text>
             <LabelInput
+              ref={labelInputRef}
               value={trackedLabelsText}
               onChangeText={setTrackedLabelsText}
               suggestions={labelSuggestions}
@@ -1181,12 +1203,17 @@ export default function BudgetPlanLineModal({
               colors={colors}
               t={t}
             />
-            <Text
-              style={[styles.groupHint, { color: colors.mutedText }]}
-              testID="plan-tracked-labels-hint"
-            >
-              {categoryIds.length > 0 ? t('tracked_labels_hint_with_categories') : t('tracked_labels_hint')}
-            </Text>
+            {/* Only once labels are actually set: before that there is nothing
+                the hint could describe, and the AND wording would be a claim
+                about a filter the line does not have. */}
+            {trackedLabelCount > 0 && (
+              <Text
+                style={[styles.groupHint, { color: colors.mutedText }]}
+                testID="plan-tracked-labels-hint"
+              >
+                {categoryIds.length > 0 ? t('tracked_labels_hint_with_categories') : t('tracked_labels_hint')}
+              </Text>
+            )}
           </View>
         )}
 
