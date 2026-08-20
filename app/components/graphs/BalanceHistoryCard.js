@@ -741,10 +741,17 @@ const BalanceChart = ({
   const { state: pressState, isActive } = useChartPressState(pressInit);
   const { state: transformState } = useChartTransformState();
 
+  // Read the press flag inside the reaction rather than the x value alone. The
+  // press state starts at x = 0 and the reaction fires once on mount, so an
+  // ungated reaction reported "day 0" before the chart had ever been touched —
+  // and the reset below could not undo it, because that runOnJS lands after the
+  // mount effect has already run. Gating on the shared `isActive` (not the
+  // JS-thread mirror, which trails it by a frame) emits null until a finger is
+  // actually down and null again the moment it lifts.
   useAnimatedReaction(
-    () => pressState.x.value.value,
+    () => (pressState.isActive.value ? Math.round(pressState.x.value.value) : null),
     (current, previous) => {
-      if (current !== previous) runOnJS(onScrub)(Math.round(current));
+      if (current !== previous) runOnJS(onScrub)(current);
     },
     [onScrub],
   );
