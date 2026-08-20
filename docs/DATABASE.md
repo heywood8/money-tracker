@@ -253,9 +253,16 @@ one:
   and the Sheets export), and existing values are left where they are.
 
 Income lines declare the month's expected income: they are excluded from the
-allocation total and have no per-line actual (the income section compares their
-sum against the month's real income). They are the only lines allowed to have no
-tracking target.
+allocation total, and their sum is what the income section compares the month's
+real income against. They are the only lines allowed to have no tracking target.
+
+Since **migration 0028** an income line may also carry its own actual, by
+tracking income CATEGORIES and/or operation LABELS
+(`budget_plan_line_labels`, see below). Its actual is still kept out of the
+allocation totals — it is a subset of the month's income, which the section
+already counts whole — but the row gets its own progress. That is what lets a
+salary and its advance, which necessarily share one income category, each show
+how far they have been paid.
 
 ```javascript
 {
@@ -319,6 +326,9 @@ longer expresses a choice — descendant spending always rolls up.
 Since **migration 0024** a line may also narrow spending by the SOURCE account
 the money left from, via the `budget_plan_line_accounts` junction. See below.
 
+Since **migration 0028** an INCOME line may narrow what it counts by operation
+LABEL, via the `budget_plan_line_labels` junction. See below.
+
 ### 10. budget_plan_line_accounts (migration 0024)
 
 The set of source accounts whose expenses count toward a line — matched against
@@ -359,7 +369,50 @@ not expenses) and on an income line (which has no per-line actual), so
 
 **Indexes**: `account_id`
 
-### 11. budget_plan_line_groups (migration 0022)
+### 11. budget_plan_line_labels (migration 0028)
+
+The set of operation labels whose income counts toward a line — matched against
+the labels parsed out of `operations.description` (see `app/utils/labelUtils.js`).
+An empty set (the default, and what every pre-0028 line has) means "not tracked
+by label", so nothing about an existing line changed.
+
+Offered on **income lines only**. Category was the only dimension a line had, and
+a salary and its advance are the same income category — so the two lines were
+indistinguishable to anything that counts, and the Budgets tab could only compare
+the month's income against their sum. The label on the operation is what tells
+them apart.
+
+Several labels are an **OR** (any of them counts), and the set combines with the
+line's categories by **AND**:
+
+| categories | labels | the income line's actual counts |
+|---|---|---|
+| set | empty | all income in those categories (descendants included) |
+| empty | set | all income carrying any of those labels |
+| set | set | the intersection of the two |
+| empty | empty | nothing per-line — the line only declares expected income |
+
+`label` is the label TEXT, not a foreign key: a label is free text inside a
+description, there is no labels table to reference. It is stored as the user
+typed it and matched case-insensitively, with case-variants de-duplicated on
+write so the composite primary key holds. Control characters are stripped on
+write, since the line SELECT joins the set with the ASCII unit separator (a comma
+would be ambiguous — a label may contain one).
+
+Only the line side cascades: deleting a line drops its labels, and re-labelling
+an operation simply stops that operation counting.
+
+```javascript
+{
+  line_id: TEXT NOT NULL REFERENCES budget_plan_lines(id) ON DELETE CASCADE,
+  label: TEXT NOT NULL,
+  PRIMARY KEY (line_id, label)
+}
+```
+
+**Indexes**: `label`
+
+### 12. budget_plan_line_groups (migration 0022)
 
 An envelope over several `budget_plan_lines`. Members may mix category targets
 from unrelated trees with transfer targets, and recurring lines with one-off

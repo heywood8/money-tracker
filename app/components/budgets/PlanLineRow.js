@@ -30,9 +30,11 @@ const FILL_ALPHA = '99'; // ~60%
  * per-category budget and the plan allocation. It renders:
  *   - what is LEFT of the target (the figure a person acts on), with the
  *     actual/target pair under it as the supporting detail,
- *   - plan-vs-actual progress as a bar for expense/transfer lines (income lines
- *     are compared as a whole against the month's real income, so they get no
- *     bar).
+ *   - plan-vs-actual progress as a bar, for any line that tracks something: an
+ *     expense/transfer line always, and an income line once it has a label or
+ *     category filter of its own (migration 0028). An income line with neither
+ *     only declares part of the expected income — there is nothing per-line to
+ *     compare it against — so it gets no bar.
  *
  * Memoized because a row is nontrivial to build, so rows whose props are
  * unchanged (the common case when an unrelated bit of the section's state
@@ -50,6 +52,7 @@ const PlanLineRow = memo(function PlanLineRow({
   colors,
   t,
   showProgress = true,
+  overflowIsPositive = false,
   indented = false,
   envelopeColor = null,
   listLength,
@@ -135,8 +138,15 @@ const PlanLineRow = memo(function PlanLineRow({
   // — barely started, half gone, nearly spent — is said by the bar's length,
   // because colouring those too is how the previous design ended up with ten
   // tinted rows and no hierarchy.
+  //
+  // WHICH colour depends on which way the row points. Past the target is bad news
+  // on a budget and good news on an income line — a salary that came in above
+  // plan is not an overspend — so an income row paints its overflow in the
+  // income colour instead. Same shape, opposite meaning, and the row says which
+  // rather than leaving a red bar to be misread as a problem.
   const overspent = remaining != null && Currency.isNegative(remaining);
-  const primaryColor = overspent ? colors.overspend : colors.text;
+  const overflowColor = overflowIsPositive ? colors.income : colors.overspend;
+  const primaryColor = overspent ? overflowColor : colors.text;
 
   // The scope moved from a text line into a glyph, and the amount pair moved
   // below the figure it supports — neither of which a screen reader conveys by
@@ -235,7 +245,7 @@ const PlanLineRow = memo(function PlanLineRow({
                 ratio={ratio}
                 trackColor={`${colors.mutedText}${TRACK_ALPHA}`}
                 fillColor={`${colors.mutedText}${FILL_ALPHA}`}
-                overspendColor={colors.overspend}
+                overspendColor={overflowColor}
                 testID={`${testIDPrefix}-bar-${line.id}`}
               />
             </View>
@@ -297,6 +307,8 @@ PlanLineRow.propTypes = {
   colors: PropTypes.object.isRequired,
   t: PropTypes.func.isRequired,
   showProgress: PropTypes.bool,
+  // Income rows: past the target is a win, not an overspend — see `overflowColor`.
+  overflowIsPositive: PropTypes.bool,
   indented: PropTypes.bool,
   envelopeColor: PropTypes.string,
   onMove: PropTypes.func,

@@ -20,6 +20,7 @@ const COLORS = {
   altRow: '#16191f',
   warning: '#F2A93B',
   overspend: '#FF6B6B',
+  income: '#66aa66',
 };
 
 jest.mock('../../../app/contexts/ThemeColorsContext', () => ({
@@ -370,6 +371,89 @@ describe('MonthlyPlanSection', () => {
       await waitFor(() => expect(getByTestId('plan-line-l1')).toBeTruthy());
       expect(queryByTestId('plan-remainder-hint')).toBeNull();
       expect(getByTestId('plan-remainder')).toHaveTextContent(/400\.00/);
+    });
+  });
+
+  describe('Income lines tracked by label (migration 0028)', () => {
+    const incomeLine = (id, amount, overrides = {}) => ({
+      id, planId: 'p1', amount, label: null, comment: null, categoryId: null,
+      categoryIds: [], trackedLabels: [], toAccountId: null, kind: 'income',
+      sortOrder: 0, isBroken: false, ...overrides,
+    });
+
+    const setIncomePlan = (lines, lineStatuses) => setPlans({
+      plans: [{ id: 'p1', month: THIS_MONTH, currency: 'USD', expectedIncome: null }],
+      lines,
+      planStatuses: new Map([['p1', {
+        planId: 'p1',
+        month: THIS_MONTH,
+        currency: 'USD',
+        convertAll: false,
+        lines: lineStatuses,
+        totals: {
+          expectedIncome: '460', actualIncome: '350', allocated: '0',
+          totalActual: '0', plannedRemainder: '460', actualRemainder: '350',
+        },
+        unconvertible: [],
+      }]]),
+    });
+
+    it('gives a label-tracked income line its own meter and pair', async () => {
+      setIncomePlan(
+        [incomeLine('adv', '220', { trackedLabels: ['Аванс'] })],
+        [{
+          lineId: 'adv', broken: false, amount: '220', actual: '110', remaining: '110',
+          percentage: 50, isExceeded: false, tracked: true, status: 'income',
+        }],
+      );
+      const { getByTestId } = await renderSection();
+      await waitFor(() => expect(getByTestId('plan-line-adv')).toBeTruthy());
+
+      expect(getByTestId('plan-line-bar-adv')).toBeTruthy();
+      expect(getByTestId('plan-line-pair-adv')).toHaveTextContent('110 / 220');
+      expect(getByTestId('plan-line-primary-adv')).toHaveTextContent('50%');
+    });
+
+    it('leaves an income line that tracks nothing without a meter', async () => {
+      setIncomePlan(
+        [incomeLine('plain', '460')],
+        [{
+          lineId: 'plain', broken: false, amount: '460', actual: '0', remaining: '460',
+          percentage: 0, isExceeded: false, tracked: false, status: 'income',
+        }],
+      );
+      const { getByTestId, queryByTestId } = await renderSection();
+      await waitFor(() => expect(getByTestId('plan-line-plain')).toBeTruthy());
+
+      expect(queryByTestId('plan-line-bar-plain')).toBeNull();
+      expect(getByTestId('plan-line-primary-plain')).toHaveTextContent('460');
+    });
+
+    it('paints income above plan as a win, not an overspend', async () => {
+      setIncomePlan(
+        [incomeLine('sal', '240', { trackedLabels: ['Зарплата'] })],
+        [{
+          lineId: 'sal', broken: false, amount: '240', actual: '300', remaining: '-60',
+          percentage: 125, isExceeded: true, tracked: true, status: 'income',
+        }],
+      );
+      const { getByTestId } = await renderSection();
+      await waitFor(() => expect(getByTestId('plan-line-sal')).toBeTruthy());
+
+      // The overspend segment is drawn (the bar still says "past the target"),
+      // but the figure reads in the income colour rather than the alarm red an
+      // allocation would get.
+      expect(getByTestId('plan-line-bar-sal-over')).toBeTruthy();
+      expect(flatColor(getByTestId('plan-line-primary-sal'))).toBe(COLORS.income);
+    });
+
+    it('names a line that has only labels after them', async () => {
+      setIncomePlan(
+        [incomeLine('adv', '220', { trackedLabels: ['Аванс', 'Advance'] })],
+        [],
+      );
+      const { getByText } = await renderSection();
+      await waitFor(() => expect(getByText('Аванс +1')).toBeTruthy());
     });
   });
 

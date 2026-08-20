@@ -174,8 +174,9 @@ describe('BackupRestore', () => {
       // accounts, categories, operations, budgets, app_metadata, balance_history,
       // planned_operations, notification_merchant_rules, notification_templates,
       // budget_plans, budget_plan_lines, budget_plan_line_categories,
-      // budget_plan_line_groups, budget_plan_line_accounts
-      expect(mockDb.queryAll).toHaveBeenCalledTimes(14);
+      // budget_plan_line_groups, budget_plan_line_accounts,
+      // budget_plan_line_labels
+      expect(mockDb.queryAll).toHaveBeenCalledTimes(15);
     });
 
     it('includes empty arrays when tables are empty', async () => {
@@ -571,18 +572,19 @@ describe('BackupRestore', () => {
       expect(deleteCalls[1]).toContain('notification_templates');
       expect(deleteCalls[2]).toContain('planned_operations');
       expect(deleteCalls[3]).toContain('budgets');
-      // The 0021 and 0024 junctions are cleared before the lines they hang off.
+      // The 0021, 0024 and 0028 junctions are cleared before the lines they hang off.
       expect(deleteCalls[4]).toContain('budget_plan_line_categories');
       expect(deleteCalls[5]).toContain('budget_plan_line_accounts');
-      expect(deleteCalls[6]).toContain('budget_plan_lines');
-      expect(deleteCalls[7]).toContain('budget_plans');
+      expect(deleteCalls[6]).toContain('budget_plan_line_labels');
+      expect(deleteCalls[7]).toContain('budget_plan_lines');
+      expect(deleteCalls[8]).toContain('budget_plans');
       // Groups (migration 0022) are referenced BY lines (ON DELETE SET NULL), so
       // they clear after the lines that point at them.
-      expect(deleteCalls[8]).toContain('budget_plan_line_groups');
-      expect(deleteCalls[9]).toContain('accounts_balance_history');
-      expect(deleteCalls[10]).toContain('operations');
-      expect(deleteCalls[11]).toContain('categories');
-      expect(deleteCalls[12]).toContain('accounts');
+      expect(deleteCalls[9]).toContain('budget_plan_line_groups');
+      expect(deleteCalls[10]).toContain('accounts_balance_history');
+      expect(deleteCalls[11]).toContain('operations');
+      expect(deleteCalls[12]).toContain('categories');
+      expect(deleteCalls[13]).toContain('accounts');
     });
 
     // Regression: a CSV backup structurally cannot carry parse templates (the

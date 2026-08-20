@@ -313,3 +313,24 @@ export const matchesAllLabels = (opDescription, filterLabels) => {
   const opSet = new Set(opLabels);
   return filterLabels.every((l) => opSet.has(normalizeLabel(l).toLowerCase()));
 };
+
+/**
+ * Whether `opDescription` carries AT LEAST ONE of `filterLabels` (OR semantics).
+ * Used by a budget plan line's label filter (migration 0028), where several
+ * labels are alternatives — "count anything tagged Зарплата or Salary" — not a
+ * conjunction the way the operations list's filter reads them.
+ *
+ * An empty filter matches NOTHING (the opposite of {@link matchesAllLabels}): a
+ * line with no labels is not tracked by label at all, so callers gate on the set
+ * being non-empty and this returns the answer consistent with "none of these".
+ * @param {*} opDescription
+ * @param {string[]} filterLabels
+ * @returns {boolean}
+ */
+export const matchesAnyLabel = (opDescription, filterLabels) => {
+  if (!Array.isArray(filterLabels) || filterLabels.length === 0) return false;
+  const opLabels = parseLabels(opDescription).map((l) => l.toLowerCase());
+  if (opLabels.length === 0) return false;
+  const opSet = new Set(opLabels);
+  return filterLabels.some((l) => opSet.has(normalizeLabel(l).toLowerCase()));
+};

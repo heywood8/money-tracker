@@ -30,7 +30,7 @@ export const createBackup = async () => {
     console.log('Creating database backup...');
 
     // Fetch all data from all tables
-    const [accounts, categories, operations, budgets, appMetadata, balanceHistory, plannedOperations, merchantRules, notificationTemplates, budgetPlans, budgetPlanLines, budgetPlanLineCategories, budgetPlanLineGroups, budgetPlanLineAccounts] = await Promise.all([
+    const [accounts, categories, operations, budgets, appMetadata, balanceHistory, plannedOperations, merchantRules, notificationTemplates, budgetPlans, budgetPlanLines, budgetPlanLineCategories, budgetPlanLineGroups, budgetPlanLineAccounts, budgetPlanLineLabels] = await Promise.all([
       queryAll('SELECT * FROM accounts ORDER BY created_at ASC'),
       queryAll('SELECT * FROM categories ORDER BY created_at ASC'),
       queryAll('SELECT * FROM operations ORDER BY created_at ASC'),
@@ -60,6 +60,10 @@ export const createBackup = async () => {
       // above; a pre-0024 backup has no filters and every line restores counting
       // any account, which is exactly what it did.
       queryAll('SELECT * FROM budget_plan_line_accounts ORDER BY line_id ASC, account_id ASC').catch(() => []),
+      // Per-line label filter (migration 0028) — what makes an income line track
+      // a salary apart from its advance. Guarded like the tables above; a
+      // pre-0028 backup has no labels and every line restores untracked by label.
+      queryAll('SELECT * FROM budget_plan_line_labels ORDER BY line_id ASC, label ASC').catch(() => []),
     ]);
 
     // Create backup object
@@ -86,6 +90,7 @@ export const createBackup = async () => {
         budget_plan_line_categories: budgetPlanLineCategories || [],
         budget_plan_line_groups: budgetPlanLineGroups || [],
         budget_plan_line_accounts: budgetPlanLineAccounts || [],
+        budget_plan_line_labels: budgetPlanLineLabels || [],
       },
     };
 
@@ -102,6 +107,7 @@ export const createBackup = async () => {
       budget_plan_line_categories: backup.data.budget_plan_line_categories.length,
       budget_plan_line_groups: backup.data.budget_plan_line_groups.length,
       budget_plan_line_accounts: backup.data.budget_plan_line_accounts.length,
+      budget_plan_line_labels: backup.data.budget_plan_line_labels.length,
     });
 
     return backup;
@@ -143,6 +149,7 @@ const TABLE_FIELDS = {
   // The source-account filter of each line (migration 0024). A line with no rows
   // here counts spending from any account.
   budget_plan_line_accounts: ['line_id', 'account_id'],
+  budget_plan_line_labels: ['line_id', 'label'],
 };
 
 /**
@@ -204,6 +211,7 @@ export const exportBackupCSV = async () => {
       'budget_plan_line_categories.csv': convertToCSV(backup.data.budget_plan_line_categories, TABLE_FIELDS.budget_plan_line_categories),
       'budget_plan_line_groups.csv': convertToCSV(backup.data.budget_plan_line_groups, TABLE_FIELDS.budget_plan_line_groups),
       'budget_plan_line_accounts.csv': convertToCSV(backup.data.budget_plan_line_accounts, TABLE_FIELDS.budget_plan_line_accounts),
+      'budget_plan_line_labels.csv': convertToCSV(backup.data.budget_plan_line_labels, TABLE_FIELDS.budget_plan_line_labels),
       'backup_info.csv': `version,timestamp,platform\n${backup.version},${backup.timestamp},${backup.platform}`,
     };
 
@@ -223,7 +231,8 @@ export const exportBackupCSV = async () => {
     combinedCSV += `[BUDGET_PLAN_LINES]\n${csvFiles['budget_plan_lines.csv']}\n\n`;
     combinedCSV += `[BUDGET_PLAN_LINE_CATEGORIES]\n${csvFiles['budget_plan_line_categories.csv']}\n\n`;
     combinedCSV += `[BUDGET_PLAN_LINE_GROUPS]\n${csvFiles['budget_plan_line_groups.csv']}\n\n`;
-    combinedCSV += `[BUDGET_PLAN_LINE_ACCOUNTS]\n${csvFiles['budget_plan_line_accounts.csv']}\n`;
+    combinedCSV += `[BUDGET_PLAN_LINE_ACCOUNTS]\n${csvFiles['budget_plan_line_accounts.csv']}\n\n`;
+    combinedCSV += `[BUDGET_PLAN_LINE_LABELS]\n${csvFiles['budget_plan_line_labels.csv']}\n`;
 
     const filename = `money_tracker_backup_${timestamp}.csv`;
     const fileUri = `${FileSystem.documentDirectory}${filename}`;
@@ -582,6 +591,9 @@ export const restoreBackup = async (backup, cancelToken) => {
       // lines and accounts; cleared first and explicitly for the same reason as
       // the category junction above.
       await db.runAsync('DELETE FROM budget_plan_line_accounts').catch(() => {});
+      // The label junction (migration 0028) has only a line-side FK, so it too is
+      // cleared before the lines rather than left to a cascade.
+      await db.runAsync('DELETE FROM budget_plan_line_labels').catch(() => {});
       await db.runAsync('DELETE FROM budget_plan_lines').catch(() => {});
       await db.runAsync('DELETE FROM budget_plans').catch(() => {});
       // Groups (migration 0022) reference nothing and are referenced by lines
@@ -1112,7 +1124,25 @@ export const restoreBackup = async (backup, cancelToken) => {
           );
           restoredAccountLinks++;
         }
-        console.log(`Restored ${restoredPlans} budget plans, ${restoredLines} plan lines, ${restoredLinks} category links and ${restoredAccountLinks} account links`);
+
+        // Label filter links (migration 0028). Like the account links there is no
+        // fallback: no pre-0028 line could carry labels, and an absent section
+        // means the line is not tracked by label. Labels are plain text and need
+        // no re-keying — an operation's label is matched by value, not by id.
+        let restoredLabelLinks = 0;
+        for (const link of backup.data.budget_plan_line_labels || []) {
+          if (!link.line_id || link.label == null || link.label === '') continue;
+          if (!restoredLineIds.has(link.line_id)) {
+            console.warn('Skipping plan line label link for an unknown line:', link.line_id);
+            continue;
+          }
+          await db.runAsync(
+            'INSERT OR IGNORE INTO budget_plan_line_labels (line_id, label) VALUES (?, ?)',
+            [link.line_id, String(link.label)],
+          );
+          restoredLabelLinks++;
+        }
+        console.log(`Restored ${restoredPlans} budget plans, ${restoredLines} plan lines, ${restoredLinks} category links, ${restoredAccountLinks} account links and ${restoredLabelLinks} label links`);
         appEvents.emit(IMPORT_PROGRESS_EVENT, {
           stepId: 'budget_plans',
           status: 'completed',
@@ -1493,9 +1523,10 @@ const importBackupCSV = async (fileUri, cancelToken) => {
     budget_plan_line_categories: [],
     budget_plan_line_groups: [],
     budget_plan_line_accounts: [],
+    budget_plan_line_labels: [],
   };
 
-  // Split by section markers. The five [BUDGET_PLAN*] markers don't collide:
+  // Split by section markers. The six [BUDGET_PLAN*] markers don't collide:
   // each marker + newline (`[BUDGET_PLANS]\n`, `[BUDGET_PLAN_LINES]\n`) is not a
   // substring of any of the others.
   const accountsMatch = fileContent.match(/\[ACCOUNTS\]\n([\s\S]*?)(?=\n\[|$)/);
@@ -1510,6 +1541,7 @@ const importBackupCSV = async (fileUri, cancelToken) => {
   const budgetPlanLineCategoriesMatch = fileContent.match(/\[BUDGET_PLAN_LINE_CATEGORIES\]\n([\s\S]*?)(?=\n\[|$)/);
   const budgetPlanLineGroupsMatch = fileContent.match(/\[BUDGET_PLAN_LINE_GROUPS\]\n([\s\S]*?)(?=\n\[|$)/);
   const budgetPlanLineAccountsMatch = fileContent.match(/\[BUDGET_PLAN_LINE_ACCOUNTS\]\n([\s\S]*?)(?=\n\[|$)/);
+  const budgetPlanLineLabelsMatch = fileContent.match(/\[BUDGET_PLAN_LINE_LABELS\]\n([\s\S]*?)(?=\n\[|$)/);
 
   if (accountsMatch) sections.accounts = parseCSV(accountsMatch[1]);
   if (categoriesMatch) sections.categories = parseCSV(categoriesMatch[1]);
@@ -1523,6 +1555,7 @@ const importBackupCSV = async (fileUri, cancelToken) => {
   if (budgetPlanLineCategoriesMatch) sections.budget_plan_line_categories = parseCSV(budgetPlanLineCategoriesMatch[1]);
   if (budgetPlanLineGroupsMatch) sections.budget_plan_line_groups = parseCSV(budgetPlanLineGroupsMatch[1]);
   if (budgetPlanLineAccountsMatch) sections.budget_plan_line_accounts = parseCSV(budgetPlanLineAccountsMatch[1]);
+  if (budgetPlanLineLabelsMatch) sections.budget_plan_line_labels = parseCSV(budgetPlanLineLabelsMatch[1]);
 
   // Extract version from header
   const versionMatch = fileContent.match(/# Version: (\d+)/);
@@ -1692,6 +1725,17 @@ const importBackupSQLite = async (fileUri, cancelToken) => {
       console.warn('No budget_plan_line_accounts table in imported database (older format)');
     }
 
+    // The label filter (migration 0028), guarded for the same reason: a pre-0028
+    // database has no labels and every line imports untracked by label.
+    let budgetPlanLineLabels = [];
+    try {
+      budgetPlanLineLabels = await tempDb.getAllAsync(
+        'SELECT * FROM budget_plan_line_labels ORDER BY line_id ASC, label ASC',
+      );
+    } catch (e) {
+      console.warn('No budget_plan_line_labels table in imported database (older format)');
+    }
+
     // Create backup object
     const backup = {
       version: BACKUP_VERSION,
@@ -1712,6 +1756,7 @@ const importBackupSQLite = async (fileUri, cancelToken) => {
         budget_plan_line_categories: budgetPlanLineCategories || [],
         budget_plan_line_groups: budgetPlanLineGroups || [],
         budget_plan_line_accounts: budgetPlanLineAccounts || [],
+        budget_plan_line_labels: budgetPlanLineLabels || [],
       },
     };
 

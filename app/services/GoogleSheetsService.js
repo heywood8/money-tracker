@@ -81,7 +81,7 @@ export const buildSheetsData = (backup) => {
   const {
     accounts, categories, operations, budgets, balance_history,
     budget_plans, budget_plan_lines, budget_plan_line_categories,
-    budget_plan_line_groups, budget_plan_line_accounts,
+    budget_plan_line_groups, budget_plan_line_accounts, budget_plan_line_labels,
   } = backup.data;
 
   const accountNames = new Map(accounts.map(a => [a.id, a.name]));
@@ -114,6 +114,17 @@ export const buildSheetsData = (backup) => {
     const current = accountIdsByLine.get(link.line_id);
     if (current) current.push(link.account_id);
     else accountIdsByLine.set(link.line_id, [link.account_id]);
+  }
+
+  // A line's label filter (migration 0028), same shape and same semicolon join.
+  // Labels are plain text, so unlike the two above there is only ONE column —
+  // there is no id to carry alongside the readable name; the label IS both.
+  const labelsByLine = new Map();
+  for (const link of budget_plan_line_labels || []) {
+    if (!link.line_id || link.label == null || link.label === '') continue;
+    const current = labelsByLine.get(link.line_id);
+    if (current) current.push(String(link.label));
+    else labelsByLine.set(link.line_id, [String(link.label)]);
   }
 
   return [
@@ -193,10 +204,11 @@ export const buildSheetsData = (backup) => {
     {
       range: 'Budget Plan Lines!A1',
       values: [
-        ['id', 'plan_id', 'label', 'amount', 'comment', 'category', 'account', 'category_id', 'to_account_id', 'sort_order', 'is_recurring', 'currency', 'kind', 'execution_account', 'account_id', 'last_executed_month', 'categories', 'category_ids', 'include_children', 'group', 'group_id', 'spending_accounts', 'spending_account_ids', 'effective_from', 'effective_to'],
+        ['id', 'plan_id', 'label', 'amount', 'comment', 'category', 'account', 'category_id', 'to_account_id', 'sort_order', 'is_recurring', 'currency', 'kind', 'execution_account', 'account_id', 'last_executed_month', 'categories', 'category_ids', 'include_children', 'group', 'group_id', 'spending_accounts', 'spending_account_ids', 'effective_from', 'effective_to', 'tracked_labels'],
         ...(budget_plan_lines || []).map(l => {
           const ids = lineCategoryIds(l);
           const sourceIds = accountIdsByLine.get(l.id) || [];
+          const trackedLabels = labelsByLine.get(l.id) || [];
           return [
             l.id, l.plan_id || '', l.label || '', l.amount, l.comment || '',
             categoryNames.get(l.category_id) || '',
@@ -227,6 +239,9 @@ export const buildSheetsData = (backup) => {
             // predates the columns and so speaks for every month.
             l.effective_from || '',
             l.effective_to || '',
+            // The label filter (migration 0028): which operations an income line
+            // counts. Blank means "not tracked by label".
+            trackedLabels.join(';'),
           ];
         }),
       ],
@@ -579,6 +594,24 @@ export const importFromSheets = async (accessToken, onProgress) => {
     }
   }
 
+  // Label filter (migration 0028). One column, not the two the references above
+  // need: a label is its own identity, so there is nothing to map — the cell's
+  // text IS what gets stored and matched against operations. A sheet without the
+  // column was written before 0028 and its lines were tracked by nothing.
+  const budget_plan_line_labels = [];
+  for (let i = 0; i < budgetPlanLineRows.length; i++) {
+    const row = budgetPlanLineRows[i];
+    const line = budget_plan_lines[i];
+    if (!line.id) continue;
+    const seen = new Set();
+    for (const label of splitList(row.tracked_labels)) {
+      const key = label.toLowerCase();
+      if (seen.has(key)) continue;
+      seen.add(key);
+      budget_plan_line_labels.push({ line_id: line.id, label });
+    }
+  }
+
   // Preserve current app preferences (language, theme, etc.) so they survive the restore.
   // Do NOT catch DB errors here — a locked or corrupted DB must abort the import loudly
   // rather than silently overwriting all user preferences with an empty set (#747).
@@ -605,6 +638,7 @@ export const importFromSheets = async (accessToken, onProgress) => {
       budget_plan_line_categories,
       budget_plan_line_groups,
       budget_plan_line_accounts,
+      budget_plan_line_labels,
     },
   };
 };

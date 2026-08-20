@@ -606,6 +606,15 @@ const MonthlyPlanSection = forwardRef(function MonthlyPlanSection({
       const first = accountsById.get(sourceAccountIds[0])?.name || t('allocation_unlinked');
       return sourceAccountIds.length > 1 ? `${first} +${sourceAccountIds.length - 1}` : first;
     }
+    // An income line tracked purely by label has no category or account to
+    // borrow a name from, so it names its labels — which is exactly what the
+    // user typed to tell it apart from its same-category sibling.
+    const trackedLabels = line.trackedLabels ?? [];
+    if (trackedLabels.length > 0) {
+      return trackedLabels.length > 1
+        ? `${trackedLabels[0]} +${trackedLabels.length - 1}`
+        : trackedLabels[0];
+    }
     if (line.kind === 'income') return t('expected_income');
     return t('allocation_unlinked');
   }, [categoriesById, accountsById, t]);
@@ -846,6 +855,9 @@ const MonthlyPlanSection = forwardRef(function MonthlyPlanSection({
     // An account-only line has no category icon to show; the card glyph says at
     // a glance that this row is scoped to where the money left from.
     if (line.sourceAccountIds?.length) return 'credit-card-outline';
+    // Nor has a label-tracked income line; the tag glyph says what this row
+    // counts by, the way the card glyph does for an account-scoped one.
+    if (line.trackedLabels?.length) return 'tag-outline';
     return line.kind === 'income' ? 'cash-plus' : 'shape-outline';
   }, [categoriesById]);
 
@@ -873,7 +885,11 @@ const MonthlyPlanSection = forwardRef(function MonthlyPlanSection({
       converting={converting}
       colors={colors}
       t={t}
-      showProgress={line.kind !== 'income'}
+      // An income line earns a meter once it tracks something of its own
+      // (migration 0028) — `tracked` on its status says whether it does. One
+      // that merely declares expected income has no per-line actual to draw.
+      showProgress={line.kind !== 'income' || !!lineStatusById.get(line.id)?.tracked}
+      overflowIsPositive={line.kind === 'income'}
       listLength={list.length}
       lifted={lifted}
       onMove={lifted ? null : onMove}

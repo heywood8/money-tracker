@@ -172,6 +172,7 @@ const isSchemaComplete = async (rawDb) => {
       'notification_merchant_rules', 'pending_notifications',
       'budget_plans', 'budget_plan_lines', 'budget_plan_line_categories',
       'budget_plan_line_groups', 'budget_plan_line_accounts',
+      'budget_plan_line_labels',
       'notification_templates',
     ];
     const existingTables = await rawDb.getAllAsync(
@@ -329,6 +330,11 @@ const isSchemaComplete = async (rawDb) => {
     // through 0024 doesn't have it, so its schema reads "incomplete" here and
     // migrate() runs to create it, rather than the fast path skipping migrate()
     // and every template query throwing `no such table`.
+
+    // Migration 0028: creates budget_plan_line_labels (the per-line label
+    // filter). Covered by the expectedTables check above, like 0024 — a single
+    // CREATE TABLE with no accompanying ALTER, so there is no half-applied state
+    // a column check would have to catch.
 
     // Check budget_plan_lines has BOTH effective_from and effective_to
     // (migration 0026 — the recurring line's effective month range). Both are
@@ -692,6 +698,13 @@ const detectAppliedMigrations = async (rawDb) => {
     // table's presence is the whole marker and re-running is harmless.
     if (await tableExists('budget_plan_line_accounts')) {
       applied.push(24);
+    }
+
+    // Migration 0028: creates budget_plan_line_labels (the per-line label
+    // filter). One CREATE TABLE plus an IF NOT EXISTS index, so the table's
+    // presence is the whole marker and re-running is harmless.
+    if (await tableExists('budget_plan_line_labels')) {
+      applied.push(28);
     }
 
     // Migration 0026: adds effective_from / effective_to to budget_plan_lines

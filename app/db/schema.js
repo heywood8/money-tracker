@@ -523,3 +523,34 @@ export const budgetPlanLineAccounts = sqliteTable('budget_plan_line_accounts', {
   pk: primaryKey({ columns: [table.lineId, table.accountId] }),
   accountIdx: index('idx_budget_plan_line_accounts_account').on(table.accountId),
 }));
+
+/**
+ * Budget Plan Line ↔ Labels junction (migration 0028)
+ *
+ * The set of operation LABELS a plan line counts operations from — matched
+ * against the labels parsed out of `operations.description` (see
+ * app/utils/labelUtils.js). An empty set (the default, and what every pre-0028
+ * line has) means "not tracked by label", so nothing about an existing line
+ * changes.
+ *
+ * This is what lets two income lines that share one income category — a salary
+ * and its advance — track separately: the category cannot tell them apart, the
+ * label on the operation can. Several labels are an OR (any of them counts) and
+ * the set combines with the line's categories by AND, mirroring
+ * budgetPlanLineAccounts' filter semantics.
+ *
+ * `label` is TEXT, not a foreign key: a label is free text inside a description,
+ * there is no labels table to reference. Stored as the user typed it and matched
+ * case-insensitively, with case-variants de-duplicated on write (see
+ * BudgetPlansDB.uniqueLabels) so the composite primary key holds.
+ *
+ * Only the line side cascades — deleting the line drops its labels. Nothing
+ * cascades from a label: re-labelling an operation simply stops it counting.
+ */
+export const budgetPlanLineLabels = sqliteTable('budget_plan_line_labels', {
+  lineId: text('line_id').notNull().references(() => budgetPlanLines.id, { onDelete: 'cascade' }),
+  label: text('label').notNull(),
+}, (table) => ({
+  pk: primaryKey({ columns: [table.lineId, table.label] }),
+  labelIdx: index('idx_budget_plan_line_labels_label').on(table.label),
+}));

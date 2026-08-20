@@ -35,6 +35,12 @@ jest.mock('../../../app/contexts/DialogContext', () => ({
   useDialog: () => ({ showDialog: jest.fn() }),
 }));
 jest.mock('../../../app/components/ModalBlurOverlay', () => () => null);
+// The income line's label filter offers the labels already in use on real
+// operations; the suggestion query itself belongs to OperationsDB's own tests.
+const mockGetDistinctLabels = jest.fn(async () => ['Аванс', 'Зарплата']);
+jest.mock('../../../app/services/OperationsDB', () => ({
+  getDistinctLabels: (...args) => mockGetDistinctLabels(...args),
+}));
 
 // The amount is a plain FormInput, so no calculator mock is needed.
 
@@ -386,6 +392,68 @@ describe('BudgetPlanLineModal', () => {
         kind: 'transfer',
         toAccountId: 2,
         sourceAccountIds: [],
+      }));
+    });
+  });
+
+  describe('Income label filter (migration 0028)', () => {
+    it('offers the filter on an income line only', async () => {
+      const props = baseProps();
+      const { getByTestId, queryByTestId } = await render(<BudgetPlanLineModal {...props} />);
+      // Expense (the default kind) has no same-category sibling to separate.
+      expect(queryByTestId('plan-tracked-labels')).toBeNull();
+      await fireEvent.press(getByTestId('plan-line-kind-income'));
+      await waitFor(() => expect(getByTestId('plan-tracked-labels')).toBeTruthy());
+      await fireEvent.press(getByTestId('plan-line-kind-transfer'));
+      await waitFor(() => expect(queryByTestId('plan-tracked-labels')).toBeNull());
+    });
+
+    it('saves the labels typed into it', async () => {
+      const props = { ...baseProps(), initialKind: 'income' };
+      const { getByTestId } = await render(<BudgetPlanLineModal {...props} />);
+      await waitFor(() => expect(getByTestId('label-input-field')).toBeTruthy());
+      await fireEvent.changeText(getByTestId('label-input-field'), 'Аванс');
+      await fireEvent(getByTestId('label-input-field'), 'submitEditing');
+      await fireEvent.changeText(getByTestId('plan-line-amount'), '220000');
+      await fireEvent.press(getByTestId('plan-line-save'));
+
+      expect(props.onSaveLine).toHaveBeenCalledWith(expect.objectContaining({
+        kind: 'income',
+        trackedLabels: ['Аванс'],
+      }));
+    });
+
+    it('opens an existing line on the labels it already tracks', async () => {
+      const props = {
+        ...baseProps(),
+        line: {
+          id: 'l1', planId: 'p1', amount: '220000', kind: 'income', label: null,
+          comment: null, categoryIds: [], sourceAccountIds: [],
+          trackedLabels: ['Аванс'], toAccountId: null, isRecurring: false, currency: null,
+        },
+      };
+      const { getByTestId } = await render(<BudgetPlanLineModal {...props} />);
+      await waitFor(() => expect(getByTestId('label-chip-Аванс')).toBeTruthy());
+    });
+
+    it('sends an empty filter for an allocation, so switching kind clears it', async () => {
+      const props = { ...baseProps(), initialKind: 'income' };
+      const { getByTestId } = await render(<BudgetPlanLineModal {...props} />);
+      await waitFor(() => expect(getByTestId('label-input-field')).toBeTruthy());
+      await fireEvent.changeText(getByTestId('label-input-field'), 'Аванс');
+      await fireEvent(getByTestId('label-input-field'), 'submitEditing');
+      // Turn it into an expense line and give it a target.
+      await fireEvent.press(getByTestId('plan-line-kind-expense'));
+      await fireEvent.press(getByTestId('plan-target-picker'));
+      await waitFor(() => expect(getByTestId('plan-target-option-cat-cat1')).toBeTruthy());
+      await fireEvent.press(getByTestId('plan-target-option-cat-cat1'));
+      await fireEvent.press(getByTestId('plan-target-done'));
+      await fireEvent.changeText(getByTestId('plan-line-amount'), '100');
+      await fireEvent.press(getByTestId('plan-line-save'));
+
+      expect(props.onSaveLine).toHaveBeenCalledWith(expect.objectContaining({
+        kind: 'expense',
+        trackedLabels: [],
       }));
     });
   });
