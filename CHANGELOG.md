@@ -1,5 +1,12 @@
 # Changelog
 
+## [0.272.1](https://github.com/heywood8/money-tracker/compare/penny-v0.272.0...penny-v0.272.1) (2026-08-21)
+
+
+### Bug Fixes
+
+* **graphs:** stop balance header showing "day 0/31" before any scrub ([#1625](https://github.com/heywood8/money-tracker/issues/1625)) ([7047bff](https://github.com/heywood8/money-tracker/commit/7047bffa5568b368b55ff7c03c15cf44875812ab))
+
 ## [0.272.0](https://github.com/heywood8/money-tracker/compare/penny-v0.271.3...penny-v0.272.0) (2026-08-20)
 
 
