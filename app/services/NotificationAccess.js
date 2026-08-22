@@ -1,5 +1,6 @@
 import * as IntentLauncher from 'expo-intent-launcher';
 import { NativeModules } from 'react-native';
+import { traceAsync } from './perfTrace';
 
 /**
  * Android settings action that opens the system "Notification access" screen,
@@ -44,12 +45,20 @@ export const isNotificationAccessEnabled = async () => {
  * Each entry is `{ title, text, packageName, postTime }`. Resolves to an empty
  * array when the module is unavailable or the read fails.
  *
+ * The read is a SharedPreferences lookup on the native side with no I/O beyond
+ * it, so it should never be slow. It is timed anyway: this is the one call that
+ * genuinely *is* "fetching notifications", and having its duration in the log
+ * is what separates a slow bridge from slow work the caller does afterwards.
+ *
  * @returns {Promise<Array<{ title: string, text: string, packageName: string, postTime: number }>>}
  */
 export const getRecentNotifications = async () => {
   if (!PennyNotifications?.getRecentNotifications) return [];
   try {
-    const items = await PennyNotifications.getRecentNotifications();
+    const items = await traceAsync(
+      'notifications.native-read',
+      () => PennyNotifications.getRecentNotifications(),
+    );
     return Array.isArray(items) ? items : [];
   } catch (error) {
     return [];
