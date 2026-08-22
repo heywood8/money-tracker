@@ -164,6 +164,116 @@ describe('fetchLiveExchangeRate', () => {
     expect(result).toEqual({ rate: '0.92', source: 'offline' });
   });
 
+  describe('failed-lookup backoff', () => {
+    // Regression: only successes were remembered, so with no working connection
+    // every call paid the full two-URL timeout (5 s each). Bank-notification
+    // ingestion converts in a loop, which turned an offline batch into minutes of
+    // waiting for an answer the bundled offline table already had.
+    const failBothUrls = () => {
+      global.fetch
+        .mockRejectedValueOnce(new Error('Network error'))
+        .mockRejectedValueOnce(new Error('Network error'));
+    };
+
+    it('still retries the network after a single failure', async () => {
+      // One flaky request must not switch a batch onto the bundled offline
+      // snapshot: the converted amount is written into an operation for good.
+      failBothUrls();
+      expect(await fetchLiveExchangeRate('USD', 'EUR')).toEqual({ rate: '0.92', source: 'offline' });
+      expect(global.fetch).toHaveBeenCalledTimes(2);
+
+      global.fetch.mockResolvedValueOnce({
+        ok: true,
+        json: () => Promise.resolve({ date: '2025-06-01', usd: { eur: 0.93 } }),
+      });
+      expect(await fetchLiveExchangeRate('USD', 'EUR')).toEqual({ rate: '0.93', source: 'live' });
+      expect(global.fetch).toHaveBeenCalledTimes(3);
+    });
+
+    it('skips the network once the lookups have failed twice in a row', async () => {
+      failBothUrls();
+      await fetchLiveExchangeRate('USD', 'EUR');
+      failBothUrls();
+      await fetchLiveExchangeRate('USD', 'EUR');
+      expect(global.fetch).toHaveBeenCalledTimes(4);
+
+      // Third call answers from the offline table without touching the network.
+      expect(await fetchLiveExchangeRate('USD', 'EUR')).toEqual({ rate: '0.92', source: 'offline' });
+      expect(global.fetch).toHaveBeenCalledTimes(4);
+
+      // …and so does a different pair off the same base currency.
+      expect(await fetchLiveExchangeRate('USD', 'GBP')).toEqual({ rate: '0.79', source: 'offline' });
+      expect(global.fetch).toHaveBeenCalledTimes(4);
+    });
+
+    it('still tries the network for a different base currency', async () => {
+      failBothUrls();
+      await fetchLiveExchangeRate('USD', 'EUR');
+      failBothUrls();
+      await fetchLiveExchangeRate('USD', 'EUR');
+      expect(global.fetch).toHaveBeenCalledTimes(4);
+
+      global.fetch.mockResolvedValueOnce({
+        ok: true,
+        json: () => Promise.resolve({ date: '2025-06-01', eur: { usd: 1.11 } }),
+      });
+      expect(await fetchLiveExchangeRate('EUR', 'USD')).toEqual({ rate: '1.11', source: 'live' });
+      expect(global.fetch).toHaveBeenCalledTimes(5);
+    });
+
+    it('tries the network again once the backoff window has passed', async () => {
+      failBothUrls();
+      await fetchLiveExchangeRate('USD', 'EUR');
+      failBothUrls();
+      await fetchLiveExchangeRate('USD', 'EUR');
+      expect(global.fetch).toHaveBeenCalledTimes(4);
+
+      jest.advanceTimersByTime(60 * 1000 + 1);
+
+      global.fetch.mockResolvedValueOnce({
+        ok: true,
+        json: () => Promise.resolve({ date: '2025-06-01', usd: { eur: 0.93 } }),
+      });
+      expect(await fetchLiveExchangeRate('USD', 'EUR')).toEqual({ rate: '0.93', source: 'live' });
+      expect(global.fetch).toHaveBeenCalledTimes(5);
+    });
+
+    it('does not back off when the table loaded but simply lacks the pair', async () => {
+      // A base currency that answered is not a failed lookup — its table is
+      // cached, and the missing pair is a fact about the data, not the network.
+      global.fetch
+        .mockResolvedValueOnce({
+          ok: true,
+          json: () => Promise.resolve({ date: '2025-06-01', usd: { gbp: 0.80 } }),
+        })
+        .mockRejectedValueOnce(new Error('Fallback also fails'));
+      expect(await fetchLiveExchangeRate('USD', 'EUR')).toEqual({ rate: '0.92', source: 'offline' });
+
+      global.fetch.mockResolvedValueOnce({
+        ok: true,
+        json: () => Promise.resolve({ date: '2025-06-01', usd: { eur: 0.93 } }),
+      });
+      expect(await fetchLiveExchangeRate('USD', 'EUR')).toEqual({ rate: '0.93', source: 'live' });
+    });
+
+    it('is cleared by clearExchangeRateCache', async () => {
+      failBothUrls();
+      await fetchLiveExchangeRate('USD', 'EUR');
+      failBothUrls();
+      await fetchLiveExchangeRate('USD', 'EUR');
+      expect(global.fetch).toHaveBeenCalledTimes(4);
+
+      clearExchangeRateCache();
+
+      global.fetch.mockResolvedValueOnce({
+        ok: true,
+        json: () => Promise.resolve({ date: '2025-06-01', usd: { eur: 0.93 } }),
+      });
+      expect(await fetchLiveExchangeRate('USD', 'EUR')).toEqual({ rate: '0.93', source: 'live' });
+      expect(global.fetch).toHaveBeenCalledTimes(5);
+    });
+  });
+
   it('converts currency codes to lowercase for API calls', async () => {
     global.fetch.mockResolvedValueOnce({
       ok: true,

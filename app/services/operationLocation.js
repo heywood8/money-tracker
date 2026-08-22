@@ -16,6 +16,7 @@
 
 import { getPreference, PREF_KEYS } from './PreferencesDB';
 import { ensureLocationPermission, getCurrentLocation } from './LocationService';
+import { traceAsync } from './perfTrace';
 
 /**
  * Whether the "attach location to new operations" opt-in is enabled. Reads the
@@ -39,6 +40,11 @@ export const isAttachLocationEnabled = async () => {
  * feature is off, permission is missing, or the fix fails/times out. Never
  * prompts beyond the OS permission (already secured by the Settings toggle before
  * the feature can be on) and never throws.
+ *
+ * The fix itself is timed: it is bounded by an 8 s timeout, and a run that hits
+ * that ceiling is invisible to the user except as a caller that seems to hang —
+ * notification ingestion waits on exactly this before booking its first
+ * operation.
  * @param {Object} [opts]
  * @param {number} [opts.timeoutMs] - forwarded to getCurrentLocation
  * @returns {Promise<{ latitude: string, longitude: string } | null>}
@@ -47,7 +53,7 @@ export const captureLocationIfEnabled = async (opts = {}) => {
   if (!(await isAttachLocationEnabled())) return null;
   const { granted } = await ensureLocationPermission();
   if (!granted) return null;
-  return getCurrentLocation(opts);
+  return traceAsync('location.fix', () => getCurrentLocation(opts));
 };
 
 /**

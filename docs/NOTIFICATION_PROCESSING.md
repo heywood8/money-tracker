@@ -146,6 +146,39 @@ next tick; pull-to-refresh keeps its own spinner. A newly-captured card fades an
 slides into the feed (content-stable keys mean only genuinely new cards animate;
 the initial batch appears at rest).
 
+### Opening the panel never waits on ingestion
+
+The feed paints from what is already on the device — the custom parse templates,
+the review queue, and the native rolling window — and nothing else. The messages
+arrived on the phone long ago and reading them back is a SharedPreferences
+lookup, so showing them needs no network and no permission beyond the one
+already granted.
+
+The panel used to `await processBankNotifications()` before its first render,
+which put three things the user never asked for behind the spinner: a
+best-effort GPS fix (bounded at 8 s, taken once per run when the *attach
+location* opt-in is on), a live exchange-rate lookup for every foreign-currency
+charge that auto-creates, and a duplicate-check query per notification. On a
+weak or captive connection those rate lookups dominate — two CDNs, 5 s timeout
+each — and nothing on screen said why the feed was still loading. The pass now
+starts *after* the first paint, and its results land through the same reload the
+auto-refresh uses.
+
+Two supporting changes keep it that way:
+
+- A currency whose live lookup fails outright twice in a row goes straight to the
+  bundled offline table for the next minute (`currency.js`), so an offline batch
+  pays the two-CDN timeout a couple of times rather than once per item. Two
+  failures, not one: a converted amount is written into an operation for good, so
+  a single flaky request must not switch a whole batch onto snapshot rates.
+- The slow phases are timed and written to the app log (Settings → Logs, `debug`
+  level, `[perf]` prefix) by `app/services/perfTrace.js` — `notifications.panel-open`,
+  `notifications.process` with its phase breakdown, `notifications.native-read`,
+  `notifications.book`, `location.fix`, and `currency.rate`. Logging is
+  threshold-gated (250 ms, and 3 s for a pass that found nothing to do) because
+  the panel re-runs the pipeline every three seconds and a line per tick would
+  evict the 500-entry log ring within the hour.
+
 ### Re-adding an already-processed notification
 
 Each already-processed notification stays visible in the **Recent notifications**

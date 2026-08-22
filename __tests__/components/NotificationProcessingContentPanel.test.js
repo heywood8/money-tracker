@@ -295,6 +295,52 @@ describe('NotificationProcessingContentPanel', () => {
     });
   });
 
+  describe('first paint does not wait on ingestion', () => {
+    // Regression: the panel used to await processBankNotifications() before its
+    // first render, so the spinner covered a GPS fix, live exchange-rate lookups
+    // and a per-notification database sweep — none of which is needed to *show*
+    // notifications the phone already received. The feed must paint from the
+    // local read alone, with the pass running behind it.
+    it('shows the feed while the ingestion pass is still in flight', async () => {
+      let finishPipeline;
+      pipeline.processBankNotifications.mockImplementation(
+        () => new Promise((resolve) => {
+          finishPipeline = () => resolve({ created: 0, pending: 0, skipped: 0 });
+        }),
+      );
+
+      const { getByText, queryByText } = await render(<NotificationProcessingContentPanel />);
+
+      // The captured notifications are on screen before the pass resolves.
+      await waitFor(() => expect(getByText('New message')).toBeTruthy());
+      expect(queryByText('BANK_NOTIFICATIONS_REVIEW')).toBeTruthy();
+      expect(pipeline.processBankNotifications).toHaveBeenCalled();
+
+      await act(async () => { finishPipeline(); });
+    });
+
+    it('still runs the pass, and its results reach the review queue', async () => {
+      // Nothing queued when the panel paints; the pass finds an item.
+      PendingNotificationsDB.getPendingNotifications
+        .mockResolvedValueOnce([])
+        .mockResolvedValue([PENDING]);
+
+      const { getByTestId } = await render(<NotificationProcessingContentPanel />);
+      // The item can only have come from the second load — the one the pass
+      // triggers after the panel has already painted.
+      await waitFor(() => expect(getByTestId('pending-merchant-p1')).toBeTruthy());
+      expect(pipeline.processBankNotifications).toHaveBeenCalled();
+      expect(PendingNotificationsDB.getPendingNotifications.mock.calls.length)
+        .toBeGreaterThanOrEqual(2);
+    });
+
+    it('paints even when the ingestion pass rejects', async () => {
+      pipeline.processBankNotifications.mockRejectedValue(new Error('offline'));
+      const { getByText } = await render(<NotificationProcessingContentPanel />);
+      await waitFor(() => expect(getByText('New message')).toBeTruthy());
+    });
+  });
+
   describe('auto-refresh', () => {
     // Grab the 3-second tick the panel arms after its initial load. Spying on
     // setInterval and invoking the callback directly sidesteps the fragile
