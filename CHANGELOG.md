@@ -1,5 +1,12 @@
 # Changelog
 
+## [0.272.2](https://github.com/heywood8/money-tracker/compare/penny-v0.272.1...penny-v0.272.2) (2026-08-23)
+
+
+### Performance Improvements
+
+* **notifications:** paint the feed before running the ingestion pass ([#1627](https://github.com/heywood8/money-tracker/issues/1627)) ([a020f77](https://github.com/heywood8/money-tracker/commit/a020f77b297d1e4975050e04f75827c21f17b298))
+
 ## [0.272.1](https://github.com/heywood8/money-tracker/compare/penny-v0.272.0...penny-v0.272.1) (2026-08-21)
 
 
