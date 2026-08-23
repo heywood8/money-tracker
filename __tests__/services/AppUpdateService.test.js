@@ -1,4 +1,6 @@
+import { createHash } from 'crypto';
 import {
+  createSha256,
   parseVersionFromRelease,
   compareVersions,
   extractApkAsset,
@@ -830,25 +832,113 @@ describe('AppUpdateService', () => {
     });
   });
 
+  describe('createSha256', () => {
+    const nodeSha = (buf) => createHash('sha256').update(buf).digest('hex');
+
+    // Block-boundary sizes are where a hand-written SHA-256 goes wrong: 55 and 56 straddle the
+    // point where the length field no longer fits in the final block, 64 fills it exactly.
+    it.each([0, 1, 3, 55, 56, 63, 64, 65, 127, 128, 1000, 100000])(
+      'matches the reference digest for %i bytes',
+      (size) => {
+        const bytes = Uint8Array.from({ length: size }, (unused, i) => (i * 37) % 256);
+        const hasher = createSha256();
+        hasher.update(bytes);
+        expect(hasher.digest()).toBe(nodeSha(Buffer.from(bytes)));
+      },
+    );
+
+    it('is independent of how the input is split across updates', () => {
+      const bytes = Uint8Array.from({ length: 5000 }, (unused, i) => (i * 91) % 256);
+      const expected = nodeSha(Buffer.from(bytes));
+
+      for (const step of [1, 7, 64, 100, 4096]) {
+        const hasher = createSha256();
+        for (let i = 0; i < bytes.length; i += step) {
+          hasher.update(bytes.subarray(i, Math.min(i + step, bytes.length)));
+        }
+        expect(hasher.digest()).toBe(expected);
+      }
+    });
+  });
+
   describe('computeSha256', () => {
-    it('reads the entire file in one call and returns the SHA-256 hex digest', async () => {
-      // 'aGVsbG8=' is base64("hello"); SHA-256("hello") is a known constant
-      FileSystem.readAsStringAsync.mockResolvedValue('aGVsbG8=');
+    // SHA-256("hello") and SHA-256("hello world"), both known constants.
+    const HELLO_SHA = '2cf24dba5fb0a30e26e83b2ac5b9e29e1b161e5c1fa7425e73043362938b9824';
+    const HELLO_WORLD_SHA = 'b94d27b9934d3e08a52e52d7da7dabfac484efe37a5380ee9088f7ace2efcde9';
+
+    // Serves positional base64 reads out of `content`, the way the native file system does.
+    const mockFileContent = (content) => {
+      FileSystem.getInfoAsync.mockResolvedValue({ exists: true, size: content.length });
+      FileSystem.readAsStringAsync.mockImplementation(async (uri, { position, length }) =>
+        Buffer.from(content.slice(position, position + length)).toString('base64'));
+    };
+
+    it('returns the SHA-256 hex digest of the file', async () => {
+      mockFileContent('hello');
 
       const result = await computeSha256('file:///cache/penny.apk');
 
-      expect(FileSystem.readAsStringAsync).toHaveBeenCalledTimes(1);
-      expect(FileSystem.readAsStringAsync).toHaveBeenCalledWith(
-        'file:///cache/penny.apk',
-        { encoding: 'base64' },
-      );
-      expect(result).toBe('2cf24dba5fb0a30e26e83b2ac5b9e29e1b161e5c1fa7425e73043362938b9824');
+      expect(result).toBe(HELLO_SHA);
+    });
+
+    it('reads the file in slices instead of loading it whole', async () => {
+      // Regression: a single whole-file base64 read asks for a ~150MB string on a 55MB APK and
+      // OOMs ("Failed to allocate a 149232328 byte allocation"), leaving every update unverified.
+      mockFileContent('hello world');
+
+      const result = await computeSha256('file:///cache/penny.apk', { chunkBytes: 4 });
+
+      expect(result).toBe(HELLO_WORLD_SHA);
+      expect(FileSystem.readAsStringAsync.mock.calls.map(([, options]) => options)).toEqual([
+        { encoding: 'base64', position: 0, length: 4 },
+        { encoding: 'base64', position: 4, length: 4 },
+        { encoding: 'base64', position: 8, length: 3 },
+      ]);
+    });
+
+    it('never asks for more than one slice at a time', async () => {
+      mockFileContent('x'.repeat(1000));
+
+      await computeSha256('file:///cache/penny.apk', { chunkBytes: 64 });
+
+      for (const [, options] of FileSystem.readAsStringAsync.mock.calls) {
+        expect(options.length).toBeLessThanOrEqual(64);
+      }
+    });
+
+    it('hashes without crypto.subtle, which Hermes does not provide', async () => {
+      const nativeCrypto = globalThis.crypto;
+      globalThis.crypto = undefined;
+      try {
+        mockFileContent('hello world');
+
+        const result = await computeSha256('file:///cache/penny.apk', { chunkBytes: 4 });
+
+        expect(result).toBe(HELLO_WORLD_SHA);
+      } finally {
+        globalThis.crypto = nativeCrypto;
+      }
     });
 
     it('propagates read errors to the caller', async () => {
+      FileSystem.getInfoAsync.mockResolvedValue({ exists: true, size: 5 });
       FileSystem.readAsStringAsync.mockRejectedValue(new Error('read failed'));
 
       await expect(computeSha256('file:///cache/penny.apk')).rejects.toThrow('read failed');
+    });
+
+    it('throws rather than looping when the file cannot be sized', async () => {
+      FileSystem.getInfoAsync.mockResolvedValue({ exists: false });
+
+      await expect(computeSha256('file:///cache/penny.apk')).rejects.toThrow('Cannot hash file');
+      expect(FileSystem.readAsStringAsync).not.toHaveBeenCalled();
+    });
+
+    it('throws rather than looping when a slice comes back empty', async () => {
+      FileSystem.getInfoAsync.mockResolvedValue({ exists: true, size: 5000 });
+      FileSystem.readAsStringAsync.mockResolvedValue('');
+
+      await expect(computeSha256('file:///cache/penny.apk')).rejects.toThrow('Cannot hash file');
     });
   });
 
@@ -908,7 +998,7 @@ describe('AppUpdateService', () => {
     });
 
     it('returns verified:true when the cached APK matches the checksum', async () => {
-      FileSystem.getInfoAsync.mockResolvedValue({ exists: true, size: 12345 });
+      FileSystem.getInfoAsync.mockResolvedValue({ exists: true, size: 5 });
       FileSystem.readAsStringAsync.mockResolvedValue(HELLO_B64);
       const fetchImpl = jest.fn().mockResolvedValue({
         ok: true,
@@ -927,7 +1017,7 @@ describe('AppUpdateService', () => {
 
     it('deletes the file and reports corrupted when the checksum does not match', async () => {
       jest.spyOn(console, 'warn').mockImplementation(() => {});
-      FileSystem.getInfoAsync.mockResolvedValue({ exists: true, size: 12345 });
+      FileSystem.getInfoAsync.mockResolvedValue({ exists: true, size: 5 });
       FileSystem.readAsStringAsync.mockResolvedValue(HELLO_B64);
       FileSystem.deleteAsync.mockResolvedValue();
       const fetchImpl = jest.fn().mockResolvedValue({
@@ -1071,6 +1161,17 @@ describe('AppUpdateService', () => {
 
   describe('downloadAndInstallApk - checksum error handling', () => {
     const IntentLauncher = require('expo-intent-launcher');
+    const HELLO_B64 = 'aGVsbG8='; // base64("hello")
+    // Base64 of the ZIP signatures the structural check looks for.
+    const APK_HEAD_B64 = 'UEsDBA=='; // PK\x03\x04 — local file header
+    const APK_EOCD_B64 = 'UEsFBg=='; // PK\x05\x06 — End Of Central Directory record
+    // Make the structural check (head read, then tail read) see a complete archive.
+    const mockIntactApkStructure = () => {
+      FileSystem.getInfoAsync.mockResolvedValue({ exists: true, size: 12345 });
+      FileSystem.readAsStringAsync
+        .mockResolvedValueOnce(APK_HEAD_B64)
+        .mockResolvedValueOnce(APK_EOCD_B64);
+    };
 
     beforeEach(() => {
       FileSystem.getInfoAsync.mockResolvedValue({ exists: true, size: 5 });
@@ -1079,7 +1180,8 @@ describe('AppUpdateService', () => {
       IntentLauncher.startActivityAsync.mockResolvedValue();
     });
 
-    it('proceeds to install when computeSha256 throws (OOM / read error)', async () => {
+    it('proceeds to install when computeSha256 throws and the file cannot be inspected', async () => {
+      jest.spyOn(console, 'warn').mockImplementation(() => {});
       FileSystem.createDownloadResumable.mockReturnValue({
         downloadAsync: jest.fn().mockResolvedValue({ uri: 'file:///cache/penny-v1.0.0.apk' }),
       });
@@ -1122,12 +1224,38 @@ describe('AppUpdateService', () => {
           null,
           { checksumUrl: 'https://example.com/penny-v1.0.0.apk.sha256', fetchImpl },
         ),
-      ).rejects.toThrow('APK checksum mismatch — file deleted');
+      ).rejects.toThrow('APK checksum mismatch — file discarded');
 
       expect(FileSystem.deleteAsync).toHaveBeenCalledWith(
         'file:///cache/penny-v1.0.0.apk',
         { idempotent: true },
       );
+    });
+
+    it('refuses to install a hash-mismatched APK even when deleting it fails', async () => {
+      // The mismatch is the verdict; a failed cleanup must not let the file through as merely
+      // "unverified" and get waved past by the structural check.
+      jest.spyOn(console, 'warn').mockImplementation(() => {});
+      FileSystem.createDownloadResumable.mockReturnValue({
+        downloadAsync: jest.fn().mockResolvedValue({ uri: 'file:///cache/penny-v1.0.0.apk' }),
+      });
+      FileSystem.deleteAsync.mockRejectedValue(new Error('EBUSY'));
+      FileSystem.readAsStringAsync.mockResolvedValue(HELLO_B64);
+
+      const fetchImpl = jest.fn().mockResolvedValue({
+        ok: true,
+        text: async () => 'ffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffff  penny-v1.0.0.apk\n',
+      });
+
+      await expect(
+        downloadAndInstallApk(
+          'https://example.com/penny-v1.0.0.apk',
+          null,
+          { checksumUrl: 'https://example.com/penny-v1.0.0.apk.sha256', fetchImpl },
+        ),
+      ).rejects.toThrow('APK checksum mismatch — file discarded');
+
+      expect(IntentLauncher.startActivityAsync).not.toHaveBeenCalled();
     });
 
     it('calls onPhaseChange("verifying") before computing the hash', async () => {
@@ -1155,6 +1283,7 @@ describe('AppUpdateService', () => {
       FileSystem.createDownloadResumable.mockReturnValue({
         downloadAsync: jest.fn().mockResolvedValue({ uri: 'file:///cache/penny-v1.0.0.apk' }),
       });
+      mockIntactApkStructure();
 
       const onPhaseChange = jest.fn();
 
@@ -1166,6 +1295,57 @@ describe('AppUpdateService', () => {
 
       expect(onPhaseChange).toHaveBeenCalledWith('backing_up');
       expect(onPhaseChange).not.toHaveBeenCalledWith('verifying');
+    });
+
+    it('deletes a truncated download and throws when there is no checksum to verify it', async () => {
+      // Without this, a half-written APK stays in the cache and the update panel keeps offering
+      // to install it — the user can never get a fresh download.
+      jest.spyOn(console, 'warn').mockImplementation(() => {});
+      FileSystem.createDownloadResumable.mockReturnValue({
+        downloadAsync: jest.fn().mockResolvedValue({ uri: 'file:///cache/penny-v1.0.0.apk' }),
+      });
+      FileSystem.deleteAsync.mockResolvedValue();
+      FileSystem.getInfoAsync.mockResolvedValue({ exists: true, size: 12345 });
+      FileSystem.readAsStringAsync
+        .mockResolvedValueOnce(APK_HEAD_B64)
+        .mockResolvedValueOnce('AAAAAAAA'); // decodes to zero bytes — no EOCD, so truncated
+
+      await expect(
+        downloadAndInstallApk('https://example.com/penny-v1.0.0.apk', null, {}),
+      ).rejects.toThrow('Downloaded APK is incomplete — file deleted');
+
+      expect(FileSystem.deleteAsync).toHaveBeenCalledWith(
+        'file:///cache/penny-v1.0.0.apk',
+        { idempotent: true },
+      );
+      expect(IntentLauncher.startActivityAsync).not.toHaveBeenCalled();
+    });
+
+    it('deletes a truncated download when the checksum could not be computed', async () => {
+      jest.spyOn(console, 'warn').mockImplementation(() => {});
+      FileSystem.createDownloadResumable.mockReturnValue({
+        downloadAsync: jest.fn().mockResolvedValue({ uri: 'file:///cache/penny-v1.0.0.apk' }),
+      });
+      FileSystem.deleteAsync.mockResolvedValue();
+      FileSystem.getInfoAsync.mockResolvedValue({ exists: true, size: 12345 });
+      FileSystem.readAsStringAsync
+        .mockRejectedValueOnce(new RangeError('Array buffer allocation failed')) // hashing
+        .mockResolvedValueOnce(APK_HEAD_B64)
+        .mockResolvedValueOnce('AAAAAAAA'); // no EOCD
+      const fetchImpl = jest.fn().mockResolvedValue({
+        ok: true,
+        text: async () => 'abc123def456abc123def456abc123def456abc123def456abc123def456abcd  penny-v1.0.0.apk\n',
+      });
+
+      await expect(
+        downloadAndInstallApk(
+          'https://example.com/penny-v1.0.0.apk',
+          null,
+          { checksumUrl: 'https://example.com/penny-v1.0.0.apk.sha256', fetchImpl },
+        ),
+      ).rejects.toThrow('Downloaded APK is incomplete — file deleted');
+
+      expect(IntentLauncher.startActivityAsync).not.toHaveBeenCalled();
     });
   });
 
