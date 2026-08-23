@@ -189,3 +189,31 @@ export const Z_INDEX = {
   popover: 50,       // Popovers, tooltips
   toast: 60,         // Toast notifications
 };
+
+// ============ COLD START SEQUENCE ============
+/**
+ * The cold-start loading sequence (app/components/startup/ColdStartScreen.js).
+ *
+ * Its own group rather than entries in `DURATION`, because these are one
+ * timeline and only mean anything relative to each other — `DURATION` is a flat
+ * scale of independent transition speeds.
+ *
+ *   0-60     hold — the frame still matches the native splash
+ *   60-360   the mark turns once
+ *   120-440  three coins fall into a stack, 70 ms apart
+ *   440-560  cross-fade into the app
+ */
+export const COLD_START = {
+  hold: 60,               // motionless; reads finishing inside it show no animation at all
+  spin: 300,              // one full turn of the mark
+  minHalfTurn: 150,       // floor for finishing the current half-turn when data arrives early
+  firstCoin: 120,         // first coin leaves, measured from the start of the sequence
+  coinStagger: 70,        // between coins
+  coinFall: 150,          // the fall itself
+  coinFadeIn: 60,         // a coin appearing below the mark
+  coinSquash: 15,         // landing squash, once down and once back
+  dissolve: 120,          // cross-fade into a dark-theme app
+  dissolveToLight: 200,   // longer: the brand surface and a light app differ more
+  captionThreshold: 1600, // after this the wait needs words
+  captionFade: 200,
+};

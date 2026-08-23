@@ -25,3 +25,18 @@ export const DESTRUCTIVE = {
   light: '#d9534f',
   dark: '#ff6b6b',
 };
+
+/**
+ * Brand colours, as opposed to theme colours: they are the same in both
+ * schemes because they belong to the mark rather than to the UI.
+ *
+ * `surface` is the navy of the disc in the app icon. The native splash and the
+ * cold-start screen both paint it, which is what lets one hand over to the
+ * other without a seam — see `app/components/startup/ColdStartScreen.js` and
+ * the `expo-splash-screen` plugin config in `app.config.js`.
+ */
+export const BRAND = {
+  surface: '#001329',
+  coin: '#f7b06f',
+  coinEdge: '#d98b3f',
+};

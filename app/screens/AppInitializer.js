@@ -16,6 +16,7 @@ import { registerAcknowledgeTaskAsync } from '../services/notifications/acknowle
 import { useAppBlur } from '../contexts/AppBlurContext';
 import { getPreference, setPreference, PREF_KEYS } from '../services/PreferencesDB';
 import UpdateAvailableModal from '../modals/UpdateAvailableModal';
+import ColdStartScreen, { hasColdStartPlayed } from '../components/startup/ColdStartScreen';
 
 // Poll for a newer release this often while the app is open and in the foreground.
 const UPDATE_CHECK_INTERVAL_MS = 60 * 1000;
@@ -36,6 +37,12 @@ const AppInitializer = () => {
   const { blurCount } = useAppBlur();
   const [isInitializing, setIsInitializing] = useState(false);
   const [pendingUpdate, setPendingUpdate] = useState(null);
+  // The cold-start screen covers the first database reads of a launch. It is
+  // mounted as an overlay rather than rendered instead of the app, so it can
+  // watch the contexts' loading flags itself without re-rendering SimpleTabs on
+  // every later data change. `hasColdStartPlayed()` keeps it from replaying on
+  // a re-mount within the same launch.
+  const [coldStartDone, setColdStartDone] = useState(hasColdStartPlayed);
 
   // Versions the user has already dealt with this session (dismissed or chose to install).
   // Held in a ref for the session; "Later" additionally persists a time-boxed snooze
@@ -243,6 +250,8 @@ const AppInitializer = () => {
     return () => cancelIdleCallback(handle);
   }, [isFirstLaunch]);
 
+  const handleColdStartFinish = useCallback(() => setColdStartDone(true), []);
+
   const handleUpdateDismiss = useCallback(() => {
     // "Later" silences this version for the session and, persisted, across restarts for
     // UPDATE_SNOOZE_MS. A newer release still prompts because it carries a different version.
@@ -325,6 +334,7 @@ const AppInitializer = () => {
         onUpdate={handleUpdateNow}
         updateData={pendingUpdate}
       />
+      {!coldStartDone && <ColdStartScreen onFinish={handleColdStartFinish} />}
     </>
   );
 };

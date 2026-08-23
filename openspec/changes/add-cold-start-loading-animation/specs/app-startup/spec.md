@@ -61,6 +61,7 @@ the app.
 - **WHEN** the sequence ends
 - **THEN** the loading screen cross-fades into the app over 120 ms
 - **AND** the cross-fade takes 200 ms when the app is in the light theme, because the surfaces differ more
+- **AND** it takes the longer 200 ms while the stored theme preference has not been read yet, since the device's own scheme is not yet proof of the app's
 
 ### Requirement: The animation never blocks on the JS thread
 The sequence SHALL run on the UI thread so that database work on the JS thread
@@ -70,6 +71,7 @@ cannot stall it.
 - **GIVEN** the first database reads are saturating the JS thread
 - **WHEN** the sequence is playing
 - **THEN** it continues at full frame rate
+- **AND** its timing — the hold, the stagger between coins, the slow-path threshold — holds too, because none of it waits on the JS thread
 
 ### Requirement: No animation for fast reads
 The app SHALL NOT start the sequence when the data is ready before it would
@@ -79,7 +81,7 @@ become visible.
 - **GIVEN** the loading screen is showing its first, motionless frame
 - **WHEN** all first reads resolve within the 60 ms hold
 - **THEN** no rotation and no coin ever appears
-- **AND** the app is shown without an animated frame
+- **AND** the screen cross-fades straight into the app, with none of the sequence's motion
 
 ### Requirement: Graceful truncation
 When the data arrives mid-sequence the app SHALL shorten the sequence rather than
@@ -106,6 +108,11 @@ enough to read as a hang.
 - **WHEN** 1600 ms have passed since the loading screen appeared
 - **THEN** a translated caption fades in below the stack over 200 ms
 - **AND** no caption is shown before that threshold
+
+#### Scenario: A long wait with animations turned off
+- **GIVEN** the device has animations turned off in accessibility settings
+- **WHEN** 1600 ms have passed since the loading screen appeared with the data still pending
+- **THEN** the caption appears as it would otherwise — the wait is no shorter
 
 ### Requirement: Reduced motion
 The app SHALL respect the operating system's reduced-motion setting.

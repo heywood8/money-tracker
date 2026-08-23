@@ -960,6 +960,10 @@ jest.mock('react-native-reanimated', () => {
     useAnimatedGestureHandler: jest.fn(() => () => {}),
     useAnimatedReaction: jest.fn(),
     useAnimatedRef: jest.fn(() => ({ current: null })),
+    // Reanimated reads the OS reduced-motion setting at startup and returns it
+    // synchronously; under test there is no such setting, so components get the
+    // animated path unless a test says otherwise.
+    useReducedMotion: jest.fn(() => false),
     useWorkletCallback: jest.fn((fn) => fn),
     withTiming: jest.fn((value) => value),
     withSpring: jest.fn((value) => value),

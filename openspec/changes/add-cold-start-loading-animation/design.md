@@ -22,13 +22,38 @@ The cost is real and accepted: a light-theme user dissolves from `#001329` to
 `#f8f8f8`. That transition gets 200 ms rather than 120 ms so it reads as a
 dissolve and not as a flash.
 
-### The animation runs on the UI thread
+### The whole timeline runs on the UI thread
 
 The reason for the screen is that the JS thread is busy with SQLite reads. An
 `Animated` timeline driven from JS would stutter exactly when those reads
 resolve — the worst possible moment. The sequence is therefore built with
-`react-native-reanimated` (already a dependency at 4.3.1) so it runs on the UI
-thread and is unaffected by JS-thread work.
+`react-native-reanimated` (already a dependency at 4.3.1).
+
+That covers the animations, but not the *schedule*: a hold, a stagger and a
+threshold expressed as `setTimeout` would collapse the moment the JS thread
+blocked, which is the very case this screen exists for. So the entire timeline —
+hold, turn, each coin's start, the slow-path caption — is handed to the UI
+thread at mount as delayed animations (`withDelay`). Nothing about the motion
+waits on JS.
+
+JS timers survive in one place only: the wind-down after the data has landed. By
+then the reads are done and the thread is free.
+
+### The wind-down is a pure function
+
+Deciding what happens when the data arrives mid-sequence — which coins are
+cancelled, how far the mark still has to turn, how long the screen must wait
+before it may leave — is the subtle part. It lives in `planWindDown(angle,
+coins)`, a pure function taking the live values and returning a plan, so it can
+be checked against real numbers instead of through mocked animations.
+
+### The theme may not be known yet
+
+`ThemeConfigContext` starts at `'system'` and reports the *device's* scheme
+until the stored preference has been read, so a Light-theme user on a dark
+device would briefly look like a dark-theme user. The context now exposes
+`isThemeLoaded`, and the screen takes the longer, always-safe cross-fade until
+that is true.
 
 ### "Cold start" is a module-level flag, not state
 
@@ -73,10 +98,11 @@ the splash left it in.
 
 ## Risks
 
-- **Reduced motion.** `AccessibilityInfo.isReduceMotionEnabled()` is async; it is
-  read once at module load so the first frame already knows the answer. If it has
-  not resolved, the animated path is used — the safer default, since the static
-  path is the fallback and not the other way round.
+- **Reduced motion.** Read through Reanimated's `useReducedMotion()`, which
+  reports the setting as it was at app start and returns it synchronously — so
+  the first frame already knows which path it is on, with no async read to race
+  against. `AccessibilityInfo.isReduceMotionEnabled()` is a promise and would
+  resolve after the first frames had already moved.
 - **Very slow devices.** If the reads take longer than 1600 ms the stack simply
   stands there. The spec adds a caption at that point rather than looping the
   animation, which would read as a progress bar that does not progress.
