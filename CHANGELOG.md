@@ -1,5 +1,12 @@
 # Changelog
 
+## [0.273.0](https://github.com/heywood8/money-tracker/compare/penny-v0.272.5...penny-v0.273.0) (2026-08-23)
+
+
+### Features
+
+* **android:** draw the themed launcher icon from the mascot ([#1636](https://github.com/heywood8/money-tracker/issues/1636)) ([a23b6cf](https://github.com/heywood8/money-tracker/commit/a23b6cfd45a0ddebd6f9add8dc5a10814cdb36cc))
+
 ## [0.272.5](https://github.com/heywood8/money-tracker/compare/penny-v0.272.4...penny-v0.272.5) (2026-08-23)
 
 
