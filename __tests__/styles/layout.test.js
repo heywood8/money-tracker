@@ -26,6 +26,7 @@ import {
   OPACITY,
   DURATION,
   Z_INDEX,
+  COLD_START,
 } from '../../app/styles/designTokens';
 
 describe('Layout Constants', () => {
@@ -340,6 +341,23 @@ describe('Design Tokens', () => {
         expect(typeof value).toBe('number');
         expect(value).toBeGreaterThan(0);
       });
+    });
+
+    it('COLD_START holds only positive millisecond values', async () => {
+      Object.values(COLD_START).forEach(value => {
+        expect(typeof value).toBe('number');
+        expect(value).toBeGreaterThan(0);
+      });
+    });
+
+    it('COLD_START adds up to the ~560 ms budget for the sequence', async () => {
+      const lastCoinLands = COLD_START.firstCoin
+        + COLD_START.coinStagger * 2
+        + COLD_START.coinFall
+        + COLD_START.coinSquash * 2;
+      const markStops = COLD_START.hold + COLD_START.spin;
+
+      expect(Math.max(lastCoinLands, markStops) + COLD_START.dissolve).toBeLessThanOrEqual(600);
     });
   });
 

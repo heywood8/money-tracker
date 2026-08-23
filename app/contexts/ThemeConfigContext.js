@@ -8,11 +8,18 @@ const ThemeConfigContext = createContext();
 export const ThemeConfigProvider = ({ children }) => {
   const [theme, setTheme] = useState('system'); // 'light' | 'dark' | 'system'
   const [osColorScheme, setOsColorScheme] = useState(Appearance.getColorScheme() || 'light');
+  // Whether the stored preference has been read yet. Until it has, `theme` is
+  // the 'system' default and `colorScheme` therefore reports the OS scheme —
+  // which is the wrong answer for anyone who chose the other one. Callers that
+  // act on the scheme during the first frames (ColdStartScreen) need to know.
+  const [isThemeLoaded, setIsThemeLoaded] = useState(false);
   // Load theme preference from storage
   useEffect(() => {
-    getPreference(PREF_KEYS.THEME, 'system').then(stored => {
-      if (stored) setTheme(stored);
-    });
+    getPreference(PREF_KEYS.THEME, 'system')
+      .then(stored => {
+        if (stored) setTheme(stored);
+      })
+      .finally(() => setIsThemeLoaded(true));
   }, []);
 
   // Listen to OS color scheme changes
@@ -30,7 +37,7 @@ export const ThemeConfigProvider = ({ children }) => {
   };
 
   return (
-    <ThemeConfigContext.Provider value={{ theme, colorScheme, setTheme: updateTheme }}>
+    <ThemeConfigContext.Provider value={{ theme, colorScheme, isThemeLoaded, setTheme: updateTheme }}>
       {children}
     </ThemeConfigContext.Provider>
   );

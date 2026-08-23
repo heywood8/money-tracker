@@ -23,11 +23,6 @@ module.exports = {
     icon: './assets/icon.png',
     userInterfaceStyle: 'light',
     newArchEnabled: true, // Required for react-native-worklets (used by reanimated 4.x)
-    splash: {
-      image: './assets/splash-icon.png',
-      resizeMode: 'contain',
-      backgroundColor: '#ffffff',
-    },
     packagerOpts: {
       hostType: 'tunnel',
     },
@@ -69,6 +64,20 @@ module.exports = {
     owner: 'lopatinikita',
     platforms: ['android'],
     plugins: [
+      // The splash is configured through the plugin rather than the deprecated
+      // top-level `splash` key so the icon size can be pinned: `resizeMode:
+      // 'contain'` scaled it to the screen width, which made it jump when
+      // ColdStartScreen took over. `imageWidth` must stay equal to MARK_SIZE in
+      // app/components/startup/ColdStartScreen.js, and the background is the
+      // brand navy (BRAND.surface) in both themes so the handover has no seam.
+      [
+        'expo-splash-screen',
+        {
+          image: './assets/splash-icon.png',
+          imageWidth: 200,
+          backgroundColor: '#001329',
+        },
+      ],
       'expo-sqlite',
       '@react-native-google-signin/google-signin',
       '@react-native-community/datetimepicker',
