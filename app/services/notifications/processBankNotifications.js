@@ -26,6 +26,14 @@ import { resolveNotification } from './resolveNotification';
 import { learnAccountBinding } from './accountBindings';
 import { findMatchingOperation, reconcilePendingNotifications } from './duplicateOperations';
 import { dismissPendingOperationsAlert } from './localNotifications';
+import { startTrace, traceAsync } from '../perfTrace';
+
+// A pass that found nothing new to do is held to a much higher bar before it is
+// worth a log line. The feed re-runs this every three seconds while it is open,
+// so an idle pass logging at the normal threshold would emit a line every tick —
+// rewriting the day's log file, evicting the 500-entry ring within the hour, and
+// burying the one slow run somebody actually opened the log to find.
+const IDLE_PASS_LOG_MS = 3000;
 
 /**
  * A per-run location provider. Captures the device location at most once (lazily,
@@ -687,9 +695,17 @@ const runProcess = async () => {
   // task's "operations added" alert; the counters alone can't say what was booked.
   const summary = { created: 0, pending: 0, skipped: 0, createdItems: [] };
 
+  // This pass is what makes "open the notifications tab" feel slow when it is
+  // slow: reading the notifications themselves is a SharedPreferences lookup,
+  // but booking them touches the database once per item, can wait on a GPS fix,
+  // and can wait on an exchange-rate lookup over the network. The trace records
+  // where the time actually went so the log answers that instead of a guess.
+  const trace = startTrace('notifications.process');
+
   if (!(await isBankNotificationsEnabled())) {
     return summary;
   }
+  trace.mark('flag');
 
   // The parser reads the user's templates from a synchronous cache, so they have
   // to be in it before the first parse. This matters most for the background
@@ -697,23 +713,28 @@ const runProcess = async () => {
   // run every pass with no custom templates at all — silently ingesting nothing
   // for the banks only a template can read. A no-op once loaded.
   await ensureCustomTemplatesLoaded();
+  trace.mark('templates');
 
   // Drop any queued review item the user has already recorded by hand since it
   // was enqueued, before parsing new notifications.
   const prunedExisting = await reconcilePendingNotifications();
+  trace.mark('reconcile');
 
   const notifications = await getRecentNotifications();
+  trace.mark('read');
   if (!notifications || notifications.length === 0) {
     if (prunedExisting > 0) {
       appEvents.emit(EVENTS.RELOAD_ALL);
       await syncPendingOperationsAlert();
     }
+    trace.end('(no notifications)', { threshold: IDLE_PASS_LOG_MS });
     return summary;
   }
 
   const seen = new Set(await loadSignatures());
   const allowedPackages = await getAllowedPackages();
   const newlySeen = [];
+  trace.mark('signatures');
 
   // One best-effort location fix, shared by every operation auto-created this run.
   const getLocation = makeLocationProvider();
@@ -748,16 +769,22 @@ const runProcess = async () => {
     const date = descriptor.date || isoDateFromPostTime(notification.postTime) || todayIso();
 
     try {
-      const resolution = await resolveNotification(descriptor);
+      // Per-item timing, logged only for an item that was slow on its own. One
+      // notification stalling on a rate lookup or a GPS fix is the shape of the
+      // problem this is here to catch, and it is invisible in the run total when
+      // the other forty items were instant.
+      await traceAsync(`notifications.book ${descriptor.kind || descriptor.type}`, async () => {
+        const resolution = await resolveNotification(descriptor);
 
-      // Transfers (ATM cash withdrawals) move money between the user's own
-      // accounts, so they resolve a *target* account (a bound "cash" account)
-      // instead of a category. Everything else books as expense/income.
-      if (descriptor.isTransfer) {
-        await bookTransferOrQueue(descriptor, resolution, date, allowedPackages, summary, getLocation, bookOptions);
-      } else {
-        await bookExpenseOrQueue(descriptor, resolution, date, allowedPackages, summary, getLocation, bookOptions);
-      }
+        // Transfers (ATM cash withdrawals) move money between the user's own
+        // accounts, so they resolve a *target* account (a bound "cash" account)
+        // instead of a category. Everything else books as expense/income.
+        if (descriptor.isTransfer) {
+          await bookTransferOrQueue(descriptor, resolution, date, allowedPackages, summary, getLocation, bookOptions);
+        } else {
+          await bookExpenseOrQueue(descriptor, resolution, date, allowedPackages, summary, getLocation, bookOptions);
+        }
+      });
 
       seen.add(signature);
       newlySeen.push(signature);
@@ -766,6 +793,8 @@ const runProcess = async () => {
       console.error('[processBankNotifications] Failed to process notification:', error);
     }
   }
+
+  trace.mark('book');
 
   if (newlySeen.length > 0) {
     await saveSignatures([...seen]);
@@ -782,6 +811,16 @@ const runProcess = async () => {
   if (prunedExisting > 0) {
     await syncPendingOperationsAlert();
   }
+
+  trace.mark('finish');
+  trace.end(
+    `(read=${notifications.length} new=${newlySeen.length} created=${summary.created} `
+    + `pending=${summary.pending} skipped=${summary.skipped})`,
+    // A pass that booked, pruned or newly recognized something is worth a line as
+    // soon as it is perceptible; one that had nothing to do is on the auto-refresh
+    // timer and must not narrate every tick.
+    { threshold: newlySeen.length > 0 || prunedExisting > 0 ? undefined : IDLE_PASS_LOG_MS },
+  );
 
   return summary;
 };

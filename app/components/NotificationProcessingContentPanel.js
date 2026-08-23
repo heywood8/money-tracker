@@ -47,6 +47,7 @@ import { getLabelForMerchant } from '../services/NotificationRulesDB';
 import { getRecentNotifications } from '../services/NotificationAccess';
 import { normalizeMerchantLabel } from '../utils/labelUtils';
 import * as Currency from '../services/currency';
+import { startTrace } from '../services/perfTrace';
 import { BUTTON_COMPACT, BUTTON_TEXT, CARD_SURFACE, SECTION_LABEL } from '../styles/componentStyles';
 import EmptyState from './EmptyState';
 
@@ -196,34 +197,6 @@ export default function NotificationProcessingContentPanel({ active = true, onCr
     setHidden(Array.isArray(hiddenList) ? hiddenList : []);
   }, []);
 
-  // On mount: read the feature flag, process once (if enabled), then load the
-  // review queue and the recent-notifications feed.
-  useEffect(() => {
-    (async () => {
-      setLoading(true);
-      try {
-        // Every card in the feed parses itself as it renders, and that parse
-        // reads the user's templates from a synchronous cache. Load it before
-        // the first render — otherwise a notification only a template can read
-        // would draw as unrecognized until something else happened to populate
-        // the cache. Runs regardless of the feature toggle: the feed and its
-        // highlighting are shown either way.
-        await ensureCustomTemplatesLoaded();
-        const isOn = await isBankNotificationsEnabled();
-        if (!mountedRef.current) return;
-        if (isOn) {
-          await processBankNotifications();
-        }
-        // The pipeline (when run) already reconciled the queue.
-        if (mountedRef.current) await Promise.all([reloadPending({ reconcile: !isOn }), reloadRecent()]);
-      } catch (error) {
-        // Non-fatal; show whatever loaded.
-      } finally {
-        if (mountedRef.current) setLoading(false);
-      }
-    })();
-  }, [reloadPending, reloadRecent]);
-
   const handleRefresh = useCallback(async () => {
     setProcessing(true);
     try {
@@ -255,6 +228,46 @@ export default function NotificationProcessingContentPanel({ active = true, onCr
       autoRefreshingRef.current = false;
     }
   }, [reloadPending, reloadRecent]);
+
+  // On mount: put the feed on screen from what is already on the device, then
+  // run the ingestion pass behind it.
+  //
+  // The panel used to await processBankNotifications() before its first render,
+  // so the spinner covered work that has nothing to do with *showing*
+  // notifications: a best-effort GPS fix (bounded at 8 s), a live exchange-rate
+  // lookup per foreign-currency charge, and a database sweep per notification.
+  // The messages themselves arrived on the phone long ago and reading them is a
+  // SharedPreferences lookup, so displaying them never needed to wait on any of
+  // it — which is exactly why the wait had no visible cause. Ingestion still
+  // runs, a tick later, and its results land through the same reload the
+  // auto-refresh timer uses.
+  useEffect(() => {
+    (async () => {
+      const trace = startTrace('notifications.panel-open');
+      setLoading(true);
+      try {
+        // Every card in the feed parses itself as it renders, and that parse
+        // reads the user's templates from a synchronous cache. Load it before
+        // the first render — otherwise a notification only a template can read
+        // would draw as unrecognized until something else happened to populate
+        // the cache. Runs regardless of the feature toggle: the feed and its
+        // highlighting are shown either way.
+        await ensureCustomTemplatesLoaded();
+        trace.mark('templates');
+        // Skip the reconcile sweep here: the pass started below opens with one,
+        // and this load exists to paint, not to be right about a queued item a
+        // second before that pass is.
+        await Promise.all([reloadPending({ reconcile: false }), reloadRecent()]);
+        trace.mark('lists');
+      } catch (error) {
+        // Non-fatal; show whatever loaded.
+      } finally {
+        if (mountedRef.current) setLoading(false);
+        trace.end();
+      }
+      if (mountedRef.current) runSilentRefresh();
+    })();
+  }, [reloadPending, reloadRecent, runSilentRefresh]);
 
   // Auto-refresh every AUTO_REFRESH_MS once the initial load has finished, so
   // notifications arriving while the panel is open surface without a manual pull.

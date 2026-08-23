@@ -11,6 +11,7 @@
 import Decimal from 'decimal.js';
 import exchangeRatesData from '../../assets/exchange-rates.json';
 import currenciesData from '../../assets/currencies.json';
+import { SLOW_PHASE_MS } from './perfTrace';
 
 // Configure Decimal.js for financial calculations
 Decimal.set({
@@ -702,11 +703,36 @@ const liveRateCache = new Map();
 const CACHE_TTL_MS = 60 * 60 * 1000; // 1 hour
 const FETCH_TIMEOUT_MS = 5000; // 5 seconds
 
+// How long a currency whose live lookup keeps failing outright goes straight to
+// the offline rates instead of trying the network again.
+//
+// Only a *success* used to be remembered, so with no working connection every
+// caller paid the full two-URL timeout — 10 s each — and a caller that converts
+// in a loop paid it once per item. Bank-notification ingestion is exactly that
+// loop, which is how opening the notification feed could sit on its spinner for
+// a minute over work that needs no network at all (the offline table answers
+// the same question immediately). A minute is short enough that a connection
+// coming back is picked up almost at once, and long enough that one offline
+// batch pays the timeout a couple of times rather than once per item.
+const FETCH_FAILURE_BACKOFF_MS = 60 * 1000;
+
+// Consecutive outright failures before the backoff arms. The offline table is a
+// bundled snapshot, and a converted amount is written into an operation for
+// good — so a single flaky request must not be enough to silently switch a whole
+// batch onto stale rates. Two says "the network is down", not "one request lost
+// its connection"; a genuine outage still costs two timeouts for the batch
+// instead of one per item.
+const FETCH_FAILURES_BEFORE_BACKOFF = 2;
+
+// fromCurrency (lowercase) -> { at, consecutive } for lookups that reached no URL
+const failedFetches = new Map();
+
 /**
  * Clear the in-memory exchange rate cache (for testing)
  */
 export const clearExchangeRateCache = () => {
   liveRateCache.clear();
+  failedFetches.clear();
 };
 
 /**
@@ -738,44 +764,75 @@ export const fetchLiveExchangeRate = async (fromCurrency, toCurrency) => {
     }
   }
 
-  // Try fetching from APIs
-  const urls = [
-    `https://cdn.jsdelivr.net/npm/@fawazahmed0/currency-api@latest/v1/currencies/${fromLower}.min.json`,
-    `https://latest.currency-api.pages.dev/v1/currencies/${fromLower}.min.json`,
-  ];
+  // Try fetching from APIs — unless this currency's lookups keep failing, in
+  // which case the offline table answers now instead of after two more timeouts.
+  const failure = failedFetches.get(fromLower);
+  const backingOff = failure !== undefined
+    && failure.consecutive >= FETCH_FAILURES_BEFORE_BACKOFF
+    && Date.now() - failure.at < FETCH_FAILURE_BACKOFF_MS;
 
-  for (const url of urls) {
-    try {
-      const controller = new AbortController();
-      const timeoutId = setTimeout(() => controller.abort(), FETCH_TIMEOUT_MS);
+  if (!backingOff) {
+    const urls = [
+      `https://cdn.jsdelivr.net/npm/@fawazahmed0/currency-api@latest/v1/currencies/${fromLower}.min.json`,
+      `https://latest.currency-api.pages.dev/v1/currencies/${fromLower}.min.json`,
+    ];
 
-      const response = await fetch(url, { signal: controller.signal });
-      clearTimeout(timeoutId);
+    const fetchStartedAt = Date.now();
+    // Whether any URL answered with a usable rate table. A base currency that
+    // loaded but simply doesn't quote `toCurrency` is not a failed lookup — the
+    // table is cached for an hour, so nothing is gained by re-fetching it.
+    let ratesLoaded = false;
+    for (const url of urls) {
+      try {
+        const controller = new AbortController();
+        const timeoutId = setTimeout(() => controller.abort(), FETCH_TIMEOUT_MS);
 
-      if (!response.ok) continue;
+        const response = await fetch(url, { signal: controller.signal });
+        clearTimeout(timeoutId);
 
-      const data = await response.json();
-      const rates = data[fromLower];
-      if (rates && typeof rates === 'object') {
-        const validatedRates = {};
-        for (const [key, value] of Object.entries(rates)) {
-          if (typeof value === 'number' && value > 0 && isFinite(value)) {
-            validatedRates[key] = value;
+        if (!response.ok) continue;
+
+        const data = await response.json();
+        const rates = data[fromLower];
+        if (rates && typeof rates === 'object') {
+          const validatedRates = {};
+          for (const [key, value] of Object.entries(rates)) {
+            if (typeof value === 'number' && value > 0 && isFinite(value)) {
+              validatedRates[key] = value;
+            }
+          }
+          liveRateCache.set(fromLower, {
+            rates: validatedRates,
+            timestamp: Date.now(),
+          });
+          failedFetches.delete(fromLower);
+          ratesLoaded = true;
+
+          const rate = validatedRates[toLower];
+          if (rate !== undefined) {
+            return { rate: rate.toString(), source: 'live' };
           }
         }
-        liveRateCache.set(fromLower, {
-          rates: validatedRates,
-          timestamp: Date.now(),
-        });
-
-        const rate = validatedRates[toLower];
-        if (rate !== undefined) {
-          return { rate: rate.toString(), source: 'live' };
-        }
+      } catch {
+        // Network error or timeout, try next URL
+        continue;
       }
-    } catch {
-      // Network error or timeout, try next URL
-      continue;
+    }
+
+    // Every URL failed. Count it towards the backoff, and say so in the log when
+    // the attempt was slow enough for a caller to feel it — a conversion silently
+    // waiting on the network is not something the screen that triggered it shows.
+    if (!ratesLoaded) {
+      failedFetches.set(fromLower, {
+        at: Date.now(),
+        consecutive: (failure ? failure.consecutive : 0) + 1,
+      });
+      const elapsed = Date.now() - fetchStartedAt;
+      if (elapsed >= SLOW_PHASE_MS) {
+        console.debug(
+          `[perf] currency.rate ${fromCurrency}->${toCurrency} ${elapsed}ms (live lookup failed, using offline rates)`,
+        );
+      }
     }
   }
 
