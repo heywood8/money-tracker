@@ -1,5 +1,12 @@
 # Changelog
 
+## [0.272.4](https://github.com/heywood8/money-tracker/compare/penny-v0.272.3...penny-v0.272.4) (2026-08-23)
+
+
+### Bug Fixes
+
+* **updates:** hash the APK in slices so verification survives low memory ([#1631](https://github.com/heywood8/money-tracker/issues/1631)) ([00e3577](https://github.com/heywood8/money-tracker/commit/00e357788fc101a8ebc72651fa59c7cc1ce8f8ac))
+
 ## [0.272.3](https://github.com/heywood8/money-tracker/compare/penny-v0.272.2...penny-v0.272.3) (2026-08-23)
 
 
