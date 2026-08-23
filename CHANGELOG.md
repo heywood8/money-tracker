@@ -1,5 +1,12 @@
 # Changelog
 
+## [0.272.3](https://github.com/heywood8/money-tracker/compare/penny-v0.272.2...penny-v0.272.3) (2026-08-23)
+
+
+### Bug Fixes
+
+* **operations:** fill the screen with the loading skeleton ([#1629](https://github.com/heywood8/money-tracker/issues/1629)) ([d510654](https://github.com/heywood8/money-tracker/commit/d5106544ce9a17f04a993c788a075853b4689465))
+
 ## [0.272.2](https://github.com/heywood8/money-tracker/compare/penny-v0.272.1...penny-v0.272.2) (2026-08-23)
 
 
