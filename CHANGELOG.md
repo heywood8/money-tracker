@@ -1,5 +1,12 @@
 # Changelog
 
+## [0.272.5](https://github.com/heywood8/money-tracker/compare/penny-v0.272.4...penny-v0.272.5) (2026-08-23)
+
+
+### Bug Fixes
+
+* **notifications:** give the bank alerts real status-bar icons ([#1634](https://github.com/heywood8/money-tracker/issues/1634)) ([fdb920e](https://github.com/heywood8/money-tracker/commit/fdb920e02400b9c08f21ae20da49c3e51e9f2bba))
+
 ## [0.272.4](https://github.com/heywood8/money-tracker/compare/penny-v0.272.3...penny-v0.272.4) (2026-08-23)
 
 
