@@ -36,6 +36,10 @@ module.exports = {
       adaptiveIcon: {
         foregroundImage: './assets/adaptive-icon.png',
         backgroundColor: '#ffffff',
+        // Android 13+ themed icons tint a single-colour layer with the user's
+        // wallpaper palette. Without one the launcher falls back to the full
+        // adaptive icon, so Penny's mascot sat unthemed among themed icons.
+        monochromeImage: './assets/monochrome-icon.png',
       },
       edgeToEdgeEnabled: true,
       package: 'com.heywood8.monkeep',
@@ -103,7 +107,21 @@ module.exports = {
       // alert. Only local (scheduled) notifications are used — no push/FCM setup
       // is required. The plugin also declares the POST_NOTIFICATIONS permission
       // needed on Android 13+.
-      'expo-notifications',
+      //
+      // `icon` is required, not cosmetic: Android draws the small icon as an
+      // alpha mask, so without a purpose-made monochrome asset it falls back to
+      // the launcher icon and every alert shows up as a featureless white blob.
+      // This one is the default; the per-alert icons are set by the plugin below.
+      [
+        'expo-notifications',
+        {
+          icon: './assets/notification-icon.png',
+          color: '#007AFF',
+        },
+      ],
+      // Gives the "transactions to review" and "operations added" alerts their
+      // own status-bar icons, which expo-notifications alone cannot express.
+      './plugins/withNotificationIcons.js',
     ],
     updates: {
       'url': 'https://u.expo.dev/89372eb2-93f5-475a-a630-9caa827d8406',

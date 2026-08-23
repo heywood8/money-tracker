@@ -339,6 +339,28 @@ already looking at the app, where `RELOAD_ALL` refreshes the lists instead.
 Tapping either opens the Operations tab; only the review alert additionally
 surfaces the suggestion deck.
 
+**Status-bar icons.** Android draws a notification's small icon as an alpha mask
+— every non-transparent pixel is painted flat white, colour discarded — so the
+launcher icon (a mascot on a filled disc) arrived in the status bar as a
+featureless white circle. Each alert now carries its own monochrome glyph:
+banknote + clock for the review task, banknote + tick for the receipt. Which one
+arrived is readable without pulling the shade down.
+
+Android picks the small icon per notification, but expo-notifications exposes
+only one app-wide icon: its config plugin writes the
+`expo.modules.notifications.default_notification_icon` meta-data, and
+`ExpoNotificationBuilder` reads that for every notification it builds. The
+per-alert choice is therefore made natively. `plugins/withNotificationIcons.js`
+declares a `NotificationsService` subclass at intent-filter priority 0 — expo's
+own receiver sits at -1 and dispatch resolves through
+`queryBroadcastReceivers().firstOrNull()`, so the app-level one wins — whose
+builder overrides `icon` by reading the `route` value already carried in each
+alert's payload. Nothing else is replaced: tap routing, the action button,
+dismissal and scheduling are inherited, and a route the override does not
+recognise falls back to the app-wide icon. The glyphs themselves are generated
+by `scripts/generate-notification-icon.js` (Material Design Icons path data,
+rendered to a PNG for the expo plugin and to vector drawables for the variants).
+
 **The receipt is skipped under an open app.** A wakeup never *starts* while the
 app is foregrounded — `expo-background-task`'s scheduler bails out and
 re-enqueues — but it routinely *finishes* under one: a run released from Doze, or
