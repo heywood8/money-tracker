@@ -34,6 +34,10 @@ module.exports = {
         // Android 13+ themed icons tint a single-colour layer with the user's
         // wallpaper palette. Without one the launcher falls back to the full
         // adaptive icon, so Penny's mascot sat unthemed among themed icons.
+        // The layer is the mascot itself, extracted from the foreground artwork
+        // as a silhouette with the face punched out of it (a flat silhouette of
+        // a character drawn on a disc is just a disc); see
+        // scripts/generate-notification-icon.js.
         monochromeImage: './assets/monochrome-icon.png',
       },
       edgeToEdgeEnabled: true,

@@ -28,16 +28,23 @@
  * expo-notifications' `icon` prop and `android.adaptiveIcon.monochromeImage` —
  * take raster input and generate the density buckets themselves.
  *
- * Artwork: Material Design Icons (github.com/Templarian/MaterialDesign), Apache
- * License 2.0 — the unmodified 24x24 path data of `cash-multiple`, `cash-check`,
- * `cash-clock` and `piggy-bank`.
+ * The themed launcher icon is a different job with the same constraint: Android
+ * 13+ paints that layer in one colour drawn from the wallpaper, so it too has to
+ * survive as a silhouette. It is not drawn here — it is *extracted* from
+ * assets/adaptive-icon.png, so the themed icon stays Penny's own mascot and
+ * follows the artwork if the artwork is ever redrawn.
+ *
+ * Artwork: the notification glyphs are Material Design Icons
+ * (github.com/Templarian/MaterialDesign), Apache License 2.0 — the unmodified
+ * 24x24 path data of `cash-multiple`, `cash-check` and `cash-clock`.
  *
  * Regenerate (only needed when the artwork changes):
  *
  *   node scripts/generate-notification-icon.js
  *
- * Pure Node: rasterization and PNG encoding are done here (zlib + CRC32) rather
- * than pulling in an image dependency for four files that rarely change.
+ * Pure Node: rasterization, PNG decoding and PNG encoding are all done here
+ * (zlib + CRC32) rather than pulling in an image dependency for four files that
+ * rarely change.
  */
 
 const fs = require('fs');
@@ -57,9 +64,6 @@ const GLYPHS = {
   cashCheck: 'M3 6V18H13.32C13.1 17.33 13 16.66 13 16H7C7 14.9 6.11 14 5 14V10C6.11 10 7 9.11 7 8H17C17 9.11 17.9 10 19 10V10.06C19.67 10.06 20.34 10.18 21 10.4V6H3M12 9C10.3 9.03 9 10.3 9 12C9 13.7 10.3 14.94 12 15C12.38 15 12.77 14.92 13.14 14.77C13.41 13.67 13.86 12.63 14.97 11.61C14.85 10.28 13.59 8.97 12 9M21.63 12.27L17.76 16.17L16.41 14.8L15 16.22L17.75 19L23.03 13.68L21.63 12.27Z',
   // Banknote + clock: transactions parked in the review queue. Waiting on you.
   cashClock: 'M17.5 16.82L19.94 18.23L19.19 19.53L16 17.69V14H17.5V16.82M24 17C24 20.87 20.87 24 17 24S10 20.87 10 17C10 16.66 10.03 16.33 10.08 16H2V4H20V10.68C22.36 11.81 24 14.21 24 17M10.68 14C10.86 13.64 11.05 13.3 11.28 12.97C11.19 13 11.1 13 11 13C9.34 13 8 11.66 8 10S9.34 7 11 7 14 8.34 14 10C14 10.25 13.96 10.5 13.9 10.73C14.84 10.27 15.89 10 17 10C17.34 10 17.67 10.03 18 10.08V8C16.9 8 16 7.11 16 6H6C6 7.11 5.11 8 4 8V12C5.11 12 6 12.9 6 14H10.68M22 17C22 14.24 19.76 12 17 12S12 14.24 12 17 14.24 22 17 22 22 19.76 22 17Z',
-  // The piggy bank stands in for the app itself on the themed launcher icon,
-  // where the mascot's filled disc has the same silhouette problem.
-  piggyBank: 'M19.83 7.5L17.56 5.23C17.63 4.81 17.74 4.42 17.88 4.08C17.96 3.9 18 3.71 18 3.5C18 2.67 17.33 2 16.5 2C14.86 2 13.41 2.79 12.5 4H7.5C4.46 4 2 6.46 2 9.5S4.5 21 4.5 21H10V19H12V21H17.5L19.18 15.41L22 14.47V7.5H19.83M13 9H8V7H13V9M16 11C15.45 11 15 10.55 15 10S15.45 9 16 9C16.55 9 17 9.45 17 10S16.55 11 16 11Z',
 };
 
 const VIEWPORT = 24;
@@ -113,10 +117,15 @@ const flattenPath = (d) => {
 
   // Endpoint -> centre parameterisation, per the SVG implementation notes.
   const arcTo = (rxIn, ryIn, rotation, largeArc, sweep, endX, endY) => {
+    // Both degenerate cases are spelled out by the spec: a zero radius draws a
+    // straight line, and coincident endpoints omit the arc entirely. Neither can
+    // go through the maths below — the second divides by zero, which would put
+    // NaN into the contours and from there into a drawable's transform.
     if (rxIn === 0 || ryIn === 0) {
       push(endX, endY);
       return;
     }
+    if (x === endX && y === endY) return;
     let rx = Math.abs(rxIn);
     let ry = Math.abs(ryIn);
     const phi = (rotation * Math.PI) / 180;
@@ -437,6 +446,250 @@ const encodePng = (pixels, size) => {
 };
 
 // ---------------------------------------------------------------------------
+// Mascot silhouette
+// ---------------------------------------------------------------------------
+
+/**
+ * Decode an 8-bit RGBA PNG into a flat pixel buffer.
+ *
+ * Handles what the project's own assets are (colour type 6, no interlacing) and
+ * refuses anything else rather than returning quietly wrong pixels.
+ *
+ * @param {string} file
+ * @returns {{ width: number, height: number, pixels: Buffer }}
+ */
+const decodePng = (file) => {
+  const png = fs.readFileSync(file);
+  let offset = 8; // skip the signature
+  let width = 0;
+  let height = 0;
+  const data = [];
+
+  while (offset < png.length) {
+    const length = png.readUInt32BE(offset);
+    const type = png.toString('ascii', offset + 4, offset + 8);
+    const chunk = png.subarray(offset + 8, offset + 8 + length);
+    if (type === 'IHDR') {
+      width = chunk.readUInt32BE(0);
+      height = chunk.readUInt32BE(4);
+      if (chunk[8] !== 8 || chunk[9] !== 6 || chunk[12] !== 0) {
+        throw new Error(`${file}: expected an 8-bit RGBA non-interlaced PNG`);
+      }
+    } else if (type === 'IDAT') {
+      data.push(chunk);
+    }
+    offset += 12 + length;
+  }
+
+  const raw = zlib.inflateSync(Buffer.concat(data));
+  const stride = width * 4;
+  const pixels = Buffer.alloc(height * stride);
+  let read = 0;
+
+  // Undo the per-row filter. Each byte is predicted from the one to its left
+  // (a), above (b) and above-left (c); see the PNG spec, "Filtering".
+  for (let y = 0; y < height; y += 1) {
+    const filter = raw[read];
+    read += 1;
+    for (let i = 0; i < stride; i += 1) {
+      const value = raw[read + i];
+      const a = i >= 4 ? pixels[y * stride + i - 4] : 0;
+      const b = y > 0 ? pixels[(y - 1) * stride + i] : 0;
+      const c = i >= 4 && y > 0 ? pixels[(y - 1) * stride + i - 4] : 0;
+      let restored;
+      switch (filter) {
+      case 0: restored = value; break;
+      case 1: restored = value + a; break;
+      case 2: restored = value + b; break;
+      case 3: restored = value + ((a + b) >> 1); break;
+      case 4: {
+        const p = a + b - c;
+        const pa = Math.abs(p - a);
+        const pb = Math.abs(p - b);
+        const pc = Math.abs(p - c);
+        restored = value + (pa <= pb && pa <= pc ? a : pb <= pc ? b : c);
+        break;
+      }
+      default: throw new Error(`${file}: unknown row filter ${filter}`);
+      }
+      pixels[y * stride + i] = restored & 0xff;
+    }
+    read += stride;
+  }
+
+  return { width, height, pixels };
+};
+
+/**
+ * How the mascot artwork is read. The character is drawn in warm colours (orange
+ * fill, brown line work) on a cold near-black plate, which is what these two
+ * thresholds separate — no colour is matched exactly, so a re-coloured mascot
+ * still comes out right.
+ */
+const PLATE_MAX_CHANNEL = 90; // the plate is dark…
+const LINE_WORK_LUMA = 110; // …and the line work is darker than the fill
+
+/**
+ * Extract the mascot as a one-bit silhouette: the character solid, its face cut
+ * out of it.
+ *
+ * The whole point is the cut-outs. Flattened naively, the mascot is a filled
+ * disc — the very white blob this script exists to avoid — so the eyes and smile
+ * have to become holes. They are found structurally rather than by position: the
+ * dark line work is grouped into connected regions, and a region is a hole when
+ * it is fully enclosed by the character. The outline and the limbs touch the
+ * outside and stay solid; the eyes, lashes and smile do not and are punched out.
+ *
+ * @param {string} file - the adaptive icon's foreground artwork
+ * @returns {{ width: number, height: number, mask: Uint8Array, bounds: { minX: number, minY: number, maxX: number, maxY: number } }}
+ */
+const mascotSilhouette = (file) => {
+  const { width, height, pixels } = decodePng(file);
+  const count = width * height;
+  const isCharacter = new Uint8Array(count);
+  const isLineWork = new Uint8Array(count);
+
+  for (let i = 0; i < count; i += 1) {
+    const r = pixels[i * 4];
+    const g = pixels[i * 4 + 1];
+    const b = pixels[i * 4 + 2];
+    if (pixels[i * 4 + 3] < 128) continue;
+    if (b >= r && Math.max(r, g, b) < PLATE_MAX_CHANNEL) continue; // the plate
+    isCharacter[i] = 1;
+    if (0.299 * r + 0.587 * g + 0.114 * b < LINE_WORK_LUMA) isLineWork[i] = 1;
+  }
+
+  // Flood the background in from the border. Anything it cannot reach is inside
+  // the character — which also fills the stray specks the artwork's own
+  // anti-aliasing leaves behind, instead of pitting the silhouette with them.
+  const outside = new Uint8Array(count);
+  const queue = [];
+  const visit = (index) => {
+    if (!isCharacter[index] && !outside[index]) {
+      outside[index] = 1;
+      queue.push(index);
+    }
+  };
+  for (let x = 0; x < width; x += 1) {
+    visit(x);
+    visit((height - 1) * width + x);
+  }
+  for (let y = 0; y < height; y += 1) {
+    visit(y * width);
+    visit(y * width + width - 1);
+  }
+  while (queue.length) {
+    const index = queue.pop();
+    const x = index % width;
+    const y = (index - x) / width;
+    if (x > 0) visit(index - 1);
+    if (x < width - 1) visit(index + 1);
+    if (y > 0) visit(index - width);
+    if (y < height - 1) visit(index + width);
+  }
+
+  // Group the line work, tracking whether each group reaches the outside.
+  const group = new Int32Array(count).fill(-1);
+  const reachesOutside = [];
+  const groupSize = [];
+  for (let start = 0; start < count; start += 1) {
+    if (!isLineWork[start] || group[start] >= 0) continue;
+    const id = reachesOutside.length;
+    reachesOutside.push(false);
+    groupSize.push(0);
+    group[start] = id;
+    queue.push(start);
+    while (queue.length) {
+      const index = queue.pop();
+      const x = index % width;
+      const y = (index - x) / width;
+      groupSize[id] += 1;
+      for (let dy = -1; dy <= 1; dy += 1) {
+        for (let dx = -1; dx <= 1; dx += 1) {
+          const nx = x + dx;
+          const ny = y + dy;
+          if (nx < 0 || ny < 0 || nx >= width || ny >= height) {
+            reachesOutside[id] = true;
+            continue;
+          }
+          const neighbour = ny * width + nx;
+          if (outside[neighbour]) reachesOutside[id] = true;
+          else if (isLineWork[neighbour] && group[neighbour] < 0) {
+            group[neighbour] = id;
+            queue.push(neighbour);
+          }
+        }
+      }
+    }
+  }
+
+  // A few pixels of enclosed line work is a compression artefact, not a feature.
+  const minimumFeature = Math.round(count * 0.00005);
+  const isHole = (id) => !reachesOutside[id] && groupSize[id] >= minimumFeature;
+
+  const mask = new Uint8Array(count);
+  const bounds = { minX: width, minY: height, maxX: -1, maxY: -1 };
+  for (let i = 0; i < count; i += 1) {
+    if (outside[i]) continue;
+    const x = i % width;
+    const y = (i - x) / width;
+    if (x < bounds.minX) bounds.minX = x;
+    if (x > bounds.maxX) bounds.maxX = x;
+    if (y < bounds.minY) bounds.minY = y;
+    if (y > bounds.maxY) bounds.maxY = y;
+    if (group[i] >= 0 && isHole(group[i])) continue;
+    mask[i] = 1;
+  }
+
+  if (bounds.maxX < 0) throw new Error(`${file}: found no artwork to extract`);
+  return { width, height, mask, bounds };
+};
+
+/**
+ * Draw a silhouette onto a square canvas, fitted to the live area the same way
+ * `fitToLiveArea` fits a path — same rule, different input.
+ *
+ * @param {{ width: number, height: number, mask: Uint8Array, bounds: object }} silhouette
+ * @param {number} size - canvas edge in pixels
+ * @param {number} liveArea - target size of the glyph's longest side, in viewport units
+ * @returns {Buffer}
+ */
+const rasterizeSilhouette = (silhouette, size, liveArea) => {
+  const { width, height, mask, bounds } = silhouette;
+  const artWidth = bounds.maxX - bounds.minX + 1;
+  const artHeight = bounds.maxY - bounds.minY + 1;
+  const target = (size * liveArea) / VIEWPORT;
+  const scale = target / Math.max(artWidth, artHeight);
+  const originX = (size - artWidth * scale) / 2;
+  const originY = (size - artHeight * scale) / 2;
+
+  const pixels = Buffer.alloc(size * size * 4);
+  const step = 1 / SUPERSAMPLE;
+  const samples = SUPERSAMPLE * SUPERSAMPLE;
+
+  for (let py = 0; py < size; py += 1) {
+    for (let px = 0; px < size; px += 1) {
+      let hits = 0;
+      for (let sy = 0; sy < SUPERSAMPLE; sy += 1) {
+        for (let sx = 0; sx < SUPERSAMPLE; sx += 1) {
+          const ax = Math.floor((px + (sx + 0.5) * step - originX) / scale) + bounds.minX;
+          const ay = Math.floor((py + (sy + 0.5) * step - originY) / scale) + bounds.minY;
+          if (ax >= 0 && ay >= 0 && ax < width && ay < height && mask[ay * width + ax]) {
+            hits += 1;
+          }
+        }
+      }
+      const offset = (py * size + px) * 4;
+      pixels[offset] = 255;
+      pixels[offset + 1] = 255;
+      pixels[offset + 2] = 255;
+      pixels[offset + 3] = Math.round((hits / samples) * 255);
+    }
+  }
+  return pixels;
+};
+
+// ---------------------------------------------------------------------------
 // Vector drawable
 // ---------------------------------------------------------------------------
 
@@ -493,22 +746,22 @@ const MONOCHROME_LIVE_AREA = 13.5;
 
 const PNG_TARGETS = [
   {
-    // xxhdpi 24dp status-bar icon, consumed by the expo-notifications config
-    // plugin, which downscales it into every density bucket.
+    // The 24dp status-bar icon at its largest density: expo-notifications scales
+    // a 24px baseline into every bucket, so 96px is the xxxhdpi one and every
+    // other bucket is downscaled from it.
     file: path.join(ASSETS_DIR, 'notification-icon.png'),
     glyph: GLYPHS.cashMultiple,
     size: 96,
     liveArea: SMALL_ICON_LIVE_AREA,
   },
-  {
-    // Themed launcher icon (android.adaptiveIcon.monochromeImage), on the same
-    // canvas as adaptive-icon.png.
-    file: path.join(ASSETS_DIR, 'monochrome-icon.png'),
-    glyph: GLYPHS.piggyBank,
-    size: 592,
-    liveArea: MONOCHROME_LIVE_AREA,
-  },
 ];
+
+/** Source and destination for the themed launcher icon. */
+const ADAPTIVE_ICON = path.join(ASSETS_DIR, 'adaptive-icon.png');
+const MONOCHROME_ICON = path.join(ASSETS_DIR, 'monochrome-icon.png');
+
+/** Themed launcher layers keep the adaptive icon's canvas. */
+const MONOCHROME_SIZE = 592;
 
 const VECTOR_TARGETS = [
   { file: path.join(DRAWABLES_DIR, 'notification_icon_added.xml'), glyph: GLYPHS.cashCheck },
@@ -530,6 +783,14 @@ const generate = () => {
     fs.writeFileSync(target.file, vectorDrawable(target.glyph, fit));
     console.log(`wrote ${path.relative(process.cwd(), target.file)}`);
   }
+
+  const silhouette = mascotSilhouette(ADAPTIVE_ICON);
+  const monochrome = encodePng(
+    rasterizeSilhouette(silhouette, MONOCHROME_SIZE, MONOCHROME_LIVE_AREA),
+    MONOCHROME_SIZE,
+  );
+  fs.writeFileSync(MONOCHROME_ICON, monochrome);
+  console.log(`wrote ${path.relative(process.cwd(), MONOCHROME_ICON)} (${MONOCHROME_SIZE}x${MONOCHROME_SIZE}, ${monochrome.length} bytes)`);
 };
 
 if (require.main === module) {
@@ -543,8 +804,15 @@ module.exports = {
   GLYPHS,
   VIEWPORT,
   SMALL_ICON_LIVE_AREA,
+  MONOCHROME_LIVE_AREA,
+  ADAPTIVE_ICON,
+  MONOCHROME_SIZE,
+  MONOCHROME_ICON,
+  decodePng,
   flattenPath,
   fitToLiveArea,
   vectorDrawable,
+  mascotSilhouette,
+  rasterizeSilhouette,
   generate,
 };
