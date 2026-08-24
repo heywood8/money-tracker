@@ -1,5 +1,5 @@
 import React, { useState, useMemo, useRef, useEffect, useCallback } from 'react';
-import { View, Text, StyleSheet, TouchableOpacity, ActivityIndicator } from 'react-native';
+import { View, Text, StyleSheet, TouchableOpacity, ActivityIndicator, Dimensions } from 'react-native';
 import PropTypes from 'prop-types';
 import {
   CartesianChart,
@@ -25,9 +25,21 @@ import { useDisplaySettings } from '../../contexts/DisplaySettingsContext';
 import { getJsonPreference, setJsonPreference, PREF_KEYS } from '../../services/PreferencesDB';
 import { balanceLineColors } from '../../styles/chartPalette';
 import BalanceHistoryCalendarView from './BalanceHistoryCalendarView';
-import { getMonthAbbreviations } from './monthLabels';
+import {
+  getMonthAbbreviations,
+  measureWidestLabel,
+  resolveLabelStride,
+} from './monthLabels';
 import { CARD_SURFACE } from '../../styles/componentStyles';
 import { BORDER_RADIUS, FONT_SIZE, SPACING } from '../../styles/designTokens';
+
+// Size the axis labels are drawn at, and the size their widths are estimated
+// against when the font cannot measure itself.
+const AXIS_FONT_SIZE = 11;
+// What the y-axis labels and their gutter take out of the card before the plot
+// itself starts. The month pitch is derived from what is left, so the year
+// view's labels are thinned against the width they actually have.
+const Y_AXIS_ALLOWANCE = 44;
 
 // Helper to format numbers compactly (e.g., 10K, 1.5M)
 const formatCompact = (value, currency) => {
@@ -733,6 +745,7 @@ const BalanceChart = ({
   xTickValues,
   monthByDay,
   monthAbbreviations,
+  chartWidth,
   showDeviationBand = true,
 }) => {
   const pressInit = useRef({
@@ -772,18 +785,35 @@ const BalanceChart = ({
       enableRescaling: true,
     };
     if (xTickValues) {
+      // A year's worth of months is a tighter fit than the trends card's, so the
+      // labels are thinned to what the plot can hold while every month keeps its
+      // tick — the gridlines stay on the real month boundaries either way.
+      // Phased on the month, so January is always among the labelled ones.
+      //
+      // Measured from the resting layout: the chart's pinch zoom lives in a
+      // shared value the axis never sees, so zooming in does not bring the
+      // skipped labels back.
+      const stride = resolveLabelStride(
+        Math.max(chartWidth - Y_AXIS_ALLOWANCE, 0) / xTickValues.length,
+        measureWidestLabel(monthAbbreviations, axisFont, AXIS_FONT_SIZE),
+        AXIS_FONT_SIZE,
+      );
       return {
         ...base,
         tickValues: xTickValues,
         // Victory downsamples tickValues to its default tickCount of 5, which
-        // labelled five of the twelve months at uneven spacing. Asking for as
+        // put five ticks on the twelve months at uneven spacing. Asking for as
         // many ticks as there are months keeps all twelve.
         tickCount: xTickValues.length,
-        formatXLabel: (value) => monthAbbreviations[monthByDay?.[Math.round(value)]] ?? '',
+        formatXLabel: (value) => {
+          const month = monthByDay?.[Math.round(value)];
+          if (month == null || month % stride !== 0) return '';
+          return monthAbbreviations[month] ?? '';
+        },
       };
     }
     return { ...base, formatXLabel: (value) => formatXAxisLabel(value, lastDay) };
-  }, [axisFont, colors.border, colors.mutedText, lastDay, xTickValues, monthByDay, monthAbbreviations]);
+  }, [axisFont, colors.border, colors.mutedText, lastDay, xTickValues, monthByDay, monthAbbreviations, chartWidth]);
 
   const yAxis = useMemo(() => ([{
     font: axisFont,
@@ -866,6 +896,7 @@ const BalanceChart = ({
 BalanceChart.propTypes = {
   axisFont: PropTypes.object,
   chartData: PropTypes.array.isRequired,
+  chartWidth: PropTypes.number,
   chartSeries: PropTypes.array.isRequired,
   chartYKeys: PropTypes.arrayOf(PropTypes.string).isRequired,
   colors: PropTypes.object.isRequired,
@@ -904,6 +935,10 @@ const BalanceHistoryCard = ({
 }) => {
   const { hideBalances } = useDisplaySettings();
   const monthAbbreviations = useMemo(() => getMonthAbbreviations(t), [t]);
+  // Measured rather than derived from the window: the card is inset, and its
+  // chart bleeds back out past that inset. Seeded with the screen width so the
+  // first frame is close, then corrected on layout.
+  const [chartWidth, setChartWidth] = useState(Dimensions.get('window').width);
   // `showCalendar` is the user's intent; `calendarVisible` below is whether it
   // can be honoured — the year view has no calendar and hides the toggle, so a
   // calendar left open across a period switch would otherwise strand the user in
@@ -1027,7 +1062,7 @@ const BalanceHistoryCard = ({
   // returns a stub under Jest and a real SkFont on device.
   const axisFont = useMemo(() => {
     try {
-      return matchFont({ fontFamily: 'sans-serif', fontSize: 11 }) || null;
+      return matchFont({ fontFamily: 'sans-serif', fontSize: AXIS_FONT_SIZE }) || null;
     } catch (e) {
       return null;
     }
@@ -1202,6 +1237,7 @@ const BalanceHistoryCard = ({
                 {chartComputed && (
                   <View
                     style={[styles.balanceHistoryChart, { backgroundColor: colors.altRow }]}
+                    onLayout={(e) => setChartWidth(e.nativeEvent.layout.width)}
                     accessibilityRole="image"
                     accessibilityLabel={t('balance_history') || 'Balance history chart'}
                   >
@@ -1219,6 +1255,7 @@ const BalanceHistoryCard = ({
                       xTickValues={isYearView ? chartComputed.monthTicks : undefined}
                       monthByDay={isYearView ? chartComputed.monthByDay : undefined}
                       monthAbbreviations={monthAbbreviations}
+                      chartWidth={chartWidth}
                       showDeviationBand={!isYearView && showPlainAvg}
                     />
                   </View>

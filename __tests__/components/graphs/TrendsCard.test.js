@@ -1,6 +1,6 @@
 import React from 'react';
 import { render, fireEvent } from '@testing-library/react-native';
-import TrendsCard, { formatPctTick, formatYTick, resolveLabelStride, resolveScrollTarget, resolveTapIndex } from '../../../app/components/graphs/TrendsCard';
+import TrendsCard, { canLabelYear, formatPctTick, formatYTick, resolveScrollTarget, resolveTapIndex } from '../../../app/components/graphs/TrendsCard';
 import useMonthlyTrendSeries from '../../../app/hooks/useMonthlyTrendSeries';
 
 // Mock the hook
@@ -776,23 +776,27 @@ describe('TrendsCard', () => {
       });
     });
 
-    describe('resolveLabelStride', () => {
-      it('labels every month at the resting pitch', () => {
-        expect(resolveLabelStride(36)).toBe(1);
-        expect(resolveLabelStride(96)).toBe(1);
+    describe('canLabelYear', () => {
+      // A January's neighbours are ordinary labels one slot away, so what has to
+      // fit in a slot is half of each label plus a gap.
+      const MONTH = 16;
+      const YEAR = 30;
+      const FONT_SIZE = 9;
+
+      it('carries the year where the slot has room for it', () => {
+        expect(canLabelYear(72, YEAR, MONTH, FONT_SIZE)).toBe(true);
       });
 
-      it('thins the labels out once a month is too narrow to hold one', () => {
-        // Localised abbreviations are wider than the two glyphs the axis used
-        // to draw, so a fully pinched-out chart labels every other month rather
-        // than smearing them together.
-        expect(resolveLabelStride(18)).toBe(2);
-        expect(resolveLabelStride(8)).toBe(3);
+      it('drops the year rather than running it into the months beside it', () => {
+        expect(canLabelYear(24, YEAR, MONTH, FONT_SIZE)).toBe(false);
       });
 
-      it('never returns a stride that would drop every label', () => {
-        expect(resolveLabelStride(0)).toBe(1);
-        expect(resolveLabelStride(-10)).toBe(1);
+      it('holds the year to half the clearance the repeating labels get', () => {
+        // One tick in twelve: losing the only marker that tells one January
+        // from the next costs more than its tighter spacing does.
+        const slot = (YEAR + MONTH) / 2 + FONT_SIZE;
+        expect(canLabelYear(slot, YEAR, MONTH, FONT_SIZE)).toBe(true);
+        expect(canLabelYear(slot - 1, YEAR, MONTH, FONT_SIZE)).toBe(false);
       });
     });
 

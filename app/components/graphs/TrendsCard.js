@@ -10,7 +10,13 @@ import currencies from '../../../assets/currencies.json';
 import useMonthlyTrendSeries, { ALL_CATEGORIES } from '../../hooks/useMonthlyTrendSeries';
 import { BORDER_RADIUS, FONT_SIZE, HORIZONTAL_PADDING, SPACING } from '../../styles/designTokens';
 import { comparisonSeriesColor, ledgerSeriesColors } from '../../styles/chartPalette';
-import { getMonthAbbreviations } from './monthLabels';
+import {
+  getMonthAbbreviations,
+  labelGapFor,
+  measureLabelWidth,
+  measureWidestLabel,
+  resolveLabelStride,
+} from './monthLabels';
 import ModalBlurOverlay from '../ModalBlurOverlay';
 import CategoryGridSelector from '../CategoryGridSelector';
 import { useDisplaySettings } from '../../contexts/DisplaySettingsContext';
@@ -68,13 +74,12 @@ const ACCESSIBILITY_ACTIONS = [{ name: 'increment' }, { name: 'decrement' }];
 const DEFAULT_MONTH_WIDTH = 36;
 const MIN_MONTH_WIDTH = 18;
 const MAX_MONTH_WIDTH = 96;
-// A tick needs room for its own label plus a gap between it and its neighbours.
-// Localised abbreviations are wider than the two glyphs the axis used to draw,
-// so below this pitch only every Nth month is labelled rather than letting the
-// months smear into one another when the chart is pinched out.
-const MIN_LABEL_PITCH = 24;
-// A January carries its year, but only where the pitch has room for both.
-const YEAR_SUFFIX_PITCH = 34;
+// Size the axis labels are drawn at, and the size their widths are estimated
+// against when the font cannot measure itself.
+const AXIS_FONT_SIZE = 9;
+// Stands in for any year in the width measurement — the digits are the same
+// width whichever year it is.
+const YEAR_SAMPLE = "'00";
 // Gutter for the pinned y-axis. It sits outside the scroller, so the scale stays
 // readable however far back the user has scrolled.
 const Y_AXIS_WIDTH = 34;
@@ -122,11 +127,16 @@ export const resolveTapIndex = (x, monthWidth, count) => {
 };
 
 /**
- * How many months apart the labelled ticks are at a given pitch: 1 (label every
- * month) until the months are too narrow to hold a label, then 2, 3, ...
+ * Whether a January tick has room to carry its year.
+ *
+ * Its neighbours are ordinary month labels one slot away, so what has to fit in
+ * a slot is half of each label plus a gap. The gap it is held to is half the one
+ * the repeating labels get: this is one tick in twelve, and losing the only
+ * marker that tells one January from the next costs more than its tighter
+ * spacing does.
  */
-export const resolveLabelStride = (pitch) => (
-  pitch > 0 ? Math.max(1, Math.ceil(MIN_LABEL_PITCH / pitch)) : 1
+export const canLabelYear = (slot, yearWidth, monthWidth, fontSize) => (
+  slot >= (yearWidth + monthWidth) / 2 + labelGapFor(fontSize) / 2
 );
 
 export const formatYTick = (value) => {
@@ -223,7 +233,7 @@ const TrendBarChart = ({
   // under Jest and a real SkFont on device, so the call is guarded.
   const axisFont = useMemo(() => {
     try {
-      return matchFont({ fontFamily: 'sans-serif', fontSize: 9 }) || null;
+      return matchFont({ fontFamily: 'sans-serif', fontSize: AXIS_FONT_SIZE }) || null;
     } catch (e) {
       return null;
     }
@@ -467,24 +477,41 @@ const TrendBarChart = ({
 
   const formatYLabel = isStacked ? formatPctTick : formatYTick;
 
+  // How many months a label is actually allowed to claim. A locale's own
+  // abbreviations are not all the same width — "Июл" is half again as wide as
+  // "Jul" — so the axis measures them rather than assuming a character count,
+  // and thins the labels out when a month cannot hold one with room to spare.
+  const labelWidths = useMemo(() => {
+    const month = measureWidestLabel(monthAbbreviations, axisFont, AXIS_FONT_SIZE);
+    const january = monthAbbreviations[0] ?? '';
+    return {
+      month,
+      year: measureLabelWidth(`${january}${YEAR_SAMPLE}`, axisFont, AXIS_FONT_SIZE),
+    };
+  }, [monthAbbreviations, axisFont]);
+
+  const labelStride = resolveLabelStride(pitch, labelWidths.month, AXIS_FONT_SIZE);
   // Twelve months no longer fit in one window, so a bare "Jan" cannot say which
-  // January it is. Each January carries its year, where the pitch has room.
-  //
-  // The stride is counted back from the newest month rather than forward from
-  // the oldest, so the month the card opens on is always one of the labelled
-  // ones however far back the history runs.
-  const labelStride = resolveLabelStride(pitch);
+  // January it is. Each January carries its year, where its slot has room.
+  const showYear = canLabelYear(
+    pitch * labelStride,
+    labelWidths.year,
+    labelWidths.month,
+    AXIS_FONT_SIZE,
+  );
+
   const formatXLabel = useCallback((value) => {
-    const index = Math.round(value);
-    const item = data[index];
+    const item = data[Math.round(value)];
     if (!item) return '';
-    if ((count - 1 - index) % labelStride !== 0) return '';
+    // Phased on the month, so January is labelled at every stride and the same
+    // months stay labelled as the window scrolls or a new month rolls in.
+    if (item.month % labelStride !== 0) return '';
     const abbreviation = monthAbbreviations[item.month] ?? '';
-    if (item.month === 0 && pitch >= YEAR_SUFFIX_PITCH) {
+    if (item.month === 0 && showYear) {
       return `${abbreviation}'${String(item.year).slice(2)}`;
     }
     return abbreviation;
-  }, [data, count, labelStride, monthAbbreviations, pitch]);
+  }, [data, labelStride, monthAbbreviations, showYear]);
 
   return (
     <View
