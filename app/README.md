@@ -176,7 +176,7 @@ SimpleTabs was moved here from `components/` to resolve a circular dependency. N
 
 **Files:**
 - `useBalanceHistory.js` - Balance history data for graphs
-- `useCategoryMonthlySpending.js` - Monthly spending per category
+- `useMonthlyTrendSeries.js` - Monthly income or expense totals, optionally per category
 - `useExpenseData.js` - Expense summary data for graphs
 - `useIncomeData.js` - Income summary data for graphs
 - `useLogEntries.js` - App log entries for developer tools

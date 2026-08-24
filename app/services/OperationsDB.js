@@ -2204,54 +2204,67 @@ export const getMonthlySpendingByCategories = async (currency, year, categoryIds
 };
 
 /**
- * First month that holds a chart-visible expense, across every account and
- * category.
+ * First month that holds a chart-visible expense or income, across every account
+ * and category.
  *
- * Deliberately unfiltered: the spending-trend card runs two of these series side
- * by side, and they can only be compared month against month if both are built
- * over the same window. A per-category earliest month would give the two series
- * different lengths.
+ * Deliberately unfiltered — by category *and* by type: the trends card runs two
+ * of these series side by side, and they can only be compared month against
+ * month if both are built over the same window. Narrowing the window per series
+ * would give an income series that starts in 2020 a different length from an
+ * expense series that starts in 2024, and the two would no longer line up.
  *
- * @returns {Promise<string|null>} 'YYYY-MM', or null when there are no expenses
+ * @returns {Promise<string|null>} 'YYYY-MM', or null when the ledger is empty
  */
-export const getEarliestExpenseMonth = async () => {
+export const getEarliestTrendMonth = async () => {
   try {
     const rows = await queryAll(
       `SELECT strftime('%Y-%m', MIN(o.date)) as year_month
        FROM operations o
        JOIN accounts a ON o.account_id = a.id
-       WHERE o.type = 'expense'
+       WHERE o.type IN ('expense', 'income')
          AND ${chartVisibleSql()}`,
       [],
     );
     return rows?.[0]?.year_month || null;
   } catch (error) {
-    console.error('Failed to get earliest expense month:', error);
+    console.error('Failed to get earliest trend month:', error);
     throw error;
   }
 };
 
 /**
- * Get spending by categories per month, from `startYearMonth` (inclusive) to the
- * current month.
+ * Monthly totals for one operation type, optionally narrowed to a set of
+ * categories, from `startYearMonth` (inclusive) to the current month.
  * @param {string} currency - Currency code
  * @param {Array<string>|null} categoryIds - Category IDs to include, or `null`
- *   for every expense (uncategorised operations included). An empty array still
- *   means "nothing to sum" and returns [].
+ *   for every operation of that type (uncategorised ones included). An empty
+ *   array still means "nothing to sum" and returns [].
  * @param {boolean} [convertAll=false] - When true, include operations from every
  *   currency and convert amounts to `currency` at the current exchange rate.
  *   Past months are converted at today's rate too (a single "current rate" view).
  * @param {string|null} [startYearMonth=null] - 'YYYY-MM' lower bound; defaults to
  *   the 12-month rolling window when omitted.
+ * @param {'expense'|'income'} [operationType='expense'] - Which side of the
+ *   ledger to sum. Transfers are never included either way.
  * @returns {Promise<Array<{yearMonth: string, total: string}>>} Array of {yearMonth: 'YYYY-MM', total as Decimal-safe string}
  */
-export const getMonthlySpendingHistoryByCategories = async (currency, categoryIds, convertAll = false, startYearMonth = null) => {
+export const getMonthlyTotalsHistoryByCategories = async (
+  currency,
+  categoryIds,
+  convertAll = false,
+  startYearMonth = null,
+  operationType = 'expense',
+) => {
   try {
     const allCategories = categoryIds === null;
 
     if (!allCategories && (!categoryIds || categoryIds.length === 0)) {
       return [];
     }
+
+    // Anything that is not an explicit 'income' sums the expense side, so a
+    // caller that omits the argument keeps the old behaviour.
+    const type = operationType === 'income' ? 'income' : 'expense';
 
     const placeholders = allCategories ? '' : categoryIds.map(() => '?').join(',');
 
@@ -2268,8 +2281,8 @@ export const getMonthlySpendingHistoryByCategories = async (currency, categoryId
     const categoryFilter = allCategories ? '' : `AND o.category_id IN (${placeholders})`;
     const categoryParams = allCategories ? [] : categoryIds;
     const params = convertAll
-      ? [startDateStr, endDateStr, ...categoryParams]
-      : [currency, startDateStr, endDateStr, ...categoryParams];
+      ? [type, startDateStr, endDateStr, ...categoryParams]
+      : [type, currency, startDateStr, endDateStr, ...categoryParams];
 
     const results = await queryAll(
       `SELECT
@@ -2278,7 +2291,7 @@ export const getMonthlySpendingHistoryByCategories = async (currency, categoryId
          a.currency as currency
        FROM operations o
        JOIN accounts a ON o.account_id = a.id
-       WHERE o.type = 'expense'
+       WHERE o.type = ?
          ${currencyFilter}
          AND o.date >= ?
          AND o.date <= ?
@@ -2309,7 +2322,7 @@ export const getMonthlySpendingHistoryByCategories = async (currency, categoryId
       .sort(([a], [b]) => (a < b ? -1 : a > b ? 1 : 0))
       .map(([yearMonth, total]) => ({ yearMonth, total }));
   } catch (error) {
-    console.error('Failed to get monthly spending history by categories:', error);
+    console.error('Failed to get monthly totals history by categories:', error);
     throw error;
   }
 };

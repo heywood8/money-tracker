@@ -85,10 +85,10 @@ Findings from a code-level UX audit. Each item is small-scope (no major rework) 
 
 ### QoL-15. Subpanel-convention stragglers
 **Status**: 🟡 Partially completed (#1298, merged)
-**Problem**: two places still stack a second `Modal` instead of the app's subpanel pattern: the split-operation category picker (`SplitOperationModal.js:241-276`, hides the amount just typed) and `CategorySpendingCard`'s picker (`CategorySpendingCard.js:628-643`, also lacks search). The parent-category picker in `CategoriesScreen.js:560-585` has no type-to-filter either.
+**Problem**: two places still stack a second `Modal` instead of the app's subpanel pattern: the split-operation category picker (`SplitOperationModal.js:241-276`, hides the amount just typed) and `TrendsCard`'s picker (also lacks search). The parent-category picker in `CategoriesScreen.js:560-585` has no type-to-filter either.
 **Fix**: migrate to subpanels; add a search box to category pickers.
 **Done (#1298)**: the split-operation category picker was migrated from a nested `Modal` to an animated in-modal subpanel (slides in over the split form; keeps all testIDs).
-**Still open**: (a) `CategorySpendingCard`'s picker still stacks a second `Modal` and lacks search; (b) the parent-category picker in `CategoriesScreen` still has no type-to-filter search box.
+**Still open**: (a) `TrendsCard`'s picker still stacks a second `Modal` and lacks search; (b) the parent-category picker in `CategoriesScreen` still has no type-to-filter search box.
 
 
 ## High Priority Features

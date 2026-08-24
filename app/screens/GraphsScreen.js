@@ -23,7 +23,7 @@ import { TIMING_ENTER } from '../utils/motion';
 import BalanceHistoryCard from '../components/graphs/BalanceHistoryCard';
 import CategoryBackChip from '../components/graphs/CategoryBackChip';
 import { chartTransition, CHART_DROP } from '../components/graphs/chartTransitions';
-import CategorySpendingCard from '../components/graphs/CategorySpendingCard';
+import TrendsCard from '../components/graphs/TrendsCard';
 import OperationsHeatmapCard from '../components/graphs/OperationsHeatmapCard';
 import ExpenseSummaryCard from '../components/graphs/ExpenseSummaryCard';
 import IncomeSummaryCard from '../components/graphs/IncomeSummaryCard';
@@ -84,7 +84,9 @@ const GraphsScreen = () => {
   const [categories, setCategories] = useState([]);
   const [topLevelCategories, setTopLevelCategories] = useState([]);
   const [topLevelIncomeCategories, setTopLevelIncomeCategories] = useState([]);
-  const [selectedCategoryForTrend, setSelectedCategoryForTrend] = useState(null);
+  // null lets the trends card fall back to its own default pair (income vs
+  // expenses). Lifted so the pick survives the card unmounting with the panel.
+  const [trendSeries, setTrendSeries] = useState(null);
 
 
   // Account selection state
@@ -794,13 +796,13 @@ const GraphsScreen = () => {
               />
             )}
 
-            {/* Category Spending Trend Card - Last 12 Months */}
-            <CategorySpendingCard
+            {/* Income/expense trends over the ledger's whole history */}
+            <TrendsCard
               colors={colors}
               t={t}
               selectedCurrency={selectedCurrency}
-              selectedCategory={selectedCategoryForTrend}
-              onCategoryChange={setSelectedCategoryForTrend}
+              selectedSeries={trendSeries}
+              onSeriesChange={setTrendSeries}
               categories={categories}
               convertAllCurrencies={convertAllCurrencies}
             />
