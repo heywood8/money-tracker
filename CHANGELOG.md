@@ -1,5 +1,13 @@
 # Changelog
 
+## [0.276.2](https://github.com/heywood8/money-tracker/compare/penny-v0.276.1...penny-v0.276.2) (2026-08-24)
+
+
+### Bug Fixes
+
+* **graphs:** make the drill-down rows tappable and stop them hugging the edges ([#1647](https://github.com/heywood8/money-tracker/issues/1647)) ([95103ae](https://github.com/heywood8/money-tracker/commit/95103aede1745709bc670df4c953cad1991c3b97))
+* **graphs:** thin month labels to what the axis can actually hold ([#1648](https://github.com/heywood8/money-tracker/issues/1648)) ([b22c6f6](https://github.com/heywood8/money-tracker/commit/b22c6f6cea6af6e59829135f87ae77d3a932de37))
+
 ## [0.276.1](https://github.com/heywood8/money-tracker/compare/penny-v0.276.0...penny-v0.276.1) (2026-08-24)
 
 
