@@ -46,23 +46,25 @@ describe('CategoryOperationsList', () => {
     expect(getByText('nothing here')).toBeTruthy();
   });
 
-  it('shows the date, the label chip and the amount on one row', async () => {
+  // The category names every row, so the operation's own label is the title —
+  // the row is otherwise the Operations tab's row.
+  it('titles the row with the label, and heads the day with its date', async () => {
     const ops = [{ id: '1', amount: '12.50', date: '2024-03-05', description: 'Coffee' }];
-    const { getByText } = await render(
+    const { getByText, getAllByText } = await render(
       <CategoryOperationsList operations={ops} currency="USD" colors={colors} language="en" />,
     );
     expect(getByText('Coffee')).toBeTruthy();
-    expect(getByText('March 5')).toBeTruthy();
-    expect(getByText('$12.50')).toBeTruthy();
+    expect(getByText('MARCH 5')).toBeTruthy();
+    expect(getAllByText('$12.50')).toHaveLength(1);
   });
 
   it('shows the converted amount in the target currency and the original beside it', async () => {
     const ops = [{ id: '1', amount: '4000', date: '2024-03-05', description: 'Rent', accountCurrency: 'AMD', convertedAmount: '10.00' }];
-    const { getByText } = await render(
+    const { getByText, getAllByText } = await render(
       <CategoryOperationsList operations={ops} currency="USD" colors={colors} language="en" />,
     );
-    expect(getByText('$10.00')).toBeTruthy();   // converted, selected currency
-    expect(getByText('֏4,000')).toBeTruthy();   // original, account currency (AMD: 0 decimals)
+    expect(getAllByText('$10.00').length).toBeGreaterThan(0); // converted, selected currency
+    expect(getByText('֏4,000')).toBeTruthy();                 // original, account currency (AMD: 0 decimals)
   });
 
   it('does not show a separate original for a same-currency (convertedAmount null) op', async () => {
@@ -70,7 +72,6 @@ describe('CategoryOperationsList', () => {
     const { getByText, queryAllByText } = await render(
       <CategoryOperationsList operations={ops} currency="USD" colors={colors} language="en" />,
     );
-    expect(getByText('$12.50')).toBeTruthy();
     expect(queryAllByText('$12.50')).toHaveLength(1); // not duplicated as an "original"
   });
 
@@ -80,25 +81,25 @@ describe('CategoryOperationsList', () => {
       <CategoryOperationsList operations={ops} currency="USD" colors={colors} language="ru" />,
     );
     // Genitive "июля", not the standalone nominative "Июль".
-    expect(getByText('5 июля')).toBeTruthy();
+    expect(getByText('5 ИЮЛЯ')).toBeTruthy();
   });
 
   it('still shows date and amount when the operation has no label', async () => {
     const ops = [{ id: '2', amount: '100', date: '2024-03-05', description: '' }];
-    const { getByText } = await render(
+    const { getByText, getAllByText } = await render(
       <CategoryOperationsList operations={ops} currency="JPY" colors={colors} language="en" />,
     );
-    expect(getByText('March 5')).toBeTruthy();
-    expect(getByText('¥100')).toBeTruthy();
+    expect(getByText('MARCH 5')).toBeTruthy();
+    expect(getAllByText('¥100').length).toBeGreaterThan(0);
   });
 
   it('masks amounts when hideBalances is true', async () => {
     useDisplaySettings.mockReturnValue({ hideBalances: true });
     const ops = [{ id: '3', amount: '12.50', date: '2024-03-05', description: 'Coffee' }];
-    const { getByText, queryByText } = await render(
+    const { getAllByText, queryByText } = await render(
       <CategoryOperationsList operations={ops} currency="USD" colors={colors} language="en" />,
     );
-    expect(getByText('••••')).toBeTruthy();
+    expect(getAllByText('••••').length).toBeGreaterThan(0);
     expect(queryByText('$12.50')).toBeNull();
   });
 
@@ -118,10 +119,10 @@ describe('CategoryOperationsList', () => {
 
   it('groups digits so a large amount stays readable', async () => {
     const ops = [{ id: '1', amount: '100000', date: '2024-03-05', description: '' }];
-    const { getByText } = await render(
+    const { getAllByText } = await render(
       <CategoryOperationsList operations={ops} currency="USD" colors={colors} language="en" />,
     );
-    expect(getByText('$100,000.00')).toBeTruthy();
+    expect(getAllByText('$100,000.00').length).toBeGreaterThan(0);
   });
 
   // Same-day operations read as one block: only the first of the day is dated.
@@ -137,8 +138,8 @@ describe('CategoryOperationsList', () => {
         <CategoryOperationsList operations={ops} currency="USD" colors={colors} language="en" />,
       );
 
-      expect(queryAllByText('March 5')).toHaveLength(1);
-      expect(queryAllByText('March 4')).toHaveLength(1);
+      expect(queryAllByText('MARCH 5')).toHaveLength(1);
+      expect(queryAllByText('MARCH 4')).toHaveLength(1);
     });
   });
 
@@ -246,20 +247,25 @@ describe('CategoryOperationsList', () => {
       expect(rendered).toEqual(['Large', 'Middle', 'Small']);
     });
 
-    // Sorted by amount there are no runs of same-day rows left to collapse, so
-    // suppressing a repeated date would strand rows with no date at all.
-    it('dates every row once sorted by amount', async () => {
-      const sameDay = [
+    // Sorted by amount there are no day runs left to head, so the date drops out
+    // of the header and into each row's subtitle instead of vanishing.
+    it('moves the date into every row once sorted by amount', async () => {
+      const twoDays = [
         { id: '1', amount: '10.00', date: '2024-03-05', description: 'A' },
-        { id: '2', amount: '90.00', date: '2024-03-05', description: 'B' },
+        { id: '2', amount: '90.00', date: '2024-03-04', description: 'B' },
       ];
-      const { getByTestId, queryAllByText } = await render(
-        <CategoryOperationsList operations={sameDay} currency="USD" colors={colors} language="en" t={t} />,
+      const { getByTestId, queryByTestId, queryByText, getByText } = await render(
+        <CategoryOperationsList operations={twoDays} currency="USD" colors={colors} language="en" t={t} />,
       );
 
-      expect(queryAllByText('March 5')).toHaveLength(1);
+      expect(queryByTestId('category-operations-day-2024-03-05')).toBeTruthy();
+
       await fireEvent.press(getByTestId('category-operations-sort'));
-      expect(queryAllByText('March 5')).toHaveLength(2);
+
+      expect(queryByTestId('category-operations-day-2024-03-05')).toBeNull();
+      expect(queryByText('MARCH 5')).toBeNull();
+      expect(getByText('March 5')).toBeTruthy();
+      expect(getByText('March 4')).toBeTruthy();
     });
 
     it('sorts on the converted amount, which is what the rows show', async () => {
@@ -372,17 +378,18 @@ describe('CategoryOperationsList', () => {
       expect(getByText('Cash')).toBeTruthy();
     });
 
-    // One account name repeated down every row carries no information.
-    it('is not repeated on labelled rows when every operation shares an account', async () => {
+    // The Operations tab subtitles every row with its account; this list does the
+    // same rather than deciding per-list whether the name is worth the line.
+    it('subtitles every row, even when the whole list shares one account', async () => {
       const ops = [
         { id: '1', accountId: 'a', amount: '10.00', date: '2024-03-05', description: 'A' },
         { id: '2', accountId: 'a', amount: '20.00', date: '2024-03-04', description: 'B' },
       ];
-      const { queryByText } = await render(
+      const { getAllByText } = await render(
         <CategoryOperationsList operations={ops} currency="USD" colors={colors} language="en" t={t} getAccountName={getAccountName} />,
       );
 
-      expect(queryByText('Cash')).toBeNull();
+      expect(getAllByText('Cash')).toHaveLength(2);
     });
 
     it('is shown on every row once the list spans more than one account', async () => {
@@ -399,53 +406,133 @@ describe('CategoryOperationsList', () => {
     });
   });
 
-  describe('magnitude bars', () => {
-    const ops = [
-      { id: '1', amount: '100.00', date: '2024-03-05', description: 'A' },
-      { id: '2', amount: '25.00', date: '2024-03-04', description: 'B' },
-    ];
+  describe('row title', () => {
+    // The marker leads the description of every MoneyOK-imported operation, so
+    // titling with it would put the same word down the whole list.
+    it('skips the [MoneyOK] import marker and titles with the real label', async () => {
+      const ops = [{ id: '1', amount: '10.00', date: '2024-03-05', description: '[MoneyOK] | Gurman' }];
+      const { getByText } = await render(
+        <CategoryOperationsList operations={ops} currency="USD" colors={colors} language="en" t={t} />,
+      );
 
-    it('scales each bar against the largest operation in the category', async () => {
+      expect(getByText('Gurman')).toBeTruthy();
+      // Still present, as a chip — the Operations tab shows it that way too.
+      expect(getByText('[MoneyOK]')).toBeTruthy();
+    });
+
+    it('falls back to the category name when the operation has no labels', async () => {
+      const ops = [{ id: '1', amount: '10.00', date: '2024-03-05', description: '' }];
+      const { getByText } = await render(
+        <CategoryOperationsList operations={ops} currency="USD" colors={colors} language="en" t={t} categoryName="Groceries" />,
+      );
+
+      expect(getByText('Groceries')).toBeTruthy();
+    });
+
+    it('falls back to the category name when only the import marker is left', async () => {
+      const ops = [{ id: '1', amount: '10.00', date: '2024-03-05', description: '[MoneyOK]' }];
+      const { getByText } = await render(
+        <CategoryOperationsList operations={ops} currency="USD" colors={colors} language="en" t={t} categoryName="Groceries" />,
+      );
+
+      expect(getByText('Groceries')).toBeTruthy();
+    });
+
+    // The chips are inside the row's accessibility group, so nothing announces
+    // them unless the row's own label does.
+    it('announces the date, every label, the account and the amount', async () => {
+      const ops = [{ id: '1', accountId: 'a', amount: '10.00', date: '2024-03-05', description: 'Gurman | lunch' }];
+      const { getByTestId } = await render(
+        <CategoryOperationsList
+          operations={ops}
+          currency="USD"
+          colors={colors}
+          language="en"
+          t={t}
+          getAccountName={() => 'Cash'}
+          onOperationPress={jest.fn()}
+        />,
+      );
+
+      expect(getByTestId('category-operation-1').props.accessibilityLabel)
+        .toBe('March 5, Gurman, lunch, Cash, $10.00');
+    });
+  });
+
+  describe('day headers', () => {
+    // A one-operation day's total would just repeat the row beneath it.
+    it('gives no total to a day holding a single operation', async () => {
+      const ops = [
+        { id: '1', amount: '10.00', date: '2024-03-05', description: 'A' },
+        { id: '2', amount: '20.00', date: '2024-03-04', description: 'B' },
+        { id: '3', amount: '5.00', date: '2024-03-04', description: 'C' },
+      ];
       const { getByTestId } = await render(
         <CategoryOperationsList operations={ops} currency="USD" colors={colors} language="en" t={t} />,
       );
 
-      expect(getByTestId('category-operation-bar-1')).toHaveStyle({ width: '100%' });
-      expect(getByTestId('category-operation-bar-2')).toHaveStyle({ width: '25%' });
+      expect(getByTestId('category-operations-day-2024-03-05')).not.toHaveTextContent(/\$/);
+      expect(getByTestId('category-operations-day-2024-03-04')).toHaveTextContent(/\$25\.00/);
     });
 
-    it('draws no bar for a lone operation, which has nothing to compare to', async () => {
-      const { queryByTestId } = await render(
-        <CategoryOperationsList operations={[ops[0]]} currency="USD" colors={colors} language="en" t={t} />,
-      );
-
-      expect(queryByTestId('category-operation-bar-1')).toBeNull();
-    });
-
-    // A bar is a readable amount: leaving them on would defeat the masking.
-    it('draws no bars while balances are hidden', async () => {
-      useDisplaySettings.mockReturnValue({ hideBalances: true });
-      const { queryByTestId } = await render(
+    it('heads each day with its date and its total', async () => {
+      const ops = [
+        { id: '1', amount: '10.00', date: '2024-03-05', description: 'A' },
+        { id: '2', amount: '20.00', date: '2024-03-05', description: 'B' },
+        { id: '3', amount: '5.00', date: '2024-03-04', description: 'C' },
+        { id: '4', amount: '2.50', date: '2024-03-04', description: 'D' },
+      ];
+      const { getByTestId, getByText } = await render(
         <CategoryOperationsList operations={ops} currency="USD" colors={colors} language="en" t={t} />,
       );
 
-      expect(queryByTestId('category-operation-bar-1')).toBeNull();
+      expect(getByTestId('category-operations-day-2024-03-05')).toHaveTextContent(/\$30\.00/);
+      expect(getByTestId('category-operations-day-2024-03-04')).toHaveTextContent(/\$7\.50/);
+      expect(getByText('MARCH 5')).toBeTruthy();
     });
 
-    // Revealing the tail must not rescale the bars already on screen, so the
-    // scale comes from the whole category rather than the rendered slice.
-    it('keeps the scale fixed when the hidden tail is revealed', async () => {
-      const many = Array.from({ length: 30 }, (_, i) => ({
-        id: String(i), amount: String(i + 1), date: '2024-03-05', description: `Op ${i}`,
+    // A header summing three of a day's eight operations would read as the day's
+    // spending and be wrong, so a cut-off day states its date and nothing more.
+    it('gives no total for a day the row limit cut in half', async () => {
+      const ops = Array.from({ length: 40 }, (_, i) => ({
+        id: String(i), amount: '1.00', date: '2024-03-05', description: `Op ${i}`,
       }));
       const { getByTestId } = await render(
-        <CategoryOperationsList operations={many} currency="USD" colors={colors} language="en" t={t} />,
+        <CategoryOperationsList operations={ops} currency="USD" colors={colors} language="en" t={t} />,
       );
 
-      // Largest is 30, which is in the hidden tail: the visible 25 is 83%.
-      expect(getByTestId('category-operation-bar-24')).toHaveStyle({ width: '83%' });
+      const header = getByTestId('category-operations-day-2024-03-05');
+      expect(header).toHaveTextContent(/MARCH 5/);
+      expect(header).not.toHaveTextContent(/\$/);
+    });
+
+    it('gives the day its total back once the tail is revealed', async () => {
+      const ops = Array.from({ length: 40 }, (_, i) => ({
+        id: String(i), amount: '1.00', date: '2024-03-05', description: `Op ${i}`,
+      }));
+      const { getByTestId } = await render(
+        <CategoryOperationsList operations={ops} currency="USD" colors={colors} language="en" t={t} />,
+      );
+
       await fireEvent.press(getByTestId('category-operations-show-all'));
-      expect(getByTestId('category-operation-bar-24')).toHaveStyle({ width: '83%' });
+
+      expect(getByTestId('category-operations-day-2024-03-05')).toHaveTextContent(/\$40\.00/);
+    });
+
+    // A day total is a readable amount, so it masks with the rest.
+    it('masks the day total while balances are hidden', async () => {
+      useDisplaySettings.mockReturnValue({ hideBalances: true });
+      const ops = [
+        { id: '1', amount: '10.00', date: '2024-03-05', description: 'A' },
+        { id: '2', amount: '20.00', date: '2024-03-05', description: 'B' },
+      ];
+      const { getByTestId } = await render(
+        <CategoryOperationsList operations={ops} currency="USD" colors={colors} language="en" t={t} />,
+      );
+
+      const header = getByTestId('category-operations-day-2024-03-05');
+      expect(header).toHaveTextContent(/••••/);
+      expect(header).not.toHaveTextContent(/\$/);
     });
   });
 

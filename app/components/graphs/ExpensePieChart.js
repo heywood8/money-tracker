@@ -23,6 +23,8 @@ const ExpensePieChart = ({
   categoryChip = null,
   getAccountName = null,
   onOperationPress = null,
+  categoryName = '',
+  categoryIcon = undefined,
 }) => {
   // The drill-down chip rides along with whatever this chart is showing: under
   // the donut when there is one, heading the body otherwise. Anywhere it can be
@@ -47,6 +49,8 @@ const ExpensePieChart = ({
         t={t}
         getAccountName={getAccountName}
         onOperationPress={onOperationPress}
+        categoryName={categoryName}
+        categoryIcon={categoryIcon}
       />
     );
   }
@@ -121,6 +125,9 @@ ExpensePieChart.propTypes = {
   getAccountName: PropTypes.func,
   // Opens a listed operation for editing; without it the list is read-only.
   onOperationPress: PropTypes.func,
+  // Name and icon of the drilled-into category, for the leaf list's rows.
+  categoryName: PropTypes.string,
+  categoryIcon: PropTypes.string,
 };
 
 const styles = StyleSheet.create({
