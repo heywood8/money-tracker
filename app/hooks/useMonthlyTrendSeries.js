@@ -1,15 +1,15 @@
 import { useState, useCallback, useMemo, useEffect } from 'react';
-import { getEarliestExpenseMonth, getMonthlySpendingHistoryByCategories } from '../services/OperationsDB';
+import { getEarliestTrendMonth, getMonthlyTotalsHistoryByCategories } from '../services/OperationsDB';
 import * as Currency from '../services/currency';
 import { getAllDescendants } from '../services/CategoriesDB';
 import { appEvents, EVENTS } from '../services/eventEmitter';
 
 /**
- * Sentinel category id meaning "every expense", not a single category.
- * Kept distinct from `null` (which means "no series at all", used by the
- * comparison series when nothing is picked to compare against).
+ * Sentinel category id meaning "every category on this side of the ledger", not
+ * a single category. Kept distinct from `null` (which means "no series at all",
+ * used by the comparison series when it has been cleared).
  */
-export const ALL_EXPENSE_CATEGORIES = 'all';
+export const ALL_CATEGORIES = 'all';
 
 // The window never gets shorter than a year, however new the ledger is: a
 // three-bar chart says less about a spending habit than three bars and nine
@@ -25,7 +25,7 @@ const MAX_MONTHS = 240;
  *
  * Computed per call (not memoized at mount) so the window follows a month
  * rollover during a long-lived session — the DB query recomputes its end from
- * "now" too, and the two must agree or the newest month's spending maps to
+ * "now" too, and the two must agree or the newest month's total maps to
  * nothing.
  */
 export const buildMonthWindow = (startYearMonth, now = new Date()) => {
@@ -54,19 +54,31 @@ export const buildMonthWindow = (startYearMonth, now = new Date()) => {
 };
 
 /**
- * Custom hook for loading monthly spending data for a specific category
- * Covers every month back to the first expense ever recorded (at least 12)
- * Includes all descendant categories in the totals
+ * Monthly totals for one trend series — one side of the ledger, optionally
+ * narrowed to a category and everything under it.
+ *
+ * The month window is the ledger's whole history (at least a year) and is
+ * deliberately the same for every series, so two of these hooks running side by
+ * side produce arrays that line up index for index and can be compared month
+ * against month.
+ *
  * @param {string} selectedCurrency - Currency code
- * @param {string|null} selectedCategoryId - Category ID to show spending for,
- *   or ALL_EXPENSE_CATEGORIES for the total across every expense
- * @param {Array} categories - Array of all categories
+ * @param {string|null} selectedCategoryId - Category ID to total, or
+ *   ALL_CATEGORIES for every category of `operationType`, or null for no series
+ * @param {boolean} [convertAllCurrencies=false] - Convert other currencies into
+ *   `selectedCurrency` instead of showing only same-currency operations
+ * @param {'expense'|'income'} [operationType='expense'] - Side of the ledger
  */
-const useCategoryMonthlySpending = (selectedCurrency, selectedCategoryId, categories, convertAllCurrencies = false) => {
+const useMonthlyTrendSeries = (
+  selectedCurrency,
+  selectedCategoryId,
+  convertAllCurrencies = false,
+  operationType = 'expense',
+) => {
   const [monthlyData, setMonthlyData] = useState([]);
   const [loading, setLoading] = useState(false);
 
-  // Load monthly spending data
+  // Load monthly data for the series
   const loadData = useCallback(async () => {
     if (!selectedCurrency || !selectedCategoryId) {
       setMonthlyData([]);
@@ -79,52 +91,53 @@ const useCategoryMonthlySpending = (selectedCurrency, selectedCategoryId, catego
 
       // Get all descendant category IDs including the selected category itself.
       // `null` tells the DB layer to skip the category filter entirely, which
-      // also picks up expenses left uncategorised.
+      // also picks up operations left uncategorised.
       let categoryIds = null;
-      if (selectedCategoryId !== ALL_EXPENSE_CATEGORIES) {
+      if (selectedCategoryId !== ALL_CATEGORIES) {
         const descendants = await getAllDescendants(selectedCategoryId);
         categoryIds = [selectedCategoryId, ...descendants.map(d => d.id)];
       }
 
       // The window is the ledger's own history, so the chart can be scrolled
-      // back to the first expense instead of stopping a year ago.
-      const earliestMonth = await getEarliestExpenseMonth();
+      // back to the first operation instead of stopping a year ago.
+      const earliestMonth = await getEarliestTrendMonth();
       const monthWindow = buildMonthWindow(earliestMonth);
 
-      const spending = await getMonthlySpendingHistoryByCategories(
+      const totals = await getMonthlyTotalsHistoryByCategories(
         selectedCurrency,
         categoryIds,
         convertAllCurrencies,
         monthWindow[0].yearMonth,
+        operationType,
       );
 
       // Create a map of yearMonth to total for easy lookup
-      const spendingMap = new Map();
-      spending.forEach(item => {
-        spendingMap.set(item.yearMonth, item.total);
+      const totalsMap = new Map();
+      totals.forEach(item => {
+        totalsMap.set(item.yearMonth, item.total);
       });
 
-      // Fill 0 for months with no spending.
+      // Fill 0 for months with nothing on this side of the ledger.
       // totals arrive as Decimal-safe strings from the DB layer; convert to float here
       // since chart components need numeric values for bar height arithmetic.
       const windowData = monthWindow.map(monthInfo => ({
         yearMonth: monthInfo.yearMonth,
         year: monthInfo.year,
         month: monthInfo.month,
-        total: parseFloat(spendingMap.get(monthInfo.yearMonth) || '0') || 0,
+        total: parseFloat(totalsMap.get(monthInfo.yearMonth) || '0') || 0,
       }));
 
       setMonthlyData(windowData);
     } catch (error) {
-      console.error('Failed to load category monthly spending:', error);
+      console.error('Failed to load monthly trend series:', error);
       setMonthlyData([]);
     } finally {
       setLoading(false);
     }
-  }, [selectedCurrency, selectedCategoryId, convertAllCurrencies]);
+  }, [selectedCurrency, selectedCategoryId, convertAllCurrencies, operationType]);
 
   // Total across the whole loaded window using Decimal-safe addition before the final float conversion
-  const totalYearlySpending = useMemo(() => {
+  const totalForWindow = useMemo(() => {
     const total = monthlyData.reduce(
       (sum, item) => Currency.add(sum, String(item.total || '0')),
       '0',
@@ -149,9 +162,9 @@ const useCategoryMonthlySpending = (selectedCurrency, selectedCategoryId, catego
   return {
     monthlyData,
     loading,
-    totalYearlySpending,
+    totalForWindow,
     loadData,
   };
 };
 
-export default useCategoryMonthlySpending;
+export default useMonthlyTrendSeries;

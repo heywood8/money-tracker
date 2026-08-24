@@ -7,11 +7,12 @@ import { runOnJS } from 'react-native-reanimated';
 import { Gesture, GestureDetector } from 'react-native-gesture-handler';
 import Icon from '@expo/vector-icons/MaterialCommunityIcons';
 import currencies from '../../../assets/currencies.json';
-import useCategoryMonthlySpending, { ALL_EXPENSE_CATEGORIES } from '../../hooks/useCategoryMonthlySpending';
+import useMonthlyTrendSeries, { ALL_CATEGORIES } from '../../hooks/useMonthlyTrendSeries';
 import { BORDER_RADIUS, FONT_SIZE, HORIZONTAL_PADDING, SPACING } from '../../styles/designTokens';
 import { comparisonSeriesColor } from '../../styles/chartPalette';
 import { MONTH_ABBREVIATIONS } from './monthLabels';
 import ModalBlurOverlay from '../ModalBlurOverlay';
+import CategoryGridSelector from '../CategoryGridSelector';
 import { useDisplaySettings } from '../../contexts/DisplaySettingsContext';
 import { useSwipeNavigationGesture } from '../../contexts/SwipeNavigationContext';
 import { CARD_SURFACE, SECTION_LABEL } from '../../styles/componentStyles';
@@ -131,7 +132,7 @@ const niceStepFor = (max) => {
  * navigation for as long as it can scroll), and a pinch re-pitches the months so
  * more or fewer fit at once.
  */
-const SpendingBarChart = ({
+const TrendBarChart = ({
   data,
   vsData,
   stacked,
@@ -454,7 +455,7 @@ const SpendingBarChart = ({
         {/* Pinned scale. Its own canvas, sharing the height, y-domain and x-label
             metrics of the scrolling one so Victory resolves both plots to the
             same vertical geometry and the labels line up with the gridlines. */}
-        <View style={styles.axisColumn} pointerEvents="none" testID="spending-chart-axis">
+        <View style={styles.axisColumn} pointerEvents="none" testID="trend-chart-axis">
           <CartesianChart
             data={AXIS_GUIDE_DATA}
             xKey="x"
@@ -492,12 +493,12 @@ const SpendingBarChart = ({
             onContentSizeChange={handleContentSizeChange}
             onLayout={handleLayout}
             style={styles.scrollArea}
-            testID="spending-chart-scroll"
+            testID="trend-chart-scroll"
           >
             <GestureDetector gesture={tapGesture}>
               <View
                 style={[styles.chartCanvas, { width: contentWidth }]}
-                testID="spending-chart-canvas"
+                testID="trend-chart-canvas"
               >
                 <CartesianChart
                   data={chartData}
@@ -538,119 +539,143 @@ const SpendingBarChart = ({
   );
 };
 
-const CategorySpendingCard = ({
+/**
+ * The two series the card opens on: income against expenses, both across every
+ * category. The card is a comparison first and a category drill-down second —
+ * "how much came in against how much went out" is the question a month has, and
+ * it should not take two taps to ask it.
+ */
+const DEFAULT_PRIMARY_SERIES = { type: 'income', categoryId: ALL_CATEGORIES };
+const DEFAULT_VS_SERIES = { type: 'expense', categoryId: ALL_CATEGORIES };
+
+// The "every category" pseudo-entry borrows each side's arrow from the summary
+// cards at the top of the same screen, so one glyph means one thing per screen.
+const ALL_SERIES_ICON = { income: 'arrow-bottom-left', expense: 'arrow-top-right' };
+
+const TrendsCard = ({
   colors,
   t,
   selectedCurrency,
-  selectedCategory,
-  onCategoryChange,
+  selectedSeries,
+  onSeriesChange,
   categories,
   convertAllCurrencies = false,
 }) => {
-  // null = closed, 'primary' = picking primary, 'vs' = picking vs category
+  // null = closed, 'primary' = picking the primary series, 'vs' = picking the
+  // comparison one.
   const [pickerMode, setPickerMode] = useState(null);
-  const [vsCategory, setVsCategory] = useState(null);
-  const [expandedParents, setExpandedParents] = useState(new Set());
+  // Which side of the ledger the open picker is showing. Seeded from the series
+  // being edited so the picker opens on what is already selected.
+  const [pickerType, setPickerType] = useState('expense');
+  const [vsSeries, setVsSeries] = useState(DEFAULT_VS_SERIES);
   const [selectedBarIndex, setSelectedBarIndex] = useState(null);
   const [showStackedBar, setShowStackedBar] = useState(false);
   const vsColor = comparisonSeriesColor(colors);
 
-  const allExpenseCategories = useMemo(() => {
-    return categories.filter(cat =>
-      cat.categoryType === 'expense' &&
-      !cat.isShadow,
-    );
-  }, [categories]);
+  const visibleCategories = useMemo(
+    () => categories.filter(cat => !cat.isShadow),
+    [categories],
+  );
 
-  const parentExpenseCategories = useMemo(() => {
-    return allExpenseCategories.filter(cat => cat.parentId === null);
-  }, [allExpenseCategories]);
+  const categoriesByType = useMemo(() => ({
+    expense: visibleCategories.filter(cat => cat.categoryType === 'expense'),
+    income: visibleCategories.filter(cat => cat.categoryType === 'income'),
+  }), [visibleCategories]);
 
-  const childrenByParent = useMemo(() => {
-    const map = new Map();
-    parentExpenseCategories.forEach(parent => {
-      const children = allExpenseCategories.filter(cat => cat.parentId === parent.id);
-      map.set(parent.id, children);
-    });
-    return map;
-  }, [parentExpenseCategories, allExpenseCategories]);
+  /**
+   * A series with its category checked against the categories that actually
+   * exist. A stale id (a category deleted since it was picked) falls back to the
+   * whole side of the ledger rather than to an empty chart.
+   */
+  const resolveSeries = useCallback((series, fallback) => {
+    if (!series) return fallback;
+    const type = series.type === 'income' ? 'income' : 'expense';
+    if (series.categoryId === ALL_CATEGORIES) return { type, categoryId: ALL_CATEGORIES };
+    const exists = categoriesByType[type].some(c => c.id === series.categoryId);
+    return exists ? { type, categoryId: series.categoryId } : { type, categoryId: ALL_CATEGORIES };
+  }, [categoriesByType]);
 
-  // No pick (or a stale one) means the whole expense trend, not an arbitrary
-  // first category — the default view should describe all spending.
-  const effectiveCategory = useMemo(() => {
-    if (selectedCategory && allExpenseCategories.some(c => c.id === selectedCategory)) {
-      return selectedCategory;
+  const primary = useMemo(
+    () => resolveSeries(selectedSeries, DEFAULT_PRIMARY_SERIES),
+    [selectedSeries, resolveSeries],
+  );
+
+  const vs = useMemo(
+    () => (vsSeries ? resolveSeries(vsSeries, DEFAULT_VS_SERIES) : null),
+    [vsSeries, resolveSeries],
+  );
+
+  const seriesLabel = useCallback((series) => {
+    if (!series) return '';
+    if (series.categoryId === ALL_CATEGORIES) {
+      return series.type === 'income' ? t('all_income') : t('all_expenses');
     }
-    return ALL_EXPENSE_CATEGORIES;
-  }, [selectedCategory, allExpenseCategories]);
-
-  const effectiveVsCategory = useMemo(() => {
-    if (!vsCategory) return null;
-    return allExpenseCategories.some(c => c.id === vsCategory) ? vsCategory : null;
-  }, [vsCategory, allExpenseCategories]);
-
-  const isAllCategories = effectiveCategory === ALL_EXPENSE_CATEGORIES;
-
-  const selectedCategoryName = useMemo(() => {
-    if (isAllCategories) return t('all_categories');
-    const cat = allExpenseCategories.find(c => c.id === effectiveCategory);
+    const cat = categoriesByType[series.type].find(c => c.id === series.categoryId);
     return cat ? cat.name : '';
-  }, [allExpenseCategories, effectiveCategory, isAllCategories, t]);
+  }, [categoriesByType, t]);
 
-  const selectedCategoryIcon = useMemo(() => {
-    if (isAllCategories) return 'shape-outline';
-    const cat = allExpenseCategories.find(c => c.id === effectiveCategory);
+  const seriesIcon = useCallback((series) => {
+    if (!series) return null;
+    if (series.categoryId === ALL_CATEGORIES) return ALL_SERIES_ICON[series.type];
+    const cat = categoriesByType[series.type].find(c => c.id === series.categoryId);
     return cat?.icon ?? null;
-  }, [allExpenseCategories, effectiveCategory, isAllCategories]);
+  }, [categoriesByType]);
 
-  const vsCategoryName = useMemo(() => {
-    if (!effectiveVsCategory) return '';
-    const cat = allExpenseCategories.find(c => c.id === effectiveVsCategory);
-    return cat ? cat.name : '';
-  }, [allExpenseCategories, effectiveVsCategory]);
-
-  const vsCategoryIcon = useMemo(() => {
-    if (!effectiveVsCategory) return null;
-    const cat = allExpenseCategories.find(c => c.id === effectiveVsCategory);
-    return cat?.icon ?? null;
-  }, [allExpenseCategories, effectiveVsCategory]);
-
-  const toggleParent = useCallback((parentId) => {
-    setExpandedParents(prev => {
-      if (prev.has(parentId)) return new Set();
-      return new Set([parentId]);
-    });
-  }, []);
+  const primaryLabel = seriesLabel(primary);
+  const primaryIcon = seriesIcon(primary);
+  const vsLabel = seriesLabel(vs);
+  const vsIcon = seriesIcon(vs);
 
   const openPicker = useCallback((mode) => {
-    setExpandedParents(new Set());
+    setPickerType((mode === 'vs' ? vs : primary)?.type ?? 'expense');
     setPickerMode(mode);
-  }, []);
+  }, [primary, vs]);
 
-  const handleSelectCategory = useCallback((categoryId) => {
+  const commitSeries = useCallback((series) => {
     if (pickerMode === 'primary') {
-      onCategoryChange(categoryId);
+      onSeriesChange(series);
     } else if (pickerMode === 'vs') {
-      setVsCategory(categoryId);
+      setVsSeries(series);
     }
     setPickerMode(null);
-  }, [pickerMode, onCategoryChange]);
+  }, [pickerMode, onSeriesChange]);
 
-  const clearVsCategory = useCallback(() => {
-    setVsCategory(null);
+  const handleSelectCategory = useCallback((categoryId) => {
+    commitSeries({ type: pickerType, categoryId });
+  }, [commitSeries, pickerType]);
+
+  const handleSelectAll = useCallback(() => {
+    commitSeries({ type: pickerType, categoryId: ALL_CATEGORIES });
+  }, [commitSeries, pickerType]);
+
+  const clearVsSeries = useCallback(() => {
+    setVsSeries(null);
     setShowStackedBar(false);
   }, []);
 
-  const { monthlyData, loading } = useCategoryMonthlySpending(selectedCurrency, effectiveCategory, categories, convertAllCurrencies);
-  const { monthlyData: vsMonthlyData, loading: vsLoading } = useCategoryMonthlySpending(selectedCurrency, effectiveVsCategory, categories, convertAllCurrencies);
+  const { monthlyData, loading } = useMonthlyTrendSeries(
+    selectedCurrency,
+    primary.categoryId,
+    convertAllCurrencies,
+    primary.type,
+  );
+  const { monthlyData: vsMonthlyData, loading: vsLoading } = useMonthlyTrendSeries(
+    selectedCurrency,
+    vs ? vs.categoryId : null,
+    convertAllCurrencies,
+    vs ? vs.type : 'expense',
+  );
 
   const { hideBalances } = useDisplaySettings();
 
   const monthAbbreviations = MONTH_ABBREVIATIONS;
   const monthKeys = ['month_january', 'month_february', 'month_march', 'month_april', 'month_may', 'month_june', 'month_july', 'month_august', 'month_september', 'month_october', 'month_november', 'month_december'];
 
-  const hasData = monthlyData.some(item => item.total > 0);
-  const hasVsData = effectiveVsCategory !== null && !vsLoading && vsMonthlyData.length > 0;
+  const hasVsData = vs !== null && !vsLoading && vsMonthlyData.length > 0;
+  // A card showing two series has data when *either* of them does: an empty
+  // income series next to a full expense one is still a chart worth drawing.
+  const hasData = monthlyData.some(item => item.total > 0)
+    || (hasVsData && vsMonthlyData.some(item => item.total > 0));
 
   const prevDataRef = React.useRef(monthlyData);
   if (prevDataRef.current !== monthlyData) {
@@ -660,136 +685,120 @@ const CategorySpendingCard = ({
 
   const effectiveBarIndex = selectedBarIndex !== null ? selectedBarIndex : monthlyData.length - 1;
   const displayedTotal = monthlyData.length > 0 ? (monthlyData[effectiveBarIndex]?.total ?? 0) : 0;
-  const vsDisplayedTotal = effectiveVsCategory && vsMonthlyData.length > 0
+  const vsDisplayedTotal = vs && vsMonthlyData.length > 0
     ? (vsMonthlyData[effectiveBarIndex]?.total ?? 0)
     : 0;
 
-  if (parentExpenseCategories.length === 0) {
+  const editingSeries = pickerMode === 'vs' ? vs : primary;
+  const pickerSelectedId = editingSeries && editingSeries.type === pickerType
+    ? editingSeries.categoryId
+    : null;
+  const allRowSelected = pickerSelectedId === ALL_CATEGORIES;
+
+  if (categoriesByType.expense.length === 0 && categoriesByType.income.length === 0) {
     return null;
   }
 
   const pickerContent = (
-    <ScrollView>
-      {/* "All categories" is only offered for the primary series — comparing a
-          category against the total it is part of is not a meaningful vs. */}
-      {pickerMode === 'primary' && (
-        <View style={[styles.parentRow, { borderBottomColor: colors.border }]}>
-          <View style={styles.expandPlaceholder} />
-          <TouchableOpacity
-            style={[
-              styles.categoryItem,
-              isAllCategories && { backgroundColor: colors.selected },
-            ]}
-            onPress={() => handleSelectCategory(ALL_EXPENSE_CATEGORIES)}
-          >
-            <Text style={[styles.categoryText, { color: colors.text }]}>
-              {t('all_categories')}
-            </Text>
-          </TouchableOpacity>
-        </View>
-      )}
-      {parentExpenseCategories.map(parent => {
-        const children = childrenByParent.get(parent.id) || [];
-        const hasChildren = children.length > 0;
-        const isExpanded = expandedParents.has(parent.id);
-        const isSelected = pickerMode === 'primary'
-          ? effectiveCategory === parent.id
-          : effectiveVsCategory === parent.id;
+    <ScrollView contentContainerStyle={styles.pickerBody}>
+      {/* Which side of the ledger, before which category on it — the two sides
+          are separate trees, not one list with a type column. */}
+      <View style={[styles.typeToggle, { borderColor: colors.border }]}>
+        {['expense', 'income'].map(type => {
+          const active = pickerType === type;
+          return (
+            <TouchableOpacity
+              key={type}
+              style={[styles.typeToggleItem, active && { backgroundColor: colors.selected }]}
+              onPress={() => setPickerType(type)}
+              accessibilityRole="button"
+              accessibilityState={{ selected: active }}
+              testID={`trend-type-${type}`}
+            >
+              <Icon name={ALL_SERIES_ICON[type]} size={16} color={active ? colors.text : colors.mutedText} />
+              <Text style={[styles.typeToggleText, { color: active ? colors.text : colors.mutedText }]}>
+                {type === 'income' ? t('income') : t('expense')}
+              </Text>
+            </TouchableOpacity>
+          );
+        })}
+      </View>
 
-        return (
-          <View key={parent.id}>
-            <View style={[styles.parentRow, { borderBottomColor: colors.border }]}>
-              {hasChildren && (
-                <TouchableOpacity
-                  style={styles.expandButton}
-                  onPress={() => toggleParent(parent.id)}
-                  hitSlop={{ top: 12, bottom: 12, left: 12, right: 12 }}
-                >
-                  <Icon
-                    name={isExpanded ? 'chevron-down' : 'chevron-right'}
-                    size={20}
-                    color={colors.mutedText}
-                  />
-                </TouchableOpacity>
-              )}
-              {!hasChildren && <View style={styles.expandPlaceholder} />}
-              <TouchableOpacity
-                style={[
-                  styles.categoryItem,
-                  isSelected && { backgroundColor: colors.selected },
-                ]}
-                onPress={() => handleSelectCategory(parent.id)}
-              >
-                <Text style={[styles.categoryText, { color: colors.text }]}>
-                  {parent.name}
-                </Text>
-              </TouchableOpacity>
-            </View>
+      <TouchableOpacity
+        style={[
+          styles.allRow,
+          { borderColor: colors.border },
+          allRowSelected && { backgroundColor: colors.selected },
+        ]}
+        onPress={handleSelectAll}
+        testID="trend-all-categories"
+      >
+        <Icon name={ALL_SERIES_ICON[pickerType]} size={18} color={colors.text} />
+        <Text style={[styles.allRowText, { color: colors.text }]}>
+          {pickerType === 'income' ? t('all_income') : t('all_expenses')}
+        </Text>
+      </TouchableOpacity>
 
-            {hasChildren && isExpanded && children.map(child => {
-              const isChildSelected = pickerMode === 'primary'
-                ? effectiveCategory === child.id
-                : effectiveVsCategory === child.id;
-              return (
-                <TouchableOpacity
-                  key={child.id}
-                  style={[
-                    styles.childRow,
-                    { borderBottomColor: colors.border },
-                    isChildSelected && { backgroundColor: colors.selected },
-                  ]}
-                  onPress={() => handleSelectCategory(child.id)}
-                >
-                  <Text style={[styles.childText, { color: colors.text }]}>
-                    {child.name}
-                  </Text>
-                </TouchableOpacity>
-              );
-            })}
-          </View>
-        );
-      })}
+      {/* The whole list, not the slice: the grid walks the tree itself and
+          filters by type and shadow flag on the way down.
+
+          Keyed by type so switching sides remounts it: the grid keeps its own
+          breadcrumb, and a grid left standing inside an expense folder shows
+          none of the income categories it has just been handed. */}
+      <CategoryGridSelector
+        key={pickerType}
+        categories={categories}
+        categoryType={pickerType}
+        selectedCategoryId={allRowSelected ? null : pickerSelectedId}
+        onSelect={handleSelectCategory}
+        colors={colors}
+        t={t}
+        selectableFolders
+        testIDPrefix="trend-category-option"
+      />
     </ScrollView>
   );
 
   return (
     <View style={[styles.card, { backgroundColor: colors.altRow, borderColor: colors.border }]}>
       <View style={styles.header}>
-        {/* Left: label + primary category selector + vs selector */}
+        {/* Left: label + primary series selector + vs selector */}
         <View style={styles.headerLeft}>
           <Text style={[styles.sectionLabel, { color: colors.mutedText }]}>
-            {t('category_spending_trend').toUpperCase()}
+            {t('trends').toUpperCase()}
           </Text>
           <TouchableOpacity
             style={styles.categorySelector}
             onPress={() => openPicker('primary')}
+            testID="trend-primary-selector"
           >
-            {selectedCategoryIcon && (
-              <Icon name={selectedCategoryIcon} size={18} color={colors.text} />
+            {primaryIcon && (
+              <Icon name={primaryIcon} size={18} color={colors.text} />
             )}
             <Text style={[styles.categoryName, { color: colors.text }]} numberOfLines={1}>
-              {selectedCategoryName}
+              {primaryLabel}
             </Text>
             <Icon name="chevron-down" size={18} color={colors.mutedText} />
           </TouchableOpacity>
 
-          {/* VS category selector row */}
+          {/* VS series selector row */}
           <View style={styles.vsRow}>
             <TouchableOpacity
               style={styles.vsSelector}
               onPress={() => openPicker('vs')}
+              testID="trend-vs-selector"
             >
-              {effectiveVsCategory ? (
+              {vs ? (
                 <>
                   <Text style={[styles.vsText, { color: colors.mutedText }]}>vs</Text>
                   {/* The mark beside the label carries the series identity; the
                       label itself stays in ink, so it is never a colour-only cue. */}
                   <View style={[styles.seriesDot, { backgroundColor: vsColor }]} />
-                  {vsCategoryIcon && (
-                    <Icon name={vsCategoryIcon} size={14} color={colors.text} />
+                  {vsIcon && (
+                    <Icon name={vsIcon} size={14} color={colors.text} />
                   )}
                   <Text style={[styles.vsCategoryName, { color: colors.text }]} numberOfLines={1}>
-                    {vsCategoryName}
+                    {vsLabel}
                   </Text>
                 </>
               ) : (
@@ -799,10 +808,11 @@ const CategorySpendingCard = ({
                 </>
               )}
             </TouchableOpacity>
-            {effectiveVsCategory && (
+            {vs && (
               <TouchableOpacity
-                onPress={clearVsCategory}
+                onPress={clearVsSeries}
                 hitSlop={{ top: 8, bottom: 8, left: 8, right: 8 }}
+                testID="trend-vs-clear"
               >
                 <Icon name="close" size={14} color={colors.mutedText} />
               </TouchableOpacity>
@@ -831,14 +841,14 @@ const CategorySpendingCard = ({
               {/* In vs mode the two figures need telling apart, so each gets the
                   dot of its series — the number itself stays in text ink. */}
               <View style={styles.amountRow}>
-                {effectiveVsCategory && (
+                {vs && (
                   <View style={[styles.seriesDot, { backgroundColor: colors.primary }]} />
                 )}
                 <Text style={[styles.currentAmount, { color: colors.text }]}>
                   {formatCurrency(displayedTotal, selectedCurrency)}
                 </Text>
               </View>
-              {effectiveVsCategory && (
+              {vs && (
                 <View style={styles.amountRow}>
                   <View style={[styles.seriesDot, { backgroundColor: vsColor }]} />
                   <Text style={[styles.currentAmount, { color: colors.text }]}>
@@ -858,7 +868,7 @@ const CategorySpendingCard = ({
         </View>
       </View>
 
-      {/* Category Picker Modal (shared for primary and vs) */}
+      {/* Series Picker Modal (shared for primary and vs) */}
       {pickerMode !== null && <ModalBlurOverlay />}
       <Modal
         visible={pickerMode !== null}
@@ -877,18 +887,21 @@ const CategorySpendingCard = ({
         </TouchableOpacity>
       </Modal>
 
-      {loading ? (
+      {/* Both series gate the chart: the primary can resolve to all zeros while
+          the comparison one is still in flight, and gating on the primary alone
+          flashed the empty state before the bars arrived. */}
+      {loading || vsLoading ? (
         <View style={styles.loadingContainer}>
           <ActivityIndicator size="large" color={colors.primary} />
         </View>
       ) : !hasData ? (
         <EmptyState
-          message={t('no_spending_data')}
+          message={t('no_trend_data')}
           fill={false}
           style={styles.emptyContainer}
         />
       ) : (
-        <SpendingBarChart
+        <TrendBarChart
           // No remount when the vs-series appears or disappears: the press state
           // that used to be keyed by series is gone, and holding the mount keeps
           // the zoom and scroll position the user has arrived at.
@@ -906,7 +919,7 @@ const CategorySpendingCard = ({
   );
 };
 
-SpendingBarChart.propTypes = {
+TrendBarChart.propTypes = {
   colors: PropTypes.object.isRequired,
   data: PropTypes.arrayOf(PropTypes.shape({
     month: PropTypes.number,
@@ -921,17 +934,34 @@ SpendingBarChart.propTypes = {
   width: PropTypes.number.isRequired,
 };
 
-CategorySpendingCard.propTypes = {
+TrendsCard.propTypes = {
   colors: PropTypes.object.isRequired,
   t: PropTypes.func.isRequired,
   selectedCurrency: PropTypes.string.isRequired,
-  selectedCategory: PropTypes.string,
-  onCategoryChange: PropTypes.func.isRequired,
+  selectedSeries: PropTypes.shape({
+    type: PropTypes.oneOf(['expense', 'income']),
+    categoryId: PropTypes.string,
+  }),
+  onSeriesChange: PropTypes.func.isRequired,
   categories: PropTypes.array.isRequired,
   convertAllCurrencies: PropTypes.bool,
 };
 
 const styles = StyleSheet.create({
+  allRow: {
+    alignItems: 'center',
+    borderRadius: BORDER_RADIUS.md,
+    borderWidth: 1,
+    flexDirection: 'row',
+    gap: SPACING.sm,
+    marginBottom: SPACING.md,
+    paddingHorizontal: SPACING.md,
+    paddingVertical: 12,
+  },
+  allRowText: {
+    fontSize: FONT_SIZE.base,
+    fontWeight: '500',
+  },
   amountRow: {
     alignItems: 'center',
     flexDirection: 'row',
@@ -946,12 +976,6 @@ const styles = StyleSheet.create({
     marginBottom: SPACING.lg,
     padding: SPACING.lg,
   },
-  categoryItem: {
-    borderRadius: BORDER_RADIUS.sm,
-    flex: 1,
-    paddingHorizontal: 8,
-    paddingVertical: 12,
-  },
   categoryName: {
     fontSize: FONT_SIZE.base,
     fontWeight: '600',
@@ -962,10 +986,6 @@ const styles = StyleSheet.create({
     gap: SPACING.xs,
     marginTop: 4,
   },
-  categoryText: {
-    fontSize: FONT_SIZE.base,
-    fontWeight: '500',
-  },
   chartCanvas: {
     height: CHART_HEIGHT,
   },
@@ -975,15 +995,6 @@ const styles = StyleSheet.create({
   chartWrap: {
     marginTop: 12,
   },
-  childRow: {
-    borderBottomWidth: 1,
-    marginLeft: 44,
-    paddingHorizontal: HORIZONTAL_PADDING,
-    paddingVertical: 12,
-  },
-  childText: {
-    fontSize: 15,
-  },
   currentAmount: {
     fontSize: FONT_SIZE.lg,
     fontWeight: '700',
@@ -992,16 +1003,6 @@ const styles = StyleSheet.create({
   emptyContainer: {
     height: 120,
     paddingHorizontal: SPACING.xxl,
-  },
-  expandButton: {
-    alignItems: 'center',
-    justifyContent: 'center',
-    paddingHorizontal: 12,
-    paddingVertical: 12,
-    width: 44,
-  },
-  expandPlaceholder: {
-    width: 44,
   },
   header: {
     alignItems: 'flex-start',
@@ -1031,10 +1032,8 @@ const styles = StyleSheet.create({
     flex: 1,
     justifyContent: 'center',
   },
-  parentRow: {
-    alignItems: 'center',
-    borderBottomWidth: 1,
-    flexDirection: 'row',
+  pickerBody: {
+    padding: SPACING.md,
   },
   scrollArea: {
     flex: 1,
@@ -1055,6 +1054,25 @@ const styles = StyleSheet.create({
   thisMonthLabel: {
     fontSize: 11,
     marginTop: 2,
+  },
+  typeToggle: {
+    borderRadius: BORDER_RADIUS.md,
+    borderWidth: 1,
+    flexDirection: 'row',
+    marginBottom: SPACING.md,
+    overflow: 'hidden',
+  },
+  typeToggleItem: {
+    alignItems: 'center',
+    flex: 1,
+    flexDirection: 'row',
+    gap: SPACING.xs,
+    justifyContent: 'center',
+    paddingVertical: 10,
+  },
+  typeToggleText: {
+    fontSize: FONT_SIZE.sm,
+    fontWeight: '600',
   },
   vsCategoryName: {
     flexShrink: 1,
@@ -1078,4 +1096,4 @@ const styles = StyleSheet.create({
   },
 });
 
-export default CategorySpendingCard;
+export default TrendsCard;

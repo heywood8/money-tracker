@@ -31,5 +31,5 @@
   "app/hooks/useExpenseData*":            ["graphs"],
   "app/hooks/useIncomeData*":             ["graphs", "add-income"],
   "app/hooks/useBalanceHistory*":         ["graphs", "balance-update"],
-  "app/hooks/useCategoryMonthlySpending*": ["graphs"]
+  "app/hooks/useMonthlyTrendSeries*": ["graphs"]
 }

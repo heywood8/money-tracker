@@ -58,7 +58,7 @@ The app follows a feature-based organization under the `app/` directory:
     - `QuickAddForm.js`, `SplitOperationModal.js`, `PickerModal.js`, `DateSeparator.js`, `DescriptionSuggestionRow.js`
   - **components/search/**: `SearchBar.js`, `SearchOverlay.js`, `ExpandableFilters.js`, `FilterBadge.js`, `FilterChipStrip.js`
   - **components/graphs/**: `ExpenseSummaryCard.js`, `IncomeSummaryCard.js`, `ExpensePieChart.js`, `IncomePieChart.js`
-    - `CategorySpendingCard.js`, `SpendingPredictionCard.js`, `BalanceHistoryCard.js`, `BalanceHistoryModal.js`
+    - `TrendsCard.js`, `SpendingPredictionCard.js`, `BalanceHistoryCard.js`, `BalanceHistoryModal.js`
     - `ChartModal.js`, `CustomLegend.js`
   - **components/modals/**: `MultiCurrencyFields.js`
   - **components/accounts/**: account-specific components
@@ -69,7 +69,7 @@ The app follows a feature-based organization under the `app/` directory:
 - **hooks/** (10 files) - Custom React hooks
   - `useMaterialTheme.js`, `useOperationForm.js`, `useOperationPicker.js`
   - `useQuickAddForm.js`, `useMultiCurrencyTransfer.js`, `useExpenseData.js`
-  - `useIncomeData.js`, `useBalanceHistory.js`, `useCategoryMonthlySpending.js`
+  - `useIncomeData.js`, `useBalanceHistory.js`, `useMonthlyTrendSeries.js`
   - `useLogEntries.js`
 
 - **services/** (18 files) - Business logic and data access layer
