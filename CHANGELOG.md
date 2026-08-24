@@ -1,5 +1,12 @@
 # Changelog
 
+## [0.276.0](https://github.com/heywood8/money-tracker/compare/penny-v0.275.0...penny-v0.276.0) (2026-08-24)
+
+
+### Features
+
+* **graphs:** make the drill-down operations list readable and openable ([#1642](https://github.com/heywood8/money-tracker/issues/1642)) ([656a9ea](https://github.com/heywood8/money-tracker/commit/656a9ea84f26c37df29ca9d05f29f36d069fd27c))
+
 ## [0.275.0](https://github.com/heywood8/money-tracker/compare/penny-v0.274.0...penny-v0.275.0) (2026-08-24)
 
 
