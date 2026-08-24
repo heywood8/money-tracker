@@ -472,6 +472,18 @@ const GraphsScreen = () => {
     convertAllCurrencies,
   );
 
+  // Icon of the drilled-into category — every row of the leaf list draws it, the
+  // way the Operations tab draws each operation's category icon.
+  const expenseCategoryIcon = useMemo(() => {
+    const cat = categories.find(c => c.id === selectedCategory);
+    return cat?.icon || 'shape-outline';
+  }, [selectedCategory, categories]);
+
+  const incomeCategoryIcon = useMemo(() => {
+    const cat = categories.find(c => c.id === selectedIncomeCategory);
+    return cat?.icon || 'shape-outline';
+  }, [selectedIncomeCategory, categories]);
+
   // Resolve an account id to its name for the leaf operations list. In converted
   // mode that list mixes accounts, and without a name a row cannot say which
   // wallet the money actually left.
@@ -740,6 +752,8 @@ const GraphsScreen = () => {
                       categoryChip={incomeCategoryChip}
                       getAccountName={getAccountName}
                       onOperationPress={handleOperationPress}
+                      categoryName={selectedIncomeCategoryName}
+                      categoryIcon={incomeCategoryIcon}
                     />
                   </Animated.View>
                 </ScrollView>
@@ -780,6 +794,8 @@ const GraphsScreen = () => {
                       categoryChip={expenseCategoryChip}
                       getAccountName={getAccountName}
                       onOperationPress={handleOperationPress}
+                      categoryName={selectedCategoryName}
+                      categoryIcon={expenseCategoryIcon}
                     />
                   </Animated.View>
                 </ScrollView>
