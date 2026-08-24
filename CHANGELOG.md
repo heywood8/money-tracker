@@ -1,5 +1,12 @@
 # Changelog
 
+## [0.275.0](https://github.com/heywood8/money-tracker/compare/penny-v0.274.0...penny-v0.275.0) (2026-08-24)
+
+
+### Features
+
+* **graphs:** colour the trends card by side of the ledger ([#1640](https://github.com/heywood8/money-tracker/issues/1640)) ([339eee3](https://github.com/heywood8/money-tracker/commit/339eee325ed1beac747bee5fbc1a6c3bbe60847d))
+
 ## [0.274.0](https://github.com/heywood8/money-tracker/compare/penny-v0.273.0...penny-v0.274.0) (2026-08-24)
 
 
