@@ -70,6 +70,12 @@ jest.mock('../../assets/currencies.json', () => ({
   RUB: { name: 'Russian Ruble', symbol: '₽', decimal_digits: 2 },
 }), { virtual: true });
 
+// Compiled once at module scope so the screen's module graph — which now reaches
+// OperationModal and the pickers behind it — is built during file evaluation
+// instead of inside the first test's 5s budget. The per-test requires below are
+// registry hits after this.
+require('../../app/screens/GraphsScreen');
+
 describe('GraphsScreen', () => {
   beforeEach(() => {
     jest.clearAllMocks();
