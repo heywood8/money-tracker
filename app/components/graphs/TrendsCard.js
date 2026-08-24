@@ -10,7 +10,7 @@ import currencies from '../../../assets/currencies.json';
 import useMonthlyTrendSeries, { ALL_CATEGORIES } from '../../hooks/useMonthlyTrendSeries';
 import { BORDER_RADIUS, FONT_SIZE, HORIZONTAL_PADDING, SPACING } from '../../styles/designTokens';
 import { comparisonSeriesColor, ledgerSeriesColors } from '../../styles/chartPalette';
-import { MONTH_ABBREVIATIONS } from './monthLabels';
+import { getMonthAbbreviations } from './monthLabels';
 import ModalBlurOverlay from '../ModalBlurOverlay';
 import CategoryGridSelector from '../CategoryGridSelector';
 import { useDisplaySettings } from '../../contexts/DisplaySettingsContext';
@@ -20,11 +20,23 @@ import EmptyState from '../EmptyState';
 
 const screenWidth = Dimensions.get('window').width;
 
+// Collapsed to K/M above a thousand, the same way the expense/income tabs
+// directly above this card write theirs. Spelled out in full, a seven-digit
+// total ran the width of the card and disagreed with the figure sitting one row
+// higher on the same screen.
 const formatCurrency = (amount, currency) => {
   const currencyInfo = currencies[currency];
   const decimals = currencyInfo?.decimal_digits ?? 2;
   const symbol = currencyInfo?.symbol ?? currency;
-  return `${symbol}${parseFloat(amount).toFixed(decimals)}`;
+  const value = parseFloat(amount);
+  if (!Number.isFinite(value)) return `${symbol}${(0).toFixed(decimals)}`;
+  const magnitude = Math.abs(value);
+  // The crossing point is where the K form *rounds* to a million, not where the
+  // value reaches one: 999,950 written to one decimal is "1000.0K", which is
+  // wider than the "1.0M" it turns into a cent later.
+  if (magnitude >= 999950) return `${symbol}${(value / 1000000).toFixed(1)}M`;
+  if (magnitude >= 1000) return `${symbol}${(value / 1000).toFixed(1)}K`;
+  return `${symbol}${value.toFixed(decimals)}`;
 };
 
 const BAR_HEIGHT = 90;
@@ -56,6 +68,13 @@ const ACCESSIBILITY_ACTIONS = [{ name: 'increment' }, { name: 'decrement' }];
 const DEFAULT_MONTH_WIDTH = 36;
 const MIN_MONTH_WIDTH = 18;
 const MAX_MONTH_WIDTH = 96;
+// A tick needs room for its own label plus a gap between it and its neighbours.
+// Localised abbreviations are wider than the two glyphs the axis used to draw,
+// so below this pitch only every Nth month is labelled rather than letting the
+// months smear into one another when the chart is pinched out.
+const MIN_LABEL_PITCH = 24;
+// A January carries its year, but only where the pitch has room for both.
+const YEAR_SUFFIX_PITCH = 34;
 // Gutter for the pinned y-axis. It sits outside the scroller, so the scale stays
 // readable however far back the user has scrolled.
 const Y_AXIS_WIDTH = 34;
@@ -68,7 +87,7 @@ const renderNothing = () => null;
 // Labels are drawn beside the pinned axis instead, but the space they would take
 // still has to be reserved so both canvases resolve the same plot height.
 const hideYLabel = () => '';
-const spacerXLabel = () => 'Ja';
+const spacerXLabel = () => 'Jan';
 
 const clamp = (value, min, max) => Math.min(Math.max(value, min), max);
 
@@ -101,6 +120,14 @@ export const resolveTapIndex = (x, monthWidth, count) => {
   if (index < 0 || index >= count) return -1;
   return index;
 };
+
+/**
+ * How many months apart the labelled ticks are at a given pitch: 1 (label every
+ * month) until the months are too narrow to hold a label, then 2, 3, ...
+ */
+export const resolveLabelStride = (pitch) => (
+  pitch > 0 ? Math.max(1, Math.ceil(MIN_LABEL_PITCH / pitch)) : 1
+);
 
 export const formatYTick = (value) => {
   const num = Number(value);
@@ -440,17 +467,24 @@ const TrendBarChart = ({
 
   const formatYLabel = isStacked ? formatPctTick : formatYTick;
 
-  // Twelve months no longer fit in one window, so a bare "Ja" cannot say which
+  // Twelve months no longer fit in one window, so a bare "Jan" cannot say which
   // January it is. Each January carries its year, where the pitch has room.
+  //
+  // The stride is counted back from the newest month rather than forward from
+  // the oldest, so the month the card opens on is always one of the labelled
+  // ones however far back the history runs.
+  const labelStride = resolveLabelStride(pitch);
   const formatXLabel = useCallback((value) => {
-    const item = data[Math.round(value)];
+    const index = Math.round(value);
+    const item = data[index];
     if (!item) return '';
+    if ((count - 1 - index) % labelStride !== 0) return '';
     const abbreviation = monthAbbreviations[item.month] ?? '';
-    if (item.month === 0 && pitch >= 34) {
+    if (item.month === 0 && pitch >= YEAR_SUFFIX_PITCH) {
       return `${abbreviation}'${String(item.year).slice(2)}`;
     }
     return abbreviation;
-  }, [data, monthAbbreviations, pitch]);
+  }, [data, count, labelStride, monthAbbreviations, pitch]);
 
   return (
     <View
@@ -687,7 +721,7 @@ const TrendsCard = ({
 
   const { hideBalances } = useDisplaySettings();
 
-  const monthAbbreviations = MONTH_ABBREVIATIONS;
+  const monthAbbreviations = useMemo(() => getMonthAbbreviations(t), [t]);
   const monthKeys = ['month_january', 'month_february', 'month_march', 'month_april', 'month_may', 'month_june', 'month_july', 'month_august', 'month_september', 'month_october', 'month_november', 'month_december'];
 
   const hasVsData = vs !== null && !vsLoading && vsMonthlyData.length > 0;
