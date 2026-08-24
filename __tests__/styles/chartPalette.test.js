@@ -6,11 +6,17 @@ import {
   chartMode,
   comparisonSeriesColor,
   contrastRatio,
+  ledgerSeriesColors,
   inkOn,
   otherSliceColor,
   relativeLuminance,
   seriesColorForSlot,
 } from '../../app/styles/chartPalette';
+import { EXPENSE_ACCENT } from '../../app/components/graphs/ExpenseSummaryCard';
+
+// jest.setup.js swaps ThemeColorsContext for a fixed stub palette, so the real
+// theme values have to be reached past the mock.
+const { darkTheme, lightTheme } = jest.requireActual('../../app/contexts/ThemeColorsContext');
 
 const LIGHT = { surface: '#ffffff' };
 const DARK = { surface: '#1a1a1a' };
@@ -91,6 +97,41 @@ describe('chartPalette', () => {
 
     it('steps the comparison series per mode', () => {
       expect(comparisonSeriesColor(LIGHT)).not.toBe(comparisonSeriesColor(DARK));
+    });
+  });
+
+  describe('ledgerSeriesColors', () => {
+    it('keys the pair by operation type', () => {
+      [LIGHT, DARK].forEach((mode) => {
+        const pair = ledgerSeriesColors(mode);
+        expect(Object.keys(pair).sort()).toEqual(['expense', 'income']);
+        expect(pair.income).not.toBe(pair.expense);
+      });
+    });
+
+    it('re-steps the green for the dark chart surface', () => {
+      expect(ledgerSeriesColors(LIGHT).income).not.toBe(ledgerSeriesColors(DARK).income);
+    });
+
+    it('matches the summary-card badges on the same screen', () => {
+      // The palette copies these values rather than referencing them, so that
+      // the measurements recorded beside them stay true to what is drawn. This
+      // is what stops the copy drifting: re-tune the theme's green and the bars
+      // stop matching the ↙ badge, and this fails instead of going unnoticed.
+      expect(ledgerSeriesColors(LIGHT).income).toBe(lightTheme.colors.income);
+      expect(ledgerSeriesColors(DARK).income).toBe(darkTheme.colors.income);
+      expect(ledgerSeriesColors(LIGHT).expense).toBe(EXPENSE_ACCENT);
+      expect(ledgerSeriesColors(DARK).expense).toBe(EXPENSE_ACCENT);
+    });
+
+    it('keeps both sides readable against the chart surface', () => {
+      // Red/green only survives here because these particular steps stay well
+      // apart; a restep that drops one of them onto its surface breaks the pair.
+      [[LIGHT, '#ffffff'], [DARK, '#1a1a1a']].forEach(([mode, surface]) => {
+        const pair = ledgerSeriesColors(mode);
+        expect(contrastRatio(pair.income, surface)).toBeGreaterThanOrEqual(3);
+        expect(contrastRatio(pair.expense, surface)).toBeGreaterThanOrEqual(3);
+      });
     });
   });
 

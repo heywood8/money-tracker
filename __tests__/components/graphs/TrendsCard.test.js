@@ -410,6 +410,87 @@ describe('TrendsCard', () => {
     });
   });
 
+  describe('Series colours', () => {
+    const LEDGER_GREEN = '#4a8a4a';
+    const LEDGER_RED = '#d93025';
+
+    const barGroupColors = (getAllByTestId) =>
+      getAllByTestId('vn-bar-group-bar').map((node) => node.props.color);
+
+    it('paints income green and expenses red when the two sides are compared', async () => {
+      const { getAllByTestId } = await render(
+        <TrendsCard {...defaultProps} />,
+      );
+
+      // Default pair is All income (primary) vs All expenses (vs).
+      const [primaryColor, vsSeriesColor] = barGroupColors(getAllByTestId);
+      expect(primaryColor).toBe(LEDGER_GREEN);
+      expect(vsSeriesColor).toBe(LEDGER_RED);
+    });
+
+    it('follows the sides round when the primary is the expense series', async () => {
+      const { getByTestId, getAllByTestId } = await render(
+        <TrendsCard
+          {...defaultProps}
+          selectedSeries={{ type: 'expense', categoryId: 'all' }}
+        />,
+      );
+
+      // Primary is expenses now; make the comparison an income category.
+      await fireEvent.press(getByTestId('trend-vs-selector'));
+      await fireEvent.press(getByTestId('trend-type-income'));
+      await fireEvent.press(getByTestId('trend-category-option-cat-salary'));
+
+      const [primaryColor, vsSeriesColor] = barGroupColors(getAllByTestId);
+      expect(primaryColor).toBe(LEDGER_RED);
+      expect(vsSeriesColor).toBe(LEDGER_GREEN);
+    });
+
+    it('keeps the neutral pair when both series are on the same side', async () => {
+      const { getByTestId, getAllByTestId } = await render(
+        <TrendsCard
+          {...defaultProps}
+          selectedSeries={{ type: 'expense', categoryId: 'all' }}
+        />,
+      );
+
+      // Two expense series: red/green would assert a meaning the chart does not
+      // carry, so the categorical pair stays.
+      await fireEvent.press(getByTestId('trend-vs-selector'));
+      await fireEvent.press(getByTestId('trend-category-option-cat-transport'));
+
+      const colours = barGroupColors(getAllByTestId);
+      expect(colours).not.toContain(LEDGER_GREEN);
+      expect(colours).not.toContain(LEDGER_RED);
+      expect(colours[0]).toBe(defaultColors.primary);
+    });
+
+    it('carries the ledger pair into stacked mode', async () => {
+      const { getByTestId } = await render(
+        <TrendsCard {...defaultProps} />,
+      );
+
+      await fireEvent.press(getByTestId('stacked-bar-toggle-btn'));
+
+      expect(getByTestId('vn-stacked-bar').props.colors).toEqual([LEDGER_GREEN, LEDGER_RED]);
+    });
+
+    it('gives the header dots the same colours as the bars', async () => {
+      const { container } = await render(
+        <TrendsCard {...defaultProps} />,
+      );
+
+      const dotColours = container
+        .queryAll(n => n.type === 'View')
+        .map(n => (Array.isArray(n.props.style) ? Object.assign({}, ...n.props.style) : n.props.style))
+        .filter(style => style && style.width === 8 && style.height === 8)
+        .map(style => style.backgroundColor);
+
+      expect(dotColours).toContain(LEDGER_GREEN);
+      expect(dotColours).toContain(LEDGER_RED);
+    });
+  });
+
   describe('Stacked Bar Toggle', () => {
     it('is offered as soon as there are two series', async () => {
       const { getByTestId } = await render(
@@ -594,11 +675,11 @@ describe('TrendsCard', () => {
         ? Object.assign({}, ...canvas.props.style)
         : canvas.props.style;
 
-      // 12 months at the default 48px pitch, or the viewport when that is wider
+      // 12 months at the default 36px pitch, or the viewport when that is wider
       // — a phone gets the scrolling layout, a tablet-width card still fills.
       const { width: screenWidth } = require('react-native').Dimensions.get('window');
       const viewport = screenWidth - 64 - 34;
-      expect(style.width).toBeCloseTo(Math.max(12 * 48, viewport), 5);
+      expect(style.width).toBeCloseTo(Math.max(12 * 36, viewport), 5);
     });
   });
 
