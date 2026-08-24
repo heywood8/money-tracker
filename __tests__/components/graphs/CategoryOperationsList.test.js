@@ -158,6 +158,46 @@ describe('CategoryOperationsList', () => {
       expect(queryByText('$30.50')).toBeNull();
     });
 
+    // With one operation the category total IS the row's amount; printing it in
+    // the header too puts the same figure twice across an otherwise empty panel.
+    it('does not echo a lone operation with a category total', async () => {
+      const single = [{ id: '1', amount: '10.00', date: '2024-03-05', description: 'A' }];
+      const { queryAllByText } = await render(
+        <CategoryOperationsList operations={single} currency="USD" colors={colors} language="en" headerChip={chip} />,
+      );
+
+      expect(queryAllByText('$10.00')).toHaveLength(1);
+    });
+
+    // Every operation on one day means the day header already prints the
+    // category's figure; the panel would show it twice.
+    it('does not echo a single-day category with a category total', async () => {
+      const oneDay = [
+        { id: '1', amount: '10.00', date: '2024-03-05', description: 'A' },
+        { id: '2', amount: '20.00', date: '2024-03-05', description: 'B' },
+      ];
+      const { queryAllByText } = await render(
+        <CategoryOperationsList operations={oneDay} currency="USD" colors={colors} language="en" headerChip={chip} />,
+      );
+
+      expect(queryAllByText('$30.00')).toHaveLength(1);
+    });
+
+    // Sorted by amount there are no day headers, so nothing else carries it.
+    it('keeps the category total when the day headers are gone', async () => {
+      const oneDay = [
+        { id: '1', amount: '10.00', date: '2024-03-05', description: 'A' },
+        { id: '2', amount: '20.00', date: '2024-03-05', description: 'B' },
+      ];
+      const { getByTestId, queryAllByText } = await render(
+        <CategoryOperationsList operations={oneDay} currency="USD" colors={colors} language="en" t={t} headerChip={chip} />,
+      );
+
+      await fireEvent.press(getByTestId('category-operations-sort'));
+
+      expect(queryAllByText('$30.00')).toHaveLength(1);
+    });
+
     it('pairs the chip with the total of the listed operations', async () => {
       const { getByTestId, getByText } = await render(
         <CategoryOperationsList operations={ops} currency="USD" colors={colors} language="en" headerChip={chip} />,
@@ -403,6 +443,49 @@ describe('CategoryOperationsList', () => {
 
       expect(getByText('Cash')).toBeTruthy();
       expect(getByText('Card')).toBeTruthy();
+    });
+  });
+
+  // Regression: the root carried `flex: 1` inside the chart panel's ScrollView,
+  // whose main axis is unbounded — flexBasis resolved to 0 with no free space to
+  // grow back into, so the box could end up shorter than the rows it held. The
+  // rows still drew, but on Android a child outside its parent's bounds gets no
+  // touches, so a press landed about one time in five and only on the first row.
+  describe('layout', () => {
+    const ops = [
+      { id: '1', amount: '10.00', date: '2024-03-05', description: 'A' },
+      { id: '2', amount: '20.00', date: '2024-03-04', description: 'B' },
+    ];
+
+    it('does not flex its root inside the panel scroll view', async () => {
+      const { getByTestId } = await render(
+        <CategoryOperationsList operations={ops} currency="USD" colors={colors} language="en" t={t} />,
+      );
+
+      const style = Object.assign({}, ...[].concat(getByTestId('category-operations-list').props.style));
+      expect(style.flex).toBeUndefined();
+      expect(style.flexBasis).toBeUndefined();
+      expect(style.flexGrow).toBeUndefined();
+    });
+
+    // The panel's own scroll padding is 3px, so without an inset of its own the
+    // list is glued to the card's edges and the row reads as pulled apart.
+    it('insets the rows and the day headers off the panel edges', async () => {
+      const { getByTestId } = await render(
+        <CategoryOperationsList
+          operations={ops}
+          currency="USD"
+          colors={colors}
+          language="en"
+          t={t}
+        />,
+      );
+
+      const dayStyle = Object.assign({}, ...[].concat(getByTestId('category-operations-day-2024-03-05').props.style));
+      expect(dayStyle.paddingHorizontal).toBeGreaterThan(0);
+
+      const rowStyle = Object.assign({}, ...[].concat(getByTestId('category-operation-row-1').props.style));
+      expect(rowStyle.paddingHorizontal).toBeGreaterThan(0);
     });
   });
 
