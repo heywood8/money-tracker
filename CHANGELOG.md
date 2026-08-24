@@ -1,5 +1,12 @@
 # Changelog
 
+## [0.276.1](https://github.com/heywood8/money-tracker/compare/penny-v0.276.0...penny-v0.276.1) (2026-08-24)
+
+
+### Bug Fixes
+
+* **graphs:** localise trend month labels and collapse totals to K/M ([#1644](https://github.com/heywood8/money-tracker/issues/1644)) ([fbb0a8b](https://github.com/heywood8/money-tracker/commit/fbb0a8b2893df10514e9fb6a08768b5d286b5bec))
+
 ## [0.276.0](https://github.com/heywood8/money-tracker/compare/penny-v0.275.0...penny-v0.276.0) (2026-08-24)
 
 
