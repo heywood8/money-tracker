@@ -61,11 +61,20 @@ jest.mock('../../app/components/SimplePicker', () => {
   };
 });
 
+// `name` matters as well as `symbol`: the screen now mounts OperationModal for
+// the drill-down list, and the currency picker inside it sorts the map by name
+// at module load.
 jest.mock('../../assets/currencies.json', () => ({
-  USD: { symbol: '$', decimal_digits: 2 },
-  EUR: { symbol: '€', decimal_digits: 2 },
-  RUB: { symbol: '₽', decimal_digits: 2 },
+  USD: { name: 'US Dollar', symbol: '$', decimal_digits: 2 },
+  EUR: { name: 'Euro', symbol: '€', decimal_digits: 2 },
+  RUB: { name: 'Russian Ruble', symbol: '₽', decimal_digits: 2 },
 }), { virtual: true });
+
+// Compiled once at module scope so the screen's module graph — which now reaches
+// OperationModal and the pickers behind it — is built during file evaluation
+// instead of inside the first test's 5s budget. The per-test requires below are
+// registry hits after this.
+require('../../app/screens/GraphsScreen');
 
 describe('GraphsScreen', () => {
   beforeEach(() => {

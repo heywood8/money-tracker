@@ -33,6 +33,7 @@ import useExpenseData from '../hooks/useExpenseData';
 import useIncomeData from '../hooks/useIncomeData';
 import useCategoryOperations from '../hooks/useCategoryOperations';
 import useBalanceHistory from '../hooks/useBalanceHistory';
+import OperationModal from '../modals/OperationModal';
 import { CARD_SURFACE } from '../styles/componentStyles';
 
 const CARD_HEADER_HEIGHT = 56;
@@ -471,6 +472,29 @@ const GraphsScreen = () => {
     convertAllCurrencies,
   );
 
+  // Resolve an account id to its name for the leaf operations list. In converted
+  // mode that list mixes accounts, and without a name a row cannot say which
+  // wallet the money actually left.
+  const getAccountName = useCallback((accountId) => {
+    const account = accounts.find(acc => String(acc.id) === String(accountId));
+    return account ? account.name : '';
+  }, [accounts]);
+
+  // Tapping an operation in the drill-down opens it for editing, the same way
+  // the Operations tab does — spotting a wrong figure in a chart and having no
+  // way through to it was the drill-down's dead end. useCategoryOperations and
+  // both data hooks listen for OPERATION_CHANGED, so a save refreshes the list
+  // and the donut behind it without any wiring here.
+  const [editingOperation, setEditingOperation] = useState(null);
+
+  const handleOperationPress = useCallback((operation) => {
+    setEditingOperation(operation);
+  }, []);
+
+  const handleCloseOperationModal = useCallback(() => {
+    setEditingOperation(null);
+  }, []);
+
   // Shared category parent lookup
   const getParentCategoryId = useCallback((categoryId) => {
     if (categoryId === 'all') return 'all';
@@ -714,6 +738,8 @@ const GraphsScreen = () => {
                       introKey={chartIntro.key}
                       introDelay={chartIntro.delay}
                       categoryChip={incomeCategoryChip}
+                      getAccountName={getAccountName}
+                      onOperationPress={handleOperationPress}
                     />
                   </Animated.View>
                 </ScrollView>
@@ -752,6 +778,8 @@ const GraphsScreen = () => {
                       introKey={chartIntro.key}
                       introDelay={chartIntro.delay}
                       categoryChip={expenseCategoryChip}
+                      getAccountName={getAccountName}
+                      onOperationPress={handleOperationPress}
                     />
                   </Animated.View>
                 </ScrollView>
@@ -875,6 +903,23 @@ const GraphsScreen = () => {
         onToggleConvert={handleToggleConvert}
         testIDPrefix="graphs-currency"
       />
+
+      {/* Opened from a row of the pie-chart drill-down list. The modal reads its
+          own contexts, so it needs nothing here beyond the operation itself; it
+          is never used to create one, hence no isNew / onDelete.
+
+          Mounted only while an operation is open, unlike the Operations tab's
+          permanently-mounted one: this tab mounts eagerly at startup and editing
+          from a chart is a rare path, so it should not carry the form's hooks and
+          autocomplete queries the rest of the time. Nothing is lost by unmounting
+          — ModalShell finishes its slide-out before it calls onClose. */}
+      {editingOperation ? (
+        <OperationModal
+          visible
+          onClose={handleCloseOperationModal}
+          operation={editingOperation}
+        />
+      ) : null}
 
     </View>
   );
