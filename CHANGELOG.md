@@ -1,5 +1,12 @@
 # Changelog
 
+## [0.274.0](https://github.com/heywood8/money-tracker/compare/penny-v0.273.0...penny-v0.274.0) (2026-08-24)
+
+
+### Features
+
+* **graphs:** show income against expenses in the trends card ([#1638](https://github.com/heywood8/money-tracker/issues/1638)) ([f0e1794](https://github.com/heywood8/money-tracker/commit/f0e17942cb56c28decca3fc53c95f68baa5e6480))
+
 ## [0.273.0](https://github.com/heywood8/money-tracker/compare/penny-v0.272.5...penny-v0.273.0) (2026-08-23)
 
 
