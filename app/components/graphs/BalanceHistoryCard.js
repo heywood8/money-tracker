@@ -775,6 +775,10 @@ const BalanceChart = ({
       return {
         ...base,
         tickValues: xTickValues,
+        // Victory downsamples tickValues to its default tickCount of 5, which
+        // labelled five of the twelve months at uneven spacing. Asking for as
+        // many ticks as there are months keeps all twelve.
+        tickCount: xTickValues.length,
         formatXLabel: (value) => monthAbbreviations[monthByDay?.[Math.round(value)]] ?? '',
       };
     }

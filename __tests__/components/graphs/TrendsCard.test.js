@@ -629,6 +629,26 @@ describe('TrendsCard', () => {
 
       expect(getAllByText('¥2.3M').length).toBeGreaterThan(0);
     });
+
+    it('crosses to M where the K form would round to a thousand', async () => {
+      // Regression: 999,950 written to one decimal is "1000.0K" — six glyphs
+      // wider than the "1.0M" it becomes a cent later, in the one row this
+      // change set out to keep narrow.
+      const edgeData = generateMonthlyData().map((item, i) =>
+        i === 11 ? { ...item, total: 999950 } : item,
+      );
+      useMonthlyTrendSeries.mockReturnValue({
+        monthlyData: edgeData,
+        loading: false,
+        loadData: jest.fn(),
+      });
+
+      const { getAllByText } = await render(
+        <TrendsCard {...defaultProps} selectedCurrency="JPY" />,
+      );
+
+      expect(getAllByText('¥1.0M').length).toBeGreaterThan(0);
+    });
   });
 
   describe('Theming', () => {

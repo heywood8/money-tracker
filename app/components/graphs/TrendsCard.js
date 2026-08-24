@@ -31,7 +31,10 @@ const formatCurrency = (amount, currency) => {
   const value = parseFloat(amount);
   if (!Number.isFinite(value)) return `${symbol}${(0).toFixed(decimals)}`;
   const magnitude = Math.abs(value);
-  if (magnitude >= 1000000) return `${symbol}${(value / 1000000).toFixed(1)}M`;
+  // The crossing point is where the K form *rounds* to a million, not where the
+  // value reaches one: 999,950 written to one decimal is "1000.0K", which is
+  // wider than the "1.0M" it turns into a cent later.
+  if (magnitude >= 999950) return `${symbol}${(value / 1000000).toFixed(1)}M`;
   if (magnitude >= 1000) return `${symbol}${(value / 1000).toFixed(1)}K`;
   return `${symbol}${value.toFixed(decimals)}`;
 };
