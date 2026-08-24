@@ -1,6 +1,6 @@
 import React from 'react';
 import { render, fireEvent } from '@testing-library/react-native';
-import TrendsCard, { formatPctTick, formatYTick, resolveScrollTarget, resolveTapIndex } from '../../../app/components/graphs/TrendsCard';
+import TrendsCard, { formatPctTick, formatYTick, resolveLabelStride, resolveScrollTarget, resolveTapIndex } from '../../../app/components/graphs/TrendsCard';
 import useMonthlyTrendSeries from '../../../app/hooks/useMonthlyTrendSeries';
 
 // Mock the hook
@@ -581,7 +581,7 @@ describe('TrendsCard', () => {
 
     it('formats current month amount with currency symbol for JPY (0 decimals)', async () => {
       const jpyData = generateMonthlyData().map((item, i) =>
-        i === 11 ? { ...item, total: 5000 } : item,
+        i === 11 ? { ...item, total: 500 } : item,
       );
       useMonthlyTrendSeries.mockReturnValue({
         monthlyData: jpyData,
@@ -593,7 +593,41 @@ describe('TrendsCard', () => {
         <TrendsCard {...defaultProps} selectedCurrency="JPY" />,
       );
 
-      expect(getAllByText('¥5000').length).toBeGreaterThan(0);
+      expect(getAllByText('¥500').length).toBeGreaterThan(0);
+    });
+
+    it('collapses a thousands figure to K, the way the summary tabs above do', async () => {
+      const bigData = generateMonthlyData().map((item, i) =>
+        i === 11 ? { ...item, total: 5000 } : item,
+      );
+      useMonthlyTrendSeries.mockReturnValue({
+        monthlyData: bigData,
+        loading: false,
+        loadData: jest.fn(),
+      });
+
+      const { getAllByText } = await render(
+        <TrendsCard {...defaultProps} selectedCurrency="JPY" />,
+      );
+
+      expect(getAllByText('¥5.0K').length).toBeGreaterThan(0);
+    });
+
+    it('collapses a millions figure to M rather than spelling out seven digits', async () => {
+      const bigData = generateMonthlyData().map((item, i) =>
+        i === 11 ? { ...item, total: 2273310 } : item,
+      );
+      useMonthlyTrendSeries.mockReturnValue({
+        monthlyData: bigData,
+        loading: false,
+        loadData: jest.fn(),
+      });
+
+      const { getAllByText } = await render(
+        <TrendsCard {...defaultProps} selectedCurrency="JPY" />,
+      );
+
+      expect(getAllByText('¥2.3M').length).toBeGreaterThan(0);
     });
   });
 
@@ -719,6 +753,26 @@ describe('TrendsCard', () => {
 
       it('accepts the string values Victory may hand back', () => {
         expect(formatYTick('2000')).toBe('2K');
+      });
+    });
+
+    describe('resolveLabelStride', () => {
+      it('labels every month at the resting pitch', () => {
+        expect(resolveLabelStride(36)).toBe(1);
+        expect(resolveLabelStride(96)).toBe(1);
+      });
+
+      it('thins the labels out once a month is too narrow to hold one', () => {
+        // Localised abbreviations are wider than the two glyphs the axis used
+        // to draw, so a fully pinched-out chart labels every other month rather
+        // than smearing them together.
+        expect(resolveLabelStride(18)).toBe(2);
+        expect(resolveLabelStride(8)).toBe(3);
+      });
+
+      it('never returns a stride that would drop every label', () => {
+        expect(resolveLabelStride(0)).toBe(1);
+        expect(resolveLabelStride(-10)).toBe(1);
       });
     });
 

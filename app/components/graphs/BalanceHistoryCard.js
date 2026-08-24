@@ -25,7 +25,7 @@ import { useDisplaySettings } from '../../contexts/DisplaySettingsContext';
 import { getJsonPreference, setJsonPreference, PREF_KEYS } from '../../services/PreferencesDB';
 import { balanceLineColors } from '../../styles/chartPalette';
 import BalanceHistoryCalendarView from './BalanceHistoryCalendarView';
-import { MONTH_ABBREVIATIONS } from './monthLabels';
+import { getMonthAbbreviations } from './monthLabels';
 import { CARD_SURFACE } from '../../styles/componentStyles';
 import { BORDER_RADIUS, FONT_SIZE, SPACING } from '../../styles/designTokens';
 
@@ -732,6 +732,7 @@ const BalanceChart = ({
   onScrub,
   xTickValues,
   monthByDay,
+  monthAbbreviations,
   showDeviationBand = true,
 }) => {
   const pressInit = useRef({
@@ -774,11 +775,11 @@ const BalanceChart = ({
       return {
         ...base,
         tickValues: xTickValues,
-        formatXLabel: (value) => MONTH_ABBREVIATIONS[monthByDay?.[Math.round(value)]] ?? '',
+        formatXLabel: (value) => monthAbbreviations[monthByDay?.[Math.round(value)]] ?? '',
       };
     }
     return { ...base, formatXLabel: (value) => formatXAxisLabel(value, lastDay) };
-  }, [axisFont, colors.border, colors.mutedText, lastDay, xTickValues, monthByDay]);
+  }, [axisFont, colors.border, colors.mutedText, lastDay, xTickValues, monthByDay, monthAbbreviations]);
 
   const yAxis = useMemo(() => ([{
     font: axisFont,
@@ -866,6 +867,7 @@ BalanceChart.propTypes = {
   colors: PropTypes.object.isRequired,
   hideBalances: PropTypes.bool,
   lastDay: PropTypes.number,
+  monthAbbreviations: PropTypes.arrayOf(PropTypes.string).isRequired,
   monthByDay: PropTypes.object,
   onScrub: PropTypes.func.isRequired,
   showDeviationBand: PropTypes.bool,
@@ -897,6 +899,7 @@ const BalanceHistoryCard = ({
   onShowCalendar,
 }) => {
   const { hideBalances } = useDisplaySettings();
+  const monthAbbreviations = useMemo(() => getMonthAbbreviations(t), [t]);
   // `showCalendar` is the user's intent; `calendarVisible` below is whether it
   // can be honoured — the year view has no calendar and hides the toggle, so a
   // calendar left open across a period switch would otherwise strand the user in
@@ -1053,8 +1056,8 @@ const BalanceHistoryCard = ({
     const monthStarts = monthStartDaysOfYear(selectedYear);
     let month = 0;
     monthStarts.forEach((start, index) => { if (scrubDay >= start) month = index; });
-    return MONTH_ABBREVIATIONS[month];
-  }, [isYearView, scrubDay, selectedYear]);
+    return monthAbbreviations[month];
+  }, [isYearView, scrubDay, selectedYear, monthAbbreviations]);
 
   // Series composition drives the press-state shape; remount the canvas when it changes.
   const chartKey = chartYKeys.join('|');
@@ -1211,6 +1214,7 @@ const BalanceHistoryCard = ({
                       onScrub={handleScrub}
                       xTickValues={isYearView ? chartComputed.monthTicks : undefined}
                       monthByDay={isYearView ? chartComputed.monthByDay : undefined}
+                      monthAbbreviations={monthAbbreviations}
                       showDeviationBand={!isYearView && showPlainAvg}
                     />
                   </View>
