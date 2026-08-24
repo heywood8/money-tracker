@@ -21,6 +21,8 @@ const ExpensePieChart = ({
   introKey = 0,
   introDelay = 0,
   categoryChip = null,
+  getAccountName = null,
+  onOperationPress = null,
 }) => {
   // The drill-down chip rides along with whatever this chart is showing: under
   // the donut when there is one, heading the body otherwise. Anywhere it can be
@@ -42,6 +44,9 @@ const ExpensePieChart = ({
         language={language}
         emptyText={t('no_expense_data')}
         headerChip={categoryChip}
+        t={t}
+        getAccountName={getAccountName}
+        onOperationPress={onOperationPress}
       />
     );
   }
@@ -112,6 +117,10 @@ ExpensePieChart.propTypes = {
   introDelay: PropTypes.number,
   // Drill-down chip owned by the screen; placed under the donut by this chart.
   categoryChip: PropTypes.node,
+  // Resolves an account id to its name for the leaf operations list.
+  getAccountName: PropTypes.func,
+  // Opens a listed operation for editing; without it the list is read-only.
+  onOperationPress: PropTypes.func,
 };
 
 const styles = StyleSheet.create({

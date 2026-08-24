@@ -61,10 +61,13 @@ jest.mock('../../app/components/SimplePicker', () => {
   };
 });
 
+// `name` matters as well as `symbol`: the screen now mounts OperationModal for
+// the drill-down list, and the currency picker inside it sorts the map by name
+// at module load.
 jest.mock('../../assets/currencies.json', () => ({
-  USD: { symbol: '$', decimal_digits: 2 },
-  EUR: { symbol: '€', decimal_digits: 2 },
-  RUB: { symbol: '₽', decimal_digits: 2 },
+  USD: { name: 'US Dollar', symbol: '$', decimal_digits: 2 },
+  EUR: { name: 'Euro', symbol: '€', decimal_digits: 2 },
+  RUB: { name: 'Russian Ruble', symbol: '₽', decimal_digits: 2 },
 }), { virtual: true });
 
 describe('GraphsScreen', () => {
