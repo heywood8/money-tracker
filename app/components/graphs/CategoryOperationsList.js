@@ -13,6 +13,13 @@ import { CHIP, CHIP_TEXT } from '../../styles/componentStyles';
 // Chips beside the title, matching OperationListItem's cap on the same row.
 const MAX_VISIBLE_LABELS = 3;
 
+// Inset applied to the list's header, its sort control, each day header and
+// each row. The chart panel pads its own scroll content by only 3px on the left
+// and 9px on the right — tuned for the donut, which is centred — so without an
+// inset of its own the icons and amounts sit flush against the card's edges and
+// the row reads as pulled apart towards them.
+const ROW_INSET = SPACING.sm;
+
 // Rows rendered before the "show all" button appears. The list renders plain
 // Views (see below) so every row mounts at once — a category with a year of
 // operations behind it would otherwise cost hundreds of views in one frame for
@@ -161,10 +168,16 @@ const CategoryOperationsList = ({
     return byDay.map(group => ({ ...group, complete: group.items.length === perDay.get(group.date) }));
   }, [sorted, sortBy, visible]);
 
+  const totalEchoedBelow = operations.length === 1
+    || (sortBy === SORT_DATE && groups.length === 1 && groups[0].complete);
+
   const header = headerChip ? (
     <View style={styles.header}>
       <View style={styles.headerChip}>{headerChip}</View>
-      {operations.length > 0 && !loading ? (
+      {/* Worth printing only when nothing below already carries the same figure:
+          a lone operation's row amount is that figure, and so is the day total
+          of a category that fits inside one fully-listed day. */}
+      {!totalEchoedBelow && !loading ? (
         <Text style={[styles.headerTotal, { color: colors.text }]} numberOfLines={1}>
           {hideBalances ? '••••' : formatOpAmount(total, currency, language)}
         </Text>
@@ -229,7 +242,7 @@ const CategoryOperationsList = ({
     ].filter(Boolean).join(', ');
 
     const body = (
-      <View style={styles.row}>
+      <View style={styles.row} testID={`category-operation-row-${op.id}`}>
         <View style={styles.iconContainer}>
           <Icon name={categoryIcon} size={ICON_SIZE.md} color={amountColor} />
         </View>
@@ -307,7 +320,7 @@ const CategoryOperationsList = ({
   };
 
   return (
-    <View style={styles.container}>
+    <View style={styles.container} testID="category-operations-list">
       {header}
 
       {/* One operation has nothing to be sorted against. */}
@@ -410,19 +423,26 @@ const styles = StyleSheet.create({
     alignItems: 'center',
     paddingVertical: 32,
   },
-  container: {
-    flex: 1,
-  },
+  // NO `flex: 1` here. This list is a plain block inside the chart panel's
+  // ScrollView, whose main axis is unbounded — `flex: 1` resolves flexBasis to 0
+  // with no free space to grow back into, so the box can end up shorter than the
+  // rows it holds. They still draw (the panel clips, not this view), but on
+  // Android a child outside its parent's bounds gets no touches: every row past
+  // the collapsed height became untappable, which is why a press landed maybe
+  // one time in five and only ever on the first row.
+  container: {},
   controls: {
     alignItems: 'center',
     flexDirection: 'row',
     marginBottom: SPACING.xs,
+    paddingHorizontal: ROW_INSET,
   },
   dayHeader: {
     alignItems: 'center',
     flexDirection: 'row',
     justifyContent: 'space-between',
     paddingBottom: SPACING.xs,
+    paddingHorizontal: ROW_INSET,
     paddingTop: SPACING.md,
   },
   dayLabel: {
@@ -451,6 +471,7 @@ const styles = StyleSheet.create({
     justifyContent: 'space-between',
     marginBottom: SPACING.xs,
     paddingBottom: SPACING.sm,
+    paddingHorizontal: ROW_INSET,
   },
   headerChip: {
     flexShrink: 1,
@@ -481,11 +502,13 @@ const styles = StyleSheet.create({
     alignItems: 'center',
     flexDirection: 'row',
     minHeight: HEIGHTS.listItem,
+    paddingHorizontal: ROW_INSET,
     paddingVertical: SPACING.xs,
   },
   separator: {
     height: StyleSheet.hairlineWidth,
-    marginLeft: 32 + SPACING.md,
+    // Starts where the row's text does, past the inset and the icon column.
+    marginLeft: ROW_INSET + 32 + SPACING.md,
   },
   showAll: {
     alignItems: 'center',
