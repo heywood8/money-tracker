@@ -5,7 +5,7 @@ import { DESTRUCTIVE } from '../styles/semanticColors';
 
 const ThemeColorsContext = createContext();
 
-const lightTheme = {
+export const lightTheme = {
   mode: 'light',
   colors: {
     background: '#f8f8f8',
@@ -62,7 +62,7 @@ const lightTheme = {
   },
 };
 
-const darkTheme = {
+export const darkTheme = {
   mode: 'dark',
   colors: {
     background: '#111111',

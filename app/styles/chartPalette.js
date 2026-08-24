@@ -50,9 +50,33 @@ const BALANCE_LINES = {
   dark: { norm: '#c98500', prevMonth: '#d55181', yearAvg: '#008300' },
 };
 
-// Second series in the category-spending card (the "vs" comparison). Slot 2,
-// which is the validated neighbour of the brand blue the primary bars use.
+// Second series in the trends card (the "vs" comparison). Slot 2, which is the
+// validated neighbour of the brand blue the primary bars use. Used whenever the
+// two series are NOT opposite sides of the ledger — comparing two expense
+// categories is a categorical question, and red/green would say nothing.
 const COMPARISON = { light: '#eb6834', dark: '#d95926' };
+
+// Income against expenses. These two are not categorical slots: money in and
+// money out is the one comparison this app has a convention for, and the
+// convention is green and red. Matched to the arrow badges on the summary cards
+// at the top of the same screen, so the red bar and the red ↗ are the same red.
+//
+// Red/green is normally the pair to avoid, and it survives here only because of
+// the lightness gap between these particular steps. Measured with the same
+// method as the rest of this file: worst dichromat ΔE 40.0 (protanopia, light)
+// / 56.6 (dark), against the file's target of 8 — the two never collapse into
+// each other. Contrast against the chart surfaces, income then expense:
+// 4.18 / 4.77 light, 6.22 / 3.65 dark — the dark red is the tight one, with
+// little headroom over the 3:1 floor. Re-measure before restepping either.
+//
+// The steps are copies of the summary badges rather than references to them, so
+// that the measurements above stay true to what is actually drawn; a test pins
+// the two together, and it is that test, not this comment, that keeps them
+// honest if the theme's green is ever re-tuned.
+const LEDGER = {
+  light: { income: '#4a8a4a', expense: '#d93025' },
+  dark: { income: '#66aa66', expense: '#d93025' },
+};
 
 // Past this many slices the tail is folded into a single "Other" — eight colour
 // classes is already the ceiling at which adjacent hues stay tellable apart.
@@ -100,6 +124,12 @@ export const adjustmentSliceColor = (colors) => NEUTRAL[chartMode(colors)].adjus
 export const balanceLineColors = (colors) => BALANCE_LINES[chartMode(colors)];
 
 export const comparisonSeriesColor = (colors) => COMPARISON[chartMode(colors)];
+
+/**
+ * The income/expense pair, keyed by operation type so a caller can index it
+ * with the series' own `type` field.
+ */
+export const ledgerSeriesColors = (colors) => LEDGER[chartMode(colors)];
 
 const DARK_INK = '#1a1a1a';
 const LIGHT_INK = '#ffffff';

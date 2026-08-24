@@ -9,7 +9,7 @@ import Icon from '@expo/vector-icons/MaterialCommunityIcons';
 import currencies from '../../../assets/currencies.json';
 import useMonthlyTrendSeries, { ALL_CATEGORIES } from '../../hooks/useMonthlyTrendSeries';
 import { BORDER_RADIUS, FONT_SIZE, HORIZONTAL_PADDING, SPACING } from '../../styles/designTokens';
-import { comparisonSeriesColor } from '../../styles/chartPalette';
+import { comparisonSeriesColor, ledgerSeriesColors } from '../../styles/chartPalette';
 import { MONTH_ABBREVIATIONS } from './monthLabels';
 import ModalBlurOverlay from '../ModalBlurOverlay';
 import CategoryGridSelector from '../CategoryGridSelector';
@@ -42,10 +42,19 @@ const STACK_GAP = 2;
 const ACCESSIBILITY_ACTIONS = [{ name: 'increment' }, { name: 'decrement' }];
 
 // The history is as long as the user's, so months are laid out at a fixed pitch
-// and scrolled through rather than squeezed into the card. 48px leaves a 24px
-// bar with 24px of air — the width at which twelve months stopped fitting.
-const DEFAULT_MONTH_WIDTH = 48;
-const MIN_MONTH_WIDTH = 24;
+// and scrolled through rather than squeezed into the card. 36px is the resting
+// pitch: the card holds two bars per month now, and at the old 48px a phone
+// showed six months of a comparison that only starts to read as a trend around
+// nine. The pinch still reaches 96px for anyone who wants the old width back.
+//
+// The pitch is also the month's tap slot (see `resolveTapIndex`), so this puts
+// the target under Android's 48dp guidance — 36dp at rest, 18dp fully pinched
+// out. Accepted rather than overlooked: selecting a month is a non-destructive,
+// self-evident action whose mis-tap costs one more tap, the pinch widens the
+// slot for anyone who needs it, and the chart carries `accessibilityRole
+//="adjustable"` so a screen reader steps month to month without aiming at all.
+const DEFAULT_MONTH_WIDTH = 36;
+const MIN_MONTH_WIDTH = 18;
 const MAX_MONTH_WIDTH = 96;
 // Gutter for the pinned y-axis. It sits outside the scroller, so the scale stays
 // readable however far back the user has scrolled.
@@ -138,6 +147,8 @@ const TrendBarChart = ({
   stacked,
   monthAbbreviations,
   colors,
+  seriesColor,
+  vsSeriesColor,
   width,
   selectedIndex,
   onBarPress,
@@ -145,7 +156,6 @@ const TrendBarChart = ({
   const count = data.length;
   const hasVs = vsData != null && vsData.length === count;
   const isStacked = stacked && hasVs;
-  const vsColor = comparisonSeriesColor(colors);
 
   const axisMax = useMemo(() => {
     if (isStacked) return 100;
@@ -355,7 +365,7 @@ const TrendBarChart = ({
           <StackedBar
             chartBounds={chartBounds}
             points={[points.primary, points.vs]}
-            colors={[colors.primary, vsColor]}
+            colors={[seriesColor, vsSeriesColor]}
             barWidth={slot * 0.6}
             animate={BAR_ANIMATION}
             barOptions={({ isTop, isBottom }) => {
@@ -383,8 +393,8 @@ const TrendBarChart = ({
             withinGroupPadding={0.1}
             roundedCorners={{ topLeft: CORNER, topRight: CORNER }}
           >
-            <BarGroup.Bar points={points.primary} color={colors.primary} animate={BAR_ANIMATION} />
-            <BarGroup.Bar points={points.vs} color={vsColor} animate={BAR_ANIMATION} />
+            <BarGroup.Bar points={points.primary} color={seriesColor} animate={BAR_ANIMATION} />
+            <BarGroup.Bar points={points.vs} color={vsSeriesColor} animate={BAR_ANIMATION} />
           </BarGroup>
         );
       }
@@ -393,14 +403,14 @@ const TrendBarChart = ({
         <Bar
           points={points.amount}
           chartBounds={chartBounds}
-          color={colors.primary}
+          color={seriesColor}
           barWidth={slot * 0.5}
           roundedCorners={{ topLeft: CORNER, topRight: CORNER }}
           animate={BAR_ANIMATION}
         />
       );
     },
-    [isStacked, hasVs, colors.primary, colors.altRow, vsColor],
+    [isStacked, hasVs, seriesColor, colors.altRow, vsSeriesColor],
   );
 
   const renderChart = useCallback(
@@ -570,7 +580,6 @@ const TrendsCard = ({
   const [vsSeries, setVsSeries] = useState(DEFAULT_VS_SERIES);
   const [selectedBarIndex, setSelectedBarIndex] = useState(null);
   const [showStackedBar, setShowStackedBar] = useState(false);
-  const vsColor = comparisonSeriesColor(colors);
 
   const visibleCategories = useMemo(
     () => categories.filter(cat => !cat.isShadow),
@@ -604,6 +613,16 @@ const TrendsCard = ({
     () => (vsSeries ? resolveSeries(vsSeries, DEFAULT_VS_SERIES) : null),
     [vsSeries, resolveSeries],
   );
+
+  // Two series on opposite sides of the ledger are money in against money out,
+  // which is the one comparison this app has a colour convention for. Two series
+  // on the same side (two expense categories, say) are a categorical question,
+  // and keep the neutral primary/comparison pair — green and red would be
+  // asserting a meaning the chart does not carry.
+  const crossLedger = vs !== null && vs.type !== primary.type;
+  const ledgerColors = ledgerSeriesColors(colors);
+  const seriesColor = crossLedger ? ledgerColors[primary.type] : colors.primary;
+  const vsColor = crossLedger ? ledgerColors[vs.type] : comparisonSeriesColor(colors);
 
   const seriesLabel = useCallback((series) => {
     if (!series) return '';
@@ -842,7 +861,7 @@ const TrendsCard = ({
                   dot of its series — the number itself stays in text ink. */}
               <View style={styles.amountRow}>
                 {vs && (
-                  <View style={[styles.seriesDot, { backgroundColor: colors.primary }]} />
+                  <View style={[styles.seriesDot, { backgroundColor: seriesColor }]} />
                 )}
                 <Text style={[styles.currentAmount, { color: colors.text }]}>
                   {formatCurrency(displayedTotal, selectedCurrency)}
@@ -910,6 +929,8 @@ const TrendsCard = ({
           stacked={showStackedBar && hasVsData}
           monthAbbreviations={monthAbbreviations}
           colors={colors}
+          seriesColor={seriesColor}
+          vsSeriesColor={vsColor}
           width={screenWidth - 64}
           selectedIndex={effectiveBarIndex}
           onBarPress={setSelectedBarIndex}
@@ -921,6 +942,8 @@ const TrendsCard = ({
 
 TrendBarChart.propTypes = {
   colors: PropTypes.object.isRequired,
+  seriesColor: PropTypes.string.isRequired,
+  vsSeriesColor: PropTypes.string.isRequired,
   data: PropTypes.arrayOf(PropTypes.shape({
     month: PropTypes.number,
     total: PropTypes.number,

@@ -511,16 +511,21 @@ jest.mock(
         typeof children === 'function' ? null : children,
       );
     const Line = () => React.createElement(View, { testID: 'vn-line' });
-    const Bar = () => React.createElement(View, { testID: 'vn-bar' });
+    // Fill colours are forwarded so tests can assert which colour a series got;
+    // everything else about the real primitives is irrelevant under Jest.
+    // eslint-disable-next-line react/prop-types
+    const Bar = ({ color }) => React.createElement(View, { testID: 'vn-bar', color });
     const Area = () => React.createElement(View, { testID: 'vn-area' });
     const AreaRange = () => React.createElement(View, { testID: 'vn-area-range' });
     const StackedArea = () => React.createElement(View, { testID: 'vn-stacked-area' });
-    const StackedBar = () => React.createElement(View, { testID: 'vn-stacked-bar' });
+    // eslint-disable-next-line react/prop-types
+    const StackedBar = ({ colors }) => React.createElement(View, { testID: 'vn-stacked-bar', colors });
     const Scatter = () => React.createElement(View, { testID: 'vn-scatter' });
     // eslint-disable-next-line react/prop-types
     const BarGroup = ({ children }) =>
       React.createElement(View, { testID: 'vn-bar-group' }, children);
-    const BarGroupBar = () => React.createElement(View, { testID: 'vn-bar-group-bar' });
+    // eslint-disable-next-line react/prop-types
+    const BarGroupBar = ({ color }) => React.createElement(View, { testID: 'vn-bar-group-bar', color });
     BarGroupBar.displayName = 'BarGroup.Bar';
     BarGroup.Bar = BarGroupBar;
     // Gesture state stubs: components read `.value` off Reanimated shared values,
