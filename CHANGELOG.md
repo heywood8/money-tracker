@@ -1,5 +1,12 @@
 # Changelog
 
+## [0.277.2](https://github.com/heywood8/money-tracker/compare/penny-v0.277.1...penny-v0.277.2) (2026-08-25)
+
+
+### Bug Fixes
+
+* **updates:** show that a release's CI build failed ([#1654](https://github.com/heywood8/money-tracker/issues/1654)) ([07458f9](https://github.com/heywood8/money-tracker/commit/07458f9b7334b684f6b34ae6fbc758341bc74a42))
+
 ## [0.277.1](https://github.com/heywood8/money-tracker/compare/penny-v0.277.0...penny-v0.277.1) (2026-08-25)
 
 
