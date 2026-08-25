@@ -872,4 +872,43 @@ describe('GraphsScreen', () => {
       expect(getByTestId('graphs-period-label').props.children).toBe(`full_year ${thisYear - 1}`);
     });
   });
+  // Drilling into a leaf category mounts the wrapper below fresh, with an
+  // entering slide, around a list that is still loading — a spinner about a row
+  // tall. Reanimated drives that slide from a snapshot taken when it started and
+  // re-pushes every property the slide does not itself animate, so the wrapper's
+  // native view kept the spinner's height after the operations arrived and the
+  // rows drew. A Reanimated view is never flattened away, so it stays a real
+  // Android view and Android drops any touch that falls outside one: every row
+  // below that height was untappable, which is why a press landed only on the
+  // first row and only sometimes. Registering a layout animation is what makes
+  // Reanimated re-read the wrapper when a commit changes its frame.
+  describe('Drill-down wrapper', () => {
+    // The invariant, rather than one named view: anything inside a chart that
+    // animates its own entrance holds a snapshot of the frame it entered with,
+    // so it needs a layout animation to let go of it. Moving the slide to a new
+    // wrapper without one brings the untappable rows straight back.
+    const enteringViewsIn = (node, found = []) => {
+      if (!node || typeof node === 'string') return found;
+      if (node.props && (node.props.entering || node.props.exiting)) found.push(node);
+      for (const child of node.children || []) enteringViewsIn(child, found);
+      return found;
+    };
+
+    it.each([['expense'], ['income']])(
+      'gives every entering view in the %s chart a layout transition',
+      async (tab) => {
+        const GraphsScreen = require('../../app/screens/GraphsScreen').default;
+
+        const { getByTestId } = await render(<GraphsScreen />);
+        await act(async () => { fireEvent.press(getByTestId(`${tab}-summary-card`)); });
+
+        const animated = enteringViewsIn(getByTestId(`${tab}-chart-content`));
+
+        expect(animated.length).toBeGreaterThan(0);
+        for (const view of animated) {
+          expect(view.props.layout).toBeDefined();
+        }
+      },
+    );
+  });
 });

@@ -446,11 +446,12 @@ describe('CategoryOperationsList', () => {
     });
   });
 
-  // Regression: the root carried `flex: 1` inside the chart panel's ScrollView,
-  // whose main axis is unbounded — flexBasis resolved to 0 with no free space to
-  // grow back into, so the box could end up shorter than the rows it held. The
-  // rows still drew, but on Android a child outside its parent's bounds gets no
-  // touches, so a press landed about one time in five and only on the first row.
+  // The root once carried `flex: 1`, which was blamed for presses landing about
+  // one time in five and only on the first row. That blame was misplaced — the
+  // box left shorter than these rows is the drill-down wrapper the chart panel
+  // puts around this list (see DRILL_LAYOUT_NOTE in GraphsScreen.js) — but the
+  // root has no business flexing here either: it is a plain block in a scroll
+  // view with an unbounded main axis, so it should simply be as tall as its rows.
   describe('layout', () => {
     const ops = [
       { id: '1', amount: '10.00', date: '2024-03-05', description: 'A' },

@@ -423,13 +423,17 @@ const styles = StyleSheet.create({
     alignItems: 'center',
     paddingVertical: 32,
   },
-  // NO `flex: 1` here. This list is a plain block inside the chart panel's
-  // ScrollView, whose main axis is unbounded — `flex: 1` resolves flexBasis to 0
-  // with no free space to grow back into, so the box can end up shorter than the
-  // rows it holds. They still draw (the panel clips, not this view), but on
-  // Android a child outside its parent's bounds gets no touches: every row past
-  // the collapsed height became untappable, which is why a press landed maybe
-  // one time in five and only ever on the first row.
+  // No `flex: 1` here — this list is a plain block inside the chart panel's
+  // ScrollView and has nothing to flex against, so it takes the height of the
+  // rows it holds.
+  //
+  // That box was once blamed for the rows landing maybe one press in five and
+  // only ever on the first row. It was the right shape of explanation — on
+  // Android a touch outside a view's own bounds is dropped, so an ancestor
+  // shorter than this list makes the rows below it untappable while they still
+  // draw — but the wrong box: the short one is the drill-down wrapper the chart
+  // panel puts around this list, left at its loading height by an entering
+  // animation. See DRILL_LAYOUT_NOTE in GraphsScreen.js.
   container: {},
   controls: {
     alignItems: 'center',
