@@ -276,6 +276,29 @@ describe('UpdateContentPanel', () => {
       );
       expect(getByText('update_check_failed')).toBeTruthy();
     });
+
+    it('offers a retry button that re-runs the check', async () => {
+      const onRefresh = jest.fn();
+      const { getByTestId } = await render(
+        <UpdateContentPanel
+          {...baseProps}
+          updateResult={{ type: 'error', errorCode: 'network_error' }}
+          onRefresh={onRefresh}
+        />,
+      );
+      fireEvent.press(getByTestId('update-retry-button'));
+      expect(onRefresh).toHaveBeenCalledTimes(1);
+    });
+
+    it('omits the retry button when the host provides no refresh handler', async () => {
+      const { queryByTestId } = await render(
+        <UpdateContentPanel
+          {...baseProps}
+          updateResult={{ type: 'error', errorCode: 'network_error' }}
+        />,
+      );
+      expect(queryByTestId('update-retry-button')).toBeNull();
+    });
   });
 
   describe('error — releases_without_apks', () => {

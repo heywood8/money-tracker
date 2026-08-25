@@ -502,6 +502,7 @@
   "check_updates": "アップデートを確認",
   "checking_for_updates": "利用可能なアップデートを確認中…",
   "update_check_failed": "現在アップデートを確認できません。後でもう一度お試しください。",
+  "retry": "再試行",
   "up_to_date": "すでに最新バージョンがインストールされています。",
   "update_from_version": "インストール済み: v{currentVersion}",
   "whats_new": "新着情報",

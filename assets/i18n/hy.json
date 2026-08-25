@@ -498,6 +498,7 @@
   "check_updates": "Stugel tarmaсumnerí",
   "checking_for_updates": "Հասանելի թարմացումների ստուգում…",
   "update_check_failed": "Ays pahin tarmaцumnerí stugum ckareli: Крkin forceq aveli usherin:",
+  "retry": "Կրկնել",
   "up_to_date": "Dukarden unek verijn tarmaçí tegadrvatsí:",
   "update_from_version": "տեղադրված է: v{currentVersion}",
   "whats_new": "Ինչ նոր կա",
