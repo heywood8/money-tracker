@@ -502,6 +502,7 @@
   "check_updates": "Controlla aggiornamenti",
   "checking_for_updates": "Ricerca aggiornamenti disponibili…",
   "update_check_failed": "Impossibile verificare gli aggiornamenti. Riprova più tardi.",
+  "retry": "Riprova",
   "up_to_date": "Hai già l'ultima versione installata.",
   "update_from_version": "installata: v{currentVersion}",
   "whats_new": "Novità",

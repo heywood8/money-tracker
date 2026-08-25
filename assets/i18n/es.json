@@ -498,6 +498,7 @@
   "check_updates": "Buscar actualizaciones",
   "checking_for_updates": "Comprobando actualizaciones disponibles…",
   "update_check_failed": "No se pudieron comprobar las actualizaciones ahora. Por favor, inténtalo más tarde.",
+  "retry": "Reintentar",
   "up_to_date": "Ya tienes la última versión instalada.",
   "update_from_version": "instalada: v{currentVersion}",
   "whats_new": "Novedades",

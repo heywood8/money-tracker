@@ -6,6 +6,7 @@ import Ionicons from '@expo/vector-icons/Ionicons';
 import { useThemeColors } from '../contexts/ThemeColorsContext';
 import { useLocalization } from '../contexts/LocalizationContext';
 import { BORDER_RADIUS, FONT_SIZE, HORIZONTAL_PADDING, SPACING } from '../styles/designTokens';
+import { BUTTON_COMPACT, BUTTON_TEXT } from '../styles/componentStyles';
 import { motionDuration } from '../utils/reducedMotion';
 
 const DATE_RE = /(\d{4}-\d{2}-\d{2})/;
@@ -636,6 +637,20 @@ export default function UpdateContentPanel({ isChecking = false, updateResult = 
               ? (t('update_releases_without_apks') || 'Found releases but no APKs attached. Check GitHub for the latest release.')
               : (t('update_check_failed') || 'Could not check updates right now. Please try again later.')}
           </Text>
+          {onRefresh ? (
+            <TouchableOpacity
+              onPress={() => onRefresh()}
+              style={[styles.retryButton, { backgroundColor: colors.primary }]}
+              accessibilityRole="button"
+              accessibilityLabel={t('retry') || 'Retry'}
+              testID="update-retry-button"
+            >
+              <Ionicons name="refresh" size={18} color="#fff" />
+              <Text style={styles.retryButtonText}>
+                {t('retry') || 'Retry'}
+              </Text>
+            </TouchableOpacity>
+          ) : null}
         </View>
       )}
     </Animated.View>
@@ -896,6 +911,17 @@ const styles = StyleSheet.create({
     // contentContainerStyle / bottom action row) so list content can scroll
     // behind the floating tab bar instead of stopping short above it.
     paddingTop: SPACING.lg,
+  },
+  retryButton: {
+    ...BUTTON_COMPACT,
+    flexDirection: 'row',
+    gap: SPACING.xs,
+    marginTop: SPACING.lg,
+  },
+  retryButtonText: {
+    ...BUTTON_TEXT,
+    // Sits on colors.primary, matching the filled release action button above.
+    color: '#fff',
   },
   upToDateBottomRight: {
     alignItems: 'center',

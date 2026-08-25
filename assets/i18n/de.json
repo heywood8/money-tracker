@@ -498,6 +498,7 @@
   "check_updates": "Auf Updates prüfen",
   "checking_for_updates": "Verfügbare Updates werden gesucht…",
   "update_check_failed": "Updates können momentan nicht geprüft werden. Bitte später erneut versuchen.",
+  "retry": "Erneut versuchen",
   "up_to_date": "Sie haben bereits die neueste Version installiert.",
   "update_from_version": "installiert: v{currentVersion}",
   "whats_new": "Was ist neu",
