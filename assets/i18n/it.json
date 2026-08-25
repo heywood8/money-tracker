@@ -517,6 +517,7 @@
   "update_install_now": "Installa ora",
   "install": "Installa",
   "download": "Scarica",
+  "redownload_hint": "Scarica di nuovo la versione {version} se il file è danneggiato",
   "apk_corrupt_redownload": "Il download precedente era danneggiato ed è stato rimosso. Tocca Aggiorna ora per scaricarlo di nuovo.",
   "downloaded_apks": "APK scaricati",
   "installed": "Installato",

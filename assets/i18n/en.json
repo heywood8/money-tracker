@@ -520,6 +520,7 @@
   "update_install_now": "Install now",
   "install": "Install",
   "download": "Download",
+  "redownload_hint": "Download version {version} again in case the file is damaged",
   "apk_corrupt_redownload": "The previous download was damaged and was removed. Download it again from the release above.",
   "downloaded_apks": "Downloaded APKs",
   "installed": "Installed",

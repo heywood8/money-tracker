@@ -134,8 +134,10 @@ export const formatReleaseDateTime = (publishedAt, fallbackDate) => {
 const INSTALLED_GREEN = '#4caf50';
 // Amber used to warn that a corrupt cached download was discarded and is being re-downloaded.
 const WARNING_AMBER = '#f0a500';
+// Lifts the icon-only re-download button to a comfortable touch target without enlarging it.
+const REDOWNLOAD_HIT_SLOP = { top: 10, bottom: 10, left: 10, right: 4 };
 
-function ReleaseCard({ version, notes, publishedAt, releaseUrl, badge, buildProgress, buildFailure, matchedApk, downloadUrl, checksumUrl, repoBase, onInstallApk, onUpdate, colors, t, isInstalled, isLatestInstalled, isUpdateCandidate }) {
+function ReleaseCard({ version, notes, publishedAt, releaseUrl, badge, buildProgress, buildFailure, matchedApk, downloadUrl, checksumUrl, repoBase, onInstallApk, onUpdate, onRedownload, colors, t, isInstalled, isLatestInstalled, isUpdateCandidate }) {
   const { date, body } = parseReleaseNotes(notes, version);
   const dateLabel = formatReleaseDateTime(publishedAt, date);
   const releasePageUrl = releaseUrlFor(releaseUrl, repoBase, version);
@@ -169,6 +171,14 @@ function ReleaseCard({ version, notes, publishedAt, releaseUrl, badge, buildProg
     } else if (downloadUrl) {
       onUpdate(downloadUrl, checksumUrl, version);
     }
+  };
+  // A cached APK can still be a bad copy — a download that was interrupted in a way neither the
+  // checksum nor the structure check caught, or an installer Android refuses. Rather than leave
+  // "Install" as the only way forward, offer to throw the cached file away and fetch it again.
+  // Icon only: it sits beside the primary action and must not compete with it.
+  const canRedownload = !isInstalled && isCached && !!downloadUrl;
+  const handleRedownloadPress = () => {
+    onRedownload(downloadUrl, checksumUrl, version, matchedApk.uri);
   };
   return (
     <View
@@ -260,22 +270,40 @@ function ReleaseCard({ version, notes, publishedAt, releaseUrl, badge, buildProg
           ) : null}
         </View>
         {canAct ? (
-          <TouchableOpacity
-            onPress={handleActionPress}
-            style={[
-              styles.releaseActionButton,
-              actionFilled
-                ? { backgroundColor: colors.primary }
-                : { borderColor: colors.primary, borderWidth: StyleSheet.hairlineWidth },
-            ]}
-            accessibilityRole="button"
-            accessibilityLabel={isCached ? `Install version ${version}` : `Download version ${version}`}
-          >
-            <Ionicons name={isCached ? 'archive-outline' : 'cloud-download-outline'} size={15} color={actionColor} />
-            <Text style={[styles.releaseActionText, { color: actionColor }]}>
-              {isCached ? (t('install') || 'Install') : (t('download') || 'Download')}
-            </Text>
-          </TouchableOpacity>
+          <View style={styles.releaseActions}>
+            {canRedownload ? (
+              <TouchableOpacity
+                onPress={handleRedownloadPress}
+                // The button is deliberately small so it cannot compete with the primary action,
+                // which leaves it under the 44dp touch target on its own. hitSlop restores that
+                // without growing the chrome; the Install button is rendered after it, so where
+                // the two touch areas overlap the primary action still wins the tap.
+                hitSlop={REDOWNLOAD_HIT_SLOP}
+                style={[styles.releaseRedownloadButton, { borderColor: colors.border }]}
+                accessibilityRole="button"
+                accessibilityLabel={(t('redownload_hint') || 'Download version {version} again in case the downloaded file is damaged').replace('{version}', version)}
+                testID={`redownload-${version}`}
+              >
+                <Ionicons name="refresh-outline" size={15} color={colors.mutedText} />
+              </TouchableOpacity>
+            ) : null}
+            <TouchableOpacity
+              onPress={handleActionPress}
+              style={[
+                styles.releaseActionButton,
+                actionFilled
+                  ? { backgroundColor: colors.primary }
+                  : { borderColor: colors.primary, borderWidth: StyleSheet.hairlineWidth },
+              ]}
+              accessibilityRole="button"
+              accessibilityLabel={isCached ? `Install version ${version}` : `Download version ${version}`}
+            >
+              <Ionicons name={isCached ? 'archive-outline' : 'cloud-download-outline'} size={15} color={actionColor} />
+              <Text style={[styles.releaseActionText, { color: actionColor }]}>
+                {isCached ? (t('install') || 'Install') : (t('download') || 'Download')}
+              </Text>
+            </TouchableOpacity>
+          </View>
         ) : null}
       </View>
       {isLatestInstalled ? (
@@ -314,6 +342,7 @@ ReleaseCard.propTypes = {
   repoBase: PropTypes.string,
   onInstallApk: PropTypes.func,
   onUpdate: PropTypes.func,
+  onRedownload: PropTypes.func,
   colors: PropTypes.object,
   t: PropTypes.func,
   isInstalled: PropTypes.bool,
@@ -392,7 +421,7 @@ const unmatchedApksFor = (downloadedApks, releases) => {
   return downloadedApks.filter((apk) => !apk.version || !shown.has(apk.version));
 };
 
-export default function UpdateContentPanel({ isChecking = false, updateResult = null, downloadedApks = [], onUpdate = () => {}, onInstallApk = () => {}, onRefresh = null, bottomInset = 0 }) {
+export default function UpdateContentPanel({ isChecking = false, updateResult = null, downloadedApks = [], onUpdate = () => {}, onInstallApk = () => {}, onRedownload = null, onRefresh = null, bottomInset = 0 }) {
   const { colors } = useThemeColors();
   const { t } = useLocalization();
   const contentAnim = useRef(new Animated.Value(0)).current;
@@ -461,6 +490,7 @@ export default function UpdateContentPanel({ isChecking = false, updateResult = 
         repoBase={repoBase}
         onInstallApk={onInstallApk}
         onUpdate={onUpdate}
+        onRedownload={onRedownload || onUpdate}
         colors={colors}
         t={t}
         isInstalled={isInstalled}
@@ -729,6 +759,9 @@ UpdateContentPanel.propTypes = {
   downloadedApks: PropTypes.array,
   onUpdate: PropTypes.func,
   onInstallApk: PropTypes.func,
+  // Discards the cached APK and downloads the release again. Falls back to onUpdate when a host
+  // doesn't supply it, so the button still fetches — it just can't clear the cache first.
+  onRedownload: PropTypes.func,
   onRefresh: PropTypes.func,
   bottomInset: PropTypes.number,
 };
@@ -888,6 +921,13 @@ const styles = StyleSheet.create({
     fontSize: 13,
     fontWeight: '600',
   },
+  releaseActions: {
+    alignItems: 'center',
+    flexDirection: 'row',
+    // Wider than the gaps elsewhere in the header: the two buttons here do very different things,
+    // and a mis-tap on the small one costs the user a fresh multi-megabyte download.
+    gap: SPACING.sm,
+  },
   releaseBadge: {
     borderRadius: BORDER_RADIUS.sm,
     borderWidth: StyleSheet.hairlineWidth,
@@ -930,6 +970,14 @@ const styles = StyleSheet.create({
     flexDirection: 'row',
     flexWrap: 'wrap',
     gap: SPACING.sm,
+  },
+  releaseRedownloadButton: {
+    alignItems: 'center',
+    borderRadius: BORDER_RADIUS.md,
+    borderWidth: StyleSheet.hairlineWidth,
+    justifyContent: 'center',
+    paddingHorizontal: SPACING.xs,
+    paddingVertical: SPACING.xs,
   },
   releaseVersion: {
     fontSize: 15,

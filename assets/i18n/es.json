@@ -513,6 +513,7 @@
   "update_install_now": "Instalar ahora",
   "install": "Instalar",
   "download": "Descargar",
+  "redownload_hint": "Descargar de nuevo la versión {version} por si el archivo está dañado",
   "apk_corrupt_redownload": "La descarga anterior estaba dañada y se eliminó. Toca Actualizar ahora para descargarla de nuevo.",
   "downloaded_apks": "APKs descargados",
   "installed": "Instalada",

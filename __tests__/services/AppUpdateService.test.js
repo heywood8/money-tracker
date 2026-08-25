@@ -10,6 +10,7 @@ import {
   checkAlreadyDownloaded,
   verifyCachedApk,
   verifyApkStructure,
+  deleteDownloadedApk,
   sanitizeFilename,
   fetchExpectedChecksum,
   computeSha256,
@@ -1005,6 +1006,28 @@ describe('AppUpdateService', () => {
       FileSystem.readAsStringAsync.mockResolvedValue('');
 
       await expect(computeSha256('file:///cache/penny.apk')).rejects.toThrow('Cannot hash file');
+    });
+  });
+
+  describe('deleteDownloadedApk', () => {
+    it('removes the cached file so the next download starts from scratch', async () => {
+      FileSystem.deleteAsync.mockResolvedValue(undefined);
+
+      await expect(deleteDownloadedApk('file:///cache/penny-v1.0.0.apk')).resolves.toBe(true);
+      expect(FileSystem.deleteAsync).toHaveBeenCalledWith('file:///cache/penny-v1.0.0.apk', { idempotent: true });
+    });
+
+    it('does nothing when there is no uri to delete', async () => {
+      await expect(deleteDownloadedApk(null)).resolves.toBe(false);
+      expect(FileSystem.deleteAsync).not.toHaveBeenCalled();
+    });
+
+    it('reports failure instead of throwing when the file cannot be removed', async () => {
+      const warn = jest.spyOn(console, 'warn').mockImplementation(() => {});
+      FileSystem.deleteAsync.mockRejectedValue(new Error('read-only'));
+
+      await expect(deleteDownloadedApk('file:///cache/penny-v1.0.0.apk')).resolves.toBe(false);
+      warn.mockRestore();
     });
   });
 
