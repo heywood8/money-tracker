@@ -1,6 +1,6 @@
 import React, { useState, useEffect, useLayoutEffect, useCallback, useMemo, useRef } from 'react';
 import { View, Text, StyleSheet, ScrollView } from 'react-native';
-import Animated, { useSharedValue, useAnimatedStyle, withTiming, withDelay, interpolate, Easing, SlideInLeft, SlideInRight, SlideOutLeft, SlideOutRight } from 'react-native-reanimated';
+import Animated, { useSharedValue, useAnimatedStyle, withTiming, withDelay, interpolate, Easing, LinearTransition, SlideInLeft, SlideInRight, SlideOutLeft, SlideOutRight } from 'react-native-reanimated';
 import Icon from '@expo/vector-icons/MaterialCommunityIcons';
 import { useThemeColors } from '../contexts/ThemeColorsContext';
 import { useLocalization } from '../contexts/LocalizationContext';
@@ -636,7 +636,7 @@ const GraphsScreen = () => {
     if (ref.current === target) return;
     ref.current = target;
     if (expandedCard === card) {
-      panelHeight.value = withTiming(CARD_HEADER_HEIGHT + target, { duration: 280, easing: Easing.out(Easing.cubic) });
+      panelHeight.value = withTiming(CARD_HEADER_HEIGHT + target, { duration: PANEL_OPEN_DURATION, easing: Easing.out(Easing.cubic) });
     }
   }, [expandedCard, panelHeight]);
 
@@ -733,8 +733,12 @@ const GraphsScreen = () => {
                 >
                   <Animated.View
                     key={selectedIncomeCategory}
+                    testID="income-chart-drilldown"
                     entering={incomeDrillReq.dir === 'none' ? undefined : incomeDrillReq.dir === 'in' ? SlideInRight.duration(280) : SlideInLeft.duration(280)}
                     exiting={incomeDrillReq.dir === 'none' ? undefined : incomeDrillReq.dir === 'in' ? SlideOutLeft.duration(220) : SlideOutRight.duration(220)}
+                    // Not decoration — this keeps the drill-down's rows tappable.
+                    // See DRILL_LAYOUT_NOTE at the foot of this file.
+                    layout={LinearTransition.duration(PANEL_OPEN_DURATION).easing(Easing.out(Easing.cubic))}
                   >
                     <IncomePieChart
                       colors={colors}
@@ -775,8 +779,12 @@ const GraphsScreen = () => {
                 >
                   <Animated.View
                     key={selectedCategory}
+                    testID="expense-chart-drilldown"
                     entering={expenseDrillReq.dir === 'none' ? undefined : expenseDrillReq.dir === 'in' ? SlideInRight.duration(280) : SlideInLeft.duration(280)}
                     exiting={expenseDrillReq.dir === 'none' ? undefined : expenseDrillReq.dir === 'in' ? SlideOutLeft.duration(220) : SlideOutRight.duration(220)}
+                    // Not decoration — this keeps the drill-down's rows tappable.
+                    // See DRILL_LAYOUT_NOTE at the foot of this file.
+                    layout={LinearTransition.duration(PANEL_OPEN_DURATION).easing(Easing.out(Easing.cubic))}
                   >
                     <ExpensePieChart
                       colors={colors}
@@ -1003,5 +1011,42 @@ const styles = StyleSheet.create({
     height: CARD_HEADER_HEIGHT,
   },
 });
+
+/*
+ * DRILL_LAYOUT_NOTE — why the drill-down wrapper carries a `layout` transition.
+ *
+ * Drilling into a leaf category mounts that wrapper fresh (it is keyed on the
+ * category) with an `entering` slide, and the list inside it starts in its
+ * loading state: a spinner about a row tall. The operations arrive a moment
+ * later and the list grows to its real height, while the entering slide is
+ * still running.
+ *
+ * Reanimated drives an entering animation through a mounting override
+ * delegate, and each frame it pushes an update built from the view snapshot it
+ * took when the animation began, overwriting whatever React committed in the
+ * meantime for every property the animation itself does not animate. A slide
+ * animates originX, so the height in that snapshot — the spinner's — is what
+ * the wrapper's native view keeps, long after the list has drawn its rows.
+ *
+ * Nothing clips at that height, so the list looks correct. But a Reanimated
+ * view is never flattened away, so the wrapper stays a real Android view, and
+ * Android hit-testing drops a touch the moment it falls outside one
+ * (facebook/react-native#54659, software-mansion/react-native-reanimated#8497).
+ * Every row below the spinner's height was silently untappable: the first row
+ * landed, sometimes, and no other row ever did.
+ *
+ * Registering a layout animation is what makes Reanimated re-read the wrapper:
+ * with one, a commit that changes its frame restarts the animation against the
+ * new frame, so the height it holds is the list's own. Without one, that commit
+ * is passed through and then immediately overwritten by the next animation
+ * frame. It runs on the panel's own open timing, so the wrapper and the card
+ * around it grow together.
+ *
+ * The window is narrowed rather than closed: the transition interpolates from
+ * the spinner's height, so for its duration the rows below it are still outside
+ * the wrapper. That is the moment the list appears, not a moment anyone is
+ * pressing in — but a zero-duration transition would be the way to close it
+ * outright if it ever proves otherwise.
+ */
 
 export default GraphsScreen;
