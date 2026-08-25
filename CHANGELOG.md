@@ -1,5 +1,12 @@
 # Changelog
 
+## [0.277.0](https://github.com/heywood8/money-tracker/compare/penny-v0.276.2...penny-v0.277.0) (2026-08-25)
+
+
+### Features
+
+* **updates:** add retry button to failed update check ([#1650](https://github.com/heywood8/money-tracker/issues/1650)) ([a6b2d6b](https://github.com/heywood8/money-tracker/commit/a6b2d6ba3829e3e61b08d225471689d8440929fc))
+
 ## [0.276.2](https://github.com/heywood8/money-tracker/compare/penny-v0.276.1...penny-v0.276.2) (2026-08-24)
 
 
