@@ -1,5 +1,12 @@
 # Changelog
 
+## [0.278.0](https://github.com/heywood8/money-tracker/compare/penny-v0.277.2...penny-v0.278.0) (2026-08-25)
+
+
+### Features
+
+* **updates:** offer an icon-only re-download beside install ([#1656](https://github.com/heywood8/money-tracker/issues/1656)) ([f9c35a9](https://github.com/heywood8/money-tracker/commit/f9c35a951f6154ef5ca3e7e267101d0ca2fa93e0))
+
 ## [0.277.2](https://github.com/heywood8/money-tracker/compare/penny-v0.277.1...penny-v0.277.2) (2026-08-25)
 
 
