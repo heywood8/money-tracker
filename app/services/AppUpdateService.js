@@ -163,16 +163,33 @@ const computeRunProgress = (run, now, expectedDurationMinutes) => {
   };
 };
 
-// Queries the GitHub Actions API for all currently active (not yet completed) runs of the APK
-// build workflow and maps each to a rough completion percentage. Returned newest-first so the
-// most recently started run is first. Returns an empty array when the API is unreachable, when
-// there are no active runs, or when timing data is unusable.
-export const fetchActiveBuildRuns = async ({
+// A run is "active" until GitHub marks it completed (queued / in_progress / waiting / etc.).
+const isActiveRun = (run) => !!run && !!run.status && run.status !== 'completed';
+
+// A completed run that did not succeed will never attach an APK — the release stays empty until
+// someone re-runs the build. We test for "not success" rather than for a list of failure
+// conclusions so that cancelled, timed-out and startup-failure runs all count without having to
+// track GitHub's conclusion vocabulary.
+const isFailedRun = (run) => !!run && run.status === 'completed' && run.conclusion !== 'success';
+
+const runStartedMs = (run) => new Date(run?.run_started_at || run?.created_at || 0).getTime();
+
+// The user-facing facts about a build that finished without producing an APK.
+const describeFailedRun = (run) => ({
+  conclusion: run.conclusion || 'failure',
+  completedAt: run.updated_at || null,
+  htmlUrl: run.html_url || null,
+  version: versionFromRun(run),
+});
+
+// Fetches the APK build workflow's recent runs, newest-first. Build status is supplementary
+// information, so every failure mode — unreachable API, rate limit, unexpected payload — comes
+// back as an empty list rather than as an error: not knowing how a build is doing must never
+// turn a working update check into a failed one.
+const fetchBuildWorkflowRuns = async ({
   owner = DEFAULT_GITHUB_OWNER,
   repo = DEFAULT_GITHUB_REPO,
   fetchImpl = fetch,
-  now = Date.now(),
-  expectedDurationMinutes = BUILD_DURATION_MINUTES,
 } = {}) => {
   const endpoint = `https://api.github.com/repos/${owner}/${repo}/actions/workflows/${BUILD_WORKFLOW_FILE}/runs?per_page=20`;
 
@@ -196,22 +213,69 @@ export const fetchActiveBuildRuns = async ({
 
     const data = await response.json();
     const runs = Array.isArray(data?.workflow_runs) ? data.workflow_runs : [];
-
-    // A run is "active" until GitHub marks it completed (queued / in_progress / waiting / etc.).
-    const activeRuns = runs.filter((run) => run && run.status && run.status !== 'completed');
-    if (activeRuns.length === 0) {
-      return [];
-    }
-
-    const startedMs = (run) => new Date(run.run_started_at || run.created_at || 0).getTime();
-    activeRuns.sort((a, b) => startedMs(b) - startedMs(a));
-
-    return activeRuns
-      .map((run) => computeRunProgress(run, now, expectedDurationMinutes))
-      .filter(Boolean);
+    return runs.filter(Boolean).sort((a, b) => runStartedMs(b) - runStartedMs(a));
   } catch {
     return [];
   }
+};
+
+// All currently active runs of the APK build workflow, each mapped to a rough completion
+// percentage. Returned newest-first so the most recently started run is first. Returns an empty
+// array when the API is unreachable, when there are no active runs, or when timing data is
+// unusable.
+export const fetchActiveBuildRuns = async ({
+  owner = DEFAULT_GITHUB_OWNER,
+  repo = DEFAULT_GITHUB_REPO,
+  fetchImpl = fetch,
+  now = Date.now(),
+  expectedDurationMinutes = BUILD_DURATION_MINUTES,
+} = {}) => {
+  const runs = await fetchBuildWorkflowRuns({ owner, repo, fetchImpl });
+  return runs
+    .filter(isActiveRun)
+    .map((run) => computeRunProgress(run, now, expectedDurationMinutes))
+    .filter(Boolean);
+};
+
+// Reduces the build workflow's runs to one state per release version, so a release still missing
+// its APK can say *why*. The newest run for a version wins — a re-run supersedes the attempt
+// before it, and a re-run that succeeded must not leave the earlier failure on display.
+//
+// Each version maps to `{ progress, failure }` with exactly one side filled in: `progress` while
+// the build is still going, `failure` once it has finished without an APK. Versions whose newest
+// run succeeded are absent entirely — that build attached its APK, so there is nothing to report.
+export const fetchBuildStateByVersion = async ({
+  owner = DEFAULT_GITHUB_OWNER,
+  repo = DEFAULT_GITHUB_REPO,
+  fetchImpl = fetch,
+  now = Date.now(),
+  expectedDurationMinutes = BUILD_DURATION_MINUTES,
+} = {}) => {
+  const runs = await fetchBuildWorkflowRuns({ owner, repo, fetchImpl });
+  const byVersion = {};
+  const seen = new Set();
+
+  for (const run of runs) {
+    const version = versionFromRun(run);
+    // Runs arrive newest-first, so the first one we see for a version is the one that counts.
+    // Mark it seen even when it yields no state (an active run with unusable timing, or a
+    // successful one) — otherwise an older, superseded run would speak for the version.
+    if (!version || seen.has(version)) {
+      continue;
+    }
+    seen.add(version);
+
+    if (isActiveRun(run)) {
+      const progress = computeRunProgress(run, now, expectedDurationMinutes);
+      if (progress) {
+        byVersion[version] = { progress, failure: null };
+      }
+    } else if (isFailedRun(run)) {
+      byVersion[version] = { progress: null, failure: describeFailedRun(run) };
+    }
+  }
+
+  return byVersion;
 };
 
 // Returns a rough completion percentage for the most recently started active APK build run.
@@ -353,22 +417,24 @@ export const checkForAppUpdate = async ({
 
     if (!bestRelease) {
       if (foundReleasesWithoutApk) {
-        // The newer release(s) have no APK yet — a CI build is likely still running for each.
-        // Fetch every active build run once and tie each one to its release version, so when
-        // several releases are awaiting APKs we can show how far along each individual build is
-        // (not just the newest). The most recently started run is also surfaced top-level as
-        // `buildProgress` for the build-progress poller and legacy single-progress consumers.
-        const activeRuns = await fetchActiveBuildRuns({ owner, repo, fetchImpl });
-        const progressByVersion = {};
-        for (const progress of activeRuns) {
-          if (progress.version && !(progress.version in progressByVersion)) {
-            progressByVersion[progress.version] = progress;
-          }
-        }
-        const buildProgress = activeRuns.length > 0 ? activeRuns[0] : null;
+        // The newer release(s) have no APK. Resolve each one's own CI build in a single request,
+        // so a release can say whether its build is still running or has failed outright — a
+        // failed build never attaches an APK, and without that distinction the release looks
+        // identical to one whose build simply has not finished yet.
+        const buildStateByVersion = await fetchBuildStateByVersion({ owner, repo, fetchImpl });
+        // The most recently started *running* build is also surfaced top-level as
+        // `buildProgress`, for the build-progress poller and legacy single-progress consumers.
+        // Failures are deliberately absent from it: there is nothing left to poll for.
+        const buildProgress = Object.values(buildStateByVersion)
+          .map((state) => state.progress)
+          .filter(Boolean)
+          .sort((a, b) => new Date(b.startedAt || 0).getTime() - new Date(a.startedAt || 0).getTime())[0] || null;
 
+        // Every newer release is listed, notes or no notes. A release whose build failed is
+        // exactly the one the user needs to see, and release-please occasionally publishes a tag
+        // with an empty body — filtering those out used to leave the panel with nothing to show
+        // and drop it onto the generic "could not check updates" screen.
         const releaseNotes = newerReleases
-          .filter((r) => r.notes)
           .map((r) => ({
             version: r.version,
             notes: r.notes,
@@ -377,7 +443,8 @@ export const checkForAppUpdate = async ({
             releaseUrl: r.releaseUrl || null,
             downloadUrl: r.downloadUrl || null,
             checksumUrl: r.checksumUrl || null,
-            buildProgress: !r.hasApk ? (progressByVersion[r.version] || null) : null,
+            buildProgress: !r.hasApk ? (buildStateByVersion[r.version]?.progress || null) : null,
+            buildFailure: !r.hasApk ? (buildStateByVersion[r.version]?.failure || null) : null,
           }));
         return {
           success: false,

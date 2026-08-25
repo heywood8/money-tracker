@@ -525,6 +525,8 @@
   "release_history": "Cronologia versioni",
   "no_apk_attached": "Nessun APK",
   "build_in_progress": "Compilazione {percent}%",
+  "build_failed": "Build non riuscita",
+  "view_build_log": "apri il log della build",
   "more_releases": "Altro su GitHub",
   "update_releases_without_apks": "Trovate versioni ma nessun APK allegato. Controlla l'ultima versione su GitHub.",
   "later": "Più tardi",

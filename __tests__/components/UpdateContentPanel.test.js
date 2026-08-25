@@ -320,6 +320,103 @@ describe('UpdateContentPanel', () => {
       expect(getByText('Changelog entry')).toBeTruthy();
     });
 
+    it('shows a build-failed chip instead of the bare no-APK badge when CI failed', async () => {
+      const { getByText, queryByText } = await render(
+        <UpdateContentPanel
+          {...baseProps}
+          updateResult={{
+            type: 'error',
+            errorCode: 'releases_without_apks',
+            releaseNotes: [{
+              version: '1.3.0',
+              notes: 'Changelog entry',
+              hasApk: false,
+              buildProgress: null,
+              buildFailure: { conclusion: 'failure', htmlUrl: 'https://github.com/o/r/actions/runs/1' },
+            }],
+            recentReleaseNotes: null,
+            releasesUrl: null,
+          }}
+        />,
+      );
+      expect(getByText('build_failed')).toBeTruthy();
+      // "No APK" only restates the symptom once the failure chip explains the cause.
+      expect(queryByText(/no_apk_attached/)).toBeNull();
+    });
+
+    it('opens the failed build log when the chip is tapped', async () => {
+      const openURL = jest.spyOn(Linking, 'openURL').mockResolvedValue();
+      const { getByText } = await render(
+        <UpdateContentPanel
+          {...baseProps}
+          updateResult={{
+            type: 'error',
+            errorCode: 'releases_without_apks',
+            releaseNotes: [{
+              version: '1.3.0',
+              notes: 'Changelog entry',
+              hasApk: false,
+              buildFailure: { conclusion: 'failure', htmlUrl: 'https://github.com/o/r/actions/runs/1' },
+            }],
+            recentReleaseNotes: null,
+            releasesUrl: null,
+          }}
+        />,
+      );
+      fireEvent.press(getByText('build_failed'));
+      expect(openURL).toHaveBeenCalledWith('https://github.com/o/r/actions/runs/1');
+      openURL.mockRestore();
+    });
+
+    it('keeps the no-APK badge while the build is still running', async () => {
+      const { getByText } = await render(
+        <UpdateContentPanel
+          {...baseProps}
+          updateResult={{
+            type: 'error',
+            errorCode: 'releases_without_apks',
+            releaseNotes: [{
+              version: '1.3.0',
+              notes: 'Changelog entry',
+              hasApk: false,
+              buildProgress: { percent: 40 },
+              buildFailure: null,
+            }],
+            recentReleaseNotes: null,
+            releasesUrl: null,
+          }}
+        />,
+      );
+      expect(getByText(/no_apk_attached/)).toBeTruthy();
+      expect(getByText(/build_in_progress/)).toBeTruthy();
+    });
+
+    it('never paints the legacy top-level progress onto a release whose build failed', async () => {
+      // The top-level buildProgress belongs to whichever build started most recently — not
+      // necessarily to this release — so a card we know failed must not also read "Building N%".
+      const { getByText, queryByText } = await render(
+        <UpdateContentPanel
+          {...baseProps}
+          updateResult={{
+            type: 'error',
+            errorCode: 'releases_without_apks',
+            releaseNotes: [{
+              version: '1.3.0',
+              notes: 'Changelog entry',
+              hasApk: false,
+              buildProgress: null,
+              buildFailure: { conclusion: 'failure', htmlUrl: 'https://github.com/o/r/actions/runs/1' },
+            }],
+            recentReleaseNotes: null,
+            releasesUrl: null,
+            buildProgress: { percent: 40 },
+          }}
+        />,
+      );
+      expect(getByText('build_failed')).toBeTruthy();
+      expect(queryByText(/build_in_progress/)).toBeNull();
+    });
+
     it('shows older APK releases below the no-APK entry', async () => {
       const { getByText } = await render(
         <UpdateContentPanel

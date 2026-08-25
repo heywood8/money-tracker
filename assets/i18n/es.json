@@ -521,6 +521,8 @@
   "release_history": "Historial de versiones",
   "no_apk_attached": "Sin APK",
   "build_in_progress": "Compilando {percent}%",
+  "build_failed": "La compilación falló",
+  "view_build_log": "ver el registro de compilación",
   "more_releases": "Más en GitHub",
   "update_releases_without_apks": "Se encontraron versiones pero sin APK adjunto. Consulta la última versión en GitHub.",
   "later": "Más tarde",

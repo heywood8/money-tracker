@@ -528,6 +528,8 @@
   "release_history": "Release history",
   "no_apk_attached": "No APK",
   "build_in_progress": "Building {percent}%",
+  "build_failed": "Build failed",
+  "view_build_log": "view the build log",
   "more_releases": "More on GitHub",
   "update_releases_without_apks": "Found releases but no APKs attached. Check GitHub for the latest release.",
   "later": "Later",
