@@ -1,5 +1,12 @@
 # Changelog
 
+## [0.278.1](https://github.com/heywood8/money-tracker/compare/penny-v0.278.0...penny-v0.278.1) (2026-08-25)
+
+
+### Bug Fixes
+
+* **graphs:** let go of the drill-down's loading height so its rows take a press ([#1658](https://github.com/heywood8/money-tracker/issues/1658)) ([f14c18a](https://github.com/heywood8/money-tracker/commit/f14c18adc773de10c09864242cee3366c42772af))
+
 ## [0.278.0](https://github.com/heywood8/money-tracker/compare/penny-v0.277.2...penny-v0.278.0) (2026-08-25)
 
 
