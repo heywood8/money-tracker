@@ -135,7 +135,7 @@ const INSTALLED_GREEN = '#4caf50';
 // Amber used to warn that a corrupt cached download was discarded and is being re-downloaded.
 const WARNING_AMBER = '#f0a500';
 
-function ReleaseCard({ version, notes, publishedAt, releaseUrl, badge, buildProgress, matchedApk, downloadUrl, checksumUrl, repoBase, onInstallApk, onUpdate, colors, t, isInstalled, isLatestInstalled, isUpdateCandidate }) {
+function ReleaseCard({ version, notes, publishedAt, releaseUrl, badge, buildProgress, buildFailure, matchedApk, downloadUrl, checksumUrl, repoBase, onInstallApk, onUpdate, colors, t, isInstalled, isLatestInstalled, isUpdateCandidate }) {
   const { date, body } = parseReleaseNotes(notes, version);
   const dateLabel = formatReleaseDateTime(publishedAt, date);
   const releasePageUrl = releaseUrlFor(releaseUrl, repoBase, version);
@@ -214,6 +214,22 @@ function ReleaseCard({ version, notes, publishedAt, releaseUrl, badge, buildProg
               </Text>
             </View>
           ) : null}
+          {buildFailure ? (
+            <TouchableOpacity
+              style={[styles.buildProgressChip, { borderColor: colors.destructive }]}
+              onPress={buildFailure.htmlUrl ? () => Linking.openURL(buildFailure.htmlUrl) : undefined}
+              disabled={!buildFailure.htmlUrl}
+              accessibilityRole={buildFailure.htmlUrl ? 'link' : 'text'}
+              accessibilityLabel={buildFailure.htmlUrl
+                ? `${t('build_failed') || 'Build failed'} — ${t('view_build_log') || 'view the build log'}`
+                : (t('build_failed') || 'Build failed')}
+            >
+              <Ionicons name="alert-circle-outline" size={13} color={colors.destructive} />
+              <Text style={[styles.buildProgressText, { color: colors.destructive }]}>
+                {t('build_failed') || 'Build failed'}
+              </Text>
+            </TouchableOpacity>
+          ) : null}
           {isUpdateCandidate ? (
             <View
               style={[styles.installedChip, { borderColor: colors.primary }]}
@@ -287,6 +303,10 @@ ReleaseCard.propTypes = {
   badge: PropTypes.string,
   buildProgress: PropTypes.shape({
     percent: PropTypes.number,
+  }),
+  buildFailure: PropTypes.shape({
+    conclusion: PropTypes.string,
+    htmlUrl: PropTypes.string,
   }),
   matchedApk: PropTypes.object,
   downloadUrl: PropTypes.string,
@@ -434,6 +454,7 @@ export default function UpdateContentPanel({ isChecking = false, updateResult = 
         releaseUrl={release.releaseUrl}
         badge={release.badge}
         buildProgress={release.buildProgress}
+        buildFailure={release.buildFailure}
         matchedApk={apkLookup.get(release.version)}
         downloadUrl={release.downloadUrl}
         checksumUrl={release.checksumUrl}
@@ -591,8 +612,12 @@ export default function UpdateContentPanel({ isChecking = false, updateResult = 
         const hasPerReleaseProgress = releaseNotesList.some((r) => r.buildProgress);
         let legacyProgressShown = false;
         const noApkReleases = releaseNotesList.map((r) => {
+          const buildFailure = !r.hasApk ? (r.buildFailure || null) : null;
           let buildProgress = null;
-          if (!r.hasApk) {
+          // A known failure settles the question: never let the legacy top-level progress — which
+          // belongs to whichever build started most recently, not necessarily to this release —
+          // paint a "Building N%" chip onto a card we already know finished without an APK.
+          if (!r.hasApk && !buildFailure) {
             if (hasPerReleaseProgress) {
               buildProgress = r.buildProgress || null;
             } else if (!legacyProgressShown && updateResult.buildProgress) {
@@ -605,8 +630,11 @@ export default function UpdateContentPanel({ isChecking = false, updateResult = 
             notes: r.notes,
             publishedAt: r.publishedAt,
             releaseUrl: r.releaseUrl,
-            badge: !r.hasApk ? (t('no_apk_attached') || 'NO_APK_ATTACHED') : undefined,
+            // "No APK" only states the symptom. Once we know the build failed, that chip says
+            // why, so the bare badge would just repeat it less usefully.
+            badge: !r.hasApk && !buildFailure ? (t('no_apk_attached') || 'NO_APK_ATTACHED') : undefined,
             buildProgress,
+            buildFailure,
           };
         });
         const recentReleases = updateResult.recentReleaseNotes || [];
@@ -675,6 +703,10 @@ UpdateContentPanel.propTypes = {
       hasApk: PropTypes.bool,
       buildProgress: PropTypes.shape({
         percent: PropTypes.number,
+      }),
+      buildFailure: PropTypes.shape({
+        conclusion: PropTypes.string,
+        htmlUrl: PropTypes.string,
       }),
     })),
     recentReleaseNotes: PropTypes.arrayOf(PropTypes.shape({

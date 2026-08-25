@@ -17,6 +17,7 @@ import {
   fetchBuildProgress,
   fetchBuildProgressByVersion,
   fetchActiveBuildRuns,
+  fetchBuildStateByVersion,
 } from '../../app/services/AppUpdateService';
 
 jest.mock('expo-file-system/legacy', () => ({
@@ -549,6 +550,71 @@ describe('AppUpdateService', () => {
       expect(byVersion['0.50.4'].buildProgress.percent).toBe(50);
       // The newest active run is still surfaced top-level for the poller / legacy consumers.
       expect(result.buildProgress.version).toBe('0.50.5');
+    });
+
+    it('reports a failed CI build on the release whose APK never arrived', async () => {
+      const fetchImpl = jest.fn(async (url) => {
+        if (url.includes('/actions/workflows/')) {
+          return {
+            ok: true,
+            json: async () => ({
+              workflow_runs: [
+                {
+                  status: 'completed',
+                  conclusion: 'failure',
+                  head_branch: 'penny-v0.50.5',
+                  run_started_at: '2026-08-25T04:11:35Z',
+                  updated_at: '2026-08-25T04:12:15Z',
+                  html_url: 'https://github.com/o/r/actions/runs/1',
+                },
+              ],
+            }),
+          };
+        }
+        return {
+          ok: true,
+          json: async () => ([
+            { tag_name: 'v0.50.5', assets: [], body: 'Notes for 0.50.5' },
+            { tag_name: 'v0.50.0', assets: [{ name: 'penny-0.50.0.apk', browser_download_url: 'https://example.com/penny-0.50.0.apk' }], body: 'Notes for 0.50.0' },
+          ]),
+        };
+      });
+
+      const result = await checkForAppUpdate({ currentVersion: '0.50.0', fetchImpl });
+
+      expect(result.errorCode).toBe('releases_without_apks');
+      const failed = result.releaseNotes.find((r) => r.version === '0.50.5');
+      expect(failed.buildFailure).toEqual({
+        conclusion: 'failure',
+        completedAt: '2026-08-25T04:12:15Z',
+        htmlUrl: 'https://github.com/o/r/actions/runs/1',
+        version: '0.50.5',
+      });
+      expect(failed.buildProgress).toBeNull();
+      // Nothing is left to poll for, so the top-level progress the poller watches stays empty.
+      expect(result.buildProgress).toBeNull();
+    });
+
+    it('lists a newer no-APK release even when its body is empty', async () => {
+      // Regression: releases were filtered by `notes`, so a bodyless tag whose build failed
+      // vanished and the panel fell through to the generic "could not check updates" screen.
+      const fetchImpl = jest.fn(async (url) => {
+        if (url.includes('/actions/workflows/')) {
+          return { ok: true, json: async () => ({ workflow_runs: [] }) };
+        }
+        return {
+          ok: true,
+          json: async () => ([
+            { tag_name: 'v0.50.5', assets: [], body: '' },
+            { tag_name: 'v0.50.0', assets: [{ name: 'penny-0.50.0.apk', browser_download_url: 'https://example.com/penny-0.50.0.apk' }], body: 'Notes for 0.50.0' },
+          ]),
+        };
+      });
+
+      const result = await checkForAppUpdate({ currentVersion: '0.50.0', fetchImpl });
+
+      expect(result.errorCode).toBe('releases_without_apks');
+      expect(result.releaseNotes.map((r) => r.version)).toContain('0.50.5');
     });
 
     it('returns invalid_release_data when releases list is empty', async () => {
@@ -1487,6 +1553,76 @@ describe('AppUpdateService', () => {
       const result = await fetchActiveBuildRuns({ fetchImpl, now });
 
       expect(result).toEqual([]);
+    });
+  });
+
+  describe('fetchBuildStateByVersion', () => {
+    const MINUTE = 60000;
+    const now = new Date('2026-06-18T12:00:00Z').getTime();
+
+    const runsResponse = (runs) => ({
+      ok: true,
+      json: async () => ({ workflow_runs: runs }),
+    });
+
+    it('reports progress for a running build and a failure for a finished one', async () => {
+      const fetchImpl = jest.fn().mockResolvedValue(runsResponse([
+        { status: 'in_progress', head_branch: 'penny-v0.142.0', run_started_at: new Date(now - 1.7 * MINUTE).toISOString() },
+        {
+          status: 'completed',
+          conclusion: 'failure',
+          head_branch: 'penny-v0.141.4',
+          run_started_at: new Date(now - 30 * MINUTE).toISOString(),
+          updated_at: new Date(now - 28 * MINUTE).toISOString(),
+          html_url: 'https://github.com/o/r/actions/runs/2',
+        },
+      ]));
+
+      const result = await fetchBuildStateByVersion({ fetchImpl, now });
+
+      expect(result['0.142.0'].progress.percent).toBe(10);
+      expect(result['0.142.0'].failure).toBeNull();
+      expect(result['0.141.4'].progress).toBeNull();
+      expect(result['0.141.4'].failure.conclusion).toBe('failure');
+      expect(result['0.141.4'].failure.htmlUrl).toBe('https://github.com/o/r/actions/runs/2');
+    });
+
+    it('omits a version whose build succeeded', async () => {
+      const fetchImpl = jest.fn().mockResolvedValue(runsResponse([
+        { status: 'completed', conclusion: 'success', head_branch: 'penny-v0.142.0', run_started_at: new Date(now - 30 * MINUTE).toISOString() },
+      ]));
+
+      const result = await fetchBuildStateByVersion({ fetchImpl, now });
+
+      expect(result).toEqual({});
+    });
+
+    it('lets a newer re-run supersede the attempt before it', async () => {
+      const fetchImpl = jest.fn().mockResolvedValue(runsResponse([
+        { status: 'completed', conclusion: 'success', head_branch: 'penny-v0.142.0', run_started_at: new Date(now - 10 * MINUTE).toISOString() },
+        { status: 'completed', conclusion: 'failure', head_branch: 'penny-v0.142.0', run_started_at: new Date(now - 40 * MINUTE).toISOString(), html_url: 'https://github.com/o/r/actions/runs/3' },
+      ]));
+
+      const result = await fetchBuildStateByVersion({ fetchImpl, now });
+
+      // The successful re-run is the newest, so the earlier failure must not be reported.
+      expect(result['0.142.0']).toBeUndefined();
+    });
+
+    it('treats a cancelled build as a failure', async () => {
+      const fetchImpl = jest.fn().mockResolvedValue(runsResponse([
+        { status: 'completed', conclusion: 'cancelled', head_branch: 'penny-v0.142.0', run_started_at: new Date(now - 10 * MINUTE).toISOString() },
+      ]));
+
+      const result = await fetchBuildStateByVersion({ fetchImpl, now });
+
+      expect(result['0.142.0'].failure.conclusion).toBe('cancelled');
+    });
+
+    it('returns an empty map on API error', async () => {
+      const fetchImpl = jest.fn().mockResolvedValue({ ok: false, status: 500 });
+
+      expect(await fetchBuildStateByVersion({ fetchImpl, now })).toEqual({});
     });
   });
 
