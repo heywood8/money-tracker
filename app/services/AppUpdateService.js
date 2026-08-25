@@ -560,6 +560,20 @@ export const checkAlreadyDownloaded = async (downloadUrl, cacheDir = FileSystem.
   }
 };
 
+// Removes a downloaded APK from the cache. Used when the user asks to fetch a release again
+// because the cached copy is suspect: deleting first is what makes the next download start from
+// scratch instead of reusing (or resuming onto) the file already sitting there.
+export const deleteDownloadedApk = async (localUri) => {
+  if (!localUri) return false;
+  try {
+    await FileSystem.deleteAsync(localUri, { idempotent: true });
+    return true;
+  } catch (e) {
+    console.warn('[AppUpdate] could not delete the cached APK', e.message);
+    return false;
+  }
+};
+
 // Verifies the integrity of an APK already sitting in the cache for the given download URL.
 // A previous download can be left truncated or corrupt (interrupted transfer, app killed
 // mid-download, full disk), in which case offering "Install now" launches a broken installer

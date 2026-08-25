@@ -513,6 +513,7 @@
   "update_install_now": "Jetzt installieren",
   "install": "Installieren",
   "download": "Herunterladen",
+  "redownload_hint": "Version {version} erneut herunterladen, falls die Datei beschädigt ist",
   "apk_corrupt_redownload": "Der vorherige Download war beschädigt und wurde entfernt. Tippe auf „Jetzt aktualisieren“, um ihn erneut herunterzuladen.",
   "downloaded_apks": "Heruntergeladene APKs",
   "installed": "Installiert",

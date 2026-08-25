@@ -617,6 +617,70 @@ describe('UpdateContentPanel', () => {
       expect(onInstallApk).toHaveBeenCalledWith('file:///cache/penny-2.0.0.apk');
     });
 
+    it('offers an icon-only re-download beside install when the APK is already cached', async () => {
+      const onRedownload = jest.fn();
+      const { getByTestId } = await render(
+        <UpdateContentPanel
+          {...baseProps}
+          onRedownload={onRedownload}
+          updateResult={availableResult}
+          downloadedApks={[{ uri: 'file:///cache/penny-2.0.0.apk', version: '2.0.0', filename: 'penny-2.0.0.apk', modificationTime: 1700000000 }]}
+        />,
+      );
+      // A cached copy can still be corrupt, so fetching it again must stay reachable.
+      fireEvent.press(getByTestId('redownload-2.0.0'));
+      expect(onRedownload).toHaveBeenCalledWith(
+        'https://example.com/penny-2.0.0.apk',
+        null,
+        '2.0.0',
+        'file:///cache/penny-2.0.0.apk',
+      );
+    });
+
+    it('does not offer a re-download when there is nothing cached to replace', async () => {
+      const { queryByTestId } = await render(
+        <UpdateContentPanel {...baseProps} updateResult={availableResult} />,
+      );
+      // The primary button already downloads; a second one would say the same thing twice.
+      expect(queryByTestId('redownload-2.0.0')).toBeNull();
+    });
+
+    it('does not offer a re-download for the version already installed', async () => {
+      const { queryByTestId } = await render(
+        <UpdateContentPanel
+          {...baseProps}
+          updateResult={{
+            ...availableResult,
+            releaseNotes: [
+              { version: '2.0.0', notes: 'Major update', hasApk: true, downloadUrl: 'https://example.com/penny-2.0.0.apk', checksumUrl: null },
+              { version: '1.0.0', notes: 'Older', hasApk: true, downloadUrl: 'https://example.com/penny-1.0.0.apk', checksumUrl: null },
+            ],
+          }}
+          downloadedApks={[{ uri: 'file:///cache/penny-1.0.0.apk', version: '1.0.0', filename: 'penny-1.0.0.apk', modificationTime: 1700000000 }]}
+        />,
+      );
+      expect(queryByTestId('redownload-1.0.0')).toBeNull();
+    });
+
+    it('falls back to onUpdate when the host supplies no re-download handler', async () => {
+      const onUpdate = jest.fn();
+      const { getByTestId } = await render(
+        <UpdateContentPanel
+          {...baseProps}
+          onUpdate={onUpdate}
+          updateResult={availableResult}
+          downloadedApks={[{ uri: 'file:///cache/penny-2.0.0.apk', version: '2.0.0', filename: 'penny-2.0.0.apk', modificationTime: 1700000000 }]}
+        />,
+      );
+      fireEvent.press(getByTestId('redownload-2.0.0'));
+      expect(onUpdate).toHaveBeenCalledWith(
+        'https://example.com/penny-2.0.0.apk',
+        null,
+        '2.0.0',
+        'file:///cache/penny-2.0.0.apk',
+      );
+    });
+
     it('synthesizes a candidate card with a download button when the update has no release notes', async () => {
       const { getByLabelText, getByText } = await render(
         <UpdateContentPanel

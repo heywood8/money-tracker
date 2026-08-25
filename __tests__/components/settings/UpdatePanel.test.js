@@ -12,6 +12,7 @@ import UpdatePanel from '../../../app/components/settings/UpdatePanel';
 const mockCheckForAppUpdate = jest.fn();
 const mockListDownloadedApks = jest.fn(() => Promise.resolve([]));
 const mockInstallApk = jest.fn(() => Promise.resolve());
+const mockDeleteDownloadedApk = jest.fn(() => Promise.resolve(true));
 const mockVerifyCachedApk = jest.fn(() => Promise.resolve({ exists: false }));
 const mockSetPreference = jest.fn(() => Promise.resolve());
 const mockStartDownload = jest.fn();
@@ -46,6 +47,7 @@ jest.mock('../../../app/services/AppUpdateService', () => ({
   checkForAppUpdate: (...a) => mockCheckForAppUpdate(...a),
   listDownloadedApks: (...a) => mockListDownloadedApks(...a),
   installApk: (...a) => mockInstallApk(...a),
+  deleteDownloadedApk: (...a) => mockDeleteDownloadedApk(...a),
   verifyCachedApk: (...a) => mockVerifyCachedApk(...a),
 }));
 jest.mock('../../../app/services/PreferencesDB', () => ({
@@ -223,6 +225,37 @@ describe('UpdatePanel', () => {
       });
 
       expect(mockSetPreference).toHaveBeenCalledWith('lastPrompted', '1.1.0');
+    });
+
+    it('throws the cached APK away before downloading it again', async () => {
+      const onDone = jest.fn();
+      await setup({ onDone });
+      await waitFor(() => expect(lastContentProps.updateResult?.type).toBe('available'));
+
+      await act(async () => {
+        await lastContentProps.onRedownload('https://apk', 'https://sum', '1.1.0', 'file:///cache/penny-1.1.0.apk');
+      });
+
+      // Deleting first is the whole point: the download must not reuse the suspect file.
+      expect(mockDeleteDownloadedApk).toHaveBeenCalledWith('file:///cache/penny-1.1.0.apk');
+      expect(mockDeleteDownloadedApk.mock.invocationCallOrder[0])
+        .toBeLessThan(mockStartDownload.mock.invocationCallOrder[0]);
+      expect(mockStartDownload).toHaveBeenCalledWith('https://apk', expect.objectContaining({
+        checksumUrl: 'https://sum',
+      }));
+      expect(onDone).toHaveBeenCalled();
+    });
+
+    it('still downloads again when the cached file could not be deleted', async () => {
+      mockDeleteDownloadedApk.mockImplementationOnce(() => Promise.resolve(false));
+      await setup();
+      await waitFor(() => expect(lastContentProps.updateResult?.type).toBe('available'));
+
+      await act(async () => {
+        await lastContentProps.onRedownload('https://apk', 'https://sum', '1.1.0', 'file:///cache/penny-1.1.0.apk');
+      });
+
+      expect(mockStartDownload).toHaveBeenCalled();
     });
 
     it('explains a download that could not start', async () => {

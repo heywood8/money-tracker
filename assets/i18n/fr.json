@@ -517,6 +517,7 @@
   "update_install_now": "Installer maintenant",
   "install": "Installer",
   "download": "Télécharger",
+  "redownload_hint": "Télécharger à nouveau la version {version} si le fichier est endommagé",
   "apk_corrupt_redownload": "Le téléchargement précédent était endommagé et a été supprimé. Touchez Mettre à jour maintenant pour le télécharger à nouveau.",
   "downloaded_apks": "APKs téléchargés",
   "installed": "Installée",

@@ -6,6 +6,7 @@ import { useDialog } from '../../contexts/DialogContext';
 import { useUpdateDownload } from '../../contexts/UpdateDownloadContext';
 import {
   checkForAppUpdate,
+  deleteDownloadedApk,
   listDownloadedApks,
   installApk,
   verifyCachedApk,
@@ -158,6 +159,21 @@ export default function UpdatePanel({ onRegisterTitle, onDone, bottomInset }) {
     });
   }, [updateResult, onDone, startDownload, showDialog, t]);
 
+  // The cached APK is suspect — a corrupt copy that still passed our checks, or one Android
+  // refused to install. Delete it before downloading again.
+  //
+  // The download would truncate that path itself (expo-file-system's download task zeroes the
+  // destination before writing), so this is not what makes the new copy clean. What it buys is
+  // the case where the cached file's name does not match the one the download URL produces: only
+  // an explicit delete gets that stale copy out of the cache, instead of leaving it listed as an
+  // installable build of this version. Either way the old file does not survive the attempt, so
+  // deleting up front costs nothing the download was not already going to do.
+  const handleRedownload = useCallback(async (downloadUrl, checksumUrl, version, localUri) => {
+    await deleteDownloadedApk(localUri);
+    await loadDownloadedApks();
+    await handleUpdate(downloadUrl, checksumUrl, version);
+  }, [loadDownloadedApks, handleUpdate]);
+
   return (
     <View style={styles.fill}>
       <UpdateContentPanel
@@ -166,6 +182,7 @@ export default function UpdatePanel({ onRegisterTitle, onDone, bottomInset }) {
         downloadedApks={downloadedApks}
         onUpdate={handleUpdate}
         onInstallApk={handleInstallApk}
+        onRedownload={handleRedownload}
         onRefresh={runUpdateCheck}
         bottomInset={bottomInset}
       />
