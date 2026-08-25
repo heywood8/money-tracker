@@ -1,5 +1,12 @@
 # Changelog
 
+## [0.277.1](https://github.com/heywood8/money-tracker/compare/penny-v0.277.0...penny-v0.277.1) (2026-08-25)
+
+
+### Bug Fixes
+
+* **ci:** run release builds on Node 22 so eas-cli installs ([#1652](https://github.com/heywood8/money-tracker/issues/1652)) ([a83cafa](https://github.com/heywood8/money-tracker/commit/a83cafa2e973654332a68cebd33ccfc4b1d2148a))
+
 ## [0.277.0](https://github.com/heywood8/money-tracker/compare/penny-v0.276.2...penny-v0.277.0) (2026-08-25)
 
 
