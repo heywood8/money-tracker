@@ -39,6 +39,24 @@ const AnimatedPressable = Animated.createAnimatedComponent(Pressable);
 // background. (Downward has no such limit; that direction is the dismiss.)
 const UPWARD_GIVE = 32;
 
+// Extra travel past the bottom edge before the exit animation is considered
+// done, so the dismissal never lands on the frame where the card's last row of
+// pixels is still on screen.
+const EXIT_CLEARANCE = 8;
+
+// px/s. The exit animation ends on position alone (see `exitRestOptions`), so
+// the speed condition is set out of reach rather than removed — RN's spring
+// requires both.
+const EXIT_REST_SPEED_THRESHOLD = 1e9;
+
+// Floor for the computed exit threshold — a card as tall as the screen would
+// otherwise ask the spring to rest on a distance of zero, which it never
+// reaches — and the value used while the card's height is still unknown.
+const MIN_EXIT_REST_DISPLACEMENT = 40;
+// Speed threshold used only in that unmeasured case (a dismissal before the
+// card's first layout, which in practice only tests reach).
+const UNMEASURED_EXIT_REST_SPEED = 100;
+
 /**
  * ModalShell — shared bottom-sheet wrapper for all modals.
  *
@@ -93,6 +111,15 @@ export default function ModalShell({
   // 0 on hide guarantees the sheet is glued back to the bottom (no residual
   // offset, the bug the old behavior="height" KeyboardAvoidingView left behind).
   const keyboardOffset = useRef(new Animated.Value(0)).current;
+  // Plain mirror of that offset, kept by a listener so it cannot drift from the
+  // value it shadows: the exit animation has to know synchronously how far above
+  // the bottom edge the card is currently sitting, and an Animated.Value cannot
+  // be read that way.
+  const keyboardHeightRef = useRef(0);
+  useEffect(() => {
+    const id = keyboardOffset.addListener(({ value }) => { keyboardHeightRef.current = value; });
+    return () => keyboardOffset.removeListener(id);
+  }, [keyboardOffset]);
   useEffect(() => {
     // ModalShell instances stay permanently mounted (e.g. OperationModal, and all
     // tab screens mount eagerly), so without this gate every closed modal would run
@@ -200,6 +227,49 @@ export default function ModalShell({
     commitShrink(() => onDismissRef.current?.());
   }, [commitShrink, onBackIntercept]);
 
+  // The card's own height, from its layout. Together with the keyboard offset it
+  // says how far the sheet has to travel before it is out of sight.
+  const cardHeightRef = useRef(0);
+  const handleCardLayout = useCallback((e) => {
+    cardHeightRef.current = e?.nativeEvent?.layout?.height || 0;
+  }, []);
+
+  // When to consider the exit animation finished.
+  //
+  // The completion callback is what actually dismisses the sheet — it flips the
+  // host's `visible`, which unmounts the Modal and releases the app-wide blur.
+  // RN's spring rests only once BOTH its displacement and its speed are under
+  // threshold, and a spring closing a ~800px gap is still travelling several
+  // hundred px/s when it comes within 40px of the target: the old
+  // `restSpeedThreshold: 100` kept it alive for ~0.47s, while the card itself
+  // left the screen at ~0.2s. The remaining quarter-second was a blurred, empty
+  // screen with no modal on it — which read as the app hanging.
+  //
+  // So end on position alone: the sheet is done the moment the card clears the
+  // bottom edge, and everything after that is travel nobody can see. The speed
+  // condition is put out of reach rather than removed (the spring needs both),
+  // and Animated snaps the value to `toValue` when it rests, so translateY
+  // still ends at exactly screenHeight for the next open.
+  const exitRestOptions = useCallback(() => {
+    if (!cardHeightRef.current) {
+      return {
+        restDisplacementThreshold: MIN_EXIT_REST_DISPLACEMENT,
+        restSpeedThreshold: UNMEASURED_EXIT_REST_SPEED,
+      };
+    }
+    // The card sits above the keyboard while one is up, so it has that much
+    // further to fall before the top edge of the card passes the bottom edge of
+    // the screen.
+    const travelToClear = cardHeightRef.current + keyboardHeightRef.current + EXIT_CLEARANCE;
+    return {
+      restDisplacementThreshold: Math.max(
+        screenHeightRef.current - travelToClear,
+        MIN_EXIT_REST_DISPLACEMENT,
+      ),
+      restSpeedThreshold: EXIT_REST_SPEED_THRESHOLD,
+    };
+  }, []);
+
   // Animate out then call callback — used for overlay tap and cancel button
   const animateOut = useCallback((callback) => {
     if (isReduceMotionEnabled()) {
@@ -214,11 +284,9 @@ export default function ModalShell({
     Animated.spring(translateY, {
       ...ANIMATED_SPRING_SETTLE,
       toValue: screenHeight,
-      // The card is out of sight long before the spring mathematically settles,
-      // so finish on "off-screen" rather than on the tail — same thresholds the
-      // drag dismissal uses.
-      restDisplacementThreshold: 40,
-      restSpeedThreshold: 100,
+      // Finish on "off-screen" rather than on the tail — same thresholds the
+      // drag dismissal uses (see exitRestOptions).
+      ...exitRestOptions(),
       // Leave translateY at screenHeight after close so the next open
       // renders offscreen immediately (no reset-to-0 flicker)
     }).start(({ finished }) => {
@@ -228,7 +296,7 @@ export default function ModalShell({
       // it out from under them.
       if (finished) callback?.();
     });
-  }, [translateY, screenHeight]);
+  }, [translateY, screenHeight, exitRestOptions]);
 
   // translateY at the instant the drag began. The sheet is grabbable while it is
   // still animating (opening, or sliding away after an overlay tap), so the drag
@@ -271,8 +339,7 @@ export default function ModalShell({
             velocity,
             // The card is out of sight long before the spring mathematically
             // settles, so finish on "off-screen" rather than on the tail.
-            restDisplacementThreshold: 40,
-            restSpeedThreshold: 100,
+            ...exitRestOptions(),
           }).start(({ finished }) => {
             // Leave translateY at screen height — no reset to avoid close flicker
             if (finished) onDismissRef.current?.();
@@ -312,6 +379,8 @@ export default function ModalShell({
               <Pressable
                 style={[styles.card, { backgroundColor: colors.card, maxHeight: Dimensions.get('window').height * 0.88 }]}
                 onPress={() => {}}
+                onLayout={handleCardLayout}
+                testID="modal-shell-card"
               >
                 {/* Drag zone: handle + header — touch here to dismiss by dragging down */}
                 <View {...panResponder.panHandlers}>

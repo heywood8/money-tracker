@@ -1,5 +1,5 @@
 import { useEffect } from 'react';
-import { useAppBlur } from '../contexts/AppBlurContext';
+import { useAppBlurControls } from '../contexts/AppBlurContext';
 
 /**
  * Place this component conditionally outside a Modal to activate
@@ -12,7 +12,7 @@ import { useAppBlur } from '../contexts/AppBlurContext';
  * the app content — the only place on Android where blur works.
  */
 export default function ModalBlurOverlay() {
-  const { increment, decrement } = useAppBlur();
+  const { increment, decrement } = useAppBlurControls();
 
   useEffect(() => {
     increment();
