@@ -1,5 +1,12 @@
 # Changelog
 
+## [0.278.2](https://github.com/heywood8/money-tracker/compare/penny-v0.278.1...penny-v0.278.2) (2026-08-26)
+
+
+### Bug Fixes
+
+* **operations:** clear the modal blur when the sheet leaves, not half a second later ([#1660](https://github.com/heywood8/money-tracker/issues/1660)) ([df467d0](https://github.com/heywood8/money-tracker/commit/df467d0e4fb51823815b1a494e634c3589480379))
+
 ## [0.278.1](https://github.com/heywood8/money-tracker/compare/penny-v0.278.0...penny-v0.278.1) (2026-08-25)
 
 
