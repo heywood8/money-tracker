@@ -33,6 +33,7 @@ import useExpenseData from '../hooks/useExpenseData';
 import useIncomeData from '../hooks/useIncomeData';
 import useCategoryOperations from '../hooks/useCategoryOperations';
 import useBalanceHistory from '../hooks/useBalanceHistory';
+import { NET_WORTH_ACCOUNT_ID, isNetWorthSelection } from '../services/BalanceHistorySource';
 import OperationModal from '../modals/OperationModal';
 import { CARD_SURFACE } from '../styles/componentStyles';
 
@@ -157,7 +158,10 @@ const GraphsScreen = () => {
     handleCancelEdit,
     handleSaveBalance,
     handleDeleteBalance,
-  } = useBalanceHistory(selectedAccount, selectedYear, selectedMonth);
+  } = useBalanceHistory(selectedAccount, selectedYear, selectedMonth, {
+    accounts,
+    targetCurrency: selectedCurrency,
+  });
 
   // Phase 2: apply the pending category change after the old component has
   // re-rendered with the correct exiting prop (useLayoutEffect fires before paint)
@@ -225,16 +229,29 @@ const GraphsScreen = () => {
     }
   }, [accounts, selectedCurrency]);
 
+  // Whether the balance card offers the net-worth line at all. With a single
+  // account it would just redraw that account, so it only appears once there is
+  // more than one thing to add up.
+  const netWorthAvailable = accounts.length > 1;
+
   // Initialize default account (display_order=0, non-hidden)
   useEffect(() => {
     const visibleAccounts = accounts.filter(acc => !acc.hidden);
+    if (isNetWorthSelection(selectedAccount)) {
+      // Deleting accounts down to one takes the option away; fall back to a real
+      // account rather than leaving the card charting a selection that is gone.
+      if (!netWorthAvailable) {
+        setSelectedAccount(visibleAccounts[0]?.id ?? null);
+      }
+      return;
+    }
     if (visibleAccounts.length > 0 && !selectedAccount) {
       const defaultAccount = visibleAccounts.find(acc => acc.displayOrder === 0) || visibleAccounts[0];
       setSelectedAccount(defaultAccount.id);
     } else if (visibleAccounts.length === 0 && selectedAccount) {
       setSelectedAccount(null);
     }
-  }, [accounts, selectedAccount]);
+  }, [accounts, selectedAccount, netWorthAvailable]);
 
   // Load categories function
   const loadCategories = useCallback(async () => {
@@ -313,8 +330,11 @@ const GraphsScreen = () => {
   // `[]` on every run would re-render, and since `currencies` gets a new identity
   // whenever `accounts` does, that render would re-fire this effect — an infinite
   // loop. Returning `prev` when already empty lets React bail out.
+  // The net-worth line converts every account into the display currency whether
+  // or not the pie charts are set to convert, so it needs the same warning.
+  const conversionInUse = convertAllCurrencies || isNetWorthSelection(selectedAccount);
   useEffect(() => {
-    if (!convertAllCurrencies || !selectedCurrency) {
+    if (!conversionInUse || !selectedCurrency) {
       setUnconvertedCurrencies(prev => (prev.length === 0 ? prev : []));
       return;
     }
@@ -323,15 +343,15 @@ const GraphsScreen = () => {
       .then(list => { if (!cancelled) setUnconvertedCurrencies(list); })
       .catch(() => { if (!cancelled) setUnconvertedCurrencies(prev => (prev.length === 0 ? prev : [])); });
     return () => { cancelled = true; };
-  }, [convertAllCurrencies, selectedCurrency, currencies]);
+  }, [conversionInUse, selectedCurrency, currencies]);
 
   const [currencySheetVisible, setCurrencySheetVisible] = useState(false);
   const handleOpenCurrencyPicker = useCallback(() => setCurrencySheetVisible(true), []);
   const handleCloseCurrencyPicker = useCallback(() => setCurrencySheetVisible(false), []);
   const handleToggleConvert = useCallback(() => setConvertAllCurrencies(v => !v), []);
 
-  const accountItems = useMemo(() =>
-    accounts
+  const accountItems = useMemo(() => {
+    const items = accounts
       .filter(acc => !acc.hidden)
       .map(acc => {
         const currencyInfo = currenciesJson[acc.currency];
@@ -341,9 +361,18 @@ const GraphsScreen = () => {
           value: acc.id,
           subLabel: `${symbol}${formatAmount(acc.balance, acc.currency)}`,
         };
-      }),
-  [accounts],
-  );
+      });
+    // First in the list, above the individual accounts: everything at once, as a
+    // single line in the display currency.
+    if (netWorthAvailable) {
+      items.unshift({
+        label: t('net_worth'),
+        value: NET_WORTH_ACCOUNT_ID,
+        subLabel: `${t('all_accounts')} · ${selectedCurrency}`,
+      });
+    }
+    return items;
+  }, [accounts, netWorthAvailable, selectedCurrency, t]);
 
   // Human-readable name of the selected period. It is both the header's title
   // and the scope named by surfaces further down (the heatmap header), so there
@@ -672,7 +701,7 @@ const GraphsScreen = () => {
         <ScrollView style={styles.scrollView} contentContainerStyle={styles.scrollContent}>
           <View style={scrollContentStyle} testID="graphs-content">
             {/* Warn when some account currencies can't be converted to the selected one */}
-            {convertAllCurrencies && unconvertedCurrencies.length > 0 && (
+            {conversionInUse && unconvertedCurrencies.length > 0 && (
               <View style={[styles.convertWarning, { backgroundColor: colors.altRow, borderColor: colors.border }]}>
                 <Icon name="alert-outline" size={16} color={colors.mutedText} />
                 <Text style={[styles.convertWarningText, { color: colors.mutedText }]}>
@@ -828,6 +857,7 @@ const GraphsScreen = () => {
                 selectedYear={selectedYear}
                 selectedMonth={selectedMonth}
                 accounts={accounts}
+                netWorthCurrency={selectedCurrency}
                 spendingPrediction={spendingPrediction}
                 isCurrentMonth={isCurrentMonth}
                 closeLabel={t('close')}

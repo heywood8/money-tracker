@@ -1,6 +1,6 @@
-import { useState, useCallback, useEffect } from 'react';
-import { getBalanceHistory, getAccountBalanceOnOrBeforeDate, upsertBalanceHistory, deleteBalanceHistory, formatDate } from '../services/BalanceHistoryDB';
-import { getTotalExpenses, getTotalIncome, getTransferTotals, getMonthlyExpenseTotals } from '../services/OperationsDB';
+import { useState, useCallback, useEffect, useMemo, useRef } from 'react';
+import { upsertBalanceHistory, deleteBalanceHistory, formatDate } from '../services/BalanceHistoryDB';
+import { createBalanceHistorySource, isNetWorthSelection } from '../services/BalanceHistorySource';
 import { appEvents, EVENTS } from '../services/eventEmitter';
 
 // Median of a numeric list; even counts average the two middle values.
@@ -161,8 +161,49 @@ export const buildYearSeries = ({ historyRows, sampleDays, anchorBalance, maxDay
  *
  * `selectedMonth === null` means the whole-year view, which loads a separate,
  * coarser dataset (see loadYearHistory) rather than the day-by-day month one.
+ *
+ * `selectedAccount` may also be the net-worth sentinel (NET_WORTH_ACCOUNT_ID),
+ * which charts every account at once converted to `options.targetCurrency`. Every
+ * read below goes through the source object, so the two modes share one code path
+ * (see services/BalanceHistorySource).
+ *
+ * @param {string} selectedAccount - account id, or NET_WORTH_ACCOUNT_ID
+ * @param {number} selectedYear
+ * @param {number|null} selectedMonth
+ * @param {{accounts?: Array, targetCurrency?: string}} [options] - only read for
+ *   the net-worth selection
  */
-const useBalanceHistory = (selectedAccount, selectedYear, selectedMonth) => {
+const useBalanceHistory = (selectedAccount, selectedYear, selectedMonth, options = {}) => {
+  const { accounts, targetCurrency } = options;
+  const isNetWorth = isNetWorthSelection(selectedAccount);
+
+  // What the net-worth source is actually built from: which accounts take part and
+  // what currency each one is in. Balances move on every operation and never change
+  // the queries, so keying on them would reload the whole chart for nothing.
+  const accountsKey = useMemo(
+    () => (isNetWorth ? (accounts || []).map(acc => `${acc?.id}:${acc?.currency}`).join('|') : ''),
+    [isNetWorth, accounts],
+  );
+  const accountsRef = useRef(accounts);
+  accountsRef.current = accounts;
+  // A single account is charted in its own currency, so switching the screen's
+  // display currency must not rebuild its source and reload the whole chart.
+  const sourceCurrency = isNetWorth ? targetCurrency : null;
+  const source = useMemo(
+    // The account list is read through the ref: a re-rendered context handing back
+    // an equal-but-new array must not rebuild the source and re-run every query.
+    () => createBalanceHistorySource(selectedAccount, {
+      accounts: accountsRef.current,
+      targetCurrency: sourceCurrency,
+    }),
+    [selectedAccount, sourceCurrency, accountsKey],
+  );
+
+  // Which load is allowed to publish its results. A net-worth load fans out over
+  // every account and can wait on a live exchange rate, so a slower earlier load
+  // could otherwise land after a newer one and paint the wrong series (worse: one
+  // portfolio's totals under a single account's currency symbol).
+  const loadSeqRef = useRef(0);
   const [balanceHistoryData, setBalanceHistoryData] = useState({ labels: [] });
   // Start in the loading state so the first render shows a spinner instead of a
   // momentary "no data" flash before loadBalanceHistory() runs (QoL-11). The
@@ -200,6 +241,7 @@ const useBalanceHistory = (selectedAccount, selectedYear, selectedMonth) => {
   // zero describes nothing) and no forecast (the month's prediction has no
   // year-scale counterpart).
   const loadYearHistory = useCallback(async () => {
+    const seq = ++loadSeqRef.current;
     try {
       setLoadingBalanceHistory(true);
 
@@ -227,13 +269,13 @@ const useBalanceHistory = (selectedAccount, selectedYear, selectedMonth) => {
         prevAnchorBalance,
         prevYearTotalExpenses,
       ] = await Promise.all([
-        getBalanceHistory(selectedAccount, startDateStr, endDateStr),
-        getBalanceHistory(selectedAccount, prevStartDateStr, prevEndDateStr),
+        source.getHistory(startDateStr, endDateStr),
+        source.getHistory(prevStartDateStr, prevEndDateStr),
         // Balance carried in from before Jan 1, so a year whose first snapshot
         // lands in March still starts at a real number instead of a gap.
-        getAccountBalanceOnOrBeforeDate(selectedAccount, startDateStr),
-        getAccountBalanceOnOrBeforeDate(selectedAccount, prevStartDateStr),
-        getTotalExpenses(selectedAccount, prevStartDateStr, prevEndDateStr),
+        source.getAnchorBalance(startDateStr),
+        source.getAnchorBalance(prevStartDateStr),
+        source.getTotalExpenses(prevStartDateStr, prevEndDateStr),
       ]);
 
       const actualForChart = buildYearSeries({
@@ -259,6 +301,8 @@ const useBalanceHistory = (selectedAccount, selectedYear, selectedMonth) => {
           : { x: day, y: actualForChart[index] }))
         .filter(Boolean);
 
+      if (seq !== loadSeqRef.current) return; // superseded mid-flight
+
       setBalanceHistoryData({
         granularity: 'year',
         labels: sampleDays,
@@ -272,24 +316,30 @@ const useBalanceHistory = (selectedAccount, selectedYear, selectedMonth) => {
       });
     } catch (error) {
       console.error('Failed to load balance history:', error);
-      setBalanceHistoryData({ labels: [] });
+      if (seq === loadSeqRef.current) setBalanceHistoryData({ labels: [] });
     } finally {
-      setLoadingBalanceHistory(false);
+      if (seq === loadSeqRef.current) setLoadingBalanceHistory(false);
     }
-  }, [selectedAccount, selectedYear]);
+  }, [source, selectedYear]);
 
   // Load balance history data
   const loadBalanceHistory = useCallback(async () => {
     if (!selectedAccount) {
+      // Bump the sequence too: an in-flight load must not repaint over the empty
+      // state the caller just asked for.
+      loadSeqRef.current++;
       setBalanceHistoryData({ labels: [] });
       setLoadingBalanceHistory(false);
       return;
     }
 
     if (selectedMonth === null) {
+      // loadYearHistory takes its own sequence number; nothing is published here.
       await loadYearHistory();
       return;
     }
+
+    const seq = ++loadSeqRef.current;
 
     try {
       setLoadingBalanceHistory(true);
@@ -343,16 +393,16 @@ const useBalanceHistory = (selectedAccount, selectedYear, selectedMonth) => {
         incomeAfterDay1,
         yearMonthlyExpenses,
       ] = await Promise.all([
-        getBalanceHistory(selectedAccount, startDateStr, endDateStr),
+        source.getHistory(startDateStr, endDateStr),
         // One read covers both comparison lines: the previous month is just the
         // tail of the 12-month window, sliced out below instead of re-queried.
-        getBalanceHistory(selectedAccount, yearWindowStartStr, prevEndDateStr),
-        getTotalExpenses(selectedAccount, prevStartDateStr, prevEndDateStr),
-        getTotalExpenses(selectedAccount, startDateStr, expenseEndStr),
-        getAccountBalanceOnOrBeforeDate(selectedAccount, startDateStr),
-        getTransferTotals(selectedAccount, secondDayStr, endDateStr),
-        getTotalIncome(selectedAccount, secondDayStr, endDateStr),
-        getMonthlyExpenseTotals(selectedAccount, yearWindowStartStr, prevEndDateStr),
+        source.getHistory(yearWindowStartStr, prevEndDateStr),
+        source.getTotalExpenses(prevStartDateStr, prevEndDateStr),
+        source.getTotalExpenses(startDateStr, expenseEndStr),
+        source.getAnchorBalance(startDateStr),
+        source.getTransferTotals(secondDayStr, endDateStr),
+        source.getTotalIncome(secondDayStr, endDateStr),
+        source.getMonthlyExpenseTotals(yearWindowStartStr, prevEndDateStr),
       ]);
 
       const prevMonthKey = `${prevYear}-${String(prevMonth + 1).padStart(2, '0')}`;
@@ -504,6 +554,8 @@ const useBalanceHistory = (selectedAccount, selectedYear, selectedMonth) => {
         daysInMonth,
       });
 
+      if (seq !== loadSeqRef.current) return; // superseded mid-flight
+
       setBalanceHistoryData({
         actual: actualData,
         actualForChart: actualForChart,
@@ -520,15 +572,18 @@ const useBalanceHistory = (selectedAccount, selectedYear, selectedMonth) => {
       });
     } catch (error) {
       console.error('Failed to load balance history:', error);
-      setBalanceHistoryData({ labels: [] });
+      if (seq === loadSeqRef.current) setBalanceHistoryData({ labels: [] });
     } finally {
-      setLoadingBalanceHistory(false);
+      if (seq === loadSeqRef.current) setLoadingBalanceHistory(false);
     }
-  }, [selectedAccount, selectedYear, selectedMonth, loadYearHistory]);
+  }, [source, selectedYear, selectedMonth, loadYearHistory]);
 
   // Open balance history modal with table data
+  // The calendar grid is an editing surface for one account's snapshots, so the
+  // net-worth selection — a sum with no row of its own to write back to — has
+  // none (the card hides the toggle for it too).
   const loadBalanceHistoryTable = useCallback(async () => {
-    if (!selectedAccount || selectedMonth === null) return null;
+    if (!selectedAccount || selectedMonth === null || isNetWorth) return null;
 
     try {
       // Calculate start and end dates for the selected month
@@ -540,7 +595,7 @@ const useBalanceHistory = (selectedAccount, selectedYear, selectedMonth) => {
       const endDateStr = formatDate(endDate);
 
       // Get balance history from database
-      const history = await getBalanceHistory(selectedAccount, startDateStr, endDateStr);
+      const history = await source.getHistory(startDateStr, endDateStr);
 
       // Create map of existing balances
       const balanceByDate = {};
@@ -566,7 +621,7 @@ const useBalanceHistory = (selectedAccount, selectedYear, selectedMonth) => {
       console.error('Failed to load balance history table:', error);
       return null;
     }
-  }, [selectedAccount, selectedYear, selectedMonth]);
+  }, [selectedAccount, isNetWorth, source, selectedYear, selectedMonth]);
 
   // Start editing a balance row
   const handleEditBalance = useCallback((date, currentBalance) => {
@@ -582,7 +637,7 @@ const useBalanceHistory = (selectedAccount, selectedYear, selectedMonth) => {
 
   // Save edited balance
   const handleSaveBalance = useCallback(async (date) => {
-    if (!selectedAccount || !editingBalanceValue) return;
+    if (!selectedAccount || isNetWorth || !editingBalanceValue) return;
 
     try {
       await upsertBalanceHistory(selectedAccount, date, editingBalanceValue);
@@ -602,11 +657,11 @@ const useBalanceHistory = (selectedAccount, selectedYear, selectedMonth) => {
     } catch (error) {
       console.error('Failed to save balance:', error);
     }
-  }, [selectedAccount, editingBalanceValue, loadBalanceHistory]);
+  }, [selectedAccount, isNetWorth, editingBalanceValue, loadBalanceHistory]);
 
   // Delete balance entry
   const handleDeleteBalance = useCallback(async (date) => {
-    if (!selectedAccount) return;
+    if (!selectedAccount || isNetWorth) return;
 
     try {
       await deleteBalanceHistory(selectedAccount, date);
@@ -623,7 +678,7 @@ const useBalanceHistory = (selectedAccount, selectedYear, selectedMonth) => {
     } catch (error) {
       console.error('Failed to delete balance:', error);
     }
-  }, [selectedAccount, loadBalanceHistory]);
+  }, [selectedAccount, isNetWorth, loadBalanceHistory]);
 
   // Listen for operation changes and reload balance history
   useEffect(() => {

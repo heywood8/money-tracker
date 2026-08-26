@@ -110,6 +110,127 @@ describe('BalanceHistoryDB', () => {
     });
   });
 
+  describe('getBalanceHistoryForAccounts', () => {
+    it('reads every account in one query and buckets the rows by account', async () => {
+      queryAll.mockResolvedValue([
+        { account_id: 1, date: '2024-01-01', balance: '1000.00' },
+        { account_id: 2, date: '2024-01-01', balance: '50.00' },
+        { account_id: 1, date: '2024-01-05', balance: '900.00' },
+      ]);
+
+      const result = await BalanceHistoryDB.getBalanceHistoryForAccounts([1, 2], '2024-01-01', '2024-01-31');
+
+      expect(queryAll).toHaveBeenCalledTimes(1);
+      expect(queryAll).toHaveBeenCalledWith(
+        expect.stringContaining('account_id IN (?, ?)'),
+        [1, 2, '2024-01-01', '2024-01-31'],
+      );
+      expect(result.get('1')).toEqual([
+        { date: '2024-01-01', balance: '1000.00' },
+        { date: '2024-01-05', balance: '900.00' },
+      ]);
+      expect(result.get('2')).toEqual([{ date: '2024-01-01', balance: '50.00' }]);
+    });
+
+    it('keys the map by string id, so a caller holding string ids still matches', async () => {
+      queryAll.mockResolvedValue([{ account_id: 7, date: '2024-01-01', balance: '10.00' }]);
+
+      const result = await BalanceHistoryDB.getBalanceHistoryForAccounts(['7'], '2024-01-01', '2024-01-31');
+
+      expect(result.get('7')).toEqual([{ date: '2024-01-01', balance: '10.00' }]);
+    });
+
+    it('gives an account with no rows an empty list rather than omitting it', async () => {
+      queryAll.mockResolvedValue([]);
+
+      const result = await BalanceHistoryDB.getBalanceHistoryForAccounts([1, 2], '2024-01-01', '2024-01-31');
+
+      expect(result.get('1')).toEqual([]);
+      expect(result.get('2')).toEqual([]);
+    });
+
+    it('does not query at all for an empty account list', async () => {
+      const result = await BalanceHistoryDB.getBalanceHistoryForAccounts([], '2024-01-01', '2024-01-31');
+
+      expect(queryAll).not.toHaveBeenCalled();
+      expect(result.size).toBe(0);
+    });
+
+    it('normalises date comparisons with SQLite date() (#773)', async () => {
+      queryAll.mockResolvedValue([]);
+
+      await BalanceHistoryDB.getBalanceHistoryForAccounts([1], '2024-01-01', '2024-01-31');
+
+      const sql = queryAll.mock.calls[0][0];
+      expect(sql).toMatch(/date\(date\)\s*>=\s*date\(\?\)/);
+      expect(sql).toMatch(/date\(date\)\s*<=\s*date\(\?\)/);
+    });
+
+    it('throws on database failure', async () => {
+      const consoleSpy = jest.spyOn(console, 'error').mockImplementation(() => {});
+      queryAll.mockRejectedValue(new Error('DB error'));
+
+      await expect(BalanceHistoryDB.getBalanceHistoryForAccounts([1], '2024-01-01', '2024-01-31'))
+        .rejects.toThrow('DB error');
+
+      consoleSpy.mockRestore();
+    });
+  });
+
+  describe('getAccountBalancesOnOrBeforeDate', () => {
+    it('returns each account latest balance on or before the date', async () => {
+      queryAll.mockResolvedValue([
+        { account_id: 1, balance: '1000.00' },
+        { account_id: 2, balance: '50.00' },
+      ]);
+
+      const result = await BalanceHistoryDB.getAccountBalancesOnOrBeforeDate([1, 2], '2024-01-01');
+
+      expect(queryAll).toHaveBeenCalledWith(
+        expect.stringContaining('MAX(date(h2.date))'),
+        [1, 2, '2024-01-01'],
+      );
+      expect(result.get('1')).toBe('1000.00');
+      expect(result.get('2')).toBe('50.00');
+    });
+
+    it('reports an account with no snapshot as null', async () => {
+      queryAll.mockResolvedValue([{ account_id: 1, balance: '1000.00' }]);
+
+      const result = await BalanceHistoryDB.getAccountBalancesOnOrBeforeDate([1, 2], '2024-01-01');
+
+      expect(result.get('2')).toBeNull();
+    });
+
+    it('keeps the first row when one day carries a duplicate (imported) snapshot', async () => {
+      queryAll.mockResolvedValue([
+        { account_id: 1, balance: '1000.00' },
+        { account_id: 1, balance: '999.00' },
+      ]);
+
+      const result = await BalanceHistoryDB.getAccountBalancesOnOrBeforeDate([1], '2024-01-01');
+
+      expect(result.get('1')).toBe('1000.00');
+    });
+
+    it('does not query at all for an empty account list', async () => {
+      const result = await BalanceHistoryDB.getAccountBalancesOnOrBeforeDate([], '2024-01-01');
+
+      expect(queryAll).not.toHaveBeenCalled();
+      expect(result.size).toBe(0);
+    });
+
+    it('throws on database failure', async () => {
+      const consoleSpy = jest.spyOn(console, 'error').mockImplementation(() => {});
+      queryAll.mockRejectedValue(new Error('DB error'));
+
+      await expect(BalanceHistoryDB.getAccountBalancesOnOrBeforeDate([1], '2024-01-01'))
+        .rejects.toThrow('DB error');
+
+      consoleSpy.mockRestore();
+    });
+  });
+
   describe('getAllAccountsBalanceOnDate', () => {
     it('returns all accounts balances for a specific date', async () => {
       const mockBalances = [
