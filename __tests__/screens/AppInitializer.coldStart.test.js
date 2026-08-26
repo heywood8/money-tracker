@@ -29,7 +29,11 @@ jest.mock('../../app/contexts/UpdateDownloadContext', () => ({
 }));
 
 jest.mock('../../app/contexts/AppBlurContext', () => ({
-  useAppBlur: jest.fn(() => ({ blurCount: 0 })),
+  useAppBlurControls: jest.fn(() => ({
+    increment: jest.fn(),
+    decrement: jest.fn(),
+    blurCountRef: { current: 0 },
+  })),
 }));
 
 jest.mock('../../app/hooks/useSqliteFileImport', () => ({ useSqliteFileImport: jest.fn() }));

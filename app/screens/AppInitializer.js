@@ -13,7 +13,7 @@ import { useSqliteFileImport } from '../hooks/useSqliteFileImport';
 import useNotificationResponseRouter from '../hooks/useNotificationResponseRouter';
 import { syncBackgroundBankTaskRegistrationAsync } from '../services/notifications/backgroundBankTask';
 import { registerAcknowledgeTaskAsync } from '../services/notifications/acknowledgeTask';
-import { useAppBlur } from '../contexts/AppBlurContext';
+import { useAppBlurControls } from '../contexts/AppBlurContext';
 import { getPreference, setPreference, PREF_KEYS } from '../services/PreferencesDB';
 import UpdateAvailableModal from '../modals/UpdateAvailableModal';
 import ColdStartScreen, { hasColdStartPlayed } from '../components/startup/ColdStartScreen';
@@ -34,7 +34,12 @@ const AppInitializer = () => {
   const { colors } = useThemeColors();
   const { showDialog } = useDialog();
   const { startDownload, isDownloading } = useUpdateDownload();
-  const { blurCount } = useAppBlur();
+  // Whether any blur-backed modal (operation editor, pickers, dialogs) is open. The
+  // update prompt must not pop over an in-progress task, so we hold off while this is
+  // set. Read through the ref rather than subscribing to the count: a modal opening or
+  // closing would otherwise re-render this component — and SimpleTabs with it — at the
+  // exact frame the blur is applied or removed.
+  const { blurCountRef } = useAppBlurControls();
   const [isInitializing, setIsInitializing] = useState(false);
   const [pendingUpdate, setPendingUpdate] = useState(null);
   // The cold-start screen covers the first database reads of a launch. It is
@@ -60,9 +65,6 @@ const AppInitializer = () => {
   const pendingUpdateRef = useRef(null);
   const isDownloadingRef = useRef(false);
   const isCheckingRef = useRef(false);
-  // Whether any blur-backed modal (operation editor, pickers, dialogs) is open. The update
-  // prompt must not pop over an in-progress task, so we hold off while this is set.
-  const blurCountRef = useRef(0);
 
   useEffect(() => {
     pendingUpdateRef.current = pendingUpdate;
@@ -71,10 +73,6 @@ const AppInitializer = () => {
   useEffect(() => {
     isDownloadingRef.current = isDownloading;
   }, [isDownloading]);
-
-  useEffect(() => {
-    blurCountRef.current = blurCount;
-  }, [blurCount]);
 
   // Load the persisted "Later" snooze once so a restart within the snooze window doesn't
   // re-nag for a version the user already deferred.
@@ -194,7 +192,7 @@ const AppInitializer = () => {
       clearInterval(intervalId);
       subscription.remove();
     };
-  }, [isFirstLaunch]);
+  }, [isFirstLaunch, blurCountRef]);
 
   // Process any bank notifications captured while the app was backgrounded.
   // Runs once on open and again whenever the app returns to the foreground.

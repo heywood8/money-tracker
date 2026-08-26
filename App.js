@@ -5,6 +5,7 @@ initSentry();
 import * as SplashScreen from 'expo-splash-screen';
 SplashScreen.preventAutoHideAsync().catch(() => {});
 import React from 'react';
+import PropTypes from 'prop-types';
 import AppInitializer from './app/screens/AppInitializer';
 import { ThemeConfigProvider } from './app/contexts/ThemeConfigContext';
 import { ThemeColorsProvider } from './app/contexts/ThemeColorsContext';
@@ -19,7 +20,7 @@ import { LocalizationProvider } from './app/contexts/LocalizationContext';
 import { DialogProvider } from './app/contexts/DialogContext';
 import { ImportProgressProvider } from './app/contexts/ImportProgressContext';
 import { UpdateDownloadProvider } from './app/contexts/UpdateDownloadContext';
-import { AppBlurProvider, useAppBlur } from './app/contexts/AppBlurContext';
+import { AppBlurProvider, useAppBlurState } from './app/contexts/AppBlurContext';
 import { OverlayHostProvider, OverlayOutlet, useOverlayHost } from './app/contexts/OverlayHostContext';
 import { DisplaySettingsProvider } from './app/contexts/DisplaySettingsContext';
 import { SearchProvider } from './app/contexts/SearchContext';
@@ -49,9 +50,33 @@ function ThemedStatusBar() {
   return <StatusBar translucent={false} />;
 }
 
+// The only subscriber to the blur count, deliberately: a modal opening or
+// closing re-renders this wrapper and nothing else. `children` arrives as an
+// element built by AppContent (which does not subscribe), so its reference is
+// unchanged and React skips the whole app subtree — otherwise applying and
+// removing the blur dragged a full re-render of the tree along with it, and the
+// blur visibly outlived the modal that asked for it.
+function BlurHost({ hostRef, children }) {
+  const blurCount = useAppBlurState();
+
+  return (
+    <View
+      ref={hostRef}
+      collapsable={false}
+      style={[styles.container, blurCount > 0 && styles.blurred]}
+    >
+      {children}
+    </View>
+  );
+}
+
+BlurHost.propTypes = {
+  hostRef: PropTypes.oneOfType([PropTypes.func, PropTypes.object]),
+  children: PropTypes.node,
+};
+
 function AppContent() {
   const paperTheme = useMaterialTheme();
-  const { blurCount } = useAppBlur();
   const { hostRef } = useOverlayHost();
 
   // The content view and the overlay outlet are siblings filling the same parent, so
@@ -61,15 +86,11 @@ function AppContent() {
   return (
     <PaperProvider theme={paperTheme}>
       <View style={styles.container}>
-        <View
-          ref={hostRef}
-          collapsable={false}
-          style={[styles.container, blurCount > 0 && styles.blurred]}
-        >
+        <BlurHost hostRef={hostRef}>
           <ThemedStatusBar />
           <AppInitializer />
           <ImportProgressModal />
-        </View>
+        </BlurHost>
         <OverlayOutlet />
       </View>
     </PaperProvider>

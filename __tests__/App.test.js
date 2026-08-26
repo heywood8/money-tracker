@@ -74,7 +74,12 @@ jest.mock('../app/contexts/UpdateDownloadContext', () => ({
 
 jest.mock('../app/contexts/AppBlurContext', () => ({
   AppBlurProvider: ({ children }) => children,
-  useAppBlur: jest.fn(() => ({ blurCount: 0, increment: jest.fn(), decrement: jest.fn() })),
+  useAppBlurState: jest.fn(() => 0),
+  useAppBlurControls: jest.fn(() => ({
+    increment: jest.fn(),
+    decrement: jest.fn(),
+    blurCountRef: { current: 0 },
+  })),
 }));
 
 // Mock ErrorBoundary
@@ -372,18 +377,34 @@ describe('App', () => {
   });
 
   describe('Blur overlay', () => {
-    it('applies blurred style when blurCount is greater than 0', async () => {
-      const AppBlurContext = require('../app/contexts/AppBlurContext');
-      AppBlurContext.useAppBlur.mockReturnValueOnce({
-        blurCount: 1,
-        increment: jest.fn(),
-        decrement: jest.fn(),
-      });
+    // The blur is a `filter` on the view wrapping the whole app; nothing else in
+    // the tree sets one, so its presence is what "the app is blurred" means.
+    const isBlurred = (node) => {
+      if (!node || typeof node !== 'object') return false;
+      const style = node.props?.style;
+      const applied = (Array.isArray(style) ? style.flat(Infinity) : [style]);
+      if (applied.some((entry) => entry && entry.filter)) return true;
+      return (node.children || []).some(isBlurred);
+    };
 
-      const { toJSON } = await render(<App />);
-      await waitFor(() => {
-        expect(toJSON()).toBeTruthy();
-      });
+    const withBlurCount = async (count, assert) => {
+      const AppBlurContext = require('../app/contexts/AppBlurContext');
+      AppBlurContext.useAppBlurState.mockReturnValue(count);
+      try {
+        const { toJSON } = await render(<App />);
+        await waitFor(() => { expect(toJSON()).toBeTruthy(); });
+        assert(toJSON());
+      } finally {
+        AppBlurContext.useAppBlurState.mockReturnValue(0);
+      }
+    };
+
+    it('applies blurred style when blurCount is greater than 0', async () => {
+      await withBlurCount(1, (tree) => { expect(isBlurred(tree)).toBe(true); });
+    });
+
+    it('leaves the app unblurred while no modal is asking for it', async () => {
+      await withBlurCount(0, (tree) => { expect(isBlurred(tree)).toBe(false); });
     });
   });
 });
