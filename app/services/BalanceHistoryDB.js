@@ -229,6 +229,93 @@ export const getBalanceHistory = async (accountId, startDate, endDate) => {
 };
 
 /**
+ * Get balance history for several accounts at once, bucketed by account.
+ *
+ * The net-worth line needs every account's snapshots for the same window; asking
+ * per account costs one query each, and the 12-month comparison window makes that
+ * the heaviest read on the Graphs screen. One `IN` query answers for all of them.
+ *
+ * Account ids come back from SQLite as the column's own integer type, so the map
+ * is keyed by their string form — callers hold ids that may be either.
+ *
+ * @param {Array<number|string>} accountIds
+ * @param {string} startDate - YYYY-MM-DD format
+ * @param {string} endDate - YYYY-MM-DD format
+ * @returns {Promise<Map<string, Array<{date: string, balance: string}>>>} one entry
+ *   per requested account (empty array when it has no rows), ascending by date
+ */
+export const getBalanceHistoryForAccounts = async (accountIds, startDate, endDate) => {
+  const ids = [...new Set((accountIds || []).filter(id => id !== null && id !== undefined))];
+  const byAccount = new Map(ids.map(id => [String(id), []]));
+  if (ids.length === 0) return byAccount;
+
+  try {
+    const placeholders = ids.map(() => '?').join(', ');
+    const results = await queryAll(
+      `SELECT account_id, date, balance
+       FROM accounts_balance_history
+       WHERE account_id IN (${placeholders})
+         AND date(date) >= date(?) -- date() normalises non-ISO formats from CSV import (#773)
+         AND date(date) <= date(?)
+       ORDER BY date ASC`,
+      [...ids, startDate, endDate],
+    );
+    (results || []).forEach((row) => {
+      const key = String(row.account_id);
+      if (!byAccount.has(key)) byAccount.set(key, []);
+      byAccount.get(key).push({ date: row.date, balance: row.balance });
+    });
+    return byAccount;
+  } catch (error) {
+    console.error('Failed to get balance history for accounts:', error);
+    throw error;
+  }
+};
+
+/**
+ * Each account's most recent balance snapshot on or before a date — the batched
+ * counterpart of {@link getAccountBalanceOnOrBeforeDate}, with the same
+ * carried-forward semantics and the same null for "no snapshot at all".
+ *
+ * @param {Array<number|string>} accountIds
+ * @param {string} date - YYYY-MM-DD format
+ * @returns {Promise<Map<string, string|null>>} account id (as string) → balance
+ */
+export const getAccountBalancesOnOrBeforeDate = async (accountIds, date) => {
+  const ids = [...new Set((accountIds || []).filter(id => id !== null && id !== undefined))];
+  const byAccount = new Map(ids.map(id => [String(id), null]));
+  if (ids.length === 0) return byAccount;
+
+  try {
+    const placeholders = ids.map(() => '?').join(', ');
+    // The correlated MAX picks each account's latest calendar day in one pass.
+    // A day carrying both a plain and a timestamped row (a CSV import over a live
+    // snapshot, #773) matches twice; the first row wins, as LIMIT 1 does in the
+    // single-account query.
+    const results = await queryAll(
+      `SELECT h.account_id, h.balance
+       FROM accounts_balance_history h
+       WHERE h.account_id IN (${placeholders})
+         AND date(h.date) = (
+           SELECT MAX(date(h2.date))
+           FROM accounts_balance_history h2
+           WHERE h2.account_id = h.account_id
+             AND date(h2.date) <= date(?)
+         )`,
+      [...ids, date],
+    );
+    (results || []).forEach((row) => {
+      const key = String(row.account_id);
+      if (byAccount.get(key) === null) byAccount.set(key, row.balance);
+    });
+    return byAccount;
+  } catch (error) {
+    console.error('Failed to get account balances on or before date:', error);
+    throw error;
+  }
+};
+
+/**
  * Get all accounts' balances on a specific date
  *
  * @param {string} date - YYYY-MM-DD format

@@ -23,6 +23,7 @@ import SimplePicker from '../SimplePicker';
 import currencies from '../../../assets/currencies.json';
 import { useDisplaySettings } from '../../contexts/DisplaySettingsContext';
 import { getJsonPreference, setJsonPreference, PREF_KEYS } from '../../services/PreferencesDB';
+import { isNetWorthSelection } from '../../services/BalanceHistorySource';
 import { balanceLineColors } from '../../styles/chartPalette';
 import BalanceHistoryCalendarView from './BalanceHistoryCalendarView';
 import {
@@ -921,6 +922,7 @@ const BalanceHistoryCard = ({
   selectedYear,
   selectedMonth,
   accounts,
+  netWorthCurrency,
   spendingPrediction,
   isCurrentMonth,
   closeLabel,
@@ -1003,7 +1005,11 @@ const BalanceHistoryCard = ({
   // card cannot disagree with the data the hook loaded for the same period.
   const isYearView = selectedMonth === null;
   const granularity = isYearView ? 'year' : 'month';
-  const calendarVisible = showCalendar && !isYearView;
+  // The net-worth line is a sum across accounts, so there is no single snapshot
+  // behind a given day to edit — the calendar (an editing grid) is not offered
+  // for it, exactly as the year view doesn't offer it either.
+  const isNetWorth = isNetWorthSelection(selectedAccount);
+  const calendarVisible = showCalendar && !isYearView && !isNetWorth;
   // Each period reads its own remembered mode; the fallback still guards a value
   // that period no longer offers, so a stale 'yearAvg' can never leave the year
   // view with nothing drawn.
@@ -1012,7 +1018,9 @@ const BalanceHistoryCard = ({
   const effectiveThirdLine = thirdLineModes.includes(thirdLine) ? thirdLine : thirdLineModes[0];
 
   const selectedAccountData = accounts.find(acc => acc.id === selectedAccount);
-  const currency = selectedAccountData?.currency || 'USD';
+  // Net worth is expressed in the screen's display currency — the accounts it
+  // sums are in several, and the hook has already converted them all into it.
+  const currency = (isNetWorth ? netWorthCurrency : selectedAccountData?.currency) || 'USD';
   const currentBalance = balanceHistoryData.actual && balanceHistoryData.actual.length > 0
     ? balanceHistoryData.actual[balanceHistoryData.actual.length - 1].y
     : null;
@@ -1177,7 +1185,7 @@ const BalanceHistoryCard = ({
         )}
         {/* Calendar / Chart toggle. The calendar is a month grid, so the year
             view has nothing to switch to. */}
-        {!isYearView && balanceHistoryData.actual && balanceHistoryData.actual.length > 0 && (
+        {!isYearView && !isNetWorth && balanceHistoryData.actual && balanceHistoryData.actual.length > 0 && (
           <TouchableOpacity
             testID="calendar-toggle-btn"
             style={[styles.calendarToggleBtn, { backgroundColor: colors.surface }]}
@@ -1202,7 +1210,7 @@ const BalanceHistoryCard = ({
             onValueChange={onAccountChange}
             items={accountItems}
             colors={colors}
-            leftIcon="bank"
+            leftIcon={isNetWorth ? 'earth' : 'bank'}
             style={styles.accountPickerInner}
             closeLabel={closeLabel}
           />
@@ -1388,6 +1396,7 @@ BalanceHistoryCard.propTypes = {
   selectedYear: PropTypes.number.isRequired,
   selectedMonth: PropTypes.number,
   accounts: PropTypes.array.isRequired,
+  netWorthCurrency: PropTypes.string,
   spendingPrediction: PropTypes.shape({
     currentSpending: PropTypes.number,
     predictedTotal: PropTypes.number,
