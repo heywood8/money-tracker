@@ -1,5 +1,12 @@
 # Changelog
 
+## [0.279.0](https://github.com/heywood8/money-tracker/compare/penny-v0.278.2...penny-v0.279.0) (2026-08-27)
+
+
+### Features
+
+* **graphs:** chart balance history for total net worth ([#1662](https://github.com/heywood8/money-tracker/issues/1662)) ([81119ba](https://github.com/heywood8/money-tracker/commit/81119ba4134a76a47859597148deffb48ebf6cf7))
+
 ## [0.278.2](https://github.com/heywood8/money-tracker/compare/penny-v0.278.1...penny-v0.278.2) (2026-08-26)
 
 
