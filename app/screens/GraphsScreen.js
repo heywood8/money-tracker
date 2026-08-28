@@ -2,10 +2,11 @@ import React, { useState, useEffect, useLayoutEffect, useCallback, useMemo, useR
 import { View, Text, StyleSheet, ScrollView } from 'react-native';
 import Animated, { useSharedValue, useAnimatedStyle, withTiming, withDelay, interpolate, Easing, LinearTransition, SlideInLeft, SlideInRight, SlideOutLeft, SlideOutRight } from 'react-native-reanimated';
 import Icon from '@expo/vector-icons/MaterialCommunityIcons';
+import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { useThemeColors } from '../contexts/ThemeColorsContext';
 import { useLocalization } from '../contexts/LocalizationContext';
 import { useAccountsData } from '../contexts/AccountsDataContext';
-import { BORDER_RADIUS, FONT_SIZE, SPACING, TOP_CONTENT_SPACING } from '../styles/designTokens';
+import { BORDER_RADIUS, FONT_SIZE, SPACING, TAB_BAR_CLEARANCE, TOP_CONTENT_SPACING } from '../styles/designTokens';
 import { getUnconvertibleCurrencies } from '../services/OperationsDB';
 import { getAllCategories } from '../services/CategoriesDB';
 import { appEvents, EVENTS } from '../services/eventEmitter';
@@ -53,6 +54,7 @@ const PERIOD_TRANSITION_DURATION = 280;
 
 const GraphsScreen = () => {
   const { colors } = useThemeColors();
+  const insets = useSafeAreaInsets();
   const { t, language } = useLocalization();
   const { accounts } = useAccountsData();
 
@@ -629,6 +631,19 @@ const GraphsScreen = () => {
     [headerHeight],
   );
 
+  // And the matching clearance at the bottom, where the floating tab bar overlays
+  // the content the same way the header does. Only the bar: this tab renders no
+  // AddFAB, so the FAB clearance it used to copy from the tabs that do (a flat
+  // 180) was ~80px of scroll with nothing floating over it — the last card
+  // stopped well short of the bar and the screen kept scrolling into blank
+  // space. The inset is added here rather than baked into the constant because
+  // it is 0 with the navigation bar hidden and ~48px with three-button
+  // navigation.
+  const scrollContentBottomStyle = useMemo(
+    () => ({ paddingBottom: insets.bottom + TAB_BAR_CLEARANCE }),
+    [insets.bottom],
+  );
+
   // Chart heights are re-reported by onContentSizeChange whenever the content or
   // the available width changes, so rotation needs no special handling here.
   const panelAnimStyle = useAnimatedStyle(() => ({ height: panelHeight.value }));
@@ -698,7 +713,7 @@ const GraphsScreen = () => {
       {/* The scrolling layer as a whole is what belongs to the period, so it is
           what moves. */}
       <Animated.View style={[styles.contentLayer, periodTransitionStyle]} testID="graphs-period-transition">
-        <ScrollView style={styles.scrollView} contentContainerStyle={styles.scrollContent}>
+        <ScrollView style={styles.scrollView} contentContainerStyle={scrollContentBottomStyle} testID="graphs-scroll">
           <View style={scrollContentStyle} testID="graphs-content">
             {/* Warn when some account currencies can't be converted to the selected one */}
             {conversionInUse && unconvertedCurrencies.length > 0 && (
@@ -1020,9 +1035,6 @@ const styles = StyleSheet.create({
   convertWarningText: {
     flex: 1,
     fontSize: FONT_SIZE.sm,
-  },
-  scrollContent: {
-    paddingBottom: 180,
   },
   scrollView: {
     flex: 1,

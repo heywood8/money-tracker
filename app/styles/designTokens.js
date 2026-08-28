@@ -102,6 +102,30 @@ export const FONT_WEIGHT = {
 export const HORIZONTAL_PADDING = SPACING.lg; // 16px - screen horizontal gutters
 export const TOP_CONTENT_SPACING = SPACING.sm; // 12px - top margin for content
 
+// ============ SCROLL BOTTOM CLEARANCE ============
+/**
+ * Clearance a scrolling screen leaves below its last item so that item can be
+ * read and tapped instead of sitting under the floating tab bar, which overlays
+ * the content rather than displacing it.
+ *
+ * Measured ABOVE the bottom safe-area inset, so a caller adds its own:
+ *
+ *   contentContainerStyle={{ paddingBottom: insets.bottom + TAB_BAR_CLEARANCE }}
+ *
+ * The bar itself is a 60px row with a 12px bottom margin, sitting inside a
+ * bottom-edge SafeAreaView; the remaining 12px is breathing room, so the last
+ * item ends clear of the pill rather than flush against it. The inset is not
+ * folded in as a constant because it is 0 with the navigation bar hidden and
+ * ~48px with Android's three-button navigation — a fixed guess is either dead
+ * space on one and an overlap on the other.
+ *
+ * This is NOT the number for a screen that also renders <AddFAB />: the FAB
+ * floats above the bar (bottom: 100, HEIGHTS.fab tall) and needs more. Those
+ * screens carry their own larger padding — Graphs used to copy it despite
+ * rendering no FAB, which read as a strip of dead scroll under the last card.
+ */
+export const TAB_BAR_CLEARANCE = 84;
+
 // ============ ICON SIZES ============
 /**
  * Standardized icon sizes

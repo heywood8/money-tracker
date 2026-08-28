@@ -364,6 +364,41 @@ describe('GraphsScreen', () => {
       expect(padding.paddingTop).toBe(112); // 100 measured + SPACING.md
     });
 
+    // The other end of the same scroll. This tab has no FAB, so the last card
+    // only has to clear the floating tab bar; it used to carry the larger FAB
+    // clearance the Operations/Accounts/Categories/Budgets screens need, which
+    // read as a strip of empty scroll under the last card with nothing floating
+    // over it. The inset is part of it because the bar sits inside a
+    // bottom-edge SafeAreaView while the scrolling content does not — it is 0
+    // with the navigation bar hidden and ~48px with three-button navigation.
+    describe('bottom clearance', () => {
+      afterEach(() => {
+        jest.restoreAllMocks();
+      });
+
+      it.each([[0], [24], [48]])(
+        'clears the tab bar and a %ipx bottom inset below the last card',
+        async (bottom) => {
+          const safeArea = require('react-native-safe-area-context');
+          jest.spyOn(safeArea, 'useSafeAreaInsets')
+            .mockReturnValue({ top: 0, bottom, left: 0, right: 0 });
+
+          const GraphsScreen = require('../../app/screens/GraphsScreen').default;
+          const { StyleSheet } = require('react-native');
+          const { TAB_BAR_CLEARANCE } = require('../../app/styles/designTokens');
+
+          const { getByTestId } = await render(<GraphsScreen />);
+
+          const scroll = getByTestId('graphs-scroll');
+          const padding = StyleSheet.flatten(scroll.props.contentContainerStyle);
+
+          expect(padding.paddingBottom).toBe(bottom + TAB_BAR_CLEARANCE);
+          // Never the FAB clearance again: this tab renders no FAB.
+          expect(padding.paddingBottom).toBeLessThan(180);
+        },
+      );
+    });
+
     it('opens the period picker from the title and offers the whole year', async () => {
       const GraphsScreen = require('../../app/screens/GraphsScreen').default;
       const { useLocalization } = require('../../app/contexts/LocalizationContext');
