@@ -1,5 +1,12 @@
 # Changelog
 
+## [0.279.1](https://github.com/heywood8/money-tracker/compare/penny-v0.279.0...penny-v0.279.1) (2026-08-28)
+
+
+### Bug Fixes
+
+* **graphs:** stop reserving FAB clearance below the last card ([#1664](https://github.com/heywood8/money-tracker/issues/1664)) ([3ee1c02](https://github.com/heywood8/money-tracker/commit/3ee1c022a56a4c52a3e1ce4e0bee769dd1659021))
+
 ## [0.279.0](https://github.com/heywood8/money-tracker/compare/penny-v0.278.2...penny-v0.279.0) (2026-08-27)
 
 
