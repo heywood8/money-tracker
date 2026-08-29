@@ -430,12 +430,18 @@ describe('TrendsCard', () => {
       expect(within(vsRow).queryByTestId('trend-primary-selector')).toBeFalsy();
     });
 
-    it('carries the period on the section-label row', async () => {
+    it('stacks the card name and the period in a column beside the series', async () => {
       const { getByText } = await render(
         <TrendsCard {...defaultProps} />,
       );
 
-      expect(within(getByText('TRENDS').parent).getByText('this_month')).toBeTruthy();
+      const labelColumn = getByText('TRENDS').parent;
+
+      expect(within(labelColumn).getByText('this_month')).toBeTruthy();
+      // The selectors sit next to that column, not under it — a selector inside
+      // it would mean the header is back to stacking three rows.
+      expect(within(labelColumn).queryByTestId('trend-primary-selector')).toBeFalsy();
+      expect(within(labelColumn).queryByTestId('trend-vs-selector')).toBeFalsy();
     });
 
     it('offers no chart-mode toggle', async () => {
