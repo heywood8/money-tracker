@@ -802,89 +802,92 @@ const TrendsCard = ({
 
   return (
     <View style={[styles.card, { backgroundColor: colors.altRow, borderColor: colors.border }]}>
-      {/* The header is one column: each figure sits at the end of its own
-          series' row, so the number and the name it belongs to are read
-          together instead of across the card. Nothing stacks on the right. */}
+      {/* Two rows, not three: the label column names the card and the period
+          it is showing, and each series row beside it carries its own selector
+          with that series' figure at the card's right edge. */}
       <View style={styles.header}>
-        <View style={styles.labelRow}>
-          <Text style={[styles.sectionLabel, { color: colors.mutedText }]}>
+        <View style={styles.labelColumn}>
+          {/* Held to one line like the period below it: the column is capped, and
+              a name that wraps at a large OS font scale would grow the header on
+              the label side — the opposite of what this layout is for. */}
+          <Text style={[styles.sectionLabel, { color: colors.mutedText }]} numberOfLines={1}>
             {t('trends').toUpperCase()}
           </Text>
-          {/* The period rides the eyebrow line, which already exists — it costs
-              no height, and it labels both figures at once. The separator is its
-              own node so the period stays one uninterrupted string. */}
-          <Text style={[styles.periodLabel, { color: colors.mutedText }]}>{'\u00B7'}</Text>
+          {/* The period sits under the card's name rather than beside a figure:
+              it labels both of them, and it costs no row of its own here. */}
           <Text style={[styles.periodLabel, { color: colors.mutedText }]} numberOfLines={1}>
             {periodLabel}
           </Text>
         </View>
 
-        {/* Primary series: selector + its own total */}
-        <View style={styles.seriesRow}>
-          <TouchableOpacity
-            style={styles.categorySelector}
-            onPress={() => openPicker('primary')}
-            testID="trend-primary-selector"
-          >
-            {/* In vs mode the two rows need telling apart, so each carries the
-                mark of its series; the labels and figures stay in text ink. */}
-            {vs && (
-              <View style={[styles.seriesDot, { backgroundColor: seriesColor }]} />
-            )}
-            {primaryIcon && (
-              <Icon name={primaryIcon} size={18} color={colors.text} />
-            )}
-            <Text style={[styles.categoryName, { color: colors.text }]} numberOfLines={1}>
-              {primaryLabel}
-            </Text>
-            <Icon name="chevron-down" size={18} color={colors.mutedText} />
-          </TouchableOpacity>
-          {!hideBalances && (
-            <Text style={[styles.currentAmount, { color: colors.text }]} numberOfLines={1}>
-              {formatCurrency(displayedTotal, selectedCurrency)}
-            </Text>
-          )}
-        </View>
-
-        {/* VS series: selector + its own total */}
-        <View style={styles.vsRow}>
-          <TouchableOpacity
-            style={styles.vsSelector}
-            onPress={() => openPicker('vs')}
-            testID="trend-vs-selector"
-          >
-            {vs ? (
-              <>
-                <Text style={[styles.vsText, { color: colors.mutedText }]}>vs</Text>
-                <View style={[styles.seriesDot, { backgroundColor: vsColor }]} />
-                {vsIcon && (
-                  <Icon name={vsIcon} size={14} color={colors.text} />
-                )}
-                <Text style={[styles.vsCategoryName, { color: colors.text }]} numberOfLines={1}>
-                  {vsLabel}
-                </Text>
-              </>
-            ) : (
-              <>
-                <Icon name="plus-circle-outline" size={13} color={colors.mutedText} />
-                <Text style={[styles.vsText, { color: colors.mutedText }]}>vs</Text>
-              </>
-            )}
-          </TouchableOpacity>
-          {vs && (
+        <View style={styles.seriesColumn}>
+          {/* Primary series: selector + its own total */}
+          <View style={styles.seriesRow}>
             <TouchableOpacity
-              onPress={clearVsSeries}
-              hitSlop={{ top: 8, bottom: 8, left: 8, right: 8 }}
-              testID="trend-vs-clear"
+              style={styles.categorySelector}
+              onPress={() => openPicker('primary')}
+              testID="trend-primary-selector"
             >
-              <Icon name="close" size={14} color={colors.mutedText} />
+              {/* In vs mode the two rows need telling apart, so each carries the
+                  mark of its series; the labels and figures stay in text ink. */}
+              {vs && (
+                <View style={[styles.seriesDot, { backgroundColor: seriesColor }]} />
+              )}
+              {primaryIcon && (
+                <Icon name={primaryIcon} size={18} color={colors.text} />
+              )}
+              <Text style={[styles.categoryName, { color: colors.text }]} numberOfLines={1}>
+                {primaryLabel}
+              </Text>
+              <Icon name="chevron-down" size={18} color={colors.mutedText} />
             </TouchableOpacity>
-          )}
-          {vs && !hideBalances && (
-            <Text style={[styles.vsAmount, { color: colors.text }]} numberOfLines={1}>
-              {vsLoading ? '...' : formatCurrency(vsDisplayedTotal, selectedCurrency)}
-            </Text>
-          )}
+            {!hideBalances && (
+              <Text style={[styles.currentAmount, { color: colors.text }]} numberOfLines={1}>
+                {formatCurrency(displayedTotal, selectedCurrency)}
+              </Text>
+            )}
+          </View>
+
+          {/* VS series: selector + its own total */}
+          <View style={styles.vsRow}>
+            <TouchableOpacity
+              style={styles.vsSelector}
+              onPress={() => openPicker('vs')}
+              testID="trend-vs-selector"
+            >
+              {vs ? (
+                <>
+                  <Text style={[styles.vsText, { color: colors.mutedText }]}>vs</Text>
+                  <View style={[styles.seriesDot, { backgroundColor: vsColor }]} />
+                  {vsIcon && (
+                    <Icon name={vsIcon} size={14} color={colors.text} />
+                  )}
+                  <Text style={[styles.vsCategoryName, { color: colors.text }]} numberOfLines={1}>
+                    {vsLabel}
+                  </Text>
+                </>
+              ) : (
+                <>
+                  <Icon name="plus-circle-outline" size={13} color={colors.mutedText} />
+                  <Text style={[styles.vsText, { color: colors.mutedText }]}>vs</Text>
+                </>
+              )}
+            </TouchableOpacity>
+            {vs && (
+              <TouchableOpacity
+                onPress={clearVsSeries}
+                hitSlop={{ top: 8, bottom: 8, left: 8, right: 8 }}
+                testID="trend-vs-clear"
+              >
+                <Icon name="close" size={14} color={colors.mutedText} />
+              </TouchableOpacity>
+            )}
+            {vs && !hideBalances && (
+              <Text style={[styles.vsAmount, { color: colors.text }]} numberOfLines={1}>
+                {vsLoading ? '...' : formatCurrency(vsDisplayedTotal, selectedCurrency)}
+              </Text>
+            )}
+          </View>
         </View>
       </View>
 
@@ -1026,12 +1029,19 @@ const styles = StyleSheet.create({
     paddingHorizontal: SPACING.xxl,
   },
   header: {
+    alignItems: 'stretch',
+    flexDirection: 'row',
+    gap: SPACING.md,
     marginBottom: 4,
   },
-  labelRow: {
-    alignItems: 'baseline',
-    flexDirection: 'row',
-    gap: SPACING.xs,
+  // The two labels stack beside the series rows rather than above them, so the
+  // header is two rows tall instead of three. Held to a third of the card so a
+  // long translation cannot squeeze the selectors it sits next to.
+  labelColumn: {
+    flexShrink: 0,
+    justifyContent: 'space-between',
+    maxWidth: '32%',
+    paddingTop: 2,
   },
   loadingContainer: {
     alignItems: 'center',
@@ -1060,6 +1070,10 @@ const styles = StyleSheet.create({
     flex: 1,
   },
   sectionLabel: SECTION_LABEL,
+  seriesColumn: {
+    flex: 1,
+    minWidth: 0,
+  },
   seriesDot: {
     borderRadius: BORDER_RADIUS.pill,
     height: 8,
@@ -1068,7 +1082,6 @@ const styles = StyleSheet.create({
   seriesRow: {
     alignItems: 'center',
     flexDirection: 'row',
-    marginTop: 4,
   },
   typeToggle: {
     borderRadius: BORDER_RADIUS.md,
