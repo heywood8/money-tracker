@@ -1,5 +1,12 @@
 # Changelog
 
+## [0.279.2](https://github.com/heywood8/money-tracker/compare/penny-v0.279.1...penny-v0.279.2) (2026-08-29)
+
+
+### Code Refactoring
+
+* **graphs:** lay the trends header out in one column ([#1666](https://github.com/heywood8/money-tracker/issues/1666)) ([45d5cce](https://github.com/heywood8/money-tracker/commit/45d5cce0eda23763e528138fe94c8acf3d7a3924))
+
 ## [0.279.1](https://github.com/heywood8/money-tracker/compare/penny-v0.279.0...penny-v0.279.1) (2026-08-28)
 
 
