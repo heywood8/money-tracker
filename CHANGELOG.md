@@ -1,5 +1,12 @@
 # Changelog
 
+## [0.279.3](https://github.com/heywood8/money-tracker/compare/penny-v0.279.2...penny-v0.279.3) (2026-08-29)
+
+
+### Code Refactoring
+
+* **graphs:** move the trends selectors beside the card name ([#1668](https://github.com/heywood8/money-tracker/issues/1668)) ([015277a](https://github.com/heywood8/money-tracker/commit/015277a648bd493c39011fdaaa9abc4cc26b49df))
+
 ## [0.279.2](https://github.com/heywood8/money-tracker/compare/penny-v0.279.1...penny-v0.279.2) (2026-08-29)
 
 
