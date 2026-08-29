@@ -1,8 +1,8 @@
 import React, { useMemo, useRef, useState, useCallback } from 'react';
 import { View, Text, StyleSheet, ActivityIndicator, Dimensions, TouchableOpacity, Modal, ScrollView } from 'react-native';
 import PropTypes from 'prop-types';
-import { CartesianChart, Bar, BarGroup, StackedBar } from 'victory-native';
-import { matchFont, Paint, RoundedRect } from '@shopify/react-native-skia';
+import { CartesianChart, Bar, BarGroup } from 'victory-native';
+import { matchFont, RoundedRect } from '@shopify/react-native-skia';
 import { runOnJS } from 'react-native-reanimated';
 import { Gesture, GestureDetector } from 'react-native-gesture-handler';
 import Icon from '@expo/vector-icons/MaterialCommunityIcons';
@@ -52,10 +52,6 @@ const TOP_PADDING = 8;
 const CHART_HEIGHT = TOP_PADDING + BAR_HEIGHT + LABEL_HEIGHT;
 const CORNER = 4;
 const BAR_ANIMATION = { type: 'spring' };
-// Stacked segments are separated by a gap in the card's own colour, not by a
-// border: a stroke in the surface colour reads as breathing room, an outline
-// reads as one more piece of chrome. 2px total (1px either side of the seam).
-const STACK_GAP = 2;
 // TalkBack can still step through months now that the RN hit slots are gone.
 const ACCESSIBILITY_ACTIONS = [{ name: 'increment' }, { name: 'decrement' }];
 
@@ -146,8 +142,6 @@ export const formatYTick = (value) => {
   return num.toFixed(0);
 };
 
-export const formatPctTick = (value) => `${Math.round(Number(value))}%`;
-
 // "Nice" y-axis step so ticks land on round numbers.
 const niceStepFor = (max) => {
   const raw = max / 5;
@@ -164,10 +158,9 @@ const niceStepFor = (max) => {
 /**
  * Category-spending bar chart backed by Victory Native XL.
  *
- * Three layouts, all driven by Victory's own bar primitives:
+ * Two layouts, both driven by Victory's own bar primitives:
  *  - single:  one <Bar> series
  *  - grouped: <BarGroup> with primary + vs bars side by side per month
- *  - stacked: <StackedBar> over 100%-normalized shares of primary vs vs
  *
  * The months are laid out at a fixed pitch inside a horizontal scroller and the
  * y-axis is pinned beside it, so the window opens on the current month and the
@@ -181,7 +174,6 @@ const niceStepFor = (max) => {
 const TrendBarChart = ({
   data,
   vsData,
-  stacked,
   monthAbbreviations,
   colors,
   seriesColor,
@@ -192,10 +184,8 @@ const TrendBarChart = ({
 }) => {
   const count = data.length;
   const hasVs = vsData != null && vsData.length === count;
-  const isStacked = stacked && hasVs;
 
   const axisMax = useMemo(() => {
-    if (isStacked) return 100;
     const max = Math.max(
       ...data.map((d) => d.total),
       ...(hasVs ? vsData.map((d) => d.total) : []),
@@ -203,27 +193,18 @@ const TrendBarChart = ({
     );
     const step = niceStepFor(max);
     return Math.ceil(max / step) * step;
-  }, [isStacked, data, vsData, hasVs]);
+  }, [data, vsData, hasVs]);
 
   // Per-month field bundle consumed by Victory Native. Every series we draw must be a
   // field here AND listed in yKeys, otherwise VN never computes points for it.
   const chartData = useMemo(() => {
     return data.map((d, i) => {
-      if (isStacked) {
-        // 100%-normalized stack: the two shares always add up to a full-height bar.
-        const totalAmt = d.total + vsData[i].total;
-        return {
-          x: i,
-          primary: totalAmt > 0 ? (d.total / totalAmt) * 100 : 0,
-          vs: totalAmt > 0 ? (vsData[i].total / totalAmt) * 100 : 0,
-        };
-      }
       if (hasVs) {
         return { x: i, primary: d.total, vs: vsData[i].total };
       }
       return { x: i, amount: d.total };
     });
-  }, [data, vsData, hasVs, isStacked]);
+  }, [data, vsData, hasVs]);
 
   const yKeys = useMemo(() => (hasVs ? ['primary', 'vs'] : ['amount']), [hasVs]);
 
@@ -397,31 +378,6 @@ const TrendBarChart = ({
 
   const renderSeries = useCallback(
     (points, chartBounds, slot) => {
-      if (isStacked) {
-        return (
-          <StackedBar
-            chartBounds={chartBounds}
-            points={[points.primary, points.vs]}
-            colors={[seriesColor, vsSeriesColor]}
-            barWidth={slot * 0.6}
-            animate={BAR_ANIMATION}
-            barOptions={({ isTop, isBottom }) => {
-              const gap = (
-                <Paint
-                  key="stack-gap"
-                  style="stroke"
-                  strokeWidth={STACK_GAP}
-                  color={colors.altRow}
-                />
-              );
-              if (isTop) return { roundedCorners: { topLeft: CORNER, topRight: CORNER }, children: gap };
-              if (isBottom) return { roundedCorners: { bottomLeft: CORNER, bottomRight: CORNER }, children: gap };
-              return { children: gap };
-            }}
-          />
-        );
-      }
-
       if (hasVs) {
         return (
           <BarGroup
@@ -447,7 +403,7 @@ const TrendBarChart = ({
         />
       );
     },
-    [isStacked, hasVs, seriesColor, colors.altRow, vsSeriesColor],
+    [hasVs, seriesColor, vsSeriesColor],
   );
 
   const renderChart = useCallback(
@@ -474,8 +430,6 @@ const TrendBarChart = ({
     () => ({ left: pitch / 2, right: pitch / 2, top: TOP_PADDING }),
     [pitch],
   );
-
-  const formatYLabel = isStacked ? formatPctTick : formatYTick;
 
   // How many months a label is actually allowed to claim. A locale's own
   // abbreviations are not all the same width — "Июл" is half again as wide as
@@ -546,7 +500,7 @@ const TrendBarChart = ({
               lineWidth: 0,
               labelColor: colors.mutedText,
               tickCount: 5,
-              formatYLabel,
+              formatYLabel: formatYTick,
             }]}
             frame={{ lineWidth: 0 }}
           >
@@ -640,7 +594,6 @@ const TrendsCard = ({
   const [pickerType, setPickerType] = useState('expense');
   const [vsSeries, setVsSeries] = useState(DEFAULT_VS_SERIES);
   const [selectedBarIndex, setSelectedBarIndex] = useState(null);
-  const [showStackedBar, setShowStackedBar] = useState(false);
 
   const visibleCategories = useMemo(
     () => categories.filter(cat => !cat.isShadow),
@@ -730,7 +683,6 @@ const TrendsCard = ({
 
   const clearVsSeries = useCallback(() => {
     setVsSeries(null);
-    setShowStackedBar(false);
   }, []);
 
   const { monthlyData, loading } = useMonthlyTrendSeries(
@@ -768,6 +720,15 @@ const TrendsCard = ({
   const vsDisplayedTotal = vs && vsMonthlyData.length > 0
     ? (vsMonthlyData[effectiveBarIndex]?.total ?? 0)
     : 0;
+
+  // Which month the two figures are for. The newest bar is "this month"; any
+  // other selected bar names itself.
+  const selectedMonth = monthlyData[effectiveBarIndex];
+  const periodLabel = effectiveBarIndex === monthlyData.length - 1
+    ? t('this_month')
+    : selectedMonth
+      ? `${t(monthKeys[selectedMonth.month])} ${selectedMonth.year}`
+      : '';
 
   const editingSeries = pickerMode === 'vs' ? vs : primary;
   const pickerSelectedId = editingSeries && editingSeries.type === pickerType
@@ -841,17 +802,35 @@ const TrendsCard = ({
 
   return (
     <View style={[styles.card, { backgroundColor: colors.altRow, borderColor: colors.border }]}>
+      {/* The header is one column: each figure sits at the end of its own
+          series' row, so the number and the name it belongs to are read
+          together instead of across the card. Nothing stacks on the right. */}
       <View style={styles.header}>
-        {/* Left: label + primary series selector + vs selector */}
-        <View style={styles.headerLeft}>
+        <View style={styles.labelRow}>
           <Text style={[styles.sectionLabel, { color: colors.mutedText }]}>
             {t('trends').toUpperCase()}
           </Text>
+          {/* The period rides the eyebrow line, which already exists — it costs
+              no height, and it labels both figures at once. The separator is its
+              own node so the period stays one uninterrupted string. */}
+          <Text style={[styles.periodLabel, { color: colors.mutedText }]}>{'\u00B7'}</Text>
+          <Text style={[styles.periodLabel, { color: colors.mutedText }]} numberOfLines={1}>
+            {periodLabel}
+          </Text>
+        </View>
+
+        {/* Primary series: selector + its own total */}
+        <View style={styles.seriesRow}>
           <TouchableOpacity
             style={styles.categorySelector}
             onPress={() => openPicker('primary')}
             testID="trend-primary-selector"
           >
+            {/* In vs mode the two rows need telling apart, so each carries the
+                mark of its series; the labels and figures stay in text ink. */}
+            {vs && (
+              <View style={[styles.seriesDot, { backgroundColor: seriesColor }]} />
+            )}
             {primaryIcon && (
               <Icon name={primaryIcon} size={18} color={colors.text} />
             )}
@@ -860,91 +839,52 @@ const TrendsCard = ({
             </Text>
             <Icon name="chevron-down" size={18} color={colors.mutedText} />
           </TouchableOpacity>
-
-          {/* VS series selector row */}
-          <View style={styles.vsRow}>
-            <TouchableOpacity
-              style={styles.vsSelector}
-              onPress={() => openPicker('vs')}
-              testID="trend-vs-selector"
-            >
-              {vs ? (
-                <>
-                  <Text style={[styles.vsText, { color: colors.mutedText }]}>vs</Text>
-                  {/* The mark beside the label carries the series identity; the
-                      label itself stays in ink, so it is never a colour-only cue. */}
-                  <View style={[styles.seriesDot, { backgroundColor: vsColor }]} />
-                  {vsIcon && (
-                    <Icon name={vsIcon} size={14} color={colors.text} />
-                  )}
-                  <Text style={[styles.vsCategoryName, { color: colors.text }]} numberOfLines={1}>
-                    {vsLabel}
-                  </Text>
-                </>
-              ) : (
-                <>
-                  <Icon name="plus-circle-outline" size={13} color={colors.mutedText} />
-                  <Text style={[styles.vsText, { color: colors.mutedText }]}>vs</Text>
-                </>
-              )}
-            </TouchableOpacity>
-            {vs && (
-              <TouchableOpacity
-                onPress={clearVsSeries}
-                hitSlop={{ top: 8, bottom: 8, left: 8, right: 8 }}
-                testID="trend-vs-clear"
-              >
-                <Icon name="close" size={14} color={colors.mutedText} />
-              </TouchableOpacity>
-            )}
-          </View>
+          {!hideBalances && (
+            <Text style={[styles.currentAmount, { color: colors.text }]} numberOfLines={1}>
+              {formatCurrency(displayedTotal, selectedCurrency)}
+            </Text>
+          )}
         </View>
 
-        {/* Right: stacked toggle (vs mode only) + amount(s) + month label */}
-        <View style={styles.headerRight}>
-          {hasVsData && (
+        {/* VS series: selector + its own total */}
+        <View style={styles.vsRow}>
+          <TouchableOpacity
+            style={styles.vsSelector}
+            onPress={() => openPicker('vs')}
+            testID="trend-vs-selector"
+          >
+            {vs ? (
+              <>
+                <Text style={[styles.vsText, { color: colors.mutedText }]}>vs</Text>
+                <View style={[styles.seriesDot, { backgroundColor: vsColor }]} />
+                {vsIcon && (
+                  <Icon name={vsIcon} size={14} color={colors.text} />
+                )}
+                <Text style={[styles.vsCategoryName, { color: colors.text }]} numberOfLines={1}>
+                  {vsLabel}
+                </Text>
+              </>
+            ) : (
+              <>
+                <Icon name="plus-circle-outline" size={13} color={colors.mutedText} />
+                <Text style={[styles.vsText, { color: colors.mutedText }]}>vs</Text>
+              </>
+            )}
+          </TouchableOpacity>
+          {vs && (
             <TouchableOpacity
-              style={styles.stackedToggleBtn}
-              onPress={() => setShowStackedBar(v => !v)}
-              activeOpacity={0.7}
-              testID="stacked-bar-toggle-btn"
+              onPress={clearVsSeries}
+              hitSlop={{ top: 8, bottom: 8, left: 8, right: 8 }}
+              testID="trend-vs-clear"
             >
-              <Icon
-                name={showStackedBar ? 'chart-bar' : 'chart-bar-stacked'}
-                size={20}
-                color={colors.primary}
-              />
+              <Icon name="close" size={14} color={colors.mutedText} />
             </TouchableOpacity>
           )}
-          {!hideBalances && (
-            <>
-              {/* In vs mode the two figures need telling apart, so each gets the
-                  dot of its series — the number itself stays in text ink. */}
-              <View style={styles.amountRow}>
-                {vs && (
-                  <View style={[styles.seriesDot, { backgroundColor: seriesColor }]} />
-                )}
-                <Text style={[styles.currentAmount, { color: colors.text }]}>
-                  {formatCurrency(displayedTotal, selectedCurrency)}
-                </Text>
-              </View>
-              {vs && (
-                <View style={styles.amountRow}>
-                  <View style={[styles.seriesDot, { backgroundColor: vsColor }]} />
-                  <Text style={[styles.currentAmount, { color: colors.text }]}>
-                    {vsLoading ? '...' : formatCurrency(vsDisplayedTotal, selectedCurrency)}
-                  </Text>
-                </View>
-              )}
-            </>
+          {vs && !hideBalances && (
+            <Text style={[styles.vsAmount, { color: colors.text }]} numberOfLines={1}>
+              {vsLoading ? '...' : formatCurrency(vsDisplayedTotal, selectedCurrency)}
+            </Text>
           )}
-          <Text style={[styles.thisMonthLabel, { color: colors.mutedText }]}>
-            {effectiveBarIndex === monthlyData.length - 1
-              ? t('this_month')
-              : monthlyData[effectiveBarIndex]
-                ? `${t(monthKeys[monthlyData[effectiveBarIndex].month])} ${monthlyData[effectiveBarIndex].year}`
-                : ''}
-          </Text>
         </View>
       </View>
 
@@ -987,7 +927,6 @@ const TrendsCard = ({
           // the zoom and scroll position the user has arrived at.
           data={monthlyData}
           vsData={hasVsData ? vsMonthlyData : null}
-          stacked={showStackedBar && hasVsData}
           monthAbbreviations={monthAbbreviations}
           colors={colors}
           seriesColor={seriesColor}
@@ -1013,7 +952,6 @@ TrendBarChart.propTypes = {
   monthAbbreviations: PropTypes.arrayOf(PropTypes.string).isRequired,
   onBarPress: PropTypes.func.isRequired,
   selectedIndex: PropTypes.number,
-  stacked: PropTypes.bool,
   vsData: PropTypes.arrayOf(PropTypes.shape({ total: PropTypes.number, month: PropTypes.number })),
   width: PropTypes.number.isRequired,
 };
@@ -1046,11 +984,6 @@ const styles = StyleSheet.create({
     fontSize: FONT_SIZE.base,
     fontWeight: '500',
   },
-  amountRow: {
-    alignItems: 'center',
-    flexDirection: 'row',
-    gap: 5,
-  },
   axisColumn: {
     height: CHART_HEIGHT,
     width: Y_AXIS_WIDTH,
@@ -1061,14 +994,15 @@ const styles = StyleSheet.create({
     padding: SPACING.lg,
   },
   categoryName: {
+    flexShrink: 1,
     fontSize: FONT_SIZE.base,
     fontWeight: '600',
   },
   categorySelector: {
     alignItems: 'center',
     flexDirection: 'row',
+    flexShrink: 1,
     gap: SPACING.xs,
-    marginTop: 4,
   },
   chartCanvas: {
     height: CHART_HEIGHT,
@@ -1080,8 +1014,11 @@ const styles = StyleSheet.create({
     marginTop: 12,
   },
   currentAmount: {
+    flexShrink: 0,
     fontSize: FONT_SIZE.lg,
     fontWeight: '700',
+    marginLeft: 'auto',
+    paddingLeft: SPACING.sm,
     textAlign: 'right',
   },
   emptyContainer: {
@@ -1089,16 +1026,12 @@ const styles = StyleSheet.create({
     paddingHorizontal: SPACING.xxl,
   },
   header: {
-    alignItems: 'flex-start',
-    flexDirection: 'row',
-    justifyContent: 'space-between',
     marginBottom: 4,
   },
-  headerLeft: {
-    flex: 1,
-  },
-  headerRight: {
-    alignItems: 'flex-end',
+  labelRow: {
+    alignItems: 'baseline',
+    flexDirection: 'row',
+    gap: SPACING.xs,
   },
   loadingContainer: {
     alignItems: 'center',
@@ -1116,6 +1049,10 @@ const styles = StyleSheet.create({
     flex: 1,
     justifyContent: 'center',
   },
+  periodLabel: {
+    flexShrink: 1,
+    fontSize: FONT_SIZE.xs,
+  },
   pickerBody: {
     padding: SPACING.md,
   },
@@ -1128,16 +1065,10 @@ const styles = StyleSheet.create({
     height: 8,
     width: 8,
   },
-  stackedToggleBtn: {
-    alignSelf: 'flex-end',
-    height: 28,
-    justifyContent: 'center',
-    marginBottom: 2,
-    width: 28,
-  },
-  thisMonthLabel: {
-    fontSize: 11,
-    marginTop: 2,
+  seriesRow: {
+    alignItems: 'center',
+    flexDirection: 'row',
+    marginTop: 4,
   },
   typeToggle: {
     borderRadius: BORDER_RADIUS.md,
@@ -1158,6 +1089,14 @@ const styles = StyleSheet.create({
     fontSize: FONT_SIZE.sm,
     fontWeight: '600',
   },
+  vsAmount: {
+    flexShrink: 0,
+    fontSize: FONT_SIZE.md,
+    fontWeight: '700',
+    marginLeft: 'auto',
+    paddingLeft: SPACING.sm,
+    textAlign: 'right',
+  },
   vsCategoryName: {
     flexShrink: 1,
     fontSize: FONT_SIZE.sm,
@@ -1172,6 +1111,7 @@ const styles = StyleSheet.create({
   vsSelector: {
     alignItems: 'center',
     flexDirection: 'row',
+    flexShrink: 1,
     gap: 3,
   },
   vsText: {

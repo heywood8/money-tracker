@@ -1,6 +1,6 @@
 import React from 'react';
-import { render, fireEvent } from '@testing-library/react-native';
-import TrendsCard, { canLabelYear, formatPctTick, formatYTick, resolveScrollTarget, resolveTapIndex } from '../../../app/components/graphs/TrendsCard';
+import { render, fireEvent, within } from '@testing-library/react-native';
+import TrendsCard, { canLabelYear, formatYTick, resolveScrollTarget, resolveTapIndex } from '../../../app/components/graphs/TrendsCard';
 import useMonthlyTrendSeries from '../../../app/hooks/useMonthlyTrendSeries';
 
 // Mock the hook
@@ -410,6 +410,47 @@ describe('TrendsCard', () => {
     });
   });
 
+  describe('Header layout', () => {
+    it('puts each figure on its own series row', async () => {
+      // The totals used to stack in a right-hand column, which made the header
+      // taller than the selectors beside it and left the reader to pair a
+      // number with a name across the card.
+      const { getByTestId } = await render(
+        <TrendsCard {...defaultProps} />,
+      );
+
+      const primaryRow = getByTestId('trend-primary-selector').parent;
+      const vsRow = getByTestId('trend-vs-selector').parent;
+
+      // One figure per row, and the rows are the two separate series — a row
+      // holding both figures would mean the column is still there.
+      expect(within(primaryRow).queryAllByText('$200.00').length).toBe(1);
+      expect(within(primaryRow).queryByTestId('trend-vs-selector')).toBeFalsy();
+      expect(within(vsRow).queryAllByText('$200.00').length).toBe(1);
+      expect(within(vsRow).queryByTestId('trend-primary-selector')).toBeFalsy();
+    });
+
+    it('carries the period on the section-label row', async () => {
+      const { getByText } = await render(
+        <TrendsCard {...defaultProps} />,
+      );
+
+      expect(within(getByText('TRENDS').parent).getByText('this_month')).toBeTruthy();
+    });
+
+    it('offers no chart-mode toggle', async () => {
+      // The stacked layout, and the button that was its only way in, are gone.
+      const { queryByTestId, container } = await render(
+        <TrendsCard {...defaultProps} />,
+      );
+
+      expect(queryByTestId('stacked-bar-toggle-btn')).toBeFalsy();
+      const icons = container.queryAll(n => n.type === 'Icon');
+      expect(icons.find(i => i.props.name === 'chart-bar-stacked')).toBeFalsy();
+      expect(icons.find(i => i.props.name === 'chart-bar')).toBeFalsy();
+    });
+  });
+
   describe('Series colours', () => {
     const LEDGER_GREEN = '#4a8a4a';
     const LEDGER_RED = '#d93025';
@@ -465,16 +506,6 @@ describe('TrendsCard', () => {
       expect(colours[0]).toBe(defaultColors.primary);
     });
 
-    it('carries the ledger pair into stacked mode', async () => {
-      const { getByTestId } = await render(
-        <TrendsCard {...defaultProps} />,
-      );
-
-      await fireEvent.press(getByTestId('stacked-bar-toggle-btn'));
-
-      expect(getByTestId('vn-stacked-bar').props.colors).toEqual([LEDGER_GREEN, LEDGER_RED]);
-    });
-
     it('gives the header dots the same colours as the bars', async () => {
       const { container } = await render(
         <TrendsCard {...defaultProps} />,
@@ -488,84 +519,6 @@ describe('TrendsCard', () => {
 
       expect(dotColours).toContain(LEDGER_GREEN);
       expect(dotColours).toContain(LEDGER_RED);
-    });
-  });
-
-  describe('Stacked Bar Toggle', () => {
-    it('is offered as soon as there are two series', async () => {
-      const { getByTestId } = await render(
-        <TrendsCard {...defaultProps} />,
-      );
-
-      expect(getByTestId('stacked-bar-toggle-btn')).toBeTruthy();
-    });
-
-    it('is not offered for a single series', async () => {
-      const { getByTestId, queryByTestId } = await render(
-        <TrendsCard {...defaultProps} />,
-      );
-
-      await fireEvent.press(getByTestId('trend-vs-clear'));
-
-      expect(queryByTestId('stacked-bar-toggle-btn')).toBeFalsy();
-    });
-
-    it('switches to chart-bar icon after toggling to stacked mode', async () => {
-      const { getByTestId, container } = await render(
-        <TrendsCard {...defaultProps} />,
-      );
-
-      await fireEvent.press(getByTestId('stacked-bar-toggle-btn'));
-
-      const icons = container.queryAll(n => n.type === 'Icon');
-      expect(icons.find(i => i.props.name === 'chart-bar')).toBeTruthy();
-      expect(icons.find(i => i.props.name === 'chart-bar-stacked')).toBeFalsy();
-    });
-
-    it('pressing toggle again returns to side-by-side mode', async () => {
-      const { getByTestId, container } = await render(
-        <TrendsCard {...defaultProps} />,
-      );
-
-      await fireEvent.press(getByTestId('stacked-bar-toggle-btn'));
-      await fireEvent.press(getByTestId('stacked-bar-toggle-btn'));
-
-      const icons = container.queryAll(n => n.type === 'Icon');
-      expect(icons.find(i => i.props.name === 'chart-bar-stacked')).toBeTruthy();
-    });
-
-    it('clearing the vs series resets stacked mode', async () => {
-      const { getByTestId, container } = await render(
-        <TrendsCard {...defaultProps} />,
-      );
-
-      await fireEvent.press(getByTestId('stacked-bar-toggle-btn'));
-      await fireEvent.press(getByTestId('trend-vs-clear'));
-
-      // Re-pick a comparison series
-      await fireEvent.press(getByTestId('trend-vs-selector'));
-      await fireEvent.press(getByTestId('trend-category-option-cat-transport'));
-
-      const icons = container.queryAll(n => n.type === 'Icon');
-      expect(icons.find(i => i.props.name === 'chart-bar-stacked')).toBeTruthy();
-    });
-
-    it('swaps the grouped series for a stacked one in stacked mode', async () => {
-      const { getByTestId, queryByTestId } = await render(
-        <TrendsCard {...defaultProps} />,
-      );
-
-      // Side-by-side mode draws the two series through <BarGroup>...
-      expect(queryByTestId('vn-bar-group')).toBeTruthy();
-      expect(queryByTestId('vn-stacked-bar')).toBeFalsy();
-
-      await fireEvent.press(getByTestId('stacked-bar-toggle-btn'));
-
-      // ...and the toggle replaces them with a single <StackedBar>. The 0%/50%/100%
-      // ticks it is scaled against are painted on the Skia canvas by Victory's
-      // yAxis, so they are covered via formatPctTick below instead of by query.
-      expect(getByTestId('vn-stacked-bar')).toBeTruthy();
-      expect(queryByTestId('vn-bar-group')).toBeFalsy();
     });
   });
 
@@ -800,18 +753,6 @@ describe('TrendsCard', () => {
       });
     });
 
-    describe('formatPctTick', () => {
-      it('renders whole-percent ticks for the 100%-normalized stack', () => {
-        expect(formatPctTick(0)).toBe('0%');
-        expect(formatPctTick(50)).toBe('50%');
-        expect(formatPctTick(100)).toBe('100%');
-      });
-
-      it('rounds fractional ticks', () => {
-        expect(formatPctTick(33.333)).toBe('33%');
-        expect(formatPctTick('66.7')).toBe('67%');
-      });
-    });
   });
 
   // The tap gesture's callback is a worklet under the gesture-handler mock, so
