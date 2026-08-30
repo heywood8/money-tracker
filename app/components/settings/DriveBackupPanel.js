@@ -212,7 +212,7 @@ export default function DriveBackupPanel({ bottomInset }) {
           color={statusColor}
         />
         <Text style={[styles.statusText, { color: statusColor }]}>{statusLine}</Text>
-        {isRunning && <ActivityIndicator size={14} color={colors.primary} />}
+        {isRunning && <ActivityIndicator size="small" color={colors.primary} />}
       </View>
 
       {lastResult?.status === 'error' && !isRunning && (

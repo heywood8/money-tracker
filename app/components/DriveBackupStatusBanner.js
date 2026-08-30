@@ -1,6 +1,6 @@
 import React, { useEffect, useRef } from 'react';
-import { View, StyleSheet, Animated, Easing } from 'react-native';
-import { Text, ActivityIndicator } from 'react-native-paper';
+import { View, StyleSheet, Animated, Easing, ActivityIndicator } from 'react-native';
+import { Text } from 'react-native-paper';
 import Ionicons from '@expo/vector-icons/Ionicons';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { useThemeColors } from '../contexts/ThemeColorsContext';
@@ -78,7 +78,15 @@ export default function DriveBackupStatusBanner() {
       >
         <Ionicons name="cloud-upload-outline" size={16} color={colors.primary} />
         <Text style={[styles.label, { color: colors.text }]} numberOfLines={1}>{label}</Text>
-        <ActivityIndicator size={14} color={colors.primary} />
+        {/*
+          Platform spinner, not Paper's: Paper draws its ring as two half-layers
+          that it clips with `overflow: hidden`, and that clip is not applied
+          inside this pill (an elevated view running an animated transform), so
+          the lower half escaped and rendered as a second arc below the plate.
+          The native indicator is one view with nothing to clip — and it is what
+          the rest of the settings screens already use.
+        */}
+        <ActivityIndicator size="small" color={colors.primary} />
       </Animated.View>
     </View>
   );
