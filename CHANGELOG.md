@@ -1,5 +1,12 @@
 # Changelog
 
+## [0.280.0](https://github.com/heywood8/money-tracker/compare/penny-v0.279.3...penny-v0.280.0) (2026-08-30)
+
+
+### Features
+
+* **backup:** add automatic Google Drive backups ([#1670](https://github.com/heywood8/money-tracker/issues/1670)) ([a831c8b](https://github.com/heywood8/money-tracker/commit/a831c8baebca66d2b436614ba2dde2b7fe30d686))
+
 ## [0.279.3](https://github.com/heywood8/money-tracker/compare/penny-v0.279.2...penny-v0.279.3) (2026-08-29)
 
 
