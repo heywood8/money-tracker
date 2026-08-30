@@ -1,5 +1,12 @@
 # Changelog
 
+## [0.280.2](https://github.com/heywood8/money-tracker/compare/penny-v0.280.1...penny-v0.280.2) (2026-08-30)
+
+
+### Bug Fixes
+
+* **backup:** draw one spinner in the Drive backup pill ([#1677](https://github.com/heywood8/money-tracker/issues/1677)) ([46ea837](https://github.com/heywood8/money-tracker/commit/46ea837e6eddc5d5e3c642be3e2488b6ca6d4f6f))
+
 ## [0.280.1](https://github.com/heywood8/money-tracker/compare/penny-v0.280.0...penny-v0.280.1) (2026-08-30)
 
 
