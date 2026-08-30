@@ -444,6 +444,20 @@ describe('TrendsCard', () => {
       expect(within(labelColumn).queryByTestId('trend-vs-selector')).toBeFalsy();
     });
 
+    it('holds the label column at a fixed width so the selectors cannot slide', async () => {
+      // Regression: the column sized itself to its text, and the period under
+      // the card name changes with the selected bar ("this month" vs "April
+      // 2026"), so picking a different month shifted the selectors sideways.
+      const { getByText } = await render(
+        <TrendsCard {...defaultProps} />,
+      );
+
+      const style = Object.assign({}, ...[getByText('TRENDS').parent.props.style].flat());
+
+      expect(typeof style.width === 'string' && style.width.endsWith('%')).toBe(true);
+      expect(style.flexShrink).toBe(0);
+    });
+
     it('offers no chart-mode toggle', async () => {
       // The stacked layout, and the button that was its only way in, are gone.
       const { queryByTestId, container } = await render(

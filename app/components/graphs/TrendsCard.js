@@ -52,6 +52,10 @@ const TOP_PADDING = 8;
 const CHART_HEIGHT = TOP_PADDING + BAR_HEIGHT + LABEL_HEIGHT;
 const CORNER = 4;
 const BAR_ANIMATION = { type: 'spring' };
+// Share of the card the label column claims. Fixed so the selectors beside it
+// hold their position whatever month is selected; wide enough for a spelled-out
+// month and year at the label's own size.
+const LABEL_COLUMN_WIDTH = '32%';
 // TalkBack can still step through months now that the RN hit slots are gone.
 const ACCESSIBILITY_ACTIONS = [{ name: 'increment' }, { name: 'decrement' }];
 
@@ -1035,13 +1039,15 @@ const styles = StyleSheet.create({
     marginBottom: 4,
   },
   // The two labels stack beside the series rows rather than above them, so the
-  // header is two rows tall instead of three. Held to a third of the card so a
-  // long translation cannot squeeze the selectors it sits next to.
+  // header is two rows tall instead of three. The width is FIXED, not intrinsic:
+  // the period below the name changes with the selected month ("this month" vs
+  // "September 2026"), and a column that sized itself to that text slid the
+  // selectors sideways every time the reader tapped a different bar.
   labelColumn: {
     flexShrink: 0,
     justifyContent: 'space-between',
-    maxWidth: '32%',
     paddingTop: 2,
+    width: LABEL_COLUMN_WIDTH,
   },
   loadingContainer: {
     alignItems: 'center',
