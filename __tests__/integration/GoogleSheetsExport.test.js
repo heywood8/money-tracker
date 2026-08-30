@@ -51,6 +51,12 @@ jest.mock('../../app/contexts/UpdateDownloadContext', () => ({
   useUpdateDownload: () => ({ startDownload: jest.fn() }),
 }));
 
+// The export list's Drive row reads the run state from this context; the panel
+// itself has its own tests, so an idle context is all this file needs.
+jest.mock('../../app/contexts/DriveBackupContext', () => ({
+  useDriveBackup: () => ({ isRunning: false, progress: null, lastResult: null, startBackup: jest.fn() }),
+}));
+
 jest.mock('../../app/contexts/DisplaySettingsContext', () => ({
   useDisplaySettings: () => ({ hideBalances: false, setHideBalances: jest.fn() }),
 }));

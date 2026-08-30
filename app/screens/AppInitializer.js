@@ -6,6 +6,8 @@ import LanguageSelectionScreen from './LanguageSelectionScreen';
 import SimpleTabs from '../navigation/SimpleTabs';
 import { useThemeColors } from '../contexts/ThemeColorsContext';
 import { performDailyBackupIfNeeded } from '../services/DailyBackupService';
+import { performDriveBackupIfNeeded } from '../services/GoogleDriveBackupService';
+import { getValidAccessToken } from '../services/GoogleSheetsService';
 import { useDialog } from '../contexts/DialogContext';
 import { checkForAppUpdate } from '../services/AppUpdateService';
 import { useUpdateDownload } from '../contexts/UpdateDownloadContext';
@@ -106,10 +108,26 @@ const AppInitializer = () => {
   // Run the daily backup once on every app open (after first launch is complete).
   // Defer the initial kick-off until the JS thread is idle so it doesn't contend with
   // the first data loads / interactive frame on startup.
+  //
+  // The Google Drive upload follows the local write rather than running beside it:
+  // both build a snapshot of the same database, and doing that twice at once on
+  // startup is the one place it would be felt. Neither is awaited by anything —
+  // the upload reports itself through DriveBackupContext while the user carries
+  // on — and both swallow their own errors, so a failure cannot reach startup.
+  // getValidAccessToken and not signIn: a scheduled run must never put a Google
+  // sign-in sheet in front of someone who just opened the app. Without a session
+  // it simply does not run, and the settings panel says so.
   useEffect(() => {
     if (isFirstLaunch) return undefined;
     const handle = requestIdleCallback(() => {
-      performDailyBackupIfNeeded();
+      (async () => {
+        try {
+          await performDailyBackupIfNeeded();
+          await performDriveBackupIfNeeded(getValidAccessToken);
+        } catch (error) {
+          console.warn('[AppInitializer] Backup failed:', error);
+        }
+      })();
     });
     return () => cancelIdleCallback(handle);
   }, [isFirstLaunch]);
