@@ -1,5 +1,12 @@
 # Changelog
 
+## [0.280.1](https://github.com/heywood8/money-tracker/compare/penny-v0.280.0...penny-v0.280.1) (2026-08-30)
+
+
+### Bug Fixes
+
+* **graphs:** stop the trends selectors sliding with the month ([#1672](https://github.com/heywood8/money-tracker/issues/1672)) ([e82ede6](https://github.com/heywood8/money-tracker/commit/e82ede6d0426c5c8312993d37cd67bd2db2841b2))
+
 ## [0.280.0](https://github.com/heywood8/money-tracker/compare/penny-v0.279.3...penny-v0.280.0) (2026-08-30)
 
 
