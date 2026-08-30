@@ -274,6 +274,38 @@ describe('GoogleDriveBackupService', () => {
       await expect(ensureBackupFolder('token-abc')).rejects.toThrow(/drive_request_failed_503/);
     });
 
+    it('escapes backslashes and quotes in a folder name (CodeQL alert)', async () => {
+      // A name ending in a backslash used to have that backslash escape the
+      // closing quote of the q= string, swallowing the rest of the query.
+      setPreferences({ drive_backup_folder_id: null });
+      let searchUrl = null;
+      routeFetch([
+        { method: 'GET', match: (u) => { searchUrl = u; return u.includes('q='); }, body: { files: [] } },
+        { method: 'POST', match: (u) => u.includes('/drive/v3/files'), body: { id: 'folder-new' } },
+      ]);
+
+      await ensureBackupFolder('token-abc', 'Backups\\');
+
+      const query = decodeURIComponent(searchUrl.split('q=')[1].split('&')[0]);
+      expect(query).toContain("name='Backups\\\\'");
+      // The trailing quote still closes the name, so the rest of the query survives.
+      expect(query).toContain('trashed=false');
+    });
+
+    it('escapes a folder name containing a quote', async () => {
+      setPreferences({ drive_backup_folder_id: null });
+      let searchUrl = null;
+      routeFetch([
+        { method: 'GET', match: (u) => { searchUrl = u; return u.includes('q='); }, body: { files: [] } },
+        { method: 'POST', match: (u) => u.includes('/drive/v3/files'), body: { id: 'folder-new' } },
+      ]);
+
+      await ensureBackupFolder('token-abc', "Bob's Backups");
+
+      const query = decodeURIComponent(searchUrl.split('q=')[1].split('&')[0]);
+      expect(query).toContain("name='Bob\\'s Backups'");
+    });
+
     it('surfaces an expired token instead of creating a duplicate folder', async () => {
       routeFetch([
         { method: 'GET', match: (u) => u.includes(`/files/${FOLDER_ID}?`), status: 401, body: {} },

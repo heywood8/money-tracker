@@ -76,6 +76,20 @@ const driveError = async (response) => {
 };
 
 /**
+ * Escape a value for interpolation into a Drive `q=` search string.
+ *
+ * Backslash first, then the quote: Drive's query grammar escapes with a
+ * backslash, so a name ending in one ("Backups\") would otherwise have its own
+ * trailing backslash escape the closing quote and swallow the rest of the query.
+ * Quoting alone is not enough — that is the whole bug.
+ * @param {string} value
+ * @returns {string}
+ */
+const escapeDriveQueryValue = (value) => String(value)
+  .replace(/\\/g, '\\\\')
+  .replace(/'/g, "\\'");
+
+/**
  * Emit a progress update. Purely advisory — nothing waits on a listener.
  * @param {Object} payload
  */
@@ -179,8 +193,7 @@ export const ensureBackupFolder = async (accessToken, folderName = DEFAULT_FOLDE
     console.log('[DriveBackup] Stored folder is gone, recreating');
   }
 
-  // Escape single quotes so a renamed folder cannot break the query syntax.
-  const escapedName = folderName.replace(/'/g, "\\'");
+  const escapedName = escapeDriveQueryValue(folderName);
   const query = `mimeType='${FOLDER_MIME}' and name='${escapedName}' and trashed=false`;
   const searchResponse = await fetch(
     `${DRIVE_API}?q=${encodeURIComponent(query)}&fields=files(id,name)&pageSize=10`,
@@ -258,7 +271,7 @@ export const listBackupFiles = async (accessToken, folderId) => {
  * @returns {Promise<string|null>} File id, or null
  */
 const findFileIdByName = async (accessToken, folderId, name) => {
-  const escapedName = name.replace(/'/g, "\\'");
+  const escapedName = escapeDriveQueryValue(name);
   const query = `'${folderId}' in parents and name='${escapedName}' and trashed=false`;
   const response = await fetch(
     `${DRIVE_API}?q=${encodeURIComponent(query)}&fields=files(id)&pageSize=1`,
