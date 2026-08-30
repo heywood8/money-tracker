@@ -96,6 +96,12 @@ jest.mock('../../app/contexts/UpdateDownloadContext', () => ({
   }),
 }));
 
+// The export list's Drive row reads the run state from this context; the panel
+// itself has its own tests, so an idle context is all this file needs.
+jest.mock('../../app/contexts/DriveBackupContext', () => ({
+  useDriveBackup: () => ({ isRunning: false, progress: null, lastResult: null, startBackup: jest.fn() }),
+}));
+
 // Mock BackupRestore service
 const mockExportBackup = jest.fn(() => Promise.resolve());
 const mockPickImportFile = jest.fn(() => Promise.resolve({ fileUri: '/mock/file.json', filename: 'backup.json' }));

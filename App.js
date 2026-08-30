@@ -20,6 +20,8 @@ import { LocalizationProvider } from './app/contexts/LocalizationContext';
 import { DialogProvider } from './app/contexts/DialogContext';
 import { ImportProgressProvider } from './app/contexts/ImportProgressContext';
 import { UpdateDownloadProvider } from './app/contexts/UpdateDownloadContext';
+import { DriveBackupProvider } from './app/contexts/DriveBackupContext';
+import DriveBackupStatusBanner from './app/components/DriveBackupStatusBanner';
 import { AppBlurProvider, useAppBlurState } from './app/contexts/AppBlurContext';
 import { OverlayHostProvider, OverlayOutlet, useOverlayHost } from './app/contexts/OverlayHostContext';
 import { DisplaySettingsProvider } from './app/contexts/DisplaySettingsContext';
@@ -90,6 +92,7 @@ function AppContent() {
           <ThemedStatusBar />
           <AppInitializer />
           <ImportProgressModal />
+          <DriveBackupStatusBanner />
         </BlurHost>
         <OverlayOutlet />
       </View>
@@ -111,23 +114,25 @@ function App() {
                       <SearchProvider>
                         <DialogProvider>
                           <UpdateDownloadProvider>
-                            <ImportProgressProvider>
-                              <AccountsDataProvider>
-                                <AccountsActionsProvider>
-                                  <CategoriesProvider>
-                                    <OperationsDataProvider>
-                                      <OperationsActionsProvider>
-                                        <BudgetsProvider>
-                                          <BudgetPlansProvider>
-                                            <AppContent />
-                                          </BudgetPlansProvider>
-                                        </BudgetsProvider>
-                                      </OperationsActionsProvider>
-                                    </OperationsDataProvider>
-                                  </CategoriesProvider>
-                                </AccountsActionsProvider>
-                              </AccountsDataProvider>
-                            </ImportProgressProvider>
+                            <DriveBackupProvider>
+                              <ImportProgressProvider>
+                                <AccountsDataProvider>
+                                  <AccountsActionsProvider>
+                                    <CategoriesProvider>
+                                      <OperationsDataProvider>
+                                        <OperationsActionsProvider>
+                                          <BudgetsProvider>
+                                            <BudgetPlansProvider>
+                                              <AppContent />
+                                            </BudgetPlansProvider>
+                                          </BudgetsProvider>
+                                        </OperationsActionsProvider>
+                                      </OperationsDataProvider>
+                                    </CategoriesProvider>
+                                  </AccountsActionsProvider>
+                                </AccountsDataProvider>
+                              </ImportProgressProvider>
+                            </DriveBackupProvider>
                           </UpdateDownloadProvider>
                         </DialogProvider>
                       </SearchProvider>

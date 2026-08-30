@@ -28,6 +28,19 @@ export const PREF_KEYS = {
   // so the reader's choice of baseline survives leaving the Graphs tab.
   BALANCE_CHART_COMPARISON: 'balance_chart_comparison',
   GOOGLE_SHEETS_SPREADSHEET_ID: 'google_sheets_spreadsheet_id',
+  // Google Drive automatic backup. Off unless the user turns it on; the folder id
+  // is what binds the destination, so renaming or moving the folder in Drive
+  // keeps working (the name is only used to find it the first time).
+  DRIVE_BACKUP_ENABLED: 'drive_backup_enabled',
+  DRIVE_BACKUP_FOLDER_ID: 'drive_backup_folder_id',
+  // JSON array of the formats each run uploads ('json' | 'csv' | 'sqlite').
+  DRIVE_BACKUP_FORMATS: 'drive_backup_formats',
+  // Rotation marks, mirroring the local backups: the day / ISO week already
+  // uploaded, so a second launch the same day is a no-op.
+  DRIVE_BACKUP_LAST_DAILY: 'drive_backup_last_daily_date',
+  DRIVE_BACKUP_LAST_WEEKLY: 'drive_backup_last_weekly_week',
+  // JSON {status, at, error?, files?} of the last run, for the settings status line.
+  DRIVE_BACKUP_LAST_RESULT: 'drive_backup_last_result',
   DEFAULT_ACCOUNT_ID: 'default_account_id',
   // Bank-notification processing
   BANK_NOTIFICATIONS_ENABLED: 'bank_notifications_enabled',

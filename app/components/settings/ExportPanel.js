@@ -7,11 +7,13 @@ import * as LegacyFileSystem from 'expo-file-system/legacy';
 import { useThemeColors } from '../../contexts/ThemeColorsContext';
 import { useLocalization } from '../../contexts/LocalizationContext';
 import { useDialog } from '../../contexts/DialogContext';
+import { useDriveBackup } from '../../contexts/DriveBackupContext';
 import { exportBackup, createBackup } from '../../services/BackupRestore';
 import { DAILY_BACKUP_DIR } from '../../services/DailyBackupService';
 import { getValidAccessToken, signIn as googleSignIn, exportToSheets } from '../../services/GoogleSheetsService';
 import { BORDER_RADIUS, FONT_SIZE, SPACING } from '../../styles/designTokens';
 import SheetsProgressList, { sheetsErrorTextStyle } from './SheetsProgressList';
+import DriveBackupPanel from './DriveBackupPanel';
 import {
   FORMAT_DESCRIPTION,
   FORMAT_ITEM_ROW,
@@ -110,6 +112,11 @@ export default function ExportPanel({
   const [saveLocalBackupLoading, setSaveLocalBackupLoading] = useState(false);
   const [saveLocalBackupSuccess, setSaveLocalBackupSuccess] = useState(false);
   const [fileExport, setFileExport] = useState({});
+  // Only to label the Drive row while a run is in flight — deliberately not fed to
+  // `loading`, which would disable the row and lock the user out of the progress
+  // they came to look at. The run belongs to DriveBackupContext and outlives this
+  // panel either way.
+  const { isRunning: driveBackupRunning } = useDriveBackup();
 
   // Back is locked while a Sheets stage is mid-flight, so the host must know.
   // Gated on the progress step as well as the stage: an early return that
@@ -241,6 +248,10 @@ export default function ExportPanel({
     }
   }, [updateSheetsStep, onPushStep, onPopToRoot, t]);
 
+  if (step === 'drive-auto') {
+    return <DriveBackupPanel bottomInset={bottomInset} />;
+  }
+
   if (step === 'sheets-progress') {
     return (
       <SheetsProgressList steps={sheetsSteps}>
@@ -279,6 +290,18 @@ export default function ExportPanel({
         disableOnSuccess
         onPress={handleSaveLocalBackup}
         testID="settings-export-save-local-backup"
+      />
+
+      <ExportRow
+        icon="cloud-upload-outline"
+        title={t('drive_backup_row') || 'Auto-backup to Google Drive'}
+        description={
+          driveBackupRunning
+            ? (t('drive_backup_status_running') || 'Backing up to Google Drive…')
+            : (t('drive_backup_row_description') || 'Scheduled JSON, CSV and SQLite backups to your Drive')
+        }
+        onPress={() => onPushStep('drive-auto')}
+        testID="settings-export-drive-backup"
       />
 
       <ExportRow
@@ -343,7 +366,7 @@ export default function ExportPanel({
 }
 
 ExportPanel.propTypes = {
-  // 'list' | 'sheets-progress'
+  // 'list' | 'sheets-progress' | 'drive-auto'
   step: PropTypes.string,
   onPushStep: PropTypes.func.isRequired,
   onPopToRoot: PropTypes.func.isRequired,

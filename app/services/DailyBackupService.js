@@ -150,8 +150,13 @@ const cleanupBackups = async (backups, maxToKeep, pinnedUri = null) => {
  *   more than 50% relative to the most recent backup, treat it as suspicious
  *   and skip the write.  A 50% floor is generous enough to survive legitimate
  *   mass-deletes while catching the all-empty / near-empty failure mode.
+ *
+ * Exported because the Google Drive backup needs the same guard: uploading an
+ * empty snapshot would overwrite a good remote copy exactly as it would a local
+ * one. It compares against the local backup files either way, which is the only
+ * cheap record of what "normal" looks like for this database.
  */
-const isSnapshotValid = async (backup) => {
+export const isSnapshotValid = async (backup) => {
   const accountCount = backup?.data?.accounts?.length ?? 0;
   const operationCount = backup?.data?.operations?.length ?? 0;
   const newTotal = accountCount + operationCount;

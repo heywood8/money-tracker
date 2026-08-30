@@ -72,6 +72,10 @@ jest.mock('../app/contexts/UpdateDownloadContext', () => ({
   UpdateDownloadProvider: ({ children }) => children,
 }));
 
+jest.mock('../app/contexts/DriveBackupContext', () => ({
+  DriveBackupProvider: ({ children }) => children,
+}));
+
 jest.mock('../app/contexts/AppBlurContext', () => ({
   AppBlurProvider: ({ children }) => children,
   useAppBlurState: jest.fn(() => 0),
@@ -106,6 +110,15 @@ jest.mock('../app/modals/ImportProgressModal', () => {
   const React = require('react');
   return function MockImportProgressModal() {
     return React.createElement('ImportProgressModal', { testID: 'import-progress-modal' });
+  };
+});
+
+// Mock the Drive backup indicator: it reads the localization and theme contexts,
+// which this file stubs down to bare providers.
+jest.mock('../app/components/DriveBackupStatusBanner', () => {
+  const React = require('react');
+  return function MockDriveBackupStatusBanner() {
+    return React.createElement('DriveBackupStatusBanner', { testID: 'drive-backup-status-banner' });
   };
 });
 

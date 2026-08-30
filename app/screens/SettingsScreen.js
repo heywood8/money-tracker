@@ -249,7 +249,9 @@ export default function SettingsScreen({ setSubPanelActive }) {
     if (activeSubPanel === 'appearance') return t('appearance') || 'Appearance';
     if (activeSubPanel === 'privacy') return t('privacy') || 'Privacy';
     if (activeSubPanel === 'export') {
-      return exportStep === 'sheets-progress' ? 'Google Sheets' : (t('export_format') || 'Export Format');
+      if (exportStep === 'sheets-progress') return 'Google Sheets';
+      if (exportStep === 'drive-auto') return t('drive_backup_row') || 'Auto-backup to Google Drive';
+      return t('export_format') || 'Export Format';
     }
     if (activeSubPanel === 'import') {
       if (importStep === 'source') return t('import') || 'Import';

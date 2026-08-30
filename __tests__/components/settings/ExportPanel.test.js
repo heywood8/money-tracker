@@ -26,6 +26,11 @@ jest.mock('../../../app/contexts/LocalizationContext', () => ({
 jest.mock('../../../app/contexts/DialogContext', () => ({
   useDialog: () => ({ showDialog: mockShowDialog }),
 }));
+// The Drive row only reads the run state from here; the panel behind it has its
+// own tests, so an idle context is all this file needs.
+jest.mock('../../../app/contexts/DriveBackupContext', () => ({
+  useDriveBackup: () => ({ isRunning: false, progress: null, lastResult: null, startBackup: jest.fn() }),
+}));
 jest.mock('../../../app/services/BackupRestore', () => ({
   exportBackup: (...a) => mockExportBackup(...a),
   createBackup: (...a) => mockCreateBackup(...a),
@@ -75,6 +80,7 @@ describe('ExportPanel', () => {
       const { getByText, getByTestId } = await setup();
 
       expect(getByTestId('settings-export-save-local-backup')).toBeTruthy();
+      expect(getByTestId('settings-export-drive-backup')).toBeTruthy();
       expect(getByTestId('settings-export-google-sheets')).toBeTruthy();
       expect(getByText('Save externally to SQLite')).toBeTruthy();
       expect(getByText('Save externally to CSV')).toBeTruthy();

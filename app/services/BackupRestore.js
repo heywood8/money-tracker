@@ -192,47 +192,93 @@ const convertToCSV = (data, explicitFields) => {
  * Export backup as CSV files (creates a zip-like folder structure)
  * @returns {Promise<string>} Filename
  */
+/**
+ * Render a backup snapshot as the combined-CSV document the app writes and reads.
+ *
+ * Every table becomes a `[SECTION]` block of its own, so one file carries the
+ * whole database without needing ZIP support. Split out of exportBackupCSV so
+ * destinations that do not share a file (the Google Drive auto-export) can build
+ * the same document rather than growing a second, drifting CSV writer.
+ * @param {Object} backup - Snapshot from createBackup()
+ * @returns {string} CSV document
+ */
+export const buildCombinedCSV = (backup) => {
+  // Explicit field lists per table (issue #748) keep column order stable even
+  // when a row object happens to be missing a key.
+  const section = (name, rows, fields) =>
+    `[${name}]\n${convertToCSV(rows, fields)}\n`;
+
+  let csv = `# Money Tracker Backup - ${backup.timestamp}\n`;
+  csv += `# Version: ${backup.version}\n\n`;
+
+  const tables = [
+    ['ACCOUNTS', 'accounts'],
+    ['CATEGORIES', 'categories'],
+    ['OPERATIONS', 'operations'],
+    ['BUDGETS', 'budgets'],
+    ['APP_METADATA', 'app_metadata'],
+    ['BALANCE_HISTORY', 'balance_history'],
+    ['PLANNED_OPERATIONS', 'planned_operations'],
+    ['BUDGET_PLANS', 'budget_plans'],
+    ['BUDGET_PLAN_LINES', 'budget_plan_lines'],
+    ['BUDGET_PLAN_LINE_CATEGORIES', 'budget_plan_line_categories'],
+    ['BUDGET_PLAN_LINE_GROUPS', 'budget_plan_line_groups'],
+    ['BUDGET_PLAN_LINE_ACCOUNTS', 'budget_plan_line_accounts'],
+    ['BUDGET_PLAN_LINE_LABELS', 'budget_plan_line_labels'],
+  ];
+
+  tables.forEach(([label, key], index) => {
+    csv += section(label, backup.data[key], TABLE_FIELDS[key]);
+    // The importer tolerates either, but the historical layout separated every
+    // section but the last with a blank line — keep byte-compatible output.
+    if (index < tables.length - 1) csv += '\n';
+  });
+
+  return csv;
+};
+
+/**
+ * Copy the live SQLite database to `destUri`, checkpointing WAL first.
+ *
+ * The checkpoint is the whole point: without it the copy misses everything
+ * still sitting in the write-ahead log. Split out of exportBackupSQLite so the
+ * Drive auto-export produces a byte-identical snapshot instead of copying a
+ * database that is missing its most recent writes.
+ * @param {string} destUri - Where to write the copy
+ * @returns {Promise<string>} destUri
+ */
+export const writeSQLiteSnapshot = async (destUri) => {
+  const sourceUri = `${FileSystem.documentDirectory}SQLite/penny.db`;
+
+  const fileInfo = await FileSystem.getInfoAsync(sourceUri);
+  if (!fileInfo.exists) {
+    throw new Error('Database file not found');
+  }
+
+  // Force a checkpoint so WAL contents are merged into the main database file.
+  console.log('Checkpointing database before export...');
+  try {
+    const { executeQuery: runQuery } = await import('./db');
+    await runQuery('PRAGMA wal_checkpoint(TRUNCATE)');
+    console.log('Database checkpoint completed');
+  } catch (checkpointError) {
+    console.warn('Failed to checkpoint database:', checkpointError);
+    // Continue anyway, the copy might still work
+  }
+
+  await FileSystem.copyAsync({ from: sourceUri, to: destUri });
+  return destUri;
+};
+
+/**
+ * Export backup as a single combined CSV file and hand it to the share sheet.
+ * @returns {Promise<string>} Filename
+ */
 export const exportBackupCSV = async () => {
   try {
     const backup = await createBackup();
     const timestamp = new Date().toISOString().replace(/[:.]/g, '-').slice(0, -5);
-
-    // Create CSV content for each table using explicit field lists (issue #748)
-    const csvFiles = {
-      'accounts.csv': convertToCSV(backup.data.accounts, TABLE_FIELDS.accounts),
-      'categories.csv': convertToCSV(backup.data.categories, TABLE_FIELDS.categories),
-      'operations.csv': convertToCSV(backup.data.operations, TABLE_FIELDS.operations),
-      'budgets.csv': convertToCSV(backup.data.budgets, TABLE_FIELDS.budgets),
-      'app_metadata.csv': convertToCSV(backup.data.app_metadata, TABLE_FIELDS.app_metadata),
-      'balance_history.csv': convertToCSV(backup.data.balance_history, TABLE_FIELDS.balance_history),
-      'planned_operations.csv': convertToCSV(backup.data.planned_operations, TABLE_FIELDS.planned_operations),
-      'budget_plans.csv': convertToCSV(backup.data.budget_plans, TABLE_FIELDS.budget_plans),
-      'budget_plan_lines.csv': convertToCSV(backup.data.budget_plan_lines, TABLE_FIELDS.budget_plan_lines),
-      'budget_plan_line_categories.csv': convertToCSV(backup.data.budget_plan_line_categories, TABLE_FIELDS.budget_plan_line_categories),
-      'budget_plan_line_groups.csv': convertToCSV(backup.data.budget_plan_line_groups, TABLE_FIELDS.budget_plan_line_groups),
-      'budget_plan_line_accounts.csv': convertToCSV(backup.data.budget_plan_line_accounts, TABLE_FIELDS.budget_plan_line_accounts),
-      'budget_plan_line_labels.csv': convertToCSV(backup.data.budget_plan_line_labels, TABLE_FIELDS.budget_plan_line_labels),
-      'backup_info.csv': `version,timestamp,platform\n${backup.version},${backup.timestamp},${backup.platform}`,
-    };
-
-    // For simplicity, we'll combine all CSVs into one file with section markers
-    // This makes import easier and doesn't require ZIP support
-    let combinedCSV = `# Money Tracker Backup - ${backup.timestamp}\n`;
-    combinedCSV += `# Version: ${backup.version}\n\n`;
-
-    combinedCSV += `[ACCOUNTS]\n${csvFiles['accounts.csv']}\n\n`;
-    combinedCSV += `[CATEGORIES]\n${csvFiles['categories.csv']}\n\n`;
-    combinedCSV += `[OPERATIONS]\n${csvFiles['operations.csv']}\n\n`;
-    combinedCSV += `[BUDGETS]\n${csvFiles['budgets.csv']}\n\n`;
-    combinedCSV += `[APP_METADATA]\n${csvFiles['app_metadata.csv']}\n\n`;
-    combinedCSV += `[BALANCE_HISTORY]\n${csvFiles['balance_history.csv']}\n\n`;
-    combinedCSV += `[PLANNED_OPERATIONS]\n${csvFiles['planned_operations.csv']}\n\n`;
-    combinedCSV += `[BUDGET_PLANS]\n${csvFiles['budget_plans.csv']}\n\n`;
-    combinedCSV += `[BUDGET_PLAN_LINES]\n${csvFiles['budget_plan_lines.csv']}\n\n`;
-    combinedCSV += `[BUDGET_PLAN_LINE_CATEGORIES]\n${csvFiles['budget_plan_line_categories.csv']}\n\n`;
-    combinedCSV += `[BUDGET_PLAN_LINE_GROUPS]\n${csvFiles['budget_plan_line_groups.csv']}\n\n`;
-    combinedCSV += `[BUDGET_PLAN_LINE_ACCOUNTS]\n${csvFiles['budget_plan_line_accounts.csv']}\n\n`;
-    combinedCSV += `[BUDGET_PLAN_LINE_LABELS]\n${csvFiles['budget_plan_line_labels.csv']}\n`;
+    const combinedCSV = buildCombinedCSV(backup);
 
     const filename = `money_tracker_backup_${timestamp}.csv`;
     const fileUri = `${FileSystem.documentDirectory}${filename}`;
@@ -267,31 +313,9 @@ export const exportBackupSQLite = async () => {
   try {
     const timestamp = new Date().toISOString().replace(/[:.]/g, '-').slice(0, -5);
     const filename = `money_tracker_backup_${timestamp}.db`;
-    const sourceUri = `${FileSystem.documentDirectory}SQLite/penny.db`;
     const destUri = `${FileSystem.documentDirectory}${filename}`;
 
-    // Check if source database exists
-    const fileInfo = await FileSystem.getInfoAsync(sourceUri);
-    if (!fileInfo.exists) {
-      throw new Error('Database file not found');
-    }
-
-    // Force a checkpoint to ensure WAL is merged into main database file
-    console.log('Checkpointing database before export...');
-    try {
-      const { executeQuery } = await import('./db');
-      await executeQuery('PRAGMA wal_checkpoint(TRUNCATE)');
-      console.log('Database checkpoint completed');
-    } catch (checkpointError) {
-      console.warn('Failed to checkpoint database:', checkpointError);
-      // Continue anyway, the copy might still work
-    }
-
-    // Copy database file
-    await FileSystem.copyAsync({
-      from: sourceUri,
-      to: destUri,
-    });
+    await writeSQLiteSnapshot(destUri);
 
     console.log('SQLite backup file created:', destUri);
 
