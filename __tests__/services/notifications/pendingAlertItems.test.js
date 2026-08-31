@@ -54,6 +54,9 @@ describe('pendingAlertItems.collectPendingAlertDetails', () => {
     const [detail] = await collectPendingAlertDetails(1);
 
     expect(detail).toMatchObject({
+      // The row id travels with the detail so the alert's Reject button can
+      // name what it drops.
+      id: 'p1',
       amount: '1299.00',
       currency: 'AMD',
       merchant: 'SAS SUPERMARKET',

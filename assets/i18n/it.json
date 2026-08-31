@@ -585,6 +585,8 @@
   "bank_notifications_bg_added_body_other": "{count} operazioni aggiunte automaticamente",
   "bank_notifications_bg_added_to_account": "Su: {name}",
   "bank_notifications_bg_added_acknowledge": "Letto",
+  "bank_notifications_bg_reject": "Rifiuta",
+  "bank_notifications_bg_select": "Scegli",
   "bank_notifications_channel_name": "Operazioni bancarie",
   "bank_notifications_permission_denied": "Abilita le notifiche nelle impostazioni di sistema per ricevere gli avvisi in background",
   "monthly_plan": "Piano mensile",

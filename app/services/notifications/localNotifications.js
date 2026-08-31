@@ -7,6 +7,9 @@
  * - **transactions to review** — new items landed in the review queue; tapping
  *   deep-links to the quick-add surface on the operations page, where the queue
  *   is stacked as binding cards over the form (see useNotificationResponseRouter).
+ *   It carries two buttons — "Select" (the same deep link, spelled out) and,
+ *   when the alert is about a single transaction, "Reject", which drops that
+ *   transaction from the queue without opening the app.
  * - **operations added** — the run booked fully-matched operations on its own.
  *   Without it the silent auto-create path is invisible until the user next opens
  *   the app; tapping lands on the operations list where the new rows are.
@@ -36,6 +39,39 @@ export const ROUTE_PENDING_OPERATIONS = 'notificationProcessing';
  * the suggestion deck.
  */
 export const ROUTE_ADDED_OPERATIONS = 'addedOperations';
+
+/**
+ * Categories (action-button sets) attached to the "transactions to review" alert,
+ * and the ids of their actions.
+ *
+ * The alert asks a question — what is this transaction? — so its buttons are the
+ * two answers a user can give without reading the whole queue: "Select" opens the
+ * review surface (the same place a tap on the body lands, spelled out as a
+ * button), and "Reject" drops the transaction without opening the app at all.
+ *
+ * Rejecting is offered only for an alert about a *single* transaction, which is
+ * why there are two categories: a button that silently discards several
+ * transactions at once — some of which the collapsed row does not even name — is
+ * not a choice anyone can make from the shade. A multi-transaction alert
+ * therefore gets the select-only set, and rejecting stays a per-card action in
+ * the review surface.
+ *
+ * "Reject" declares `opensAppToForeground: false` (Android broadcasts the press
+ * and the handlers act on it headless, as with the receipt's "Acknowledged"),
+ * while "Select" opens the app precisely because picking a category is what it
+ * is for.
+ */
+export const PENDING_ALERT_CATEGORY_ID = 'bank-operations-review';
+export const PENDING_ALERT_SELECT_ONLY_CATEGORY_ID = 'bank-operations-review-select';
+export const REJECT_PENDING_ACTION_ID = 'reject-pending';
+export const SELECT_PENDING_ACTION_ID = 'select-pending';
+
+/**
+ * Data key carrying the ids of the pending rows an alert is about, so the
+ * "Reject" handler knows what to drop. Only populated for the single-transaction
+ * alert (see the categories above).
+ */
+export const PENDING_IDS_KEY = 'pendingIds';
 
 /**
  * Category (action-button set) attached to the "operations added" receipt, and
@@ -160,6 +196,46 @@ export const ensureAddedAlertCategoryAsync = async (buttonTitle) => {
 };
 
 /**
+ * Register (or relabel) the two categories carrying the review alert's buttons.
+ * Safe to call repeatedly — re-setting an existing category overwrites it, which
+ * is how the labels follow a language change.
+ *
+ * Best-effort: if it fails the alert still posts, just without its buttons.
+ *
+ * @param {{ rejectLabel?: string, selectLabel?: string }} [labels]
+ * @returns {Promise<void>}
+ */
+export const ensurePendingAlertCategoriesAsync = async (labels = {}) => {
+  const selectAction = {
+    identifier: SELECT_PENDING_ACTION_ID,
+    buttonTitle: labels.selectLabel || 'Select',
+    // Picking an account/category is done in the app, so this one opens it.
+    options: { opensAppToForeground: true },
+  };
+  const rejectAction = {
+    identifier: REJECT_PENDING_ACTION_ID,
+    buttonTitle: labels.rejectLabel || 'Reject',
+    // Rejecting needs nothing from the app: Android broadcasts the press and the
+    // response handlers drop the queued row headless.
+    options: { opensAppToForeground: false },
+  };
+  try {
+    await Promise.all([
+      Notifications.setNotificationCategoryAsync(
+        PENDING_ALERT_CATEGORY_ID,
+        [rejectAction, selectAction],
+      ),
+      Notifications.setNotificationCategoryAsync(
+        PENDING_ALERT_SELECT_ONLY_CATEGORY_ID,
+        [selectAction],
+      ),
+    ]);
+  } catch (error) {
+    // Non-fatal — the alert is still worth posting without its buttons.
+  }
+};
+
+/**
  * Remove a notification from the tray by id. Best-effort.
  * @param {string} identifier
  * @returns {Promise<void>}
@@ -214,9 +290,16 @@ export const requestNotificationsPermission = async () => {
  * @param {string} route - deep-link route value carried in the payload
  * @param {{ title: string, body: string, channelName?: string }} copy
  * @param {string} [categoryIdentifier] - action-button set to attach
+ * @param {object} [extraData] - additional payload merged into `data`
  * @returns {Promise<void>}
  */
-const presentBankAlert = async (identifier, route, { title, body, channelName }, categoryIdentifier) => {
+const presentBankAlert = async (
+  identifier,
+  route,
+  { title, body, channelName },
+  categoryIdentifier,
+  extraData,
+) => {
   await ensureBankAlertsChannelAsync(channelName);
   try {
     await Notifications.scheduleNotificationAsync({
@@ -224,7 +307,7 @@ const presentBankAlert = async (identifier, route, { title, body, channelName },
       content: {
         title,
         body,
-        data: { [NOTIFICATION_ROUTE_KEY]: route },
+        data: { [NOTIFICATION_ROUTE_KEY]: route, ...extraData },
         ...(categoryIdentifier ? { categoryIdentifier } : null),
       },
       // `null` presents the notification immediately, but assigns it to the
@@ -241,11 +324,31 @@ const presentBankAlert = async (identifier, route, { title, body, channelName },
 /**
  * Post (or refresh) the "transactions to review" alert.
  *
- * @param {{ title: string, body: string, channelName?: string }} copy
+ * Carries the "Select" button always and "Reject" only when `pendingIds` names
+ * exactly one queued row — the alert then describes that one transaction, so
+ * rejecting it is a decision the shade actually shows the user enough to make.
+ * Anything else (several ids, or none because the caller could not identify
+ * them) gets the select-only button set; see the category docs above.
+ *
+ * @param {{ title: string, body: string, channelName?: string,
+ *   rejectLabel?: string, selectLabel?: string }} copy
+ * @param {Array<string>} [pendingIds] - queued rows this alert is about
  * @returns {Promise<void>}
  */
-export const presentPendingOperationsAlert = async (copy) =>
-  presentBankAlert(PENDING_ALERT_IDENTIFIER, ROUTE_PENDING_OPERATIONS, copy);
+export const presentPendingOperationsAlert = async (copy, pendingIds) => {
+  const ids = (Array.isArray(pendingIds) ? pendingIds : [])
+    .filter((id) => id != null)
+    .map(String);
+  const rejectable = ids.length === 1;
+  await ensurePendingAlertCategoriesAsync(copy);
+  return presentBankAlert(
+    PENDING_ALERT_IDENTIFIER,
+    ROUTE_PENDING_OPERATIONS,
+    copy,
+    rejectable ? PENDING_ALERT_CATEGORY_ID : PENDING_ALERT_SELECT_ONLY_CATEGORY_ID,
+    rejectable ? { [PENDING_IDS_KEY]: ids } : null,
+  );
+};
 
 /**
  * Post the "operations added" alert — the receipt for operations a background run
@@ -326,6 +429,41 @@ export const isAddedOperationsResponse = (response) =>
  */
 export const isAcknowledgeResponse = (response) =>
   response?.actionIdentifier === ACKNOWLEDGE_ACTION_ID;
+
+/**
+ * Whether a response is the review alert's "Reject" button. Checked before the
+ * route matchers for the same reason "Acknowledged" is: the press means "drop
+ * this one", so it must never also navigate.
+ *
+ * @param {object|null} response - a Notifications.NotificationResponse
+ * @returns {boolean}
+ */
+export const isRejectPendingResponse = (response) =>
+  response?.actionIdentifier === REJECT_PENDING_ACTION_ID;
+
+/**
+ * Whether a response is the review alert's "Select" button rather than a tap on
+ * the notification body. Both go to the same place; they differ only in that
+ * Android auto-cancels the notification for a body tap and not for a button.
+ *
+ * @param {object|null} response - a Notifications.NotificationResponse
+ * @returns {boolean}
+ */
+export const isSelectPendingResponse = (response) =>
+  response?.actionIdentifier === SELECT_PENDING_ACTION_ID;
+
+/**
+ * The pending-queue row ids a response's notification is about, as strings.
+ * Empty when the alert carried none (see presentPendingOperationsAlert).
+ *
+ * @param {object|null} response - a Notifications.NotificationResponse
+ * @returns {Array<string>}
+ */
+export const responsePendingIds = (response) => {
+  const ids = response?.notification?.request?.content?.data?.[PENDING_IDS_KEY];
+  if (!Array.isArray(ids)) return [];
+  return ids.filter((id) => id != null).map(String);
+};
 
 /**
  * The tray id of the notification a response belongs to, or null.
