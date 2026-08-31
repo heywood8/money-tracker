@@ -11,6 +11,19 @@ import * as OperationsDB from '../../../app/services/OperationsDB';
 import * as AccountsDB from '../../../app/services/AccountsDB';
 import * as NotificationRulesDB from '../../../app/services/NotificationRulesDB';
 import * as PendingNotificationsDB from '../../../app/services/PendingNotificationsDB';
+// The rejection log is mocked as a port, but keeps its real fingerprint function:
+// the pipeline and the dismissal path must agree on what identifies a
+// transaction, and a stubbed fingerprint would make every test pass regardless.
+jest.mock('../../../app/services/DismissedNotificationsDB', () => {
+  const actual = jest.requireActual('../../../app/services/DismissedNotificationsDB');
+  return {
+    notificationFingerprint: actual.notificationFingerprint,
+    loadDismissedFingerprints: jest.fn(),
+    rememberDismissedNotification: jest.fn(),
+    forgetDismissedNotification: jest.fn(),
+  };
+});
+import * as DismissedNotificationsDB from '../../../app/services/DismissedNotificationsDB';
 import { appEvents, EVENTS } from '../../../app/services/eventEmitter';
 
 jest.mock('../../../app/services/NotificationAccess');
@@ -132,6 +145,11 @@ describe('processBankNotifications', () => {
     // Opt-in on by default so the resolve path can reuse a stored fix; the tests
     // that exercise the off case override this explicitly.
     OperationLocation.isAttachLocationEnabled.mockResolvedValue(true);
+    // Nothing rejected by default.
+    DismissedNotificationsDB.loadDismissedFingerprints.mockResolvedValue(new Set());
+    DismissedNotificationsDB.rememberDismissedNotification.mockResolvedValue('fp');
+    DismissedNotificationsDB.forgetDismissedNotification.mockResolvedValue();
+    PendingNotificationsDB.getPendingNotificationById.mockResolvedValue(null);
   });
 
   it('does nothing when disabled', async () => {
@@ -1320,6 +1338,122 @@ describe('processBankNotifications', () => {
 
       expect(PendingNotificationsDB.deletePendingNotification).toHaveBeenCalledWith('p1');
       expect(emitSpy).toHaveBeenCalledWith(EVENTS.RELOAD_ALL);
+    });
+
+    it('remembers the rejection before deleting the row', async () => {
+      const pending = {
+        id: 'p1', kind: 'purchase', type: 'expense', amount: '3900.00',
+        currency: 'AMD', cardMask: '4083***7027', merchant: 'NAREK MEHRABYAN',
+        date: '2026-06-28', time: '10:15', packageName: PKG, raw: PURCHASE.text,
+      };
+      PendingNotificationsDB.getPendingNotificationById.mockResolvedValue(pending);
+      PendingNotificationsDB.deletePendingNotification.mockResolvedValue();
+
+      await pipeline.dismissPendingNotification('p1');
+
+      expect(DismissedNotificationsDB.rememberDismissedNotification)
+        .toHaveBeenCalledWith(expect.objectContaining({ amount: '3900.00', raw: PURCHASE.text }));
+    });
+
+    it('still dismisses when the rejection cannot be remembered', async () => {
+      // A card that refuses to leave is worse than a forgotten rejection: the
+      // user can dismiss again, but cannot un-stick the card.
+      PendingNotificationsDB.getPendingNotificationById.mockRejectedValue(new Error('db down'));
+      PendingNotificationsDB.deletePendingNotification.mockResolvedValue();
+
+      await pipeline.dismissPendingNotification('p1');
+
+      expect(PendingNotificationsDB.deletePendingNotification).toHaveBeenCalledWith('p1');
+    });
+  });
+
+  describe('rejected notifications', () => {
+    // The queue's memory of a rejection is what keeps a dismissed card from
+    // coming back: the seen-signature is keyed on the notification's post time,
+    // so a bank re-post reads as new, and the signature window is bounded anyway.
+    const dismissedPurchase = new Set([
+      DismissedNotificationsDB.notificationFingerprint({
+        packageName: PKG, kind: 'purchase', type: 'expense', amount: '3900.00',
+        currency: 'AMD', cardMask: '4083***7027', merchant: 'NAREK MEHRABYAN',
+        raw: PURCHASE.text,
+      }),
+    ]);
+
+    it('does not re-queue a notification the user dismissed', async () => {
+      NotificationAccess.getRecentNotifications.mockResolvedValue([PURCHASE]);
+      AccountsDB.getAccountByCardMask.mockResolvedValue({ id: 7, currency: 'AMD' });
+      DismissedNotificationsDB.loadDismissedFingerprints.mockResolvedValue(dismissedPurchase);
+
+      const summary = await pipeline.processBankNotifications();
+
+      expect(summary).toMatchObject({ created: 0, pending: 0, skipped: 1 });
+      expect(PendingNotificationsDB.addPendingNotification).not.toHaveBeenCalled();
+    });
+
+    it('does not auto-create a dismissed notification once its bindings resolve', async () => {
+      // The rejection outranks the trusted-source auto-create path — booking it
+      // silently would be worse than re-queueing it.
+      NotificationAccess.getRecentNotifications.mockResolvedValue([PURCHASE]);
+      AccountsDB.getAccountByCardMask.mockResolvedValue({ id: 7, currency: 'AMD' });
+      NotificationRulesDB.getMerchantRule.mockResolvedValue({ categoryId: 'cat-food', labelOverride: 'Groceries' });
+      PreferencesDB.getJsonPreference.mockImplementation((key) => prefs([], [PKG])(key));
+      DismissedNotificationsDB.loadDismissedFingerprints.mockResolvedValue(dismissedPurchase);
+
+      const summary = await pipeline.processBankNotifications();
+
+      expect(summary).toMatchObject({ created: 0, pending: 0, skipped: 1 });
+      expect(OperationsDB.createOperation).not.toHaveBeenCalled();
+    });
+
+    it('records the skipped notification as seen so later passes stop re-checking it', async () => {
+      NotificationAccess.getRecentNotifications.mockResolvedValue([PURCHASE]);
+      DismissedNotificationsDB.loadDismissedFingerprints.mockResolvedValue(dismissedPurchase);
+
+      await pipeline.processBankNotifications();
+
+      expect(PreferencesDB.setJsonPreference).toHaveBeenCalledWith(
+        PREF_KEYS.BANK_NOTIFICATIONS_PROCESSED_SIGS,
+        [pipeline.notificationSignature(PURCHASE)],
+      );
+    });
+
+    it('stays dismissed when the bank re-posts the notification with a new post time', async () => {
+      // The regression this whole log exists for: the seen-signature is keyed on
+      // the post time, so a re-post reads as a brand-new notification. Only the
+      // content fingerprint can recognize it as the transaction already rejected.
+      const rePost = { ...PURCHASE, postTime: PURCHASE.postTime + 45 * 60 * 1000 };
+      NotificationAccess.getRecentNotifications.mockResolvedValue([rePost]);
+      AccountsDB.getAccountByCardMask.mockResolvedValue({ id: 7, currency: 'AMD' });
+      DismissedNotificationsDB.loadDismissedFingerprints.mockResolvedValue(dismissedPurchase);
+
+      const summary = await pipeline.processBankNotifications();
+
+      expect(summary).toMatchObject({ created: 0, pending: 0, skipped: 1 });
+      expect(PendingNotificationsDB.addPendingNotification).not.toHaveBeenCalled();
+    });
+
+    it('still ingests a different transaction from the same card and merchant', async () => {
+      // Only the exact rejected transaction is suppressed — a later charge at the
+      // same shop differs in amount (and date/time), so it must still be queued.
+      NotificationAccess.getRecentNotifications.mockResolvedValue([EPOS_EUR]);
+      AccountsDB.getAccountByCardMask.mockResolvedValue({ id: 7, currency: 'AMD' });
+      Currency.fetchLiveExchangeRate.mockResolvedValue({ rate: '0.0024', source: 'live' });
+      DismissedNotificationsDB.loadDismissedFingerprints.mockResolvedValue(dismissedPurchase);
+
+      const summary = await pipeline.processBankNotifications();
+
+      expect(summary.pending).toBe(1);
+      expect(PendingNotificationsDB.addPendingNotification).toHaveBeenCalled();
+    });
+
+    it('forgets the rejection when the user explicitly re-adds the notification', async () => {
+      AccountsDB.getAccountByCardMask.mockResolvedValue({ id: 7, currency: 'AMD' });
+
+      await pipeline.reAddNotification(PURCHASE);
+
+      expect(DismissedNotificationsDB.forgetDismissedNotification).toHaveBeenCalledWith(
+        expect.objectContaining({ amount: '3900.00', raw: PURCHASE.text }),
+      );
     });
   });
 

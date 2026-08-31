@@ -8,6 +8,12 @@
  * binding; otherwise queue. Already-processed notifications are skipped
  * using a rolling set of signatures persisted in preferences, because the native
  * listener exposes a pull-only rolling window with no per-item "seen" state.
+ *
+ * That signature is keyed on the notification's post time, so a bank that
+ * re-posts or updates a notification presents it as new — and the signature
+ * window is bounded, so an old one eventually rolls off. Either way the same
+ * transaction can reach this pipeline twice, which is why a rejected one is also
+ * remembered by content (DismissedNotificationsDB) and skipped here.
  */
 
 import { getRecentNotifications } from '../NotificationAccess';
@@ -17,6 +23,7 @@ import * as AccountsDB from '../AccountsDB';
 import * as Currency from '../currency';
 import * as NotificationRulesDB from '../NotificationRulesDB';
 import * as PendingNotificationsDB from '../PendingNotificationsDB';
+import * as DismissedNotificationsDB from '../DismissedNotificationsDB';
 import { serializeLabels, sanitizeLabel, normalizeMerchantLabel } from '../../utils/labelUtils';
 import { appEvents, EVENTS } from '../eventEmitter';
 import { captureLocationIfEnabled, isAttachLocationEnabled, operationLocationFields } from '../operationLocation';
@@ -732,6 +739,11 @@ const runProcess = async () => {
   }
 
   const seen = new Set(await loadSignatures());
+  // Transactions the user rejected in the review queue. Read once per pass and
+  // consulted before anything is booked or queued, so a notification that comes
+  // back (a bank re-post carries a new post time, and the signature window is
+  // bounded) does not resurrect a card the user already said no to.
+  const dismissed = await DismissedNotificationsDB.loadDismissedFingerprints();
   const allowedPackages = await getAllowedPackages();
   const newlySeen = [];
   trace.mark('signatures');
@@ -759,6 +771,20 @@ const runProcess = async () => {
     const descriptor = parseBankNotification(notification);
     if (!descriptor) {
       // Not a recognized transaction — mark seen so we don't re-parse it.
+      seen.add(signature);
+      newlySeen.push(signature);
+      summary.skipped += 1;
+      continue;
+    }
+
+    // The user already rejected this transaction. Drop it before resolution, so
+    // it is neither re-queued for review nor auto-created behind their back when
+    // its bindings have since become resolvable. Marked seen so the check does
+    // not have to run again for as long as the signature holds. The explicit
+    // "Re-add operation" path clears the rejection first, so the user keeps a way
+    // back in.
+    if (dismissed.size > 0
+      && dismissed.has(DismissedNotificationsDB.notificationFingerprint(descriptor))) {
       seen.add(signature);
       newlySeen.push(signature);
       summary.skipped += 1;
@@ -1130,6 +1156,9 @@ const resolvePendingTransfer = async (pending, choices = {}) => {
  * make the re-add report "added to review queue" over an empty queue. A no-op
  * (skipped) when the notification does not parse as a bank transaction.
  *
+ * A rejection recorded for this same transaction is forgotten first, for the same
+ * reason the duplicate check is bypassed: the user is explicitly asking for it.
+ *
  * @param {{ title?: string, text?: string, packageName?: string, postTime?: number }} notification
  * @returns {Promise<{ created: number, pending: number, skipped: number }>}
  */
@@ -1147,6 +1176,12 @@ export const reAddNotification = async (notification) => {
 
   // operations.date is NOT NULL — always supply a valid date.
   const date = descriptor.date || isoDateFromPostTime(notification.postTime) || todayIso();
+
+  // The user is asking for this notification back, so clear any rejection they
+  // recorded for it — otherwise the item would be booked or queued here and then
+  // dropped again by the very next automatic pass.
+  await DismissedNotificationsDB.forgetDismissedNotification(descriptor);
+
   const resolution = await resolveNotification(descriptor);
 
   // The user explicitly asked to re-add this, so treat its own source as trusted
@@ -1172,6 +1207,16 @@ export const reAddNotification = async (notification) => {
 
 /**
  * Dismiss a pending notification without creating an operation.
+ *
+ * The rejection is remembered by content before the row is deleted, so the next
+ * ingestion pass drops the same transaction instead of re-queueing it: deleting
+ * the row alone left no trace, and the pipeline re-reads a notification whenever
+ * its post-time signature changes (a bank re-post) or rolls out of the bounded
+ * signature window — which is exactly how a dismissed card kept coming back.
+ * Recording is best-effort: failing to remember a rejection must not also fail to
+ * perform it, since the user can dismiss again but cannot un-stick a card that
+ * refused to leave.
+ *
  * Emits RELOAD_ALL so every live surface (the settings review queue and the
  * operations-page suggestion stack) drops the card — mirroring the resolve path,
  * which already emits it. Without this, dismissing from one surface leaves a
@@ -1180,6 +1225,12 @@ export const reAddNotification = async (notification) => {
  * @returns {Promise<void>}
  */
 export const dismissPendingNotification = async (pendingId) => {
+  try {
+    const pending = await PendingNotificationsDB.getPendingNotificationById(pendingId);
+    if (pending) await DismissedNotificationsDB.rememberDismissedNotification(pending);
+  } catch (error) {
+    console.warn('[dismissPendingNotification] Failed to remember dismissal:', error);
+  }
   await PendingNotificationsDB.deletePendingNotification(pendingId);
   appEvents.emit(EVENTS.RELOAD_ALL);
   await syncPendingOperationsAlert();
