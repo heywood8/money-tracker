@@ -114,14 +114,15 @@ export default function usePendingOperationSuggestions({
   // a suggestion until the next event.
   const reloadSeqRef = useRef(0);
 
-  const reload = useCallback(async ({ reconcile = true } = {}) => {
+  const reload = useCallback(async () => {
     const seq = reloadSeqRef.current + 1;
     reloadSeqRef.current = seq;
     try {
       // Drop any card the user has already recorded by hand before reading the
       // queue, so a matching operation makes its suggestion disappear at once.
-      // Skipped when the caller just ran the pipeline (which already reconciled).
-      if (reconcile) await reconcilePendingNotifications();
+      // Always, including right after an ingestion pass: that pass reconciles at
+      // its start, so anything it went on to book is still queued here.
+      await reconcilePendingNotifications();
       const [items, atmAccount] = await Promise.all([
         getPendingNotifications(),
         resolveAtmTargetAccount().catch(() => null),
@@ -286,8 +287,14 @@ export default function usePendingOperationSuggestions({
     } catch (error) {
       // Ingestion failure is non-fatal — still reload whatever is queued.
     }
-    // The pipeline already reconciled the queue, so skip a redundant second pass.
-    await reload({ reconcile: false });
+    // Reconcile before publishing, even though the pass just reconciled: it does
+    // so at its *start*, before it books anything, so a row the pass has since
+    // made redundant — it auto-created the same transaction, or the user recorded
+    // it by hand while away — is still in the queue this read sees. Publishing it
+    // put a card on screen that the next reconciling reload then took away, which
+    // on the foreground path is a card that appears and vanishes half a second
+    // later.
+    await reload();
   }, [reload]);
 
   // Re-read the queue whenever the app comes back to the foreground.
