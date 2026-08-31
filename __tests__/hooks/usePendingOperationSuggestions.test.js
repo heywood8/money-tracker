@@ -5,6 +5,7 @@
  */
 
 import { renderHook, act, waitFor } from '@testing-library/react-native';
+import { AppState } from 'react-native';
 import usePendingOperationSuggestions, { canSaveSuggestion } from '../../app/hooks/usePendingOperationSuggestions';
 import * as pipeline from '../../app/services/notifications/processBankNotifications';
 import * as PendingNotificationsDB from '../../app/services/PendingNotificationsDB';
@@ -255,6 +256,93 @@ describe('usePendingOperationSuggestions', () => {
         appEvents.emit(EVENTS.RELOAD_ALL);
       });
       await waitFor(() => expect(result.current.choices).toEqual({}));
+    });
+  });
+
+  // A queue filled while the user was away is invisible to a live event: the
+  // background task emits RELOAD_ALL in its own headless JS context, and the
+  // foreground pass has nothing to announce once that task has marked those
+  // notifications seen. Screens never remount, so the return to the foreground
+  // is the hook's only chance to notice.
+  describe('foreground resync', () => {
+    const originalState = AppState.currentState;
+    let handler;
+    let remove;
+
+    beforeEach(() => {
+      handler = null;
+      remove = jest.fn();
+      AppState.currentState = 'background';
+      jest.spyOn(AppState, 'addEventListener').mockImplementation((event, callback) => {
+        if (event === 'change') handler = callback;
+        return { remove };
+      });
+    });
+
+    afterEach(() => {
+      AppState.addEventListener.mockRestore();
+      AppState.currentState = originalState;
+    });
+
+    it('re-runs the pipeline and reloads the queue when the app comes back', async () => {
+      const { result } = await renderHook(() => usePendingOperationSuggestions());
+      await waitFor(() => expect(result.current.suggestions).toEqual([EXPENSE]));
+
+      // Queued while the app was away — by the background task, which this JS
+      // context never heard about.
+      PendingNotificationsDB.getPendingNotifications.mockResolvedValue([EXPENSE, TRANSFER]);
+      await act(async () => { handler('active'); });
+
+      expect(pipeline.processBankNotifications).toHaveBeenCalledTimes(1);
+      await waitFor(() => expect(result.current.suggestions).toHaveLength(2));
+    });
+
+    it('ignores a transition that is not a return to the foreground', async () => {
+      const { result } = await renderHook(() => usePendingOperationSuggestions());
+      await waitFor(() => expect(result.current.suggestions).toEqual([EXPENSE]));
+      const callsBefore = PendingNotificationsDB.getPendingNotifications.mock.calls.length;
+
+      await act(async () => { handler('inactive'); });
+
+      expect(pipeline.processBankNotifications).not.toHaveBeenCalled();
+      expect(PendingNotificationsDB.getPendingNotifications.mock.calls.length).toBe(callsBefore);
+    });
+
+    it('never lets a slower earlier reload write back over a newer one', async () => {
+      const { result } = await renderHook(() => usePendingOperationSuggestions());
+      await waitFor(() => expect(result.current.suggestions).toEqual([EXPENSE]));
+
+      // The foreground resync reads the queue as it was; the RELOAD_ALL the same
+      // pipeline pass emits reads it after the new item landed — and resolves
+      // first, because the two take different paths through the DB.
+      let releaseStale;
+      PendingNotificationsDB.getPendingNotifications
+        .mockImplementationOnce(() => new Promise((resolve) => {
+          releaseStale = () => resolve([EXPENSE]);
+        }))
+        .mockResolvedValue([EXPENSE, TRANSFER]);
+
+      await act(async () => { handler('active'); });
+      await act(async () => {
+        appEvents.emit(EVENTS.RELOAD_ALL);
+      });
+      await waitFor(() => expect(result.current.suggestions).toHaveLength(2));
+
+      await act(async () => {
+        releaseStale();
+        await Promise.resolve();
+      });
+
+      expect(result.current.suggestions).toHaveLength(2);
+    });
+
+    it('stops listening on unmount', async () => {
+      const { unmount } = await renderHook(() => usePendingOperationSuggestions());
+      await waitFor(() => expect(PendingNotificationsDB.getPendingNotifications).toHaveBeenCalled());
+
+      await unmount();
+
+      expect(remove).toHaveBeenCalled();
     });
   });
 

@@ -338,6 +338,17 @@ live on `AccountsDB` (`getAccountByCardMask`, `setAccountCardMask`).
 - Triggered on app open and on every foreground transition via an `AppState`
   listener in `app/screens/AppInitializer.js`, and — when background alerts are
   on — from the periodic background task (below).
+- The binding-card deck on the operations page
+  (`app/hooks/usePendingOperationSuggestions.js`) re-reads the review queue on
+  mount, on `RELOAD_ALL` / `OPERATION_CHANGED`, on pull-to-refresh, and on every
+  return to the foreground. The last one is not redundant: a queue filled while
+  the user was away is announced by a `RELOAD_ALL` this JS context never hears
+  (the background task runs headless), and the foreground pass that follows stays
+  silent because those notifications are already marked seen. Screens stay
+  mounted for the whole session (`SimpleTabs`), so without the foreground re-read
+  a queued card would never reach the operations page at all. It runs the
+  pipeline rather than only re-reading, which joins the pass `AppInitializer`
+  starts on the same transition (overlapping runs share one pass).
 - **Known limitation:** the native service keeps only the **last 50**
   notifications and is pull-only (no JS events). For lossless capture under
   bursty/backgrounded conditions, extend the Kotlin
