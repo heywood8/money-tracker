@@ -34,7 +34,7 @@ import {
   presentAddedOperationsAlert,
   presentPendingOperationsAlert,
 } from './localNotifications';
-import { getAddedAlertCopy, getPendingAlertCopy } from './notificationStrings';
+import { getAddedAlertCopy, getPendingAlertCopy, isSingleItemAlert } from './notificationStrings';
 import { collectPendingAlertDetails } from './pendingAlertItems';
 import { collectAddedAlertDetails } from './addedAlertItems';
 import { isAppInForeground } from './appForeground';
@@ -163,7 +163,14 @@ export const runBackgroundBankCheck = async () => {
     // glance; an empty list degrades to the plain count-only copy.
     const details = await collectPendingAlertDetails(summary.pending);
     const copy = await getPendingAlertCopy(totalPending, details);
-    await presentPendingOperationsAlert(copy);
+    // The queued rows the alert is about, which is what its "Reject" button
+    // drops. Only supplied when the alert is about that one transaction and
+    // nothing else is waiting — a reject button on a summary of several would
+    // discard transactions the collapsed row never named.
+    await presentPendingOperationsAlert(
+      copy,
+      isSingleItemAlert(totalPending, details) ? [details[0].id] : [],
+    );
     return { ...summary, notified: true, notifiedAdded };
   }
 

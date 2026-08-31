@@ -128,6 +128,23 @@ const recognizedFor = (language, detail) => {
 };
 
 /**
+ * Whether the review alert for this queue is about one single transaction — the
+ * shape whose title is that transaction's own headline rather than a count.
+ *
+ * Also decides whether the alert may carry a "Reject" button: rejecting from the
+ * shade is only offered when the notification names the transaction being
+ * rejected (see localNotifications' category docs), which is exactly this shape.
+ *
+ * @param {number} count - number of transactions currently awaiting review
+ * @param {Array<Object>} [details] - described items (see collectPendingAlertDetails)
+ * @returns {boolean}
+ */
+export const isSingleItemAlert = (count, details = []) => {
+  const items = Array.isArray(details) ? details.filter(Boolean) : [];
+  return items.length === 1 && count === 1;
+};
+
+/**
  * Build the localized title/body/channel-name for the pending-operations alert.
  *
  * With no details it stays a plain count ("3 transactions are waiting to be
@@ -137,9 +154,14 @@ const recognizedFor = (language, detail) => {
  * get one line each (Android expands the body via BigTextStyle), with a
  * "+N more" line when the queue is longer than the described batch.
  *
+ * `rejectLabel` / `selectLabel` are the alert's two action buttons; which of
+ * them the notification actually shows is the presenter's call (see
+ * presentPendingOperationsAlert).
+ *
  * @param {number} count - number of transactions currently awaiting review
  * @param {Array<Object>} [details] - described items (see collectPendingAlertDetails)
- * @returns {Promise<{ title: string, body: string, channelName: string }>}
+ * @returns {Promise<{ title: string, body: string, channelName: string,
+ *   rejectLabel: string, selectLabel: string }>}
  */
 export const getPendingAlertCopy = async (count, details = []) => {
   const language = await resolveLanguage();
@@ -149,6 +171,10 @@ export const getPendingAlertCopy = async (count, details = []) => {
     : 'bank_notifications_bg_notification_body_other';
   const countLine = translate(language, bodyKey).replace('{count}', String(safeCount));
   const channelName = translate(language, 'bank_notifications_channel_name');
+  const actions = {
+    rejectLabel: translate(language, 'bank_notifications_bg_reject'),
+    selectLabel: translate(language, 'bank_notifications_bg_select'),
+  };
   const items = Array.isArray(details) ? details.filter(Boolean) : [];
 
   if (items.length === 0) {
@@ -156,10 +182,11 @@ export const getPendingAlertCopy = async (count, details = []) => {
       title: translate(language, 'bank_notifications_bg_notification_title'),
       body: countLine,
       channelName,
+      ...actions,
     };
   }
 
-  if (items.length === 1 && safeCount === 1) {
+  if (isSingleItemAlert(safeCount, items)) {
     const detail = items[0];
     return {
       title: headlineFor(language, detail),
@@ -167,6 +194,7 @@ export const getPendingAlertCopy = async (count, details = []) => {
         .filter(Boolean)
         .join('\n'),
       channelName,
+      ...actions,
     };
   }
 
@@ -184,6 +212,7 @@ export const getPendingAlertCopy = async (count, details = []) => {
     title: countLine,
     body: lines.join('\n'),
     channelName,
+    ...actions,
   };
 };
 

@@ -585,6 +585,8 @@
   "bank_notifications_bg_added_body_other": "{count} opérations ajoutées automatiquement",
   "bank_notifications_bg_added_to_account": "Vers : {name}",
   "bank_notifications_bg_added_acknowledge": "Vu",
+  "bank_notifications_bg_reject": "Rejeter",
+  "bank_notifications_bg_select": "Choisir",
   "bank_notifications_channel_name": "Opérations bancaires",
   "bank_notifications_permission_denied": "Activez les notifications dans les paramètres système pour recevoir les alertes en arrière-plan",
   "monthly_plan": "Plan mensuel",

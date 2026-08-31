@@ -1,5 +1,26 @@
 # Changelog
 
+## [0.281.0](https://github.com/heywood8/money-tracker/compare/penny-v0.280.4...penny-v0.281.0) (2026-08-31)
+
+
+### Features
+
+* **notifications:** add Reject/Select buttons to the review alert ([#1683](https://github.com/heywood8/money-tracker/issues/1683)) ([8821c42](https://github.com/heywood8/money-tracker/commit/8821c42b9e87c1b0c2ff490a0ecb82744e032247))
+
+## [0.280.4](https://github.com/heywood8/money-tracker/compare/penny-v0.280.3...penny-v0.280.4) (2026-08-31)
+
+
+### Bug Fixes
+
+* **notifications:** remember dismissed operations so they stop coming back ([#1681](https://github.com/heywood8/money-tracker/issues/1681)) ([f577e2e](https://github.com/heywood8/money-tracker/commit/f577e2e0bfb23f2b1420a565f6ac014666fb7f91))
+
+## [0.280.3](https://github.com/heywood8/money-tracker/compare/penny-v0.280.2...penny-v0.280.3) (2026-08-31)
+
+
+### Bug Fixes
+
+* **notifications:** re-read the review queue when the app comes back ([#1679](https://github.com/heywood8/money-tracker/issues/1679)) ([ae6af20](https://github.com/heywood8/money-tracker/commit/ae6af20bc6087ac2ed304415f734aa374a8c25a9))
+
 ## [0.280.2](https://github.com/heywood8/money-tracker/compare/penny-v0.280.1...penny-v0.280.2) (2026-08-30)
 
 

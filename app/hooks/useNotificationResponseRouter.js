@@ -6,8 +6,11 @@ import {
   isAcknowledgeResponse,
   isAddedOperationsResponse,
   isPendingOperationsResponse,
+  isRejectPendingResponse,
+  isSelectPendingResponse,
   responseNotificationId,
 } from '../services/notifications/localNotifications';
+import { handleRejectPendingResponse } from '../services/notifications/rejectPendingAction';
 
 /**
  * Routes a tapped "transactions to review" notification to the quick-add surface
@@ -17,6 +20,10 @@ import {
  * The sibling "operations added" notification routes to the same page but not to
  * the deck: those operations are already booked, so the user wants to see them in
  * the list, not a review surface.
+ *
+ * The alert's two buttons are handled here too: "Select" is the same deep link
+ * as a tap on the body (plus the dismissal Android does not do for a button),
+ * while "Reject" navigates nowhere — it drops the queued item where it stands.
  *
  * Handles both cases:
  *   - Warm: the app is already running when the notification is tapped
@@ -36,7 +43,11 @@ export default function useNotificationResponseRouter() {
   useEffect(() => {
     let active = true;
 
-    const route = (response) => {
+    // `fromColdStart` marks the response expo-notifications replays on launch.
+    // It is how a press that opened the app arrives — but it is also handed back
+    // on a later launch from the home screen, so a press that never opens the
+    // app (Reject) is *always* a replay here and must not be acted on twice.
+    const route = (response, fromColdStart = false) => {
       // "Acknowledged" is checked first and navigates nowhere: it means "seen,
       // dismiss it", so treating it as a tap would yank the user into the app.
       // Clearing it here covers the running app; acknowledgeTask covers the rest.
@@ -44,7 +55,23 @@ export default function useNotificationResponseRouter() {
         dismissNotificationById(responseNotificationId(response));
         return;
       }
+      // "Reject" likewise answers the alert instead of navigating: the item is
+      // dropped from the review queue where it stands. Handled here for the
+      // running app; the headless task covers the rest — which is also why a
+      // cold-start replay is dropped rather than re-run. The press was already
+      // performed, the queued row is long gone, and re-running it would clear
+      // whatever review alert is in the tray *now*, about another transaction.
+      if (isRejectPendingResponse(response)) {
+        if (!fromColdStart) handleRejectPendingResponse(response).catch(() => {});
+        return;
+      }
       if (isPendingOperationsResponse(response)) {
+        // The "Select" button lands in the same place as a tap on the body, but
+        // Android's auto-cancel only covers the tap — so clear the alert here or
+        // it outlives the review it asked for.
+        if (isSelectPendingResponse(response)) {
+          dismissNotificationById(responseNotificationId(response));
+        }
         appEvents.emit(EVENTS.OPEN_PENDING_OPERATIONS);
       } else if (isAddedOperationsResponse(response)) {
         appEvents.emit(EVENTS.OPEN_ADDED_OPERATIONS);
@@ -54,7 +81,7 @@ export default function useNotificationResponseRouter() {
     // Cold start: the notification that launched the app, if any.
     Notifications.getLastNotificationResponseAsync()
       .then((response) => {
-        if (active && response) route(response);
+        if (active && response) route(response, true);
       })
       .catch(() => {});
 

@@ -179,6 +179,39 @@ Two supporting changes keep it that way:
   the panel re-runs the pipeline every three seconds and a line per tick would
   evict the 500-entry log ring within the hour.
 
+### Dismissing a review item is remembered
+
+Dismissing a queued item used to only delete its `pending_notifications` row,
+which left nothing to stop the next pass from queueing the same transaction
+again. The seen-signature is keyed on the notification's **post time**, so a bank
+that re-posts or updates a notification presents it to the pipeline as new — and
+the signature list is a bounded rolling window, so an old entry eventually falls
+off regardless. Either way, a rejected card came back.
+
+`dismissPendingNotification` now records the transaction in
+`dismissed_notifications` before deleting the queue row
+(`app/services/DismissedNotificationsDB.js`), and ingestion loads those
+fingerprints once per pass and drops a match **before** resolution — so a
+rejected transaction is neither re-queued nor, once its bindings become
+resolvable, auto-created behind the user's back.
+
+The cost, stated plainly: two genuinely distinct charges the bank announced in
+byte-identical words share one fingerprint, so a repeat within the retention
+window is dropped rather than queued. Nothing in such a pair distinguishes them —
+that is what byte-identical means — so no fingerprint could separate them either.
+In practice both built-in parsers read a running balance (and Ameriabank a clock
+time) out of the text, which differs between two charges; the exposure is a terser
+source, mainly a user-defined template. The way back is **Re-add operation**
+below.
+
+That cost is why a rejection expires after **14 days**, enforced on read as well
+as pruned on write. It only has to outlive the two rolling windows that can
+re-present a notification — the native listener's 50 entries and the pipeline's
+100 remembered signatures, both of which turn over in days on an active device. A
+rejection that outlived them would start suppressing charges nobody would call a
+repeat: the same subscription billed a month later reads exactly the same and is
+a transaction the user does want queued.
+
 ### Re-adding an already-processed notification
 
 Each already-processed notification stays visible in the **Recent notifications**
@@ -188,7 +221,9 @@ re-runs the parse → resolve → book pipeline for just that notification
 seen-signature dedup and the learn-on-trust gate (the user is explicitly asking
 for it). It creates the operation when it fully resolves, or enqueues it for
 review otherwise — useful after deleting the original operation or dismissing a
-review item by mistake.
+review item by mistake. It also forgets any recorded rejection for that
+transaction first: without that, the item would be re-added here and dropped
+again by the very next automatic pass.
 
 ## Agreed design decisions
 
@@ -304,6 +339,15 @@ Covered by `__tests__/services/notifications/parseBankNotification.test.js`
   | `createdAt` / `updatedAt` | text | ISO timestamps             |
 - `pending_notifications` — the review queue (parsed descriptor + best-effort
   account/category suggestions).
+- `dismissed_notifications` — the rejection log (migration 0029). One row per
+  transaction the user dismissed from the review queue, keyed by a `fingerprint`
+  of the transaction the notification described (source app, kind, type, amount,
+  currency, card mask, merchant, and the bank's own text) rather than of the
+  notification's delivery. The date the item would be booked with is deliberately
+  *not* in it: for a bank that sends no date, that date is derived from the very
+  post time whose change is why the notification is being read again. Rows expire
+  after 14 days and, like the pending queue, stay out of backups: this is local
+  dedup state, not user data.
 
   > Alternative considered: store rules as a JSON blob in `appMetadata`. Rejected
   > — a real table gives indexed lookups and a clean "rules list" UI later.
@@ -329,9 +373,10 @@ live on `AccountsDB` (`getAccountByCardMask`, `setAccountCardMask`).
 
 - `processBankNotifications()` reads `getRecentNotifications()`, de-dupes against
   a rolling set of signatures (`postTime + text hash`) persisted in preferences,
-  parses + resolves each, and either `createOperation` (fully matched — account,
-  category, and a name binding all resolved — description seeded with the learned
-  label) or enqueues a pending item. Emits
+  parses + resolves each, drops anything the user has already rejected (see
+  *Dismissing a review item is remembered*), and either `createOperation` (fully
+  matched — account, category, and a name binding all resolved — description
+  seeded with the learned label) or enqueues a pending item. Emits
   `RELOAD_ALL` when operations are created. No-op when disabled.
 - `resolvePendingNotification(id, choices)` — creates the operation from a
   reviewed item and learns the card → account and merchant → category bindings.

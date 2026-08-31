@@ -12,6 +12,13 @@ const mockUnique = jest.fn(() => ({
   on: jest.fn((...columns) => ({ type: 'unique', columns })),
 }));
 
+// Named unique index (dismissed_notifications.fingerprint, migration 0029).
+// Shaped like index() rather than unique(): it takes the index name up front and
+// the columns through .on().
+const mockUniqueIndex = jest.fn((name) => ({
+  on: jest.fn((...columns) => ({ type: 'uniqueIndex', name, columns })),
+}));
+
 // Composite primary key (budget_plan_line_categories, migration 0021). Unlike
 // index()/unique() this one takes its columns up front and returns the
 // constraint directly — there is no .on() to chain.
@@ -79,6 +86,7 @@ jest.mock('drizzle-orm/sqlite-core', () => {
     }),
     index: mockIndex,
     unique: mockUnique,
+    uniqueIndex: mockUniqueIndex,
     primaryKey: mockPrimaryKey,
   };
 });

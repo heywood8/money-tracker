@@ -56,10 +56,10 @@ const missingFor = (item, hasAtmTarget) => {
  * @param {number} newCount - how many items this run queued (summary.pending)
  * @param {number} [limit] - maximum number of described items
  * @returns {Promise<Array<{
- *   type: string, amount: string, currency: string, merchant: string|null,
- *   cardMask: string|null, date: string|null, accountName: string|null,
- *   categoryName: string|null, categoryNameKey: string|null,
- *   missing: string|null,
+ *   id: string, type: string, amount: string, currency: string,
+ *   merchant: string|null, cardMask: string|null, date: string|null,
+ *   accountName: string|null, categoryName: string|null,
+ *   categoryNameKey: string|null, missing: string|null,
  * }>>} described items, or [] when nothing could be read
  */
 export const collectPendingAlertDetails = async (newCount, limit = MAX_ALERT_DETAILS) => {
@@ -90,6 +90,8 @@ export const collectPendingAlertDetails = async (newCount, limit = MAX_ALERT_DET
         ? categoriesById.get(item.categoryId)
         : null;
       return {
+        // Carried so the alert's "Reject" button knows which row to drop.
+        id: item.id,
         type: item.type,
         amount: item.amount,
         currency: item.currency,
