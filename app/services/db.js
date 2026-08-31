@@ -174,6 +174,7 @@ const isSchemaComplete = async (rawDb) => {
       'budget_plan_line_groups', 'budget_plan_line_accounts',
       'budget_plan_line_labels',
       'notification_templates',
+      'dismissed_notifications',
     ];
     const existingTables = await rawDb.getAllAsync(
       "SELECT name FROM sqlite_master WHERE type='table'",
@@ -336,6 +337,19 @@ const isSchemaComplete = async (rawDb) => {
     // CREATE TABLE with no accompanying ALTER, so there is no half-applied state
     // a column check would have to catch.
 
+    // Migration 0029: creates dismissed_notifications (the rejection log that
+    // stops a dismissed bank notification from being re-queued). The table is
+    // covered by the expectedTables check above, but its unique fingerprint index
+    // is a separate statement and applyPendingMigrations continues on failure —
+    // so a half-applied 0029 (table created, index not) must not read as
+    // complete. It would otherwise stamp the fast-path fingerprint and lock in a
+    // schema where every dismissal throws `ON CONFLICT clause does not match any
+    // PRIMARY KEY or UNIQUE constraint`, leaving the feature silently inert.
+    const dismissedIndex = await rawDb.getFirstAsync(
+      "SELECT name FROM sqlite_master WHERE type='index' AND name='idx_dismissed_notifications_fingerprint'",
+    );
+    if (!dismissedIndex) return false;
+
     // Check budget_plan_lines has BOTH effective_from and effective_to
     // (migration 0026 — the recurring line's effective month range). Both are
     // checked for the same reason as operations' 0009 columns: each is a separate
@@ -475,6 +489,15 @@ const detectAppliedMigrations = async (rawDb) => {
   const tableExists = async (name) => {
     const result = await rawDb.getAllAsync(
       "SELECT name FROM sqlite_master WHERE type='table' AND name=?",
+      [name],
+    );
+    return result && result.length > 0;
+  };
+
+  // Helper: check if an index exists
+  const indexExists = async (name) => {
+    const result = await rawDb.getAllAsync(
+      "SELECT name FROM sqlite_master WHERE type='index' AND name=?",
       [name],
     );
     return result && result.length > 0;
@@ -727,6 +750,18 @@ const detectAppliedMigrations = async (rawDb) => {
   // Migration 0025: Adds the notification_templates table (user-defined parsers).
   if (await tableExists('notification_templates')) {
     applied.push(25);
+  }
+
+  // Migration 0029: Adds the dismissed_notifications table (rejected bank
+  // notifications). Require the unique fingerprint index too, not just the table:
+  // applyPendingMigrations continues past a failed statement, and a table created
+  // without that index would still satisfy a table-only marker while every
+  // dismissal threw `ON CONFLICT clause does not match any PRIMARY KEY or UNIQUE
+  // constraint` — silently, so the feature would look present and do nothing.
+  // Every statement is IF NOT EXISTS, so re-running to add the index is harmless.
+  if ((await tableExists('dismissed_notifications'))
+    && (await indexExists('idx_dismissed_notifications_fingerprint'))) {
+    applied.push(29);
   }
 
   return applied.sort((a, b) => a - b);

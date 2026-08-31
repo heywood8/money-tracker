@@ -1,4 +1,4 @@
-import { sqliteTable, text, integer, index, unique, primaryKey } from 'drizzle-orm/sqlite-core';
+import { sqliteTable, text, integer, index, unique, uniqueIndex, primaryKey } from 'drizzle-orm/sqlite-core';
 
 /**
  * App metadata table for tracking database version and migration status
@@ -288,6 +288,46 @@ export const pendingNotifications = sqliteTable('pending_notifications', {
   createdAt: text('created_at').notNull(),
 }, (table) => ({
   createdIdx: index('idx_pending_notifications_created').on(table.createdAt),
+}));
+
+/**
+ * Dismissed Notifications table
+ *
+ * A rejection log for bank notifications the user declined in the review queue.
+ * Dismissing only deletes the pending_notifications row, so without this the
+ * next ingestion pass — which re-reads a notification whenever its processed
+ * signature no longer matches (the bank re-posted it, or the bounded signature
+ * window rolled over) — would queue, or even auto-create, the very transaction
+ * the user had just rejected.
+ *
+ * `fingerprint` is the transaction's identity as the parser describes it (source
+ * app, kind/type, amount, currency, card, merchant) plus the bank's own text, so
+ * a re-read of the same notification matches regardless of its post time. The
+ * date the item would be booked with is deliberately excluded: for a dateless
+ * notification it is derived from that very post time. Rows are local dedup
+ * state and deliberately stay out of backups, like the pending queue they come
+ * from, and expire on age (see DismissedNotificationsDB).
+ */
+export const dismissedNotifications = sqliteTable('dismissed_notifications', {
+  id: text('id').primaryKey(),
+  fingerprint: text('fingerprint').notNull(),
+  // The descriptor fields the fingerprint is built from, kept as columns so a
+  // dismissal is readable (and debuggable) rather than an opaque hash.
+  packageName: text('package_name'),
+  kind: text('kind'),
+  type: text('type'),
+  amount: text('amount'),
+  currency: text('currency'),
+  cardMask: text('card_mask'),
+  merchant: text('merchant'),
+  // Context only — the booking date and clock time are not part of the identity.
+  date: text('date'),
+  time: text('time'),
+  raw: text('raw'),
+  dismissedAt: text('dismissed_at').notNull(),
+}, (table) => ({
+  fingerprintIdx: uniqueIndex('idx_dismissed_notifications_fingerprint').on(table.fingerprint),
+  dismissedAtIdx: index('idx_dismissed_notifications_dismissed_at').on(table.dismissedAt),
 }));
 
 /**

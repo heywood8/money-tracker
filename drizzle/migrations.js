@@ -30,6 +30,7 @@ import m0025 from './0025_notification_templates.js';
 import m0026 from './0026_plan_line_effective_range.js';
 import m0027 from './0027_pending_notification_force_added.js';
 import m0028 from './0028_plan_line_labels.js';
+import m0029 from './0029_dismissed_notifications.js';
 
 export default {
   journal,
@@ -63,6 +64,7 @@ export default {
     m0026,
     m0027,
     m0028,
+    m0029,
   },
   postMigrationHandlers: {
     m0003: m0003PostMigration,

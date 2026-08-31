@@ -56,6 +56,7 @@ const COMPLETE_TABLES = [
   'budget_plan_line_groups', 'budget_plan_line_accounts',
   'budget_plan_line_labels',
   'notification_templates',
+  'dismissed_notifications',
 ];
 const mockSchemaComplete = (db, storedUserVersion) => {
   db.getFirstAsync.mockImplementation((q) => {
@@ -64,6 +65,11 @@ const mockSchemaComplete = (db, storedUserVersion) => {
     }
     if (typeof q === 'string' && q.includes('trg_operations_type_insert')) {
       return Promise.resolve({ name: 'trg_operations_type_insert' });
+    }
+    // The unique fingerprint index of migration 0029 — checked separately from
+    // its table, since applyPendingMigrations can leave one without the other.
+    if (typeof q === 'string' && q.includes('idx_dismissed_notifications_fingerprint')) {
+      return Promise.resolve({ name: 'idx_dismissed_notifications_fingerprint' });
     }
     return Promise.resolve(null);
   });
