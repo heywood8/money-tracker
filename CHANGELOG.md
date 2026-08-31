@@ -1,5 +1,12 @@
 # Changelog
 
+## [0.281.0](https://github.com/heywood8/money-tracker/compare/penny-v0.280.4...penny-v0.281.0) (2026-08-31)
+
+
+### Features
+
+* **notifications:** add Reject/Select buttons to the review alert ([#1683](https://github.com/heywood8/money-tracker/issues/1683)) ([8821c42](https://github.com/heywood8/money-tracker/commit/8821c42b9e87c1b0c2ff490a0ecb82744e032247))
+
 ## [0.280.4](https://github.com/heywood8/money-tracker/compare/penny-v0.280.3...penny-v0.280.4) (2026-08-31)
 
 
