@@ -1,5 +1,12 @@
 # Changelog
 
+## [0.280.3](https://github.com/heywood8/money-tracker/compare/penny-v0.280.2...penny-v0.280.3) (2026-08-31)
+
+
+### Bug Fixes
+
+* **notifications:** re-read the review queue when the app comes back ([#1679](https://github.com/heywood8/money-tracker/issues/1679)) ([ae6af20](https://github.com/heywood8/money-tracker/commit/ae6af20bc6087ac2ed304415f734aa374a8c25a9))
+
 ## [0.280.2](https://github.com/heywood8/money-tracker/compare/penny-v0.280.1...penny-v0.280.2) (2026-08-30)
 
 
