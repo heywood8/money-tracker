@@ -30,6 +30,10 @@ jest.mock('../../../app/services/notifications/localNotifications', () => ({
   presentAddedOperationsAlert: jest.fn(),
 }));
 jest.mock('../../../app/services/notifications/notificationStrings', () => ({
+  // isSingleItemAlert is a pure predicate over the copy's own shape; the run
+  // reads it to decide whether the alert may carry a Reject button, so the real
+  // one keeps the two in step.
+  ...jest.requireActual('../../../app/services/notifications/notificationStrings'),
   getPendingAlertCopy: jest.fn(),
   getAddedAlertCopy: jest.fn(),
 }));
@@ -176,11 +180,16 @@ describe('backgroundBankTask', () => {
 
       expect(getPendingCount).toHaveBeenCalled();
       expect(notificationStrings.getPendingAlertCopy).toHaveBeenCalledWith(2, []);
-      expect(localNotifications.presentPendingOperationsAlert).toHaveBeenCalledWith({
-        title: 'Transactions to review',
-        body: '2 transactions are waiting to be added',
-        channelName: 'Bank operations',
-      });
+      expect(localNotifications.presentPendingOperationsAlert).toHaveBeenCalledWith(
+        {
+          title: 'Transactions to review',
+          body: '2 transactions are waiting to be added',
+          channelName: 'Bank operations',
+        },
+        // Two are waiting, so the alert summarizes rather than names one — no
+        // row for a Reject button to drop.
+        [],
+      );
       expect(result.notified).toBe(true);
     });
 
@@ -198,6 +207,40 @@ describe('backgroundBankTask', () => {
       // Detail collection is scoped to the items this run added, not the queue.
       expect(collectPendingAlertDetails).toHaveBeenCalledWith(2);
       expect(notificationStrings.getPendingAlertCopy).toHaveBeenCalledWith(2, details);
+    });
+
+    it('hands the alert the row to reject when one transaction is waiting', async () => {
+      enableBothGates();
+      processMod.processBankNotifications.mockResolvedValue({ created: 0, pending: 1, skipped: 0 });
+      getPendingCount.mockResolvedValue(1);
+      collectPendingAlertDetails.mockResolvedValue([
+        { id: 'pending-1', amount: '8074', currency: 'AMD', merchant: 'SAS', missing: 'category' },
+      ]);
+
+      await backgroundBankTask.runBackgroundBankCheck();
+
+      expect(localNotifications.presentPendingOperationsAlert).toHaveBeenCalledWith(
+        expect.any(Object),
+        ['pending-1'],
+      );
+    });
+
+    it('withholds the row when the queue holds more than this run described', async () => {
+      // The alert is a summary then: rejecting from it would discard
+      // transactions its collapsed row never named.
+      enableBothGates();
+      processMod.processBankNotifications.mockResolvedValue({ created: 0, pending: 1, skipped: 0 });
+      getPendingCount.mockResolvedValue(3);
+      collectPendingAlertDetails.mockResolvedValue([
+        { id: 'pending-3', amount: '8074', currency: 'AMD', merchant: 'SAS', missing: 'category' },
+      ]);
+
+      await backgroundBankTask.runBackgroundBankCheck();
+
+      expect(localNotifications.presentPendingOperationsAlert).toHaveBeenCalledWith(
+        expect.any(Object),
+        [],
+      );
     });
 
     it('still alerts when no details could be described', async () => {

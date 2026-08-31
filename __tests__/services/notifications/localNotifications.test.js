@@ -143,6 +143,113 @@ describe('localNotifications', () => {
         localNotifications.presentPendingOperationsAlert({ title: 't', body: 'b' }),
       ).resolves.toBeUndefined();
     });
+
+    it('registers both button sets with the localized labels', async () => {
+      await localNotifications.presentPendingOperationsAlert({
+        title: 't',
+        body: 'b',
+        rejectLabel: 'Отклонить',
+        selectLabel: 'Выбрать',
+      });
+
+      const categories = Object.fromEntries(
+        Notifications.setNotificationCategoryAsync.mock.calls.map(([id, actions]) => [id, actions]),
+      );
+      expect(Object.keys(categories)).toEqual(
+        expect.arrayContaining(['bank-operations-review', 'bank-operations-review-select']),
+      );
+
+      const [reject, select] = categories['bank-operations-review'];
+      expect(reject.identifier).toBe('reject-pending');
+      expect(reject.buttonTitle).toBe('Отклонить');
+      // Rejecting is done with the notification, never by launching the app.
+      expect(reject.options.opensAppToForeground).toBe(false);
+      expect(select.identifier).toBe('select-pending');
+      expect(select.buttonTitle).toBe('Выбрать');
+      expect(select.options.opensAppToForeground).toBe(true);
+
+      // The select-only set carries the same Select action and nothing else.
+      expect(categories['bank-operations-review-select']).toEqual([select]);
+    });
+
+    it('offers Reject and names the row when the alert is about one transaction', async () => {
+      await localNotifications.presentPendingOperationsAlert(
+        { title: '8074 AMD · Ameriabank', body: 'Choose a category' },
+        ['pending-1'],
+      );
+
+      const request = Notifications.scheduleNotificationAsync.mock.calls[0][0];
+      expect(request.content.categoryIdentifier).toBe('bank-operations-review');
+      expect(request.content.data).toEqual({
+        route: 'notificationProcessing',
+        pendingIds: ['pending-1'],
+      });
+    });
+
+    it('withholds Reject when the alert summarizes several transactions', async () => {
+      // The collapsed row does not even name them all, so a single button press
+      // must not be able to discard them.
+      await localNotifications.presentPendingOperationsAlert(
+        { title: '3 transactions are waiting to be added', body: 'lines' },
+        ['pending-1', 'pending-2', 'pending-3'],
+      );
+
+      const request = Notifications.scheduleNotificationAsync.mock.calls[0][0];
+      expect(request.content.categoryIdentifier).toBe('bank-operations-review-select');
+      expect(request.content.data).toEqual({ route: 'notificationProcessing' });
+    });
+
+    it('withholds Reject when the queued row could not be identified', async () => {
+      await localNotifications.presentPendingOperationsAlert({ title: 't', body: 'b' });
+
+      const request = Notifications.scheduleNotificationAsync.mock.calls[0][0];
+      expect(request.content.categoryIdentifier).toBe('bank-operations-review-select');
+      expect(request.content.data).toEqual({ route: 'notificationProcessing' });
+    });
+
+    it('still posts when the button sets cannot be registered', async () => {
+      Notifications.setNotificationCategoryAsync.mockRejectedValue(new Error('boom'));
+
+      await localNotifications.presentPendingOperationsAlert({ title: 't', body: 'b' }, ['p1']);
+
+      expect(Notifications.scheduleNotificationAsync).toHaveBeenCalled();
+    });
+  });
+
+  describe('isRejectPendingResponse / isSelectPendingResponse / responsePendingIds', () => {
+    const response = (actionIdentifier, data = {}) => ({
+      actionIdentifier,
+      notification: { request: { identifier: 'penny-pending-operations', content: { data } } },
+    });
+
+    it('matches only its own action', () => {
+      expect(localNotifications.isRejectPendingResponse(response('reject-pending'))).toBe(true);
+      expect(localNotifications.isRejectPendingResponse(response('select-pending'))).toBe(false);
+      expect(localNotifications.isRejectPendingResponse(null)).toBe(false);
+
+      expect(localNotifications.isSelectPendingResponse(response('select-pending'))).toBe(true);
+      // A tap on the body is not the button: only the button needs dismissing.
+      expect(
+        localNotifications.isSelectPendingResponse(
+          response('expo.modules.notifications.actions.DEFAULT'),
+        ),
+      ).toBe(false);
+      expect(localNotifications.isSelectPendingResponse(null)).toBe(false);
+    });
+
+    it('reads the queued row ids the notification was about', () => {
+      expect(
+        localNotifications.responsePendingIds(response('reject-pending', { pendingIds: ['a', 1] })),
+      ).toEqual(['a', '1']);
+    });
+
+    it('reads no ids from an alert that carried none', () => {
+      expect(localNotifications.responsePendingIds(response('reject-pending'))).toEqual([]);
+      expect(
+        localNotifications.responsePendingIds(response('reject-pending', { pendingIds: 'nope' })),
+      ).toEqual([]);
+      expect(localNotifications.responsePendingIds(null)).toEqual([]);
+    });
   });
 
   describe('presentAddedOperationsAlert', () => {
@@ -282,11 +389,15 @@ describe('localNotifications', () => {
       expect(Notifications.scheduleNotificationAsync).toHaveBeenCalled();
     });
 
-    it('leaves the review alert without action buttons', async () => {
+    it('never lends its Acknowledged button to the review alert', async () => {
+      // The review alert has its own button set (Reject / Select); the receipt's
+      // one-button "seen" set would answer a question it is not asking.
       await localNotifications.presentPendingOperationsAlert({ title: 'p', body: 'b' });
 
       const [request] = Notifications.scheduleNotificationAsync.mock.calls[0];
-      expect(request.content.categoryIdentifier).toBeUndefined();
+      expect(request.content.categoryIdentifier).not.toBe(
+        localNotifications.ADDED_ALERT_CATEGORY_ID,
+      );
     });
   });
 

@@ -10,6 +10,7 @@ import * as PreferencesDB from '../../../app/services/PreferencesDB';
 import {
   getAddedAlertCopy,
   getPendingAlertCopy,
+  isSingleItemAlert,
 } from '../../../app/services/notifications/notificationStrings';
 
 jest.mock('../../../app/services/PreferencesDB', () => ({
@@ -31,6 +32,19 @@ describe('notificationStrings.getPendingAlertCopy', () => {
     );
     expect(copy.channelName).toBe(enJson.bank_notifications_channel_name);
     expect(copy.body).toContain('2');
+  });
+
+  it('carries the localized labels for both action buttons', async () => {
+    const english = await getPendingAlertCopy(2);
+    expect(english.rejectLabel).toBe(enJson.bank_notifications_bg_reject);
+    expect(english.selectLabel).toBe(enJson.bank_notifications_bg_select);
+
+    PreferencesDB.getPreference.mockResolvedValue('ru');
+    const russian = await getPendingAlertCopy(1, [
+      { id: 'p1', amount: '8074', currency: 'AMD', merchant: 'SAS', missing: 'category' },
+    ]);
+    expect(russian.rejectLabel).toBe(ruJson.bank_notifications_bg_reject);
+    expect(russian.selectLabel).toBe(ruJson.bank_notifications_bg_select);
   });
 
   it('uses the singular body for a count of 1', async () => {
@@ -301,5 +315,26 @@ describe('notificationStrings.getAddedAlertCopy', () => {
     const copy = await getAddedAlertCopy(1, [detail()]);
 
     expect(copy.actionLabel).toBe(ruJson.bank_notifications_bg_added_acknowledge);
+  });
+});
+
+describe('notificationStrings.isSingleItemAlert', () => {
+  const detail = { id: 'p1', amount: '8074', currency: 'AMD', merchant: 'SAS' };
+
+  it('is true only when one described item is the whole queue', () => {
+    expect(isSingleItemAlert(1, [detail])).toBe(true);
+  });
+
+  it('is false when the queue holds more than the alert describes', () => {
+    // The copy is a summary then, and so must the buttons be.
+    expect(isSingleItemAlert(3, [detail])).toBe(false);
+    expect(isSingleItemAlert(2, [detail, detail])).toBe(false);
+  });
+
+  it('is false without describable items', () => {
+    expect(isSingleItemAlert(1)).toBe(false);
+    expect(isSingleItemAlert(1, [])).toBe(false);
+    expect(isSingleItemAlert(1, [null])).toBe(false);
+    expect(isSingleItemAlert(1, 'nonsense')).toBe(false);
   });
 });

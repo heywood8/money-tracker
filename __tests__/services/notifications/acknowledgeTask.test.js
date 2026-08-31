@@ -13,6 +13,11 @@ import {
   handleAcknowledgePayload,
   registerAcknowledgeTaskAsync,
 } from '../../../app/services/notifications/acknowledgeTask';
+import { dismissPendingNotification } from '../../../app/services/notifications/processBankNotifications';
+
+jest.mock('../../../app/services/notifications/processBankNotifications', () => ({
+  dismissPendingNotification: jest.fn(async () => {}),
+}));
 
 // Capture the executor registered at import time, before any mock is cleared.
 const defineCall = TaskManager.defineTask.mock.calls.find((c) => c[0] === ACKNOWLEDGE_TASK);
@@ -28,6 +33,7 @@ describe('acknowledgeTask', () => {
     jest.clearAllMocks();
     Notifications.dismissNotificationAsync.mockResolvedValue();
     Notifications.registerTaskAsync.mockResolvedValue();
+    dismissPendingNotification.mockResolvedValue();
   });
 
   it('defines the task at module load', () => {
@@ -77,6 +83,27 @@ describe('acknowledgeTask', () => {
       await taskExecutor({ data: ackResponse('xyz') });
 
       expect(Notifications.dismissNotificationAsync).toHaveBeenCalledWith('xyz');
+    });
+
+    it('handles a review-alert reject press through the same task', async () => {
+      // expo-notifications registers one response task, so this executor is the
+      // headless entry point for every button that does not open the app.
+      await taskExecutor({
+        data: {
+          actionIdentifier: 'reject-pending',
+          notification: {
+            request: {
+              identifier: 'penny-pending-operations',
+              content: { data: { route: 'notificationProcessing', pendingIds: ['pending-1'] } },
+            },
+          },
+        },
+      });
+
+      expect(dismissPendingNotification).toHaveBeenCalledWith('pending-1');
+      expect(Notifications.dismissNotificationAsync).toHaveBeenCalledWith(
+        'penny-pending-operations',
+      );
     });
 
     it('does nothing when the task is invoked with an error', async () => {

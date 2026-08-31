@@ -588,6 +588,8 @@
   "bank_notifications_bg_added_body_other": "{count} operations added automatically",
   "bank_notifications_bg_added_to_account": "To: {name}",
   "bank_notifications_bg_added_acknowledge": "Acknowledged",
+  "bank_notifications_bg_reject": "Reject",
+  "bank_notifications_bg_select": "Select",
   "bank_notifications_channel_name": "Bank operations",
   "bank_notifications_permission_denied": "Enable notifications in system settings to receive background alerts",
   "monthly_plan": "Monthly plan",
