@@ -1,5 +1,12 @@
 # Changelog
 
+## [0.280.4](https://github.com/heywood8/money-tracker/compare/penny-v0.280.3...penny-v0.280.4) (2026-08-31)
+
+
+### Bug Fixes
+
+* **notifications:** remember dismissed operations so they stop coming back ([#1681](https://github.com/heywood8/money-tracker/issues/1681)) ([f577e2e](https://github.com/heywood8/money-tracker/commit/f577e2e0bfb23f2b1420a565f6ac014666fb7f91))
+
 ## [0.280.3](https://github.com/heywood8/money-tracker/compare/penny-v0.280.2...penny-v0.280.3) (2026-08-31)
 
 
