@@ -11,6 +11,7 @@ import * as pipeline from '../../app/services/notifications/processBankNotificat
 import * as PendingNotificationsDB from '../../app/services/PendingNotificationsDB';
 import * as NotificationRulesDB from '../../app/services/NotificationRulesDB';
 import * as AccountsDB from '../../app/services/AccountsDB';
+import { reconcilePendingNotifications } from '../../app/services/notifications/duplicateOperations';
 import { kindRequiresCategory } from '../../app/services/notifications/parseBankNotification';
 import { appEvents, EVENTS } from '../../app/services/eventEmitter';
 
@@ -357,6 +358,27 @@ describe('usePendingOperationSuggestions', () => {
       });
       expect(pipeline.processBankNotifications).toHaveBeenCalledTimes(1);
       expect(result.current.suggestions).toHaveLength(2);
+    });
+
+    it('prunes what the run made redundant before putting it on screen', async () => {
+      const { result } = await renderHook(() => usePendingOperationSuggestions());
+      await waitFor(() => expect(result.current.suggestions).toEqual([EXPENSE]));
+
+      // The pass reconciles at its start, before it books anything, so a row it
+      // then makes redundant (it auto-created the same transaction) is still in
+      // the queue when the run ends. Publishing that row would show a card the
+      // next reconciling reload takes away again.
+      reconcilePendingNotifications.mockImplementationOnce(async () => {
+        PendingNotificationsDB.getPendingNotifications.mockResolvedValue([]);
+        return 1;
+      });
+
+      await act(async () => {
+        await result.current.refresh();
+      });
+
+      expect(reconcilePendingNotifications).toHaveBeenCalled();
+      expect(result.current.suggestions).toEqual([]);
     });
 
     it('still reloads when the pipeline run fails', async () => {

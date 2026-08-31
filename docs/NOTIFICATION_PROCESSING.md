@@ -393,7 +393,11 @@ live on `AccountsDB` (`getAccountByCardMask`, `setAccountCardMask`).
   mounted for the whole session (`SimpleTabs`), so without the foreground re-read
   a queued card would never reach the operations page at all. It runs the
   pipeline rather than only re-reading, which joins the pass `AppInitializer`
-  starts on the same transition (overlapping runs share one pass).
+  starts on the same transition (overlapping runs share one pass), and it
+  reconciles the queue again before publishing: the pass reconciles at its
+  *start*, so a row it then makes redundant (it auto-created the same
+  transaction) would otherwise be shown as a card the next reconciling reload
+  takes straight back off the screen.
 - **Known limitation:** the native service keeps only the **last 50**
   notifications and is pull-only (no JS events). For lossless capture under
   bursty/backgrounded conditions, extend the Kotlin
