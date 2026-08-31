@@ -1,5 +1,12 @@
 # Changelog
 
+## [0.281.1](https://github.com/heywood8/money-tracker/compare/penny-v0.281.0...penny-v0.281.1) (2026-08-31)
+
+
+### Bug Fixes
+
+* **notifications:** stop the review card flashing on to the screen and off ([#1685](https://github.com/heywood8/money-tracker/issues/1685)) ([b7d3cee](https://github.com/heywood8/money-tracker/commit/b7d3ceed96664419b2134960d05da6cff8fc96ff))
+
 ## [0.281.0](https://github.com/heywood8/money-tracker/compare/penny-v0.280.4...penny-v0.281.0) (2026-08-31)
 
 
