@@ -1,5 +1,5 @@
 import { useState, useEffect, useCallback, useMemo, useRef } from 'react';
-import { LayoutAnimation, Platform, UIManager } from 'react-native';
+import { AppState, LayoutAnimation, Platform, UIManager } from 'react-native';
 import { getPendingNotifications } from '../services/PendingNotificationsDB';
 import {
   processBankNotifications,
@@ -61,9 +61,10 @@ export const canSaveSuggestion = (item, choice = {}) => {
  * transfer target, custom label) plus save/dismiss/refresh actions for the
  * stacked binding cards rendered over the quick-add form.
  *
- * There is intentionally no polling here — the pipeline already runs on app
- * open/foreground (AppInitializer) and on the pull-to-refresh gesture (refresh),
- * so the main page stays cheap while idle.
+ * There is intentionally no polling here — the queue is re-read whenever the app
+ * comes back to the foreground (where the pipeline also runs, via AppInitializer)
+ * and on the pull-to-refresh gesture (refresh), so the main page stays cheap
+ * while idle.
  *
  * Saving is non-blocking: on accept the card leaves the deck at once (revealing
  * the next suggestion, or the quick-add form) while the booking runs in the
@@ -105,8 +106,17 @@ export default function usePendingOperationSuggestions({
   // Guards async setters from firing after unmount.
   const mountedRef = useRef(true);
   useEffect(() => () => { mountedRef.current = false; }, []);
+  // Monotonic token for reload runs. Two reloads are routinely in flight at
+  // once — the foreground resync runs alongside the RELOAD_ALL the very pipeline
+  // pass it awaits emits — and they take different paths through the DB, so the
+  // one that started first can finish last. Only the newest run may publish, or
+  // an older snapshot would write back over the queue as it now stands and hide
+  // a suggestion until the next event.
+  const reloadSeqRef = useRef(0);
 
   const reload = useCallback(async ({ reconcile = true } = {}) => {
+    const seq = reloadSeqRef.current + 1;
+    reloadSeqRef.current = seq;
     try {
       // Drop any card the user has already recorded by hand before reading the
       // queue, so a matching operation makes its suggestion disappear at once.
@@ -153,7 +163,7 @@ export default function usePendingOperationSuggestions({
             .catch(() => null);
         }),
       );
-      if (!mountedRef.current) return;
+      if (!mountedRef.current || seq !== reloadSeqRef.current) return;
       setSuggestions(list);
       // Seed choices with any suggested account/category, the bound ATM target
       // for transfers, and the learned label.
@@ -279,6 +289,35 @@ export default function usePendingOperationSuggestions({
     // The pipeline already reconciled the queue, so skip a redundant second pass.
     await reload({ reconcile: false });
   }, [reload]);
+
+  // Re-read the queue whenever the app comes back to the foreground.
+  //
+  // RELOAD_ALL is a live event, and everything that fills the queue while the
+  // user is away fires it somewhere this hook cannot hear: the background task
+  // runs in its own headless JS context, and the foreground pass AppInitializer
+  // starts on the same transition stays silent when that task has already marked
+  // those notifications seen (nothing booked, nothing queued, nothing pruned —
+  // so nothing emitted). Screens stay mounted for the whole session, so there is
+  // no remount to re-read the queue either: without this the deck would keep
+  // showing the queue as it stood when the app was opened, and a card sitting in
+  // the review queue would never reach the operations page at all.
+  //
+  // Runs the pipeline rather than only re-reading: overlapping calls share one
+  // run, so this joins the pass AppInitializer just started instead of racing it,
+  // and the reload then sees whatever that pass queued.
+  useEffect(() => {
+    let appState = AppState.currentState;
+    const subscription = AppState.addEventListener('change', (nextState) => {
+      const prev = appState;
+      appState = nextState;
+      if (nextState === 'active' && prev && /inactive|background/.test(prev)) {
+        refresh();
+      }
+    });
+    // Optional: a stubbed AppState (unit environments) hands back nothing to
+    // unsubscribe from, and a throw here would break the whole cleanup pass.
+    return () => subscription?.remove?.();
+  }, [refresh]);
 
   /**
    * Book the suggestion with the bindings the user picked (or the seeded
