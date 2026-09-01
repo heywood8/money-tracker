@@ -1141,6 +1141,57 @@ export const getTransferTotals = async (accountId, startDate, endDate) => {
 };
 
 /**
+ * Signed balance deltas for one account on one calendar day, in the order the
+ * operations were entered.
+ *
+ * Unlike the totals above, this filters nothing out — no shadow-category skip,
+ * no exclude_from_avg, no chart-visibility clause. It reconstructs the balance
+ * the account actually held through the day, and the snapshot it is reconciled
+ * against (accounts_balance_history) counts every operation; dropping any would
+ * make the walk land on numbers the account never held.
+ *
+ * A self-transfer contributes its debit and its credit to the same delta, so it
+ * nets to zero exactly as it should.
+ *
+ * @param {string|number} accountId
+ * @param {string} date - YYYY-MM-DD
+ * @returns {Promise<Array<{id: number, createdAt: string, delta: string}>>}
+ *   chronological by created_at
+ */
+export const getAccountDayDeltas = async (accountId, date) => {
+  try {
+    const results = await queryAll(
+      `SELECT id, type, amount, destination_amount, account_id, to_account_id, created_at
+       FROM operations
+       WHERE (account_id = ? OR to_account_id = ?)
+         AND date(date) = date(?) -- date() normalises non-ISO formats from CSV import (#773)
+       ORDER BY created_at ASC, id ASC`,
+      [accountId, accountId, date],
+    );
+
+    return (results || []).map((row) => {
+      const isSource = String(row.account_id) === String(accountId);
+      const isTarget = String(row.to_account_id) === String(accountId);
+      let delta = '0';
+      if (row.type === 'expense' && isSource) {
+        delta = Currency.subtract('0', String(row.amount || '0'));
+      } else if (row.type === 'income' && isSource) {
+        delta = Currency.add('0', String(row.amount || '0'));
+      } else if (row.type === 'transfer') {
+        if (isSource) delta = Currency.subtract(delta, String(row.amount || '0'));
+        // A multi-currency transfer credits the converted amount, mirroring
+        // getTransferTotals.
+        if (isTarget) delta = Currency.add(delta, String(row.destination_amount || row.amount || '0'));
+      }
+      return { id: row.id, createdAt: String(row.created_at || ''), delta };
+    });
+  } catch (error) {
+    console.error('Failed to get account day deltas:', error);
+    throw error;
+  }
+};
+
+/**
  * Get spending by category for date range
  * @param {string} startDate
  * @param {string} endDate

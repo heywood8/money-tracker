@@ -12,6 +12,66 @@ export const median = (values) => {
   return sorted.length % 2 === 0 ? (sorted[mid - 1] + sorted[mid]) / 2 : sorted[mid];
 };
 
+// How far the walked-back opening may sit from the recorded one and still count
+// as the same number. A whole currency unit, not a cent: the net-worth walk
+// converts every delta at the display rate and rounds each to two places, so a
+// day of many operations across many accounts drifts by more than a cent while
+// still describing exactly the same movements. The mismatches this guards
+// against are real operations — rent, a salary — never sub-unit ones.
+const OPENING_RECONCILE_TOLERANCE = 1;
+
+/**
+ * The highest balance the charted thing held at any point during a day.
+ *
+ * Balance history stores one snapshot per day — the balance at the *end* of it —
+ * so a month that opens with 100k and spends 20k on the 1st charts as a month
+ * that started at 80k, and the 20k is nowhere on the line. Walking the day's
+ * operations backwards from the end-of-day balance recovers every intermediate
+ * balance, and the highest of them is where the month actually started from.
+ *
+ * `deltas` are the day's signed balance moves in chronological order, so undoing
+ * them from the back yields (end, …, opening); the peak is the max over that
+ * whole path, the end and the opening included.
+ *
+ * The walk only means anything if the day's operations are the ones that day's
+ * snapshot was written from, and they are not always: a snapshot is only ever
+ * written under *today's* date, so an operation back-dated into the day (entered
+ * or edited later) is in the delta list but not in the balance it is subtracted
+ * from. Undoing it would invent a balance the account never held — and one that
+ * is higher than the close by construction, so it would become the day-zero point
+ * and drag the whole y-axis with it. `openingBalance` — the last snapshot before
+ * the day — is the check: when the walk does not land back on it, the operations
+ * and the snapshots disagree and the day is reported as peaking at its close.
+ *
+ * Exported for unit testing.
+ *
+ * @param {string|number|null} endOfDayBalance - the day's snapshot
+ * @param {Array<string|number>} deltas - chronological signed moves
+ * @param {string|number|null} [openingBalance] - the last snapshot before the day;
+ *   unknown (the charted thing's first day on record) skips the reconciliation
+ * @returns {number|null} null when the day's balance is unknown
+ */
+export const computeDayPeakBalance = (endOfDayBalance, deltas, openingBalance = null) => {
+  if (endOfDayBalance === null || endOfDayBalance === undefined) return null;
+  const end = parseFloat(endOfDayBalance);
+  if (!Number.isFinite(end)) return null;
+
+  let running = end;
+  let peak = end;
+  for (let i = (deltas || []).length - 1; i >= 0; i--) {
+    const delta = parseFloat(deltas[i]);
+    if (!Number.isFinite(delta)) continue;
+    running -= delta;
+    if (running > peak) peak = running;
+  }
+
+  const opening = parseFloat(openingBalance);
+  if (Number.isFinite(opening) && Math.abs(running - opening) > OPENING_RECONCILE_TOLERANCE) {
+    return end;
+  }
+  return peak;
+};
+
 /**
  * Build the "year average" comparison series: for every day of the selected
  * month, the median balance on that same day across the previous 12 months.
@@ -392,6 +452,8 @@ const useBalanceHistory = (selectedAccount, selectedYear, selectedMonth, options
         transferTotals,
         incomeAfterDay1,
         yearMonthlyExpenses,
+        firstDayDeltas,
+        openingBalance,
       ] = await Promise.all([
         source.getHistory(startDateStr, endDateStr),
         // One read covers both comparison lines: the previous month is just the
@@ -403,6 +465,11 @@ const useBalanceHistory = (selectedAccount, selectedYear, selectedMonth, options
         source.getTransferTotals(secondDayStr, endDateStr),
         source.getTotalIncome(secondDayStr, endDateStr),
         source.getMonthlyExpenseTotals(yearWindowStartStr, prevEndDateStr),
+        source.getDayDeltas(startDateStr),
+        // The balance carried into the month, i.e. what the day-1 walk has to
+        // land back on for its operations to be the ones day 1's snapshot was
+        // written from (see computeDayPeakBalance).
+        source.getAnchorBalance(prevEndDateStr),
       ]);
 
       const prevMonthKey = `${prevYear}-${String(prevMonth + 1).padStart(2, '0')}`;
@@ -427,6 +494,14 @@ const useBalanceHistory = (selectedAccount, selectedYear, selectedMonth, options
           plainAvgMax = computed;
         }
       }
+
+      // Day-zero anchor: the highest balance held during day 1. The snapshot for
+      // the 1st is an end-of-day figure, so a month that opened at 100k and spent
+      // 20k that day would otherwise start its line at 80k with the 100k nowhere
+      // on the chart. The card draws this as an extra point at x = 0 whenever it
+      // sits above the day-1 close, so the month starts from what was really
+      // there and the first day's spending shows as the drop it was.
+      const firstDayPeak = computeDayPeakBalance(firstDayBalance, firstDayDeltas, openingBalance);
 
       // Transform history data for chart
       const dataPoints = history.map(item => ({
@@ -568,6 +643,7 @@ const useBalanceHistory = (selectedAccount, selectedYear, selectedMonth, options
         prevMonthDaysCount: prevMonthDays,
         currentMonthTotalExpenses,
         plainAvgMax,
+        firstDayPeak,
         labels: allDays,
       });
     } catch (error) {

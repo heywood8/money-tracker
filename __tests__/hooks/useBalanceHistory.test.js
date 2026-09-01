@@ -1,6 +1,7 @@
 import { renderHook, act, waitFor } from '@testing-library/react-native';
 import useBalanceHistory, {
   buildYearAverageSeries,
+  computeDayPeakBalance,
   buildYearSampleDays,
   buildYearSeries,
   dayOfYearFromDateString,
@@ -29,6 +30,7 @@ jest.mock('../../app/services/OperationsDB', () => ({
   getTotalIncome: jest.fn(),
   getTransferTotals: jest.fn(),
   getMonthlyExpenseTotals: jest.fn(),
+  getAccountDayDeltas: jest.fn(),
 }));
 
 describe('useBalanceHistory', () => {
@@ -46,6 +48,8 @@ describe('useBalanceHistory', () => {
     OperationsDB.getTransferTotals.mockResolvedValue({ incoming: '0', outgoing: '0' });
     // "Year average" line inputs: no spending history unless a test says otherwise.
     OperationsDB.getMonthlyExpenseTotals.mockResolvedValue({});
+    // Day-1 intraday walk (the day-zero peak): no operations unless a test says so.
+    OperationsDB.getAccountDayDeltas.mockResolvedValue([]);
     BalanceHistoryDB.getAccountBalanceOnOrBeforeDate.mockResolvedValue(null);
     // Mock console.error to suppress error logs in tests
     jest.spyOn(console, 'error').mockImplementation(() => {});
@@ -666,6 +670,160 @@ describe('useBalanceHistory', () => {
       });
     });
   });
+  describe('Day-zero peak (first day of the month)', () => {
+    // A day's snapshot is its *closing* balance, so a month that opened on 100k
+    // and spent 20k on the 1st recorded 80k and lost the 100k entirely. Walking
+    // the day's operations backwards from the close recovers every balance the
+    // account passed through; the highest is where the month really started.
+
+    describe('computeDayPeakBalance', () => {
+      it('recovers an opening balance that was spent down', () => {
+        // Opened on 100000, spent 20000 → closed on 80000, peaked at the open.
+        expect(computeDayPeakBalance('80000', ['-20000'])).toBe(100000);
+      });
+
+      it('takes an intraday high over both the open and the close', () => {
+        // 20000 in, +100000 income, −20000 spend → closes on 100000, peaked at 120000.
+        expect(computeDayPeakBalance('100000', ['100000', '-20000'])).toBe(120000);
+      });
+
+      it('returns the close when the day only gained', () => {
+        expect(computeDayPeakBalance('120000', ['100000'])).toBe(120000);
+      });
+
+      it('returns the close for a day with no operations', () => {
+        expect(computeDayPeakBalance('5000', [])).toBe(5000);
+        expect(computeDayPeakBalance('5000', undefined)).toBe(5000);
+      });
+
+      it('handles a day that ends below zero', () => {
+        expect(computeDayPeakBalance('-500', ['-1500'])).toBe(1000);
+      });
+
+      it('is null when the day has no known balance', () => {
+        expect(computeDayPeakBalance(null, ['-20000'])).toBeNull();
+        expect(computeDayPeakBalance(undefined, [])).toBeNull();
+        expect(computeDayPeakBalance('not-a-number', [])).toBeNull();
+      });
+
+      it('skips unparsable deltas rather than abandoning the walk', () => {
+        expect(computeDayPeakBalance('80000', ['-20000', 'oops'])).toBe(100000);
+      });
+
+      it('accepts a walk that lands back on the recorded opening', () => {
+        expect(computeDayPeakBalance('80000', ['-20000'], '100000')).toBe(100000);
+      });
+
+      it('reports the close when the walk misses the recorded opening', () => {
+        // The extra −30000 is an operation back-dated into the day, so it is not
+        // in the 80000 snapshot; undoing it would invent a 130000 opening.
+        expect(computeDayPeakBalance('80000', ['-20000', '-30000'], '100000')).toBe(80000);
+      });
+
+      it('tolerates sub-unit drift from converting a portfolio at display rates', () => {
+        expect(computeDayPeakBalance('80000', ['-20000'], '100000.4')).toBe(100000);
+      });
+
+      it('accepts the walk when the opening is unknown', () => {
+        // The charted thing's first day on record: there is nothing to check
+        // against, and refusing every such month would be worse than trusting it.
+        expect(computeDayPeakBalance('80000', ['-20000'], null)).toBe(100000);
+      });
+    });
+
+    // Balances by the date they are asked for: the 1st is the day's close, the
+    // 31st of December is the balance carried into the month.
+    const stubBalances = (byDate) => {
+      BalanceHistoryDB.getAccountBalanceOnOrBeforeDate.mockImplementation(
+        async (accountId, date) => (byDate[date] === undefined ? null : byDate[date]),
+      );
+    };
+
+    it('exposes the first day\'s peak on the loaded data', async () => {
+      stubBalances({ '2023-12-31': '100000', '2024-01-01': '80000' });
+      OperationsDB.getAccountDayDeltas.mockResolvedValue([
+        { id: 1, createdAt: '2024-01-01T09:00:00Z', delta: '-20000' },
+      ]);
+      BalanceHistoryDB.getBalanceHistory.mockResolvedValue([
+        { date: '2024-01-01', balance: '80000' },
+      ]);
+
+      const { result } = await renderHook(() => useBalanceHistory(mockAccountId, mockYear, mockMonth));
+
+      await act(async () => {
+        await result.current.loadBalanceHistory();
+      });
+
+      await waitFor(() => {
+        expect(result.current.balanceHistoryData.firstDayPeak).toBe(100000);
+      });
+    });
+
+    it('falls back to the close when the day-1 operations do not reconcile', async () => {
+      // A snapshot is only ever written under today's date, so an operation
+      // back-dated into the 1st is in the delta list without being in the balance
+      // the walk subtracts it from. Undoing it would invent a 130000 the account
+      // never held — and put it straight on the chart as the month's opening.
+      stubBalances({ '2023-12-31': '100000', '2024-01-01': '80000' });
+      OperationsDB.getAccountDayDeltas.mockResolvedValue([
+        { id: 1, createdAt: '2024-01-01T09:00:00Z', delta: '-20000' },
+        { id: 2, createdAt: '2024-01-10T18:00:00Z', delta: '-30000' },
+      ]);
+      BalanceHistoryDB.getBalanceHistory.mockResolvedValue([
+        { date: '2024-01-01', balance: '80000' },
+      ]);
+
+      const { result } = await renderHook(() => useBalanceHistory(mockAccountId, mockYear, mockMonth));
+
+      await act(async () => {
+        await result.current.loadBalanceHistory();
+      });
+
+      await waitFor(() => {
+        expect(result.current.balanceHistoryData.firstDayPeak).toBe(80000);
+      });
+    });
+
+    it('reads the balance carried into the month to reconcile against', async () => {
+      const { result } = await renderHook(() => useBalanceHistory(mockAccountId, mockYear, mockMonth));
+
+      await act(async () => {
+        await result.current.loadBalanceHistory();
+      });
+
+      await waitFor(() => {
+        expect(BalanceHistoryDB.getAccountBalanceOnOrBeforeDate)
+          .toHaveBeenCalledWith(mockAccountId, '2023-12-31');
+      });
+    });
+
+    it('reads the deltas for the first day of the selected month', async () => {
+      const { result } = await renderHook(() => useBalanceHistory(mockAccountId, mockYear, mockMonth));
+
+      await act(async () => {
+        await result.current.loadBalanceHistory();
+      });
+
+      await waitFor(() => {
+        expect(OperationsDB.getAccountDayDeltas).toHaveBeenCalledWith(mockAccountId, '2024-01-01');
+      });
+    });
+
+    it('is null when the month has no known day-1 balance', async () => {
+      BalanceHistoryDB.getAccountBalanceOnOrBeforeDate.mockResolvedValue(null);
+
+      const { result } = await renderHook(() => useBalanceHistory(mockAccountId, mockYear, mockMonth));
+
+      await act(async () => {
+        await result.current.loadBalanceHistory();
+      });
+
+      await waitFor(() => {
+        expect(result.current.balanceHistoryData.firstDayPeak).toBeNull();
+      });
+    });
+  });
+
   describe('Year average line', () => {
     it('median averages the two middle values on even counts', () => {
       expect(median([3, 1, 2])).toBe(2);

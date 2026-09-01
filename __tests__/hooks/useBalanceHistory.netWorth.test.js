@@ -34,6 +34,7 @@ jest.mock('../../app/services/OperationsDB', () => ({
   getTotalIncome: jest.fn(),
   getTransferTotals: jest.fn(),
   getMonthlyExpenseTotals: jest.fn(),
+  getAccountDayDeltas: jest.fn(),
   fetchRatesToTarget: jest.fn(),
   convertWithRateMap: jest.fn(),
 }));
@@ -91,6 +92,7 @@ describe('useBalanceHistory — net worth', () => {
     OperationsDB.getTotalIncome.mockResolvedValue('0');
     OperationsDB.getTransferTotals.mockResolvedValue({ incoming: '0', outgoing: '0' });
     OperationsDB.getMonthlyExpenseTotals.mockResolvedValue({});
+    OperationsDB.getAccountDayDeltas.mockResolvedValue([]);
     jest.spyOn(console, 'error').mockImplementation(() => {});
   });
 
@@ -136,6 +138,50 @@ describe('useBalanceHistory — net worth', () => {
     // ֏500 + $2×400 = ֏1300, for both the current and the previous month window.
     expect(result.current.balanceHistoryData.currentMonthTotalExpenses).toBe('1300.00');
     expect(result.current.balanceHistoryData.prevMonthTotalExpenses).toBe('1300.00');
+  });
+
+  it('walks the portfolio\'s first day as one ordered path', async () => {
+    // ֏20000 + $0 opening; the USD income lands first, then the AMD spend.
+    BalanceHistoryDB.getAccountBalancesOnOrBeforeDate.mockImplementation(
+      async (accountIds, date) => new Map((accountIds || []).map((id) => {
+        if (date === '2023-12-31') return [String(id), id === 'a' ? '20000' : '0'];
+        return [String(id), id === 'a' ? '100000' : '0'];
+      })),
+    );
+    OperationsDB.getAccountDayDeltas.mockImplementation(async (accountId) => (accountId === 'a'
+      ? [{ id: 2, createdAt: '2024-01-01T12:00:00Z', delta: '-20000' }]
+      : [{ id: 1, createdAt: '2024-01-01T09:00:00Z', delta: '250' }]));
+
+    const { result } = await renderNetWorth();
+
+    await act(async () => { await result.current.loadBalanceHistory(); });
+    await waitFor(() => expect(result.current.loadingBalanceHistory).toBe(false));
+
+    // ֏20000 → +$250×400 = ֏120000 → −֏20000 = ֏100000. The high is the middle.
+    expect(result.current.balanceHistoryData.firstDayPeak).toBe(120000);
+  });
+
+  it('reports the close when an account joins the portfolio mid-walk', async () => {
+    // Account b has no snapshot before the month, so its whole balance shows up
+    // in the close without ever being in the opening — the walk cannot describe
+    // the portfolio's real path through the day, so it must not draw one.
+    BalanceHistoryDB.getAccountBalancesOnOrBeforeDate.mockImplementation(
+      async (accountIds, date) => new Map((accountIds || []).map((id) => {
+        if (date === '2023-12-31') return [String(id), id === 'a' ? '20000' : null];
+        return [String(id), id === 'a' ? '20000' : '250'];
+      })),
+    );
+    OperationsDB.getAccountDayDeltas.mockImplementation(async (accountId) => (accountId === 'b'
+      ? [{ id: 1, createdAt: '2024-01-01T09:00:00Z', delta: '-50' }]
+      : []));
+
+    const { result } = await renderNetWorth();
+
+    await act(async () => { await result.current.loadBalanceHistory(); });
+    await waitFor(() => expect(result.current.loadingBalanceHistory).toBe(false));
+
+    // ֏20000 + $250×400 = ֏120000, the close, with no invented high above it.
+    expect(result.current.balanceHistoryData.firstDayPeak).toBe(120000);
   });
 
   it('charts the year view from every account as well', async () => {

@@ -1,14 +1,14 @@
 /**
  * Balance History Source
  *
- * The balance chart reads six things about "the thing being charted": its daily
+ * The balance chart reads seven things about "the thing being charted": its daily
  * snapshots, its balance carried in from before a window, its expenses, its
- * income, its transfers, and its expenses bucketed by month. For a single
- * account each is one query. For the *net worth* selection — every account at
- * once — each is the same query per account, with every foreign-currency figure
- * converted to one display currency and summed.
+ * income, its transfers, its expenses bucketed by month, and the ordered balance
+ * moves of a single day. For a single account each is one query. For the *net
+ * worth* selection — every account at once — each is the same query per account,
+ * with every foreign-currency figure converted to one display currency and summed.
  *
- * Both shapes are exposed as the same six-method object so the hook that drives
+ * Both shapes are exposed as the same seven-method object so the hook that drives
  * the chart asks the same questions either way and never branches on which one
  * it is holding.
  */
@@ -24,6 +24,7 @@ import {
   getTotalIncome,
   getTransferTotals,
   getMonthlyExpenseTotals,
+  getAccountDayDeltas,
   fetchRatesToTarget,
   convertWithRateMap,
 } from './OperationsDB';
@@ -109,10 +110,11 @@ export const createSingleAccountSource = (accountId) => ({
   getTotalIncome: (startDate, endDate) => getTotalIncome(accountId, startDate, endDate),
   getTransferTotals: (startDate, endDate) => getTransferTotals(accountId, startDate, endDate),
   getMonthlyExpenseTotals: (startDate, endDate) => getMonthlyExpenseTotals(accountId, startDate, endDate),
+  getDayDeltas: async (date) => (await getAccountDayDeltas(accountId, date)).map(row => row.delta),
 });
 
 /**
- * The net-worth source: the same six questions asked of every account and summed
+ * The net-worth source: the same seven questions asked of every account and summed
  * in `targetCurrency`.
  *
  * The rate map is fetched once and shared by every method of a given source, so a
@@ -229,6 +231,35 @@ export const createNetWorthSource = (accounts, targetCurrency) => {
         incoming: entry.incoming === null ? sum.incoming : Currency.add(sum.incoming, entry.incoming),
         outgoing: entry.outgoing === null ? sum.outgoing : Currency.add(sum.outgoing, entry.outgoing),
       }), { incoming: '0', outgoing: '0' });
+    },
+
+    // Every balance move of the portfolio on one day, in the order they happened.
+    // An operation between two charted accounts shows up in both accounts' lists,
+    // and net worth moves by the *sum* of the two sides (zero for a same-currency
+    // transfer), so the deltas are folded by operation id before the day is
+    // ordered — otherwise an internal transfer would read as a dip and a spike
+    // that the portfolio never actually took.
+    getDayDeltas: async (date) => {
+      const rateMap = await rates();
+      const perAccount = await Promise.all(list.map(async (acc) => {
+        const rows = await getAccountDayDeltas(acc.id, date);
+        return rows.map(row => ({ ...row, delta: convert(row.delta, acc.currency, rateMap) }));
+      }));
+
+      const byOperation = new Map();
+      perAccount.forEach((rows) => rows.forEach(({ id, createdAt, delta }) => {
+        if (delta === null) return; // currency with no rate: left out entirely
+        const key = String(id);
+        const entry = byOperation.get(key);
+        if (entry) entry.delta = Currency.add(entry.delta, delta);
+        else byOperation.set(key, { key, createdAt, delta });
+      }));
+
+      return [...byOperation.values()]
+        .sort((a, b) => (a.createdAt < b.createdAt ? -1
+          : a.createdAt > b.createdAt ? 1
+            : (a.key < b.key ? -1 : a.key > b.key ? 1 : 0)))
+        .map(entry => entry.delta);
     },
 
     getMonthlyExpenseTotals: async (startDate, endDate) => {
