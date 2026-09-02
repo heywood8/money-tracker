@@ -1,5 +1,12 @@
 # Changelog
 
+## [0.282.0](https://github.com/heywood8/money-tracker/compare/penny-v0.281.1...penny-v0.282.0) (2026-09-02)
+
+
+### Features
+
+* **graphs:** anchor the balance line at the first day's peak ([#1687](https://github.com/heywood8/money-tracker/issues/1687)) ([fcc790d](https://github.com/heywood8/money-tracker/commit/fcc790d1590f368abed27ab75ae20e6586940193))
+
 ## [0.281.1](https://github.com/heywood8/money-tracker/compare/penny-v0.281.0...penny-v0.281.1) (2026-08-31)
 
 
