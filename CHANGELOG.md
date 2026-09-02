@@ -1,5 +1,12 @@
 # Changelog
 
+## [0.283.0](https://github.com/heywood8/money-tracker/compare/penny-v0.282.1...penny-v0.283.0) (2026-09-02)
+
+
+### Features
+
+* **graphs:** give the balance card's account picker the title line ([#1691](https://github.com/heywood8/money-tracker/issues/1691)) ([747545b](https://github.com/heywood8/money-tracker/commit/747545b28c3c71fa428a3ba369cea34c628e98c0))
+
 ## [0.282.1](https://github.com/heywood8/money-tracker/compare/penny-v0.282.0...penny-v0.282.1) (2026-09-02)
 
 
