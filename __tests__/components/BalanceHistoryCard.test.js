@@ -137,8 +137,11 @@ describe('BalanceHistoryCard', () => {
       expect(root).toBeTruthy();
     });
 
-    it('displays balance title', async () => {
-      const { getByText } = await render(
+    // Variant A of the header layout: the account picker took over the eyebrow
+    // line that used to hold the constant word "Balance", so a long account name
+    // has the width of the title instead of an 82px slot at the row's end.
+    it('renders no static Balance label — the account picker owns that line', async () => {
+      const { queryByText, container } = await render(
         <BalanceHistoryCard
           colors={mockColors}
           t={mockT}
@@ -167,7 +170,12 @@ describe('BalanceHistoryCard', () => {
         />,
       );
 
-      expect(getByText('BALANCE')).toBeTruthy();
+      expect(queryByText('BALANCE')).toBeNull();
+
+      const simplePicker = container.queryAll(n => n.type === 'SimplePicker')[0];
+      expect(simplePicker).toBeTruthy();
+      // Eyebrow-sized, so it fits the line the label vacated.
+      expect(simplePicker.props.iconSize).toBe(14);
     });
 
     it('renders account picker with correct props', async () => {
@@ -444,6 +452,36 @@ describe('BalanceHistoryCard', () => {
       );
 
       expect(container.queryAll(n => n.props.testID === 'cartesian-chart')[0]).toBeTruthy();
+    });
+
+    // The word "Balance" is no longer on screen, so it has to reach a screen
+    // reader some other way: without this the amount reads as a bare number
+    // under an account name.
+    it('names the balance amount for screen readers', async () => {
+      const { getByLabelText } = await render(
+        <BalanceHistoryCard
+          colors={mockColors}
+          t={mockT}
+          selectedAccount="acc1"
+          onAccountChange={jest.fn()}
+          accountItems={mockAccountItems}
+          loadingBalanceHistory={false}
+          balanceHistoryData={mockBalanceHistoryData}
+          selectedYear={2024}
+          selectedMonth={0}
+          accounts={mockAccounts}
+          balanceHistoryTableData={[]}
+          editingBalanceValue=""
+          onEditingBalanceValueChange={jest.fn()}
+          onEditBalance={jest.fn()}
+          onCancelEdit={jest.fn()}
+          onSaveBalance={jest.fn()}
+          onDeleteBalance={jest.fn()}
+          onShowCalendar={jest.fn()}
+        />,
+      );
+
+      expect(getByLabelText(/^Balance: /)).toBeTruthy();
     });
 
     it('configures chart with correct data including plain avg line', async () => {

@@ -32,11 +32,20 @@ import {
   resolveLabelStride,
 } from './monthLabels';
 import { CARD_SURFACE } from '../../styles/componentStyles';
-import { BORDER_RADIUS, FONT_SIZE, SPACING } from '../../styles/designTokens';
+import { BORDER_RADIUS, FONT_SIZE, FONT_WEIGHT, SPACING } from '../../styles/designTokens';
 
 // Size the axis labels are drawn at, and the size their widths are estimated
 // against when the font cannot measure itself.
 const AXIS_FONT_SIZE = 11;
+// The account picker sits on the header's title line, so the chip itself is
+// only as tall as a 12px label. The slop grows the target back to ~44px without
+// the chip pushing the amount down — downward and to the right only, because
+// the chip is pinned to the top-left corner of balanceHistoryTitleContainer and
+// Android drops a touch that lands outside the parent's bounds. Downward it
+// reaches over the amount, which is not itself tappable, so the whole title
+// block selects the account.
+const ACCOUNT_PICKER_HIT_SLOP = { bottom: 22, right: 8 };
+
 // What the y-axis labels and their gutter take out of the card before the plot
 // itself starts. The month pitch is derived from what is left, so the year
 // view's labels are thinned against the width they actually have.
@@ -1147,6 +1156,14 @@ const BalanceHistoryCard = ({
   // Series composition drives the press-state shape; remount the canvas when it changes.
   const chartKey = chartYKeys.join('|');
 
+  // The visible "BALANCE" eyebrow is gone — the picker holds that line now — so
+  // the word only survives for a screen reader, which otherwise reads a bare
+  // number under an account name.
+  const balanceLabel = t('balance') || 'Balance';
+  const balanceAccessibilityLabel = hideBalances || headerBalance === null
+    ? balanceLabel
+    : `${balanceLabel}: ${formatBalanceCompact(headerBalance, currency)}`;
+
   const thirdLineLabel = effectiveThirdLine === 'prevMonth'
     ? (t('prev_month') || 'Prev Month')
     : effectiveThirdLine === 'prevYear'
@@ -1159,12 +1176,32 @@ const BalanceHistoryCard = ({
     <View style={[styles.balanceHistoryCard, { backgroundColor: colors.surface, borderColor: colors.border }]}>
       <View style={styles.balanceHistoryHeader}>
         <View style={styles.balanceHistoryTitleContainer}>
-          <Text style={[styles.balanceHistoryLabel, { color: colors.mutedText }]}>
-            {(t('balance') || 'Balance').toUpperCase()}
-          </Text>
+          {/* The account picker IS the card's title. The eyebrow slot used to
+              hold the word "Balance", which never changed and never said which
+              account the chart was drawing; the picker was crammed into the
+              right end of the same row at a fixed 150px, leaving 82px for a
+              name. Reading the two swaps that: the account gets the whole
+              title line, the amount underneath is self-evidently the balance,
+              and the header keeps its height. */}
+          <SimplePicker
+            value={selectedAccount}
+            onValueChange={onAccountChange}
+            items={accountItems}
+            colors={colors}
+            leftIcon={isNetWorth ? 'earth' : 'bank'}
+            iconSize={14}
+            style={styles.accountPickerInner}
+            textStyle={[styles.accountPickerText, { color: colors.mutedText }]}
+            hitSlop={ACCOUNT_PICKER_HIT_SLOP}
+            closeLabel={closeLabel}
+          />
           {headerBalance !== null && (
             <View style={styles.balanceAmountRow}>
-              <Text style={[styles.balanceAmount, { color: colors.text }]} numberOfLines={1}>
+              <Text
+                style={[styles.balanceAmount, { color: colors.text }]}
+                numberOfLines={1}
+                accessibilityLabel={balanceAccessibilityLabel}
+              >
                 {hideBalances ? '••••' : formatBalanceCompact(headerBalance, currency)}
               </Text>
               {showDayContext && (
@@ -1180,78 +1217,71 @@ const BalanceHistoryCard = ({
             </View>
           )}
         </View>
-        {/* Burndown-norm toggle. Month view only — the year chart never draws
-            that line (see computeYearBalanceChart). */}
-        {!calendarVisible && !isYearView && balanceHistoryData.actual && balanceHistoryData.actual.length > 0 && (
-          <TouchableOpacity
-            testID="plain-avg-toggle-btn"
-            style={[styles.calendarToggleBtn, { backgroundColor: colors.surface }]}
-            onPress={() => setShowPlainAvg(prev => !prev)}
-            activeOpacity={0.7}
-            accessibilityRole="button"
-            accessibilityState={{ selected: showPlainAvg }}
-            accessibilityLabel={t('plain_avg') || 'Plain avg'}
-          >
-            {/* One icon in both states, muted when off: the comparison toggle
-                next to it already uses eye-off for its own "none" step, and two
-                identical eye-off glyphs side by side say nothing about which
-                line each button owns. */}
-            <Icon
-              name="trending-down"
-              size={18}
-              color={showPlainAvg ? chartLineColors.norm : colors.mutedText}
-            />
-          </TouchableOpacity>
-        )}
-        {/* Comparison line toggle: month view steps prev month → year average →
-            off, year view steps prev year → off. */}
-        {!calendarVisible && balanceHistoryData.actual && balanceHistoryData.actual.length > 0 && (
-          <TouchableOpacity
-            testID="third-line-toggle-btn"
-            style={[styles.calendarToggleBtn, { backgroundColor: colors.surface }]}
-            onPress={() => setThirdLineFor(granularity, nextThirdLineMode(effectiveThirdLine, granularity))}
-            activeOpacity={0.7}
-            accessibilityRole="button"
-            accessibilityLabel={thirdLineLabel}
-          >
-            <Icon
-              name={THIRD_LINE_ICONS[effectiveThirdLine]}
-              size={18}
-              color={effectiveThirdLine === 'none' ? colors.mutedText : colors.primary}
-            />
-          </TouchableOpacity>
-        )}
-        {/* Calendar / Chart toggle. The calendar is a month grid, so the year
-            view has nothing to switch to. */}
-        {!isYearView && !isNetWorth && balanceHistoryData.actual && balanceHistoryData.actual.length > 0 && (
-          <TouchableOpacity
-            testID="calendar-toggle-btn"
-            style={[styles.calendarToggleBtn, { backgroundColor: colors.surface }]}
-            onPress={() => {
-              const next = !showCalendar;
-              setShowCalendar(next);
-              if (next) onShowCalendar();
-            }}
-            activeOpacity={0.7}
-          >
-            <Icon
-              name={showCalendar ? 'chart-line' : 'calendar-month'}
-              size={18}
-              color={colors.primary}
-            />
-          </TouchableOpacity>
-        )}
-        {/* Account Pill Picker */}
-        <View style={[styles.accountPickerWrapper, { backgroundColor: colors.card }]}>
-          <SimplePicker
-            value={selectedAccount}
-            onValueChange={onAccountChange}
-            items={accountItems}
-            colors={colors}
-            leftIcon={isNetWorth ? 'earth' : 'bank'}
-            style={styles.accountPickerInner}
-            closeLabel={closeLabel}
-          />
+        {/* The header's controls. Grouped so the row's own gap spaces them:
+            each button used to carry a marginRight sized for the picker that
+            followed it, which now leaves a dangling 8px at the card's edge. */}
+        <View style={styles.headerActions}>
+          {/* Burndown-norm toggle. Month view only — the year chart never draws
+              that line (see computeYearBalanceChart). */}
+          {!calendarVisible && !isYearView && balanceHistoryData.actual && balanceHistoryData.actual.length > 0 && (
+            <TouchableOpacity
+              testID="plain-avg-toggle-btn"
+              style={[styles.calendarToggleBtn, { backgroundColor: colors.surface }]}
+              onPress={() => setShowPlainAvg(prev => !prev)}
+              activeOpacity={0.7}
+              accessibilityRole="button"
+              accessibilityState={{ selected: showPlainAvg }}
+              accessibilityLabel={t('plain_avg') || 'Plain avg'}
+            >
+              {/* One icon in both states, muted when off: the comparison toggle
+                  next to it already uses eye-off for its own "none" step, and two
+                  identical eye-off glyphs side by side say nothing about which
+                  line each button owns. */}
+              <Icon
+                name="trending-down"
+                size={18}
+                color={showPlainAvg ? chartLineColors.norm : colors.mutedText}
+              />
+            </TouchableOpacity>
+          )}
+          {/* Comparison line toggle: month view steps prev month → year average →
+              off, year view steps prev year → off. */}
+          {!calendarVisible && balanceHistoryData.actual && balanceHistoryData.actual.length > 0 && (
+            <TouchableOpacity
+              testID="third-line-toggle-btn"
+              style={[styles.calendarToggleBtn, { backgroundColor: colors.surface }]}
+              onPress={() => setThirdLineFor(granularity, nextThirdLineMode(effectiveThirdLine, granularity))}
+              activeOpacity={0.7}
+              accessibilityRole="button"
+              accessibilityLabel={thirdLineLabel}
+            >
+              <Icon
+                name={THIRD_LINE_ICONS[effectiveThirdLine]}
+                size={18}
+                color={effectiveThirdLine === 'none' ? colors.mutedText : colors.primary}
+              />
+            </TouchableOpacity>
+          )}
+          {/* Calendar / Chart toggle. The calendar is a month grid, so the year
+              view has nothing to switch to. */}
+          {!isYearView && !isNetWorth && balanceHistoryData.actual && balanceHistoryData.actual.length > 0 && (
+            <TouchableOpacity
+              testID="calendar-toggle-btn"
+              style={[styles.calendarToggleBtn, { backgroundColor: colors.surface }]}
+              onPress={() => {
+                const next = !showCalendar;
+                setShowCalendar(next);
+                if (next) onShowCalendar();
+              }}
+              activeOpacity={0.7}
+            >
+              <Icon
+                name={showCalendar ? 'chart-line' : 'calendar-month'}
+                size={18}
+                color={colors.primary}
+              />
+            </TouchableOpacity>
+          )}
         </View>
       </View>
 
@@ -1464,13 +1494,27 @@ BalanceHistoryCard.propTypes = {
 
 const styles = StyleSheet.create({
   accountPickerInner: {
-    height: 32,
-    paddingHorizontal: 10,
+    // Hugs its own label instead of filling the row: the chip is the card's
+    // title now, and a title that stretched to the container would put its
+    // chevron somewhere out past the end of the name.
+    alignSelf: 'flex-start',
+    height: 22,
+    paddingHorizontal: 0,
+    width: 'auto',
   },
-  accountPickerWrapper: {
-    borderRadius: BORDER_RADIUS.pill,
-    flexShrink: 0,
-    width: 150,
+  accountPickerText: {
+    // Deliberately not SECTION_LABEL: that eyebrow is uppercase and tracked
+    // out, which suits a fixed word and not a name someone typed. Upper-casing
+    // "Ameria облигации" makes it both harder to read and *wider* — the very
+    // thing this layout exists to fix.
+    //
+    // SimplePicker's chip label is flex: 1 so it fills a full-width chip. Here
+    // the chip is content-sized, and a flex-basis of 0 would collapse it to
+    // nothing; shrink keeps the ellipsis for a name that outgrows the header.
+    flex: 0,
+    flexShrink: 1,
+    fontSize: FONT_SIZE.sm,
+    fontWeight: FONT_WEIGHT.semibold,
   },
   balanceAmount: {
     fontSize: 22,
@@ -1505,11 +1549,6 @@ const styles = StyleSheet.create({
     justifyContent: 'space-between',
     marginBottom: 16,
   },
-  balanceHistoryLabel: {
-    fontSize: 11,
-    fontWeight: '500',
-    letterSpacing: 0.5,
-  },
   balanceHistoryLoading: {
     alignItems: 'center',
     height: 220,
@@ -1538,8 +1577,13 @@ const styles = StyleSheet.create({
     borderRadius: BORDER_RADIUS.md,
     height: 32,
     justifyContent: 'center',
-    marginRight: 8,
     width: 32,
+  },
+  headerActions: {
+    alignItems: 'center',
+    flexDirection: 'row',
+    flexShrink: 0,
+    gap: SPACING.sm,
   },
   legendDot: {
     borderRadius: BORDER_RADIUS.pill,
