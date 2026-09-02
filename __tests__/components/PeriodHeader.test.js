@@ -89,11 +89,54 @@ describe('PeriodHeader', () => {
 
     // It is navigation, so it belongs with the arrows rather than inside the
     // name it would otherwise push off centre.
-    it('rides in the left slot beside the previous arrow', async () => {
+    it('rides in the left slot rather than in the centred pair', async () => {
       const { getByTestId } = await setup({ showJumpToCurrent: true, jumpLabel: 'today' });
 
       expect(within(getByTestId('scope-nav-start')).getByTestId('scope-jump-current')).toBeTruthy();
       expect(within(getByTestId('scope-scope')).queryByTestId('scope-jump-current')).toBeNull();
+    });
+
+    // Sharing the slot with the ‹ arrow is not the same as sitting against it:
+    // hard against the arrow the two read as one control, and a tap meant for
+    // "back a month" lands on "today". The glyph is pushed to the slot's inner
+    // end — the period name's edge — with its gap on that side.
+    it('sits at the period end of the left slot, not against the arrow', async () => {
+      const { getByTestId } = await setup({ showJumpToCurrent: true, jumpLabel: 'today' });
+
+      const slot = StyleSheet.flatten(getByTestId('scope-nav-start').props.style);
+      expect(slot.justifyContent).toBe('space-between');
+
+      const glyph = StyleSheet.flatten(getByTestId('scope-jump-current').props.style);
+      expect(glyph.marginRight).toBeGreaterThan(0);
+      expect(glyph.marginLeft).toBeUndefined();
+    });
+
+    // The gap has to outlast the two targets' slop, or the picker — rendered
+    // after the slot — wins the taps aimed at the glyph's right edge.
+    it('keeps its target clear of the period picker', async () => {
+      const { getByTestId } = await setup({ showJumpToCurrent: true, jumpLabel: 'today' });
+
+      const gap = StyleSheet.flatten(getByTestId('scope-jump-current').props.style).marginRight;
+      const jumpSlop = getByTestId('scope-jump-current').props.hitSlop;
+      const titleSlop = getByTestId('scope-picker').props.hitSlop;
+
+      expect(jumpSlop.right + titleSlop.left).toBeLessThanOrEqual(gap);
+    });
+
+    // Slop overlaps a neighbour where a box pushes it away, and this glyph now
+    // has a neighbour on each side. So the 44dp target is mostly box, and what
+    // little slop reaches left stops inside the arrow's own padding rather than
+    // on the chevron a back-a-month tap is aiming at.
+    it('builds its 44dp target out of box, not slop over the arrow', async () => {
+      const { getByTestId } = await setup({ showJumpToCurrent: true, jumpLabel: 'today' });
+
+      const box = StyleSheet.flatten(getByTestId('scope-jump-current').props.style);
+      const slop = getByTestId('scope-jump-current').props.hitSlop;
+      const arrowPadding = StyleSheet.flatten(getByTestId('scope-prev').props.style).padding;
+
+      expect(box.width + slop.left + slop.right).toBeGreaterThanOrEqual(44);
+      expect(box.height + slop.top + slop.bottom).toBeGreaterThanOrEqual(44);
+      expect(slop.left).toBeLessThanOrEqual(arrowPadding);
     });
   });
 

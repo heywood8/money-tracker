@@ -16,7 +16,7 @@ import { withAlpha } from '../utils/colorUtils';
  * below read in those two units — so they get one header rather than two that
  * have to be kept looking alike by hand.
  *
- *     ‹ ⊙        August 2026 ⌄  │  ֏ AMD ⌄        ›
+ *     ‹        ⊙ August 2026 ⌄  │  ֏ AMD ⌄        ›
  *
  * Period and currency are a pair, and the pair as a whole is what sits on the
  * screen's centre line. A hairline parts them, not a middot: a rule says "two
@@ -60,12 +60,20 @@ import { withAlpha } from '../utils/colorUtils';
  * `flex: 1` — which in RN means `flexBasis: 0`, so they stay equal whatever
  * they hold — and the pair in the middle is sized by its own content. That is
  * what keeps the pair centred, and it is why the jump glyph needs no mirror
- * spacer: it lives in the left slot, hard against the ‹ arrow, because a jump
- * to the current period is navigation and belongs with the other navigation
- * rather than inside the name it would otherwise shove sideways. The one place
- * that gives is a narrow screen with the glyph up and a long month name, where
- * the ends hit their floors and the pair ends up a few dp right of centre; see
- * `navSlot` for why that is the loss worth taking.
+ * spacer: it lives in the left slot, which it shares with the ‹ arrow, because
+ * a jump to the current period is navigation and belongs with the other
+ * navigation rather than inside the name it would otherwise shove sideways.
+ *
+ * Sharing a slot is not the same as sitting next to each other, though. The
+ * arrow keeps the screen edge and the glyph is pushed to the slot's inner end,
+ * a `JUMP_GAP` short of the period name — two glyphs a slot's width apart read
+ * as two controls, where the pair they used to form read as one and invited a
+ * step-back-a-month tap that landed on today instead. It also puts the glyph
+ * beside the thing it acts on: what it resets is the period, and the period is
+ * immediately to its right. The one place that gives is a narrow screen with
+ * the glyph up and a long month name, where the ends hit their floors and the
+ * pair ends up a few dp right of centre; see `navSlot` for why that is the
+ * loss worth taking.
  *
  * What the header does *not* own is the choice surfaces themselves. The host
  * keeps its own MonthPickerSheet and CurrencySheet, because what a period means
@@ -89,10 +97,33 @@ const FADE_STEPS = 12;
 const SYMBOL_MAX_FONT_SCALE = 1.15;
 
 // What each end slot holds: an arrow (a 26dp glyph in a 4dp-padded box) and, on
-// the left only, the jump glyph (18dp behind a 2dp gap). Each end floors itself
-// at its own contents — see `navSlot`.
+// the left only, the jump glyph in a box of its own, ahead of the gap that
+// parts it from the period name. Each end floors itself at its own contents —
+// see `navSlot`.
 const ARROW_BOX = 34;
-const JUMP_BOX = 20;
+const JUMP_GLYPH = 18;
+
+// The jump's target is built out of a real box plus a small slop, not out of
+// slop alone. It has two neighbours now — the arrow on one side, the period
+// name on the other — and slop is what overlaps them; a box only pushes them
+// away. 36 + 4 of slop on each side is 44dp, `HEIGHTS.buttonCompact`, which is
+// the floor Android asks for and what the glyph had before this box existed.
+const JUMP_BOX_SIZE = 36;
+const JUMP_SLOP_X = 4;
+
+// What parts the box from the period name. It has to outlast both targets'
+// slop or they overlap, and the picker — rendered after this slot — would win
+// the taps: JUMP_SLOP_X (4) + the title's own 8 is exactly 12.
+const JUMP_GAP = SPACING.md;
+const JUMP_BOX = JUMP_BOX_SIZE + JUMP_GAP;
+
+// Vertical is the one direction with nothing to collide with, so it is the one
+// that stays generous. Horizontally the slop is deliberately small: at the
+// slot's floor the box sits flush against the arrow, and 4dp reaches only into
+// the arrow's own padding, never onto the chevron a back-a-month tap aims at.
+const JUMP_HIT_SLOP = {
+  bottom: 8, left: JUMP_SLOP_X, right: JUMP_SLOP_X, top: 8,
+};
 
 // Both halves of the pair are bare text, so their own boxes are only as tall as
 // a line of type. Generous vertically, where there is room to spare; held to
@@ -187,14 +218,14 @@ const PeriodHeader = memo(({
               <Pressable
                 onPress={onJumpToCurrent}
                 style={styles.jumpButton}
-                // The glyph's own box is 18dp; the slop is what brings the
-                // target up to a thumb's worth without widening the slot.
-                hitSlop={12}
+                // 36dp of box and 4dp of slop each side: 44 across, and taller
+                // still, without either edge reaching a neighbour's target.
+                hitSlop={JUMP_HIT_SLOP}
                 accessibilityRole="button"
                 accessibilityLabel={jumpLabel}
                 testID={`${testIDPrefix}-jump-current`}
               >
-                <Icon name="calendar-today" size={18} color={colors.primary} />
+                <Icon name="calendar-today" size={JUMP_GLYPH} color={colors.primary} />
               </Pressable>
             )}
           </View>
@@ -351,12 +382,15 @@ const styles = StyleSheet.create({
   fadeStep: {
     flex: 1,
   },
-  // The arrow's own 4dp padding already parts the two glyphs; this is the 2dp
-  // that keeps them from reading as one control. Its box is 18 + 2 = JUMP_BOX.
+  // Sits at the inner end of the left slot, `JUMP_GAP` clear of the period
+  // name it resets. What the slot has to reserve for it is the box plus that
+  // gap — JUMP_BOX — since the glyph is centred in a box wider than itself.
   jumpButton: {
     alignItems: 'center',
+    height: JUMP_BOX_SIZE,
     justifyContent: 'center',
-    marginLeft: 2,
+    marginRight: JUMP_GAP,
+    width: JUMP_BOX_SIZE,
   },
   navButton: {
     padding: 4,
@@ -383,7 +417,12 @@ const styles = StyleSheet.create({
   navSlotStart: {
     minWidth: ARROW_BOX,
   },
+  // The arrow keeps the screen edge, the glyph is pushed to the far end of the
+  // slot — which is the period name's edge, since the slot ends where the pair
+  // begins. With no slack left the two meet, and the slot is still no narrower
+  // than both of them.
   navSlotStartWithJump: {
+    justifyContent: 'space-between',
     minWidth: ARROW_BOX + JUMP_BOX,
   },
   overlay: {
