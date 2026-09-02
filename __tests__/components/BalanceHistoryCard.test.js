@@ -2896,4 +2896,82 @@ describe('BalanceHistoryCard', () => {
       expect(formatYAxisLabel('900', false)).toBe('900');
     });
   });
+
+  describe('Day-zero anchor (the first day\'s peak)', () => {
+    // Balance history stores one snapshot per day — the balance at the *end* of
+    // it — so a month that opened on 100k and spent 20k on the 1st charted as a
+    // month that started at 80k, with the day's 20k nowhere on the line. The hook
+    // recovers the day-1 peak and the chart draws it at x = 0.
+    const buildData = (firstDayPeak, actualForChart) => ({
+      labels: [1, 2, 3],
+      actual: actualForChart.map((y, i) => ({ x: i + 1, y })),
+      actualForChart,
+      prevMonth: [500, 480, 460],
+      yearAvg: [510, 490, 470],
+      firstDayPeak,
+    });
+
+    const compute = (firstDayPeak, actualForChart = [80000, 70000, 60000], overrides = {}) =>
+      computeBalanceChart({
+        balanceHistoryData: buildData(firstDayPeak, actualForChart),
+        spendingPrediction: null,
+        isCurrentMonth: false,
+        selectedYear: 2024,
+        selectedMonth: 0,
+        primaryColor: mockColors.primary,
+        thirdLine: 'none',
+        showPlainAvg: false,
+        ...overrides,
+      });
+
+    it('prepends a day-0 point at the first day\'s peak', () => {
+      const { data } = compute(100000);
+
+      expect(data[0]).toMatchObject({ day: 0, actual: 100000 });
+      expect(data[1]).toMatchObject({ day: 1, actual: 80000 });
+    });
+
+    it('omits the point when the day closed on its own peak', () => {
+      // Nothing to show: a flat 0→1 segment would only widen the axis.
+      const { data } = compute(80000);
+
+      expect(data[0].day).toBe(1);
+      expect(data.some(d => d.day === 0)).toBe(false);
+    });
+
+    it('omits the point when the hook could not compute a peak', () => {
+      const { data } = compute(null);
+
+      expect(data[0].day).toBe(1);
+    });
+
+    it('lifts the y-axis ceiling to fit the day-0 peak', () => {
+      // The peak is the highest thing on the line; a ceiling below it would clip
+      // the point off the top of the canvas.
+      const { computed } = compute(100000);
+
+      expect(computed.maxBalance).toBe(100000);
+      expect(computed.niceMax).toBeGreaterThanOrEqual(100000);
+    });
+
+    it('leaves the comparison lines out of the day-0 record', () => {
+      // Neither the previous month nor the 12-month median has a day-zero reading
+      // of its own; a leading gap lets each start where its data begins.
+      const { data } = compute(100000, [80000, 70000, 60000], { thirdLine: 'prevMonth' });
+
+      expect(data[0].prevMonth).toBeNull();
+      expect(data[0].yearAvg).toBeNull();
+      expect(data[1].prevMonth).toBe(500);
+    });
+
+    it('holds the burndown norm flat back to day 0', () => {
+      // The ceiling is a day-1 quantity — extrapolating the burndown slope left
+      // would draw it above its own maximum.
+      const { data, computed } = compute(100000, [80000, 70000, 60000], { showPlainAvg: true });
+
+      expect(data[0].plainAvg).toBe(computed.plainAvgMax);
+      expect(data[1].plainAvg).toBe(computed.plainAvgMax);
+    });
+  });
+
 });

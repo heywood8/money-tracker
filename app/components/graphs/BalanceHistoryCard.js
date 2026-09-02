@@ -268,7 +268,25 @@ export const computeBalanceChart = ({
     return undefined;
   });
 
-  const actualValues = balanceHistoryData.actualForChart.filter(v => v !== undefined);
+  // Day-zero anchor: the highest balance held during day 1 (computed in the hook),
+  // drawn as an extra point at x = 0. Snapshots are end-of-day figures, so without
+  // it a month that opened on 100k and spent 20k on the 1st starts its line at 80k
+  // and that first day's spending is nowhere on the chart. Added only when the peak
+  // is strictly above the day-1 close — a day whose peak *is* its close has nothing
+  // extra to show, and a flat 0→1 segment would only widen the axis for nothing.
+  const dayOneClose = balanceHistoryData.actualForChart[0];
+  const rawFirstDayPeak = balanceHistoryData.firstDayPeak;
+  const dayZeroValue = (
+    rawFirstDayPeak != null
+    && Number.isFinite(rawFirstDayPeak)
+    && dayOneClose !== undefined
+    && rawFirstDayPeak > dayOneClose
+  ) ? rawFirstDayPeak : null;
+
+  const actualValues = [
+    ...(dayZeroValue !== null ? [dayZeroValue] : []),
+    ...balanceHistoryData.actualForChart.filter(v => v !== undefined),
+  ];
   const maxBalance = actualValues.length > 0 ? Math.max(...actualValues) : 0;
   const daysInMonth = balanceHistoryData.labels[balanceHistoryData.labels.length - 1];
 
@@ -431,6 +449,7 @@ export const computeBalanceChart = ({
     combinedActualForecast,
     actualValues,
     maxBalance,
+    dayZeroValue,
     plainAvgMax,
     daysInMonth,
     plainAvgData,
@@ -477,6 +496,22 @@ export const computeBalanceChart = ({
       zero: 0,
     };
   });
+
+  if (dayZeroValue !== null) {
+    data.unshift({
+      day: 0,
+      actual: dayZeroValue,
+      forecast: null,
+      // The burndown ceiling is a day-1 quantity, so it is held flat back to x = 0
+      // rather than extrapolated up past its own maximum.
+      plainAvg: showPlainAvg ? plainAvgMax : null,
+      // The comparison lines have no day-zero reading of their own; a leading gap
+      // lets each start at day 1, where its data actually begins.
+      prevMonth: null,
+      yearAvg: null,
+      zero: 0,
+    });
+  }
 
   const series = [
     { yKey: 'actual', color: primaryColor, strokeWidth: 3, curveType: 'monotoneX', dashed: false },
@@ -1094,7 +1129,10 @@ const BalanceHistoryCard = ({
   }, [scrubDay, chartData, isYearView]);
 
   const headerBalance = scrubbedBalance != null ? scrubbedBalance : currentBalance;
-  const headerDay = scrubDay != null ? scrubDay : headerDayNum;
+  // The day-zero anchor sits at x = 0 (the start of the 1st, before any of that
+  // day's operations), so a finger on it still belongs to day 1 as far as the
+  // "day N of M" counter is concerned.
+  const headerDay = scrubDay != null ? Math.max(scrubDay, 1) : headerDayNum;
   const showDayContext = !isYearView && (isCurrentMonth || scrubDay != null) && headerDaysInMonth !== null;
   // Year view: name the month under the finger instead of a day-of-month counter
   // that would be meaningless on a year-long axis.
@@ -1384,6 +1422,7 @@ BalanceHistoryCard.propTypes = {
     prevMonthTotalExpenses: PropTypes.oneOfType([PropTypes.number, PropTypes.string]),
     prevMonthDaysCount: PropTypes.number,
     plainAvgMax: PropTypes.number,
+    firstDayPeak: PropTypes.number,
     yearAvg: PropTypes.array,
     yearAvgDailyAvg: PropTypes.number,
     // Whole-year view (selectedMonth === null): weekly samples of this year and

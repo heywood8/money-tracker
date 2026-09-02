@@ -27,6 +27,7 @@ import {
   getTotalIncome,
   getTransferTotals,
   getMonthlyExpenseTotals,
+  getAccountDayDeltas,
   fetchRatesToTarget,
   convertWithRateMap,
 } from '../../app/services/OperationsDB';
@@ -43,6 +44,7 @@ jest.mock('../../app/services/OperationsDB', () => ({
   getTotalIncome: jest.fn(),
   getTransferTotals: jest.fn(),
   getMonthlyExpenseTotals: jest.fn(),
+  getAccountDayDeltas: jest.fn(),
   fetchRatesToTarget: jest.fn(),
   convertWithRateMap: jest.fn(),
 }));
@@ -83,6 +85,7 @@ describe('BalanceHistorySource', () => {
     getTotalIncome.mockResolvedValue('0');
     getTransferTotals.mockResolvedValue({ incoming: '0', outgoing: '0' });
     getMonthlyExpenseTotals.mockResolvedValue({});
+    getAccountDayDeltas.mockResolvedValue([]);
   });
 
   describe('isNetWorthSelection', () => {
@@ -187,6 +190,7 @@ describe('BalanceHistorySource', () => {
       await source.getTotalIncome('2024-01-02', '2024-01-31');
       await source.getTransferTotals('2024-01-02', '2024-01-31');
       await source.getMonthlyExpenseTotals('2023-01-01', '2023-12-31');
+      await source.getDayDeltas('2024-01-01');
 
       expect(source.isNetWorth).toBe(false);
       expect(getBalanceHistory).toHaveBeenCalledWith('account-1', '2024-01-01', '2024-01-31');
@@ -195,6 +199,7 @@ describe('BalanceHistorySource', () => {
       expect(getTotalIncome).toHaveBeenCalledWith('account-1', '2024-01-02', '2024-01-31');
       expect(getTransferTotals).toHaveBeenCalledWith('account-1', '2024-01-02', '2024-01-31');
       expect(getMonthlyExpenseTotals).toHaveBeenCalledWith('account-1', '2023-01-01', '2023-12-31');
+      expect(getAccountDayDeltas).toHaveBeenCalledWith('account-1', '2024-01-01');
       expect(fetchRatesToTarget).not.toHaveBeenCalled();
     });
   });
@@ -301,6 +306,42 @@ describe('BalanceHistorySource', () => {
         '2023-11': '1000.00',
         '2023-12': '4000.00',
       });
+    });
+
+    it('orders one day\'s deltas across accounts and converts each into the display currency', async () => {
+      stubRates({ USD: '400' });
+      getAccountDayDeltas.mockImplementation(async (accountId) => (accountId === 'a'
+        ? [{ id: 2, createdAt: '2024-01-01T12:00:00Z', delta: '-1000' }]
+        : [{ id: 1, createdAt: '2024-01-01T09:00:00Z', delta: '10' }]));
+
+      const source = createNetWorthSource(accounts, 'AMD');
+
+      // Chronological, not account-by-account: the USD op happened first.
+      await expect(source.getDayDeltas('2024-01-01')).resolves.toEqual(['4000', '-1000']);
+    });
+
+    it('nets an internal transfer to zero instead of a dip and a spike', async () => {
+      // One operation, both sides charted: net worth never moved, so the day-1
+      // peak must not read the debit as a trough the portfolio passed through.
+      stubRates({ USD: '400' });
+      getAccountDayDeltas.mockImplementation(async (accountId) => (accountId === 'a'
+        ? [{ id: 7, createdAt: '2024-01-01T09:00:00Z', delta: '-4000' }]
+        : [{ id: 7, createdAt: '2024-01-01T09:00:00Z', delta: '10' }]));
+
+      const source = createNetWorthSource(accounts, 'AMD');
+
+      await expect(source.getDayDeltas('2024-01-01')).resolves.toEqual(['0.00']);
+    });
+
+    it('drops a day\'s deltas for a currency with no rate', async () => {
+      stubRates({});
+      getAccountDayDeltas.mockImplementation(async (accountId) => (accountId === 'a'
+        ? [{ id: 1, createdAt: '2024-01-01T09:00:00Z', delta: '-1000' }]
+        : [{ id: 2, createdAt: '2024-01-01T10:00:00Z', delta: '10' }]));
+
+      const source = createNetWorthSource(accounts, 'AMD');
+
+      await expect(source.getDayDeltas('2024-01-01')).resolves.toEqual(['-1000']);
     });
 
     it('fetches the rate map once for the whole source', async () => {
