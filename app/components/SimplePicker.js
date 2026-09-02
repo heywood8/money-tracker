@@ -18,7 +18,7 @@ const DEFAULT_COLORS = {
  * SimplePicker - A picker component for Android
  * Uses native HTML select on web, custom modal picker on Android
  */
-const SimplePicker = ({ value, onValueChange, items = [], style, textStyle, colors = DEFAULT_COLORS, leftIcon, leftText, closeLabel = 'Close' }) => {
+const SimplePicker = ({ value, onValueChange, items = [], style, textStyle, colors = DEFAULT_COLORS, leftIcon, leftText, iconSize = 16, hitSlop, closeLabel = 'Close' }) => {
   const [modalVisible, setModalVisible] = useState(false);
 
   // Defensive check for undefined items with warning
@@ -79,16 +79,17 @@ const SimplePicker = ({ value, onValueChange, items = [], style, textStyle, colo
           style={[styles.chipButton, style]}
           onPress={() => setModalVisible(true)}
           activeOpacity={0.7}
+          hitSlop={hitSlop}
         >
           {leftText ? (
             <Text style={[styles.leftText, { color: safeColors.mutedText ?? '#666666' }]}>{leftText}</Text>
           ) : (
-            <Icon name={leftIcon} size={16} color={safeColors.mutedText ?? '#666666'} />
+            <Icon name={leftIcon} size={iconSize} color={safeColors.mutedText ?? '#666666'} />
           )}
-          <Text style={[styles.chipButtonText, textStyle, { color: safeColors.text }]} numberOfLines={1}>
+          <Text style={[styles.chipButtonText, { color: safeColors.text }, textStyle]} numberOfLines={1}>
             {selectedLabel}
           </Text>
-          <Icon name="chevron-down" size={16} color={safeColors.mutedText ?? '#666666'} />
+          <Icon name="chevron-down" size={iconSize} color={safeColors.mutedText ?? '#666666'} />
         </TouchableOpacity>
       ) : (
         <TouchableOpacity
@@ -96,7 +97,7 @@ const SimplePicker = ({ value, onValueChange, items = [], style, textStyle, colo
           onPress={() => setModalVisible(true)}
           activeOpacity={0.7}
         >
-          <Text style={[styles.androidButtonText, textStyle, { color: safeColors.text }]} numberOfLines={1}>
+          <Text style={[styles.androidButtonText, { color: safeColors.text }, textStyle]} numberOfLines={1}>
             {selectedLabel}
           </Text>
         </TouchableOpacity>
@@ -260,6 +261,10 @@ SimplePicker.propTypes = {
   }),
   leftIcon: PropTypes.string,
   leftText: PropTypes.string,
+  // Size of both the left icon and the chevron. The chip is used at two scales:
+  // a full-size control and an eyebrow-sized one (BalanceHistoryCard's header).
+  iconSize: PropTypes.number,
+  hitSlop: PropTypes.oneOfType([PropTypes.object, PropTypes.number]),
   closeLabel: PropTypes.string,
 };
 
