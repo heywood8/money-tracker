@@ -1,5 +1,12 @@
 # Changelog
 
+## [0.282.1](https://github.com/heywood8/money-tracker/compare/penny-v0.282.0...penny-v0.282.1) (2026-09-02)
+
+
+### Bug Fixes
+
+* **header:** move jump-to-current away from the previous-period arrow ([#1689](https://github.com/heywood8/money-tracker/issues/1689)) ([7bc8762](https://github.com/heywood8/money-tracker/commit/7bc8762f3a3b9ce01f065adbcbc09260702c23ec))
+
 ## [0.282.0](https://github.com/heywood8/money-tracker/compare/penny-v0.281.1...penny-v0.282.0) (2026-09-02)
 
 
