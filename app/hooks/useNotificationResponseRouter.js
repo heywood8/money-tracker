@@ -40,6 +40,16 @@ const deepLinkKey = (response) => {
 };
 
 /**
+ * What a response is, for the diagnostic trail: the action pressed, the route
+ * it carries and the alert it belongs to. No notification text.
+ */
+const describe = (response) => ({
+  action: response?.actionIdentifier || null,
+  route: response?.notification?.request?.content?.data?.route || null,
+  id: responseNotificationId(response),
+});
+
+/**
  * Forget the response once it has been acted on, so neither a later launch nor
  * the next foreground re-check replays it.
  */
@@ -49,7 +59,7 @@ const clearLastResponse = () => {
   } catch (error) {
     // The key set still keeps this process from routing the press twice; a
     // later launch may replay it, which is worth knowing about.
-    console.warn('[useNotificationResponseRouter] Failed to clear the last notification response:', error);
+    console.warn('[notif-route] Failed to clear the last notification response:', error);
   }
 };
 
@@ -89,6 +99,9 @@ const clearLastResponse = () => {
  * it; responses that arrive while disabled are queued and delivered the moment
  * it flips. Mount this once, near the app root.
  *
+ * Every step logs a `[notif-route]` line (no notification text) so the path a
+ * press took — or did not take — can be read off the in-app log.
+ *
  * @param {{ enabled?: boolean }} [options]
  */
 export default function useNotificationResponseRouter({ enabled = true } = {}) {
@@ -111,6 +124,7 @@ export default function useNotificationResponseRouter({ enabled = true } = {}) {
     // dismiss it", so treating it as a tap would yank the user into the app.
     // Clearing it here covers the running app; acknowledgeTask covers the rest.
     if (isAcknowledgeResponse(response)) {
+      console.log('[notif-route] acknowledged', { ...describe(response), fromColdStart });
       dismissNotificationById(responseNotificationId(response));
       return;
     }
@@ -121,9 +135,11 @@ export default function useNotificationResponseRouter({ enabled = true } = {}) {
     // performed, the queued row is long gone, and re-running it would clear
     // whatever review alert is in the tray *now*, about another transaction.
     if (isRejectPendingResponse(response)) {
+      console.log('[notif-route] reject', { ...describe(response), fromColdStart });
       if (!fromColdStart) handleRejectPendingResponse(response).catch(() => {});
       return;
     }
+    let event = null;
     if (isPendingOperationsResponse(response)) {
       // The "Select" button lands in the same place as a tap on the body, but
       // Android's auto-cancel only covers the tap — so clear the alert here or
@@ -131,12 +147,15 @@ export default function useNotificationResponseRouter({ enabled = true } = {}) {
       if (isSelectPendingResponse(response)) {
         dismissNotificationById(responseNotificationId(response));
       }
-      appEvents.emit(EVENTS.OPEN_PENDING_OPERATIONS);
+      event = EVENTS.OPEN_PENDING_OPERATIONS;
     } else if (isAddedOperationsResponse(response)) {
-      appEvents.emit(EVENTS.OPEN_ADDED_OPERATIONS);
+      event = EVENTS.OPEN_ADDED_OPERATIONS;
     } else {
+      console.log('[notif-route] ignored (no route)', describe(response));
       return;
     }
+    console.log('[notif-route] emit', { ...describe(response), event, fromColdStart });
+    appEvents.emit(event);
     handledRef.current.add(responseKey(response));
     clearLastResponse();
   }, []);
@@ -147,9 +166,11 @@ export default function useNotificationResponseRouter({ enabled = true } = {}) {
   const route = useCallback((response, fromColdStart = false) => {
     const key = deepLinkKey(response);
     if (key && (handledRef.current.has(key) || queuedRef.current.some((entry) => entry.key === key))) {
+      console.log('[notif-route] dropped (already routed)', describe(response));
       return;
     }
     if (!enabledRef.current) {
+      console.log('[notif-route] queued until the screens mount', { ...describe(response), fromColdStart });
       queuedRef.current.push({ key, response, fromColdStart });
       return;
     }
@@ -162,6 +183,9 @@ export default function useNotificationResponseRouter({ enabled = true } = {}) {
     if (!enabled) return;
     const queued = queuedRef.current;
     queuedRef.current = [];
+    if (queued.length > 0) {
+      console.log('[notif-route] screens mounted, delivering queued', { count: queued.length });
+    }
     queued.forEach(({ response, fromColdStart }) => deliver(response, fromColdStart));
   }, [enabled, deliver]);
 
@@ -171,14 +195,18 @@ export default function useNotificationResponseRouter({ enabled = true } = {}) {
     // Cold start: the notification that launched the app, if any.
     Notifications.getLastNotificationResponseAsync()
       .then((response) => {
+        console.log('[notif-route] cold-start lookup', response ? describe(response) : { found: false });
         if (activeRef.current && response) route(response, true);
       })
-      .catch(() => {});
+      .catch((error) => {
+        console.warn('[notif-route] cold-start lookup failed:', error);
+      });
 
     // Warm: taps received while the app is running.
-    const subscription = Notifications.addNotificationResponseReceivedListener(
-      (response) => route(response, false),
-    );
+    const subscription = Notifications.addNotificationResponseReceivedListener((response) => {
+      console.log('[notif-route] listener', describe(response));
+      route(response, false);
+    });
 
     return () => {
       activeRef.current = false;
@@ -192,9 +220,13 @@ export default function useNotificationResponseRouter({ enabled = true } = {}) {
   useOnForeground(useCallback(() => {
     Notifications.getLastNotificationResponseAsync()
       .then((response) => {
-        if (!activeRef.current || !response || !deepLinkKey(response)) return;
+        const deepLink = !!(response && deepLinkKey(response));
+        console.log('[notif-route] foreground re-check', response ? { ...describe(response), deepLink } : { found: false });
+        if (!activeRef.current || !deepLink) return;
         route(response, false);
       })
-      .catch(() => {});
+      .catch((error) => {
+        console.warn('[notif-route] foreground re-check failed:', error);
+      });
   }, [route]));
 }

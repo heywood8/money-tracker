@@ -6,7 +6,7 @@
 
 import { renderHook, act, waitFor } from '@testing-library/react-native';
 import { AppState } from 'react-native';
-import usePendingOperationSuggestions, { canSaveSuggestion } from '../../app/hooks/usePendingOperationSuggestions';
+import usePendingOperationSuggestions, { canSaveSuggestion, PIPELINE_WAIT_MS } from '../../app/hooks/usePendingOperationSuggestions';
 import * as pipeline from '../../app/services/notifications/processBankNotifications';
 import * as PendingNotificationsDB from '../../app/services/PendingNotificationsDB';
 import * as NotificationRulesDB from '../../app/services/NotificationRulesDB';
@@ -296,6 +296,38 @@ describe('usePendingOperationSuggestions', () => {
 
       expect(pipeline.processBankNotifications).toHaveBeenCalledTimes(1);
       await waitFor(() => expect(result.current.suggestions).toHaveLength(2));
+    });
+
+    it('reads the queue past the wait when the ingestion pass does not return, then again behind it', async () => {
+      const { result } = await renderHook(() => usePendingOperationSuggestions());
+      await waitFor(() => expect(result.current.suggestions).toEqual([EXPENSE]));
+
+      // The pass hangs (a network call, a lock); the queue it would have
+      // published grows meanwhile.
+      let finishPass;
+      pipeline.processBankNotifications.mockImplementationOnce(
+        () => new Promise((resolve) => { finishPass = resolve; }),
+      );
+      PendingNotificationsDB.getPendingNotifications.mockResolvedValue([EXPENSE, TRANSFER]);
+
+      jest.useFakeTimers();
+      try {
+        await act(async () => { handler('active'); });
+        // Not yet: the refresh gives the pass its wait first.
+        expect(result.current.suggestions).toHaveLength(1);
+
+        await act(async () => { jest.advanceTimersByTime(PIPELINE_WAIT_MS); });
+        await waitFor(() => expect(result.current.suggestions).toHaveLength(2));
+
+        // The pass finishes late: the queue is read once more behind it.
+        const readsBefore = PendingNotificationsDB.getPendingNotifications.mock.calls.length;
+        await act(async () => { finishPass({ created: 0, pending: 0, skipped: 0 }); });
+        await waitFor(() =>
+          expect(PendingNotificationsDB.getPendingNotifications.mock.calls.length).toBe(readsBefore + 1),
+        );
+      } finally {
+        jest.useRealTimers();
+      }
     });
 
     it('ignores a transition that is not a return to the foreground', async () => {
