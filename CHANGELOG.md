@@ -1,5 +1,12 @@
 # Changelog
 
+## [0.283.2](https://github.com/heywood8/money-tracker/compare/penny-v0.283.1...penny-v0.283.2) (2026-09-05)
+
+
+### Bug Fixes
+
+* **backup:** restore CSV flags, category order and notification data ([#1719](https://github.com/heywood8/money-tracker/issues/1719)) ([9b32a10](https://github.com/heywood8/money-tracker/commit/9b32a10d1bba4104a6089f4bf8e4208831666f13))
+
 ## [0.283.1](https://github.com/heywood8/money-tracker/compare/penny-v0.283.0...penny-v0.283.1) (2026-09-05)
 
 
