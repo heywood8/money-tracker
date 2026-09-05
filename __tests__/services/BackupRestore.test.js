@@ -559,11 +559,15 @@ describe('BackupRestore', () => {
         await callback(mockDbInstance);
       });
 
-      // Carries the templates section so the conditional clear runs and the
-      // full delete sequence is asserted.
+      // Carries the rules and templates sections so both conditional clears run
+      // and the full delete sequence is asserted.
       await BackupRestore.restoreBackup({
         ...validBackup,
-        data: { ...validBackup.data, notification_templates: [] },
+        data: {
+          ...validBackup.data,
+          notification_merchant_rules: [],
+          notification_templates: [],
+        },
       });
 
       expect(deleteCalls[0]).toContain('notification_merchant_rules');
@@ -2227,6 +2231,405 @@ line-cat,plan-1,Groceries,400.00,"${NON_ASCII_COMMENT}",cat-1,,0`;
       const lineInserts = findInsert(dbInstance, 'budget_plan_lines');
       expect(lineInserts).toHaveLength(1);
       expect(lineInserts[0][1]).toEqual(expect.arrayContaining(['line-cat', 'plan-1', NON_ASCII_COMMENT]));
+    });
+  });
+
+  // ── Regression: issues #1693, #1694, #1695 ────────────────────────────────
+  // All three are the same class of bug — a restore that silently rewrote or
+  // dropped data instead of round-tripping it — so they share one harness.
+  describe('Regression — CSV flags, category ordering and notification data (#1693/#1694/#1695)', () => {
+    const makeDbInstance = (existingShadowCategories = [
+      { id: 'shadow-adjustment-expense' },
+      { id: 'shadow-adjustment-income' },
+    ]) => {
+      let insertCount = 0;
+      return {
+        runAsync: jest.fn().mockImplementation(() => Promise.resolve({ lastInsertRowId: ++insertCount })),
+        getAllAsync: jest.fn().mockResolvedValue(existingShadowCategories),
+        getFirstAsync: jest.fn().mockResolvedValue({ 1: 1 }),
+      };
+    };
+
+    const insertsInto = (dbInstance, table) =>
+      dbInstance.runAsync.mock.calls.filter(
+        (c) => typeof c[0] === 'string' && c[0].includes(`INTO ${table} `),
+      );
+
+    // One value out of an INSERT call, by the column name the statement lists it
+    // under — index arithmetic breaks every time a migration adds a column.
+    const insertedValue = (call, column) => {
+      const columns = call[0].slice(call[0].indexOf('(') + 1, call[0].indexOf(')')).split(',').map(c => c.trim());
+      return call[1][columns.indexOf(column)];
+    };
+
+    const account = {
+      id: 1, name: 'Cash', balance: '100', currency: 'USD',
+      display_order: 0, hidden: 0, deleted_at: null,
+      created_at: '2024-01-01T00:00:00.000Z', updated_at: '2024-01-01T00:00:00.000Z',
+    };
+    const category = {
+      id: 'cat-1', name: 'Food', type: 'entry', category_type: 'expense',
+      parent_id: null, icon: 'food', color: '#FF0000', is_shadow: 0,
+      created_at: '2024-01-01T00:00:00.000Z', updated_at: '2024-01-01T00:00:00.000Z',
+    };
+
+    const restoreCSV = async (backup) => {
+      const csv = BackupRestore.buildCombinedCSV(backup);
+      mockDocumentPicker.getDocumentAsync.mockResolvedValue({
+        canceled: false,
+        assets: [{ uri: 'file:///mock/backup.csv', name: 'backup.csv' }],
+      });
+      mockFileSystem.readAsStringAsync.mockResolvedValue(csv);
+      const dbInstance = makeDbInstance();
+      mockDb.executeTransaction.mockImplementation(async (cb) => { await cb(dbInstance); });
+      const imported = await BackupRestore.importBackup();
+      return { csv, dbInstance, imported };
+    };
+
+    const backupWith = (data) => ({
+      version: 1,
+      timestamp: '2026-01-01T00:00:00.000Z',
+      platform: 'native',
+      data: {
+        accounts: [account],
+        categories: [category],
+        operations: [],
+        budgets: [],
+        app_metadata: [],
+        balance_history: [],
+        planned_operations: [],
+        notification_merchant_rules: [],
+        notification_templates: [],
+        budget_plans: [],
+        budget_plan_lines: [],
+        budget_plan_line_categories: [],
+        budget_plan_line_groups: [],
+        budget_plan_line_accounts: [],
+        budget_plan_line_labels: [],
+        ...data,
+      },
+    });
+
+    // #1693: every CSV cell arrives as a string, and the string '0' is truthy —
+    // so `flag ? 1 : 0` marked every restored operation as excluded and the
+    // Graphs tab came back empty after any CSV restore.
+    it('CSV round trip keeps exclusion flags 0 as 0 and 1 as 1 (#1693)', async () => {
+      const operations = [
+        {
+          id: 1, type: 'expense', amount: '10.00', account_id: 1, category_id: 'cat-1',
+          to_account_id: null, date: '2024-01-01', created_at: '2024-01-01T00:00:00.000Z',
+          description: 'Counted', exclude_from_avg: 0, exclude_from_charts: 0,
+        },
+        {
+          id: 2, type: 'expense', amount: '20.00', account_id: 1, category_id: 'cat-1',
+          to_account_id: null, date: '2024-01-02', created_at: '2024-01-02T00:00:00.000Z',
+          description: 'Excluded', exclude_from_avg: 1, exclude_from_charts: 1,
+        },
+      ];
+
+      const { dbInstance } = await restoreCSV(backupWith({ operations }));
+
+      const opInserts = insertsInto(dbInstance, 'operations');
+      expect(opInserts).toHaveLength(2);
+      expect(insertedValue(opInserts[0], 'exclude_from_avg')).toBe(0);
+      expect(insertedValue(opInserts[0], 'exclude_from_charts')).toBe(0);
+      expect(insertedValue(opInserts[1], 'exclude_from_avg')).toBe(1);
+      expect(insertedValue(opInserts[1], 'exclude_from_charts')).toBe(1);
+    });
+
+    it('reads the other boolean-ish columns numerically too (#1693)', async () => {
+      const { dbInstance } = await restoreCSV(backupWith({
+        accounts: [{ ...account, hidden: 0 }],
+        categories: [{ ...category, is_shadow: 0 }],
+        budgets: [{
+          id: 'b-1', category_id: 'cat-1', amount: '100', currency: 'USD',
+          period_type: 'monthly', start_date: '2024-01-01', end_date: null,
+          is_recurring: 0, rollover_enabled: 0,
+          created_at: 'x', updated_at: 'y',
+        }],
+      }));
+
+      expect(insertedValue(insertsInto(dbInstance, 'accounts')[0], 'hidden')).toBe(0);
+      expect(insertedValue(insertsInto(dbInstance, 'categories')[0], 'is_shadow')).toBe(0);
+      const budgetInsert = insertsInto(dbInstance, 'budgets')[0];
+      expect(insertedValue(budgetInsert, 'is_recurring')).toBe(0);
+      expect(insertedValue(budgetInsert, 'rollover_enabled')).toBe(0);
+    });
+
+    // #1694: categories are exported in creation order, so a category moved into
+    // a folder created later than itself sorted before its own parent and its
+    // INSERT failed the immediate parent_id FK, rolling back the whole restore.
+    it('restores a child category created before its parent folder (#1694)', async () => {
+      const child = {
+        ...category, id: 'cat-child', name: 'Coffee', parent_id: 'cat-parent',
+        created_at: '2024-01-01T00:00:00.000Z',
+      };
+      const parent = {
+        ...category, id: 'cat-parent', name: 'Food', type: 'folder', parent_id: null,
+        created_at: '2025-06-01T00:00:00.000Z',
+      };
+
+      const dbInstance = makeDbInstance();
+      mockDb.executeTransaction.mockImplementation(async (cb) => { await cb(dbInstance); });
+
+      await BackupRestore.restoreBackup(backupWith({ categories: [child, parent] }));
+
+      const inserted = insertsInto(dbInstance, 'categories').map(c => insertedValue(c, 'id'));
+      expect(inserted).toEqual(['cat-parent', 'cat-child']);
+      // The link survives the reordering — the child is not flattened.
+      const childInsert = insertsInto(dbInstance, 'categories').find(c => insertedValue(c, 'id') === 'cat-child');
+      expect(insertedValue(childInsert, 'parent_id')).toBe('cat-parent');
+    });
+
+    it('restores a category whose parent is missing at the top level, without aborting (#1694)', async () => {
+      const orphan = { ...category, id: 'cat-orphan', parent_id: 'cat-gone' };
+      const dbInstance = makeDbInstance();
+      mockDb.executeTransaction.mockImplementation(async (cb) => { await cb(dbInstance); });
+
+      await expect(
+        BackupRestore.restoreBackup(backupWith({ categories: [orphan] })),
+      ).resolves.toBeUndefined();
+
+      expect(insertedValue(insertsInto(dbInstance, 'categories')[0], 'parent_id')).toBeNull();
+    });
+
+    it('nulls an operation reference to a category the backup does not contain (#1694)', async () => {
+      const warn = jest.spyOn(console, 'warn').mockImplementation(() => {});
+      const dbInstance = makeDbInstance();
+      mockDb.executeTransaction.mockImplementation(async (cb) => { await cb(dbInstance); });
+
+      await expect(BackupRestore.restoreBackup(backupWith({
+        operations: [{
+          id: 1, type: 'expense', amount: '10.00', account_id: 1,
+          category_id: 'cat-deleted', to_account_id: null, date: '2024-01-01',
+          created_at: '2024-01-01T00:00:00.000Z',
+        }],
+      }))).resolves.toBeUndefined();
+
+      expect(insertedValue(insertsInto(dbInstance, 'operations')[0], 'category_id')).toBeNull();
+      expect(warn).toHaveBeenCalledWith(expect.stringContaining('cat-deleted'));
+      warn.mockRestore();
+    });
+
+    it('inserts the shadow categories before the operations that reference them (#1694)', async () => {
+      // No shadow categories in the live DB and none in the backup: an
+      // adjustment operation could only be inserted if the pair lands first.
+      const dbInstance = makeDbInstance([]);
+      mockDb.executeTransaction.mockImplementation(async (cb) => { await cb(dbInstance); });
+
+      await BackupRestore.restoreBackup(backupWith({
+        operations: [{
+          id: 1, type: 'expense', amount: '10.00', account_id: 1,
+          category_id: 'shadow-adjustment-expense', to_account_id: null,
+          date: '2024-01-01', created_at: '2024-01-01T00:00:00.000Z',
+        }],
+      }));
+
+      const statements = dbInstance.runAsync.mock.calls.map(c => `${c[0]} ${JSON.stringify(c[1] || [])}`);
+      const shadowIndex = statements.findIndex(s => s.includes('INTO categories') && s.includes('shadow-adjustment-expense'));
+      const operationIndex = statements.findIndex(s => s.includes('INTO operations'));
+      expect(shadowIndex).toBeGreaterThan(-1);
+      expect(shadowIndex).toBeLessThan(operationIndex);
+      // And the reference is kept rather than nulled.
+      expect(insertedValue(insertsInto(dbInstance, 'operations')[0], 'category_id')).toBe('shadow-adjustment-expense');
+    });
+
+    // #1695: merchant rules were cleared unconditionally, and the CSV format had
+    // no section to restore them from — so a CSV or Sheets restore wiped every
+    // merchant → category binding the app had learned.
+    it('CSV round trip preserves merchant rules and parse templates (#1695)', async () => {
+      const rule = {
+        id: 'rule-1', merchant: 'Coffee, Bar "Nine"', package_name: 'com.bank',
+        category_id: 'cat-1', label_override: 'Coffee',
+        last_matched_at: '2025-02-02T00:00:00.000Z',
+        created_at: '2024-01-01T00:00:00.000Z', updated_at: '2024-01-01T00:00:00.000Z',
+      };
+      const template = {
+        id: 'tpl-1', name: 'Bank SMS', package_name: 'com.bank', type: 'expense',
+        enabled: 0, priority: 7, category_id: 'cat-1', currency: 'USD', date_order: 'dmy',
+        fields: '{"amount":{"regex":"(\\d+)"}}', triggers: '["purchase"]',
+        sample_title: 'Bank', sample_text: 'Purchase 100',
+        created_at: '2024-01-01T00:00:00.000Z', updated_at: '2024-01-01T00:00:00.000Z',
+      };
+
+      const { csv, dbInstance, imported } = await restoreCSV(backupWith({
+        notification_merchant_rules: [rule],
+        notification_templates: [template],
+      }));
+
+      expect(csv).toContain('[NOTIFICATION_MERCHANT_RULES]');
+      expect(csv).toContain('[NOTIFICATION_TEMPLATES]');
+      expect(imported.data.notification_merchant_rules).toHaveLength(1);
+      expect(imported.data.notification_templates).toHaveLength(1);
+
+      const ruleInsert = insertsInto(dbInstance, 'notification_merchant_rules')[0];
+      expect(insertedValue(ruleInsert, 'merchant')).toBe('Coffee, Bar "Nine"');
+      expect(insertedValue(ruleInsert, 'category_id')).toBe('cat-1');
+      // Orders the bindings list; a rule that loses it sinks under rules the
+      // user has not seen in months.
+      expect(insertedValue(ruleInsert, 'last_matched_at')).toBe('2025-02-02T00:00:00.000Z');
+
+      const templateInsert = insertsInto(dbInstance, 'notification_templates')[0];
+      expect(insertedValue(templateInsert, 'fields')).toBe(template.fields);
+      // '0' is a string after a CSV round trip; a truthiness test re-enabled
+      // every disabled template and flattened every priority to 0.
+      expect(insertedValue(templateInsert, 'enabled')).toBe(0);
+      expect(insertedValue(templateInsert, 'priority')).toBe(7);
+    });
+
+    // A live database whose notification tables hold data the backup cannot
+    // carry — the "Import from Google Sheets" case.
+    const makeDbInstanceWithLiveNotificationData = (rules, templates) => {
+      let insertCount = 0;
+      return {
+        runAsync: jest.fn().mockImplementation(() => Promise.resolve({ lastInsertRowId: ++insertCount })),
+        getAllAsync: jest.fn().mockImplementation((query) => {
+          if (query.includes('FROM notification_merchant_rules')) return Promise.resolve(rules);
+          if (query.includes('FROM notification_templates')) return Promise.resolve(templates);
+          return Promise.resolve([
+            { id: 'shadow-adjustment-expense' },
+            { id: 'shadow-adjustment-income' },
+          ]);
+        }),
+        getFirstAsync: jest.fn().mockResolvedValue({ 1: 1 }),
+      };
+    };
+
+    const liveRule = {
+      id: 'rule-1', merchant: 'Rewe', package_name: 'com.bank', category_id: 'cat-1',
+      label_override: null, last_matched_at: '2025-05-05T00:00:00.000Z',
+      created_at: '2024-01-01T00:00:00.000Z', updated_at: '2024-01-01T00:00:00.000Z',
+    };
+
+    it('leaves live merchant rules untouched when the backup carries no rules key (#1695)', async () => {
+      const dbInstance = makeDbInstance();
+      mockDb.executeTransaction.mockImplementation(async (cb) => { await cb(dbInstance); });
+
+      const backup = backupWith({});
+      delete backup.data.notification_merchant_rules;
+      delete backup.data.notification_templates;
+
+      await BackupRestore.restoreBackup(backup);
+
+      const cleared = dbInstance.runAsync.mock.calls.filter(
+        c => typeof c[0] === 'string' && c[0].startsWith('DELETE FROM notification_'),
+      );
+      expect(cleared).toHaveLength(0);
+    });
+
+    // Not clearing the table is NOT enough to keep the rules: every rule that
+    // binds a category is cascaded away by `DELETE FROM categories`
+    // (ON DELETE CASCADE), so the ones that matter have to be read back before
+    // the clear and re-applied after the new categories land.
+    it('re-applies a bound merchant rule the category clear cascaded away (#1695)', async () => {
+      const dbInstance = makeDbInstanceWithLiveNotificationData([liveRule], []);
+      mockDb.executeTransaction.mockImplementation(async (cb) => { await cb(dbInstance); });
+
+      const backup = backupWith({});
+      delete backup.data.notification_merchant_rules;
+      delete backup.data.notification_templates;
+
+      await BackupRestore.restoreBackup(backup);
+
+      const ruleInserts = insertsInto(dbInstance, 'notification_merchant_rules');
+      expect(ruleInserts).toHaveLength(1);
+      expect(insertedValue(ruleInserts[0], 'merchant')).toBe('Rewe');
+      // The backup still carries cat-1, so the binding survives with it.
+      expect(insertedValue(ruleInserts[0], 'category_id')).toBe('cat-1');
+      expect(insertedValue(ruleInserts[0], 'last_matched_at')).toBe('2025-05-05T00:00:00.000Z');
+      // The re-apply runs after the categories it points at.
+      const statements = dbInstance.runAsync.mock.calls.map(c => c[0]);
+      expect(statements.findIndex(s => s.includes('INTO notification_merchant_rules')))
+        .toBeGreaterThan(statements.findIndex(s => s.includes('INTO categories')));
+    });
+
+    it('keeps the merchant and drops only the binding when the category is gone (#1695)', async () => {
+      const dbInstance = makeDbInstanceWithLiveNotificationData(
+        [{ ...liveRule, category_id: 'cat-not-in-backup' }],
+        [],
+      );
+      mockDb.executeTransaction.mockImplementation(async (cb) => { await cb(dbInstance); });
+
+      const backup = backupWith({});
+      delete backup.data.notification_merchant_rules;
+      delete backup.data.notification_templates;
+
+      await BackupRestore.restoreBackup(backup);
+
+      const ruleInserts = insertsInto(dbInstance, 'notification_merchant_rules');
+      expect(ruleInserts).toHaveLength(1);
+      expect(insertedValue(ruleInserts[0], 'merchant')).toBe('Rewe');
+      expect(insertedValue(ruleInserts[0], 'category_id')).toBeNull();
+    });
+
+    // Templates survive the clear (their category FK is ON DELETE SET NULL), so
+    // only the blanked binding has to be put back.
+    it("re-applies a preserved template's category after the clear blanked it (#1695)", async () => {
+      const dbInstance = makeDbInstanceWithLiveNotificationData(
+        [],
+        [{ id: 'tpl-1', category_id: 'cat-1' }, { id: 'tpl-2', category_id: 'cat-gone' }],
+      );
+      mockDb.executeTransaction.mockImplementation(async (cb) => { await cb(dbInstance); });
+
+      const backup = backupWith({});
+      delete backup.data.notification_merchant_rules;
+      delete backup.data.notification_templates;
+
+      await BackupRestore.restoreBackup(backup);
+
+      const updates = dbInstance.runAsync.mock.calls.filter(
+        c => typeof c[0] === 'string' && c[0].startsWith('UPDATE notification_templates'),
+      );
+      expect(updates).toHaveLength(1);
+      expect(updates[0][1]).toEqual(['cat-1', 'tpl-1']);
+    });
+
+    // A backup that DOES carry the notification tables replaces them wholesale;
+    // nothing is preserved from the live database on top of it.
+    it('does not re-apply live rules when the backup carries its own (#1695)', async () => {
+      const dbInstance = makeDbInstanceWithLiveNotificationData([liveRule], []);
+      mockDb.executeTransaction.mockImplementation(async (cb) => { await cb(dbInstance); });
+
+      await BackupRestore.restoreBackup(backupWith({
+        notification_merchant_rules: [],
+        notification_templates: [],
+      }));
+
+      expect(insertsInto(dbInstance, 'notification_merchant_rules')).toHaveLength(0);
+    });
+
+    it('clears merchant rules when the backup does carry the section (#1695)', async () => {
+      const dbInstance = makeDbInstance();
+      mockDb.executeTransaction.mockImplementation(async (cb) => { await cb(dbInstance); });
+
+      await BackupRestore.restoreBackup(backupWith({ notification_merchant_rules: [] }));
+
+      const cleared = dbInstance.runAsync.mock.calls.filter(
+        c => typeof c[0] === 'string' && c[0] === 'DELETE FROM notification_merchant_rules',
+      );
+      expect(cleared).toHaveLength(1);
+    });
+
+    it('keeps soft-delete state and locations through a CSV round trip (#1695)', async () => {
+      const { dbInstance } = await restoreCSV(backupWith({
+        accounts: [{
+          ...account, deleted_at: '2025-03-01T00:00:00.000Z', card_mask: '1234',
+          auto_txn_rounding: 100, auto_txn_rounding_mode: 'up',
+        }],
+        operations: [{
+          id: 1, type: 'expense', amount: '10.00', account_id: 1, category_id: 'cat-1',
+          to_account_id: null, date: '2024-01-01', created_at: '2024-01-01T00:00:00.000Z',
+          latitude: 41.7, longitude: 44.8,
+        }],
+      }));
+
+      const accountInsert = insertsInto(dbInstance, 'accounts')[0];
+      expect(insertedValue(accountInsert, 'deleted_at')).toBe('2025-03-01T00:00:00.000Z');
+      expect(insertedValue(accountInsert, 'card_mask')).toBe('1234');
+
+      const opInsert = insertsInto(dbInstance, 'operations')[0];
+      expect(insertedValue(opInsert, 'latitude')).toBe('41.7');
+      expect(insertedValue(opInsert, 'longitude')).toBe('44.8');
     });
   });
 });
