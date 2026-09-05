@@ -1,5 +1,5 @@
 import { useState, useEffect, useCallback, useMemo, useRef } from 'react';
-import { AppState, LayoutAnimation, Platform, UIManager } from 'react-native';
+import { LayoutAnimation, Platform, UIManager } from 'react-native';
 import { getPendingNotifications } from '../services/PendingNotificationsDB';
 import {
   processBankNotifications,
@@ -13,6 +13,7 @@ import { getLabelForMerchant } from '../services/NotificationRulesDB';
 import { getAccountByCardMask } from '../services/AccountsDB';
 import { resolveAccountBinding } from '../services/notifications/accountBindings';
 import { appEvents, EVENTS } from '../services/eventEmitter';
+import useOnForeground from './useOnForeground';
 
 // Enable LayoutAnimation on the classic Android renderer (a no-op on Fabric, where
 // the New Architecture drives layout animations natively). Guarded so it never
@@ -312,19 +313,7 @@ export default function usePendingOperationSuggestions({
   // Runs the pipeline rather than only re-reading: overlapping calls share one
   // run, so this joins the pass AppInitializer just started instead of racing it,
   // and the reload then sees whatever that pass queued.
-  useEffect(() => {
-    let appState = AppState.currentState;
-    const subscription = AppState.addEventListener('change', (nextState) => {
-      const prev = appState;
-      appState = nextState;
-      if (nextState === 'active' && prev && /inactive|background/.test(prev)) {
-        refresh();
-      }
-    });
-    // Optional: a stubbed AppState (unit environments) hands back nothing to
-    // unsubscribe from, and a throw here would break the whole cleanup pass.
-    return () => subscription?.remove?.();
-  }, [refresh]);
+  useOnForeground(refresh);
 
   /**
    * Book the suggestion with the bindings the user picked (or the seeded

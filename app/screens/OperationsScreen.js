@@ -183,6 +183,10 @@ const OperationsScreen = () => {
   const handleQuickAddClipLayout = useCallback((event) => {
     quickAddClipHeightRef.current = Math.round(event.nativeEvent.layout.height);
   }, []);
+  // The frame a suggestion deck reserves over the form (0 without one). Kept in
+  // a ref for the same reason as the clip height: applyQuickAddCollapse reads it
+  // when it opens the clip, and it must not re-create that callback.
+  const deckReserveRef = useRef(0);
 
   // Drive the clip to `collapsed`. Three motions, because three different things
   // ask for this move and they do not feel the same:
@@ -201,7 +205,12 @@ const OperationsScreen = () => {
     // the clip touches nothing: the list below sat still for 300ms and then
     // jumped as the last 20ms cut through the actual content. Starting at the
     // measured height makes every frame of the collapse a frame the eye can see.
-    const measured = quickAddClipHeightRef.current || QUICK_ADD_UNCLIPPED;
+    // A deck over the form reserves its own frame, which the clip measurement can
+    // predate (the layout that grows the block for the cards has not run yet when
+    // the effect fires): open to at least that, or the cards would sit clipped
+    // until a release callback that an interrupted animation never delivers.
+    const measured = Math.max(quickAddClipHeightRef.current, deckReserveRef.current)
+      || QUICK_ADD_UNCLIPPED;
     // The slide's travel: exactly the block's own height, so the content clears
     // the boundary as the boundary closes. Before the first layout there is no
     // height to travel — the clip alone hides it, and the first expansion then
@@ -347,6 +356,25 @@ const OperationsScreen = () => {
   const quickAddCollapsed = isSearchOpen
     || (!showQuickAddPanel && !quickAddExpanded && !hasSuggestions);
 
+  // Measured height of the quick-add wrapper — the binding cards pin their frame
+  // to it so the deck reads as cards stacked over the form. Rounded, and only
+  // committed on a real change, so onLayout can't ping-pong re-renders. The deck
+  // does not wait for it: a panel collapsed behind the + button has no reason to
+  // have been measured yet, so the cards fall back to their floor height
+  // (deckCardHeight) until a real measurement lands.
+  const [quickAddHeight, setQuickAddHeight] = useState(0);
+  const handleQuickAddLayout = useCallback((event) => {
+    const measured = Math.round(event.nativeEvent.layout.height);
+    setQuickAddHeight((prev) => (prev === measured ? prev : measured));
+  }, []);
+  // Declared before the motion effect below: effects run in order, and the clip
+  // reads this reserve when that effect opens it.
+  useEffect(() => {
+    deckReserveRef.current = hasSuggestions
+      ? deckPeekAllowance(operationSuggestions.length) + deckCardHeight(quickAddHeight)
+      : 0;
+  }, [hasSuggestions, operationSuggestions.length, quickAddHeight]);
+
   // Which input moved decides the motion, so the previous values are kept rather
   // than just the previous collapsed state.
   const quickAddMotionRef = useRef(null);
@@ -358,23 +386,22 @@ const OperationsScreen = () => {
       setting: showQuickAddPanel,
     };
     // A change that leaves the panel where it is (e.g. the + button pressed with
-    // search open) has nothing to play.
+    // search open, or a deck landing on a block already open or opening) has
+    // nothing to play.
     if (prev && prev.collapsed === quickAddCollapsed) return;
 
     let mode = 'spring';
     if (!prev || prev.setting !== showQuickAddPanel) mode = 'instant';
     else if (prev.search !== isSearchOpen) mode = 'timing';
+    // Opened by a deck arriving from the review queue — the one remaining way a
+    // collapsed block opens with cards up, since the + button stands down while
+    // they are. The cards are the only way to answer the queue, so this open
+    // must land no matter what: instantly (the cards play their own entrance)
+    // rather than on the spring, whose settle callback is the only thing that
+    // would otherwise hand the ceiling back.
+    else if (hasSuggestions && !quickAddCollapsed) mode = 'instant';
     applyQuickAddCollapse(quickAddCollapsed, mode);
-  }, [quickAddCollapsed, isSearchOpen, showQuickAddPanel, applyQuickAddCollapse]);
-
-  // Measured height of the quick-add wrapper — the binding cards pin their frame
-  // to it so the deck reads as cards stacked over the form. Rounded, and only
-  // committed on a real change, so onLayout can't ping-pong re-renders.
-  const [quickAddHeight, setQuickAddHeight] = useState(0);
-  const handleQuickAddLayout = useCallback((event) => {
-    const measured = Math.round(event.nativeEvent.layout.height);
-    setQuickAddHeight((prev) => (prev === measured ? prev : measured));
-  }, []);
+  }, [quickAddCollapsed, isSearchOpen, showQuickAddPanel, hasSuggestions, applyQuickAddCollapse]);
 
   // Pull-to-refresh: reload the transactions the list shows AND re-run the
   // notification ingestion pipeline + reload the suggestion stack. Reloading the
@@ -1156,7 +1183,7 @@ const OperationsScreen = () => {
           <View
             style={{
               paddingTop: deckPeekAllowance(operationSuggestions.length),
-              minHeight: hasSuggestions && quickAddHeight > 0
+              minHeight: hasSuggestions
                 ? deckPeekAllowance(operationSuggestions.length) + deckCardHeight(quickAddHeight)
                 : undefined,
             }}
@@ -1193,7 +1220,7 @@ const OperationsScreen = () => {
                 flashError={quickAddFlash}
               />
             </View>
-            {hasSuggestions && quickAddHeight > 0 && (
+            {hasSuggestions && (
               <NotificationBindingStack
                 suggestions={operationSuggestions}
                 choices={suggestionChoices}
@@ -1318,6 +1345,20 @@ const OperationsScreen = () => {
     () => appEvents.on(EVENTS.OPEN_PENDING_OPERATIONS, handleOpenPendingSuggestions),
     [handleOpenPendingSuggestions],
   );
+
+  // A deck that arrives on its own — the foreground resync, a pull-to-refresh, a
+  // reload after the settings queue changed, or a tapped alert whose event was
+  // lost — needs the same landing as a handled tap: the cards sit in the list
+  // header and nothing else on this screen announces them (the + button stands
+  // down while they are up), so a list scrolled into last month would hold them
+  // out of sight indefinitely. Search keeps the block clipped, and its close
+  // effect already scrolls to the top, so only the non-search case scrolls here.
+  const deckWasUpRef = useRef(hasSuggestions);
+  useEffect(() => {
+    const wasUp = deckWasUpRef.current;
+    deckWasUpRef.current = hasSuggestions;
+    if (!wasUp && hasSuggestions && !isSearchOpen) scrollToTop();
+  }, [hasSuggestions, isSearchOpen, scrollToTop]);
 
   // Safety net for scrollToIndex failures. The list now provides getItemLayout,
   // so scrollToLocation resolves offsets directly and this should not fire in

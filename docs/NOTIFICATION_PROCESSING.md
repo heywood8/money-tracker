@@ -398,6 +398,21 @@ live on `AccountsDB` (`getAccountByCardMask`, `setAccountCardMask`).
   *start*, so a row it then makes redundant (it auto-created the same
   transaction) would otherwise be shown as a card the next reconciling reload
   takes straight back off the screen.
+- The deck does not wait for the quick-add panel to be measured. With the panel
+  setting off it sits collapsed behind the `+` button and may never have
+  reported a height, so the cards open at their floor frame
+  (`MIN_CARD_HEIGHT`), and `OperationsScreen` opens the clipped block instantly
+  and scrolls the list to the top the moment the queue becomes non-empty —
+  whether a tapped alert, the foreground resync or a pull-to-refresh filled it.
+  The `+` button stands down while cards are up, so a deck left clipped or
+  above the viewport would leave the user with neither.
+- Tapped alerts reach the page through `useNotificationResponseRouter`
+  (`app/hooks/`), mounted in `AppInitializer`. It queues a cold-start response
+  until `SimpleTabs` is on screen (nothing is subscribed before then), re-reads
+  the last response on every return to the foreground and routes a **Select** or
+  body tap the listener did not deliver — once, keyed by press — and clears the
+  response natively once routed. **Reject** and **Acknowledged** are never re-run
+  from that re-check: they were performed headless when pressed.
 - **Known limitation:** the native service keeps only the **last 50**
   notifications and is pull-only (no JS events). For lossless capture under
   bursty/backgrounded conditions, extend the Kotlin

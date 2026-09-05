@@ -1083,6 +1083,7 @@ jest.mock('expo-notifications', () => ({
   registerTaskAsync: jest.fn(() => Promise.resolve()),
   addNotificationResponseReceivedListener: jest.fn(() => ({ remove: jest.fn() })),
   getLastNotificationResponseAsync: jest.fn(() => Promise.resolve(null)),
+  clearLastNotificationResponse: jest.fn(),
   AndroidImportance: {
     MIN: 1, LOW: 2, DEFAULT: 3, HIGH: 4, MAX: 5, NONE: 0, UNSPECIFIED: -1000,
   },

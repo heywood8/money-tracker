@@ -105,11 +105,14 @@ jest.mock('../../app/modals/OperationModal', () => {
   };
 });
 
+// Hoisted so tests can assert on the list's imperative scrolls; jest allows a
+// `mock`-prefixed binding inside the factory below.
+const mockScrollToOffset = jest.fn();
 jest.mock('../../app/components/operations/OperationsList', () => {
   const React = require('react');
   return React.forwardRef(function MockOperationsList(props, ref) {
     React.useImperativeHandle(ref, () => ({
-      scrollToOffset: jest.fn(),
+      scrollToOffset: mockScrollToOffset,
       scrollToIndex: jest.fn(),
     }));
     // The header (the quick-add block) is rendered as a child so tests can reach
@@ -135,6 +138,24 @@ jest.mock('../../app/components/operations/QuickAddForm', () => {
       testID: 'quick-add-form',
       handleQuickAdd: props.handleQuickAdd,
     });
+  };
+});
+
+// The deck itself is covered by its own tests; here only whether (and with
+// what) the screen renders it matters. The sizing helpers stay real.
+jest.mock('../../app/components/operations/NotificationBindingStack', () => {
+  const React = require('react');
+  const actual = jest.requireActual('../../app/components/operations/NotificationBindingStack');
+  return {
+    __esModule: true,
+    ...actual,
+    default: function MockNotificationBindingStack(props) {
+      return React.createElement('NotificationBindingStack', {
+        testID: 'notification-binding-stack',
+        count: props.suggestions.length,
+        quickAddHeight: props.quickAddHeight,
+      });
+    },
   };
 });
 
@@ -2831,6 +2852,69 @@ describe('OperationsScreen', () => {
       const { queryByTestId } = await render(<OperationsScreen />);
 
       expect(queryByTestId('quick-add-fab')).toBeNull();
+    });
+
+    const SUGGESTION = { id: 's-1', amount: '10', currency: 'USD', type: 'expense', merchant: 'Shop' };
+    const suggestionsHookValue = (suggestions) => ({
+      suggestions,
+      committingIds: {},
+      saveErrors: {},
+      choices: {},
+      setChoice: jest.fn(),
+      reload: jest.fn(),
+      refresh: jest.fn(),
+      accept: jest.fn(),
+      dismiss: jest.fn(),
+    });
+
+    it('puts the deck on screen before the collapsed panel has ever been measured', async () => {
+      const OperationsScreen = require('../../app/screens/OperationsScreen').default;
+      const usePendingOperationSuggestions = require('../../app/hooks/usePendingOperationSuggestions').default;
+      setPanelSetting(false);
+      usePendingOperationSuggestions.mockReturnValue(suggestionsHookValue([SUGGESTION]));
+
+      const { getByTestId } = await render(<OperationsScreen />);
+
+      // onLayout never fires here — exactly as it need not have on a device
+      // where the panel sat collapsed behind the + button. The cards must not
+      // wait for a measurement; the stack floors its frame instead.
+      const stack = getByTestId('notification-binding-stack');
+      expect(stack.props.count).toBe(1);
+      expect(stack.props.quickAddHeight).toBe(0);
+    });
+
+    it('scrolls the list to the top when a deck arrives on its own', async () => {
+      const OperationsScreen = require('../../app/screens/OperationsScreen').default;
+      const usePendingOperationSuggestions = require('../../app/hooks/usePendingOperationSuggestions').default;
+      setPanelSetting(false);
+      usePendingOperationSuggestions.mockReturnValue(suggestionsHookValue([]));
+
+      const { rerender } = await render(<OperationsScreen />);
+      mockScrollToOffset.mockClear();
+
+      // The foreground resync (or a pull-to-refresh) fills the queue. The cards
+      // sit in the list header, so the list has to be brought there — nothing
+      // else on the screen announces them.
+      usePendingOperationSuggestions.mockReturnValue(suggestionsHookValue([SUGGESTION]));
+      await act(async () => { rerender(<OperationsScreen />); });
+
+      expect(mockScrollToOffset).toHaveBeenCalledWith({ offset: 0, animated: true });
+    });
+
+    it('leaves a deck arriving behind search to the search-close scroll', async () => {
+      const OperationsScreen = require('../../app/screens/OperationsScreen').default;
+      const usePendingOperationSuggestions = require('../../app/hooks/usePendingOperationSuggestions').default;
+      setPanelSetting(false);
+      useSearch.mockReturnValue({ ...searchClosed(), searchMode: 'open' });
+      usePendingOperationSuggestions.mockReturnValue(suggestionsHookValue([]));
+
+      const { rerender } = await render(<OperationsScreen />);
+      mockScrollToOffset.mockClear();
+
+      usePendingOperationSuggestions.mockReturnValue(suggestionsHookValue([SUGGESTION]));
+      await act(async () => { rerender(<OperationsScreen />); });
+
+      expect(mockScrollToOffset).not.toHaveBeenCalled();
     });
 
     it('does not reopen a summoned form behind search', async () => {
