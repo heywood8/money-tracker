@@ -133,19 +133,28 @@ export const buildSheetsData = (backup) => {
 
   return [
     {
+      // `deleted_at` and the card/rounding columns are not decoration: without
+      // them an import re-created every soft-deleted account as a live one and
+      // dropped every card binding (#1695). `created_at` goes the same way —
+      // it is what orders same-day rows and what category colours key on.
       range: 'Accounts!A1',
       values: [
-        ['id', 'name', 'balance', 'currency', 'display_order', 'hidden', 'monthly_target'],
+        ['id', 'name', 'balance', 'currency', 'display_order', 'hidden', 'monthly_target', 'card_mask', 'auto_txn_rounding', 'auto_txn_rounding_mode', 'deleted_at', 'created_at'],
         ...accounts.map(a => [
           a.id, a.name, a.balance, a.currency,
           a.display_order ?? '', a.hidden ?? 0, a.monthly_target ?? '',
+          a.card_mask ?? '',
+          a.auto_txn_rounding ?? '',
+          a.auto_txn_rounding_mode ?? '',
+          a.deleted_at ?? '',
+          a.created_at ?? '',
         ]),
       ],
     },
     {
       range: 'Operations!A1',
       values: [
-        ['id', 'date', 'type', 'amount', 'currency', 'category', 'account', 'to_account', 'description', 'account_id', 'category_id', 'to_account_id', 'exchange_rate', 'destination_amount', 'destination_currency'],
+        ['id', 'date', 'type', 'amount', 'currency', 'category', 'account', 'to_account', 'description', 'account_id', 'category_id', 'to_account_id', 'exchange_rate', 'destination_amount', 'destination_currency', 'original_balance', 'exclude_from_avg', 'exclude_from_charts', 'latitude', 'longitude', 'created_at'],
         ...operations.map(o => [
           o.id, o.date, o.type, o.amount,
           o.source_currency || '',
@@ -159,16 +168,29 @@ export const buildSheetsData = (backup) => {
           o.exchange_rate || '',
           o.destination_amount || '',
           o.destination_currency || '',
+          // Everything below used to be dropped on the way out, so a Sheets
+          // round trip silently re-included excluded operations in the charts,
+          // lost every pinned location, and scrambled same-day order (#1695).
+          o.original_balance ?? '',
+          o.exclude_from_avg ?? 0,
+          o.exclude_from_charts ?? 0,
+          o.latitude ?? '',
+          o.longitude ?? '',
+          o.created_at ?? '',
         ]),
       ],
     },
     {
       range: 'Categories!A1',
       values: [
-        ['id', 'name', 'type', 'category_type', 'icon', 'parent_id', 'color', 'is_shadow'],
+        ['id', 'name', 'type', 'category_type', 'icon', 'parent_id', 'color', 'is_shadow', 'created_at'],
         ...categories.map(c => [
           c.id, c.name, c.type, c.category_type, c.icon || '',
           c.parent_id || '', c.color || '', c.is_shadow ?? 0,
+          // A category with no colour of its own is coloured from its
+          // created_at (categoryUtils), so re-stamping it on import repainted
+          // the whole tree (#1695).
+          c.created_at ?? '',
         ]),
       ],
     },
@@ -385,6 +407,23 @@ export const importFromSheets = async (accessToken, onProgress) => {
     return row[nameCol] ? (accountIdMap.get(row[nameCol]) ?? null) : null;
   };
 
+  // A blank cell is "not stated", which for every optional column means NULL —
+  // an empty string is not the same thing: '' in `deleted_at` reads as a
+  // soft-deleted account, '' in `card_mask` as a card binding to nothing.
+  const blankToNull = (value) => (
+    value === '' || value == null ? null : value
+  );
+
+  // A 0/1 column read numerically. Every cell the Sheets API hands back is
+  // TEXT, and the string '0' is truthy in JS — so a truthiness test turned
+  // every exclusion flag on for every imported operation (#1693).
+  const asSheetFlag = (value, fallback = 0) => {
+    if (value === '' || value == null) return fallback;
+    const numeric = Number(value);
+    if (Number.isNaN(numeric)) return fallback;
+    return numeric === 0 ? 0 : 1;
+  };
+
   // A blank/absent cell is "not stated" and reads as ON (the pre-0021
   // behaviour); only an explicit 0 turns the descendant roll-up off.
   const readIncludeChildren = (value) => (
@@ -415,9 +454,18 @@ export const importFromSheets = async (accessToken, onProgress) => {
     balance: a.balance || '0',
     currency: a.currency || 'USD',
     display_order: a.display_order !== '' ? Number(a.display_order) : null,
-    hidden: a.hidden !== '' ? Number(a.hidden) : 0,
+    hidden: asSheetFlag(a.hidden, 0),
     monthly_target: a.monthly_target || null,
-    created_at: now,
+    // Absent from every spreadsheet written before these columns existed, which
+    // is exactly the blank-is-null case: no card, no rounding, not deleted.
+    card_mask: blankToNull(a.card_mask),
+    auto_txn_rounding: a.auto_txn_rounding !== '' && a.auto_txn_rounding != null
+      ? Number(a.auto_txn_rounding)
+      : null,
+    auto_txn_rounding_mode: blankToNull(a.auto_txn_rounding_mode),
+    // Re-stamping this as null resurrected every deleted account (#1695).
+    deleted_at: blankToNull(a.deleted_at),
+    created_at: blankToNull(a.created_at) || now,
     updated_at: now,
   }));
 
@@ -430,7 +478,7 @@ export const importFromSheets = async (accessToken, onProgress) => {
     icon: c.icon || null,
     color: c.color || null,
     is_shadow: c.is_shadow !== '' ? Number(c.is_shadow) : 0,
-    created_at: now,
+    created_at: blankToNull(c.created_at) || now,
     updated_at: now,
   }));
 
@@ -443,12 +491,17 @@ export const importFromSheets = async (accessToken, onProgress) => {
       ? resolveAccountId(o, 'to_account_id', 'to_account')
       : null,
     date: o.date,
-    created_at: now,
+    created_at: blankToNull(o.created_at) || now,
     description: o.description || null,
     exchange_rate: o.exchange_rate || null,
     destination_amount: o.destination_amount || null,
     source_currency: o.currency || null,
     destination_currency: o.destination_currency || null,
+    original_balance: blankToNull(o.original_balance),
+    exclude_from_avg: asSheetFlag(o.exclude_from_avg, 0),
+    exclude_from_charts: asSheetFlag(o.exclude_from_charts, 0),
+    latitude: o.latitude !== '' && o.latitude != null ? Number(o.latitude) : null,
+    longitude: o.longitude !== '' && o.longitude != null ? Number(o.longitude) : null,
   }));
 
   const budgets = budgetRows.map(b => ({

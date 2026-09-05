@@ -623,9 +623,14 @@ The money-writing path is guarded against several failure modes:
   mis-booked to an arbitrary account.
 - **Amount/date parsing** — the parser handles both `1,234.56` and `1.234,56`
   decimal conventions and rejects impossible calendar dates.
-- **Backup/restore** — `accounts.card_mask`, `accounts.auto_txn_rounding`, and the
-  learned `notification_merchant_rules` are included in JSON/CSV/SQLite backup and
-  restore (the transient `pending_notifications` queue is intentionally not).
+- **Backup/restore** — `accounts.card_mask`, `accounts.auto_txn_rounding`, the
+  learned `notification_merchant_rules` and the user-built
+  `notification_templates` are included in JSON/CSV/SQLite backup and restore
+  (the transient `pending_notifications` queue is intentionally not). A source
+  that cannot carry them — "Import from Google Sheets", or a CSV written before
+  the `[NOTIFICATION_MERCHANT_RULES]` / `[NOTIFICATION_TEMPLATES]` sections
+  existed — leaves the live rules and templates untouched rather than clearing
+  them: the restore only clears a table the backup actually carries.
 - **i18n** — the new strings exist in all 11 locale files.
 
 ### Automatic-transaction rounding
