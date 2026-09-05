@@ -1,5 +1,12 @@
 # Changelog
 
+## [0.283.3](https://github.com/heywood8/money-tracker/compare/penny-v0.283.2...penny-v0.283.3) (2026-09-05)
+
+
+### Bug Fixes
+
+* **operations:** trace the review deck path and cap the pipeline wait ([#1721](https://github.com/heywood8/money-tracker/issues/1721)) ([6036db2](https://github.com/heywood8/money-tracker/commit/6036db2404dbbeb3c9bc51bf4dd51c6613e8085b))
+
 ## [0.283.2](https://github.com/heywood8/money-tracker/compare/penny-v0.283.1...penny-v0.283.2) (2026-09-05)
 
 
