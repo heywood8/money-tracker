@@ -1,5 +1,12 @@
 # Changelog
 
+## [0.283.1](https://github.com/heywood8/money-tracker/compare/penny-v0.283.0...penny-v0.283.1) (2026-09-05)
+
+
+### Bug Fixes
+
+* **operations:** surface the notification binding deck when it arrives ([#1717](https://github.com/heywood8/money-tracker/issues/1717)) ([43d042a](https://github.com/heywood8/money-tracker/commit/43d042ac6746db9fca66d2a4016d360de0c99bd8))
+
 ## [0.283.0](https://github.com/heywood8/money-tracker/compare/penny-v0.282.1...penny-v0.283.0) (2026-09-02)
 
 
