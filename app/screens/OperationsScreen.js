@@ -216,6 +216,7 @@ const OperationsScreen = () => {
     // height to travel — the clip alone hides it, and the first expansion then
     // reads as an uncover rather than as a slide from far above the screen.
     const slide = quickAddClipHeightRef.current || 0;
+    console.log('[deck] clip', { collapsed, mode, measured, slide, reserve: deckReserveRef.current });
 
     if (mode === 'instant') {
       quickAddMaxHeight.value = collapsed ? 0 : QUICK_ADD_UNCLIPPED;
@@ -363,8 +364,13 @@ const OperationsScreen = () => {
   // have been measured yet, so the cards fall back to their floor height
   // (deckCardHeight) until a real measurement lands.
   const [quickAddHeight, setQuickAddHeight] = useState(0);
+  const loggedQuickAddHeightRef = useRef(null);
   const handleQuickAddLayout = useCallback((event) => {
     const measured = Math.round(event.nativeEvent.layout.height);
+    if (loggedQuickAddHeightRef.current !== measured) {
+      loggedQuickAddHeightRef.current = measured;
+      console.log('[deck] quick-add measured', { height: measured });
+    }
     setQuickAddHeight((prev) => (prev === measured ? prev : measured));
   }, []);
   // Declared before the motion effect below: effects run in order, and the clip
@@ -415,6 +421,7 @@ const OperationsScreen = () => {
   const pullRefreshMountedRef = useRef(true);
   useEffect(() => () => { pullRefreshMountedRef.current = false; }, []);
   const handlePullRefresh = useCallback(async () => {
+    console.log('[deck] pull-to-refresh');
     setPullRefreshing(true);
     try {
       await Promise.all([loadInitialOperations(undefined, false), refreshSuggestions()]);
@@ -1333,13 +1340,19 @@ const OperationsScreen = () => {
   // scrolls here. The queue is refreshed so a notification that arrived while the
   // app was backgrounded is ingested rather than showing a stale (or empty) deck.
   const handleOpenPendingSuggestions = useCallback(() => {
+    console.log('[deck] open-pending event', {
+      isSearchOpen, showQuickAddPanel, quickAddExpanded, suggestions: operationSuggestions.length,
+    });
     if (isSearchOpen) handleCloseSearch();
     else scrollToTop();
     // The deck is laid over the quick-add form, so a collapsed panel would swallow
     // the very cards this event exists to show. No-op when the panel is pinned.
     setQuickAddExpanded(true);
     refreshSuggestions();
-  }, [isSearchOpen, handleCloseSearch, scrollToTop, refreshSuggestions]);
+  }, [
+    isSearchOpen, handleCloseSearch, scrollToTop, refreshSuggestions,
+    showQuickAddPanel, quickAddExpanded, operationSuggestions.length,
+  ]);
 
   useEffect(
     () => appEvents.on(EVENTS.OPEN_PENDING_OPERATIONS, handleOpenPendingSuggestions),
@@ -1359,6 +1372,31 @@ const OperationsScreen = () => {
     deckWasUpRef.current = hasSuggestions;
     if (!wasUp && hasSuggestions && !isSearchOpen) scrollToTop();
   }, [hasSuggestions, isSearchOpen, scrollToTop]);
+
+  // The state the deck lands in, and — a moment later — what the clip actually
+  // did with it. The second line is the one that tells a deck that is in the
+  // tree but clipped or off screen from one that never reached the tree.
+  useEffect(() => {
+    const snapshot = () => ({
+      suggestions: operationSuggestions.length,
+      showQuickAddPanel,
+      quickAddExpanded,
+      isSearchOpen,
+      quickAddCollapsed,
+      quickAddHeight,
+      clipHeight: quickAddClipHeightRef.current,
+      maxHeight: quickAddMaxHeight.value,
+      translateY: quickAddTranslateY.value,
+      scrollOffset: Math.round(scrollOffsetRef.current),
+    });
+    console.log('[deck] suggestions changed', snapshot());
+    if (!hasSuggestions) return undefined;
+    const timer = setTimeout(() => {
+      console.log('[deck] clip after arrival', snapshot());
+    }, 600);
+    return () => clearTimeout(timer);
+    // Logged on deck changes only; the rest is read for the snapshot.
+  }, [hasSuggestions, operationSuggestions.length]);
 
   // Safety net for scrollToIndex failures. The list now provides getItemLayout,
   // so scrollToLocation resolves offsets directly and this should not fire in

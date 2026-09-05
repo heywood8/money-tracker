@@ -109,14 +109,21 @@ const NotificationBindingStack = memo(function NotificationBindingStack({
   onSave,
   onDismiss,
 }) {
+  const count = suggestions ? suggestions.length : 0;
+  const cardHeight = deckCardHeight(quickAddHeight);
+  // Before the early return, as hooks must be: the line that says the cards
+  // reached the tree, and with what frame.
+  useEffect(() => {
+    if (count > 0) console.log('[deck] stack rendered', { count, cardHeight, quickAddHeight });
+  }, [count, cardHeight, quickAddHeight]);
+
   // An unmeasured panel (quickAddHeight 0) is not a reason to hold the cards
   // back — deckCardHeight floors the frame, and the host reserves the same room.
-  if (!suggestions || suggestions.length === 0) return null;
+  if (count === 0) return null;
 
   const visible = suggestions.slice(0, MAX_DECK);
   const overflowCount = suggestions.length - visible.length;
   const peekDepth = visible.length - 1;
-  const cardHeight = deckCardHeight(quickAddHeight);
 
   return (
     <View style={styles.overlay} pointerEvents="box-none">

@@ -25,6 +25,12 @@ if (Platform.OS === 'android' && UIManager.setLayoutAnimationEnabledExperimental
 // A short ease so a card leaving the stack (accepted/dismissed) reads as a smooth
 // collapse and the quick-add form below slides up, instead of an abrupt jump.
 // Matches the settings review panel's CARD_COLLAPSE_ANIMATION timing.
+// How long a foreground/pull refresh waits for the ingestion pass before it
+// reads the queue anyway. The pass can wait on the network (exchange rates) or
+// a GPS fix; a queued card must not wait with it, let alone on a pass that never
+// returns. When it finishes late, the queue is read again behind it.
+export const PIPELINE_WAIT_MS = 4000;
+
 const CARD_LEAVE_ANIMATION = {
   duration: 220,
   create: { type: LayoutAnimation.Types.easeOut, property: LayoutAnimation.Properties.opacity },
@@ -118,18 +124,20 @@ export default function usePendingOperationSuggestions({
   const reload = useCallback(async () => {
     const seq = reloadSeqRef.current + 1;
     reloadSeqRef.current = seq;
+    const started = Date.now();
     try {
       // Drop any card the user has already recorded by hand before reading the
       // queue, so a matching operation makes its suggestion disappear at once.
       // Always, including right after an ingestion pass: that pass reconciles at
       // its start, so anything it went on to book is still queued here.
-      await reconcilePendingNotifications();
+      const pruned = await reconcilePendingNotifications();
       const [items, atmAccount] = await Promise.all([
         getPendingNotifications(),
         resolveAtmTargetAccount().catch(() => null),
       ]);
       const list = Array.isArray(items) ? items : [];
       const atmId = atmAccount ? atmAccount.id : null;
+      console.log('[deck] reload read', { seq, pending: list.length, pruned, ms: Date.now() - started });
       // Pre-fill the custom-name field with any override already learned for the
       // merchant. A field the user has edited (labelDirty) is authoritative and
       // never re-queried or overwritten; other cards are looked up so a name just
@@ -165,7 +173,13 @@ export default function usePendingOperationSuggestions({
             .catch(() => null);
         }),
       );
-      if (!mountedRef.current || seq !== reloadSeqRef.current) return;
+      if (!mountedRef.current || seq !== reloadSeqRef.current) {
+        console.log('[deck] reload discarded', {
+          seq, latest: reloadSeqRef.current, mounted: mountedRef.current, pending: list.length,
+        });
+        return;
+      }
+      console.log('[deck] reload publish', { seq, count: list.length, ids: list.map((item) => item.id) });
       setSuggestions(list);
       // Seed choices with any suggested account/category, the bound ATM target
       // for transfers, and the learned label.
@@ -208,7 +222,9 @@ export default function usePendingOperationSuggestions({
         return next;
       });
     } catch (error) {
-      // Non-fatal (e.g. storage not ready) — keep the last known state.
+      // Non-fatal (e.g. storage not ready) — keep the last known state, but say
+      // so: a queue that never reaches the deck has looked exactly like this.
+      console.warn('[deck] reload failed', { seq, ms: Date.now() - started, error: String(error?.message || error) });
     }
   }, []);
 
@@ -237,11 +253,15 @@ export default function usePendingOperationSuggestions({
   // the user adds/edits/deletes an operation by hand) also triggers a reload so a
   // just-entered operation prunes its matching suggestion from the deck at once.
   useEffect(() => {
+    console.log('[deck] mount reload');
     reload();
     // Wrap so an event payload is never read as reload's options argument.
-    const onEvent = () => reload();
-    const offReloadAll = appEvents.on(EVENTS.RELOAD_ALL, onEvent);
-    const offOperationChanged = appEvents.on(EVENTS.OPERATION_CHANGED, onEvent);
+    const onEvent = (event) => () => {
+      console.log('[deck] event reload', { event });
+      reload();
+    };
+    const offReloadAll = appEvents.on(EVENTS.RELOAD_ALL, onEvent('RELOAD_ALL'));
+    const offOperationChanged = appEvents.on(EVENTS.OPERATION_CHANGED, onEvent('OPERATION_CHANGED'));
     return () => {
       offReloadAll();
       offOperationChanged();
@@ -283,10 +303,35 @@ export default function usePendingOperationSuggestions({
    * queue. Operations created by the run surface via its RELOAD_ALL emit.
    */
   const refresh = useCallback(async () => {
-    try {
-      await processBankNotifications();
-    } catch (error) {
-      // Ingestion failure is non-fatal — still reload whatever is queued.
+    const started = Date.now();
+    console.log('[deck] refresh start');
+    let settled = false;
+    const pass = processBankNotifications()
+      .then((summary) => {
+        settled = true;
+        console.log('[deck] pipeline done', {
+          ms: Date.now() - started,
+          created: summary?.created ?? null,
+          pending: summary?.pending ?? null,
+          skipped: summary?.skipped ?? null,
+        });
+      })
+      .catch((error) => {
+        // Ingestion failure is non-fatal — still reload whatever is queued.
+        settled = true;
+        console.warn('[deck] pipeline failed', { ms: Date.now() - started, error: String(error?.message || error) });
+      });
+    // The queue is read after the pass, but never held hostage by it: a pass
+    // stuck on the network or a lock would otherwise keep a queued card off the
+    // screen for as long as it stays stuck. Past the wait the queue is read as it
+    // stands, and read again once the pass does finish.
+    await Promise.race([
+      pass,
+      new Promise((resolve) => { setTimeout(resolve, PIPELINE_WAIT_MS); }),
+    ]);
+    if (!settled) {
+      console.warn('[deck] pipeline still running, reading the queue without it', { ms: Date.now() - started });
+      pass.then(() => reload());
     }
     // Reconcile before publishing, even though the pass just reconciled: it does
     // so at its *start*, before it books anything, so a row the pass has since
@@ -313,7 +358,10 @@ export default function usePendingOperationSuggestions({
   // Runs the pipeline rather than only re-reading: overlapping calls share one
   // run, so this joins the pass AppInitializer just started instead of racing it,
   // and the reload then sees whatever that pass queued.
-  useOnForeground(refresh);
+  useOnForeground(useCallback(() => {
+    console.log('[deck] foreground refresh');
+    refresh();
+  }, [refresh]));
 
   /**
    * Book the suggestion with the bindings the user picked (or the seeded

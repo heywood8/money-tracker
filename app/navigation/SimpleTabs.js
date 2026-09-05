@@ -427,6 +427,7 @@ export default function SimpleTabs() {
   // suggestion deck over the quick-add form, so the two land together.
   React.useEffect(() => {
     const unsubscribe = appEvents.on(EVENTS.OPEN_PENDING_OPERATIONS, () => {
+      console.log('[deck] open-pending event: switching to Operations');
       handleTabPress('Operations');
     });
     return unsubscribe;
