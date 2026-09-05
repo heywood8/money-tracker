@@ -4,7 +4,8 @@
  * while running), ignores unrelated responses, and cleans up its subscription.
  */
 
-import { renderHook, waitFor } from '@testing-library/react-native';
+import { renderHook, waitFor, act } from '@testing-library/react-native';
+import { AppState } from 'react-native';
 import * as Notifications from 'expo-notifications';
 import { appEvents, EVENTS } from '../../app/services/eventEmitter';
 import useNotificationResponseRouter from '../../app/hooks/useNotificationResponseRouter';
@@ -31,6 +32,7 @@ describe('useNotificationResponseRouter', () => {
       .mockReset()
       .mockReturnValue({ remove: jest.fn() });
     Notifications.dismissNotificationAsync.mockReset().mockResolvedValue();
+    Notifications.clearLastNotificationResponse.mockReset();
     dismissPendingNotification.mockReset().mockResolvedValue();
   });
 
@@ -202,6 +204,157 @@ describe('useNotificationResponseRouter', () => {
 
     expect(emitSpy).not.toHaveBeenCalled();
     await unmount();
+  });
+
+  it('clears a routed deep link so a later launch does not replay it', async () => {
+    Notifications.getLastNotificationResponseAsync.mockResolvedValue(matchResponse);
+
+    const { unmount } = await renderHook(() => useNotificationResponseRouter());
+
+    await waitFor(() => expect(emitSpy).toHaveBeenCalledWith(EVENTS.OPEN_PENDING_OPERATIONS));
+    expect(Notifications.clearLastNotificationResponse).toHaveBeenCalled();
+    await unmount();
+  });
+
+  it('holds a cold-start deep link until the screens that act on it are mounted', async () => {
+    Notifications.getLastNotificationResponseAsync.mockResolvedValue(matchResponse);
+
+    const { rerender, unmount } = await renderHook(
+      ({ enabled }) => useNotificationResponseRouter({ enabled }),
+      { initialProps: { enabled: false } },
+    );
+    await waitFor(() => expect(Notifications.getLastNotificationResponseAsync).toHaveBeenCalled());
+    // Let the lookup resolve. AppInitializer renders nothing until the database
+    // is up, so nobody is subscribed yet and the event must not fire into a void.
+    await act(async () => {});
+    expect(emitSpy).not.toHaveBeenCalled();
+
+    await act(async () => { rerender({ enabled: true }); });
+
+    expect(emitSpy).toHaveBeenCalledWith(EVENTS.OPEN_PENDING_OPERATIONS);
+    await unmount();
+  });
+
+  it('routes a press handed over twice while the screens are unmounted once', async () => {
+    // The launch replay and the listener can both carry the press that opened
+    // the app; queued before anyone can hear them, they must still collapse
+    // into one delivery.
+    let listener;
+    Notifications.addNotificationResponseReceivedListener.mockImplementation((cb) => {
+      listener = cb;
+      return { remove: jest.fn() };
+    });
+    Notifications.getLastNotificationResponseAsync.mockResolvedValue(matchResponse);
+
+    const { rerender, unmount } = await renderHook(
+      ({ enabled }) => useNotificationResponseRouter({ enabled }),
+      { initialProps: { enabled: false } },
+    );
+    await act(async () => {});
+    listener(matchResponse);
+
+    await act(async () => { rerender({ enabled: true }); });
+
+    expect(emitSpy).toHaveBeenCalledTimes(1);
+    await unmount();
+  });
+
+  // The listener is expected to fire for a press that brings a backgrounded app
+  // forward, but nothing guarantees it — so the last response is read again on
+  // every return to the foreground and routed if it has not been already.
+  describe('foreground re-check', () => {
+    const selectResponse = {
+      actionIdentifier: 'select-pending',
+      notification: {
+        date: 1700000000000,
+        request: {
+          identifier: 'penny-pending-operations',
+          content: { data: { route: 'notificationProcessing' } },
+        },
+      },
+    };
+    const originalState = AppState.currentState;
+    let appStateHandler;
+
+    beforeEach(() => {
+      appStateHandler = null;
+      AppState.currentState = 'background';
+      jest.spyOn(AppState, 'addEventListener').mockImplementation((event, callback) => {
+        if (event === 'change') appStateHandler = callback;
+        return { remove: jest.fn() };
+      });
+    });
+
+    afterEach(() => {
+      AppState.addEventListener.mockRestore();
+      AppState.currentState = originalState;
+    });
+
+    it('routes a Select press the listener never delivered, once', async () => {
+      const { unmount } = await renderHook(() => useNotificationResponseRouter());
+      await waitFor(() =>
+        expect(Notifications.getLastNotificationResponseAsync).toHaveBeenCalledTimes(1),
+      );
+
+      // The press brought the app forward; the native side holds the response
+      // but no listener callback came with it.
+      Notifications.getLastNotificationResponseAsync.mockResolvedValue(selectResponse);
+      await act(async () => { appStateHandler('active'); });
+
+      expect(emitSpy).toHaveBeenCalledTimes(1);
+      expect(emitSpy).toHaveBeenCalledWith(EVENTS.OPEN_PENDING_OPERATIONS);
+      expect(Notifications.dismissNotificationAsync).toHaveBeenCalledWith('penny-pending-operations');
+      expect(Notifications.clearLastNotificationResponse).toHaveBeenCalled();
+
+      // The native side still hands the same response back on the next return
+      // (clearing failed or is unsupported): it must not route a second time.
+      await act(async () => { appStateHandler('background'); appStateHandler('active'); });
+      expect(emitSpy).toHaveBeenCalledTimes(1);
+      await unmount();
+    });
+
+    it('skips a press the listener already delivered', async () => {
+      let listener;
+      Notifications.addNotificationResponseReceivedListener.mockImplementation((cb) => {
+        listener = cb;
+        return { remove: jest.fn() };
+      });
+
+      const { unmount } = await renderHook(() => useNotificationResponseRouter());
+      listener(selectResponse);
+      expect(emitSpy).toHaveBeenCalledTimes(1);
+
+      Notifications.getLastNotificationResponseAsync.mockResolvedValue(selectResponse);
+      await act(async () => { appStateHandler('active'); });
+
+      expect(emitSpy).toHaveBeenCalledTimes(1);
+      await unmount();
+    });
+
+    it('never re-runs Reject from a foreground return', async () => {
+      const { unmount } = await renderHook(() => useNotificationResponseRouter());
+      await waitFor(() =>
+        expect(Notifications.getLastNotificationResponseAsync).toHaveBeenCalledTimes(1),
+      );
+
+      // Reject was performed headless when it was pressed; the row it named is
+      // gone, and re-running it would act on whatever alert is in the tray now.
+      Notifications.getLastNotificationResponseAsync.mockResolvedValue({
+        actionIdentifier: 'reject-pending',
+        notification: {
+          request: {
+            identifier: 'penny-pending-operations',
+            content: { data: { route: 'notificationProcessing', pendingIds: ['pending-1'] } },
+          },
+        },
+      });
+      await act(async () => { appStateHandler('active'); });
+
+      expect(dismissPendingNotification).not.toHaveBeenCalled();
+      expect(Notifications.dismissNotificationAsync).not.toHaveBeenCalled();
+      expect(emitSpy).not.toHaveBeenCalled();
+      await unmount();
+    });
   });
 
   it('removes the response listener on unmount', async () => {
