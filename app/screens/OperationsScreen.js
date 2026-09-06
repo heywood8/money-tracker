@@ -51,6 +51,10 @@ import AddFAB, { FAB_BOTTOM_OFFSET } from '../components/AddFAB';
 // here — it starts at the block's measured height (see the searchMode effect).
 const QUICK_ADD_UNCLIPPED = 1000;
 
+// How long after a deck arrives its landing is inspected — long enough for the
+// clip, the card entrance and the layout pass that measures them to settle.
+const DECK_SETTLE_MS = 600;
+
 // Map a QuickAdd validation failure to the form field that should flash red,
 // so single-field omissions get the same lightweight inline treatment the
 // missing-category case already had (instead of a blocking OK dialog). The
@@ -187,6 +191,21 @@ const OperationsScreen = () => {
   // a ref for the same reason as the clip height: applyQuickAddCollapse reads it
   // when it opens the clip, and it must not re-create that callback.
   const deckReserveRef = useRef(0);
+
+  // Read by the layout handler below, which must not be re-created on every
+  // collapse (its identity is a dep of the memoized header).
+  const quickAddCollapsedRef = useRef(true);
+  // Whether the run of zero-height layout passes currently being dropped has
+  // already been logged.
+  const droppedZeroRef = useRef(false);
+  // Mirror of the height state, so the handler can report the height it kept.
+  const quickAddHeightRef = useRef(0);
+  // The frame the deck container actually got. `clipHeight` says the block was
+  // open; this says the cards inside it had somewhere to draw.
+  const deckHostHeightRef = useRef(0);
+  const handleDeckHostLayout = useCallback((event) => {
+    deckHostHeightRef.current = Math.round(event.nativeEvent.layout.height);
+  }, []);
 
   // Drive the clip to `collapsed`. Three motions, because three different things
   // ask for this move and they do not feel the same:
@@ -356,6 +375,12 @@ const OperationsScreen = () => {
   // a collapsed panel would hide the very thing that needs answering.
   const quickAddCollapsed = isSearchOpen
     || (!showQuickAddPanel && !quickAddExpanded && !hasSuggestions);
+  // Mirrors for the layout handler and the diagnostic snapshot, which both run
+  // outside a render and must read the block as it stands, not as it stood when
+  // their callback was created.
+  quickAddCollapsedRef.current = quickAddCollapsed;
+  const suggestionsCountRef = useRef(0);
+  suggestionsCountRef.current = operationSuggestions.length;
 
   // Measured height of the quick-add wrapper — the binding cards pin their frame
   // to it so the deck reads as cards stacked over the form. Rounded, and only
@@ -367,6 +392,24 @@ const OperationsScreen = () => {
   const loggedQuickAddHeightRef = useRef(null);
   const handleQuickAddLayout = useCallback((event) => {
     const measured = Math.round(event.nativeEvent.layout.height);
+    // A zero from an *open* block is never the truth: the form is always there,
+    // so 0 means a transient pass — the card-leave LayoutAnimation reports one
+    // every time a suggestion is accepted. Keeping it dropped the deck's frame
+    // to the MIN_CARD_HEIGHT floor, so the next suggestion rendered a 260-high
+    // card and jumped to the form's height a frame later. While the block is
+    // collapsed 0 *is* the truth (nothing is laid out behind the + button), and
+    // the deck floors its frame for exactly that case.
+    if (measured === 0 && !quickAddCollapsedRef.current) {
+      // Once per run of them: a LayoutAnimation reports several zero passes in a
+      // row, and this handler runs on every frame of one.
+      if (!droppedZeroRef.current) {
+        droppedZeroRef.current = true;
+        console.log('[deck] quick-add measured 0 while open, keeping', { height: quickAddHeightRef.current });
+      }
+      return;
+    }
+    droppedZeroRef.current = false;
+    quickAddHeightRef.current = measured;
     if (loggedQuickAddHeightRef.current !== measured) {
       loggedQuickAddHeightRef.current = measured;
       console.log('[deck] quick-add measured', { height: measured });
@@ -1188,6 +1231,7 @@ const OperationsScreen = () => {
               pinned actions on Android). Collapses with the form when search
               opens (same clip). */}
           <View
+            onLayout={handleDeckHostLayout}
             style={{
               paddingTop: deckPeekAllowance(operationSuggestions.length),
               minHeight: hasSuggestions
@@ -1196,6 +1240,7 @@ const OperationsScreen = () => {
             }}
           >
             <View
+              testID="quick-add-measure"
               onLayout={handleQuickAddLayout}
               importantForAccessibility={hasSuggestions ? 'no-hide-descendants' : 'auto'}
             >
@@ -1247,7 +1292,7 @@ const OperationsScreen = () => {
       </Animated.View>
       {filtersExpanded && filterPanelHeight > 0 && <View style={{ height: filterPanelHeight }} />}
     </>
-  ), [animatedQuickAddClipStyle, animatedQuickAddSlideStyle, handleQuickAddClipLayout, quickAddCollapsed, colors, t, quickAddValues, visibleAccounts, filteredCategories, topCategoriesForType, getCategoryInfo, getAccountName, getAccountBalance, getCategoryName, openPicker, handleQuickAdd, handleAmountChange, handleExchangeRateChange, handleDestinationAmountChange, handleAutoAddWithCategory, topTransferAccountsForForm, handleAutoAddWithAccount, TYPES, rateSource, handleOperationCurrencyChange, foreignRateSource, foreignExchangeRate, filterPanelHeight, filtersExpanded, quickAddFlash, operationSuggestions, hasSuggestions, quickAddHeight, handleQuickAddLayout, accounts, categories, suggestionSaveErrors, suggestionChoices, setSuggestionChoice, acceptSuggestion, dismissSuggestion]);
+  ), [animatedQuickAddClipStyle, animatedQuickAddSlideStyle, handleQuickAddClipLayout, quickAddCollapsed, colors, t, quickAddValues, visibleAccounts, filteredCategories, topCategoriesForType, getCategoryInfo, getAccountName, getAccountBalance, getCategoryName, openPicker, handleQuickAdd, handleAmountChange, handleExchangeRateChange, handleDestinationAmountChange, handleAutoAddWithCategory, topTransferAccountsForForm, handleAutoAddWithAccount, TYPES, rateSource, handleOperationCurrencyChange, foreignRateSource, foreignExchangeRate, filterPanelHeight, filtersExpanded, quickAddFlash, operationSuggestions, hasSuggestions, quickAddHeight, handleQuickAddLayout, handleDeckHostLayout, accounts, categories, suggestionSaveErrors, suggestionChoices, setSuggestionChoice, acceptSuggestion, dismissSuggestion]);
 
   // Auto-scroll to top when filter panel closes, but only if the user is still
   // near the top (hasn't scrolled into past dates). The threshold is filterPanelHeight:
@@ -1376,27 +1421,47 @@ const OperationsScreen = () => {
   // The state the deck lands in, and — a moment later — what the clip actually
   // did with it. The second line is the one that tells a deck that is in the
   // tree but clipped or off screen from one that never reached the tree.
+  //
+  // It reads through a ref refreshed on every render rather than through the
+  // effect's own closure. The effect only re-runs when the deck size changes, so
+  // a closure froze the panel state as it stood at that instant — which is how
+  // the log ended up carrying impossible pairs (a stack rendered at
+  // quickAddHeight 437 and, a minute later, a "clip after arrival" reporting 0
+  // for the same deck). Every field below is now read at the moment it is
+  // printed.
+  const deckSnapshotRef = useRef(null);
+  deckSnapshotRef.current = {
+    showQuickAddPanel, quickAddExpanded, isSearchOpen, quickAddCollapsed, quickAddHeight,
+  };
+  const deckSnapshot = useCallback(() => ({
+    ...deckSnapshotRef.current,
+    suggestions: suggestionsCountRef.current,
+    clipHeight: quickAddClipHeightRef.current,
+    deckHostHeight: deckHostHeightRef.current,
+    maxHeight: Math.round(quickAddMaxHeight.value),
+    translateY: Math.round(quickAddTranslateY.value),
+    scrollOffset: Math.round(scrollOffsetRef.current),
+  }), [quickAddMaxHeight, quickAddTranslateY]);
   useEffect(() => {
-    const snapshot = () => ({
-      suggestions: operationSuggestions.length,
-      showQuickAddPanel,
-      quickAddExpanded,
-      isSearchOpen,
-      quickAddCollapsed,
-      quickAddHeight,
-      clipHeight: quickAddClipHeightRef.current,
-      maxHeight: quickAddMaxHeight.value,
-      translateY: quickAddTranslateY.value,
-      scrollOffset: Math.round(scrollOffsetRef.current),
-    });
-    console.log('[deck] suggestions changed', snapshot());
+    console.log('[deck] suggestions changed', deckSnapshot());
     if (!hasSuggestions) return undefined;
+    // Not a plain 600ms report: JS timers are held back while the app sits in
+    // the background, so this one has fired 73 seconds — and once 14 minutes —
+    // after the deck arrived, and was read as if it described the frame right
+    // after. `lateBy` says how long it actually waited, and a wait that ran long
+    // is labelled rather than passed off as a settled clip.
+    const scheduledAt = Date.now();
     const timer = setTimeout(() => {
-      console.log('[deck] clip after arrival', snapshot());
-    }, 600);
+      const lateBy = Date.now() - scheduledAt - DECK_SETTLE_MS;
+      console.log('[deck] clip after arrival', {
+        ...deckSnapshot(),
+        lateBy,
+        stale: lateBy > DECK_SETTLE_MS,
+      });
+    }, DECK_SETTLE_MS);
     return () => clearTimeout(timer);
-    // Logged on deck changes only; the rest is read for the snapshot.
-  }, [hasSuggestions, operationSuggestions.length]);
+    // Logged on deck changes only; the snapshot reads live state when it prints.
+  }, [hasSuggestions, operationSuggestions.length, deckSnapshot]);
 
   // Safety net for scrollToIndex failures. The list now provides getItemLayout,
   // so scrollToLocation resolves offsets directly and this should not fire in
