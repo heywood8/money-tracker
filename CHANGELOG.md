@@ -1,5 +1,12 @@
 # Changelog
 
+## [0.283.4](https://github.com/heywood8/money-tracker/compare/penny-v0.283.3...penny-v0.283.4) (2026-09-06)
+
+
+### Bug Fixes
+
+* **notifications:** land the review deck when "Select" opens the app ([#1724](https://github.com/heywood8/money-tracker/issues/1724)) ([e4e57a4](https://github.com/heywood8/money-tracker/commit/e4e57a40014a64db97dcae07113ab79519a7bd7a))
+
 ## [0.283.3](https://github.com/heywood8/money-tracker/compare/penny-v0.283.2...penny-v0.283.3) (2026-09-05)
 
 
