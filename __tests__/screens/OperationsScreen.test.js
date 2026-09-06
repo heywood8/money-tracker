@@ -2640,7 +2640,7 @@ describe('OperationsScreen', () => {
   // settings): SimpleTabs switches tabs, and the screen brings the suggestion deck
   // over the quick-add form into view.
   describe('Pending-operations deep link', () => {
-    const { act } = require('@testing-library/react-native');
+    const { act, fireEvent } = require('@testing-library/react-native');
     const { appEvents, EVENTS } = require('../../app/services/eventEmitter');
 
     const mockSuggestionsHook = (overrides = {}) => {
@@ -2664,6 +2664,31 @@ describe('OperationsScreen', () => {
 
     beforeEach(() => {
       jest.clearAllMocks();
+    });
+
+    // Regression: accepting a card runs a LayoutAnimation, during which the
+    // quick-add wrapper reports a transient 0. Keeping that zero dropped the
+    // deck's frame to the MIN_CARD_HEIGHT floor, so the next suggestion rendered
+    // a short card and jumped to the form's height a frame later. A zero from an
+    // open block is never real — the form is always laid out there.
+    it('keeps the last real quick-add height when an open block measures 0', async () => {
+      const OperationsScreen = require('../../app/screens/OperationsScreen').default;
+      mockSuggestionsHook({ suggestions: [{ id: 'p1', type: 'expense', amount: '10' }] });
+
+      const { getByTestId } = await render(<OperationsScreen />);
+      await act(async () => {
+        fireEvent(getByTestId('quick-add-measure', { includeHiddenElements: true }), 'layout', {
+          nativeEvent: { layout: { height: 437 } },
+        });
+      });
+      expect(getByTestId('notification-binding-stack').props.quickAddHeight).toBe(437);
+
+      await act(async () => {
+        fireEvent(getByTestId('quick-add-measure', { includeHiddenElements: true }), 'layout', {
+          nativeEvent: { layout: { height: 0 } },
+        });
+      });
+      expect(getByTestId('notification-binding-stack').props.quickAddHeight).toBe(437);
     });
 
     it('refreshes the suggestion queue on the deep-link event', async () => {
