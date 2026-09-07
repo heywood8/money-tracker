@@ -14,6 +14,15 @@ import { handleRejectPendingResponse } from '../services/notifications/rejectPen
 import useOnForeground from './useOnForeground';
 
 /**
+ * How long to wait before re-reading the native "last response" slot on a cold
+ * start that found no deep link in it. Three tries over ~2s: the slot is filled
+ * asynchronously and a launch press can land in it after the first read, while
+ * a genuinely empty slot (the app opened from the launcher) is the common case
+ * and must not keep polling.
+ */
+const COLD_START_RETRY_DELAYS = [250, 600, 1200];
+
+/**
  * One key per press, so a response already routed can be told from a new one.
  * Our alerts reuse a fixed identifier, so the post date is what separates two
  * presses on re-posted alerts.
@@ -113,6 +122,39 @@ export default function useNotificationResponseRouter({ enabled = true } = {}) {
   // Guards the async lookups from routing after unmount.
   const activeRef = useRef(true);
 
+  // A response this router has finished with: remembered so nothing in this
+  // process runs it twice, and — the part that matters across processes —
+  // erased from the native "last response" slot.
+  //
+  // Only deep links used to be cleared, so an answered "Acknowledged" or
+  // "Reject" sat in that slot indefinitely. The 2026-09-07 log has one from
+  // 06:00:25 still coming back at 10:27:18, replayed at two cold starts in
+  // between. That is not merely noisy: the slot is how a press that *launched*
+  // the app is recovered, so a stale one standing in it answers the lookup a
+  // real press should have answered — the app opens on its default tab and the
+  // deep link is never delivered. Clearing every response the router is done
+  // with keeps the slot meaning what it claims to.
+  const settle = useCallback((response) => {
+    handledRef.current.add(responseKey(response));
+    // Compare before clearing. `clearLastNotificationResponse` empties the slot
+    // whatever is in it, and between reading a response and finishing with it
+    // the OS may have written a *newer* press there — the 2026-09-07 log timed
+    // that gap at a single millisecond. Erasing that one would lose the very
+    // deep link this router exists to deliver, so the slot is re-read and
+    // cleared only while it still holds what was settled. A read that fails
+    // still clears: a slot stuck on an answered press is the failure actually
+    // observed, and it outlives everything until the next press lands.
+    Notifications.getLastNotificationResponseAsync()
+      .then((current) => {
+        if (current && responseKey(current) !== responseKey(response)) {
+          console.log('[notif-route] slot moved on, left alone', describe(current));
+          return;
+        }
+        clearLastResponse();
+      })
+      .catch(() => clearLastResponse());
+  }, []);
+
   // The one place a response is acted on; `route` below decides whether it
   // gets here. `fromColdStart` marks the response expo-notifications replays
   // on launch. It is how a press that opened the app arrives — but it is also
@@ -126,6 +168,7 @@ export default function useNotificationResponseRouter({ enabled = true } = {}) {
     if (isAcknowledgeResponse(response)) {
       console.log('[notif-route] acknowledged', { ...describe(response), fromColdStart });
       dismissNotificationById(responseNotificationId(response));
+      settle(response);
       return;
     }
     // "Reject" likewise answers the alert instead of navigating: the item is
@@ -137,6 +180,7 @@ export default function useNotificationResponseRouter({ enabled = true } = {}) {
     if (isRejectPendingResponse(response)) {
       console.log('[notif-route] reject', { ...describe(response), fromColdStart });
       if (!fromColdStart) handleRejectPendingResponse(response).catch(() => {});
+      settle(response);
       return;
     }
     let event = null;
@@ -151,27 +195,34 @@ export default function useNotificationResponseRouter({ enabled = true } = {}) {
     } else if (isAddedOperationsResponse(response)) {
       event = EVENTS.OPEN_ADDED_OPERATIONS;
     } else {
+      // Settled like any other: left unkeyed and in the slot, it would be
+      // re-read by every lookup below and sit there indefinitely — the same
+      // stale-slot failure the clearing exists to prevent.
       console.log('[notif-route] ignored (no route)', describe(response));
+      settle(response);
       return;
     }
     console.log('[notif-route] emit', { ...describe(response), event, fromColdStart });
     appEvents.emit(event);
-    handledRef.current.add(responseKey(response));
-    clearLastResponse();
-  }, []);
+    settle(response);
+  }, [settle]);
 
   // The gate every path goes through: a deep link already routed, or already
   // waiting for the screens to mount, is dropped; anything else is delivered
   // now or queued until `enabled`.
   const route = useCallback((response, fromColdStart = false) => {
-    const key = deepLinkKey(response);
-    if (key && (handledRef.current.has(key) || queuedRef.current.some((entry) => entry.key === key))) {
+    // Deep links are keyed for the queue; every response, terminal ones
+    // included, is checked against what this process has already acted on, so a
+    // cold-start retry below cannot perform the same press twice.
+    const seen = response ? responseKey(response) : null;
+    if (seen && (handledRef.current.has(seen)
+      || queuedRef.current.some((entry) => entry.key === seen))) {
       console.log('[notif-route] dropped (already routed)', describe(response));
       return;
     }
     if (!enabledRef.current) {
       console.log('[notif-route] queued until the screens mount', { ...describe(response), fromColdStart });
-      queuedRef.current.push({ key, response, fromColdStart });
+      queuedRef.current.push({ key: seen, response, fromColdStart });
       return;
     }
     deliver(response, fromColdStart);
@@ -191,16 +242,50 @@ export default function useNotificationResponseRouter({ enabled = true } = {}) {
 
   useEffect(() => {
     activeRef.current = true;
+    const timers = [];
 
     // Cold start: the notification that launched the app, if any.
-    Notifications.getLastNotificationResponseAsync()
-      .then((response) => {
-        console.log('[notif-route] cold-start lookup', response ? describe(response) : { found: false });
-        if (activeRef.current && response) route(response, true);
-      })
-      .catch((error) => {
-        console.warn('[notif-route] cold-start lookup failed:', error);
-      });
+    //
+    // The slot is filled asynchronously, and the read can lose the race with
+    // the press that filled it: on 2026-09-07 a foreground read returned a
+    // four-hour-old response one millisecond before the listener delivered the
+    // real one. On a cold start the listener is the other way this arrives and
+    // it can miss its window entirely, so a lookup that comes back with no deep
+    // link is retried a few times before the app gives up on the press. `route`
+    // drops whatever the listener delivered in the meantime, so at most one of
+    // the two wins.
+    function scheduleRetry(attempt) {
+      const delay = COLD_START_RETRY_DELAYS[attempt];
+      if (delay == null || !activeRef.current) return;
+      timers.push(setTimeout(() => lookup(attempt + 1), delay));
+    }
+    function lookup(attempt) {
+      Notifications.getLastNotificationResponseAsync()
+        .then((response) => {
+          if (!activeRef.current) return;
+          const deepLink = !!(response && deepLinkKey(response));
+          console.log('[notif-route] cold-start lookup', response
+            ? { ...describe(response), deepLink, attempt }
+            : { found: false, attempt });
+          // Only the first read can claim what it finds as the press that
+          // launched the app. A later one is a re-read of a slot that may since
+          // have taken a *warm* press, and calling that a launch replay would
+          // skip the action it asks for ("Reject" is deliberately not re-run on
+          // a replay) and then settle it out from under the listener that was
+          // about to deliver it properly. Retries therefore carry deep links
+          // only, which is all they were added for.
+          if (response && (attempt === 0 || deepLink)) route(response, attempt === 0);
+          if (deepLink) return;
+          scheduleRetry(attempt);
+        })
+        .catch((error) => {
+          console.warn('[notif-route] cold-start lookup failed:', error);
+          // A transient read failure is precisely what the retries are for, so
+          // one rejection must not end the chain.
+          scheduleRetry(attempt);
+        });
+    }
+    lookup(0);
 
     // Warm: taps received while the app is running.
     const subscription = Notifications.addNotificationResponseReceivedListener((response) => {
@@ -211,6 +296,7 @@ export default function useNotificationResponseRouter({ enabled = true } = {}) {
     return () => {
       activeRef.current = false;
       subscription.remove();
+      timers.forEach(clearTimeout);
     };
   }, [route]);
 

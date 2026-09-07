@@ -486,13 +486,20 @@ export default function SimpleTabs() {
   // arrived and was not seen.
   const openOperationsForNotification = useCallback((label) => {
     const outcome = handleTabPress('Operations');
-    const snapped = outcome === 'busy' || outcome === 'unknown'
+    // 'already-active' is read off `active`, which can lag the strip: the pan
+    // gesture moves `activeIndex` the moment the finger lifts but only calls
+    // setActive from the spring's completion, over a runOnJS hop. Mid-swipe the
+    // two disagree, and trusting the stale one would open the deck on a tab the
+    // user is not looking at — so the strip's own index gets the last word.
+    const strayed = outcome === 'already-active'
+      && activeIndex.value !== TABS.findIndex((tab) => tab.key === 'Operations');
+    const snapped = outcome === 'busy' || outcome === 'unknown' || strayed
       ? snapToTab('Operations')
       : false;
     console.log(`[deck] ${label}: switching to Operations`, {
-      from: activeRef.current, outcome, snapped,
+      from: activeRef.current, outcome, strayed, snapped,
     });
-  }, [handleTabPress, snapToTab]);
+  }, [handleTabPress, snapToTab, activeIndex, TABS]);
 
   // A tapped "transactions to review" notification routes here: jump to the
   // Operations tab. OperationsScreen listens for the same event and surfaces the
