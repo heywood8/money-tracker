@@ -1,5 +1,12 @@
 # Changelog
 
+## [0.283.6](https://github.com/heywood8/money-tracker/compare/penny-v0.283.5...penny-v0.283.6) (2026-09-07)
+
+
+### Bug Fixes
+
+* **notifications:** stop a stale response swallowing the "Select" deep link ([#1732](https://github.com/heywood8/money-tracker/issues/1732)) ([6aeb68f](https://github.com/heywood8/money-tracker/commit/6aeb68fb3059f1292e7dd5f0b69c8cd47706ddc4))
+
 ## [0.283.5](https://github.com/heywood8/money-tracker/compare/penny-v0.283.4...penny-v0.283.5) (2026-09-07)
 
 
