@@ -1,5 +1,12 @@
 # Changelog
 
+## [0.283.5](https://github.com/heywood8/money-tracker/compare/penny-v0.283.4...penny-v0.283.5) (2026-09-07)
+
+
+### Code Refactoring
+
+* **graphs:** swap balance card header sides ([#1730](https://github.com/heywood8/money-tracker/issues/1730)) ([e5ca240](https://github.com/heywood8/money-tracker/commit/e5ca240edcc00d2866cb6bda086c6beab67ee528))
+
 ## [0.283.4](https://github.com/heywood8/money-tracker/compare/penny-v0.283.3...penny-v0.283.4) (2026-09-06)
 
 
