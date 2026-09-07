@@ -357,6 +357,192 @@ describe('useNotificationResponseRouter', () => {
     });
   });
 
+  // Regression: only deep links used to clear the native "last response" slot,
+  // so an answered "Acknowledged" or "Reject" stayed in it. The 2026-09-07 log
+  // has one from 06:00:25 still coming back at 10:27:18, replayed at two cold
+  // starts in between — and while it sits there it answers the launch lookup
+  // that a real "Select" press should have answered, so the app opens on its
+  // default tab with no review deck.
+  describe('the native last-response slot', () => {
+    const terminalPress = (actionIdentifier, identifier, route) => ({
+      actionIdentifier,
+      notification: { request: { identifier, content: { data: { route } } } },
+    });
+
+    it('is cleared after "Acknowledged"', async () => {
+      let listener;
+      Notifications.addNotificationResponseReceivedListener.mockImplementation((cb) => {
+        listener = cb;
+        return { remove: jest.fn() };
+      });
+
+      const { unmount } = await renderHook(() => useNotificationResponseRouter());
+      listener(terminalPress('acknowledge', 'penny-added-operations-1', 'addedOperations'));
+
+      // Cleared after a verifying re-read of the slot, so this settles a tick later.
+      await waitFor(() => expect(Notifications.clearLastNotificationResponse).toHaveBeenCalled());
+      await unmount();
+    });
+
+    it('is cleared after "Reject"', async () => {
+      let listener;
+      Notifications.addNotificationResponseReceivedListener.mockImplementation((cb) => {
+        listener = cb;
+        return { remove: jest.fn() };
+      });
+
+      const { unmount } = await renderHook(() => useNotificationResponseRouter());
+      listener(terminalPress('reject-pending', 'penny-pending-operations', 'notificationProcessing'));
+
+      await waitFor(() => expect(Notifications.clearLastNotificationResponse).toHaveBeenCalled());
+      await unmount();
+    });
+
+    it('never performs the same terminal press twice', async () => {
+      const press = terminalPress('acknowledge', 'penny-added-operations-1', 'addedOperations');
+      let listener;
+      Notifications.addNotificationResponseReceivedListener.mockImplementation((cb) => {
+        listener = cb;
+        return { remove: jest.fn() };
+      });
+      // The slot keeps handing the same press back — a clear that silently
+      // failed, or a platform that ignores it.
+      Notifications.getLastNotificationResponseAsync.mockResolvedValue(press);
+
+      const { unmount } = await renderHook(() => useNotificationResponseRouter());
+      await waitFor(() => expect(Notifications.dismissNotificationAsync).toHaveBeenCalled());
+      listener(press);
+      await act(async () => {});
+
+      expect(Notifications.dismissNotificationAsync).toHaveBeenCalledTimes(1);
+      await unmount();
+    });
+  });
+
+  // The other half of clearing the slot: it must never take a press with it.
+  // `clearLastNotificationResponse` empties whatever is there, and the gap
+  // between reading a response and finishing with it was measured at one
+  // millisecond in the log — long enough for the OS to write the press the user
+  // just made.
+  it('leaves a newer press in the slot alone when settling an older one', async () => {
+    jest.useFakeTimers();
+    try {
+      let listener;
+      Notifications.addNotificationResponseReceivedListener.mockImplementation((cb) => {
+        listener = cb;
+        return { remove: jest.fn() };
+      });
+      let slot = null;
+      Notifications.getLastNotificationResponseAsync.mockImplementation(async () => slot);
+
+      const { unmount } = await renderHook(() => useNotificationResponseRouter());
+      await act(async () => {});
+
+      // The user presses "Select" just as the older Acknowledged is being settled.
+      slot = {
+        actionIdentifier: 'select-pending',
+        notification: {
+          request: {
+            identifier: 'penny-pending-operations',
+            content: { data: { route: 'notificationProcessing' } },
+          },
+        },
+      };
+      listener({
+        actionIdentifier: 'acknowledge',
+        notification: {
+          request: { identifier: 'penny-added-operations-1', content: { data: { route: 'addedOperations' } } },
+        },
+      });
+      await act(async () => {});
+
+      expect(Notifications.clearLastNotificationResponse).not.toHaveBeenCalled();
+      await unmount();
+    } finally {
+      jest.useRealTimers();
+    }
+  });
+
+  it('settles a response it has no route for, instead of leaving it in the slot', async () => {
+    let listener;
+    Notifications.addNotificationResponseReceivedListener.mockImplementation((cb) => {
+      listener = cb;
+      return { remove: jest.fn() };
+    });
+
+    const { unmount } = await renderHook(() => useNotificationResponseRouter());
+    listener({ notification: { request: { identifier: 'someone-elses', content: { data: {} } } } });
+
+    await waitFor(() => expect(Notifications.clearLastNotificationResponse).toHaveBeenCalled());
+    expect(emitSpy).not.toHaveBeenCalled();
+    await unmount();
+  });
+
+  it('keeps retrying the lookup after a read fails', async () => {
+    jest.useFakeTimers();
+    try {
+      Notifications.getLastNotificationResponseAsync
+        .mockRejectedValueOnce(new Error('slot unavailable'))
+        .mockResolvedValue(matchResponse);
+
+      const { unmount } = await renderHook(() => useNotificationResponseRouter());
+      await act(async () => {});
+      expect(emitSpy).not.toHaveBeenCalled();
+
+      await act(async () => { jest.advanceTimersByTime(300); });
+      await act(async () => {});
+
+      expect(emitSpy).toHaveBeenCalledWith(EVENTS.OPEN_PENDING_OPERATIONS);
+      await unmount();
+    } finally {
+      jest.useRealTimers();
+    }
+  });
+
+  // The slot is filled asynchronously: on 2026-09-07 a read returned a stale
+  // response one millisecond before the listener delivered the real one. On a
+  // cold start the listener can miss its window altogether, so an empty lookup
+  // is retried rather than treated as "the app was opened from the launcher".
+  it('picks up a launch deep link that lands in the slot after the first read', async () => {
+    jest.useFakeTimers();
+    try {
+      Notifications.getLastNotificationResponseAsync
+        .mockResolvedValueOnce(null)
+        .mockResolvedValue(matchResponse);
+
+      const { unmount } = await renderHook(() => useNotificationResponseRouter());
+      await act(async () => {});
+      expect(emitSpy).not.toHaveBeenCalled();
+
+      await act(async () => { jest.advanceTimersByTime(300); });
+      await act(async () => {});
+
+      expect(emitSpy).toHaveBeenCalledWith(EVENTS.OPEN_PENDING_OPERATIONS);
+      await unmount();
+    } finally {
+      jest.useRealTimers();
+    }
+  });
+
+  it('stops re-reading the slot once a deep link has been routed', async () => {
+    jest.useFakeTimers();
+    try {
+      Notifications.getLastNotificationResponseAsync.mockResolvedValue(matchResponse);
+
+      const { unmount } = await renderHook(() => useNotificationResponseRouter());
+      await act(async () => {});
+      const readsAfterHit = Notifications.getLastNotificationResponseAsync.mock.calls.length;
+
+      await act(async () => { jest.advanceTimersByTime(3000); });
+      await act(async () => {});
+
+      expect(Notifications.getLastNotificationResponseAsync).toHaveBeenCalledTimes(readsAfterHit);
+      await unmount();
+    } finally {
+      jest.useRealTimers();
+    }
+  });
+
   it('removes the response listener on unmount', async () => {
     const remove = jest.fn();
     Notifications.addNotificationResponseReceivedListener.mockReturnValue({ remove });
