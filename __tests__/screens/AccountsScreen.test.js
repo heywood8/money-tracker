@@ -998,6 +998,40 @@ describe('AccountsScreen', () => {
     });
   });
 
+  // Issue #1700: saveEdit fired the context action without awaiting or catching it,
+  // so a rejected write closed the panel and discarded everything the user typed.
+  describe('failed saves keep the form open (issue #1700)', () => {
+    const { fireEvent, waitFor } = require('@testing-library/react-native');
+
+    it('keeps the typed values when addAccount rejects', async () => {
+      const AccountsScreen = require('../../app/screens/AccountsScreen').default;
+      const { useAccountsActions } = require('../../app/contexts/AccountsActionsContext');
+      const { useLocalization } = require('../../app/contexts/LocalizationContext');
+
+      const addAccount = jest.fn().mockRejectedValue(new Error('db down'));
+      useAccountsActions.mockReturnValue(createAccountsActionsMock({
+        addAccount,
+        validateAccount: jest.fn(() => ({})),
+      }));
+      useLocalization.mockReturnValue({ t: jest.fn((key) => key), language: 'en' });
+
+      const { getByLabelText, getAllByText, getByDisplayValue, getByTestId } =
+        await render(<AccountsScreen />);
+
+      await fireEvent.press(getByLabelText('add_account'));
+
+      await fireEvent.changeText(getByTestId('account-name-input'), 'My Wallet');
+
+      await waitFor(() => {
+        fireEvent.press(getAllByText('save')[0]);
+      });
+
+      expect(addAccount).toHaveBeenCalledTimes(1);
+      // The panel is still there with the typed name intact.
+      expect(getByDisplayValue('My Wallet')).toBeTruthy();
+    });
+  });
+
   describe('Account Delete Handlers', () => {
     const { fireEvent, act, waitFor } = require('@testing-library/react-native');
 

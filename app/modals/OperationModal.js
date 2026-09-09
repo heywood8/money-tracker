@@ -155,6 +155,7 @@ export default function OperationModal({
     isForeignCurrencyOp,
     rateSource,
     setRateSource,
+    isSaving,
     handleSave,
     handleClose,
     handleDelete,
@@ -465,6 +466,7 @@ export default function OperationModal({
         onDismiss={handleClose}
         title={isNew ? t('add_operation') : t('edit_operation')}
         onSave={isShadowOperation ? undefined : handleSaveWithLabels}
+        saveDisabled={isSaving}
         onCancel={handleClose}
         cancelLabel={isShadowOperation ? t('close') : t('cancel')}
         onDelete={!isNew && onDelete ? handleDelete : undefined}
