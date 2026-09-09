@@ -1,5 +1,12 @@
 # Changelog
 
+## [0.284.1](https://github.com/heywood8/money-tracker/compare/penny-v0.284.0...penny-v0.284.1) (2026-09-09)
+
+
+### Bug Fixes
+
+* **forms:** guard saves against double submit and failed writes ([#1736](https://github.com/heywood8/money-tracker/issues/1736)) ([6c8234a](https://github.com/heywood8/money-tracker/commit/6c8234a692ff1f26dab716965472683a9e9434aa))
+
 ## [0.284.0](https://github.com/heywood8/money-tracker/compare/penny-v0.283.6...penny-v0.284.0) (2026-09-09)
 
 
