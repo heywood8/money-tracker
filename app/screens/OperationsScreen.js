@@ -27,6 +27,7 @@ import QuickAddForm from '../components/operations/QuickAddForm';
 import NotificationBindingStack, { deckPeekAllowance, deckCardHeight } from '../components/operations/NotificationBindingStack';
 import PickerModal from '../components/operations/PickerModal';
 import UndoSnackbar, { UNDO_DURATION_MS } from '../components/operations/UndoSnackbar';
+import { SUGGESTION_TIMEOUT_MS } from '../components/operations/DescriptionSuggestionRow';
 import SearchOverlay from '../components/search/SearchOverlay';
 import SearchBar from '../components/search/SearchBar';
 import FilterChipStrip from '../components/search/FilterChipStrip';
@@ -1052,6 +1053,16 @@ const OperationsScreen = () => {
     setPendingSuggestionId(null);
     setPendingSuggestions([]);
   }, []);
+
+  // Retire the suggestion row on its own after SUGGESTION_TIMEOUT_MS. The window
+  // starts when the suggestions are set (a beat before the row renders), and
+  // tapping a chip does not extend it — only a new operation (a new
+  // `pendingSuggestionId`) restarts the clock.
+  useEffect(() => {
+    if (!pendingSuggestionId) return undefined;
+    const timer = setTimeout(handleDismissSuggestion, SUGGESTION_TIMEOUT_MS);
+    return () => clearTimeout(timer);
+  }, [pendingSuggestionId, handleDismissSuggestion]);
 
   // Undo a just-added operation: delete it and drop any label suggestions that
   // targeted it (otherwise the suggestion row would point at a deleted op).

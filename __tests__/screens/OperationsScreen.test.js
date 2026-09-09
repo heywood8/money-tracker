@@ -6,6 +6,7 @@
 
 import React from 'react';
 import { render, waitFor } from '@testing-library/react-native';
+import { SUGGESTION_TIMEOUT_MS } from '../../app/components/operations/DescriptionSuggestionRow';
 
 // Mock all dependencies
 jest.mock('../../app/contexts/ThemeColorsContext', () => ({
@@ -127,6 +128,10 @@ jest.mock('../../app/components/operations/OperationsList', () => {
       onContentSizeChange: props.onContentSizeChange,
       onScrollToIndexFailed: props.onScrollToIndexFailed,
       onLoadMore: props.onLoadMore,
+      pendingSuggestionId: props.pendingSuggestionId,
+      pendingSuggestions: props.pendingSuggestions,
+      onApplySuggestion: props.onApplySuggestion,
+      onDismissSuggestion: props.onDismissSuggestion,
     }, props.headerComponent);
   });
 });
@@ -244,6 +249,18 @@ jest.mock('../../app/hooks/useMultiCurrencyTransfer', () => jest.fn(() => ({
   rateSource: 'offline',
   setRateSource: jest.fn(),
 })));
+
+// Only the label-suggestion query is stubbed; the rest of OperationsDB stays
+// real. Defaults to "no labels yet" so the suggestion row is absent unless a
+// test asks for it.
+jest.mock('../../app/services/OperationsDB', () => {
+  const actual = jest.requireActual('../../app/services/OperationsDB');
+  return {
+    __esModule: true,
+    ...actual,
+    getDistinctLabels: jest.fn(() => Promise.resolve([])),
+  };
+});
 
 jest.mock('../../app/services/BalanceHistoryDB', () => ({
   formatDate: jest.fn((date) => {
@@ -2974,6 +2991,99 @@ describe('OperationsScreen', () => {
       const { queryByTestId } = await render(<OperationsScreen />);
 
       expect(queryByTestId('quick-add-fab')).toBeNull();
+    });
+  });
+
+  // The label-suggestion strip under a just-added operation is an offer that
+  // expires: left alone it clears itself after two minutes so it does not stay
+  // pinned to an operation the user has long since moved past.
+  describe('Label suggestion auto-dismiss', () => {
+    const { act } = require('@testing-library/react-native');
+
+    const renderWithSuggestions = async () => {
+      const OperationsScreen = require('../../app/screens/OperationsScreen').default;
+      const { useOperationsData } = require('../../app/contexts/OperationsDataContext');
+      const { useOperationsActions } = require('../../app/contexts/OperationsActionsContext');
+      const { useAccountsData } = require('../../app/contexts/AccountsDataContext');
+      const { getDistinctLabels } = require('../../app/services/OperationsDB');
+      const useQuickAddForm = require('../../app/hooks/useQuickAddForm');
+      const useOperationPicker = require('../../app/hooks/useOperationPicker');
+
+      getDistinctLabels.mockResolvedValue(['coffee', 'groceries']);
+
+      useOperationPicker.mockReturnValue({
+        pickerState: { visible: true, type: 'category', data: [] },
+        categoryNavigation: { currentFolderId: null, breadcrumb: [] },
+        openPicker: jest.fn(),
+        closePicker: jest.fn(),
+        navigateIntoFolder: jest.fn(),
+        navigateBack: jest.fn(),
+      });
+
+      useQuickAddForm.mockReturnValue({
+        quickAddValues: { type: 'expense', amount: '100', accountId: 'acc-1', categoryId: 'cat-1' },
+        setQuickAddValues: jest.fn(),
+        getAccountName: jest.fn(() => 'Cash'),
+        getAccountBalance: jest.fn(() => '$1000.00'),
+        getCategoryInfo: jest.fn(() => ({ name: 'Food', icon: 'food' })),
+        getCategoryName: jest.fn(() => 'Food'),
+        filteredCategories: [],
+        resetForm: jest.fn(),
+      });
+
+      useAccountsData.mockReturnValue({
+        accounts: [{ id: 'acc-1', currency: 'USD' }],
+        visibleAccounts: [{ id: 'acc-1', currency: 'USD' }],
+        loading: false,
+      });
+      useOperationsData.mockReturnValue({
+        operations: [], loading: false, loadingMore: false, hasMoreOperations: false,
+      });
+      useOperationsActions.mockReturnValue({
+        deleteOperation: jest.fn(),
+        addOperation: jest.fn(() => Promise.resolve({ id: 'new-op', description: '' })),
+        updateOperation: jest.fn(() => Promise.resolve()),
+        validateOperation: jest.fn(() => null),
+        loadMoreOperations: jest.fn(),
+        jumpToDate: jest.fn(),
+      });
+
+      const utils = await render(<OperationsScreen />);
+      await act(async () => {
+        await utils.getByTestId('picker-modal').props.onAutoAddWithCategory('cat-1');
+      });
+      return utils;
+    };
+
+    beforeEach(() => {
+      jest.useFakeTimers();
+    });
+
+    afterEach(() => {
+      jest.useRealTimers();
+      // clearAllMocks resets calls, not implementations — restore the module
+      // mock's "no labels yet" default so later tests are unaffected.
+      require('../../app/services/OperationsDB').getDistinctLabels.mockResolvedValue([]);
+    });
+
+    it('keeps the suggestions on screen before the timeout elapses', async () => {
+      const { getByTestId } = await renderWithSuggestions();
+
+      expect(getByTestId('operations-list').props.pendingSuggestionId).toBe('new-op');
+
+      await act(async () => { jest.advanceTimersByTime(SUGGESTION_TIMEOUT_MS - 1000); });
+
+      expect(getByTestId('operations-list').props.pendingSuggestionId).toBe('new-op');
+      expect(getByTestId('operations-list').props.pendingSuggestions).toEqual(['coffee', 'groceries']);
+    });
+
+    it('clears the suggestions once the timeout elapses', async () => {
+      const { getByTestId } = await renderWithSuggestions();
+
+      await act(async () => { jest.advanceTimersByTime(SUGGESTION_TIMEOUT_MS); });
+
+      expect(getByTestId('operations-list').props.pendingSuggestionId).toBeNull();
+      expect(getByTestId('operations-list').props.pendingSuggestions).toEqual([]);
     });
   });
 });
