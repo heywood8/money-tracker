@@ -1,5 +1,12 @@
 # Changelog
 
+## [0.284.0](https://github.com/heywood8/money-tracker/compare/penny-v0.283.6...penny-v0.284.0) (2026-09-09)
+
+
+### Features
+
+* **operations:** auto-dismiss label suggestions after two minutes ([#1734](https://github.com/heywood8/money-tracker/issues/1734)) ([d28fb6b](https://github.com/heywood8/money-tracker/commit/d28fb6ba003856ccd1e540d9a4d0c9c5a0511366))
+
 ## [0.283.6](https://github.com/heywood8/money-tracker/compare/penny-v0.283.5...penny-v0.283.6) (2026-09-07)
 
 
