@@ -668,6 +668,87 @@ describe('useOperationForm', () => {
     });
   });
 
+  describe('double-submit guard (issue #1699)', () => {
+    const fillValidExpense = async (result) => {
+      await waitFor(() => {
+        expect(result.current.values.accountId).toBeTruthy();
+      });
+      await act(async () => {
+        result.current.setValues(prev => ({
+          ...prev,
+          type: 'expense',
+          amount: '100',
+          accountId: 'acc-1',
+          categoryId: 'cat-1',
+          date: '2024-01-15',
+        }));
+      });
+    };
+
+    it('books the operation once when Save is tapped twice while the write is pending', async () => {
+      let resolveWrite;
+      mockAddOperation.mockImplementation(() => new Promise((resolve) => { resolveWrite = resolve; }));
+
+      const { result } = await renderHook(() => useOperationForm(defaultProps));
+      await fillValidExpense(result);
+
+      await act(async () => {
+        // Two taps in the same frame — the second must be dropped.
+        result.current.handleSave();
+        result.current.handleSave();
+        resolveWrite({ id: 'op-1' });
+      });
+
+      expect(mockAddOperation).toHaveBeenCalledTimes(1);
+      expect(mockOnClose).toHaveBeenCalledTimes(1);
+    });
+
+    it('reports isSaving while the write is pending and clears it afterwards', async () => {
+      let resolveWrite;
+      mockAddOperation.mockImplementation(() => new Promise((resolve) => { resolveWrite = resolve; }));
+
+      const { result } = await renderHook(() => useOperationForm(defaultProps));
+      await fillValidExpense(result);
+
+      expect(result.current.isSaving).toBe(false);
+
+      let savePromise;
+      await act(async () => {
+        savePromise = result.current.handleSave();
+      });
+
+      expect(result.current.isSaving).toBe(true);
+
+      await act(async () => {
+        resolveWrite({ id: 'op-1' });
+        await savePromise;
+      });
+
+      expect(result.current.isSaving).toBe(false);
+    });
+
+    it('keeps the modal open and swallows the rejection when the write fails', async () => {
+      mockAddOperation.mockRejectedValue(new Error('db down'));
+
+      const { result } = await renderHook(() => useOperationForm(defaultProps));
+      await fillValidExpense(result);
+
+      await act(async () => {
+        await result.current.handleSave();
+      });
+
+      expect(mockOnClose).not.toHaveBeenCalled();
+      expect(result.current.isSaving).toBe(false);
+
+      // A retry is still possible — the guard is released.
+      mockAddOperation.mockResolvedValue({ id: 'op-1' });
+      await act(async () => {
+        await result.current.handleSave();
+      });
+      expect(mockOnClose).toHaveBeenCalledTimes(1);
+    });
+  });
+
   describe('handleClose', () => {
     it('should dismiss keyboard and close modal', async () => {
       const { result } = await renderHook(() => useOperationForm(defaultProps));

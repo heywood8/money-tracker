@@ -142,6 +142,7 @@ jest.mock('../../app/components/operations/QuickAddForm', () => {
     return React.createElement('QuickAddForm', {
       testID: 'quick-add-form',
       handleQuickAdd: props.handleQuickAdd,
+      saving: props.saving,
     });
   };
 });
@@ -1184,6 +1185,114 @@ describe('OperationsScreen', () => {
 
       expect(mockResetForm).toHaveBeenCalled();
       expect(mockClosePicker).toHaveBeenCalled();
+    });
+  });
+
+  // Issue #1699: no save path had an in-flight guard, and quick-add awaits a live
+  // exchange-rate fetch before it writes, so a fast double tap booked the operation
+  // twice.
+  describe('Quick-add double submit (issue #1699)', () => {
+    const { act } = require('@testing-library/react-native');
+
+    it('books the operation once when Add is tapped twice in the same frame', async () => {
+      const OperationsScreen = require('../../app/screens/OperationsScreen').default;
+      const { useOperationsData } = require('../../app/contexts/OperationsDataContext');
+      const { useOperationsActions } = require('../../app/contexts/OperationsActionsContext');
+      const { useAccountsData } = require('../../app/contexts/AccountsDataContext');
+      const useQuickAddForm = require('../../app/hooks/useQuickAddForm');
+
+      const mockAddOperation = jest.fn(() => Promise.resolve({ id: 'new-op' }));
+      useQuickAddForm.mockReturnValue({
+        quickAddValues: { type: 'expense', amount: '100', accountId: 'acc-1', categoryId: 'cat-1' },
+        setQuickAddValues: jest.fn(),
+        getAccountName: jest.fn(() => 'Cash'),
+        getAccountBalance: jest.fn(() => '$1000.00'),
+        getCategoryInfo: jest.fn(() => ({ name: 'Food', icon: 'food' })),
+        getCategoryName: jest.fn(() => 'Food'),
+        filteredCategories: [],
+        resetForm: jest.fn(),
+      });
+
+      useAccountsData.mockReturnValue({
+        accounts: [{ id: 'acc-1', currency: 'USD' }],
+        visibleAccounts: [{ id: 'acc-1', currency: 'USD' }],
+        loading: false,
+      });
+      useOperationsData.mockReturnValue({
+        operations: [], loading: false, loadingMore: false, hasMoreOperations: false,
+      });
+      useOperationsActions.mockReturnValue({
+        deleteOperation: jest.fn(),
+        addOperation: mockAddOperation,
+        validateOperation: jest.fn(() => null),
+        loadMoreOperations: jest.fn(),
+        jumpToDate: jest.fn(),
+      });
+
+      const { getByTestId } = await render(<OperationsScreen />);
+
+      await act(async () => {
+        const { handleQuickAdd } = getByTestId('quick-add-form').props;
+        // Both calls happen before the first save settles.
+        await Promise.all([handleQuickAdd(), handleQuickAdd()]);
+      });
+
+      expect(mockAddOperation).toHaveBeenCalledTimes(1);
+    });
+
+    it('marks the form as saving for as long as the write is pending', async () => {
+      const OperationsScreen = require('../../app/screens/OperationsScreen').default;
+      const { useOperationsData } = require('../../app/contexts/OperationsDataContext');
+      const { useOperationsActions } = require('../../app/contexts/OperationsActionsContext');
+      const { useAccountsData } = require('../../app/contexts/AccountsDataContext');
+      const useQuickAddForm = require('../../app/hooks/useQuickAddForm');
+
+      let resolveWrite;
+      const mockAddOperation = jest.fn(() => new Promise((resolve) => { resolveWrite = resolve; }));
+      useQuickAddForm.mockReturnValue({
+        quickAddValues: { type: 'expense', amount: '100', accountId: 'acc-1', categoryId: 'cat-1' },
+        setQuickAddValues: jest.fn(),
+        getAccountName: jest.fn(() => 'Cash'),
+        getAccountBalance: jest.fn(() => '$1000.00'),
+        getCategoryInfo: jest.fn(() => ({ name: 'Food', icon: 'food' })),
+        getCategoryName: jest.fn(() => 'Food'),
+        filteredCategories: [],
+        resetForm: jest.fn(),
+      });
+
+      useAccountsData.mockReturnValue({
+        accounts: [{ id: 'acc-1', currency: 'USD' }],
+        visibleAccounts: [{ id: 'acc-1', currency: 'USD' }],
+        loading: false,
+      });
+      useOperationsData.mockReturnValue({
+        operations: [], loading: false, loadingMore: false, hasMoreOperations: false,
+      });
+      useOperationsActions.mockReturnValue({
+        deleteOperation: jest.fn(),
+        addOperation: mockAddOperation,
+        validateOperation: jest.fn(() => null),
+        loadMoreOperations: jest.fn(),
+        jumpToDate: jest.fn(),
+      });
+
+      const { getByTestId } = await render(<OperationsScreen />);
+      expect(getByTestId('quick-add-form').props.saving).toBe(false);
+
+      let pending;
+      await act(async () => {
+        pending = getByTestId('quick-add-form').props.handleQuickAdd();
+      });
+
+      // The Add button has to look unavailable, not just swallow the tap.
+      expect(getByTestId('quick-add-form').props.saving).toBe(true);
+
+      await act(async () => {
+        resolveWrite({ id: 'op-1' });
+        await pending;
+      });
+
+      expect(getByTestId('quick-add-form').props.saving).toBe(false);
     });
   });
 

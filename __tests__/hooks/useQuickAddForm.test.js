@@ -1047,6 +1047,67 @@ describe('useQuickAddForm', () => {
       expect(result.current.filteredCategories[0].categoryType).toBe('income');
     });
 
+    // Issue #1699/#1702 cluster: `visibleAccounts` is a fresh array after every
+    // reloadAccounts() (operation add/update/delete, RELOAD_ALL, balance edit). The
+    // default-account effect used to re-run on that identity change and stomp on the
+    // account the user had deliberately picked, resetting operationCurrency mid-entry.
+    it('keeps a deliberately chosen account when accounts reload with the same ids', async () => {
+      PreferencesDB.getDefaultAccountId.mockResolvedValue('acc-1');
+      LastAccount.getLastAccessedAccount.mockResolvedValue(null);
+
+      let currentAccounts = mockAccounts;
+      const { result, rerender } = await renderHook(() =>
+        useQuickAddForm(currentAccounts, currentAccounts, mockCategories, mockT),
+      );
+
+      await waitFor(() => {
+        expect(result.current.quickAddValues.accountId).toBe('acc-1');
+      });
+
+      // User picks the EUR account instead of the pinned default.
+      await act(async () => {
+        result.current.setQuickAddValues(prev => ({ ...prev, accountId: 'acc-2', amount: '42' }));
+      });
+
+      await waitFor(() => {
+        expect(result.current.quickAddValues.operationCurrency).toBe('EUR');
+      });
+
+      // reloadAccounts() hands down a brand-new array with the same accounts.
+      currentAccounts = mockAccounts.map(acc => ({ ...acc }));
+      await act(async () => {
+        rerender();
+      });
+
+      expect(result.current.quickAddValues.accountId).toBe('acc-2');
+      expect(result.current.quickAddValues.operationCurrency).toBe('EUR');
+      expect(result.current.quickAddValues.amount).toBe('42');
+    });
+
+    it('re-picks a default when the chosen account disappears from the visible list', async () => {
+      PreferencesDB.getDefaultAccountId.mockResolvedValue(null);
+      LastAccount.getLastAccessedAccount.mockResolvedValue(null);
+
+      let currentAccounts = mockAccounts;
+      const { result, rerender } = await renderHook(() =>
+        useQuickAddForm(currentAccounts, currentAccounts, mockCategories, mockT),
+      );
+
+      await act(async () => {
+        result.current.setQuickAddValues(prev => ({ ...prev, accountId: 'acc-2' }));
+      });
+
+      // acc-2 gets hidden or deleted.
+      currentAccounts = mockAccounts.filter(acc => acc.id !== 'acc-2');
+      await act(async () => {
+        rerender();
+      });
+
+      await waitFor(() => {
+        expect(result.current.quickAddValues.accountId).toBe('acc-1');
+      });
+    });
+
     it('should maintain form values during re-renders', async () => {
       const { result, rerender } = await renderHook(() =>
         useQuickAddForm(mockAccounts, mockAccounts, mockCategories, mockT),

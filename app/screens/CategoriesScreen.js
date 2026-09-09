@@ -57,6 +57,10 @@ const CategoriesScreen = ({ onBackStateChange }) => {
   const [activePanel, setActivePanel] = useState(null); // null | 'form'
   const [formValues, setFormValues] = useState(DEFAULT_FORM_VALUES);
   const [formErrors, setFormErrors] = useState({});
+  // True while a category save is in flight — guards against a double submit and
+  // keeps the form open until the write actually succeeds.
+  const [saving, setSaving] = useState(false);
+  const savingRef = useRef(false);
   const [formIsNew, setFormIsNew] = useState(true);
   const [formEditingCategory, setFormEditingCategory] = useState(null);
   const [iconPickerVisible, setIconPickerVisible] = useState(false);
@@ -121,20 +125,41 @@ const CategoriesScreen = ({ onBackStateChange }) => {
     });
   }, [listAnim, formAnim]);
 
-  const handleSave = useCallback(() => {
+  // addCategory/updateCategory surface their own error dialog and rethrow. Awaiting
+  // inside try/catch closes the form only once the write succeeded, so a failure no
+  // longer discards what the user typed (nor escapes as an unhandled rejection). The
+  // in-flight flag doubles as the double-submit guard.
+  // Dismissing mid-save would let the resolving write close whatever panel is open by
+  // then — possibly a different category the user has since opened. Every user-facing
+  // cancel route goes through here; the save path calls closeForm directly.
+  const handleCancelForm = useCallback(() => {
+    if (savingRef.current) return;
+    closeForm();
+  }, [closeForm]);
+
+  const handleSave = useCallback(async () => {
     const error = validateCategory(formValues, t);
     if (error) {
       setFormErrors({ general: error });
       return;
     }
 
-    if (formIsNew) {
-      addCategory(formValues);
-    } else {
-      updateCategory(formEditingCategory.id, formValues);
+    if (savingRef.current) return;
+    savingRef.current = true;
+    setSaving(true);
+    try {
+      if (formIsNew) {
+        await addCategory(formValues);
+      } else {
+        await updateCategory(formEditingCategory.id, formValues);
+      }
+      closeForm();
+    } catch {
+      // The dialog raised by CategoriesContext is the user-facing feedback.
+    } finally {
+      savingRef.current = false;
+      setSaving(false);
     }
-
-    closeForm();
   }, [validateCategory, formValues, formIsNew, addCategory, updateCategory, formEditingCategory, closeForm, t]);
 
   const handleDelete = useCallback(() => {
@@ -146,9 +171,16 @@ const CategoriesScreen = ({ onBackStateChange }) => {
         {
           text: t('delete'),
           style: 'destructive',
-          onPress: () => {
-            deleteCategory(formEditingCategory.id);
-            closeForm();
+          onPress: async () => {
+            // deleteCategory rejects with CATEGORY_HAS_CHILDREN / CATEGORY_HAS_OPERATIONS
+            // on a routine user path, having already shown the specific reason. Keep the
+            // editor open in that case instead of sliding it away behind the dialog.
+            try {
+              await deleteCategory(formEditingCategory.id);
+              closeForm();
+            } catch {
+              // The dialog raised by CategoriesContext is the user-facing feedback.
+            }
           },
         },
       ],
@@ -305,9 +337,9 @@ const CategoriesScreen = ({ onBackStateChange }) => {
   const internalGoBack = useCallback(() => {
     if (iconPickerVisible) { setIconPickerVisible(false); return; }
     if (activePicker !== null) { handleClosePicker(); return; }
-    if (activePanel === 'form') { closeForm(); return; }
+    if (activePanel === 'form') { handleCancelForm(); return; }
     if (gridParentId !== null) { setGridParentId(null); return; }
-  }, [iconPickerVisible, activePicker, activePanel, gridParentId, handleClosePicker, closeForm]);
+  }, [iconPickerVisible, activePicker, activePanel, gridParentId, handleClosePicker, handleCancelForm]);
 
   useEffect(() => {
     onBackStateChange?.(internalCanGoBack ? internalGoBack : null);
@@ -372,7 +404,7 @@ const CategoriesScreen = ({ onBackStateChange }) => {
         >
           {/* Form header */}
           <View style={[styles.formPanelHeader, { borderBottomColor: colors.border }]}>
-            <TouchableOpacity onPress={closeForm} style={styles.formPanelBack} accessibilityRole="button" accessibilityLabel="Back">
+            <TouchableOpacity onPress={handleCancelForm} style={styles.formPanelBack} accessibilityRole="button" accessibilityLabel="Back">
               <Icon name="arrow-left" size={24} color={colors.text} />
             </TouchableOpacity>
             <Text style={[styles.formPanelTitle, { color: colors.text }]}>
@@ -478,15 +510,19 @@ const CategoriesScreen = ({ onBackStateChange }) => {
           {/* Form footer */}
           <View style={[styles.formPanelFooter, { borderTopColor: colors.border, paddingBottom: insets.bottom + 80 }]}>
             <TouchableRipple
-              onPress={closeForm}
-              style={[styles.formFooterBtn, { borderColor: colors.border }]}
+              onPress={saving ? undefined : handleCancelForm}
+              disabled={saving}
+              accessibilityState={{ disabled: saving }}
+              style={[styles.formFooterBtn, { borderColor: colors.border }, saving && styles.formFooterBtnDisabled]}
               borderless={false}
             >
               <Text style={themed.cancelButtonText}>{t('cancel') || 'Cancel'}</Text>
             </TouchableRipple>
             <TouchableRipple
-              onPress={handleSave}
-              style={[styles.formFooterBtn, styles.formFooterBtnPrimary, { backgroundColor: colors.primary }]}
+              onPress={saving ? undefined : handleSave}
+              disabled={saving}
+              accessibilityState={{ disabled: saving, busy: saving }}
+              style={[styles.formFooterBtn, styles.formFooterBtnPrimary, { backgroundColor: colors.primary }, saving && styles.formFooterBtnDisabled]}
               borderless={false}
             >
               <Text style={themed.saveButtonText}>{t('save') || 'Save'}</Text>
@@ -652,6 +688,9 @@ const styles = StyleSheet.create({
     flex: 1,
     height: 44,
     justifyContent: 'center',
+  },
+  formFooterBtnDisabled: {
+    opacity: 0.5,
   },
   formFooterBtnPrimary: {
     borderWidth: 0,

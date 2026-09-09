@@ -1,5 +1,5 @@
 import React, { useState, useEffect, useCallback, useMemo, memo, useRef } from 'react';
-import { View, Text, Pressable, StyleSheet } from 'react-native';
+import { View, Text, Pressable, StyleSheet, ActivityIndicator } from 'react-native';
 import Icon from '@expo/vector-icons/MaterialCommunityIcons';
 import PropTypes from 'prop-types';
 import { BORDER_RADIUS, FONT_SIZE, HEIGHTS, SPACING } from '../styles/designTokens';
@@ -163,7 +163,7 @@ CalcButton.propTypes = {
  * - Shows "=" button when expression contains operations
  * - Evaluates expression and replaces with result
  */
-export default function Calculator({ value = '', onValueChange = () => {}, colors, placeholder = '0', onAdd = null, containerBackground = null, compact = false, currencyCode, onCurrencyPress, flashError = false }) {
+export default function Calculator({ value = '', onValueChange = () => {}, colors, placeholder = '0', onAdd = null, addDisabled = false, containerBackground = null, compact = false, currencyCode, onCurrencyPress, flashError = false }) {
   const [expression, setExpression] = useState(value || '');
   const syncedFromPropRef = useRef(false);
 
@@ -450,12 +450,22 @@ export default function Calculator({ value = '', onValueChange = () => {}, color
                 styles.button,
                 sharedButtonStyle,
                 { backgroundColor: colors.selected },
+                addDisabled && styles.buttonDisabled,
               ]}
-              onPress={() => onAdd()}
+              // While a save is in flight the press is dropped here as well as in the
+              // handler, so the button also *looks* unavailable instead of silently
+              // swallowing taps.
+              onPress={addDisabled ? undefined : () => onAdd()}
+              disabled={addDisabled}
               accessibilityRole="button"
               accessibilityLabel="add"
+              accessibilityState={{ disabled: addDisabled, busy: addDisabled }}
             >
-              <Icon name="check" size={24} color={colors.text} />
+              {addDisabled ? (
+                <ActivityIndicator size="small" color={colors.text} />
+              ) : (
+                <Icon name="check" size={24} color={colors.text} />
+              )}
             </Pressable>
           ) : (
             <View style={styles.emptySpace} />
@@ -474,6 +484,7 @@ Calculator.propTypes = {
   colors: PropTypes.object.isRequired,
   placeholder: PropTypes.string,
   onAdd: PropTypes.func,
+  addDisabled: PropTypes.bool,
   containerBackground: PropTypes.oneOfType([PropTypes.string, PropTypes.object]),
   compact: PropTypes.bool,
   currencyCode: PropTypes.string,
@@ -493,6 +504,9 @@ const styles = StyleSheet.create({
     shadowOffset: { width: 0, height: 1 },
     shadowOpacity: 0.1,
     shadowRadius: 2,
+  },
+  buttonDisabled: {
+    opacity: 0.5,
   },
   buttonText: {
     fontSize: FONT_SIZE.base,

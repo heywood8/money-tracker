@@ -49,6 +49,9 @@ const useOperationForm = ({
   });
   const [errors, setErrors] = useState({});
   const [showDatePicker, setShowDatePicker] = useState(false);
+  // True while handleSave is in flight — see the guard in handleSave.
+  const [isSaving, setIsSaving] = useState(false);
+  const savingRef = useRef(false);
   const [lastEditedField, setLastEditedField] = useState(null);
   const [rateSource, setRateSource] = useState('offline');
 
@@ -501,6 +504,10 @@ const useOperationForm = ({
 
   // Save operation (add or update)
   const handleSave = useCallback(async (overrides = {}) => {
+    // A second tap on Save while the DB write is still pending used to book the
+    // operation twice. The ref flips synchronously, so two taps in the same frame
+    // cannot both get through; `isSaving` only drives the button's disabled state.
+    if (savingRef.current) return;
     // `overrides` lets the caller inject values committed synchronously at save
     // time (e.g. a half-typed label flushed from LabelInput) that the async
     // setValues from onChangeText would not yet have applied to `values`.
@@ -537,18 +544,29 @@ const useOperationForm = ({
     // Pass the evaluated amount to prepareOperationData
     const operationData = prepareOperationData(finalAmount, overrides);
 
-    if (isNew) {
-      await addOperation(operationData);
-    } else {
-      await updateOperation(operation.id, operationData);
-    }
+    savingRef.current = true;
+    setIsSaving(true);
+    try {
+      if (isNew) {
+        await addOperation(operationData);
+      } else {
+        await updateOperation(operation.id, operationData);
+      }
 
-    // Save last accessed account
-    if (operationData.accountId) {
-      setLastAccessedAccount(operationData.accountId);
-    }
+      // Save last accessed account
+      if (operationData.accountId) {
+        setLastAccessedAccount(operationData.accountId);
+      }
 
-    onClose();
+      onClose();
+    } catch {
+      // addOperation/updateOperation already surface the reason via dialog. Swallow
+      // the rejection here so it is not an unhandled promise rejection, and leave the
+      // modal open with everything the user typed.
+    } finally {
+      savingRef.current = false;
+      setIsSaving(false);
+    }
   }, [values, validateFields, prepareOperationData, isNew, addOperation, updateOperation, operation, onClose, validateOperation, showDialog, t, isForeignCurrencyOp, sourceAccount]);
 
   // Close modal
@@ -685,6 +703,7 @@ const useOperationForm = ({
     setRateSource,
 
     // Handlers
+    isSaving,
     handleSave,
     handleClose,
     handleDelete,

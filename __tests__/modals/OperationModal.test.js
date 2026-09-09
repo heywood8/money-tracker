@@ -447,6 +447,25 @@ describe('OperationModal', () => {
 
       expect(mockHandleSave).toHaveBeenCalled();
     });
+
+    // Issue #1699: a second tap while the write was pending booked the operation twice.
+    it('disables save while a save is in flight', async () => {
+      const mockHandleSave = jest.fn();
+      const useOperationForm = require('../../app/hooks/useOperationForm');
+      useOperationForm.mockReturnValue({
+        ...useOperationForm(),
+        isSaving: true,
+        handleSave: mockHandleSave,
+      });
+
+      const { getByText } = await render(
+        <OperationModal visible={true} onClose={mockOnClose} isNew={true} />,
+      );
+
+      await fireEvent.press(getByText('save'));
+
+      expect(mockHandleSave).not.toHaveBeenCalled();
+    });
   });
 
   describe('Delete Operation', () => {

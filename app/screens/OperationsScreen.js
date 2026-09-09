@@ -163,6 +163,11 @@ const OperationsScreen = () => {
   // attempt so re-omitting the same field re-triggers the red flash.
   const [quickAddFlash, setQuickAddFlash] = useState(null);
   const quickAddFlashTokenRef = useRef(0);
+  // True while a quick-add save is in flight. The ref is the actual guard (it flips
+  // synchronously, so two taps in the same frame cannot both get through); the state
+  // only drives the button's disabled/busy appearance.
+  const quickAddSavingRef = useRef(false);
+  const [quickAddSaving, setQuickAddSaving] = useState(false);
 
   const { searchMode, filtersExpanded, openSearch, closeSearch, reopenSearch, toggleFilters } = useSearch();
   const isSearchOpen = searchMode === 'open';
@@ -804,7 +809,7 @@ const OperationsScreen = () => {
   }, [groupedOperations, jumpToDate]);
 
   // Quick add handlers
-  const handleQuickAdd = useCallback(async (overrideCategoryId, overrideToAccountId) => {
+  const performQuickAdd = useCallback(async (overrideCategoryId, overrideToAccountId) => {
     // Automatically evaluate any pending math operation before saving
     let finalAmount = quickAddValues.amount;
 
@@ -1001,6 +1006,22 @@ const OperationsScreen = () => {
       // Errors from getDistinctLabels are non-critical — suggestion row simply won't appear.
     }
   }, [quickAddValues, validateOperation, addOperation, t, showDialog, accounts, resetForm, lastEditedField, getQuickAddLocation]);
+
+  // A second tap on Add while the first save is still pending used to book the same
+  // operation twice — the DB write is async, and a cross-currency entry awaits a live
+  // exchange-rate fetch before it even reaches the write. Guard every entry point
+  // (the Add button and both auto-add shortcuts route through here).
+  const handleQuickAdd = useCallback(async (overrideCategoryId, overrideToAccountId) => {
+    if (quickAddSavingRef.current) return;
+    quickAddSavingRef.current = true;
+    setQuickAddSaving(true);
+    try {
+      await performQuickAdd(overrideCategoryId, overrideToAccountId);
+    } finally {
+      quickAddSavingRef.current = false;
+      setQuickAddSaving(false);
+    }
+  }, [performQuickAdd]);
 
   // Handler for auto-add with category (from picker)
   const handleAutoAddWithCategory = useCallback(async (categoryId) => {
@@ -1281,6 +1302,7 @@ const OperationsScreen = () => {
                 foreignRateSource={foreignRateSource}
                 foreignExchangeRate={foreignExchangeRate}
                 flashError={quickAddFlash}
+                saving={quickAddSaving}
               />
             </View>
             {hasSuggestions && (
@@ -1303,7 +1325,7 @@ const OperationsScreen = () => {
       </Animated.View>
       {filtersExpanded && filterPanelHeight > 0 && <View style={{ height: filterPanelHeight }} />}
     </>
-  ), [animatedQuickAddClipStyle, animatedQuickAddSlideStyle, handleQuickAddClipLayout, quickAddCollapsed, colors, t, quickAddValues, visibleAccounts, filteredCategories, topCategoriesForType, getCategoryInfo, getAccountName, getAccountBalance, getCategoryName, openPicker, handleQuickAdd, handleAmountChange, handleExchangeRateChange, handleDestinationAmountChange, handleAutoAddWithCategory, topTransferAccountsForForm, handleAutoAddWithAccount, TYPES, rateSource, handleOperationCurrencyChange, foreignRateSource, foreignExchangeRate, filterPanelHeight, filtersExpanded, quickAddFlash, operationSuggestions, hasSuggestions, quickAddHeight, handleQuickAddLayout, handleDeckHostLayout, accounts, categories, suggestionSaveErrors, suggestionChoices, setSuggestionChoice, acceptSuggestion, dismissSuggestion]);
+  ), [animatedQuickAddClipStyle, animatedQuickAddSlideStyle, handleQuickAddClipLayout, quickAddCollapsed, colors, t, quickAddValues, visibleAccounts, filteredCategories, topCategoriesForType, getCategoryInfo, getAccountName, getAccountBalance, getCategoryName, openPicker, handleQuickAdd, handleAmountChange, handleExchangeRateChange, handleDestinationAmountChange, handleAutoAddWithCategory, topTransferAccountsForForm, handleAutoAddWithAccount, TYPES, rateSource, handleOperationCurrencyChange, foreignRateSource, foreignExchangeRate, filterPanelHeight, filtersExpanded, quickAddFlash, quickAddSaving, operationSuggestions, hasSuggestions, quickAddHeight, handleQuickAddLayout, handleDeckHostLayout, accounts, categories, suggestionSaveErrors, suggestionChoices, setSuggestionChoice, acceptSuggestion, dismissSuggestion]);
 
   // Auto-scroll to top when filter panel closes, but only if the user is still
   // near the top (hasn't scrolled into past dates). The threshold is filterPanelHeight:
