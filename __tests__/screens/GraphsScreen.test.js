@@ -38,6 +38,12 @@ jest.mock('../../app/contexts/AccountsDataContext', () => ({
   })),
 }));
 
+jest.mock('../../app/contexts/CategoriesContext', () => ({
+  useCategories: jest.fn(() => ({
+    categories: [],
+  })),
+}));
+
 jest.mock('../../app/contexts/DisplaySettingsContext', () => ({
   useDisplaySettings: jest.fn(() => ({
     hideBalances: false,
@@ -48,10 +54,6 @@ jest.mock('../../app/services/OperationsDB', () => ({
   getSpendingByCategoryAndCurrency: jest.fn(() => Promise.resolve([])),
   getIncomeByCategoryAndCurrency: jest.fn(() => Promise.resolve([])),
   getUnconvertibleCurrencies: jest.fn(() => Promise.resolve([])),
-}));
-
-jest.mock('../../app/services/CategoriesDB', () => ({
-  getAllCategories: jest.fn(() => Promise.resolve([])),
 }));
 
 jest.mock('../../app/components/SimplePicker', () => {
@@ -137,14 +139,13 @@ describe('GraphsScreen', () => {
       expect(true).toBe(true);
     });
 
-    it('fetches categories from CategoriesDB', async () => {
+    it('reads categories from CategoriesContext', async () => {
       const GraphsScreen = require('../../app/screens/GraphsScreen').default;
-      const { getAllCategories } = require('../../app/services/CategoriesDB');
+      const { useCategories } = require('../../app/contexts/CategoriesContext');
 
       await render(<GraphsScreen />);
 
-      // Component should call database service to fetch categories
-      expect(true).toBe(true);
+      expect(useCategories).toHaveBeenCalled();
     });
   });
 
@@ -475,18 +476,49 @@ describe('GraphsScreen', () => {
       await render(<GraphsScreen />);
     });
 
-    it('loads categories from database', async () => {
+    it('uses categories from CategoriesContext', async () => {
       const GraphsScreen = require('../../app/screens/GraphsScreen').default;
-      const { getAllCategories } = require('../../app/services/CategoriesDB');
-
-      const mockCategories = [
-        { id: 'cat-1', name: 'Food', type: 'expense' },
-        { id: 'cat-2', name: 'Salary', type: 'income' },
-      ];
-
-      getAllCategories.mockResolvedValue(mockCategories);
+      const { useCategories } = require('../../app/contexts/CategoriesContext');
 
       await render(<GraphsScreen />);
+      expect(useCategories).toHaveBeenCalled();
+    });
+
+    it('refreshes the expense legend when a category is renamed in context', async () => {
+      const GraphsScreen = require('../../app/screens/GraphsScreen').default;
+      const { useCategories } = require('../../app/contexts/CategoriesContext');
+      const { useAccountsData } = require('../../app/contexts/AccountsDataContext');
+      const { getSpendingByCategoryAndCurrency } = require('../../app/services/OperationsDB');
+
+      const account = { id: 'account-1', name: 'Cash', currency: 'USD', balance: '0', displayOrder: 0 };
+      const category = {
+        id: 'cat-1',
+        name: 'Food',
+        categoryType: 'expense',
+        parentId: null,
+        isShadow: false,
+        createdAt: '2026-01-01T00:00:00.000Z',
+      };
+
+      useAccountsData.mockReturnValue({ accounts: [account] });
+      useCategories.mockReturnValue({ categories: [category] });
+      getSpendingByCategoryAndCurrency.mockResolvedValue([
+        { category_id: category.id, total: '42.00' },
+      ]);
+
+      const screen = await render(<GraphsScreen />);
+      await act(async () => { fireEvent.press(screen.getByTestId('expense-summary-card')); });
+      expect(await screen.findByText('Food')).toBeTruthy();
+
+      useCategories.mockReturnValue({
+        categories: [{ ...category, name: 'Groceries' }],
+      });
+      await screen.rerender(<GraphsScreen />);
+
+      await waitFor(() => {
+        expect(screen.getByText('Groceries')).toBeTruthy();
+        expect(screen.queryByText('Food')).toBeNull();
+      });
     });
   });
 

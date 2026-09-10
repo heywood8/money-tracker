@@ -6,10 +6,9 @@ import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { useThemeColors } from '../contexts/ThemeColorsContext';
 import { useLocalization } from '../contexts/LocalizationContext';
 import { useAccountsData } from '../contexts/AccountsDataContext';
+import { useCategories } from '../contexts/CategoriesContext';
 import { BORDER_RADIUS, FONT_SIZE, SPACING, TAB_BAR_CLEARANCE, TOP_CONTENT_SPACING } from '../styles/designTokens';
 import { getUnconvertibleCurrencies } from '../services/OperationsDB';
-import { getAllCategories } from '../services/CategoriesDB';
-import { appEvents, EVENTS } from '../services/eventEmitter';
 import { formatAmount } from '../services/currency';
 import currenciesJson from '../../assets/currencies.json';
 import EmptyState from '../components/EmptyState';
@@ -57,6 +56,7 @@ const GraphsScreen = () => {
   const insets = useSafeAreaInsets();
   const { t, language } = useLocalization();
   const { accounts } = useAccountsData();
+  const { categories } = useCategories();
 
   // The screen is scoped to one period by the ‹ Period › header, which is the
   // Budgets tab's month header with one addition: a period here may be a whole
@@ -85,9 +85,6 @@ const GraphsScreen = () => {
   const [unconvertedCurrencies, setUnconvertedCurrencies] = useState([]);
   const [selectedCategory, setSelectedCategory] = useState('all');
   const [selectedIncomeCategory, setSelectedIncomeCategory] = useState('all');
-  const [categories, setCategories] = useState([]);
-  const [topLevelCategories, setTopLevelCategories] = useState([]);
-  const [topLevelIncomeCategories, setTopLevelIncomeCategories] = useState([]);
   // null lets the trends card fall back to its own default pair (income vs
   // expenses). Lifted so the pick survives the card unmounting with the panel.
   const [trendSeries, setTrendSeries] = useState(null);
@@ -255,56 +252,15 @@ const GraphsScreen = () => {
     }
   }, [accounts, selectedAccount, netWorthAvailable]);
 
-  // Load categories function
-  const loadCategories = useCallback(async () => {
-    try {
-      const cats = await getAllCategories(true); // Include shadow categories
-      setCategories(cats);
-
-      // Filter top-level expense categories (no parent, expense type, not shadow)
-      const topLevel = cats.filter(cat =>
-        cat.parentId === null && cat.categoryType === 'expense' && !cat.isShadow,
-      );
-      setTopLevelCategories(topLevel);
-
-      // Filter top-level income categories (no parent, income type)
-      const topLevelIncome = cats.filter(cat =>
-        cat.parentId === null && cat.categoryType === 'income',
-      );
-      setTopLevelIncomeCategories(topLevelIncome);
-    } catch (error) {
-      console.error('Failed to load categories:', error);
-    }
-  }, []);
-
-  // Load categories on mount
+  // Categories are owned by CategoriesContext so edits made in Settings reach
+  // the graph's chart data and legend immediately, without waiting for a
+  // RELOAD_ALL event or remounting the screen.
   useEffect(() => {
-    loadCategories();
-  }, [loadCategories]);
-
-  // Listen for DATABASE_RESET event to clear data
-  useEffect(() => {
-    const unsubscribe = appEvents.on(EVENTS.DATABASE_RESET, () => {
-      console.log('GraphsScreen: Database reset detected, clearing data');
-      setCategories([]);
-      setTopLevelCategories([]);
-      setTopLevelIncomeCategories([]);
+    if (categories.length === 0) {
       setSelectedCategory('all');
       setSelectedIncomeCategory('all');
-    });
-
-    return unsubscribe;
-  }, []);
-
-  // Listen for RELOAD_ALL event to reload data
-  useEffect(() => {
-    const unsubscribe = appEvents.on(EVENTS.RELOAD_ALL, () => {
-      console.log('GraphsScreen: Reloading data due to RELOAD_ALL event');
-      loadCategories();
-    });
-
-    return unsubscribe;
-  }, [loadCategories]);
+    }
+  }, [categories.length]);
 
   // Reload data when filters change
   useEffect(() => {
