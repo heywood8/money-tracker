@@ -14,6 +14,7 @@ import * as Currency from './currency';
 import { calculateSpendingForFilters, expandCategoryIds, deriveSpendingStatus } from './BudgetsDB';
 import { formatDate as formatLocalDate } from './BalanceHistoryDB';
 import { normalizeLabel, matchesAnyLabel } from '../utils/labelUtils';
+import { sumMoneySql } from './sqlMoney';
 import {
   fetchRatesToTarget,
   convertWithRateMap,
@@ -2136,7 +2137,7 @@ export const calculateActualIncome = async (month, displayCurrency, convertAll) 
 
     if (convertAll) {
       const rows = await queryAll(
-        `SELECT a.currency as currency, SUM(CAST(o.amount AS REAL)) as total
+        `SELECT a.currency as currency, ${sumMoneySql()} as total
          FROM operations o
          JOIN accounts a ON o.account_id = a.id
          WHERE o.type = 'income'
@@ -2158,7 +2159,7 @@ export const calculateActualIncome = async (month, displayCurrency, convertAll) 
     }
 
     const result = await queryFirst(
-      `SELECT SUM(CAST(o.amount AS REAL)) as total
+      `SELECT ${sumMoneySql()} as total
        FROM operations o
        JOIN accounts a ON o.account_id = a.id
        WHERE o.type = 'income'
@@ -2639,6 +2640,23 @@ const hasLineCategoriesTable = async (db) => {
  * @param {string|null} categoryId
  * @returns {Promise<void>}
  */
+/**
+ * The id a bridged line gets, derived from the row it mirrors.
+ *
+ * The bridges below run as post-migration handlers, and a handler that is killed
+ * after k of N inserts leaves its completion flag unset, so
+ * `retryIncompletePostMigrationHandlers` runs it again on the next launch. With
+ * a fresh `uuid.v4()` per row that re-run inserted k duplicates and the user's
+ * allocated total doubled. Deriving the id from the source row instead makes the
+ * insert collide with its own earlier copy, which `INSERT OR IGNORE` then drops:
+ * the bridge is idempotent per row, not just per completed run.
+ *
+ * @param {string} kind - Source table shorthand ('budget' | 'planned' | 'income')
+ * @param {string|number} sourceId - Primary key of the row being mirrored
+ * @returns {string}
+ */
+const bridgedLineId = (kind, sourceId) => `legacy-${kind}-${sourceId}`;
+
 const linkBridgedLineCategory = async (db, junctionExists, lineId, categoryId) => {
   if (!junctionExists || !isSet(categoryId)) return;
   await db.runAsync(
@@ -2707,9 +2725,9 @@ export const migrateLegacyBudgetsToRecurringLines = async (db) => {
 
   for (const budget of budgetRows || []) {
     const monthlyAmount = convertBudgetAmountToMonthly(budget.amount, budget.period_type, budget.currency);
-    const lineId = uuid.v4();
+    const lineId = bridgedLineId('budget', budget.id);
     await db.runAsync(
-      'INSERT INTO budget_plan_lines (id, plan_id, label, amount, comment, category_id, to_account_id, sort_order, is_recurring, currency, created_at, updated_at) VALUES (?, NULL, NULL, ?, NULL, ?, NULL, 0, 1, ?, ?, ?)',
+      'INSERT OR IGNORE INTO budget_plan_lines (id, plan_id, label, amount, comment, category_id, to_account_id, sort_order, is_recurring, currency, created_at, updated_at) VALUES (?, NULL, NULL, ?, NULL, ?, NULL, 0, 1, ?, ?, ?)',
       [lineId, monthlyAmount, budget.category_id, budget.currency, now, now],
     );
     await linkBridgedLineCategory(db, junctionExists, lineId, budget.category_id);
@@ -2733,7 +2751,7 @@ export const migrateLegacyBudgetsToRecurringLines = async (db) => {
 // BackupRestore.js reuses it.
 export const PLANNED_MIGRATION_FLAG_KEY = 'post_migration_m0020_completed';
 
-const INSERT_LINE_SQL = 'INSERT INTO budget_plan_lines (id, plan_id, label, amount, comment, category_id, to_account_id, sort_order, is_recurring, currency, kind, account_id, last_executed_month, created_at, updated_at) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)';
+const INSERT_LINE_SQL = 'INSERT OR IGNORE INTO budget_plan_lines (id, plan_id, label, amount, comment, category_id, to_account_id, sort_order, is_recurring, currency, kind, account_id, last_executed_month, created_at, updated_at) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)';
 
 /**
  * Plan id for `month`, creating an empty plan when the month has none. Used by
@@ -2816,7 +2834,7 @@ export const migratePlannedOperationsToLines = async (db) => {
       if (!Currency.isValid(amount) || Currency.compare(amount, '0') <= 0) continue;
       await db.runAsync(
         INSERT_LINE_SQL,
-        [uuid.v4(), plan.id, null, String(amount), null, null, null, 0, 0, null, 'income', null, null, now, now],
+        [bridgedLineId('income', plan.id), plan.id, null, String(amount), null, null, null, 0, 0, null, 'income', null, null, now, now],
       );
       migratedIncome++;
     }
@@ -2839,7 +2857,7 @@ export const migratePlannedOperationsToLines = async (db) => {
       planId = currentPlanId;
     }
 
-    const lineId = uuid.v4();
+    const lineId = bridgedLineId('planned', op.id);
     const lineCategoryId = kind === 'transfer' ? null : (op.category_id ?? null);
     await db.runAsync(
       INSERT_LINE_SQL,

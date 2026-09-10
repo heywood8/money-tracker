@@ -1903,10 +1903,14 @@ const importBackupSQLite = async (fileUri, cancelToken) => {
       console.log('No migrations table found - database will be migrated from scratch');
     }
 
+    // A migration that aborts throws, and the import must stop right there: the
+    // newer tables would be missing, every optional-table read below would log
+    // "older backup format" and yield [], and restoreBackup would then wipe the
+    // user's live plan lines and rewrite them empty.
     await applyPendingMigrations(tempDb, migrationsData);
 
     // Log which migrations were applied
-    const finalMigrations = await tempDb.getAllAsync('SELECT * FROM __drizzle_migrations ORDER BY created_at ASC');
+    const finalMigrations = await tempDb.getAllAsync('SELECT * FROM __drizzle_migrations ORDER BY created_at ASC').catch(() => []);
     console.log('Migrations after running applyPendingMigrations:', (finalMigrations || []).map(m => `${m.hash?.substring(0, 40)}...`).join(', '));
     console.log(`Total migrations applied: ${(finalMigrations || []).length}/${migrationsData.journal.entries.length}`);
 

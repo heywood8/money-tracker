@@ -194,9 +194,10 @@ const isSchemaComplete = async (rawDb) => {
     if (!opsCols.some(c => c.name === 'original_balance')) return false;
 
     // Check operations has BOTH latitude and longitude (migration 0009). Both are
-    // checked because applyPendingMigrations runs each ADD COLUMN as a separate
-    // statement and continues on failure — a half-applied 0009 (latitude added,
-    // longitude not) must not be mistaken for complete, or every INSERT would throw.
+    // checked because a database can still carry a half-applied 0009 (latitude
+    // added, longitude not): migrations only became atomic later, so anything
+    // migrated by the older runner may sit in that state. It must not be
+    // mistaken for complete, or every INSERT would throw.
     if (!opsCols.some(c => c.name === 'latitude') || !opsCols.some(c => c.name === 'longitude')) return false;
 
     // Check operations has integer account_id (migration 0002)
@@ -289,8 +290,8 @@ const isSchemaComplete = async (rawDb) => {
 
     // Check budget_plan_lines has ALL THREE executable-template columns
     // (migration 0020: kind, account_id, last_executed_month). All three are
-    // checked for the same reason as operations' 0009 columns: each is a separate
-    // ADD COLUMN statement and applyPendingMigrations continues on failure, so a
+    // checked for the same reason as operations' 0009 columns: a database
+    // migrated by the older, non-atomic runner can sit half-applied, and a
     // half-applied 0020 must not read as complete. Without this check, an install
     // complete through 0019 would skip migrate() and every plan-line query would
     // throw `no such column: kind`.
@@ -300,18 +301,17 @@ const isSchemaComplete = async (rawDb) => {
 
     // Check budget_plan_lines has include_children (migration 0021). The
     // accompanying budget_plan_line_categories table is covered by the
-    // expectedTables check above, but the column is a separate ADD COLUMN
-    // statement and applyPendingMigrations continues on failure — so a 0021 that
-    // created the table and failed the ALTER must not read as complete, or every
-    // line query would throw `no such column: include_children`.
+    // expectedTables check above, but a database migrated by the older,
+    // non-atomic runner can carry a 0021 that created the table and failed the
+    // ALTER; that must not read as complete, or every line query would throw
+    // `no such column: include_children`.
     if (!planLineCols.some(c => c.name === 'include_children')) return false;
 
     // Check budget_plan_lines has group_id (migration 0022). The accompanying
     // budget_plan_line_groups table is covered by the expectedTables check above,
-    // but the column is a separate ADD COLUMN statement and
-    // applyPendingMigrations continues on failure — so a 0022 that created the
-    // table and failed the ALTER must not read as complete, or every line query
-    // would throw `no such column: group_id`.
+    // but a database migrated by the older, non-atomic runner can carry a 0022
+    // that created the table and failed the ALTER; that must not read as
+    // complete, or every line query would throw `no such column: group_id`.
     if (!planLineCols.some(c => c.name === 'group_id')) return false;
 
     // Check operations has exclude_from_charts column (migration 0023). Same
@@ -339,10 +339,9 @@ const isSchemaComplete = async (rawDb) => {
 
     // Migration 0029: creates dismissed_notifications (the rejection log that
     // stops a dismissed bank notification from being re-queued). The table is
-    // covered by the expectedTables check above, but its unique fingerprint index
-    // is a separate statement and applyPendingMigrations continues on failure —
-    // so a half-applied 0029 (table created, index not) must not read as
-    // complete. It would otherwise stamp the fast-path fingerprint and lock in a
+    // covered by the expectedTables check above, but a database migrated by the
+    // older, non-atomic runner can carry a half-applied 0029 (table created,
+    // index not), and that must not read as complete. It would otherwise stamp the fast-path fingerprint and lock in a
     // schema where every dismissal throws `ON CONFLICT clause does not match any
     // PRIMARY KEY or UNIQUE constraint`, leaving the feature silently inert.
     const dismissedIndex = await rawDb.getFirstAsync(
@@ -352,8 +351,8 @@ const isSchemaComplete = async (rawDb) => {
 
     // Check budget_plan_lines has BOTH effective_from and effective_to
     // (migration 0026 — the recurring line's effective month range). Both are
-    // checked for the same reason as operations' 0009 columns: each is a separate
-    // ADD COLUMN and applyPendingMigrations continues on failure, so a
+    // checked for the same reason as operations' 0009 columns: a database
+    // migrated by the older, non-atomic runner can sit half-applied, and a
     // half-applied 0026 must not read as complete. Without this check, an install
     // complete through 0025 would skip migrate() and every line query would throw
     // `no such column: effective_from`.
@@ -457,25 +456,132 @@ export const applyPendingMigrations = async (rawDb, migrationsConfig) => {
     // Split on Drizzle's statement breakpoint marker (same logic as Drizzle internals)
     const statements = rawSql.split('--> statement-breakpoint').map(s => s.trim()).filter(Boolean);
 
-    console.log(`[DB] Applying migration ${tag} (${statements.length} statements)`);
-
-    for (const stmt of statements) {
-      try {
-        await rawDb.execAsync(stmt);
-      } catch (stmtErr) {
-        // Some statements may fail if partially applied (e.g. column already exists)
-        // Log but continue — detectAppliedMigrations already confirmed the migration
-        // as NOT applied, so most statements should succeed.
-        console.warn(`[DB] Statement in ${tag} failed (continuing): ${stmtErr.message}`);
-        console.warn(`[DB] Failed SQL: ${stmt.substring(0, 120)}...`);
-      }
-    }
-
-    console.log(`[DB] Migration ${tag} applied successfully`);
+    // Stop at the first failure rather than pressing on. Every later migration is
+    // written against the schema this one was supposed to produce, so running
+    // them would pile failures on failures — and syncMigrationRecords below
+    // would then stamp the whole journal as applied, locking the broken state
+    // in. Throwing (rather than returning quietly) is what lets a caller that
+    // must not proceed on a half-migrated database — importBackupSQLite, which
+    // would otherwise read the missing tables as "older backup format" and
+    // restore empty ones over the user's live data — abort instead.
+    await applyOneMigration(rawDb, tag, statements);
   }
 
   // Rebuild __drizzle_migrations to reflect all migrations as applied
   await syncMigrationRecords(rawDb, migrationsConfig);
+};
+
+/**
+ * A statement whose failure means "this step is already in place".
+ *
+ * Databases left half-migrated by an older build of the app (migrations used to
+ * run statement-by-statement outside any transaction, continuing past failures)
+ * can carry a column or index a pending migration is about to add. Aborting on
+ * that would strand those installs forever, so those two stay skippable.
+ *
+ * A pre-existing *table* deliberately does NOT qualify. Skipping a failed
+ * `CREATE TABLE __new_operations` would leave the leftover table in place and
+ * the following `INSERT INTO __new_operations SELECT … FROM operations` would
+ * append a second full copy of every row (the id is AUTOINCREMENT, so nothing
+ * collides) before the migration renamed it into place — silently doubling the
+ * user's operations. {@link dropStaleRebuildTables} clears that leftover before
+ * the migration runs instead, so the CREATE genuinely succeeds.
+ */
+const isAlreadyAppliedError = (message = '') =>
+  /duplicate column name|index .* already exists/i.test(message);
+
+/**
+ * Drop scratch tables left behind by an interrupted table-rebuild migration.
+ *
+ * `__new_*` tables exist only for the span of a rebuild migration (`0002`,
+ * `0019`): the migration creates one, copies into it, and renames it over the
+ * original. One surviving on disk therefore means a previous run died partway —
+ * only possible under the old non-transactional runner, since a rebuild is now
+ * atomic — and its rows are a partial copy nothing should ever read. Clearing
+ * them is what lets the retry start from a clean slate.
+ */
+const dropStaleRebuildTables = async (rawDb, statements) => {
+  const creates = statements.join('\n').match(/CREATE TABLE\s+`?(__new_\w+)`?/gi) || [];
+  for (const match of creates) {
+    const name = match.replace(/CREATE TABLE\s+`?/i, '').replace(/`$/, '');
+    const existing = await rawDb.getAllAsync(
+      "SELECT name FROM sqlite_master WHERE type='table' AND name=?",
+      [name],
+    ).catch(() => []);
+    if (existing && existing.length > 0) {
+      console.warn(`[DB] Dropping stale rebuild table ${name} left by an interrupted migration`);
+      await rawDb.execAsync(`DROP TABLE IF EXISTS \`${name}\``);
+    }
+  }
+};
+
+/**
+ * A statement that must not run inside a transaction.
+ *
+ * `PRAGMA foreign_keys` is a no-op inside one (as migration 0007 notes), and the
+ * recreate-table migrations depend on it actually taking effect while they swap
+ * a table out, so the PRAGMAs are hoisted around the transaction instead.
+ */
+const isPragmaStatement = (stmt) => /^\s*PRAGMA\b/i.test(stmt);
+
+/**
+ * Apply one migration atomically.
+ *
+ * The statements run inside a single transaction, so a migration either lands
+ * whole or not at all. That is what makes the recreate-table migrations safe:
+ * `0002` and `0019` copy rows into a `__new_*` table and then unconditionally
+ * `DROP TABLE operations; DROP TABLE accounts;`. Before this, a copy that failed
+ * (a UNIQUE clash in `0002`'s `(name, created_at)` account mapping, `SQLITE_FULL`,
+ * anything) still ran the DROP and took the user's data with it. Now the failed
+ * copy rolls the DROP back with it.
+ *
+ * @param {Object} rawDb - Raw SQLite instance
+ * @param {string} tag - Migration tag, for logs
+ * @param {Array<string>} statements - Statements, already split on breakpoints
+ * @throws {Error} When the migration could not be applied; the schema is
+ *   unchanged, so the caller must not treat the database as migrated.
+ */
+const applyOneMigration = async (rawDb, tag, statements) => {
+  const pragmas = statements.filter(isPragmaStatement);
+  const body = statements.filter(stmt => !isPragmaStatement(stmt));
+
+  console.log(`[DB] Applying migration ${tag} (${body.length} statements)`);
+
+  await dropStaleRebuildTables(rawDb, body);
+
+  // Foreign keys off BEFORE the transaction opens, for the reason above. Only
+  // the OFF direction is honoured here; ON is restored in the finally below so
+  // an aborted migration cannot leave enforcement disabled.
+  const disablesForeignKeys = pragmas.some(p => /foreign_keys\s*=\s*OFF/i.test(p));
+  try {
+    if (disablesForeignKeys) {
+      await rawDb.execAsync('PRAGMA foreign_keys=OFF');
+    }
+
+    await rawDb.withTransactionAsync(async () => {
+      for (const stmt of body) {
+        try {
+          await rawDb.execAsync(stmt);
+        } catch (stmtErr) {
+          if (isAlreadyAppliedError(stmtErr.message)) {
+            console.warn(`[DB] Statement in ${tag} already applied, skipping: ${stmtErr.message}`);
+            continue;
+          }
+          console.error(`[DB] Failed SQL: ${stmt.substring(0, 200)}`);
+          throw new Error(`Migration ${tag} failed: ${stmtErr.message}`, { cause: stmtErr });
+        }
+      }
+    });
+  } catch (migrationErr) {
+    console.error(`[DB] ${migrationErr.message} — rolled back, schema left untouched`);
+    throw migrationErr;
+  } finally {
+    if (disablesForeignKeys) {
+      await rawDb.execAsync('PRAGMA foreign_keys=ON').catch(() => {});
+    }
+  }
+
+  console.log(`[DB] Migration ${tag} applied successfully`);
 };
 
 /**
@@ -998,7 +1104,18 @@ const initializeDatabase = async (rawDb, db) => {
       // it computes folderMillis via formatToMillis() on keys like "m0000" → NaN,
       // so the comparison `Number(created_at) < NaN` is always false, meaning
       // pending migrations are never executed when any records exist.
-      await applyPendingMigrations(rawDb, migrations);
+      try {
+        await applyPendingMigrations(rawDb, migrations);
+      } catch (migrationErr) {
+        // A migration aborted and rolled itself back, so the schema sits at the
+        // last one that landed. Swallowing this here (rather than failing the
+        // whole init) keeps the existing self-heal: the isSchemaComplete check
+        // below finds the schema incomplete, declines to stamp the fast-path
+        // fingerprint, and the next launch retries from exactly this point.
+        // A caller that must not run against a half-migrated database sees the
+        // throw instead — see applyPendingMigrations.
+        console.error(`[DB] Migrations halted: ${migrationErr.message}`);
+      }
 
       // Log final state
       const finalMigrations = await rawDb.getAllAsync('SELECT * FROM __drizzle_migrations ORDER BY created_at ASC').catch(() => []);
@@ -1018,9 +1135,10 @@ const initializeDatabase = async (rawDb, db) => {
     await rawDb.runAsync('PRAGMA journal_mode = WAL');
 
     // Stamp the schema fingerprint ONLY if the schema is actually complete.
-    // applyPendingMigrations() swallows per-statement errors and does not throw
-    // (an ADD COLUMN can fail transiently on a locked DB / disk pressure), so
-    // "init did not throw" is NOT proof the schema is whole. Verifying
+    // A migration that aborts rolls itself back and halts the run, and init
+    // deliberately swallows that so the next launch can retry — so "init did not
+    // throw" is NOT proof the schema is whole. Neither is a clean run against a
+    // database the older, non-atomic runner already left half-applied. Verifying
     // completeness here means a half-applied migration leaves user_version
     // unstamped, so the next launch takes the full path and self-heals — instead
     // of the fast path locking in a broken schema forever ("no such column" on

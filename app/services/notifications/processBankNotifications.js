@@ -34,6 +34,7 @@ import { learnAccountBinding } from './accountBindings';
 import { findMatchingOperation, reconcilePendingNotifications } from './duplicateOperations';
 import { dismissPendingOperationsAlert } from './localNotifications';
 import { startTrace, traceAsync } from '../perfTrace';
+import { localDateOf, todayLocalDate } from '../../utils/dateUtils';
 
 // A pass that found nothing new to do is held to a much higher bar before it is
 // worth a log line. The feed re-runs this every three seconds while it is open,
@@ -144,17 +145,12 @@ const saveSignatures = async (sigs) => {
 };
 
 /**
- * ISO "YYYY-MM-DD" for an epoch-millis post time, or null if unusable.
+ * Local "YYYY-MM-DD" for an epoch-millis post time, or null if unusable.
+ *
+ * Local, not UTC: a purchase at 01:00 in UTC+4 is the user's today, and the rest
+ * of the app (operation dates, balance history, month keys) agrees.
  */
-const isoDateFromPostTime = (postTime) => {
-  if (!postTime) return null;
-  const d = new Date(postTime);
-  if (Number.isNaN(d.getTime())) return null;
-  return d.toISOString().slice(0, 10);
-};
-
-/** Today's ISO date — the last-resort fallback for a missing date. */
-const todayIso = () => new Date().toISOString().slice(0, 10);
+const isoDateFromPostTime = (postTime) => (postTime ? localDateOf(postTime) : null);
 
 /**
  * Build the amount + multi-currency fields for booking a parsed notification
@@ -792,7 +788,7 @@ const runProcess = async () => {
     }
 
     // operations.date is NOT NULL — always supply a valid date.
-    const date = descriptor.date || isoDateFromPostTime(notification.postTime) || todayIso();
+    const date = descriptor.date || isoDateFromPostTime(notification.postTime) || todayLocalDate();
 
     try {
       // Per-item timing, logged only for an item that was slow on its own. One
@@ -936,7 +932,7 @@ export const resolvePendingNotification = async (pendingId, choices = {}) => {
     accountId,
     categoryId: categoryId || null,
     // operations.date is NOT NULL — fall back to the row's creation date / today.
-    date: pending.date || (pending.createdAt ? pending.createdAt.slice(0, 10) : todayIso()),
+    date: pending.date || localDateOf(pending.createdAt) || todayLocalDate(),
     description: label ? serializeLabels([label]) : null,
     ...operationLocationFields(location),
   });
@@ -1106,7 +1102,7 @@ const resolvePendingTransfer = async (pending, choices = {}) => {
     accountId,
     toAccountId,
     // operations.date is NOT NULL — fall back to the row's creation date / today.
-    date: pending.date || (pending.createdAt ? pending.createdAt.slice(0, 10) : todayIso()),
+    date: pending.date || localDateOf(pending.createdAt) || todayLocalDate(),
     description: label ? serializeLabels([label]) : null,
     ...operationLocationFields(location),
   });
@@ -1175,7 +1171,7 @@ export const reAddNotification = async (notification) => {
   }
 
   // operations.date is NOT NULL — always supply a valid date.
-  const date = descriptor.date || isoDateFromPostTime(notification.postTime) || todayIso();
+  const date = descriptor.date || isoDateFromPostTime(notification.postTime) || todayLocalDate();
 
   // The user is asking for this notification back, so clear any rejection they
   // recorded for it — otherwise the item would be booked or queued here and then

@@ -10,18 +10,15 @@
 import { queryAll, executeTransaction } from './db';
 import * as AccountsDB from './AccountsDB';
 import * as Currency from './currency';
+import { formatLocalDate as formatDate } from '../utils/dateUtils';
 
 /**
- * Format Date object to YYYY-MM-DD string using local timezone
- * @param {Date} date
- * @returns {string}
+ * Format Date object to YYYY-MM-DD string using local timezone.
+ * Kept under its historical name for the modules that already import it from
+ * here; the definition lives in `app/utils/dateUtils.js` so the whole app shares
+ * one notion of "today".
  */
-export const formatDate = (date) => {
-  const year = date.getFullYear();
-  const month = String(date.getMonth() + 1).padStart(2, '0');
-  const day = String(date.getDate()).padStart(2, '0');
-  return `${year}-${month}-${day}`;
-};
+export { formatDate };
 
 /**
  * Calculate account balance at end of specific date

@@ -1681,7 +1681,7 @@ op-2,income,20,acc-1,cat-1`;
 
     const findInsert = (dbInstance, table) =>
       dbInstance.runAsync.mock.calls.filter(
-        (c) => typeof c[0] === 'string' && c[0].includes(`INSERT INTO ${table}`),
+        (c) => typeof c[0] === 'string' && c[0].includes(`INTO ${table}`),
       );
 
     // One value out of an INSERT call, by the column name the statement itself
@@ -2008,7 +2008,7 @@ op-2,income,20,acc-1,cat-1`;
         const lineInserts = findInsert(dbInstance, 'budget_plan_lines');
         expect(lineInserts).toHaveLength(1);
         // id, plan_id (NULL literal), amount, category_id, currency, created_at, updated_at
-        expect(lineInserts[0][1]).toEqual(['test-uuid-1234', '65000.00', 'cat-1', 'USD', expect.any(String), expect.any(String)]);
+        expect(lineInserts[0][1]).toEqual(['legacy-budget-bud-1', '65000.00', 'cat-1', 'USD', expect.any(String), expect.any(String)]);
       });
 
       it('converts a weekly legacy budget to its monthly-equivalent amount (×365÷84)', async () => {
