@@ -1,5 +1,12 @@
 # Changelog
 
+## [0.284.3](https://github.com/heywood8/money-tracker/compare/penny-v0.284.2...penny-v0.284.3) (2026-09-10)
+
+
+### Continuous Integration
+
+* skip result comments on fork pull requests ([#1739](https://github.com/heywood8/money-tracker/issues/1739)) ([c928b31](https://github.com/heywood8/money-tracker/commit/c928b311b7a0bf6ab7d62558b4c41ce9d6d7cc0f))
+
 ## [0.284.2](https://github.com/heywood8/money-tracker/compare/penny-v0.284.1...penny-v0.284.2) (2026-09-10)
 
 
