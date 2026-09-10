@@ -6,6 +6,8 @@
  * entries are created for the current day via createOperation().
  */
 
+import { todayLocalDate } from '../utils/dateUtils';
+
 /**
  * Get default operations for seeding the database
  * @param {number} accountId - Primary account ID for operations
@@ -13,8 +15,10 @@
  * @returns {Array} Array of operation objects ready for createOperation()
  */
 const getDefaultOperations = (accountId, toAccountId = null) => {
-  // Use today's date in YYYY-MM-DD format
-  const today = new Date().toISOString().split('T')[0];
+  // Today's *local* calendar day: the seed rows must land on the same day the
+  // rest of the app books to, or a fresh install in UTC+4 opens with yesterday's
+  // demo data and a balance-history entry on the wrong date.
+  const today = todayLocalDate();
 
   const operations = [
     {

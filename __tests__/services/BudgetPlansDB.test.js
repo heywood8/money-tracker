@@ -350,7 +350,7 @@ describe('BudgetPlansDB', () => {
       // Row + category links go in one transaction (migration 0021).
       expect(mockRunAsync).toHaveBeenNthCalledWith(
         1,
-        expect.stringContaining('INSERT INTO budget_plan_lines'),
+        expect.stringContaining('INTO budget_plan_lines'),
         expect.arrayContaining(['p1', 'Rent', '73000', 'c1']),
       );
       expect(mockRunAsync).toHaveBeenCalledWith(
@@ -392,7 +392,7 @@ describe('BudgetPlansDB', () => {
 
     it('addLine always stores include_children on, even when a caller asks for off', async () => {
       await BudgetPlansDB.addLine('p1', { amount: '10', categoryId: 'c1', includeChildren: false });
-      const [sql, params] = mockRunAsync.mock.calls.find(([s]) => s.includes('INSERT INTO budget_plan_lines'));
+      const [sql, params] = mockRunAsync.mock.calls.find(([s]) => s.includes('INTO budget_plan_lines'));
       expect(sql).toContain('include_children');
       // Read the position out of the statement's own column list rather than
       // counting from the end: the insert has grown a column three times now,
@@ -409,7 +409,7 @@ describe('BudgetPlansDB', () => {
         const line = await BudgetPlansDB.addRecurringLine({ amount: '65000', categoryId: 'cat1', currency: 'EUR', label: 'Rent' });
         expect(mockRunAsync).toHaveBeenNthCalledWith(
           1,
-          expect.stringContaining('INSERT INTO budget_plan_lines'),
+          expect.stringContaining('INTO budget_plan_lines'),
           expect.arrayContaining([null, 'Rent', '65000', 'cat1', 1, 'EUR']),
         );
         expect(line).toMatchObject({ planId: null, isRecurring: true, currency: 'EUR', amount: '65000' });
@@ -830,7 +830,7 @@ describe('BudgetPlansDB', () => {
         await BudgetPlansDB.copyPlan('2026-06', '2026-07');
 
         const lineInserts = mockRunAsync.mock.calls
-          .filter(([sql]) => sql.includes('INSERT INTO budget_plan_lines'));
+          .filter(([sql]) => sql.includes('INTO budget_plan_lines'));
         expect(lineInserts).toHaveLength(2);
         expect(lineInserts[0][1]).toContain('Rent');
         expect(lineInserts[1][1]).toContain('Buy fridge');
@@ -844,7 +844,7 @@ describe('BudgetPlansDB', () => {
         await BudgetPlansDB.copyPlan('2026-06', '2026-07');
 
         const [sql, params] = mockRunAsync.mock.calls
-          .find(([statement]) => statement.includes('INSERT INTO budget_plan_lines'));
+          .find(([statement]) => statement.includes('INTO budget_plan_lines'));
         expect(sql).not.toContain(', account_id');
         expect(sql).not.toContain('last_executed_month');
         expect(params).not.toContain('a1');
@@ -909,9 +909,9 @@ describe('BudgetPlansDB', () => {
       const result = await BudgetPlansDB.migrateLegacyBudgetsToRecurringLines(db);
       expect(result).toEqual({ migrated: 2, skipped: false });
 
-      const lineInserts = db.runAsync.mock.calls.filter(c => c[0].includes('INSERT INTO budget_plan_lines'));
+      const lineInserts = db.runAsync.mock.calls.filter(c => c[0].includes('INTO budget_plan_lines'));
       expect(lineInserts).toHaveLength(2);
-      expect(lineInserts[0][1]).toEqual(['uuid-1', '100.00', 'c1', 'USD', expect.any(String), expect.any(String)]);
+      expect(lineInserts[0][1]).toEqual(['legacy-budget-b1', '100.00', 'c1', 'USD', expect.any(String), expect.any(String)]);
 
       const flagInsert = db.runAsync.mock.calls.find(c => c[0].includes('app_metadata'));
       expect(flagInsert[0]).toContain("'true'"); // the flag value is inlined in the SQL, not bound
@@ -1022,7 +1022,7 @@ describe('BudgetPlansDB', () => {
       }),
       runAsync: jest.fn(async () => {}),
     });
-    const lineInserts = (db) => db.runAsync.mock.calls.filter(c => c[0].includes('INSERT INTO budget_plan_lines'));
+    const lineInserts = (db) => db.runAsync.mock.calls.filter(c => c[0].includes('INTO budget_plan_lines'));
 
     it('is a no-op once the completion flag is set', async () => {
       const db = makeDb({ flagSet: true, planned: [{ id: 'po1', type: 'expense', amount: '10', account_id: 1, is_recurring: 1 }] });

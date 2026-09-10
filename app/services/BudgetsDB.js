@@ -3,6 +3,7 @@ import * as CategoriesDB from './CategoriesDB';
 import * as Currency from './currency';
 import { formatDate as formatLocalDate } from './BalanceHistoryDB';
 import { fetchRatesToTarget, convertWithRateMap } from './OperationsDB';
+import { sumMoneySql } from './sqlMoney';
 
 /**
  * Map database field names to camelCase for application use
@@ -681,7 +682,7 @@ export const calculateSpendingForFilters = async ({
 
     if (convertAll) {
       const rows = await queryAll(
-        `SELECT a.currency as currency, SUM(CAST(o.amount AS REAL)) as total
+        `SELECT a.currency as currency, ${sumMoneySql()} as total
          FROM operations o
          JOIN accounts a ON o.account_id = a.id
          WHERE ${filterClause}
@@ -705,7 +706,7 @@ export const calculateSpendingForFilters = async ({
 
     // Query operations in date range for these filters and currency
     const query = `
-      SELECT SUM(CAST(o.amount AS REAL)) as total
+      SELECT ${sumMoneySql()} as total
       FROM operations o
       JOIN accounts a ON o.account_id = a.id
       WHERE ${filterClause}

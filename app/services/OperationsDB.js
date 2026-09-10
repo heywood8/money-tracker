@@ -15,6 +15,8 @@ const normalizeSearchQuery = (text) => normalizeSearchText(text);
 import * as Currency from './currency';
 import { formatDate, updateTodayBalance } from './BalanceHistoryDB';
 import * as AccountsDB from './AccountsDB';
+import { sumMoneySql } from './sqlMoney';
+import { formatLocalDate } from '../utils/dateUtils';
 import getDefaultOperations from '../defaults/defaultOperations';
 
 // Operation types currently supported. Used as the upper bound for the
@@ -1200,7 +1202,7 @@ export const getAccountDayDeltas = async (accountId, date) => {
 export const getSpendingByCategory = async (startDate, endDate) => {
   try {
     const results = await queryAll(
-      `SELECT o.category_id, SUM(CAST(o.amount AS REAL)) as total
+      `SELECT o.category_id, ${sumMoneySql()} as total
        FROM operations o
        WHERE o.type = 'expense' AND o.date >= ? AND o.date <= ? AND o.category_id IS NOT NULL
          AND ${chartVisibleSql()}
@@ -1224,7 +1226,7 @@ export const getSpendingByCategory = async (startDate, endDate) => {
 export const getIncomeByCategory = async (startDate, endDate) => {
   try {
     const results = await queryAll(
-      `SELECT o.category_id, SUM(CAST(o.amount AS REAL)) as total
+      `SELECT o.category_id, ${sumMoneySql()} as total
        FROM operations o
        WHERE o.type = 'income' AND o.date >= ? AND o.date <= ? AND o.category_id IS NOT NULL
          AND ${chartVisibleSql()}
@@ -1387,7 +1389,7 @@ export const getSpendingByCategoryAndCurrency = async (currency, startDate, endD
   try {
     if (convertAll && !accountId) {
       const rows = await queryAll(
-        `SELECT o.category_id, a.currency as currency, SUM(CAST(o.amount AS REAL)) as total
+        `SELECT o.category_id, a.currency as currency, ${sumMoneySql()} as total
          FROM operations o
          JOIN accounts a ON o.account_id = a.id
          WHERE o.type = 'expense'
@@ -1401,7 +1403,7 @@ export const getSpendingByCategoryAndCurrency = async (currency, startDate, endD
       return await mergeConvertedByCategory(rows || [], currency);
     }
 
-    let sql = `SELECT o.category_id, SUM(CAST(o.amount AS REAL)) as total
+    let sql = `SELECT o.category_id, ${sumMoneySql()} as total
        FROM operations o
        JOIN accounts a ON o.account_id = a.id
        WHERE o.type = 'expense'
@@ -1442,7 +1444,7 @@ export const getIncomeByCategoryAndCurrency = async (currency, startDate, endDat
   try {
     if (convertAll) {
       const rows = await queryAll(
-        `SELECT o.category_id, a.currency as currency, SUM(CAST(o.amount AS REAL)) as total
+        `SELECT o.category_id, a.currency as currency, ${sumMoneySql()} as total
          FROM operations o
          JOIN accounts a ON o.account_id = a.id
          WHERE o.type = 'income'
@@ -1457,7 +1459,7 @@ export const getIncomeByCategoryAndCurrency = async (currency, startDate, endDat
     }
 
     const results = await queryAll(
-      `SELECT o.category_id, SUM(CAST(o.amount AS REAL)) as total
+      `SELECT o.category_id, ${sumMoneySql()} as total
        FROM operations o
        JOIN accounts a ON o.account_id = a.id
        WHERE o.type = 'income'
@@ -1623,18 +1625,6 @@ export const getAvailableMonths = async () => {
     console.error('Failed to get available months:', error);
     throw error;
   }
-};
-
-/**
- * Format date to local YYYY-MM-DD string
- * @param {Date} date
- * @returns {string}
- */
-const formatLocalDate = (date) => {
-  const year = date.getFullYear();
-  const month = String(date.getMonth() + 1).padStart(2, '0');
-  const day = String(date.getDate()).padStart(2, '0');
-  return `${year}-${month}-${day}`;
 };
 
 /**
