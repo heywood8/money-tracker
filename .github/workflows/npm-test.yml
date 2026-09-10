@@ -79,7 +79,13 @@ jobs:
             core.setOutput('message', comment);
 
       - uses: marocchino/sticky-pull-request-comment@v3.0.5
-        if: always()
+        # A pull request from a fork gets a read-only GITHUB_TOKEN, so the
+        # `permissions: pull-requests: write` block above does not apply and
+        # creating a comment fails with 403 "Resource not accessible by
+        # integration". Skip the comment there rather than failing the job:
+        # the lint/test work itself already ran, and the `Fail if ...` step
+        # below stays the single source of truth for the job's verdict.
+        if: always() && github.event.pull_request.head.repo.full_name == github.repository
         with:
           header: "Lint Results"
           message: ${{ steps.set-lint-results.outputs.message }}
@@ -179,7 +185,13 @@ jobs:
 
       - uses: marocchino/sticky-pull-request-comment@v3.0.5
         id: sticky-comment
-        if: always()
+        # A pull request from a fork gets a read-only GITHUB_TOKEN, so the
+        # `permissions: pull-requests: write` block above does not apply and
+        # creating a comment fails with 403 "Resource not accessible by
+        # integration". Skip the comment there rather than failing the job:
+        # the lint/test work itself already ran, and the `Fail if ...` step
+        # below stays the single source of truth for the job's verdict.
+        if: always() && github.event.pull_request.head.repo.full_name == github.repository
         with:
           header: "Test Results"
           message: ${{ steps.set-results.outputs.message }}
