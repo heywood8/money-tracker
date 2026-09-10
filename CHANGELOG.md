@@ -1,5 +1,12 @@
 # Changelog
 
+## [0.284.5](https://github.com/heywood8/money-tracker/compare/penny-v0.284.4...penny-v0.284.5) (2026-09-10)
+
+
+### Miscellaneous Chores
+
+* **deps:** bump victory-native from 41.26.0 to 42.0.1 ([#1729](https://github.com/heywood8/money-tracker/issues/1729)) ([88f8717](https://github.com/heywood8/money-tracker/commit/88f8717664c776bf3b7fba2ca6deada35af1fbaf))
+
 ## [0.284.4](https://github.com/heywood8/money-tracker/compare/penny-v0.284.3...penny-v0.284.4) (2026-09-10)
 
 
