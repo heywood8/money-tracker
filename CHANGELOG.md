@@ -1,5 +1,12 @@
 # Changelog
 
+## [0.284.6](https://github.com/heywood8/money-tracker/compare/penny-v0.284.5...penny-v0.284.6) (2026-09-10)
+
+
+### Bug Fixes
+
+* **db:** sum money exactly, book local dates, migrate atomically ([#1743](https://github.com/heywood8/money-tracker/issues/1743)) ([5a4c5c8](https://github.com/heywood8/money-tracker/commit/5a4c5c89291ed757dd094a3cf956b3136cee57fc))
+
 ## [0.284.5](https://github.com/heywood8/money-tracker/compare/penny-v0.284.4...penny-v0.284.5) (2026-09-10)
 
 
