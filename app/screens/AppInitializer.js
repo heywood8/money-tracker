@@ -101,9 +101,13 @@ const AppInitializer = () => {
   // the user has finished initial language setup.
   useSqliteFileImport({ enabled: !isFirstLaunch });
 
-  // Deep-link a tapped "transactions to review" notification into the
-  // notification-processing screen (handles both cold-start and warm taps).
-  useNotificationResponseRouter();
+  // Deep-link a tapped "transactions to review" notification to the suggestion
+  // deck on the operations page (handles cold-start, warm and foreground-return
+  // taps). Enabled only once SimpleTabs is on screen — that is the exact
+  // condition of the main render below — because the screens that act on the
+  // event are not mounted before then, and a cold-start response resolves long
+  // before the database is ready; the hook queues anything earlier.
+  useNotificationResponseRouter({ enabled: !isLoading && !isFirstLaunch });
 
   // Run the daily backup once on every app open (after first launch is complete).
   // Defer the initial kick-off until the JS thread is idle so it doesn't contend with

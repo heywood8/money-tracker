@@ -1112,4 +1112,183 @@ describe('GoogleSheetsService', () => {
       expect(byId.get('line-c').group_id).toBeNull();
     });
   });
+
+  // ── Regression: issue #1695 ───────────────────────────────────────────────
+  // The export dropped columns the app depends on, so "Import from Google
+  // Sheets" resurrected deleted accounts, re-included excluded operations in
+  // the charts, lost pinned locations and re-stamped every created_at.
+  describe('Sheets round trip preserves every column (#1695)', () => {
+    const { getPreference } = require('../../app/services/PreferencesDB');
+
+    const backup = {
+      version: 1,
+      timestamp: '2026-01-01T00:00:00.000Z',
+      platform: 'native',
+      data: {
+        accounts: [
+          {
+            id: 1, name: 'Checking', balance: '500', currency: 'USD',
+            display_order: 0, hidden: 0, monthly_target: null,
+            card_mask: '1234', auto_txn_rounding: 100, auto_txn_rounding_mode: 'up',
+            deleted_at: null, created_at: '2024-01-01T00:00:00.000Z',
+          },
+          {
+            id: 2, name: 'Closed card', balance: '0', currency: 'USD',
+            display_order: 1, hidden: 0, monthly_target: null,
+            card_mask: null, auto_txn_rounding: null, auto_txn_rounding_mode: null,
+            deleted_at: '2025-03-01T00:00:00.000Z', created_at: '2024-02-01T00:00:00.000Z',
+          },
+        ],
+        categories: [
+          {
+            id: 'cat-1', name: 'Food', type: 'entry', category_type: 'expense',
+            icon: 'food', parent_id: null, color: null, is_shadow: 0,
+            created_at: '2024-01-01T00:00:00.000Z',
+          },
+        ],
+        operations: [
+          {
+            id: 10, date: '2024-01-15', type: 'expense', amount: '50',
+            source_currency: 'USD', category_id: 'cat-1', account_id: 1,
+            to_account_id: null, description: 'Lunch',
+            exchange_rate: null, destination_amount: null, destination_currency: null,
+            original_balance: '450', exclude_from_avg: 1, exclude_from_charts: 1,
+            latitude: 41.7151, longitude: 44.8271,
+            created_at: '2024-01-15T09:00:00.000Z',
+          },
+          {
+            id: 11, date: '2024-01-15', type: 'expense', amount: '5',
+            source_currency: 'USD', category_id: 'cat-1', account_id: 1,
+            to_account_id: null, description: 'Coffee',
+            exchange_rate: null, destination_amount: null, destination_currency: null,
+            original_balance: null, exclude_from_avg: 0, exclude_from_charts: 0,
+            latitude: null, longitude: null,
+            created_at: '2024-01-15T10:00:00.000Z',
+          },
+        ],
+        budgets: [],
+        balance_history: [],
+        budget_plans: [],
+        budget_plan_lines: [],
+        budget_plan_line_categories: [],
+        budget_plan_line_groups: [],
+        budget_plan_line_accounts: [],
+        budget_plan_line_labels: [],
+      },
+    };
+
+    // Feed the exporter's own output straight back into the importer: whatever
+    // the export does not write down is what the import cannot restore.
+    const roundTrip = async () => {
+      getPreference.mockResolvedValue('sheet-id-123');
+      // The Sheets API hands every cell back as TEXT, including the numbers the
+      // export wrote — which is the whole reason the flags needed reading
+      // numerically. Stringify so the round trip is the real one.
+      const valueRanges = buildSheetsData(backup).map(sheet => ({
+        ...sheet,
+        values: sheet.values.map(row => row.map(cell => String(cell ?? ''))),
+      }));
+      mockFetch.mockResolvedValue({ ok: true, json: async () => ({ valueRanges }) });
+      return importFromSheets('token');
+    };
+
+    it('keeps a soft-deleted account deleted and a live one live', async () => {
+      const imported = await roundTrip();
+
+      expect(imported.data.accounts[0]).toMatchObject({
+        name: 'Checking',
+        deleted_at: null,
+        card_mask: '1234',
+        auto_txn_rounding: 100,
+        auto_txn_rounding_mode: 'up',
+        created_at: '2024-01-01T00:00:00.000Z',
+      });
+      expect(imported.data.accounts[1]).toMatchObject({
+        name: 'Closed card',
+        deleted_at: '2025-03-01T00:00:00.000Z',
+        card_mask: null,
+        auto_txn_rounding: null,
+        created_at: '2024-02-01T00:00:00.000Z',
+      });
+    });
+
+    it('keeps the exclusion flags, locations, original balance and created_at of operations', async () => {
+      const imported = await roundTrip();
+
+      expect(imported.data.operations[0]).toMatchObject({
+        description: 'Lunch',
+        exclude_from_avg: 1,
+        exclude_from_charts: 1,
+        latitude: 41.7151,
+        longitude: 44.8271,
+        original_balance: '450',
+        created_at: '2024-01-15T09:00:00.000Z',
+      });
+      expect(imported.data.operations[1]).toMatchObject({
+        description: 'Coffee',
+        exclude_from_avg: 0,
+        exclude_from_charts: 0,
+        latitude: null,
+        longitude: null,
+        original_balance: null,
+        // Same day as the first: created_at is the only thing that keeps their
+        // order, and re-stamping it with `now` scrambled it.
+        created_at: '2024-01-15T10:00:00.000Z',
+      });
+    });
+
+    it("keeps a category's created_at, which is what its colour is derived from", async () => {
+      const imported = await roundTrip();
+
+      expect(imported.data.categories[0]).toMatchObject({
+        id: 'cat-1',
+        created_at: '2024-01-01T00:00:00.000Z',
+      });
+    });
+
+    it('still imports a spreadsheet written before these columns existed', async () => {
+      getPreference.mockResolvedValue('sheet-id-123');
+      mockFetch.mockResolvedValue({
+        ok: true,
+        json: async () => ({
+          valueRanges: [
+            {
+              range: 'Accounts!A1:G2',
+              values: [
+                ['id', 'name', 'balance', 'currency', 'display_order', 'hidden', 'monthly_target'],
+                ['1', 'Checking', '500', 'USD', '0', '0', ''],
+              ],
+            },
+            {
+              range: 'Operations!A1:O2',
+              values: [
+                ['id', 'date', 'type', 'amount', 'currency', 'category', 'account', 'to_account', 'description', 'account_id', 'category_id', 'to_account_id', 'exchange_rate', 'destination_amount', 'destination_currency'],
+                ['10', '2024-01-15', 'expense', '50', 'USD', '', 'Checking', '', 'Lunch', '1', '', '', '', '', ''],
+              ],
+            },
+          ],
+        }),
+      });
+
+      const imported = await importFromSheets('token');
+
+      // Absent columns are "not stated", not empty strings — '' in deleted_at
+      // would read as a deleted account.
+      expect(imported.data.accounts[0]).toMatchObject({
+        name: 'Checking',
+        deleted_at: null,
+        card_mask: null,
+        auto_txn_rounding: null,
+      });
+      expect(imported.data.accounts[0].created_at).toBeTruthy();
+      expect(imported.data.operations[0]).toMatchObject({
+        description: 'Lunch',
+        exclude_from_avg: 0,
+        exclude_from_charts: 0,
+        latitude: null,
+        longitude: null,
+        original_balance: null,
+      });
+    });
+  });
 });

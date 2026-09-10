@@ -38,30 +38,61 @@ const useQuickAddForm = (visibleAccounts, accounts, categories, t) => {
   const [foreignRateSource, setForeignRateSource] = useState(null);
   const [foreignExchangeRate, setForeignExchangeRate] = useState('');
 
-  // Set default account on mount
+  // Refs mirroring the latest props/state so the default-account effect below can
+  // read them without depending on their identity (same pattern as `accountsRef` in
+  // AccountsActionsContext). Declared first so this sync runs before that effect in
+  // every commit.
+  const visibleAccountsRef = useRef(visibleAccounts);
+  const selectedAccountIdRef = useRef(quickAddValues.accountId);
   useEffect(() => {
+    visibleAccountsRef.current = visibleAccounts;
+    selectedAccountIdRef.current = quickAddValues.accountId;
+  });
+
+  // `visibleAccounts` is a brand-new array after every reloadAccounts() — i.e. after
+  // every operation add/update/delete, every RELOAD_ALL and every balance edit — so
+  // keying the effect on the array identity re-ran it mid-entry and overwrote the
+  // account the user had deliberately picked. Key it on the ids instead.
+  const visibleAccountIdsKey = useMemo(
+    () => visibleAccounts.map(acc => acc.id).join('|'),
+    [visibleAccounts],
+  );
+
+  // Pick a default account on mount, and again only when the set of visible accounts
+  // no longer contains the current pick (e.g. that account was hidden or deleted).
+  useEffect(() => {
+    let cancelled = false;
     async function setDefaultAccount() {
-      if (visibleAccounts.length === 1) {
-        const acc = visibleAccounts[0];
+      const currentAccounts = visibleAccountsRef.current;
+      const chosenId = selectedAccountIdRef.current;
+
+      // The user's choice is still available — leave it (and operationCurrency) alone.
+      if (chosenId && currentAccounts.some(acc => acc.id === chosenId)) return;
+
+      if (currentAccounts.length === 1) {
+        const acc = currentAccounts[0];
         setQuickAddValues(v => ({ ...v, accountId: acc.id, operationCurrency: acc.currency || v.operationCurrency }));
-      } else if (visibleAccounts.length > 1) {
+      } else if (currentAccounts.length > 1) {
         const defaultId = await getDefaultAccountId();
+        if (cancelled) return;
         let resolvedAcc;
-        if (defaultId && visibleAccounts.some(acc => acc.id === defaultId)) {
-          resolvedAcc = visibleAccounts.find(acc => acc.id === defaultId);
+        if (defaultId && currentAccounts.some(acc => acc.id === defaultId)) {
+          resolvedAcc = currentAccounts.find(acc => acc.id === defaultId);
         } else {
           const lastId = await getLastAccessedAccount();
-          if (lastId && visibleAccounts.some(acc => acc.id === lastId)) {
-            resolvedAcc = visibleAccounts.find(acc => acc.id === lastId);
+          if (cancelled) return;
+          if (lastId && currentAccounts.some(acc => acc.id === lastId)) {
+            resolvedAcc = currentAccounts.find(acc => acc.id === lastId);
           } else {
-            resolvedAcc = visibleAccounts.slice().sort((a, b) => (a.id < b.id ? -1 : 1))[0];
+            resolvedAcc = currentAccounts.slice().sort((a, b) => (a.id < b.id ? -1 : 1))[0];
           }
         }
         setQuickAddValues(v => ({ ...v, accountId: resolvedAcc.id, operationCurrency: resolvedAcc.currency || v.operationCurrency }));
       }
     }
     setDefaultAccount();
-  }, [visibleAccounts]);
+    return () => { cancelled = true; };
+  }, [visibleAccountIdsKey]);
 
   // Track previous accountId to reset operationCurrency on account switch
   const prevAccountIdRef = useRef(null);

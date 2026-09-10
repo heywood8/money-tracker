@@ -52,6 +52,7 @@ import { BORDER_RADIUS, FONT_SIZE, SPACING } from '../../styles/designTokens';
  * @param {Function} props.openPicker - Function to open picker modal
  * @param {Function} props.onAmountChange - Callback when amount changes
  * @param {Function} props.onAdd - Callback for add action (QuickAdd only)
+ * @param {boolean} props.addDisabled - Disables the add button while a save is in flight (QuickAdd only)
  * @param {Array} props.TYPES - Operation types [{key, label, icon}]
  * @param {boolean} props.showTypeSelector - Whether to show inline type selector buttons
  * @param {boolean} props.showAccountBalance - Whether to show account balance in picker
@@ -98,6 +99,7 @@ const OperationFormFields = memo(({
   foreignExchangeRate,
   foreignCurrencyEditable = false,
   flashError = null,
+  addDisabled = false,
 }) => {
   const { hideBalances } = useDisplaySettings();
 
@@ -891,6 +893,7 @@ const OperationFormFields = memo(({
           currencyCode={compact && values.type !== 'transfer' && onOperationCurrencyChange ? getCurrencySymbol(values.operationCurrency) : undefined}
           onCurrencyPress={compact && values.type !== 'transfer' && onOperationCurrencyChange ? () => setShowCurrencyPicker(true) : undefined}
           flashError={flashingField === 'amount'}
+          addDisabled={addDisabled}
         />
       </View>
       {isForeignCurrencyOp && sourceAccount && !foreignCurrencyEditable && (
@@ -998,6 +1001,7 @@ OperationFormFields.propTypes = {
     field: PropTypes.oneOf(['category', 'account', 'toAccount', 'amount']),
     token: PropTypes.number,
   }),
+  addDisabled: PropTypes.bool,
 };
 
 const styles = StyleSheet.create({

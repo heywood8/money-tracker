@@ -10,6 +10,7 @@ import { StyleSheet } from 'react-native';
 import { render, fireEvent } from '@testing-library/react-native';
 import NotificationBindingStack, {
   MAX_DECK,
+  MIN_CARD_HEIGHT,
   PEEK_OFFSET,
   deckPeekAllowance,
 } from '../../../app/components/operations/NotificationBindingStack';
@@ -110,9 +111,15 @@ describe('NotificationBindingStack', () => {
     expect(toJSON()).toBeNull();
   });
 
-  it('renders nothing until the quick-add panel has been measured', async () => {
-    const { toJSON } = await renderStack({ quickAddHeight: 0 });
-    expect(toJSON()).toBeNull();
+  it('opens at the floor frame before the quick-add panel has been measured', async () => {
+    // A panel collapsed behind the + button has no reason to have reported a
+    // height yet, and a queue filled in the background must still reach the
+    // screen: the cards do not wait for a measurement.
+    const { getByTestId } = await renderStack({ quickAddHeight: 0 });
+    const card = getByTestId('notification-binding-card');
+    expect(card.props.style).toEqual(
+      expect.arrayContaining([expect.objectContaining({ height: MIN_CARD_HEIGHT })]),
+    );
   });
 
   it('shows the oldest suggestion as the only interactive card (FIFO)', async () => {

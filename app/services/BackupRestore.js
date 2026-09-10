@@ -127,7 +127,9 @@ const TABLE_FIELDS = {
   app_metadata:       ['key', 'value', 'updated_at'],
   balance_history:    ['id', 'account_id', 'date', 'balance', 'created_at'],
   planned_operations: ['id', 'name', 'type', 'amount', 'account_id', 'category_id', 'to_account_id', 'description', 'is_recurring', 'last_executed_month', 'display_order', 'created_at', 'updated_at'],
-  notification_merchant_rules: ['id', 'merchant', 'package_name', 'category_id', 'label_override', 'created_at', 'updated_at'],
+  // `last_matched_at` orders the bindings list (NotificationRulesDB), so a rule
+  // that loses it sinks under rules the user has not seen in months.
+  notification_merchant_rules: ['id', 'merchant', 'package_name', 'category_id', 'label_override', 'last_matched_at', 'created_at', 'updated_at'],
   // `fields` and `triggers` are JSON blobs; they round-trip as opaque text.
   notification_templates: ['id', 'name', 'package_name', 'type', 'enabled', 'priority', 'category_id', 'currency', 'date_order', 'fields', 'triggers', 'sample_title', 'sample_text', 'created_at', 'updated_at'],
   budget_plans: ['id', 'month', 'currency', 'expected_income', 'created_at', 'updated_at'],
@@ -206,7 +208,7 @@ export const buildCombinedCSV = (backup) => {
   // Explicit field lists per table (issue #748) keep column order stable even
   // when a row object happens to be missing a key.
   const section = (name, rows, fields) =>
-    `[${name}]\n${convertToCSV(rows, fields)}\n`;
+    `[${name}]\n${convertToCSV(rows || [], fields)}\n`;
 
   let csv = `# Money Tracker Backup - ${backup.timestamp}\n`;
   csv += `# Version: ${backup.version}\n\n`;
@@ -225,6 +227,12 @@ export const buildCombinedCSV = (backup) => {
     ['BUDGET_PLAN_LINE_GROUPS', 'budget_plan_line_groups'],
     ['BUDGET_PLAN_LINE_ACCOUNTS', 'budget_plan_line_accounts'],
     ['BUDGET_PLAN_LINE_LABELS', 'budget_plan_line_labels'],
+    // Notification data (#1695). Without these two sections a CSV restore
+    // carried no rules or templates, and the restore had to choose between
+    // wiping the live ones and leaving them untouched — neither of which is a
+    // backup. `fields` and `triggers` are JSON blobs and CSV-quote fine.
+    ['NOTIFICATION_MERCHANT_RULES', 'notification_merchant_rules'],
+    ['NOTIFICATION_TEMPLATES', 'notification_templates'],
   ];
 
   tables.forEach(([label, key], index) => {
@@ -399,6 +407,110 @@ const VALID_OPERATION_TYPES = ['expense', 'income', 'transfer'];
 const asBackupMonth = (value) => (
   typeof value === 'string' && /^\d{4}-(0[1-9]|1[0-2])$/.test(value) ? value : null
 );
+
+/**
+ * Read a boolean-ish backup column as 0 or 1.
+ *
+ * Every CSV cell arrives as a string (`parseCSV` keeps text as text), so a
+ * stored `0` comes back as the string `'0'` — which is TRUTHY in JS. A plain
+ * `value ? 1 : 0` therefore flipped every flag ON for every row of every CSV
+ * restore (#1693): after restoring a CSV backup, every operation was excluded
+ * from averages and charts and the Graphs tab came back empty. Compare
+ * numerically instead, and treat an absent/blank cell as the caller's default
+ * (older backups simply lack the newer columns).
+ * @param {*} value - Raw column value from JSON, CSV or SQLite
+ * @param {0|1} [fallback=0] - Result for an absent, blank or unreadable value
+ * @returns {0|1}
+ */
+const asFlag = (value, fallback = 0) => {
+  if (value === null || value === undefined) return fallback;
+  if (typeof value === 'boolean') return value ? 1 : 0;
+  const text = String(value).trim().toLowerCase();
+  if (text === '') return fallback;
+  if (text === 'true') return 1;
+  if (text === 'false') return 0;
+  const numeric = Number(text);
+  if (Number.isNaN(numeric)) return fallback;
+  return numeric === 0 ? 0 : 1;
+};
+
+/**
+ * Read a nullable column, treating a blank cell as "not stated".
+ *
+ * A Google Sheets cell comes back as '' rather than null, and '' is not the
+ * same value: in `deleted_at` it reads as a soft-deleted account, in a REAL
+ * column it lands as text no comparison can read.
+ * @param {*} value - Raw column value
+ * @returns {*} The value, or null when absent or blank
+ */
+const asNullable = (value) => (value === '' || value == null ? null : value);
+
+/**
+ * Read a numeric backup column, tolerating the strings a CSV round trip yields.
+ * @param {*} value - Raw column value
+ * @param {number} [fallback=0] - Result for an absent, blank or unreadable value
+ * @returns {number}
+ */
+const asNumber = (value, fallback = 0) => {
+  if (value === null || value === undefined || value === '') return fallback;
+  const numeric = Number(value);
+  return Number.isFinite(numeric) ? numeric : fallback;
+};
+
+/**
+ * Order categories so a parent always precedes its children.
+ *
+ * Categories are exported in creation order, and `parent_id` is an immediate
+ * (non-deferrable) foreign key with `PRAGMA foreign_keys = ON`. Re-parenting is
+ * a supported action, so any category moved into a folder created LATER than
+ * itself sorted before its own parent and its INSERT failed, rolling back the
+ * entire restore with a raw "FOREIGN KEY constraint failed" (#1694). Sorting
+ * parents-first fixes that without touching FK enforcement, so every other
+ * row-level guard in the restore keeps failing per statement instead of at
+ * COMMIT.
+ *
+ * Rows the restore will skip anyway (no id) keep their original position, and a
+ * cycle — impossible through the UI, but a hand-edited backup can carry one —
+ * resolves to *some* order; the restore loop nulls any parent it has not
+ * inserted yet, so a cycle costs one link, not the import.
+ * @param {Array<Object>} categories - Category rows from the backup
+ * @returns {Array<Object>} The same rows, parents before children
+ */
+const sortCategoriesParentsFirst = (categories) => {
+  const rows = Array.isArray(categories) ? categories : [];
+  const byId = new Map();
+  for (const category of rows) {
+    if (category && category.id != null && !byId.has(String(category.id))) {
+      byId.set(String(category.id), category);
+    }
+  }
+
+  const ordered = [];
+  const emitted = new Set();
+  const visiting = new Set();
+
+  const visit = (category) => {
+    if (emitted.has(category) || visiting.has(category)) return;
+    visiting.add(category);
+    if (category.parent_id != null && category.parent_id !== '') {
+      const parent = byId.get(String(category.parent_id));
+      if (parent && parent !== category) visit(parent);
+    }
+    visiting.delete(category);
+    emitted.add(category);
+    ordered.push(category);
+  };
+
+  for (const category of rows) {
+    if (!category || category.id == null) {
+      ordered.push(category);
+      continue;
+    }
+    visit(category);
+  }
+
+  return ordered;
+};
 
 const VALID_CATEGORY_TYPES = ['folder', 'entry'];
 const VALID_CATEGORY_KINDS = ['expense', 'income'];
@@ -590,15 +702,39 @@ export const restoreBackup = async (backup, cancelToken) => {
       appEvents.emit(IMPORT_PROGRESS_EVENT, { stepId: 'restore', status: 'completed' });
       appEvents.emit(IMPORT_PROGRESS_EVENT, { stepId: 'clear', status: 'in_progress' });
 
+      // Notification data a backup cannot carry is PRESERVED across the restore,
+      // and not clearing its table is not enough to do that (#1695): the
+      // `DELETE FROM categories` below cascades every merchant rule that binds a
+      // category out of existence (ON DELETE CASCADE) and blanks every
+      // template's fallback category (ON DELETE SET NULL). So read them back
+      // first and re-apply them once the new categories are in.
+      const readPreserved = async (sql) => {
+        try {
+          return (await db.getAllAsync(sql)) || [];
+        } catch {
+          // Pre-0010/0025 database: the table isn't there, so there is nothing
+          // to preserve.
+          return [];
+        }
+      };
+      const preservedRules = Array.isArray(backup.data.notification_merchant_rules)
+        ? null
+        : await readPreserved('SELECT * FROM notification_merchant_rules');
+      const preservedTemplateCategories = Array.isArray(backup.data.notification_templates)
+        ? null
+        : await readPreserved('SELECT id, category_id FROM notification_templates');
+
       // Clear existing data (in reverse order due to foreign keys)
-      await db.runAsync('DELETE FROM notification_merchant_rules').catch(() => {});
-      // Parse templates are cleared ONLY when the backup actually carries them.
-      // The CSV format has no [NOTIFICATION_TEMPLATES] section, so a CSV restore
-      // hands us a `data` object with no such key — clearing unconditionally
-      // would wipe every hand-built template and restore nothing in its place.
-      // That is unrecoverable in a way the rest of this table set is not: a
-      // merchant rule is re-learned the next time the shop is seen, but a
-      // template only exists because someone marked up a notification by hand.
+      // Merchant rules and parse templates are cleared ONLY when the backup
+      // actually carries them. A source that cannot express them — an
+      // "Import from Google Sheets", a CSV written before those sections
+      // existed — hands us a `data` object with no such key, and clearing
+      // unconditionally wiped every merchant → category binding while restoring
+      // nothing in its place (#1695): every purchase the app used to book
+      // silently went back to the review queue.
+      if (Array.isArray(backup.data.notification_merchant_rules)) {
+        await db.runAsync('DELETE FROM notification_merchant_rules').catch(() => {});
+      }
       if (Array.isArray(backup.data.notification_templates)) {
         await db.runAsync('DELETE FROM notification_templates').catch(() => {});
       }
@@ -667,13 +803,13 @@ export const restoreBackup = async (backup, cancelToken) => {
               account.balance || '0',
               account.currency || 'USD',
               account.display_order ?? null,
-              account.hidden ?? 0,
-              account.monthly_target ?? null,
-              account.card_mask ?? null,
-              account.auto_txn_rounding ?? null,
-              account.auto_txn_rounding_mode ?? null,
+              asFlag(account.hidden, 0),
+              asNullable(account.monthly_target),
+              asNullable(account.card_mask),
+              asNullable(account.auto_txn_rounding),
+              asNullable(account.auto_txn_rounding_mode),
               // Preserve soft-delete state — omitting it resurrects deleted accounts on restore
-              account.deleted_at ?? null,
+              asNullable(account.deleted_at),
               account.created_at || new Date().toISOString(),
               account.updated_at || new Date().toISOString(),
             ],
@@ -691,12 +827,12 @@ export const restoreBackup = async (backup, cancelToken) => {
               account.balance || '0',
               account.currency || 'USD',
               account.display_order ?? null,
-              account.hidden ?? 0,
-              account.monthly_target ?? null,
-              account.card_mask ?? null,
-              account.auto_txn_rounding ?? null,
-              account.auto_txn_rounding_mode ?? null,
-              account.deleted_at ?? null,
+              asFlag(account.hidden, 0),
+              asNullable(account.monthly_target),
+              asNullable(account.card_mask),
+              asNullable(account.auto_txn_rounding),
+              asNullable(account.auto_txn_rounding_mode),
+              asNullable(account.deleted_at),
               account.created_at || new Date().toISOString(),
               account.updated_at || new Date().toISOString(),
             ],
@@ -727,12 +863,26 @@ export const restoreBackup = async (backup, cancelToken) => {
       // Which categories actually landed — plan-line category links (migration
       // 0021) reference them through a NOT NULL FK, so a link to a category that
       // was skipped here has to be dropped rather than abort the restore.
+      // Ids are normalized to strings: a CSV round trip stringifies everything,
+      // and every consumer below compares against a reference read from the same
+      // backup, so one shape for the whole set keeps those comparisons honest.
       const restoredCategoryIds = new Set();
-      for (const category of backup.data.categories) {
+      // Parents before children (#1694) — `parent_id` is an immediate FK, and
+      // creation order does not follow the tree once a category has been moved.
+      for (const category of sortCategoriesParentsFirst(backup.data.categories)) {
         // Validate required fields
-        if (!category.id || !category.name) {
+        if (!category || !category.id || !category.name) {
           console.warn('Skipping category with missing id or name:', category);
           continue;
+        }
+
+        // A parent the backup does not contain (or one caught in a cycle, which
+        // only a hand-edited file can produce) restores at the top level rather
+        // than failing its FK and taking the whole import down.
+        let parentId = category.parent_id || null;
+        if (parentId != null && !restoredCategoryIds.has(String(parentId))) {
+          console.warn(`Category ${category.id} references unknown parent ${parentId} - restoring it at the top level`);
+          parentId = null;
         }
 
         const catType = VALID_CATEGORY_TYPES.includes(category.type) ? category.type : 'folder';
@@ -744,15 +894,16 @@ export const restoreBackup = async (backup, cancelToken) => {
             category.name,
             catType,
             catKind,
-            category.parent_id || null,
+            parentId,
             category.icon || null,
             category.color || null,
-            category.is_shadow || 0,
+            // '0' from a CSV cell is truthy — read the flag numerically (#1693).
+            asFlag(category.is_shadow, 0),
             category.created_at || new Date().toISOString(),
             category.updated_at || new Date().toISOString(),
           ],
         );
-        restoredCategoryIds.add(category.id);
+        restoredCategoryIds.add(String(category.id));
       }
       console.log(`Restored ${backup.data.categories.length} categories`);
       appEvents.emit(IMPORT_PROGRESS_EVENT, {
@@ -760,6 +911,88 @@ export const restoreBackup = async (backup, cancelToken) => {
         status: 'completed',
         data: backup.data.categories.length,
       });
+
+      // Shadow categories are what balance adjustments are booked against, and
+      // an operation referencing one is only insertable once the row exists — so
+      // this runs BEFORE operations rather than at the very end of the restore,
+      // where a backup missing the pair (a hand-built CSV, an old export) left
+      // every adjustment operation dangling (#1694).
+      const shadowCategories = (await db.getAllAsync(
+        'SELECT id FROM categories WHERE id IN (?, ?)',
+        ['shadow-adjustment-expense', 'shadow-adjustment-income'],
+      )) || [];
+
+      if (shadowCategories.length < 2) {
+        console.log('Adding missing shadow categories...');
+        const now = new Date().toISOString();
+
+        const hasShadowExpense = shadowCategories.some(cat => cat.id === 'shadow-adjustment-expense');
+        const hasShadowIncome = shadowCategories.some(cat => cat.id === 'shadow-adjustment-income');
+
+        // Add shadow adjustment expense category if missing
+        if (!hasShadowExpense) {
+          await db.runAsync(
+            'INSERT OR IGNORE INTO categories (id, name, type, category_type, parent_id, icon, color, is_shadow, created_at, updated_at) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)',
+            [
+              'shadow-adjustment-expense',
+              'Balance Adjustment (Expense)',
+              'entry',
+              'expense',
+              null,
+              'cash-minus',
+              null,
+              1,
+              now,
+              now,
+            ],
+          );
+          console.log('Shadow expense category added');
+        }
+
+        // Add shadow adjustment income category if missing
+        if (!hasShadowIncome) {
+          await db.runAsync(
+            'INSERT OR IGNORE INTO categories (id, name, type, category_type, parent_id, icon, color, is_shadow, created_at, updated_at) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)',
+            [
+              'shadow-adjustment-income',
+              'Balance Adjustment (Income)',
+              'entry',
+              'income',
+              null,
+              'cash-plus',
+              null,
+              1,
+              now,
+              now,
+            ],
+          );
+          console.log('Shadow income category added');
+        }
+
+        console.log('Shadow categories added successfully');
+      } else {
+        console.log('Shadow categories already exist in backup');
+      }
+      // Present either way now, so a reference to one is never nulled below.
+      restoredCategoryIds.add('shadow-adjustment-expense');
+      restoredCategoryIds.add('shadow-adjustment-income');
+
+      /**
+       * A category reference that survived the restore, or null.
+       *
+       * Only ACCOUNT references were pre-validated, so one dangling category id
+       * — a category row skipped for a missing name, a hand-edited Sheet, a
+       * partial CSV — killed the entire restore with a raw SQLite message
+       * (#1694). Every category FK but the legacy budgets table is nullable, so
+       * the row survives uncategorised and the user keeps their import.
+       */
+      const resolveCategoryReference = (rawId, context) => {
+        if (rawId == null || rawId === '') return null;
+        if (restoredCategoryIds.has(String(rawId))) return rawId;
+        console.warn(`Dropping unknown category reference "${rawId}" on ${context}`);
+        return null;
+      };
+
 
       if (cancelToken?.cancelled) throw new CancelledImportError();
 
@@ -802,7 +1035,7 @@ export const restoreBackup = async (backup, cancelToken) => {
             opType,
             operation.amount || '0',
             mappedAccountId,
-            operation.category_id || null,
+            resolveCategoryReference(operation.category_id, 'operation'),
             mappedToAccountId,
             operation.date || new Date().toISOString(),
             operation.created_at || new Date().toISOString(),
@@ -811,13 +1044,16 @@ export const restoreBackup = async (backup, cancelToken) => {
             operation.destination_amount || null,
             operation.source_currency || null,
             operation.destination_currency || null,
-            operation.original_balance ?? null,
-            // Older backups lack this column → default to 0 (counted).
-            operation.exclude_from_avg ? 1 : 0,
+            asNullable(operation.original_balance),
+            // Older backups lack this column → default to 0 (counted). Read
+            // numerically: a CSV cell is the STRING '0', which is truthy, so a
+            // plain truthiness test excluded every operation ever restored from
+            // a CSV backup from averages and charts (#1693).
+            asFlag(operation.exclude_from_avg, 0),
             // Same for the chart-exclusion flag (added in migration 0023) → 0 (shown).
-            operation.exclude_from_charts ? 1 : 0,
-            operation.latitude ?? null,
-            operation.longitude ?? null,
+            asFlag(operation.exclude_from_charts, 0),
+            asNullable(operation.latitude),
+            asNullable(operation.longitude),
           ],
         );
       }
@@ -896,6 +1132,14 @@ export const restoreBackup = async (backup, cancelToken) => {
             console.warn('Skipping budget with missing required fields:', budget);
             continue;
           }
+          // `budgets.category_id` is the one category FK that is NOT NULL, so a
+          // dangling reference cannot degrade to null — the row is skipped
+          // instead of aborting the restore (#1694). These are legacy v1
+          // budgets, already bridged into recurring plan lines below.
+          if (!restoredCategoryIds.has(String(budget.category_id))) {
+            console.warn(`Skipping budget ${budget.id}: unknown category ${budget.category_id}`);
+            continue;
+          }
 
           const budgetPeriod = VALID_BUDGET_PERIODS.includes(budget.period_type) ? budget.period_type : 'monthly';
           await db.runAsync(
@@ -908,8 +1152,8 @@ export const restoreBackup = async (backup, cancelToken) => {
               budgetPeriod,
               budget.start_date || new Date().toISOString(),
               budget.end_date || null,
-              budget.is_recurring ?? 1,
-              budget.rollover_enabled ?? 0,
+              asFlag(budget.is_recurring, 1),
+              asFlag(budget.rollover_enabled, 0),
               budget.created_at || new Date().toISOString(),
               budget.updated_at || new Date().toISOString(),
             ],
@@ -1049,7 +1293,7 @@ export const restoreBackup = async (backup, cancelToken) => {
               line.label ?? null,
               line.amount,
               line.comment ?? null,
-              line.category_id ?? null,
+              resolveCategoryReference(line.category_id, 'budget plan line'),
               mappedToAccountId,
               Number.isInteger(line.sort_order) ? line.sort_order : Number(line.sort_order) || 0,
               isRecurring ? 1 : 0,
@@ -1110,7 +1354,7 @@ export const restoreBackup = async (backup, cancelToken) => {
             console.warn('Skipping plan line category link for an unknown line:', lineId);
             continue;
           }
-          if (!restoredCategoryIds.has(categoryId)) {
+          if (!restoredCategoryIds.has(String(categoryId))) {
             console.warn('Skipping plan line category link for an unknown category:', categoryId);
             continue;
           }
@@ -1253,10 +1497,10 @@ export const restoreBackup = async (backup, cancelToken) => {
               plannedType,
               planned.amount || '0',
               mappedAccountId,
-              planned.category_id || null,
+              resolveCategoryReference(planned.category_id, 'planned operation'),
               mappedToAccountId,
               planned.description || null,
-              planned.is_recurring ?? 1,
+              asFlag(planned.is_recurring, 1),
               planned.last_executed_month || null,
               planned.display_order ?? null,
               planned.created_at || new Date().toISOString(),
@@ -1289,6 +1533,8 @@ export const restoreBackup = async (backup, cancelToken) => {
         console.warn('Failed to bridge planned operations into plan lines:', bridgeError);
       }
 
+      appEvents.emit(IMPORT_PROGRESS_EVENT, { stepId: 'upgrades', status: 'in_progress' });
+
       // Restore learned merchant -> category rules
       if (backup.data.notification_merchant_rules && backup.data.notification_merchant_rules.length > 0) {
         let restoredRules = 0;
@@ -1300,13 +1546,17 @@ export const restoreBackup = async (backup, cancelToken) => {
           // INSERT OR IGNORE: a rule whose category was not restored is skipped
           // rather than aborting the whole import.
           await db.runAsync(
-            'INSERT OR IGNORE INTO notification_merchant_rules (id, merchant, package_name, category_id, label_override, created_at, updated_at) VALUES (?, ?, ?, ?, ?, ?, ?)',
+            'INSERT OR IGNORE INTO notification_merchant_rules (id, merchant, package_name, category_id, label_override, last_matched_at, created_at, updated_at) VALUES (?, ?, ?, ?, ?, ?, ?, ?)',
             [
               rule.id,
               rule.merchant,
               rule.package_name || null,
-              rule.category_id || null,
+              resolveCategoryReference(rule.category_id, 'merchant rule'),
               rule.label_override || null,
+              // Absent from any backup taken before this column was written out;
+              // NULL then, which is what NotificationRulesDB already falls back
+              // from (it orders on COALESCE(last_matched_at, updated_at)).
+              asNullable(rule.last_matched_at),
               rule.created_at || new Date().toISOString(),
               rule.updated_at || new Date().toISOString(),
             ],
@@ -1333,9 +1583,12 @@ export const restoreBackup = async (backup, cancelToken) => {
               template.name,
               template.package_name || null,
               template.type === 'income' ? 'income' : 'expense',
-              template.enabled === 0 ? 0 : 1,
-              Number.isFinite(template.priority) ? template.priority : 0,
-              template.category_id || null,
+              // A CSV cell is a string, so neither `=== 0` nor Number.isFinite
+              // reads it: an exported-then-restored template came back enabled
+              // whatever it was, at priority 0 whatever it was (#1693/#1695).
+              asFlag(template.enabled, 1),
+              asNumber(template.priority, 0),
+              resolveCategoryReference(template.category_id, 'notification template'),
               template.currency || null,
               template.date_order || 'dmy',
               template.fields,
@@ -1351,67 +1604,53 @@ export const restoreBackup = async (backup, cancelToken) => {
         console.log(`Restored ${restoredTemplates} notification templates`);
       }
 
-      // Post-restore upgrades: Ensure shadow categories exist
-      console.log('Performing post-restore database upgrades...');
-      appEvents.emit(IMPORT_PROGRESS_EVENT, { stepId: 'upgrades', status: 'in_progress' });
-      const shadowCategories = await db.getAllAsync(
-        'SELECT id FROM categories WHERE id IN (?, ?)',
-        ['shadow-adjustment-expense', 'shadow-adjustment-income'],
-      );
-
-      if (shadowCategories.length < 2) {
-        console.log('Adding missing shadow categories...');
-        const now = new Date().toISOString();
-
-        const hasShadowExpense = shadowCategories.some(cat => cat.id === 'shadow-adjustment-expense');
-        const hasShadowIncome = shadowCategories.some(cat => cat.id === 'shadow-adjustment-income');
-
-        // Add shadow adjustment expense category if missing
-        if (!hasShadowExpense) {
+      // Put back what the backup could not carry. A rule whose category the new
+      // category set no longer has keeps the merchant and loses the binding —
+      // the next notification from that shop re-learns it — rather than being
+      // dropped altogether. A rule with no category at all was never cascaded
+      // away, so INSERT OR IGNORE simply steps over it.
+      if (preservedRules && preservedRules.length > 0) {
+        let keptRules = 0;
+        for (const rule of preservedRules) {
+          if (!rule.id || !rule.merchant) continue;
           await db.runAsync(
-            'INSERT OR IGNORE INTO categories (id, name, type, category_type, parent_id, icon, color, is_shadow, created_at, updated_at) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)',
+            'INSERT OR IGNORE INTO notification_merchant_rules (id, merchant, package_name, category_id, label_override, last_matched_at, created_at, updated_at) VALUES (?, ?, ?, ?, ?, ?, ?, ?)',
             [
-              'shadow-adjustment-expense',
-              'Balance Adjustment (Expense)',
-              'entry',
-              'expense',
-              null,
-              'cash-minus',
-              null,
-              1,
-              now,
-              now,
+              rule.id,
+              rule.merchant,
+              rule.package_name || null,
+              resolveCategoryReference(rule.category_id, 'preserved merchant rule'),
+              rule.label_override || null,
+              // The row came from the live table, so this is the real
+              // last-matched stamp: dropping it would push exactly the rules
+              // the user matches most often to the bottom of the bindings list.
+              asNullable(rule.last_matched_at),
+              rule.created_at || new Date().toISOString(),
+              rule.updated_at || new Date().toISOString(),
             ],
-          );
-          console.log('Shadow expense category added');
+          ).catch((e) => { console.warn('Skipping preserved merchant rule:', e.message); });
+          keptRules += 1;
         }
-
-        // Add shadow adjustment income category if missing
-        if (!hasShadowIncome) {
-          await db.runAsync(
-            'INSERT OR IGNORE INTO categories (id, name, type, category_type, parent_id, icon, color, is_shadow, created_at, updated_at) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)',
-            [
-              'shadow-adjustment-income',
-              'Balance Adjustment (Income)',
-              'entry',
-              'income',
-              null,
-              'cash-plus',
-              null,
-              1,
-              now,
-              now,
-            ],
-          );
-          console.log('Shadow income category added');
-        }
-
-        console.log('Shadow categories added successfully');
-      } else {
-        console.log('Shadow categories already exist in backup');
+        console.log(`Preserved ${keptRules} merchant rules the backup did not carry`);
       }
 
-      console.log('Post-restore upgrades completed');
+      // Templates survive the clear (their category FK is ON DELETE SET NULL),
+      // so only the binding has to be put back.
+      if (preservedTemplateCategories && preservedTemplateCategories.length > 0) {
+        let keptTemplateCategories = 0;
+        for (const template of preservedTemplateCategories) {
+          if (!template.id || !template.category_id) continue;
+          const categoryId = resolveCategoryReference(template.category_id, 'preserved notification template');
+          if (categoryId == null) continue;
+          await db.runAsync(
+            'UPDATE notification_templates SET category_id = ? WHERE id = ?',
+            [categoryId, template.id],
+          ).catch((e) => { console.warn('Skipping preserved template category:', e.message); });
+          keptTemplateCategories += 1;
+        }
+        console.log(`Preserved the category of ${keptTemplateCategories} notification templates`);
+      }
+
       appEvents.emit(IMPORT_PROGRESS_EVENT, { stepId: 'upgrades', status: 'completed' });
     });
 
@@ -1553,19 +1792,21 @@ const importBackupCSV = async (fileUri, cancelToken) => {
   // Split by section markers. The six [BUDGET_PLAN*] markers don't collide:
   // each marker + newline (`[BUDGET_PLANS]\n`, `[BUDGET_PLAN_LINES]\n`) is not a
   // substring of any of the others.
-  const accountsMatch = fileContent.match(/\[ACCOUNTS\]\n([\s\S]*?)(?=\n\[|$)/);
-  const categoriesMatch = fileContent.match(/\[CATEGORIES\]\n([\s\S]*?)(?=\n\[|$)/);
-  const operationsMatch = fileContent.match(/\[OPERATIONS\]\n([\s\S]*?)(?=\n\[|$)/);
-  const budgetsMatch = fileContent.match(/\[BUDGETS\]\n([\s\S]*?)(?=\n\[|$)/);
-  const metadataMatch = fileContent.match(/\[APP_METADATA\]\n([\s\S]*?)(?=\n\[|$)/);
-  const balanceHistoryMatch = fileContent.match(/\[BALANCE_HISTORY\]\n([\s\S]*?)(?=\n\[|$)/);
-  const plannedOpsMatch = fileContent.match(/\[PLANNED_OPERATIONS\]\n([\s\S]*?)(?=\n\[|$)/);
-  const budgetPlansMatch = fileContent.match(/\[BUDGET_PLANS\]\n([\s\S]*?)(?=\n\[|$)/);
-  const budgetPlanLinesMatch = fileContent.match(/\[BUDGET_PLAN_LINES\]\n([\s\S]*?)(?=\n\[|$)/);
-  const budgetPlanLineCategoriesMatch = fileContent.match(/\[BUDGET_PLAN_LINE_CATEGORIES\]\n([\s\S]*?)(?=\n\[|$)/);
-  const budgetPlanLineGroupsMatch = fileContent.match(/\[BUDGET_PLAN_LINE_GROUPS\]\n([\s\S]*?)(?=\n\[|$)/);
-  const budgetPlanLineAccountsMatch = fileContent.match(/\[BUDGET_PLAN_LINE_ACCOUNTS\]\n([\s\S]*?)(?=\n\[|$)/);
-  const budgetPlanLineLabelsMatch = fileContent.match(/\[BUDGET_PLAN_LINE_LABELS\]\n([\s\S]*?)(?=\n\[|$)/);
+  const accountsMatch = fileContent.match(/\[ACCOUNTS\]\n([\s\S]*?)(?=\n\[[A-Z_]+\]\n|$)/);
+  const categoriesMatch = fileContent.match(/\[CATEGORIES\]\n([\s\S]*?)(?=\n\[[A-Z_]+\]\n|$)/);
+  const operationsMatch = fileContent.match(/\[OPERATIONS\]\n([\s\S]*?)(?=\n\[[A-Z_]+\]\n|$)/);
+  const budgetsMatch = fileContent.match(/\[BUDGETS\]\n([\s\S]*?)(?=\n\[[A-Z_]+\]\n|$)/);
+  const metadataMatch = fileContent.match(/\[APP_METADATA\]\n([\s\S]*?)(?=\n\[[A-Z_]+\]\n|$)/);
+  const balanceHistoryMatch = fileContent.match(/\[BALANCE_HISTORY\]\n([\s\S]*?)(?=\n\[[A-Z_]+\]\n|$)/);
+  const plannedOpsMatch = fileContent.match(/\[PLANNED_OPERATIONS\]\n([\s\S]*?)(?=\n\[[A-Z_]+\]\n|$)/);
+  const budgetPlansMatch = fileContent.match(/\[BUDGET_PLANS\]\n([\s\S]*?)(?=\n\[[A-Z_]+\]\n|$)/);
+  const budgetPlanLinesMatch = fileContent.match(/\[BUDGET_PLAN_LINES\]\n([\s\S]*?)(?=\n\[[A-Z_]+\]\n|$)/);
+  const budgetPlanLineCategoriesMatch = fileContent.match(/\[BUDGET_PLAN_LINE_CATEGORIES\]\n([\s\S]*?)(?=\n\[[A-Z_]+\]\n|$)/);
+  const budgetPlanLineGroupsMatch = fileContent.match(/\[BUDGET_PLAN_LINE_GROUPS\]\n([\s\S]*?)(?=\n\[[A-Z_]+\]\n|$)/);
+  const budgetPlanLineAccountsMatch = fileContent.match(/\[BUDGET_PLAN_LINE_ACCOUNTS\]\n([\s\S]*?)(?=\n\[[A-Z_]+\]\n|$)/);
+  const budgetPlanLineLabelsMatch = fileContent.match(/\[BUDGET_PLAN_LINE_LABELS\]\n([\s\S]*?)(?=\n\[[A-Z_]+\]\n|$)/);
+  const merchantRulesMatch = fileContent.match(/\[NOTIFICATION_MERCHANT_RULES\]\n([\s\S]*?)(?=\n\[[A-Z_]+\]\n|$)/);
+  const notificationTemplatesMatch = fileContent.match(/\[NOTIFICATION_TEMPLATES\]\n([\s\S]*?)(?=\n\[[A-Z_]+\]\n|$)/);
 
   if (accountsMatch) sections.accounts = parseCSV(accountsMatch[1]);
   if (categoriesMatch) sections.categories = parseCSV(categoriesMatch[1]);
@@ -1580,6 +1821,13 @@ const importBackupCSV = async (fileUri, cancelToken) => {
   if (budgetPlanLineGroupsMatch) sections.budget_plan_line_groups = parseCSV(budgetPlanLineGroupsMatch[1]);
   if (budgetPlanLineAccountsMatch) sections.budget_plan_line_accounts = parseCSV(budgetPlanLineAccountsMatch[1]);
   if (budgetPlanLineLabelsMatch) sections.budget_plan_line_labels = parseCSV(budgetPlanLineLabelsMatch[1]);
+  // Only set when the section is really there: an absent key is what tells
+  // restoreBackup to leave the live rules and templates alone, rather than
+  // clearing them and restoring nothing (#1695). A CSV written by an older
+  // build has no such section, and its restore must not cost the user their
+  // merchant bindings.
+  if (merchantRulesMatch) sections.notification_merchant_rules = parseCSV(merchantRulesMatch[1]);
+  if (notificationTemplatesMatch) sections.notification_templates = parseCSV(notificationTemplatesMatch[1]);
 
   // Extract version from header
   const versionMatch = fileContent.match(/# Version: (\d+)/);

@@ -6,6 +6,7 @@
 
 import React from 'react';
 import { render, waitFor } from '@testing-library/react-native';
+import { SUGGESTION_TIMEOUT_MS } from '../../app/components/operations/DescriptionSuggestionRow';
 
 // Mock all dependencies
 jest.mock('../../app/contexts/ThemeColorsContext', () => ({
@@ -105,11 +106,14 @@ jest.mock('../../app/modals/OperationModal', () => {
   };
 });
 
+// Hoisted so tests can assert on the list's imperative scrolls; jest allows a
+// `mock`-prefixed binding inside the factory below.
+const mockScrollToOffset = jest.fn();
 jest.mock('../../app/components/operations/OperationsList', () => {
   const React = require('react');
   return React.forwardRef(function MockOperationsList(props, ref) {
     React.useImperativeHandle(ref, () => ({
-      scrollToOffset: jest.fn(),
+      scrollToOffset: mockScrollToOffset,
       scrollToIndex: jest.fn(),
     }));
     // The header (the quick-add block) is rendered as a child so tests can reach
@@ -124,6 +128,10 @@ jest.mock('../../app/components/operations/OperationsList', () => {
       onContentSizeChange: props.onContentSizeChange,
       onScrollToIndexFailed: props.onScrollToIndexFailed,
       onLoadMore: props.onLoadMore,
+      pendingSuggestionId: props.pendingSuggestionId,
+      pendingSuggestions: props.pendingSuggestions,
+      onApplySuggestion: props.onApplySuggestion,
+      onDismissSuggestion: props.onDismissSuggestion,
     }, props.headerComponent);
   });
 });
@@ -134,7 +142,26 @@ jest.mock('../../app/components/operations/QuickAddForm', () => {
     return React.createElement('QuickAddForm', {
       testID: 'quick-add-form',
       handleQuickAdd: props.handleQuickAdd,
+      saving: props.saving,
     });
+  };
+});
+
+// The deck itself is covered by its own tests; here only whether (and with
+// what) the screen renders it matters. The sizing helpers stay real.
+jest.mock('../../app/components/operations/NotificationBindingStack', () => {
+  const React = require('react');
+  const actual = jest.requireActual('../../app/components/operations/NotificationBindingStack');
+  return {
+    __esModule: true,
+    ...actual,
+    default: function MockNotificationBindingStack(props) {
+      return React.createElement('NotificationBindingStack', {
+        testID: 'notification-binding-stack',
+        count: props.suggestions.length,
+        quickAddHeight: props.quickAddHeight,
+      });
+    },
   };
 });
 
@@ -223,6 +250,18 @@ jest.mock('../../app/hooks/useMultiCurrencyTransfer', () => jest.fn(() => ({
   rateSource: 'offline',
   setRateSource: jest.fn(),
 })));
+
+// Only the label-suggestion query is stubbed; the rest of OperationsDB stays
+// real. Defaults to "no labels yet" so the suggestion row is absent unless a
+// test asks for it.
+jest.mock('../../app/services/OperationsDB', () => {
+  const actual = jest.requireActual('../../app/services/OperationsDB');
+  return {
+    __esModule: true,
+    ...actual,
+    getDistinctLabels: jest.fn(() => Promise.resolve([])),
+  };
+});
 
 jest.mock('../../app/services/BalanceHistoryDB', () => ({
   formatDate: jest.fn((date) => {
@@ -1146,6 +1185,114 @@ describe('OperationsScreen', () => {
 
       expect(mockResetForm).toHaveBeenCalled();
       expect(mockClosePicker).toHaveBeenCalled();
+    });
+  });
+
+  // Issue #1699: no save path had an in-flight guard, and quick-add awaits a live
+  // exchange-rate fetch before it writes, so a fast double tap booked the operation
+  // twice.
+  describe('Quick-add double submit (issue #1699)', () => {
+    const { act } = require('@testing-library/react-native');
+
+    it('books the operation once when Add is tapped twice in the same frame', async () => {
+      const OperationsScreen = require('../../app/screens/OperationsScreen').default;
+      const { useOperationsData } = require('../../app/contexts/OperationsDataContext');
+      const { useOperationsActions } = require('../../app/contexts/OperationsActionsContext');
+      const { useAccountsData } = require('../../app/contexts/AccountsDataContext');
+      const useQuickAddForm = require('../../app/hooks/useQuickAddForm');
+
+      const mockAddOperation = jest.fn(() => Promise.resolve({ id: 'new-op' }));
+      useQuickAddForm.mockReturnValue({
+        quickAddValues: { type: 'expense', amount: '100', accountId: 'acc-1', categoryId: 'cat-1' },
+        setQuickAddValues: jest.fn(),
+        getAccountName: jest.fn(() => 'Cash'),
+        getAccountBalance: jest.fn(() => '$1000.00'),
+        getCategoryInfo: jest.fn(() => ({ name: 'Food', icon: 'food' })),
+        getCategoryName: jest.fn(() => 'Food'),
+        filteredCategories: [],
+        resetForm: jest.fn(),
+      });
+
+      useAccountsData.mockReturnValue({
+        accounts: [{ id: 'acc-1', currency: 'USD' }],
+        visibleAccounts: [{ id: 'acc-1', currency: 'USD' }],
+        loading: false,
+      });
+      useOperationsData.mockReturnValue({
+        operations: [], loading: false, loadingMore: false, hasMoreOperations: false,
+      });
+      useOperationsActions.mockReturnValue({
+        deleteOperation: jest.fn(),
+        addOperation: mockAddOperation,
+        validateOperation: jest.fn(() => null),
+        loadMoreOperations: jest.fn(),
+        jumpToDate: jest.fn(),
+      });
+
+      const { getByTestId } = await render(<OperationsScreen />);
+
+      await act(async () => {
+        const { handleQuickAdd } = getByTestId('quick-add-form').props;
+        // Both calls happen before the first save settles.
+        await Promise.all([handleQuickAdd(), handleQuickAdd()]);
+      });
+
+      expect(mockAddOperation).toHaveBeenCalledTimes(1);
+    });
+
+    it('marks the form as saving for as long as the write is pending', async () => {
+      const OperationsScreen = require('../../app/screens/OperationsScreen').default;
+      const { useOperationsData } = require('../../app/contexts/OperationsDataContext');
+      const { useOperationsActions } = require('../../app/contexts/OperationsActionsContext');
+      const { useAccountsData } = require('../../app/contexts/AccountsDataContext');
+      const useQuickAddForm = require('../../app/hooks/useQuickAddForm');
+
+      let resolveWrite;
+      const mockAddOperation = jest.fn(() => new Promise((resolve) => { resolveWrite = resolve; }));
+      useQuickAddForm.mockReturnValue({
+        quickAddValues: { type: 'expense', amount: '100', accountId: 'acc-1', categoryId: 'cat-1' },
+        setQuickAddValues: jest.fn(),
+        getAccountName: jest.fn(() => 'Cash'),
+        getAccountBalance: jest.fn(() => '$1000.00'),
+        getCategoryInfo: jest.fn(() => ({ name: 'Food', icon: 'food' })),
+        getCategoryName: jest.fn(() => 'Food'),
+        filteredCategories: [],
+        resetForm: jest.fn(),
+      });
+
+      useAccountsData.mockReturnValue({
+        accounts: [{ id: 'acc-1', currency: 'USD' }],
+        visibleAccounts: [{ id: 'acc-1', currency: 'USD' }],
+        loading: false,
+      });
+      useOperationsData.mockReturnValue({
+        operations: [], loading: false, loadingMore: false, hasMoreOperations: false,
+      });
+      useOperationsActions.mockReturnValue({
+        deleteOperation: jest.fn(),
+        addOperation: mockAddOperation,
+        validateOperation: jest.fn(() => null),
+        loadMoreOperations: jest.fn(),
+        jumpToDate: jest.fn(),
+      });
+
+      const { getByTestId } = await render(<OperationsScreen />);
+      expect(getByTestId('quick-add-form').props.saving).toBe(false);
+
+      let pending;
+      await act(async () => {
+        pending = getByTestId('quick-add-form').props.handleQuickAdd();
+      });
+
+      // The Add button has to look unavailable, not just swallow the tap.
+      expect(getByTestId('quick-add-form').props.saving).toBe(true);
+
+      await act(async () => {
+        resolveWrite({ id: 'op-1' });
+        await pending;
+      });
+
+      expect(getByTestId('quick-add-form').props.saving).toBe(false);
     });
   });
 
@@ -2619,7 +2766,7 @@ describe('OperationsScreen', () => {
   // settings): SimpleTabs switches tabs, and the screen brings the suggestion deck
   // over the quick-add form into view.
   describe('Pending-operations deep link', () => {
-    const { act } = require('@testing-library/react-native');
+    const { act, fireEvent } = require('@testing-library/react-native');
     const { appEvents, EVENTS } = require('../../app/services/eventEmitter');
 
     const mockSuggestionsHook = (overrides = {}) => {
@@ -2643,6 +2790,31 @@ describe('OperationsScreen', () => {
 
     beforeEach(() => {
       jest.clearAllMocks();
+    });
+
+    // Regression: accepting a card runs a LayoutAnimation, during which the
+    // quick-add wrapper reports a transient 0. Keeping that zero dropped the
+    // deck's frame to the MIN_CARD_HEIGHT floor, so the next suggestion rendered
+    // a short card and jumped to the form's height a frame later. A zero from an
+    // open block is never real — the form is always laid out there.
+    it('keeps the last real quick-add height when an open block measures 0', async () => {
+      const OperationsScreen = require('../../app/screens/OperationsScreen').default;
+      mockSuggestionsHook({ suggestions: [{ id: 'p1', type: 'expense', amount: '10' }] });
+
+      const { getByTestId } = await render(<OperationsScreen />);
+      await act(async () => {
+        fireEvent(getByTestId('quick-add-measure', { includeHiddenElements: true }), 'layout', {
+          nativeEvent: { layout: { height: 437 } },
+        });
+      });
+      expect(getByTestId('notification-binding-stack').props.quickAddHeight).toBe(437);
+
+      await act(async () => {
+        fireEvent(getByTestId('quick-add-measure', { includeHiddenElements: true }), 'layout', {
+          nativeEvent: { layout: { height: 0 } },
+        });
+      });
+      expect(getByTestId('notification-binding-stack').props.quickAddHeight).toBe(437);
     });
 
     it('refreshes the suggestion queue on the deep-link event', async () => {
@@ -2833,6 +3005,69 @@ describe('OperationsScreen', () => {
       expect(queryByTestId('quick-add-fab')).toBeNull();
     });
 
+    const SUGGESTION = { id: 's-1', amount: '10', currency: 'USD', type: 'expense', merchant: 'Shop' };
+    const suggestionsHookValue = (suggestions) => ({
+      suggestions,
+      committingIds: {},
+      saveErrors: {},
+      choices: {},
+      setChoice: jest.fn(),
+      reload: jest.fn(),
+      refresh: jest.fn(),
+      accept: jest.fn(),
+      dismiss: jest.fn(),
+    });
+
+    it('puts the deck on screen before the collapsed panel has ever been measured', async () => {
+      const OperationsScreen = require('../../app/screens/OperationsScreen').default;
+      const usePendingOperationSuggestions = require('../../app/hooks/usePendingOperationSuggestions').default;
+      setPanelSetting(false);
+      usePendingOperationSuggestions.mockReturnValue(suggestionsHookValue([SUGGESTION]));
+
+      const { getByTestId } = await render(<OperationsScreen />);
+
+      // onLayout never fires here — exactly as it need not have on a device
+      // where the panel sat collapsed behind the + button. The cards must not
+      // wait for a measurement; the stack floors its frame instead.
+      const stack = getByTestId('notification-binding-stack');
+      expect(stack.props.count).toBe(1);
+      expect(stack.props.quickAddHeight).toBe(0);
+    });
+
+    it('scrolls the list to the top when a deck arrives on its own', async () => {
+      const OperationsScreen = require('../../app/screens/OperationsScreen').default;
+      const usePendingOperationSuggestions = require('../../app/hooks/usePendingOperationSuggestions').default;
+      setPanelSetting(false);
+      usePendingOperationSuggestions.mockReturnValue(suggestionsHookValue([]));
+
+      const { rerender } = await render(<OperationsScreen />);
+      mockScrollToOffset.mockClear();
+
+      // The foreground resync (or a pull-to-refresh) fills the queue. The cards
+      // sit in the list header, so the list has to be brought there — nothing
+      // else on the screen announces them.
+      usePendingOperationSuggestions.mockReturnValue(suggestionsHookValue([SUGGESTION]));
+      await act(async () => { rerender(<OperationsScreen />); });
+
+      expect(mockScrollToOffset).toHaveBeenCalledWith({ offset: 0, animated: true });
+    });
+
+    it('leaves a deck arriving behind search to the search-close scroll', async () => {
+      const OperationsScreen = require('../../app/screens/OperationsScreen').default;
+      const usePendingOperationSuggestions = require('../../app/hooks/usePendingOperationSuggestions').default;
+      setPanelSetting(false);
+      useSearch.mockReturnValue({ ...searchClosed(), searchMode: 'open' });
+      usePendingOperationSuggestions.mockReturnValue(suggestionsHookValue([]));
+
+      const { rerender } = await render(<OperationsScreen />);
+      mockScrollToOffset.mockClear();
+
+      usePendingOperationSuggestions.mockReturnValue(suggestionsHookValue([SUGGESTION]));
+      await act(async () => { rerender(<OperationsScreen />); });
+
+      expect(mockScrollToOffset).not.toHaveBeenCalled();
+    });
+
     it('does not reopen a summoned form behind search', async () => {
       const OperationsScreen = require('../../app/screens/OperationsScreen').default;
       setPanelSetting(false);
@@ -2865,6 +3100,99 @@ describe('OperationsScreen', () => {
       const { queryByTestId } = await render(<OperationsScreen />);
 
       expect(queryByTestId('quick-add-fab')).toBeNull();
+    });
+  });
+
+  // The label-suggestion strip under a just-added operation is an offer that
+  // expires: left alone it clears itself after two minutes so it does not stay
+  // pinned to an operation the user has long since moved past.
+  describe('Label suggestion auto-dismiss', () => {
+    const { act } = require('@testing-library/react-native');
+
+    const renderWithSuggestions = async () => {
+      const OperationsScreen = require('../../app/screens/OperationsScreen').default;
+      const { useOperationsData } = require('../../app/contexts/OperationsDataContext');
+      const { useOperationsActions } = require('../../app/contexts/OperationsActionsContext');
+      const { useAccountsData } = require('../../app/contexts/AccountsDataContext');
+      const { getDistinctLabels } = require('../../app/services/OperationsDB');
+      const useQuickAddForm = require('../../app/hooks/useQuickAddForm');
+      const useOperationPicker = require('../../app/hooks/useOperationPicker');
+
+      getDistinctLabels.mockResolvedValue(['coffee', 'groceries']);
+
+      useOperationPicker.mockReturnValue({
+        pickerState: { visible: true, type: 'category', data: [] },
+        categoryNavigation: { currentFolderId: null, breadcrumb: [] },
+        openPicker: jest.fn(),
+        closePicker: jest.fn(),
+        navigateIntoFolder: jest.fn(),
+        navigateBack: jest.fn(),
+      });
+
+      useQuickAddForm.mockReturnValue({
+        quickAddValues: { type: 'expense', amount: '100', accountId: 'acc-1', categoryId: 'cat-1' },
+        setQuickAddValues: jest.fn(),
+        getAccountName: jest.fn(() => 'Cash'),
+        getAccountBalance: jest.fn(() => '$1000.00'),
+        getCategoryInfo: jest.fn(() => ({ name: 'Food', icon: 'food' })),
+        getCategoryName: jest.fn(() => 'Food'),
+        filteredCategories: [],
+        resetForm: jest.fn(),
+      });
+
+      useAccountsData.mockReturnValue({
+        accounts: [{ id: 'acc-1', currency: 'USD' }],
+        visibleAccounts: [{ id: 'acc-1', currency: 'USD' }],
+        loading: false,
+      });
+      useOperationsData.mockReturnValue({
+        operations: [], loading: false, loadingMore: false, hasMoreOperations: false,
+      });
+      useOperationsActions.mockReturnValue({
+        deleteOperation: jest.fn(),
+        addOperation: jest.fn(() => Promise.resolve({ id: 'new-op', description: '' })),
+        updateOperation: jest.fn(() => Promise.resolve()),
+        validateOperation: jest.fn(() => null),
+        loadMoreOperations: jest.fn(),
+        jumpToDate: jest.fn(),
+      });
+
+      const utils = await render(<OperationsScreen />);
+      await act(async () => {
+        await utils.getByTestId('picker-modal').props.onAutoAddWithCategory('cat-1');
+      });
+      return utils;
+    };
+
+    beforeEach(() => {
+      jest.useFakeTimers();
+    });
+
+    afterEach(() => {
+      jest.useRealTimers();
+      // clearAllMocks resets calls, not implementations — restore the module
+      // mock's "no labels yet" default so later tests are unaffected.
+      require('../../app/services/OperationsDB').getDistinctLabels.mockResolvedValue([]);
+    });
+
+    it('keeps the suggestions on screen before the timeout elapses', async () => {
+      const { getByTestId } = await renderWithSuggestions();
+
+      expect(getByTestId('operations-list').props.pendingSuggestionId).toBe('new-op');
+
+      await act(async () => { jest.advanceTimersByTime(SUGGESTION_TIMEOUT_MS - 1000); });
+
+      expect(getByTestId('operations-list').props.pendingSuggestionId).toBe('new-op');
+      expect(getByTestId('operations-list').props.pendingSuggestions).toEqual(['coffee', 'groceries']);
+    });
+
+    it('clears the suggestions once the timeout elapses', async () => {
+      const { getByTestId } = await renderWithSuggestions();
+
+      await act(async () => { jest.advanceTimersByTime(SUGGESTION_TIMEOUT_MS); });
+
+      expect(getByTestId('operations-list').props.pendingSuggestionId).toBeNull();
+      expect(getByTestId('operations-list').props.pendingSuggestions).toEqual([]);
     });
   });
 });

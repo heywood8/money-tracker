@@ -263,7 +263,13 @@ jest.mock('react-native-reanimated', () => {
       }
     },
     withSpring: (toValue, config, callback) => {
-      if (callback) callback(true);
+      // `global.__mockSpringFinished` lets a test play an *interrupted* spring
+      // (the completion callback firing with finished=false), which is what a
+      // direct write to the same shared value does in production;
+      // `global.__mockSpringPending` leaves the spring in flight, so the
+      // completion callback never runs at all.
+      if (global.__mockSpringPending) return toValue;
+      if (callback) callback(global.__mockSpringFinished !== false);
       return toValue;
     },
     withTiming: (toValue, config, callback) => {
@@ -1794,6 +1800,108 @@ describe('SimpleTabs Navigation (Logic Tests)', () => {
       expect(shouldTriggerSwipe(30, 600)).toBe(true);
       expect(shouldTriggerSwipe(-60, -200)).toBe(true);
       expect(shouldTriggerSwipe(-30, -600)).toBe(true);
+    });
+  });
+});
+
+describe('SimpleTabs deep link to the review deck', () => {
+  const { appEvents, EVENTS } = require('../../app/services/eventEmitter');
+
+  beforeEach(() => {
+    jest.clearAllMocks();
+    mockShowAccountsTab = false;
+    mockShowBudgetTab = true;
+    delete global.__mockSpringFinished;
+    delete global.__mockSpringPending;
+  });
+
+  afterEach(() => {
+    delete global.__mockSpringFinished;
+    delete global.__mockSpringPending;
+  });
+
+  it('switches to Operations when a tapped review notification routes here', async () => {
+    const { getByTestId } = await render(<SimpleTabs />);
+    await act(async () => { fireEvent(getByTestId('tab-settings'), 'pressIn'); });
+    await waitFor(() => {
+      expect(getByTestId('tab-settings').props.accessibilityState).toEqual({ selected: true });
+    });
+
+    await act(async () => { appEvents.emit(EVENTS.OPEN_PENDING_OPERATIONS); });
+
+    await waitFor(() => {
+      expect(getByTestId('tab-Operations').props.accessibilityState).toEqual({ selected: true });
+    });
+  });
+
+  // Regression: a non-adjacent transition whose spring was interrupted used to
+  // return early from its completion callback, leaving isTransitioningRef true
+  // for the rest of the session. Every later switch — a tab press, and the one a
+  // tapped "transactions to review" notification asks for — was then dropped on
+  // handleTabPress's first line, so the review deck never came forward.
+  it('keeps navigating after a non-adjacent transition is interrupted', async () => {
+    global.__mockSpringFinished = false;
+    const { getByTestId } = await render(<SimpleTabs />);
+
+    // Operations (0) → Settings (3): the non-adjacent path, spring interrupted.
+    await act(async () => { fireEvent(getByTestId('tab-settings'), 'pressIn'); });
+
+    global.__mockSpringFinished = true;
+    await act(async () => { fireEvent(getByTestId('tab-Graphs'), 'pressIn'); });
+
+    await waitFor(() => {
+      expect(getByTestId('tab-Graphs').props.accessibilityState).toEqual({ selected: true });
+    });
+  });
+
+  it('switches to Operations when a tapped "operations added" notification routes here', async () => {
+    const { getByTestId } = await render(<SimpleTabs />);
+    await act(async () => { fireEvent(getByTestId('tab-settings'), 'pressIn'); });
+    await waitFor(() => {
+      expect(getByTestId('tab-settings').props.accessibilityState).toEqual({ selected: true });
+    });
+
+    await act(async () => { appEvents.emit(EVENTS.OPEN_ADDED_OPERATIONS); });
+
+    await waitFor(() => {
+      expect(getByTestId('tab-Operations').props.accessibilityState).toEqual({ selected: true });
+    });
+  });
+
+  // The receipt deep link gets the same treatment as the review one: the guard
+  // must not swallow it either.
+  it('lands the "operations added" deep link while a transition is in flight', async () => {
+    global.__mockSpringPending = true;
+    const { getByTestId } = await render(<SimpleTabs />);
+
+    await act(async () => { fireEvent(getByTestId('tab-settings'), 'pressIn'); });
+    await waitFor(() => {
+      expect(getByTestId('tab-settings').props.accessibilityState).toEqual({ selected: true });
+    });
+
+    await act(async () => { appEvents.emit(EVENTS.OPEN_ADDED_OPERATIONS); });
+
+    await waitFor(() => {
+      expect(getByTestId('tab-Operations').props.accessibilityState).toEqual({ selected: true });
+    });
+  });
+
+  // A transition still in flight turns an ordinary tab press away, which is the
+  // point of the guard — but a deep link is not a competing user gesture, so it
+  // lands anyway rather than going silently nowhere.
+  it('lands on Operations even while a tab transition is still in flight', async () => {
+    global.__mockSpringPending = true;
+    const { getByTestId } = await render(<SimpleTabs />);
+
+    await act(async () => { fireEvent(getByTestId('tab-settings'), 'pressIn'); });
+    await waitFor(() => {
+      expect(getByTestId('tab-settings').props.accessibilityState).toEqual({ selected: true });
+    });
+
+    await act(async () => { appEvents.emit(EVENTS.OPEN_PENDING_OPERATIONS); });
+
+    await waitFor(() => {
+      expect(getByTestId('tab-Operations').props.accessibilityState).toEqual({ selected: true });
     });
   });
 });

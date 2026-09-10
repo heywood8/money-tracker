@@ -8,6 +8,14 @@ import { displayLabel } from '../../utils/labelUtils';
 import { motionDuration } from '../../utils/reducedMotion';
 import { CHIP, CHIP_TEXT } from '../../styles/componentStyles';
 
+// How long the row stays on screen before it dismisses itself. The suggestions
+// are an offer, not a task: once the user has moved on to the next entry (or put
+// the phone down), a stale strip of chips pinned under an old operation is just
+// clutter. Two minutes is long enough to finish typing the next operation and
+// come back to tag this one. Shared with OperationsScreen, which owns the state
+// the timer clears.
+export const SUGGESTION_TIMEOUT_MS = 120000;
+
 const DescriptionSuggestionRow = ({ chips, colors, onApply, onDismiss }) => {
   // Entry polish only (rise into place). Like UndoSnackbar, this row is
   // inserted into an already-mounted virtualized list cell, where a

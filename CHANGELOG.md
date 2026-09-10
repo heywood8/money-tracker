@@ -1,5 +1,61 @@
 # Changelog
 
+## [0.284.1](https://github.com/heywood8/money-tracker/compare/penny-v0.284.0...penny-v0.284.1) (2026-09-09)
+
+
+### Bug Fixes
+
+* **forms:** guard saves against double submit and failed writes ([#1736](https://github.com/heywood8/money-tracker/issues/1736)) ([6c8234a](https://github.com/heywood8/money-tracker/commit/6c8234a692ff1f26dab716965472683a9e9434aa))
+
+## [0.284.0](https://github.com/heywood8/money-tracker/compare/penny-v0.283.6...penny-v0.284.0) (2026-09-09)
+
+
+### Features
+
+* **operations:** auto-dismiss label suggestions after two minutes ([#1734](https://github.com/heywood8/money-tracker/issues/1734)) ([d28fb6b](https://github.com/heywood8/money-tracker/commit/d28fb6ba003856ccd1e540d9a4d0c9c5a0511366))
+
+## [0.283.6](https://github.com/heywood8/money-tracker/compare/penny-v0.283.5...penny-v0.283.6) (2026-09-07)
+
+
+### Bug Fixes
+
+* **notifications:** stop a stale response swallowing the "Select" deep link ([#1732](https://github.com/heywood8/money-tracker/issues/1732)) ([6aeb68f](https://github.com/heywood8/money-tracker/commit/6aeb68fb3059f1292e7dd5f0b69c8cd47706ddc4))
+
+## [0.283.5](https://github.com/heywood8/money-tracker/compare/penny-v0.283.4...penny-v0.283.5) (2026-09-07)
+
+
+### Code Refactoring
+
+* **graphs:** swap balance card header sides ([#1730](https://github.com/heywood8/money-tracker/issues/1730)) ([e5ca240](https://github.com/heywood8/money-tracker/commit/e5ca240edcc00d2866cb6bda086c6beab67ee528))
+
+## [0.283.4](https://github.com/heywood8/money-tracker/compare/penny-v0.283.3...penny-v0.283.4) (2026-09-06)
+
+
+### Bug Fixes
+
+* **notifications:** land the review deck when "Select" opens the app ([#1724](https://github.com/heywood8/money-tracker/issues/1724)) ([e4e57a4](https://github.com/heywood8/money-tracker/commit/e4e57a40014a64db97dcae07113ab79519a7bd7a))
+
+## [0.283.3](https://github.com/heywood8/money-tracker/compare/penny-v0.283.2...penny-v0.283.3) (2026-09-05)
+
+
+### Bug Fixes
+
+* **operations:** trace the review deck path and cap the pipeline wait ([#1721](https://github.com/heywood8/money-tracker/issues/1721)) ([6036db2](https://github.com/heywood8/money-tracker/commit/6036db2404dbbeb3c9bc51bf4dd51c6613e8085b))
+
+## [0.283.2](https://github.com/heywood8/money-tracker/compare/penny-v0.283.1...penny-v0.283.2) (2026-09-05)
+
+
+### Bug Fixes
+
+* **backup:** restore CSV flags, category order and notification data ([#1719](https://github.com/heywood8/money-tracker/issues/1719)) ([9b32a10](https://github.com/heywood8/money-tracker/commit/9b32a10d1bba4104a6089f4bf8e4208831666f13))
+
+## [0.283.1](https://github.com/heywood8/money-tracker/compare/penny-v0.283.0...penny-v0.283.1) (2026-09-05)
+
+
+### Bug Fixes
+
+* **operations:** surface the notification binding deck when it arrives ([#1717](https://github.com/heywood8/money-tracker/issues/1717)) ([43d042a](https://github.com/heywood8/money-tracker/commit/43d042ac6746db9fca66d2a4016d360de0c99bd8))
+
 ## [0.283.0](https://github.com/heywood8/money-tracker/compare/penny-v0.282.1...penny-v0.283.0) (2026-09-02)
 
 

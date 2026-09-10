@@ -498,6 +498,10 @@ export default function AccountsScreen({ onBackStateChange }) {
   // editValues.cardMask as a delimiter-joined list.
   const [newCardMask, setNewCardMask] = useState('');
   const [errors, setErrors] = useState({});
+  // True while an account save is in flight — guards against a double submit and
+  // keeps the form panel open until the write actually succeeds.
+  const [saving, setSaving] = useState(false);
+  const savingRef = useRef(false);
   // Pinned default account for QuickAdd. A single stored id (or null = "latest
   // used"), so making one account the default inherently clears any previous one.
   const [defaultAccountId, setDefaultAccountIdState] = useState(null);
@@ -585,18 +589,32 @@ export default function AccountsScreen({ onBackStateChange }) {
     openFormPanel(id, { ...acc, balance });
   }, [accounts, openFormPanel]);
 
-  const saveEdit = useCallback(() => {
+  // addAccount/updateAccount show their own error dialog and then rethrow. Awaiting
+  // inside try/catch keeps the panel — and everything the user typed — in place when
+  // the write fails, and stops the rejection escaping as an unhandled promise. The
+  // in-flight flag doubles as the double-submit guard.
+  const saveEdit = useCallback(async () => {
     const validation = validateAccount(editValues, t);
     if (Object.keys(validation).length) {
       setErrors(validation);
       return;
     }
-    if (editingId === 'new') {
-      addAccount(editValues);
-    } else {
-      updateAccount(editingId, editValues, createAdjustmentOperation);
+    if (savingRef.current) return;
+    savingRef.current = true;
+    setSaving(true);
+    try {
+      if (editingId === 'new') {
+        await addAccount(editValues);
+      } else {
+        await updateAccount(editingId, editValues, createAdjustmentOperation);
+      }
+      closeFormPanel();
+    } catch {
+      // The dialog raised by the actions context is the user-facing feedback.
+    } finally {
+      savingRef.current = false;
+      setSaving(false);
     }
-    closeFormPanel();
   }, [validateAccount, editValues, editingId, addAccount, updateAccount, createAdjustmentOperation, t, closeFormPanel]);
 
   const addAccountHandler = useCallback(() => {
@@ -649,6 +667,9 @@ export default function AccountsScreen({ onBackStateChange }) {
   }, [t, getOperationCount, accounts]);
 
   const handleCloseModal = useCallback(() => {
+    // Dismissing mid-save would let the resolving write close whatever panel is open
+    // by then — possibly a different account the user has since opened.
+    if (savingRef.current) return;
     Keyboard.dismiss();
     closeFormPanel();
   }, [closeFormPanel]);
@@ -959,6 +980,8 @@ export default function AccountsScreen({ onBackStateChange }) {
 
   const internalGoBack = useCallback(() => {
     if (currencyPanelVisible) { handleClosePicker(); return; }
+    // Same reason as handleCloseModal: the panel stays put until the write lands.
+    if (savingRef.current) return;
     if (editingId !== null) { closeFormPanel(); return; }
   }, [currencyPanelVisible, editingId, handleClosePicker, closeFormPanel]);
 
@@ -1063,6 +1086,7 @@ export default function AccountsScreen({ onBackStateChange }) {
               {(t('account_name') || 'Account name').toUpperCase()}
             </Text>
             <PaperTextInput
+              testID="account-name-input"
               mode="outlined"
               theme={paperInputTheme}
               value={editValues.name}
@@ -1285,10 +1309,20 @@ export default function AccountsScreen({ onBackStateChange }) {
 
           {/* Footer with Save/Cancel buttons */}
           <View style={[styles.formPanelFooter, { borderTopColor: colors.border, paddingBottom: insets.bottom + 80 }]}>
-            <TouchableRipple onPress={handleCloseModal} style={[styles.formFooterBtn, { borderColor: colors.border }]}>
+            <TouchableRipple
+              onPress={saving ? undefined : handleCloseModal}
+              disabled={saving}
+              accessibilityState={{ disabled: saving }}
+              style={[styles.formFooterBtn, { borderColor: colors.border }, saving && styles.formFooterBtnDisabled]}
+            >
               <Text style={{ color: colors.text }}>{t('cancel') || 'Cancel'}</Text>
             </TouchableRipple>
-            <TouchableRipple onPress={saveEdit} style={[styles.formFooterBtn, styles.formFooterBtnPrimary, { backgroundColor: colors.primary }]}>
+            <TouchableRipple
+              onPress={saving ? undefined : saveEdit}
+              disabled={saving}
+              accessibilityState={{ disabled: saving, busy: saving }}
+              style={[styles.formFooterBtn, styles.formFooterBtnPrimary, { backgroundColor: colors.primary }, saving && styles.formFooterBtnDisabled]}
+            >
               <Text style={styles.formFooterBtnPrimaryText}>{t('save') || 'Save'}</Text>
             </TouchableRipple>
           </View>
@@ -1593,6 +1627,9 @@ const styles = StyleSheet.create({
     flex: 1,
     height: 44,
     justifyContent: 'center',
+  },
+  formFooterBtnDisabled: {
+    opacity: 0.5,
   },
   formFooterBtnPrimary: {
     borderWidth: 0,

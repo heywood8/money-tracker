@@ -16,6 +16,10 @@ export const PEEK_OFFSET = 10;
 const EDGE_INSET = 8;
 // Floor for the card frame when the measured quick-add panel is implausibly small
 // (a transient near-zero layout pass) — the form needs at least this to be usable.
+// It is also the frame the deck opens with before the panel has reported any
+// height at all: a queue that fills while the panel sits collapsed behind the
+// + button must still put its cards on screen, and an unmeasured panel is the
+// normal state there, not a transient.
 export const MIN_CARD_HEIGHT = 260;
 
 /**
@@ -105,12 +109,21 @@ const NotificationBindingStack = memo(function NotificationBindingStack({
   onSave,
   onDismiss,
 }) {
-  if (!suggestions || suggestions.length === 0 || quickAddHeight <= 0) return null;
+  const count = suggestions ? suggestions.length : 0;
+  const cardHeight = deckCardHeight(quickAddHeight);
+  // Before the early return, as hooks must be: the line that says the cards
+  // reached the tree, and with what frame.
+  useEffect(() => {
+    if (count > 0) console.log('[deck] stack rendered', { count, cardHeight, quickAddHeight });
+  }, [count, cardHeight, quickAddHeight]);
+
+  // An unmeasured panel (quickAddHeight 0) is not a reason to hold the cards
+  // back — deckCardHeight floors the frame, and the host reserves the same room.
+  if (count === 0) return null;
 
   const visible = suggestions.slice(0, MAX_DECK);
   const overflowCount = suggestions.length - visible.length;
   const peekDepth = visible.length - 1;
-  const cardHeight = deckCardHeight(quickAddHeight);
 
   return (
     <View style={styles.overlay} pointerEvents="box-none">

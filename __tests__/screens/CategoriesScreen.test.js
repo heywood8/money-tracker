@@ -420,6 +420,67 @@ describe('CategoriesScreen', () => {
     });
   });
 
+  // Issue #1700: the screen neither awaited nor caught the context actions, so a
+  // rejected write closed the editor anyway (and surfaced as an unhandled rejection).
+  describe('failed writes keep the form open (issue #1700)', () => {
+    const leaf = { id: 'c1', name: 'Groceries', type: 'entry', category_type: 'expense' };
+
+    const mountWithContext = async (overrides) => {
+      const CategoriesScreen = require('../../app/screens/CategoriesScreen').default;
+      const { useCategories } = require('../../app/contexts/CategoriesContext');
+      useCategories.mockReturnValue({
+        categories: [leaf],
+        loading: false,
+        getChildren: jest.fn(() => []),
+        addCategory: jest.fn(),
+        updateCategory: jest.fn(),
+        deleteCategory: jest.fn(),
+        validateCategory: jest.fn(() => null),
+        ...overrides,
+      });
+      return render(<CategoriesScreen />);
+    };
+
+    it('keeps the editor open when deleteCategory rejects', async () => {
+      const showDialog = jest.fn();
+      const { useDialog } = require('../../app/contexts/DialogContext');
+      useDialog.mockReturnValue({ showDialog });
+
+      const deleteCategory = jest.fn().mockRejectedValue(
+        Object.assign(new Error('has operations'), { code: 'CATEGORY_HAS_OPERATIONS', count: 3 }),
+      );
+      const { getByLabelText, getByText } = await mountWithContext({ deleteCategory });
+
+      fireEvent.press(getByLabelText('Groceries category'));
+      await waitFor(() => getByText('save'));
+
+      fireEvent.press(getByLabelText('delete_category'));
+      const confirm = showDialog.mock.calls.at(-1)[2].find(b => b.style === 'destructive');
+      await waitFor(async () => {
+        await confirm.onPress();
+      });
+
+      expect(deleteCategory).toHaveBeenCalledWith('c1');
+      // The form is still mounted — its save button is the tell.
+      expect(getByText('save')).toBeTruthy();
+    });
+
+    it('keeps the editor open when updateCategory rejects', async () => {
+      const updateCategory = jest.fn().mockRejectedValue(new Error('db down'));
+      const { getByLabelText, getByText } = await mountWithContext({ updateCategory });
+
+      fireEvent.press(getByLabelText('Groceries category'));
+      await waitFor(() => getByText('save'));
+
+      await waitFor(() => {
+        fireEvent.press(getByText('save'));
+      });
+
+      expect(updateCategory).toHaveBeenCalled();
+      expect(getByText('save')).toBeTruthy();
+    });
+  });
+
   describe('Theme Integration', () => {
     it('applies theme colors to components', async () => {
       const CategoriesScreen = require('../../app/screens/CategoriesScreen').default;

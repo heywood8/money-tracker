@@ -43,6 +43,7 @@ const QuickAddForm = memo(({
   foreignRateSource,
   foreignExchangeRate,
   flashError,
+  saving = false,
 }) => {
   const containerThemed = React.useMemo(() => ({
     backgroundColor: colors.background,
@@ -89,6 +90,7 @@ const QuickAddForm = memo(({
           foreignRateSource={foreignRateSource}
           foreignExchangeRate={foreignExchangeRate}
           flashError={flashError}
+          addDisabled={saving}
         />
       </View>
     </View>
@@ -126,6 +128,7 @@ QuickAddForm.propTypes = {
     field: PropTypes.oneOf(['category', 'account', 'toAccount', 'amount']),
     token: PropTypes.number,
   }),
+  saving: PropTypes.bool,
 };
 
 const styles = StyleSheet.create({

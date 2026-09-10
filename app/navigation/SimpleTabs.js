@@ -275,8 +275,20 @@ export default function SimpleTabs() {
     return () => cancelIdleCallback(handle);
   }, []);
 
+  // Which tab is on screen, readable from an event listener that must not
+  // re-subscribe on every switch. Diagnostics only.
+  const activeRef = useRef(active);
+  activeRef.current = active;
+
   // Guard ref — updated synchronously so handleTabPress never reads stale state.
   const isTransitioningRef = useRef(false);
+  // Which non-adjacent transition currently owns the strip. A spring completion
+  // callback only undoes its own reposition/hide/guard trio: once something has
+  // cut in (snapToTab, or a later transition), the older callback landing a frame
+  // afterwards would restore opacities and zero the offset the *new* owner still
+  // needs, and clear a guard that is no longer its own to clear.
+  const transitionSeqRef = useRef(0);
+  const transitionSeq = useSharedValue(0);
   // Shared value mirror — readable on the worklet thread inside panGesture
   // callbacks without making any React state a useMemo dep (which would
   // reinstall the native gesture recognizer mid-animation and cause jitter).
@@ -339,11 +351,15 @@ export default function SimpleTabs() {
     isTransitioningRef.current = false;
   }, []);
 
+  // Returns why it did nothing, or 'moved' — a deep link needs to know the
+  // difference between "already there" (fine) and "dropped" (the destination
+  // never came forward), which a silent early return cannot tell it.
   const handleTabPress = useCallback((tabKey) => {
-    if (isTransitioningRef.current) return;
+    if (isTransitioningRef.current) return 'busy';
     const newIndex = TABS.findIndex(tab => tab.key === tabKey);
     const oldIndex = TABS.findIndex(tab => tab.key === active);
-    if (newIndex === -1 || newIndex === oldIndex) return;
+    if (newIndex === -1) return 'unknown';
+    if (newIndex === oldIndex) return 'already-active';
 
     const distance = Math.abs(newIndex - oldIndex);
 
@@ -372,6 +388,9 @@ export default function SimpleTabs() {
 
       isTransitioningShared.value = true;
       isTransitioningRef.current = true;
+      transitionSeqRef.current += 1;
+      const seq = transitionSeqRef.current;
+      transitionSeq.value = seq;
 
       // Hide intermediate screens so they don't bleed through when the repositioned
       // target overlaps their strip position (all worklet-thread, no React render).
@@ -382,9 +401,19 @@ export default function SimpleTabs() {
       targetAdjust.value = adjacentOffset; // instant reposition on worklet thread
       translateX.value = withSpring(-(oldIndex + direction) * SCREEN_WIDTH, TAB_SPRING, (finished) => {
         'worklet';
-        if (!finished) return;
+        // Superseded: something else owns the strip now and has already put the
+        // offsets, opacities and guard where they belong.
+        if (transitionSeq.value !== seq) return;
         // Snap strip, zero offset, restore opacities — all on worklet thread, no flash.
-        translateX.value = -newIndex * SCREEN_WIDTH;
+        // The reposition/hide/guard trio is undone whether or not the spring
+        // reached its target. An interrupted spring (the tab set toggling under
+        // it writes translateX directly) used to return here early and leave
+        // `isTransitioningRef` true for the rest of the session — after which
+        // handleTabPress dropped every later switch on its first line, including
+        // the one a tapped "transactions to review" notification asks for, and
+        // the intermediate screens stayed at opacity 0. Only the strip position
+        // is skipped on an interruption: whoever cut in owns it now.
+        if (finished) translateX.value = -newIndex * SCREEN_WIDTH;
         targetAdjust.value = 0;
         opacityValues[0].value = 1;
         opacityValues[1].value = 1;
@@ -400,7 +429,8 @@ export default function SimpleTabs() {
     // Only the tab highlight changes; all screens are already mounted, so the
     // destination content is on-screen and slides in together with the strip.
     setActive(tabKey);
-  }, [TABS, active, activeIndex, translateX, pillPosition, isTransitioningShared,
+    return 'moved';
+  }, [TABS, active, activeIndex, translateX, pillPosition, isTransitioningShared, transitionSeq,
     screenAdjust0, screenAdjust1, screenAdjust2, screenAdjust3, screenAdjust4,
     screenOpacity0, screenOpacity1, screenOpacity2, screenOpacity3, screenOpacity4,
     clearTransitioningRef]);
@@ -422,24 +452,75 @@ export default function SimpleTabs() {
     // `active` would re-snap the strip mid-animation on every tab switch.
   }, [showAccountsTab, showBudgetTab]);
 
+  // Land on a tab with no animation and no guard, undoing anything a
+  // half-finished transition left behind (a repositioned target screen, hidden
+  // intermediates, the in-flight flags). The transition guard exists to keep two
+  // *user* switches from fighting; a deep link is not a second opinion, so when
+  // the guard turns one away this puts the destination on screen regardless.
+  const snapToTab = useCallback((tabKey) => {
+    const idx = TABS.findIndex(tab => tab.key === tabKey);
+    if (idx === -1) return false;
+    transitionSeqRef.current += 1;
+    transitionSeq.value = transitionSeqRef.current;
+    isTransitioningShared.value = false;
+    isTransitioningRef.current = false;
+    activeIndex.value = idx;
+    pillPosition.value = idx;
+    translateX.value = -idx * SCREEN_WIDTH;
+    [screenAdjust0, screenAdjust1, screenAdjust2, screenAdjust3, screenAdjust4]
+      .forEach((value) => { value.value = 0; });
+    [screenOpacity0, screenOpacity1, screenOpacity2, screenOpacity3, screenOpacity4]
+      .forEach((value) => { value.value = 1; });
+    setActive(tabKey);
+    return true;
+  }, [TABS, activeIndex, translateX, pillPosition, isTransitioningShared, transitionSeq,
+    screenAdjust0, screenAdjust1, screenAdjust2, screenAdjust3, screenAdjust4,
+    screenOpacity0, screenOpacity1, screenOpacity2, screenOpacity3, screenOpacity4]);
+
+  // Both notification deep links land on the Operations tab, and neither may be
+  // turned away by the transition guard: that guard exists to keep two *user*
+  // switches from fighting, and a deep link is not a second opinion. A switch it
+  // drops is retried as a snap, and the outcome is logged — a deep link that
+  // quietly went nowhere is exactly what "I pressed Select and no panel came up"
+  // looks like, and the old log could not tell that apart from a panel that
+  // arrived and was not seen.
+  const openOperationsForNotification = useCallback((label) => {
+    const outcome = handleTabPress('Operations');
+    // 'already-active' is read off `active`, which can lag the strip: the pan
+    // gesture moves `activeIndex` the moment the finger lifts but only calls
+    // setActive from the spring's completion, over a runOnJS hop. Mid-swipe the
+    // two disagree, and trusting the stale one would open the deck on a tab the
+    // user is not looking at — so the strip's own index gets the last word.
+    const strayed = outcome === 'already-active'
+      && activeIndex.value !== TABS.findIndex((tab) => tab.key === 'Operations');
+    const snapped = outcome === 'busy' || outcome === 'unknown' || strayed
+      ? snapToTab('Operations')
+      : false;
+    console.log(`[deck] ${label}: switching to Operations`, {
+      from: activeRef.current, outcome, strayed, snapped,
+    });
+  }, [handleTabPress, snapToTab, activeIndex, TABS]);
+
   // A tapped "transactions to review" notification routes here: jump to the
   // Operations tab. OperationsScreen listens for the same event and surfaces the
   // suggestion deck over the quick-add form, so the two land together.
-  React.useEffect(() => {
-    const unsubscribe = appEvents.on(EVENTS.OPEN_PENDING_OPERATIONS, () => {
-      handleTabPress('Operations');
-    });
-    return unsubscribe;
-  }, [handleTabPress]);
+  React.useEffect(
+    () => appEvents.on(
+      EVENTS.OPEN_PENDING_OPERATIONS,
+      () => openOperationsForNotification('open-pending event'),
+    ),
+    [openOperationsForNotification],
+  );
 
   // A tapped "operations added" notification lands on the same tab, but nothing
   // else: those operations are already booked, so the list itself is the target.
-  React.useEffect(() => {
-    const unsubscribe = appEvents.on(EVENTS.OPEN_ADDED_OPERATIONS, () => {
-      handleTabPress('Operations');
-    });
-    return unsubscribe;
-  }, [handleTabPress]);
+  React.useEffect(
+    () => appEvents.on(
+      EVENTS.OPEN_ADDED_OPERATIONS,
+      () => openOperationsForNotification('open-added event'),
+    ),
+    [openOperationsForNotification],
+  );
 
   // Android hardware back button navigates to Operations from any other tab
   React.useEffect(() => {

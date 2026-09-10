@@ -40,11 +40,11 @@ const AXIS_FONT_SIZE = 11;
 // The account picker sits on the header's title line, so the chip itself is
 // only as tall as a 12px label. The slop grows the target back to ~44px without
 // the chip pushing the amount down — downward and to the right only, because
-// the chip is pinned to the top-left corner of balanceHistoryTitleContainer and
-// Android drops a touch that lands outside the parent's bounds. Downward it
+// the chip is pinned to the top-right corner of balanceHistoryTitleContainer
+// and Android drops a touch that lands outside the parent's bounds. Downward it
 // reaches over the amount, which is not itself tappable, so the whole title
 // block selects the account.
-const ACCOUNT_PICKER_HIT_SLOP = { bottom: 22, right: 8 };
+const ACCOUNT_PICKER_HIT_SLOP = { bottom: 22, left: 8 };
 
 // What the y-axis labels and their gutter take out of the card before the plot
 // itself starts. The month pitch is derived from what is left, so the year
@@ -1217,9 +1217,12 @@ const BalanceHistoryCard = ({
             </View>
           )}
         </View>
-        {/* The header's controls. Grouped so the row's own gap spaces them:
-            each button used to carry a marginRight sized for the picker that
-            followed it, which now leaves a dangling 8px at the card's edge. */}
+        {/* The header's controls. They paint on the *left* of the row (the
+            header is row-reverse), so the icons hold a fixed position while the
+            account name beside them changes width. They stay second in the tree
+            so a screen reader still reads the account and its balance before the
+            buttons that act on them. Grouped so the row's own gap spaces them,
+            rather than a per-button margin. */}
         <View style={styles.headerActions}>
           {/* Burndown-norm toggle. Month view only — the year chart never draws
               that line (see computeYearBalanceChart). */}
@@ -1497,7 +1500,7 @@ const styles = StyleSheet.create({
     // Hugs its own label instead of filling the row: the chip is the card's
     // title now, and a title that stretched to the container would put its
     // chevron somewhere out past the end of the name.
-    alignSelf: 'flex-start',
+    alignSelf: 'flex-end',
     height: 22,
     paddingHorizontal: 0,
     width: 'auto',
@@ -1517,14 +1520,23 @@ const styles = StyleSheet.create({
     fontWeight: FONT_WEIGHT.semibold,
   },
   balanceAmount: {
+    // The row is right-aligned, so an amount that outgrows the header would
+    // spill past the container's *left* edge and get clipped there — leading
+    // digits and the currency symbol first. Shrinking ellipsises the tail
+    // instead, which is the half a reader can afford to lose.
+    flexShrink: 1,
     fontSize: 22,
     fontWeight: '700',
     letterSpacing: -0.4,
   },
   balanceAmountRow: {
     alignItems: 'baseline',
+    // Full width of the title block rather than content-sized: that is what
+    // gives the amount a bound to shrink against instead of overflowing.
+    alignSelf: 'stretch',
     flexDirection: 'row',
     gap: SPACING.sm,
+    justifyContent: 'flex-end',
     marginTop: 4,
   },
   balanceDayContext: {
@@ -1545,7 +1557,10 @@ const styles = StyleSheet.create({
   },
   balanceHistoryHeader: {
     alignItems: 'center',
-    flexDirection: 'row',
+    // Reversed rather than reordered: the controls belong on the left of the
+    // card, but the account and its balance are what a screen reader should
+    // reach first, so the visual swap happens in layout and not in the tree.
+    flexDirection: 'row-reverse',
     justifyContent: 'space-between',
     marginBottom: 16,
   },
@@ -1565,8 +1580,11 @@ const styles = StyleSheet.create({
     textAlign: 'center',
   },
   balanceHistoryTitleContainer: {
+    // Right-aligned: the controls hold the left edge, so the title block grows
+    // leftwards from the card's right edge.
+    alignItems: 'flex-end',
     flex: 1,
-    marginRight: 8,
+    marginLeft: 8,
     overflow: 'hidden',
   },
   calendarContainer: {
