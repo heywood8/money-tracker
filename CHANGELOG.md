@@ -1,5 +1,12 @@
 # Changelog
 
+## [0.284.4](https://github.com/heywood8/money-tracker/compare/penny-v0.284.3...penny-v0.284.4) (2026-09-10)
+
+
+### Bug Fixes
+
+* **graphs:** use live category context ([#1723](https://github.com/heywood8/money-tracker/issues/1723)) ([eec62ba](https://github.com/heywood8/money-tracker/commit/eec62ba652aa2a05138673c366225501a423b09b))
+
 ## [0.284.3](https://github.com/heywood8/money-tracker/compare/penny-v0.284.2...penny-v0.284.3) (2026-09-10)
 
 
