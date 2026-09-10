@@ -1,5 +1,21 @@
 # Changelog
 
+## [0.284.3](https://github.com/heywood8/money-tracker/compare/penny-v0.284.2...penny-v0.284.3) (2026-09-10)
+
+
+### Continuous Integration
+
+* skip result comments on fork pull requests ([#1739](https://github.com/heywood8/money-tracker/issues/1739)) ([c928b31](https://github.com/heywood8/money-tracker/commit/c928b311b7a0bf6ab7d62558b4c41ce9d6d7cc0f))
+
+## [0.284.2](https://github.com/heywood8/money-tracker/compare/penny-v0.284.1...penny-v0.284.2) (2026-09-10)
+
+
+### Miscellaneous Chores
+
+* **deps-dev:** bump jest from 30.4.2 to 30.5.1 ([#1727](https://github.com/heywood8/money-tracker/issues/1727)) ([90f2115](https://github.com/heywood8/money-tracker/commit/90f21151d1b5eee361791bbacfda43bff64e1c78))
+* **deps:** bump @sentry/react-native from 8.23.0 to 8.24.0 ([#1726](https://github.com/heywood8/money-tracker/issues/1726)) ([dd912d3](https://github.com/heywood8/money-tracker/commit/dd912d3d12531fb4718e59b9cf8085c7255f59d7))
+* **deps:** bump actions/setup-java from 5.7.0 to 6.0.0 ([#1674](https://github.com/heywood8/money-tracker/issues/1674)) ([0f8cc81](https://github.com/heywood8/money-tracker/commit/0f8cc810ab2b6a226aabf25bd4700e680e8e8afd))
+
 ## [0.284.1](https://github.com/heywood8/money-tracker/compare/penny-v0.284.0...penny-v0.284.1) (2026-09-09)
 
 

@@ -1,6 +1,6 @@
 {
   "name": "penny",
-  "version": "0.284.1",
+  "version": "0.284.3",
   "main": "index.js",
   "scripts": {
     "start": "expo start",
@@ -20,7 +20,7 @@
     "@react-native-async-storage/async-storage": "^2.2.0",
     "@react-native-community/datetimepicker": "9.1.0",
     "@react-native-google-signin/google-signin": "^16.1.2",
-    "@sentry/react-native": "~8.23.0",
+    "@sentry/react-native": "~8.24.0",
     "@shopify/react-native-skia": "2.11.0",
     "decimal.js": "^10.6.0",
     "drizzle-orm": "^1.0.0-beta.6-7aaf14b",
@@ -65,7 +65,7 @@
     "eslint-plugin-react": "^7.37.5",
     "eslint-plugin-react-native": "^5.0.0",
     "globals": "^17.0.0",
-    "jest": "~30.4.2",
+    "jest": "~30.5.1",
     "jest-expo": "~56.0.5",
     "react-test-renderer": "19.2.3",
     "test-renderer": "1.2"
