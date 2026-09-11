@@ -110,10 +110,11 @@ const OperationsScreen = () => {
   // per-day totals to nothing — the list looks broken rather than busy. Treat
   // the window as part of the list's loading state and let the skeleton hold it.
   //
-  // Gated on the array still being EMPTY, not on `loading` alone: both providers
-  // re-raise `loading` for background reloads (RELOAD_ALL after an import, a
-  // language switch), and those keep the previously loaded data on hand. Without
-  // the length check a finished list would blink back to a skeleton every time.
+  // Gated on the array still being EMPTY, not on `loading` alone. Both providers
+  // now route background reloads (RELOAD_ALL after an import, a language switch)
+  // through a separate flag precisely because those keep the previously loaded
+  // data on hand — but the length check is what makes this gate say "there is
+  // nothing to render yet" rather than "a fetch is in flight", so it stays.
   const referenceDataLoading = Boolean(
     (categoriesLoading && categories.length === 0)
     || (accountsLoading && accounts.length === 0),
