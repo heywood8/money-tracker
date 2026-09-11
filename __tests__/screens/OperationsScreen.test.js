@@ -5,7 +5,7 @@
  */
 
 import React from 'react';
-import { render, waitFor } from '@testing-library/react-native';
+import { render, waitFor, act } from '@testing-library/react-native';
 import { SUGGESTION_TIMEOUT_MS } from '../../app/components/operations/DescriptionSuggestionRow';
 
 // Mock all dependencies
@@ -109,9 +109,15 @@ jest.mock('../../app/modals/OperationModal', () => {
 // Hoisted so tests can assert on the list's imperative scrolls; jest allows a
 // `mock`-prefixed binding inside the factory below.
 const mockScrollToOffset = jest.fn();
+// Every header element the list has been handed, newest last. The quick-add form
+// lives in this header, so a stable identity across a keystroke is what keeps the
+// SectionList from reconciling a new header per character.
+const headerComponentsSeen = [];
+
 jest.mock('../../app/components/operations/OperationsList', () => {
   const React = require('react');
   return React.forwardRef(function MockOperationsList(props, ref) {
+    headerComponentsSeen.push(props.headerComponent);
     React.useImperativeHandle(ref, () => ({
       scrollToOffset: mockScrollToOffset,
       scrollToIndex: jest.fn(),
@@ -137,9 +143,16 @@ jest.mock('../../app/components/operations/OperationsList', () => {
   });
 });
 
+// Counts its own renders and subscribes to the real store, so a test can tell
+// "the form repainted" apart from "the screen repainted".
+const quickAddFormRenders = [];
+
 jest.mock('../../app/components/operations/QuickAddForm', () => {
   const React = require('react');
+  const { useQuickAddValues } = jest.requireActual('../../app/hooks/useQuickAddValuesStore');
   return function MockQuickAddForm(props) {
+    const values = useQuickAddValues(props.valuesStore);
+    quickAddFormRenders.push(values.amount);
     return React.createElement('QuickAddForm', {
       testID: 'quick-add-form',
       handleQuickAdd: props.handleQuickAdd,
@@ -213,8 +226,12 @@ jest.mock('../../app/hooks/usePendingOperationSuggestions', () => ({
   canSaveSuggestion: jest.fn(() => false),
 }));
 
-jest.mock('../../app/hooks/useQuickAddForm', () => jest.fn(() => ({
-  quickAddValues: {
+// The hook hands back only the structural fields as state; the typed ones
+// (amount, rate, destination amount, description) live in the store, so a
+// keystroke never reaches this screen. See useQuickAddValuesStore.
+const makeMockQuickAddStore = (values = {}) => {
+  const { createQuickAddValuesStore } = jest.requireActual('../../app/hooks/useQuickAddValuesStore');
+  return createQuickAddValuesStore({
     type: 'expense',
     amount: '',
     accountId: 'acc-1',
@@ -223,7 +240,20 @@ jest.mock('../../app/hooks/useQuickAddForm', () => jest.fn(() => ({
     toAccountId: '',
     exchangeRate: '',
     destinationAmount: '',
+    operationCurrency: '',
+    ...values,
+  });
+};
+
+jest.mock('../../app/hooks/useQuickAddForm', () => jest.fn(() => ({
+  quickAddValues: {
+    type: 'expense',
+    accountId: 'acc-1',
+    categoryId: '',
+    toAccountId: '',
+    operationCurrency: '',
   },
+  quickAddValuesStore: makeMockQuickAddStore(),
   setQuickAddValues: jest.fn(),
   getAccountName: jest.fn((id) => id === 'acc-1' ? 'Cash' : 'Unknown'),
   getAccountBalance: jest.fn(() => '$1000.00'),
@@ -1041,7 +1071,8 @@ describe('OperationsScreen', () => {
 
       const mockSetQuickAddValues = jest.fn();
       useQuickAddForm.mockReturnValue({
-        quickAddValues: { type: 'expense', amount: '', accountId: '', categoryId: '' },
+        quickAddValues: { type: 'expense', accountId: '', categoryId: '', toAccountId: '', operationCurrency: '' },
+        quickAddValuesStore: makeMockQuickAddStore({ type: 'expense', accountId: '', categoryId: '', toAccountId: '', operationCurrency: '' }),
         setQuickAddValues: mockSetQuickAddValues,
         getAccountName: jest.fn(() => 'Cash'),
         getAccountBalance: jest.fn(() => '$1000.00'),
@@ -1091,6 +1122,7 @@ describe('OperationsScreen', () => {
       const mockSetQuickAddValues = jest.fn();
       useQuickAddForm.mockReturnValue({
         quickAddValues: { type: 'expense', amount: '', accountId: '', categoryId: '' },
+        quickAddValuesStore: makeMockQuickAddStore({ type: 'expense', amount: '', accountId: '', categoryId: '' }),
         setQuickAddValues: mockSetQuickAddValues,
         getAccountName: jest.fn(() => 'Cash'),
         getAccountBalance: jest.fn(() => '$1000.00'),
@@ -1146,6 +1178,7 @@ describe('OperationsScreen', () => {
 
       useQuickAddForm.mockReturnValue({
         quickAddValues: { type: 'expense', amount: '100', accountId: 'acc-1', categoryId: '' },
+        quickAddValuesStore: makeMockQuickAddStore({ type: 'expense', amount: '100', accountId: 'acc-1', categoryId: '' }),
         setQuickAddValues: jest.fn(),
         getAccountName: jest.fn(() => 'Cash'),
         getAccountBalance: jest.fn(() => '$1000.00'),
@@ -1219,6 +1252,7 @@ describe('OperationsScreen', () => {
       const mockAddOperation = jest.fn(() => Promise.resolve({ id: 'new-op' }));
       useQuickAddForm.mockReturnValue({
         quickAddValues: { type: 'expense', amount: '100', accountId: 'acc-1', categoryId: 'cat-1' },
+        quickAddValuesStore: makeMockQuickAddStore({ type: 'expense', amount: '100', accountId: 'acc-1', categoryId: 'cat-1' }),
         setQuickAddValues: jest.fn(),
         getAccountName: jest.fn(() => 'Cash'),
         getAccountBalance: jest.fn(() => '$1000.00'),
@@ -1266,6 +1300,7 @@ describe('OperationsScreen', () => {
       const mockAddOperation = jest.fn(() => new Promise((resolve) => { resolveWrite = resolve; }));
       useQuickAddForm.mockReturnValue({
         quickAddValues: { type: 'expense', amount: '100', accountId: 'acc-1', categoryId: 'cat-1' },
+        quickAddValuesStore: makeMockQuickAddStore({ type: 'expense', amount: '100', accountId: 'acc-1', categoryId: 'cat-1' }),
         setQuickAddValues: jest.fn(),
         getAccountName: jest.fn(() => 'Cash'),
         getAccountBalance: jest.fn(() => '$1000.00'),
@@ -1340,6 +1375,7 @@ describe('OperationsScreen', () => {
       const mockAddOperation = jest.fn(() => Promise.resolve({ id: 'new-op' }));
       useQuickAddForm.mockReturnValue({
         quickAddValues: { type: 'expense', amount: '100', accountId: 'acc-1', categoryId: 'cat-1' },
+        quickAddValuesStore: makeMockQuickAddStore({ type: 'expense', amount: '100', accountId: 'acc-1', categoryId: 'cat-1' }),
         setQuickAddValues: jest.fn(),
         getAccountName: jest.fn(() => 'Cash'),
         getAccountBalance: jest.fn(() => '$1000.00'),
@@ -1403,6 +1439,7 @@ describe('OperationsScreen', () => {
       const mockAddOperation = jest.fn(() => Promise.resolve({ id: 'new-op' }));
       useQuickAddForm.mockReturnValue({
         quickAddValues: { type: 'expense', amount: '100', accountId: 'acc-1', categoryId: 'cat-1' },
+        quickAddValuesStore: makeMockQuickAddStore({ type: 'expense', amount: '100', accountId: 'acc-1', categoryId: 'cat-1' }),
         setQuickAddValues: jest.fn(),
         getAccountName: jest.fn(() => 'Cash'),
         getAccountBalance: jest.fn(() => '$1000.00'),
@@ -1708,6 +1745,7 @@ describe('OperationsScreen', () => {
 
       useQuickAddForm.mockReturnValue({
         quickAddValues: { type: 'expense', amount: '', accountId: 'acc-1', categoryId: '' },
+        quickAddValuesStore: makeMockQuickAddStore({ type: 'expense', amount: '', accountId: 'acc-1', categoryId: '' }),
         setQuickAddValues: mockSetQuickAddValues,
         getAccountName: jest.fn(() => 'Cash'),
         getAccountBalance: jest.fn(() => '$1000.00'),
@@ -1767,6 +1805,7 @@ describe('OperationsScreen', () => {
 
       useQuickAddForm.mockReturnValue({
         quickAddValues: { type: 'transfer', amount: '100', accountId: 'acc-1', toAccountId: 'acc-2' },
+        quickAddValuesStore: makeMockQuickAddStore({ type: 'transfer', amount: '100', accountId: 'acc-1', toAccountId: 'acc-2' }),
         setQuickAddValues: mockSetQuickAddValues,
         getAccountName: jest.fn(() => 'Cash'),
         getAccountBalance: jest.fn(() => '$1000.00'),
@@ -2531,6 +2570,7 @@ describe('OperationsScreen', () => {
 
       useQuickAddFormMock.mockReturnValue({
         quickAddValues: { type: 'transfer', amount: '100', accountId: 'acc-1', toAccountId: 'acc-2', exchangeRate: '', destinationAmount: '', categoryId: '' },
+        quickAddValuesStore: makeMockQuickAddStore({ type: 'transfer', amount: '100', accountId: 'acc-1', toAccountId: 'acc-2', exchangeRate: '', destinationAmount: '', categoryId: '' }),
         setQuickAddValues: mockSetQuickAddValues,
         getAccountName: jest.fn(() => 'Cash'),
         getAccountBalance: jest.fn(() => '$1000.00'),
@@ -2567,6 +2607,7 @@ describe('OperationsScreen', () => {
 
       useQuickAddFormMock.mockReturnValue({
         quickAddValues: { type: 'transfer', amount: '100', accountId: 'acc-1', toAccountId: 'acc-2', exchangeRate: '0.85', destinationAmount: '85', categoryId: '' },
+        quickAddValuesStore: makeMockQuickAddStore({ type: 'transfer', amount: '100', accountId: 'acc-1', toAccountId: 'acc-2', exchangeRate: '0.85', destinationAmount: '85', categoryId: '' }),
         setQuickAddValues: mockSetQuickAddValues,
         getAccountName: jest.fn(() => 'Cash'),
         getAccountBalance: jest.fn(() => '$1000.00'),
@@ -2598,6 +2639,7 @@ describe('OperationsScreen', () => {
 
       useQuickAddFormMock.mockReturnValue({
         quickAddValues: { type: 'transfer', amount: '100', accountId: 'acc-1', toAccountId: 'acc-2', exchangeRate: '0.92', destinationAmount: '', categoryId: '' },
+        quickAddValuesStore: makeMockQuickAddStore({ type: 'transfer', amount: '100', accountId: 'acc-1', toAccountId: 'acc-2', exchangeRate: '0.92', destinationAmount: '', categoryId: '' }),
         setQuickAddValues: mockSetQuickAddValues,
         getAccountName: jest.fn(() => 'Cash'),
         getAccountBalance: jest.fn(() => '$1000.00'),
@@ -2632,6 +2674,7 @@ describe('OperationsScreen', () => {
 
       useQuickAddFormMock.mockReturnValue({
         quickAddValues: { type: 'transfer', amount: '100', accountId: 'acc-1', toAccountId: 'acc-2', exchangeRate: '', destinationAmount: '85', categoryId: '' },
+        quickAddValuesStore: makeMockQuickAddStore({ type: 'transfer', amount: '100', accountId: 'acc-1', toAccountId: 'acc-2', exchangeRate: '', destinationAmount: '85', categoryId: '' }),
         setQuickAddValues: mockSetQuickAddValues,
         getAccountName: jest.fn(() => 'Cash'),
         getAccountBalance: jest.fn(() => '$1000.00'),
@@ -2671,6 +2714,7 @@ describe('OperationsScreen', () => {
 
       useQuickAddFormMock.mockReturnValue({
         quickAddValues: { type: 'transfer', amount: '100', accountId: 'acc-1', toAccountId: 'acc-2', exchangeRate: '0.92', destinationAmount: '92', categoryId: '' },
+        quickAddValuesStore: makeMockQuickAddStore({ type: 'transfer', amount: '100', accountId: 'acc-1', toAccountId: 'acc-2', exchangeRate: '0.92', destinationAmount: '92', categoryId: '' }),
         setQuickAddValues: mockSetQuickAddValues,
         getAccountName: jest.fn(() => 'Cash'),
         getAccountBalance: jest.fn(() => '$1000.00'),
@@ -2760,6 +2804,7 @@ describe('OperationsScreen', () => {
       const useQuickAddForm = require('../../app/hooks/useQuickAddForm');
       useQuickAddForm.mockReturnValue({
         quickAddValues: { description: '', exchangeRate: '', destinationAmount: '', toAccountId: '', categoryId: '', ...values },
+        quickAddValuesStore: makeMockQuickAddStore({ description: '', exchangeRate: '', destinationAmount: '', toAccountId: '', categoryId: '', ...values }),
         setQuickAddValues: jest.fn(),
         getAccountName: jest.fn(() => 'Cash'),
         getAccountBalance: jest.fn(() => '$1000.00'),
@@ -3194,6 +3239,7 @@ describe('OperationsScreen', () => {
 
       useQuickAddForm.mockReturnValue({
         quickAddValues: { type: 'expense', amount: '100', accountId: 'acc-1', categoryId: 'cat-1' },
+        quickAddValuesStore: makeMockQuickAddStore({ type: 'expense', amount: '100', accountId: 'acc-1', categoryId: 'cat-1' }),
         setQuickAddValues: jest.fn(),
         getAccountName: jest.fn(() => 'Cash'),
         getAccountBalance: jest.fn(() => '$1000.00'),
@@ -3258,4 +3304,55 @@ describe('OperationsScreen', () => {
       expect(getByTestId('operations-list').props.pendingSuggestions).toEqual([]);
     });
   });
+
+  // Issue #1708: typing an amount used to re-render the whole screen and rebuild
+  // the list header on every character.
+  describe('Quick-add typing does not re-render the screen', () => {
+    beforeEach(() => {
+      jest.clearAllMocks();
+      headerComponentsSeen.length = 0;
+      quickAddFormRenders.length = 0;
+    });
+
+    it('keeps the same header element and re-renders only the form as the amount changes', async () => {
+      const useQuickAddForm = require('../../app/hooks/useQuickAddForm');
+      const OperationsScreen = require('../../app/screens/OperationsScreen').default;
+
+      // A real store behind the mocked hook: writing to it is exactly what
+      // handleAmountChange does on each keystroke.
+      const store = makeMockQuickAddStore();
+      useQuickAddForm.mockReturnValue({
+        quickAddValues: { type: 'expense', accountId: 'acc-1', categoryId: '', toAccountId: '', operationCurrency: '' },
+        quickAddValuesStore: store,
+        setQuickAddValues: jest.fn(),
+        getAccountName: jest.fn(() => 'Cash'),
+        getAccountBalance: jest.fn(() => '$1000.00'),
+        getCategoryInfo: jest.fn(() => ({ name: 'Food', icon: 'food' })),
+        getCategoryName: jest.fn(() => 'Food'),
+        filteredCategories: [],
+        topCategoriesForType: [],
+        resetForm: jest.fn(),
+      });
+
+      await render(<OperationsScreen />);
+
+      const headersBefore = headerComponentsSeen.length;
+      const headerBefore = headerComponentsSeen[headersBefore - 1];
+      const formRendersBefore = quickAddFormRenders.length;
+
+      await act(async () => { store.setValues(v => ({ ...v, amount: '1' })); });
+      await act(async () => { store.setValues(v => ({ ...v, amount: '12' })); });
+      await act(async () => { store.setValues(v => ({ ...v, amount: '123' })); });
+
+      // The form saw every character...
+      expect(quickAddFormRenders.length).toBe(formRendersBefore + 3);
+      expect(quickAddFormRenders[quickAddFormRenders.length - 1]).toBe('123');
+
+      // ...and the screen did not re-render, so the list was never handed a new
+      // header element.
+      expect(headerComponentsSeen.length).toBe(headersBefore);
+      expect(headerComponentsSeen[headerComponentsSeen.length - 1]).toBe(headerBefore);
+    });
+  });
+
 });

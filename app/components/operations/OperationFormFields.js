@@ -24,6 +24,183 @@ import { hasOperation as checkHasOperation, evaluateExpression } from '../../uti
 import { BORDER_RADIUS, FONT_SIZE, SPACING } from '../../styles/designTokens';
 
 /**
+ * One button of the type selector (expense / income / transfer).
+ *
+ * Extracted and memoised because the parent re-renders on every character typed
+ * into the amount — the value it displays lives in `values` — while these three
+ * buttons depend on nothing that a keystroke changes.
+ */
+const TypeButton = memo(({ type, isSelected, disabled, colors, buttonStyle, onPress }) => {
+  const textColor = isSelected ? colors.text : (disabled ? colors.mutedText : colors.text);
+  return (
+    <Pressable
+      style={[
+        styles.typeButton,
+        {
+          backgroundColor: isSelected ? colors.selected : colors.inputBackground,
+          borderColor: colors.border,
+        },
+        buttonStyle,
+      ]}
+      onPress={() => !disabled && onPress(type.key)}
+      disabled={disabled}
+    >
+      <Icon name={type.icon} size={18} color={textColor} />
+      <Text style={[styles.typeButtonText, { color: textColor }]}>{type.label}</Text>
+    </Pressable>
+  );
+});
+TypeButton.displayName = 'TypeButton';
+TypeButton.propTypes = {
+  type: PropTypes.object.isRequired,
+  isSelected: PropTypes.bool,
+  disabled: PropTypes.bool,
+  colors: PropTypes.object.isRequired,
+  buttonStyle: PropTypes.any,
+  onPress: PropTypes.func.isRequired,
+};
+
+/**
+ * One category chip in the suggestions grid or the inline browser. Memoised for
+ * the same reason as TypeButton: up to nine of these were rebuilt per keystroke.
+ */
+const CategoryChip = memo(({
+  item,
+  // Name and icon as primitives rather than the `info` object they come from:
+  // getCategoryInfo builds a fresh object on every call, which would defeat this
+  // memo on every keystroke however stable the handlers are.
+  name,
+  icon,
+  isSelected,
+  isFolder,
+  disabled,
+  compact,
+  colors,
+  chipBackground,
+  chipBorderColor,
+  chipStyle,
+  testID,
+  numberOfLines,
+  onPress,
+}) => {
+  const textColor = isSelected ? colors.primaryStrong : (disabled ? colors.mutedText : colors.text);
+  return (
+    <Pressable
+      testID={testID}
+      style={[
+        styles.categoryShortcutButton,
+        compact && styles.categoryShortcutButtonCompact,
+        {
+          backgroundColor: isSelected ? chipBackground : colors.inputBackground,
+          borderColor: isSelected ? colors.primary : chipBorderColor,
+        },
+        chipStyle,
+      ]}
+      onPress={() => onPress(item)}
+      disabled={disabled}
+    >
+      <Icon name={icon || (isFolder ? 'folder' : 'help-circle')} size={18} color={textColor} />
+      <Text
+        style={[styles.categoryShortcutText, { color: textColor }]}
+        numberOfLines={numberOfLines}
+        ellipsizeMode="tail"
+      >
+        {name}
+      </Text>
+      {isFolder && (
+        <View style={styles.browseFolderBadge}>
+          <Icon name="folder-outline" size={11} color={isSelected ? colors.primaryStrong : colors.mutedText} />
+        </View>
+      )}
+    </Pressable>
+  );
+});
+CategoryChip.displayName = 'CategoryChip';
+CategoryChip.propTypes = {
+  item: PropTypes.object.isRequired,
+  name: PropTypes.string,
+  icon: PropTypes.string,
+  isSelected: PropTypes.bool,
+  isFolder: PropTypes.bool,
+  disabled: PropTypes.bool,
+  compact: PropTypes.bool,
+  colors: PropTypes.object.isRequired,
+  chipBackground: PropTypes.string,
+  chipBorderColor: PropTypes.string,
+  chipStyle: PropTypes.any,
+  testID: PropTypes.string,
+  numberOfLines: PropTypes.number,
+  onPress: PropTypes.func.isRequired,
+};
+
+/**
+ * One transfer-target account chip. Same reasoning again — eight of them.
+ */
+const TransferAccountChip = memo(({
+  account,
+  isSelected,
+  disabled,
+  compact,
+  colors,
+  balanceText,
+  hideBalance,
+  redactionColor,
+  chipBackground,
+  chipBorderColor,
+  chipStyle,
+  onPress,
+}) => {
+  const textColor = isSelected ? colors.primaryStrong : (disabled ? colors.mutedText : colors.text);
+  return (
+    <Pressable
+      style={[
+        styles.accountShortcutButton,
+        compact && styles.accountShortcutButtonCompact,
+        {
+          backgroundColor: isSelected ? chipBackground : colors.inputBackground,
+          borderColor: isSelected ? colors.primary : chipBorderColor,
+        },
+        chipStyle,
+      ]}
+      onPress={() => onPress(account.id)}
+      disabled={disabled}
+    >
+      {balanceText !== null && (
+        hideBalance ? (
+          <View style={[styles.hiddenBalanceSmall, { backgroundColor: redactionColor }]} />
+        ) : (
+          <Text style={[styles.accountShortcutBalance, { color: colors.mutedText }]} numberOfLines={1}>
+            {balanceText}
+          </Text>
+        )
+      )}
+      <Text
+        style={[styles.accountShortcutName, { color: textColor }]}
+        numberOfLines={1}
+        ellipsizeMode="tail"
+      >
+        {account.name}
+      </Text>
+    </Pressable>
+  );
+});
+TransferAccountChip.displayName = 'TransferAccountChip';
+TransferAccountChip.propTypes = {
+  account: PropTypes.object.isRequired,
+  isSelected: PropTypes.bool,
+  disabled: PropTypes.bool,
+  compact: PropTypes.bool,
+  colors: PropTypes.object.isRequired,
+  balanceText: PropTypes.string,
+  hideBalance: PropTypes.bool,
+  redactionColor: PropTypes.string,
+  chipBackground: PropTypes.string,
+  chipBorderColor: PropTypes.string,
+  chipStyle: PropTypes.any,
+  onPress: PropTypes.func.isRequired,
+};
+
+/**
  * OperationFormFields Component
  *
  * Reusable form fields for operation entry (expense, income, transfer)
@@ -103,6 +280,12 @@ const OperationFormFields = memo(({
   addDisabled = false,
 }) => {
   const { hideBalances } = useDisplaySettings();
+
+  // Mirrors the latest values so tap-time-only reads (the amount, consulted by
+  // the auto-add shortcuts) do not have to be dependencies of the handlers that
+  // consult them. Updated on every commit, so it is always current at tap time.
+  const valuesRef = useRef(values);
+  useEffect(() => { valuesRef.current = values; });
 
   // Local state for currency picker visibility
   const [showCurrencyPicker, setShowCurrencyPicker] = useState(false);
@@ -198,8 +381,13 @@ const OperationFormFields = memo(({
   const showAllCategoriesButton = leafCategoryCount > 8;
 
   // Reset the browser whenever the operation type changes — a leftover folder
-  // from a previous type would otherwise filter to nothing.
+  // from a previous type would otherwise filter to nothing. Skipped on the first
+  // run: the browser starts closed, so resetting it on mount only bought a
+  // second render of the whole form before anything had happened.
+  const prevTypeRef = useRef(values.type);
   useEffect(() => {
+    if (prevTypeRef.current === values.type) return;
+    prevTypeRef.current = values.type;
     browseDirRef.current = 'none';
     setCategoryBrowse({ active: false, breadcrumb: [] });
   }, [values.type]);
@@ -246,7 +434,12 @@ const OperationFormFields = memo(({
   // `fromBrowse` is set, the browser collapses back to the suggestions grid.
   const selectLeafCategory = useCallback((categoryId, { fromBrowse = false } = {}) => {
     if (disabled) return;
-    const hasValidAmount = values.amount && values.amount.trim() !== '';
+    // Read through the ref: the amount changes on every keystroke, and depending
+    // on it here would hand every category chip a new onPress per character,
+    // defeating their memo. Nothing displays it — it is only consulted at tap
+    // time, to decide between selecting and completing the operation outright.
+    const currentAmount = valuesRef.current.amount;
+    const hasValidAmount = currentAmount && currentAmount.trim() !== '';
     if (hasValidAmount && onAutoAddWithCategory) {
       onAutoAddWithCategory(categoryId);
       // Form is reset by the parent; collapse without an enter animation.
@@ -255,7 +448,41 @@ const OperationFormFields = memo(({
       setValues(v => ({ ...v, categoryId }));
       if (fromBrowse) changeBrowseLevel('back', { active: false, breadcrumb: [] });
     }
-  }, [disabled, values.amount, onAutoAddWithCategory, setValues, changeBrowseLevel]);
+  }, [disabled, onAutoAddWithCategory, setValues, changeBrowseLevel]);
+
+  // Stable per-grid handlers, so a chip's onPress identity survives a keystroke.
+  const handleSuggestionChipPress = useCallback(
+    (category) => selectLeafCategory(category.id),
+    [selectLeafCategory],
+  );
+
+  // Same ref-read as selectLeafCategory: the amount decides between selecting a
+  // target and completing the transfer, but only at tap time.
+  const handleTargetPress = useCallback((accountId) => {
+    if (disabled) return;
+    const currentAmount = valuesRef.current.amount;
+    const hasValidAmount = currentAmount && currentAmount.trim() !== '';
+    if (hasValidAmount && onAutoAddWithAccount) {
+      onAutoAddWithAccount(accountId);
+    } else {
+      setValues(v => ({ ...v, toAccountId: accountId }));
+    }
+  }, [disabled, onAutoAddWithAccount, setValues]);
+
+  const handleBrowseChipPress = useCallback((item) => (
+    item.type === 'folder'
+      ? handleBrowseIntoFolder(item)
+      : selectLeafCategory(item.id, { fromBrowse: true })
+  ), [handleBrowseIntoFolder, selectLeafCategory]);
+
+  // CurrencyPickerModal is itself memo; inline arrows here defeated it on every
+  // keystroke.
+  const closeCurrencyPicker = useCallback(() => setShowCurrencyPicker(false), []);
+  const handleCurrencySelect = useCallback((code) => {
+    setShowCurrencyPicker(false);
+    if (onOperationCurrencyChange) onOperationCurrencyChange(code);
+  }, [onOperationCurrencyChange]);
+  const openCurrencyPicker = useCallback(() => setShowCurrencyPicker(true), []);
 
   // Memoize input styles
   const inputStyle = useMemo(() => ({
@@ -288,6 +515,20 @@ const OperationFormFields = memo(({
   const destinationAccount = useMemo(() => {
     return accounts.find(acc => acc.id === values.toAccountId);
   }, [accounts, values.toAccountId]);
+
+  // MultiCurrencyFields received two object literals built inline on every
+  // render, so it could never bail out. Declared AFTER sourceAccount on purpose:
+  // `const` is transpiled to `var` here, so reading it earlier would not throw —
+  // it would silently freeze the memo on `{ currency: undefined }` and print the
+  // currency pair as "$ → " with nothing after the arrow.
+  const foreignSourceAccount = useMemo(
+    () => ({ currency: values.operationCurrency }),
+    [values.operationCurrency],
+  );
+  const foreignDestinationAccount = useMemo(
+    () => ({ currency: sourceAccount?.currency }),
+    [sourceAccount?.currency],
+  );
 
   // Check if this is a multi-currency transfer
   const isMultiCurrencyTransfer = useMemo(() => {
@@ -324,51 +565,34 @@ const OperationFormFields = memo(({
   }, [isForeignCurrencyOp, foreignExchangeRate, values.amount, values.operationCurrency, sourceAccount]);
 
   // Render type selector buttons
+  const handleTypePress = useCallback((typeKey) => {
+    setValues(v => {
+      const switchingBetweenExpenseIncome =
+        (v.type === 'expense' && typeKey === 'income') ||
+        (v.type === 'income' && typeKey === 'expense');
+      const shouldClearCategory = typeKey === 'transfer' || switchingBetweenExpenseIncome;
+      return {
+        ...v,
+        type: typeKey,
+        categoryId: shouldClearCategory ? '' : v.categoryId,
+        toAccountId: '',
+      };
+    });
+  }, [setValues]);
+
   const renderTypeSelector = () => (
     <View style={[styles.typeSelector, compact && styles.typeSelectorCompact]}>
-      {TYPES.map(type => {
-        const isSelected = values.type === type.key;
-        const textColor = isSelected ? colors.text : (disabled ? colors.mutedText : colors.text);
-
-        return (
-          <Pressable
-            key={type.key}
-            style={[
-              styles.typeButton,
-              {
-                backgroundColor: isSelected ? colors.selected : colors.inputBackground,
-                borderColor: colors.border,
-              },
-              disabledStyle,
-            ]}
-            onPress={() => !disabled && setValues(v => {
-              const switchingBetweenExpenseIncome =
-                (v.type === 'expense' && type.key === 'income') ||
-                (v.type === 'income' && type.key === 'expense');
-              const shouldClearCategory = type.key === 'transfer' || switchingBetweenExpenseIncome;
-              return {
-                ...v,
-                type: type.key,
-                categoryId: shouldClearCategory ? '' : v.categoryId,
-                toAccountId: '',
-              };
-            })}
-            disabled={disabled}
-          >
-            <Icon
-              name={type.icon}
-              size={18}
-              color={textColor}
-            />
-            <Text style={[
-              styles.typeButtonText,
-              { color: textColor },
-            ]}>
-              {type.label}
-            </Text>
-          </Pressable>
-        );
-      })}
+      {TYPES.map(type => (
+        <TypeButton
+          key={type.key}
+          type={type}
+          isSelected={values.type === type.key}
+          disabled={disabled}
+          colors={colors}
+          buttonStyle={disabledStyle}
+          onPress={handleTypePress}
+        />
+      ))}
     </View>
   );
 
@@ -479,43 +703,32 @@ const OperationFormFields = memo(({
   // browser so styling, selection colours, name resolution and the error-flash
   // border stay in one place. Rendered as a single Pressable so the layout
   // matches the original chips (a nested wrapper collapses the height).
+  // `onPress` is called with the chip's own item, so each caller passes one
+  // handler for the whole grid rather than a fresh arrow per chip — that arrow
+  // is what used to defeat CategoryChip's memo on every keystroke.
   const renderCategoryChip = (item, { testID, numberOfLines = 1, onPress, isFolder = false }) => {
     const info = getCategoryInfo
       ? getCategoryInfo(item.id)
       : { name: item.nameKey ? t(item.nameKey) : item.name, icon: item.icon };
-    const isSelected = !isFolder && values.categoryId === item.id;
-    const textColor = isSelected ? colors.primaryStrong : (disabled ? colors.mutedText : colors.text);
 
     return (
-      <Pressable
+      <CategoryChip
         key={item.id}
-        testID={testID}
-        style={[
-          styles.categoryShortcutButton,
-          compact && styles.categoryShortcutButtonCompact,
-          {
-            backgroundColor: isSelected ? selectedChipBackground : colors.inputBackground,
-            borderColor: isSelected ? colors.primary : chipBorderColor,
-          },
-          disabledStyle,
-        ]}
-        onPress={onPress}
+        item={item}
+        name={info.name}
+        icon={info.icon}
+        isSelected={!isFolder && values.categoryId === item.id}
+        isFolder={isFolder}
         disabled={disabled}
-      >
-        <Icon name={info.icon || (isFolder ? 'folder' : 'help-circle')} size={18} color={textColor} />
-        <Text
-          style={[styles.categoryShortcutText, { color: textColor }]}
-          numberOfLines={numberOfLines}
-          ellipsizeMode="tail"
-        >
-          {info.name}
-        </Text>
-        {isFolder && (
-          <View style={styles.browseFolderBadge}>
-            <Icon name="folder-outline" size={11} color={isSelected ? colors.primaryStrong : colors.mutedText} />
-          </View>
-        )}
-      </Pressable>
+        compact={compact}
+        colors={colors}
+        chipBackground={selectedChipBackground}
+        chipBorderColor={chipBorderColor}
+        chipStyle={disabledStyle}
+        testID={testID}
+        numberOfLines={numberOfLines}
+        onPress={onPress}
+      />
     );
   };
 
@@ -599,7 +812,7 @@ const OperationFormFields = memo(({
           {firstRowCats.map((category, index) => renderCategoryChip(category, {
             testID: `category-shortcut-${index}`,
             numberOfLines: 2,
-            onPress: () => selectLeafCategory(category.id),
+            onPress: handleSuggestionChipPress,
           }))}
         </View>
 
@@ -622,7 +835,7 @@ const OperationFormFields = memo(({
             return renderCategoryChip(category, {
               testID: `category-shortcut-r2-${i}`,
               numberOfLines: 1,
-              onPress: () => selectLeafCategory(category.id),
+              onPress: handleSuggestionChipPress,
             });
           })}
         </View>
@@ -685,7 +898,7 @@ const OperationFormFields = memo(({
               testID: `category-browse-${slot.item.id}`,
               numberOfLines: 1,
               isFolder,
-              onPress: () => (isFolder ? handleBrowseIntoFolder(slot.item) : selectLeafCategory(slot.item.id, { fromBrowse: true })),
+              onPress: handleBrowseChipPress,
             });
           })}
         </View>
@@ -768,16 +981,6 @@ const OperationFormFields = memo(({
     if (values.type !== 'transfer' || transferLayout !== 'sideBySide') return null;
 
     if (topTransferAccounts && topTransferAccounts.length > 0) {
-      const handleTargetPress = (accountId) => {
-        if (disabled) return;
-        const hasValidAmount = values.amount && values.amount.trim() !== '';
-        if (hasValidAmount && onAutoAddWithAccount) {
-          onAutoAddWithAccount(accountId);
-        } else {
-          setValues(v => ({ ...v, toAccountId: accountId }));
-        }
-      };
-
       // The "all accounts" entry appears whenever the eight shortcut slots can't
       // reach every pickable target — more than eight of them, or shortcuts that
       // point at accounts this picker doesn't offer. Keying it off the raw account
@@ -793,48 +996,23 @@ const OperationFormFields = memo(({
       const firstRowAccounts = showAllAccountsButton ? topTransferAccounts.slice(0, 3) : topTransferAccounts.slice(0, 4);
       const secondRowAccounts = showAllAccountsButton ? topTransferAccounts.slice(3, 7) : topTransferAccounts.slice(4, 8);
 
-      const renderAccountChip = (account) => {
-        const isSelected = values.toAccountId === account.id;
-        const textColor = isSelected ? colors.primaryStrong : (disabled ? colors.mutedText : colors.text);
-        const balanceColor = colors.mutedText;
-
-        return (
-          <Pressable
-            key={account.id}
-            style={[
-              styles.accountShortcutButton,
-              compact && styles.accountShortcutButtonCompact,
-              {
-                backgroundColor: isSelected ? selectedChipBackground : colors.inputBackground,
-                borderColor: isSelected ? colors.primary : toAccountChipBorderColor,
-              },
-              disabledStyle,
-            ]}
-            onPress={() => handleTargetPress(account.id)}
-            disabled={disabled}
-          >
-            {getAccountBalance && (
-              hideBalances ? (
-                <View style={[styles.hiddenBalanceSmall, { backgroundColor: redactionColor }]} />
-              ) : (
-                <Text
-                  style={[styles.accountShortcutBalance, { color: balanceColor }]}
-                  numberOfLines={1}
-                >
-                  {getAccountBalance(account.id)}
-                </Text>
-              )
-            )}
-            <Text
-              style={[styles.accountShortcutName, { color: textColor }]}
-              numberOfLines={1}
-              ellipsizeMode="tail"
-            >
-              {account.name}
-            </Text>
-          </Pressable>
-        );
-      };
+      const renderAccountChip = (account) => (
+        <TransferAccountChip
+          key={account.id}
+          account={account}
+          isSelected={values.toAccountId === account.id}
+          disabled={disabled}
+          compact={compact}
+          colors={colors}
+          balanceText={getAccountBalance ? getAccountBalance(account.id) : null}
+          hideBalance={hideBalances}
+          redactionColor={redactionColor}
+          chipBackground={selectedChipBackground}
+          chipBorderColor={toAccountChipBorderColor}
+          chipStyle={disabledStyle}
+          onPress={handleTargetPress}
+        />
+      );
 
       return (
         <View style={[styles.categoryRowsWrapper, styles.accountRows, compact && styles.categoryRowsWrapperCompact]}>
@@ -909,7 +1087,7 @@ const OperationFormFields = memo(({
           containerBackground={containerBackground}
           compact={compact}
           currencyCode={compact && values.type !== 'transfer' && onOperationCurrencyChange ? getCurrencySymbol(values.operationCurrency) : undefined}
-          onCurrencyPress={compact && values.type !== 'transfer' && onOperationCurrencyChange ? () => setShowCurrencyPicker(true) : undefined}
+          onCurrencyPress={compact && values.type !== 'transfer' && onOperationCurrencyChange ? openCurrencyPicker : undefined}
           flashError={flashingField === 'amount'}
           addDisabled={addDisabled}
         />
@@ -929,8 +1107,8 @@ const OperationFormFields = memo(({
         <MultiCurrencyFields
           colors={colors}
           t={t}
-          sourceAccount={{ currency: values.operationCurrency }}
-          destinationAccount={{ currency: sourceAccount.currency }}
+          sourceAccount={foreignSourceAccount}
+          destinationAccount={foreignDestinationAccount}
           exchangeRate={values.exchangeRate || ''}
           destinationAmount={values.destinationAmount || ''}
           isShadowOperation={disabled}
@@ -956,11 +1134,8 @@ const OperationFormFields = memo(({
       {values.type === 'transfer' ? (hideTransferTargetPicker ? null : renderTransferTargetPicker()) : renderCategoryPicker()}
       <CurrencyPickerModal
         visible={showCurrencyPicker}
-        onClose={() => setShowCurrencyPicker(false)}
-        onSelect={(code) => {
-          setShowCurrencyPicker(false);
-          if (onOperationCurrencyChange) onOperationCurrencyChange(code);
-        }}
+        onClose={closeCurrencyPicker}
+        onSelect={handleCurrencySelect}
         selectedCurrency={values.operationCurrency}
         colors={colors}
         t={t}

@@ -27,6 +27,7 @@ const PickerModal = ({
   // Category selection
   categoryType = 'expense',
   quickAddValues,
+  valuesStore,
   onSelectCategory,
   onAutoAddWithCategory,
   onAutoAddWithAccount,
@@ -34,32 +35,44 @@ const PickerModal = ({
   // The source account replaces the selection outright. A transfer destination
   // with an amount already typed completes the operation on the spot — the same
   // shortcut the category grid offers below.
+  // The amount is read at tap time rather than taken as a prop: it is the one
+  // field here that changes on every keystroke, and subscribing to it would
+  // re-render this modal (and the screen that owns it) per character for a value
+  // nothing here displays. `quickAddValues` carries only the structural fields
+  // the grids actually render — see useQuickAddValuesStore.
+  const readAmount = useCallback(
+    () => (valuesStore ? valuesStore.getSnapshot().amount : quickAddValues?.amount),
+    [valuesStore, quickAddValues],
+  );
+
   const handleSelectAccount = useCallback((accountId) => {
     if (pickerType === 'account') {
       onSelectAccount(accountId);
       onClose();
       return;
     }
-    const hasValidAmount = quickAddValues?.amount && quickAddValues.amount.trim() !== '';
+    const amount = readAmount();
+    const hasValidAmount = amount && amount.trim() !== '';
     if (hasValidAmount && onAutoAddWithAccount) {
       onAutoAddWithAccount(accountId);
     } else {
       onSelectToAccount(accountId);
       onClose();
     }
-  }, [pickerType, quickAddValues, onClose, onSelectAccount, onSelectToAccount, onAutoAddWithAccount]);
+  }, [pickerType, readAmount, onClose, onSelectAccount, onSelectToAccount, onAutoAddWithAccount]);
 
   // A category tapped with an amount already typed completes the operation on the
   // spot — that shortcut is the whole point of the quick-add flow.
   const handleSelectCategory = useCallback((categoryId) => {
-    const hasValidAmount = quickAddValues?.amount && quickAddValues.amount.trim() !== '';
+    const amount = readAmount();
+    const hasValidAmount = amount && amount.trim() !== '';
     if (hasValidAmount && onAutoAddWithCategory) {
       onAutoAddWithCategory(categoryId);
     } else {
       onSelectCategory(categoryId);
       onClose();
     }
-  }, [quickAddValues, onAutoAddWithCategory, onSelectCategory, onClose]);
+  }, [readAmount, onAutoAddWithCategory, onSelectCategory, onClose]);
 
   return (
     <>
@@ -142,6 +155,7 @@ PickerModal.propTypes = {
   onSelectToAccount: PropTypes.func,
   categoryType: PropTypes.oneOf(['expense', 'income']),
   quickAddValues: PropTypes.object,
+  valuesStore: PropTypes.object,
   onSelectCategory: PropTypes.func,
   onAutoAddWithCategory: PropTypes.func,
   onAutoAddWithAccount: PropTypes.func,
