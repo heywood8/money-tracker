@@ -1,5 +1,12 @@
 # Changelog
 
+## [0.284.9](https://github.com/heywood8/money-tracker/compare/penny-v0.284.8...penny-v0.284.9) (2026-09-11)
+
+
+### Bug Fixes
+
+* **contexts:** keep RELOAD_ALL from swapping loaded lists for a skeleton ([#1749](https://github.com/heywood8/money-tracker/issues/1749)) ([81f47b4](https://github.com/heywood8/money-tracker/commit/81f47b4c68df06cae3ef825b72a02d85c8c7e4be))
+
 ## [0.284.8](https://github.com/heywood8/money-tracker/compare/penny-v0.284.7...penny-v0.284.8) (2026-09-11)
 
 
