@@ -1,5 +1,12 @@
 # Changelog
 
+## [0.284.13](https://github.com/heywood8/money-tracker/compare/penny-v0.284.12...penny-v0.284.13) (2026-09-11)
+
+
+### Performance Improvements
+
+* **db:** index transfer lookups and stop loading the ledger into memory ([#1757](https://github.com/heywood8/money-tracker/issues/1757)) ([cc2a2f8](https://github.com/heywood8/money-tracker/commit/cc2a2f89c51d664217f89611d0c2bcad00bebfd8))
+
 ## [0.284.12](https://github.com/heywood8/money-tracker/compare/penny-v0.284.11...penny-v0.284.12) (2026-09-11)
 
 
