@@ -1,5 +1,12 @@
 # Changelog
 
+## [0.284.11](https://github.com/heywood8/money-tracker/compare/penny-v0.284.10...penny-v0.284.11) (2026-09-11)
+
+
+### Bug Fixes
+
+* **i18n,a11y:** one money formatter, dates in the app language, TalkBack tabs ([#1753](https://github.com/heywood8/money-tracker/issues/1753)) ([f2fd776](https://github.com/heywood8/money-tracker/commit/f2fd77614f0e717d832f2006b41f3129689b5e73))
+
 ## [0.284.10](https://github.com/heywood8/money-tracker/compare/penny-v0.284.9...penny-v0.284.10) (2026-09-11)
 
 
