@@ -8,8 +8,10 @@ import PropTypes from 'prop-types';
 import { render, waitFor, act, fireEvent } from '@testing-library/react-native';
 import AppInitializer from '../../app/screens/AppInitializer';
 import { LocalizationProvider, useLocalization } from '../../app/contexts/LocalizationContext';
+import { AppState } from 'react-native';
 import { checkForAppUpdate } from '../../app/services/AppUpdateService';
 import { useUpdateDownload } from '../../app/contexts/UpdateDownloadContext';
+import { getPreference, setPreference, PREF_KEYS } from '../../app/services/PreferencesDB';
 
 jest.mock('../../app/contexts/DialogContext', () => ({
   useDialog: jest.fn(() => ({
@@ -411,20 +413,25 @@ describe('AppInitializer', () => {
     };
 
     // Flush the promise chain of the immediate on-open check without advancing far
-    // enough to trigger the one-minute interval.
+    // enough to trigger the polling interval.
     const flushCheck = () => act(async () => {
       // The initial on-open jobs (update check, backup, ingestion) are now
       // deferred via requestIdleCallback, polyfilled to setImmediate in jest.
       // Under fake timers that immediate is queued, so flush it first, then let
-      // the resulting async promise chain settle. advanceTimersByTimeAsync(0)
-      // does not reach the one-minute interval.
+      // the resulting async promise chain settle (the rate-limit read of
+      // UPDATE_LAST_CHECK_AT adds a few hops before the network call).
+      // advanceTimersByTimeAsync(0) does not reach the polling interval.
       await jest.advanceTimersByTimeAsync(0);
-      await Promise.resolve();
-      await Promise.resolve();
+      for (let i = 0; i < 8; i += 1) {
+        await Promise.resolve();
+      }
     });
 
     beforeEach(() => {
       jest.useFakeTimers();
+      // clearAllMocks keeps implementations, so restore the "nothing persisted" default
+      // here — a test that seeds UPDATE_LAST_CHECK_AT would otherwise leak into the rest.
+      getPreference.mockImplementation(async () => null);
     });
 
     afterEach(() => {
@@ -463,7 +470,7 @@ describe('AppInitializer', () => {
       expect(queryByTestId('update-available-modal')).toBeNull();
     });
 
-    it('re-checks for updates about once a minute', async () => {
+    it('re-checks for updates about every three minutes', async () => {
       checkForAppUpdate.mockResolvedValue({ success: true, isUpdateAvailable: false });
 
       await render(<AppInitializer />);
@@ -473,7 +480,91 @@ describe('AppInitializer', () => {
       await act(async () => {
         await jest.advanceTimersByTimeAsync(3 * 60 * 1000);
       });
-      expect(checkForAppUpdate).toHaveBeenCalledTimes(4);
+      expect(checkForAppUpdate).toHaveBeenCalledTimes(2);
+
+      await act(async () => {
+        await jest.advanceTimersByTimeAsync(3 * 60 * 1000);
+      });
+      expect(checkForAppUpdate).toHaveBeenCalledTimes(3);
+    });
+
+    it('issues a single network request for two checks inside the minimum interval', async () => {
+      const foregroundListeners = [];
+      const originalAppState = AppState.currentState;
+      // A string here, because the notification-ingestion listener matches the previous
+      // state against /inactive|background/ before deciding to run.
+      AppState.currentState = 'background';
+      // Swapped by assignment rather than jest.spyOn: mockRestore() on the preset's own
+      // AppState mock leaves it returning undefined, which breaks unsubscribe in every
+      // later test in this file.
+      const originalAddEventListener = AppState.addEventListener;
+      AppState.addEventListener = jest.fn((event, callback) => {
+        if (event === 'change') {
+          foregroundListeners.push(callback);
+        }
+        return { remove: jest.fn() };
+      });
+
+      try {
+        await render(<AppInitializer />);
+        await flushCheck();
+        expect(checkForAppUpdate).toHaveBeenCalledTimes(1);
+
+        // Coming back to the foreground seconds later must not hit GitHub again.
+        await act(async () => {
+          await jest.advanceTimersByTimeAsync(5 * 1000);
+          foregroundListeners.forEach((listener) => listener('active'));
+          await jest.advanceTimersByTimeAsync(0);
+          for (let i = 0; i < 8; i += 1) {
+            await Promise.resolve();
+          }
+        });
+
+        expect(checkForAppUpdate).toHaveBeenCalledTimes(1);
+      } finally {
+        AppState.addEventListener = originalAddEventListener;
+        AppState.currentState = originalAppState;
+      }
+    });
+
+    it('skips the on-open check when a recent one is already recorded', async () => {
+      getPreference.mockImplementation(async (key) => (
+        key === PREF_KEYS.UPDATE_LAST_CHECK_AT
+          ? new Date(Date.now() - 30 * 1000).toISOString()
+          : null
+      ));
+
+      await render(<AppInitializer />);
+      await flushCheck();
+
+      expect(checkForAppUpdate).not.toHaveBeenCalled();
+    });
+
+    it('still checks when the recorded time is in the future (clock skew)', async () => {
+      getPreference.mockImplementation(async (key) => (
+        key === PREF_KEYS.UPDATE_LAST_CHECK_AT
+          ? new Date(Date.now() + 24 * 60 * 60 * 1000).toISOString()
+          : null
+      ));
+
+      await render(<AppInitializer />);
+      await flushCheck();
+
+      // A future timestamp must not silence update checks until the user asks by hand.
+      expect(checkForAppUpdate).toHaveBeenCalledTimes(1);
+    });
+
+    it('records the check time before the request so a failure still spends the slot', async () => {
+      checkForAppUpdate.mockRejectedValue(new Error('offline'));
+
+      await render(<AppInitializer />);
+      await flushCheck();
+
+      expect(checkForAppUpdate).toHaveBeenCalledTimes(1);
+      expect(setPreference).toHaveBeenCalledWith(
+        PREF_KEYS.UPDATE_LAST_CHECK_AT,
+        expect.any(String),
+      );
     });
 
     it('stops suggesting a version the user dismissed until the app restarts', async () => {
@@ -488,9 +579,9 @@ describe('AppInitializer', () => {
       });
       expect(queryByTestId('update-available-modal')).toBeNull();
 
-      // The next minute's check still finds 2.0.0, but it must stay silent.
+      // The next interval's check still finds 2.0.0, but it must stay silent.
       await act(async () => {
-        await jest.advanceTimersByTimeAsync(60 * 1000);
+        await jest.advanceTimersByTimeAsync(3 * 60 * 1000);
       });
       expect(queryByTestId('update-available-modal')).toBeNull();
     });
@@ -514,7 +605,7 @@ describe('AppInitializer', () => {
         downloadUrl: 'https://example.com/penny-2.1.0.apk',
       });
       await act(async () => {
-        await jest.advanceTimersByTimeAsync(60 * 1000);
+        await jest.advanceTimersByTimeAsync(3 * 60 * 1000);
       });
 
       expect(getByTestId('update-available-modal')).toBeTruthy();

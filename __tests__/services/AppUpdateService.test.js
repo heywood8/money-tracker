@@ -19,6 +19,7 @@ import {
   fetchBuildProgressByVersion,
   fetchActiveBuildRuns,
   fetchBuildStateByVersion,
+  resetEtagCache,
 } from '../../app/services/AppUpdateService';
 
 jest.mock('expo-file-system/legacy', () => ({
@@ -41,6 +42,9 @@ const FileSystem = require('expo-file-system/legacy');
 describe('AppUpdateService', () => {
   beforeEach(() => {
     jest.clearAllMocks();
+    // The ETag cache lives at module scope; clear it so one test's cached listing
+    // cannot answer another test's request with a 304.
+    resetEtagCache();
   });
 
   describe('cleanupOldApks', () => {
@@ -743,6 +747,99 @@ describe('AppUpdateService', () => {
         expect.stringContaining('/releases?per_page=20'),
         expect.any(Object),
       );
+    });
+
+    it('replays the cached listing when GitHub answers 304 Not Modified', async () => {
+      const releases = [
+        {
+          tag_name: 'v0.50.4',
+          assets: [{ name: 'penny-v0.50.4.apk', browser_download_url: 'https://example.com/penny-v0.50.4.apk' }],
+        },
+      ];
+      const fetchImpl = jest.fn()
+        .mockResolvedValueOnce({
+          ok: true,
+          status: 200,
+          headers: { get: (name) => (name === 'etag' ? 'W/"abc123"' : null) },
+          json: async () => releases,
+        })
+        // A conditional re-request: no body, and no charge against the rate limit.
+        .mockResolvedValueOnce({ ok: false, status: 304, headers: { get: () => null } });
+
+      const first = await checkForAppUpdate({ currentVersion: '0.50.3', fetchImpl });
+      expect(first.success).toBe(true);
+      expect(first.isUpdateAvailable).toBe(true);
+
+      const second = await checkForAppUpdate({ currentVersion: '0.50.3', fetchImpl });
+
+      // 304 is "unchanged", never an error.
+      expect(second.success).toBe(true);
+      expect(second.isUpdateAvailable).toBe(true);
+      expect(second.latestVersion).toBe('0.50.4');
+      expect(second.errorCode).toBeUndefined();
+    });
+
+    it('sends If-None-Match once an ETag has been seen', async () => {
+      const fetchImpl = jest.fn().mockResolvedValue({
+        ok: true,
+        status: 200,
+        headers: { get: (name) => (name === 'etag' ? 'W/"abc123"' : null) },
+        json: async () => ([
+          {
+            tag_name: 'v0.50.4',
+            assets: [{ name: 'penny-v0.50.4.apk', browser_download_url: 'https://example.com/penny-v0.50.4.apk' }],
+          },
+        ]),
+      });
+
+      await checkForAppUpdate({ currentVersion: '0.50.3', fetchImpl });
+      expect(fetchImpl.mock.calls[0][1].headers['If-None-Match']).toBeUndefined();
+
+      await checkForAppUpdate({ currentVersion: '0.50.3', fetchImpl });
+      expect(fetchImpl.mock.calls[1][1].headers['If-None-Match']).toBe('W/"abc123"');
+    });
+
+    it('reuses the cached workflow runs when the build listing answers 304', async () => {
+      const workflowRuns = {
+        workflow_runs: [
+          {
+            id: 1,
+            status: 'in_progress',
+            head_branch: 'penny-v0.50.4',
+            run_started_at: new Date().toISOString(),
+          },
+        ],
+      };
+      const fetchImpl = jest.fn()
+        .mockResolvedValueOnce({
+          ok: true,
+          status: 200,
+          headers: { get: (name) => (name === 'etag' ? 'W/"runs-1"' : null) },
+          json: async () => workflowRuns,
+        })
+        .mockResolvedValueOnce({ ok: false, status: 304, headers: { get: () => null } });
+
+      const first = await fetchActiveBuildRuns({ fetchImpl });
+      expect(first).toHaveLength(1);
+
+      const second = await fetchActiveBuildRuns({ fetchImpl });
+
+      expect(fetchImpl.mock.calls[1][1].headers['If-None-Match']).toBe('W/"runs-1"');
+      expect(second).toHaveLength(1);
+      expect(second[0].version).toBe('0.50.4');
+    });
+
+    it('still reports an HTTP error for a 304 with nothing cached', async () => {
+      const fetchImpl = jest.fn().mockResolvedValue({
+        ok: false,
+        status: 304,
+        headers: { get: () => null },
+      });
+
+      const result = await checkForAppUpdate({ currentVersion: '0.50.3', fetchImpl });
+
+      expect(result.success).toBe(false);
+      expect(result.errorCode).toBe('http_error');
     });
 
     it('includes checksumUrl in result when checksum asset is present', async () => {

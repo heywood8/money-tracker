@@ -120,6 +120,58 @@ const fetchWithTimeout = async (url, options = {}, timeoutMs = UPDATE_CHECK_TIME
 const MAX_RELEASES_TO_CHECK = 20;
 const MAX_CHANGELOG_ENTRIES = 10;
 
+// GitHub answers every listing endpoint with an ETag. Replaying it as `If-None-Match` turns an
+// unchanged listing into a bodiless 304 that does NOT count against the unauthenticated rate
+// limit (60 requests/hour/IP), so repeated polling stays cheap in both quota and radio time.
+// Keyed by endpoint URL; holds the parsed payload so a 304 can be answered from cache.
+const etagCache = new Map();
+
+// Drop every cached ETag/payload. Exported for tests and for callers that need a guaranteed
+// fresh read; a stale entry is otherwise harmless because 304 only ever means "unchanged".
+export const resetEtagCache = () => {
+  etagCache.clear();
+};
+
+// `headers` is absent on hand-rolled fetch stubs, so read it defensively.
+const readHeader = (response, name) => {
+  const getter = response && response.headers && response.headers.get;
+  return typeof getter === 'function' ? response.headers.get(name) : null;
+};
+
+// Conditional GET returning `{ ok, status, payload }`. A 304 backed by a cache entry is
+// reported as ok with the previously parsed payload — "not modified" is a success, not an
+// error. Callers keep their own handling of a genuine failure via `status`.
+const fetchJsonWithEtag = async (endpoint, headers, fetchImpl) => {
+  const cached = etagCache.get(endpoint);
+
+  const response = await fetchWithTimeout(
+    endpoint,
+    {
+      headers: {
+        ...headers,
+        ...(cached ? { 'If-None-Match': cached.etag } : {}),
+      },
+    },
+    UPDATE_CHECK_TIMEOUT_MS,
+    fetchImpl,
+  );
+
+  if (response.status === 304 && cached) {
+    return { ok: true, status: 304, payload: cached.payload };
+  }
+
+  if (!response.ok) {
+    return { ok: false, status: response.status, payload: null };
+  }
+
+  const payload = await response.json();
+  const etag = readHeader(response, 'etag');
+  if (etag) {
+    etagCache.set(endpoint, { etag, payload });
+  }
+  return { ok: true, status: response.status, payload };
+};
+
 // The workflow that builds and attaches the release APK. When a release tag exists but no APK
 // is attached yet, this build is usually still running on CI.
 const BUILD_WORKFLOW_FILE = 'build-release-apk.yml';
@@ -194,25 +246,21 @@ const fetchBuildWorkflowRuns = async ({
   const endpoint = `https://api.github.com/repos/${owner}/${repo}/actions/workflows/${BUILD_WORKFLOW_FILE}/runs?per_page=20`;
 
   try {
-    const response = await fetchWithTimeout(
+    const { ok, payload } = await fetchJsonWithEtag(
       endpoint,
       {
-        headers: {
-          Accept: 'application/vnd.github+json',
-          'User-Agent': `Penny/${APP_VERSION}`,
-          'X-GitHub-Api-Version': GITHUB_API_VERSION,
-        },
+        Accept: 'application/vnd.github+json',
+        'User-Agent': `Penny/${APP_VERSION}`,
+        'X-GitHub-Api-Version': GITHUB_API_VERSION,
       },
-      UPDATE_CHECK_TIMEOUT_MS,
       fetchImpl,
     );
 
-    if (!response.ok) {
+    if (!ok) {
       return [];
     }
 
-    const data = await response.json();
-    const runs = Array.isArray(data?.workflow_runs) ? data.workflow_runs : [];
+    const runs = Array.isArray(payload?.workflow_runs) ? payload.workflow_runs : [];
     return runs.filter(Boolean).sort((a, b) => runStartedMs(b) - runStartedMs(a));
   } catch {
     return [];
@@ -323,30 +371,26 @@ export const checkForAppUpdate = async ({
   const endpoint = `https://api.github.com/repos/${owner}/${repo}/releases?per_page=${MAX_RELEASES_TO_CHECK}`;
 
   try {
-    const response = await fetchWithTimeout(
+    const { ok, status, payload: releases } = await fetchJsonWithEtag(
       endpoint,
       {
-        headers: {
-          Accept: 'application/vnd.github+json',
-          'User-Agent': `Penny/${currentNormalized}`,
-          'X-GitHub-Api-Version': GITHUB_API_VERSION,
-        },
+        Accept: 'application/vnd.github+json',
+        'User-Agent': `Penny/${currentNormalized}`,
+        'X-GitHub-Api-Version': GITHUB_API_VERSION,
       },
-      UPDATE_CHECK_TIMEOUT_MS,
       fetchImpl,
     );
 
-    if (!response.ok) {
+    if (!ok) {
       return {
         success: false,
         isUpdateAvailable: false,
         currentVersion: currentNormalized,
-        errorCode: response.status === 403 ? 'rate_limited' : 'http_error',
-        httpStatus: response.status,
+        errorCode: status === 403 ? 'rate_limited' : 'http_error',
+        httpStatus: status,
       };
     }
 
-    const releases = await response.json();
     if (!Array.isArray(releases) || releases.length === 0) {
       return {
         success: false,
