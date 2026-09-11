@@ -711,5 +711,10 @@
   "drive_backup_last_error": "마지막 백업 실패",
   "drive_backup_last_skipped": "마지막 실행 건너뜀",
   "drive_backup_now": "지금 백업",
-  "drive_backup_retention": "정기 백업은 형식별로 최근 일간 7개, 주간 15개를 보관합니다. 버튼으로 만든 백업은 직접 삭제할 때까지 남아 있습니다."
+  "drive_backup_retention": "정기 백업은 형식별로 최근 일간 7개, 주간 15개를 보관합니다. 버튼으로 만든 백업은 직접 삭제할 때까지 남아 있습니다.",
+  "last_backup": "마지막 백업",
+  "no_backup_yet": "자동 백업이 아직 없습니다",
+  "backup_skipped_row_count": "건너뜀: 마지막 백업보다 데이터가 줄었습니다",
+  "accept_new_baseline": "새 기준 적용",
+  "backup_accept_failed": "백업을 저장하지 못했습니다. 다시 시도해 주세요."
 }

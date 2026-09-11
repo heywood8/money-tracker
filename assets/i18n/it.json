@@ -711,5 +711,10 @@
   "drive_backup_last_error": "Ultimo backup non riuscito",
   "drive_backup_last_skipped": "Ultima esecuzione saltata",
   "drive_backup_now": "Esegui backup ora",
-  "drive_backup_retention": "I backup programmati conservano le ultime 7 copie giornaliere e 15 settimanali per ogni formato. I backup creati con il pulsante restano finché non li elimini."
+  "drive_backup_retention": "I backup programmati conservano le ultime 7 copie giornaliere e 15 settimanali per ogni formato. I backup creati con il pulsante restano finché non li elimini.",
+  "last_backup": "Ultimo backup",
+  "no_backup_yet": "Nessun backup automatico ancora",
+  "backup_skipped_row_count": "Saltato: i dati sono diminuiti dall'ultimo backup",
+  "accept_new_baseline": "Accetta il nuovo riferimento",
+  "backup_accept_failed": "Impossibile creare il backup. Riprova."
 }

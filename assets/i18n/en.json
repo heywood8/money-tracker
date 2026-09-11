@@ -714,5 +714,10 @@
   "drive_backup_last_error": "Last backup failed",
   "drive_backup_last_skipped": "Last run skipped",
   "drive_backup_now": "Back up now",
-  "drive_backup_retention": "Scheduled backups keep the last 7 daily and 15 weekly copies of each format. Backups you make with the button are kept until you delete them."
+  "drive_backup_retention": "Scheduled backups keep the last 7 daily and 15 weekly copies of each format. Backups you make with the button are kept until you delete them.",
+  "last_backup": "Last backup",
+  "no_backup_yet": "No automatic backup yet",
+  "backup_skipped_row_count": "Skipped: the data shrank since the last backup",
+  "accept_new_baseline": "Accept new baseline",
+  "backup_accept_failed": "Could not write a backup. Try again."
 }

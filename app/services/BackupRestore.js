@@ -7,6 +7,7 @@ import * as Sharing from 'expo-sharing';
 import * as DocumentPicker from 'expo-document-picker';
 import { queryAll, executeQuery, executeTransaction, getDatabase } from './db';
 import { appEvents } from './eventEmitter';
+import { acceptBaseline, countRows } from './backupBaseline';
 import * as BudgetPlansDB from './BudgetPlansDB';
 
 const BACKUP_VERSION = 1;
@@ -1655,6 +1656,20 @@ export const restoreBackup = async (backup, cancelToken) => {
     });
 
     console.log('Database restored successfully');
+
+    // Re-anchor the automatic-backup guard to what was just restored. Without
+    // this, restoring a smaller dataset (an older backup, a partial import
+    // after a reset) leaves the guard comparing every future snapshot against
+    // the pre-restore size, so it refuses them all — forever, because nothing
+    // new is ever written for it to compare against next time. See
+    // app/services/backupBaseline.js.
+    try {
+      await acceptBaseline(countRows(backup));
+    } catch (baselineError) {
+      // Never fail a completed restore over bookkeeping.
+      console.warn('Failed to re-anchor the backup baseline:', baselineError);
+    }
+
     appEvents.emit(IMPORT_PROGRESS_EVENT, {
       stepId: 'complete',
       status: 'completed',

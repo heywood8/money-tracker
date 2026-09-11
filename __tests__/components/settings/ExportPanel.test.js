@@ -37,6 +37,11 @@ jest.mock('../../../app/services/BackupRestore', () => ({
 }));
 jest.mock('../../../app/services/DailyBackupService', () => ({
   DAILY_BACKUP_DIR: '/mock/daily/',
+  // The panel reads the automatic-backup status on mount (#1715).
+  getBackupStatus: jest.fn().mockResolvedValue({
+    lastDailyDate: null, lastWeeklyWeek: null, skipped: null,
+  }),
+  acceptBackupBaseline: jest.fn().mockResolvedValue(true),
 }));
 jest.mock('../../../app/services/GoogleSheetsService', () => ({
   getValidAccessToken: (...a) => mockGetValidAccessToken(...a),

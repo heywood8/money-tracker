@@ -711,5 +711,10 @@
   "drive_backup_last_error": "Letztes Backup fehlgeschlagen",
   "drive_backup_last_skipped": "Letzter Lauf übersprungen",
   "drive_backup_now": "Jetzt sichern",
-  "drive_backup_retention": "Geplante Backups behalten die letzten 7 täglichen und 15 wöchentlichen Kopien je Format. Mit der Schaltfläche erstellte Backups bleiben, bis du sie löschst."
+  "drive_backup_retention": "Geplante Backups behalten die letzten 7 täglichen und 15 wöchentlichen Kopien je Format. Mit der Schaltfläche erstellte Backups bleiben, bis du sie löschst.",
+  "last_backup": "Letztes Backup",
+  "no_backup_yet": "Noch kein automatisches Backup",
+  "backup_skipped_row_count": "Übersprungen: die Daten sind seit dem letzten Backup geschrumpft",
+  "accept_new_baseline": "Neuen Referenzwert übernehmen",
+  "backup_accept_failed": "Backup konnte nicht geschrieben werden. Bitte erneut versuchen."
 }
