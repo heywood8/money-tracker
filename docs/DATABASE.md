@@ -101,7 +101,16 @@ Financial transactions (expenses, income, transfers):
 }
 ```
 
-**Indexes**: `date`, `account_id`, `category_id`, `type`
+**Indexes**: `date`, `account_id`, `category_id`, `type`, `to_account_id` (0030),
+`(account_id, date)` (0030)
+
+The last two exist for transfers. Every "did this account take part" query reads
+`account_id = ? OR to_account_id = ?`, and SQLite only uses an index for an OR
+when each disjunct has one, so before 0030 all of them scanned the table:
+`getOperationsByAccount`, `getTransferTotals` (once per transfer line per plan
+inside the budget status loop), `getAccountDayDeltas`, the account-delete safety
+count, and `getTopTransferTargetAccounts`. The composite index serves the date
+half of those same lookups, which all order or window by date.
 
 **Analytic visibility**: `exclude_from_charts = 1` removes the operation from
 every analytic surface — the expense/income donuts, the 12-month spending trend,

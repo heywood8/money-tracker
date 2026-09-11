@@ -61,14 +61,12 @@ export const OperationsActionsProvider = ({ children }) => {
     hasMoreOperations,
     loadingNewer,
     hasNewerOperations,
+    searchTypes,
+    searchCategoryIds,
   } = useOperationsData();
 
   // Request ID counter to handle race conditions in loadInitialOperations
   const loadRequestIdRef = useRef(0);
-
-  // In-memory cache of all operations for instant text search
-  const allOpsCacheRef = useRef(null);   // null = not loaded, Array = all operations
-  const cacheLoadingRef = useRef(false); // prevents concurrent loads
 
   // Ref so loadInitialOperations can read latest filters without depending on them
   // (prevents the function from changing on every filter edit, which would re-trigger the
@@ -77,6 +75,33 @@ export const OperationsActionsProvider = ({ children }) => {
   useEffect(() => {
     activeFiltersRef.current = activeFilters;
   }, [activeFilters]);
+
+  // Matches the query can only be resolved for in JavaScript: operation types by
+  // their localized label, and categories by an ancestor's name at any depth.
+  // Both are computed in OperationsDataContext (it owns the search state, the
+  // translations and the category tree) and merged into the filters only where
+  // they are handed to SQL — see `withLocalMatches` below. Kept out of
+  // `activeFilters` itself because that object is persisted verbatim.
+  const searchTypesRef = useRef(searchTypes);
+  const searchCategoryIdsRef = useRef(searchCategoryIds);
+  useEffect(() => {
+    searchTypesRef.current = searchTypes;
+    searchCategoryIdsRef.current = searchCategoryIds;
+  }, [searchTypes, searchCategoryIds]);
+
+  // Add those matches to a filter object on its way to the database. SQL cannot
+  // fold a translated type label, and it reaches only one level up the category
+  // tree; the in-memory pass in OperationsDataContext can narrow the rows SQL
+  // returned but never add to them, so without this a search for "transfer" /
+  // "перевод", or for a grandparent folder's name, would come back empty.
+  const withLocalMatches = useCallback((filters) => {
+    const types = searchTypesRef.current;
+    const categoryIds = searchCategoryIdsRef.current;
+    if ((!types || types.length === 0) && (!categoryIds || categoryIds.length === 0)) {
+      return filters;
+    }
+    return { ...filters, searchTypes: types, searchCategoryIds: categoryIds };
+  }, []);
 
   // Refs mirroring the churning data/pagination state. Reading these inside the
   // callbacks (instead of closing over the values directly) lets the callbacks drop
@@ -101,21 +126,6 @@ export const OperationsActionsProvider = ({ children }) => {
     loadingNewerRef.current = loadingNewer;
   });
 
-  const _loadCache = useCallback(async () => {
-    if (cacheLoadingRef.current || Array.isArray(allOpsCacheRef.current)) return;
-    cacheLoadingRef.current = true;
-    try {
-      const result = await OperationsDB.getAllOperations();
-      if (Array.isArray(result)) {
-        allOpsCacheRef.current = result;
-      }
-    } catch {
-      // silent: cache stays null, text search falls back to DB
-    } finally {
-      cacheLoadingRef.current = false;
-    }
-  }, []);
-
   // Load initial week of operations
   const loadInitialOperations = useCallback(async (filters, showLoading = true) => {
     const effectiveFilters = filters ?? activeFiltersRef.current;
@@ -133,18 +143,13 @@ export const OperationsActionsProvider = ({ children }) => {
       let operationsData;
       let allDatesLoaded = false;
 
-      if (hasTextSearch) {
-        if (Array.isArray(allOpsCacheRef.current)) {
-          // Cache ready: pass full list; useMemo in OperationsDataContext handles filtering
-          operationsData = allOpsCacheRef.current;
-        } else {
-          // Cache not ready: fall back to DB and build cache in background for next time
-          operationsData = await OperationsDB.getFilteredOperationsAllDates(effectiveFilters);
-          _loadCache();
-        }
-        allDatesLoaded = true;
-      } else if (isFiltered) {
-        operationsData = await OperationsDB.getFilteredOperationsAllDates(effectiveFilters);
+      if (hasTextSearch || isFiltered) {
+        // Text search and every other filter are answered in SQL, over the
+        // whole ledger. This used to be served from an in-memory copy of the
+        // entire operations table, pre-warmed at idle on every launch — memory
+        // and GC proportional to ledger size, for a query SQLite already
+        // answers with the same Cyrillic folding.
+        operationsData = await OperationsDB.getFilteredOperationsAllDates(withLocalMatches(effectiveFilters));
         allDatesLoaded = true;
       } else {
         operationsData = await OperationsDB.getOperationsByWeekOffset(0);
@@ -175,12 +180,6 @@ export const OperationsActionsProvider = ({ children }) => {
       // Week-based pagination always starts with hasMore=true.
       _setHasMoreOperations(!allDatesLoaded);
       _setDataLoaded(true);
-
-      // Pre-warm cache after first non-text load so subsequent text searches are instant.
-      // Deferred to idle time so it never competes with rendering the freshly loaded list.
-      if (!hasTextSearch && !Array.isArray(allOpsCacheRef.current)) {
-        requestIdleCallback(() => { _loadCache(); });
-      }
     } catch (error) {
       console.error('Failed to load initial operations:', error);
     } finally {
@@ -197,7 +196,7 @@ export const OperationsActionsProvider = ({ children }) => {
     _setHasNewerOperations,
     _setHasMoreOperations,
     _setDataLoaded,
-    _loadCache,
+    withLocalMatches,
   ]);
 
   // Load more operations (next week with operations)
@@ -214,81 +213,40 @@ export const OperationsActionsProvider = ({ children }) => {
     loadingMoreRef.current = true;
     _setLoadingMore(true);
     try {
-      if (Array.isArray(allOpsCacheRef.current)) {
-        // Cache is ready — serve from it to avoid an extra DB round-trip.
-        // Cache is sorted DESC (newest first), same as getAllOperations.
-        const today = new Date();
-        const todayStr = `${today.getFullYear()}-${String(today.getMonth() + 1).padStart(2, '0')}-${String(today.getDate()).padStart(2, '0')}`;
-        const boundary = oldestLoadedDateRef.current ?? todayStr;
+      const currentFilters = activeFiltersRef.current;
+      const isFiltered = _hasActiveFilters(currentFilters);
 
-        const olderOps = allOpsCacheRef.current.filter(op => op.date < boundary);
+      // Local date — operation dates are stored as local YYYY-MM-DD strings
+      const todayStr = formatLocalDate(new Date());
+      const oldestLoadedDate = oldestLoadedDateRef.current;
+      let nextOp;
+      if (!oldestLoadedDate) {
+        nextOp = isFiltered
+          ? await OperationsDB.getNextOldestFilteredOperation(todayStr, withLocalMatches(currentFilters))
+          : await OperationsDB.getNextOldestOperation(todayStr);
+      } else {
+        nextOp = isFiltered
+          ? await OperationsDB.getNextOldestFilteredOperation(oldestLoadedDate, withLocalMatches(currentFilters))
+          : await OperationsDB.getNextOldestOperation(oldestLoadedDate);
+      }
 
-        if (olderOps.length === 0) {
-          hasMoreOperationsRef.current = false;
-          _setHasMoreOperations(false);
-          return;
-        }
-
-        // Take a 7-day window anchored at the most recent of the older ops.
-        const chunkEnd = olderOps[0].date;
-        const chunkEndDate = new Date(chunkEnd + 'T00:00:00');
-        const chunkStartDate = new Date(chunkEndDate);
-        chunkStartDate.setDate(chunkStartDate.getDate() - 6);
-        const chunkStart = `${chunkStartDate.getFullYear()}-${String(chunkStartDate.getMonth() + 1).padStart(2, '0')}-${String(chunkStartDate.getDate()).padStart(2, '0')}`;
-
-        const chunk = olderOps.filter(op => op.date >= chunkStart);
+      if (!nextOp) {
+        hasMoreOperationsRef.current = false;
+        _setHasMoreOperations(false);
+      } else {
+        const moreOperations = isFiltered
+          ? await OperationsDB.getFilteredOperationsByWeekFromDate(nextOp.date, withLocalMatches(currentFilters))
+          : await OperationsDB.getOperationsByWeekFromDate(nextOp.date);
 
         _setOperations(prevOps => {
           const existingIds = new Set(prevOps.map(op => op.id));
-          const newOps = chunk.filter(op => !existingIds.has(op.id));
+          const newOps = moreOperations.filter(op => !existingIds.has(op.id));
           return [...prevOps, ...newOps];
         });
 
-        if (chunk.length > 0) {
-          oldestLoadedDateRef.current = chunk[chunk.length - 1].date;
-          _setOldestLoadedDate(chunk[chunk.length - 1].date);
-        }
-
-        const stillMore = olderOps.some(op => op.date < chunkStart);
-        hasMoreOperationsRef.current = stillMore;
-        _setHasMoreOperations(stillMore);
-      } else {
-        // Cache not ready yet — fall back to DB queries.
-        const currentFilters = activeFiltersRef.current;
-        const isFiltered = _hasActiveFilters(currentFilters);
-
-        // Local date — operation dates are stored as local YYYY-MM-DD strings
-        const todayStr = formatLocalDate(new Date());
-        const oldestLoadedDate = oldestLoadedDateRef.current;
-        let nextOp;
-        if (!oldestLoadedDate) {
-          nextOp = isFiltered
-            ? await OperationsDB.getNextOldestFilteredOperation(todayStr, currentFilters)
-            : await OperationsDB.getNextOldestOperation(todayStr);
-        } else {
-          nextOp = isFiltered
-            ? await OperationsDB.getNextOldestFilteredOperation(oldestLoadedDate, currentFilters)
-            : await OperationsDB.getNextOldestOperation(oldestLoadedDate);
-        }
-
-        if (!nextOp) {
-          hasMoreOperationsRef.current = false;
-          _setHasMoreOperations(false);
-        } else {
-          const moreOperations = isFiltered
-            ? await OperationsDB.getFilteredOperationsByWeekFromDate(nextOp.date, currentFilters)
-            : await OperationsDB.getOperationsByWeekFromDate(nextOp.date);
-
-          _setOperations(prevOps => {
-            const existingIds = new Set(prevOps.map(op => op.id));
-            const newOps = moreOperations.filter(op => !existingIds.has(op.id));
-            return [...prevOps, ...newOps];
-          });
-
-          if (moreOperations.length > 0) {
-            oldestLoadedDateRef.current = moreOperations[moreOperations.length - 1].date;
-            _setOldestLoadedDate(moreOperations[moreOperations.length - 1].date);
-          }
+        if (moreOperations.length > 0) {
+          oldestLoadedDateRef.current = moreOperations[moreOperations.length - 1].date;
+          _setOldestLoadedDate(moreOperations[moreOperations.length - 1].date);
         }
       }
     } catch (error) {
@@ -321,7 +279,7 @@ export const OperationsActionsProvider = ({ children }) => {
 
       // Find the next newest operation after our current newest date
       const nextOp = isFiltered
-        ? await OperationsDB.getNextNewestFilteredOperation(newestLoadedDate, currentFilters)
+        ? await OperationsDB.getNextNewestFilteredOperation(newestLoadedDate, withLocalMatches(currentFilters))
         : await OperationsDB.getNextNewestOperation(newestLoadedDate);
 
       if (!nextOp) {
@@ -331,7 +289,7 @@ export const OperationsActionsProvider = ({ children }) => {
       } else {
         // Load a week of operations ending at this operation's date
         const newerOperations = isFiltered
-          ? await OperationsDB.getFilteredOperationsByWeekToDate(nextOp.date, currentFilters)
+          ? await OperationsDB.getFilteredOperationsByWeekToDate(nextOp.date, withLocalMatches(currentFilters))
           : await OperationsDB.getOperationsByWeekToDate(nextOp.date);
 
         // Merge and deduplicate operations by ID
@@ -387,15 +345,31 @@ export const OperationsActionsProvider = ({ children }) => {
   // that results are fetched across all dates (not just the lazily-loaded window).
   const isFirstSearchEffectRef = useRef(true);
   const prevStructuralRef = useRef(null);
+  // Compared by CONTENT, not by reference. These two are derived from the
+  // language and the category tree, and a provider that hands down a fresh `t`
+  // or `categories` on each render would otherwise make them new arrays every
+  // render — and this effect reloads, which re-renders, which reloads.
+  const localMatchesKey = `${searchTypes.join('|')}\u0000${searchCategoryIds.join('|')}`;
+  const prevLocalMatchesKeyRef = useRef(localMatchesKey);
   useEffect(() => {
     if (isFirstSearchEffectRef.current) {
       isFirstSearchEffectRef.current = false;
       prevStructuralRef.current = activeFilters;
+      prevLocalMatchesKeyRef.current = localMatchesKey;
       return;
     }
 
     const prev = prevStructuralRef.current;
     prevStructuralRef.current = activeFilters;
+
+    // The locally-resolved matches depend on the language and the category tree,
+    // both loaded asynchronously. A restored query like "Перевод" can therefore
+    // be sent to SQL before the translations arrive, matching nothing; when they
+    // land, `searchTypes` changes and the query has to be reissued. Tracked
+    // separately from `activeFilters` because these are derived and must not be
+    // persisted.
+    const localMatchesChanged = prevLocalMatchesKeyRef.current !== localMatchesKey;
+    prevLocalMatchesKeyRef.current = localMatchesKey;
 
     // Compare all filter fields by reference — React never mutates arrays in place,
     // so reference equality is sufficient to detect changes.
@@ -408,19 +382,22 @@ export const OperationsActionsProvider = ({ children }) => {
       || prev.amountRange !== activeFilters.amountRange
       || prev.searchText !== activeFilters.searchText;
 
-    if (filtersChanged) {
+    if (filtersChanged || localMatchesChanged) {
       loadInitialOperations(activeFilters, false);
     }
 
-    setJsonPreference(PREF_KEYS.OPERATIONS_FILTERS, activeFilters).catch(err => {
-      console.error('Failed to persist filters:', err);
-    });
-  }, [activeFilters, loadInitialOperations]);
+    // Only the user's own filters are persisted, and only when they changed —
+    // a language load must not rewrite the stored blob.
+    if (filtersChanged) {
+      setJsonPreference(PREF_KEYS.OPERATIONS_FILTERS, activeFilters).catch(err => {
+        console.error('Failed to persist filters:', err);
+      });
+    }
+  }, [activeFilters, localMatchesKey, loadInitialOperations]);
 
   // Listen for reload events
   useEffect(() => {
     const unsubscribe = appEvents.on(EVENTS.RELOAD_ALL, () => {
-      allOpsCacheRef.current = null; // data may have changed; rebuild on next text search
       // RELOAD_ALL is usually a background refresh (a balance edit, the
       // bank-notification pipeline on every foreground, a category change) over
       // a list that already holds valid rows: raising `loading` there swaps them
@@ -434,15 +411,6 @@ export const OperationsActionsProvider = ({ children }) => {
     return unsubscribe;
   }, [loadInitialOperations]);
 
-  // Clear cache on database reset so stale data is never served
-  useEffect(() => {
-    const unsubscribe = appEvents.on(EVENTS.DATABASE_RESET, () => {
-      allOpsCacheRef.current = null;
-      cacheLoadingRef.current = false;
-    });
-    return unsubscribe;
-  }, []);
-
   // Note: Default operations are now created directly in AccountsDataContext
   // after default accounts are created, then RELOAD_ALL is emitted to refresh everything.
 
@@ -454,11 +422,6 @@ export const OperationsActionsProvider = ({ children }) => {
     try {
       // Create operation in DB (ID will be auto-generated, handles balance updates automatically)
       const createdOperation = await OperationsDB.createOperation(operation);
-
-      // Keep cache in sync so text search reflects the new operation immediately
-      if (allOpsCacheRef.current !== null && createdOperation) {
-        allOpsCacheRef.current = [createdOperation, ...allOpsCacheRef.current];
-      }
 
       await loadInitialOperations(activeFiltersRef.current, false);
 
@@ -520,10 +483,6 @@ export const OperationsActionsProvider = ({ children }) => {
     try {
       await OperationsDB.splitOperation(id, updates, newOperationData);
 
-      // Invalidate cache — can't reconstruct the new split operations without a DB read
-      allOpsCacheRef.current = null;
-      _loadCache();
-
       await loadInitialOperations(activeFiltersRef.current, false);
 
       _setSaveError(null);
@@ -541,7 +500,7 @@ export const OperationsActionsProvider = ({ children }) => {
       );
       throw error;
     }
-  }, [reloadAccounts, showDialog, loadInitialOperations, _setSaveError, _loadCache]);
+  }, [reloadAccounts, showDialog, loadInitialOperations, _setSaveError]);
 
   const updateOperation = useCallback(async (id, updates) => {
     try {
@@ -561,12 +520,6 @@ export const OperationsActionsProvider = ({ children }) => {
         });
       });
 
-      // Mirror the persisted form into the cache
-      if (allOpsCacheRef.current !== null) {
-        allOpsCacheRef.current = allOpsCacheRef.current.map(op =>
-          op.id === id ? (persisted ?? { ...op, ...updates }) : op,
-        );
-      }
       _setSaveError(null);
 
       // Reload accounts to reflect balance changes
@@ -593,10 +546,6 @@ export const OperationsActionsProvider = ({ children }) => {
 
       _setOperations(ops => ops.filter(op => op.id !== id));
 
-      // Mirror the deletion into the cache
-      if (allOpsCacheRef.current !== null) {
-        allOpsCacheRef.current = allOpsCacheRef.current.filter(op => op.id !== id);
-      }
       _setSaveError(null);
 
       // Reload accounts to reflect balance changes

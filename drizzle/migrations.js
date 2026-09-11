@@ -31,6 +31,7 @@ import m0026 from './0026_plan_line_effective_range.js';
 import m0027 from './0027_pending_notification_force_added.js';
 import m0028 from './0028_plan_line_labels.js';
 import m0029 from './0029_dismissed_notifications.js';
+import m0030 from './0030_operations_transfer_indexes.js';
 
 export default {
   journal,
@@ -65,6 +66,7 @@ export default {
     m0027,
     m0028,
     m0029,
+    m0030,
   },
   postMigrationHandlers: {
     m0003: m0003PostMigration,
