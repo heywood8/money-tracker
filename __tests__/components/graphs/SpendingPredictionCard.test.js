@@ -85,9 +85,11 @@ describe('SpendingPredictionCard', () => {
         />,
       );
 
-      expect(getByText('500.50 USD')).toBeTruthy();
-      expect(getByText('1200.75 USD')).toBeTruthy();
-      expect(getByText('35.75 USD')).toBeTruthy();
+      // One formatter for the whole app now (#1711): symbol-prefixed and
+      // grouped, where this card alone used to print "500.50 USD".
+      expect(getByText('$500.50')).toBeTruthy();
+      expect(getByText('$1,200.75')).toBeTruthy();
+      expect(getByText('$35.75')).toBeTruthy();
     });
 
     it('displays days elapsed information', async () => {
@@ -119,7 +121,7 @@ describe('SpendingPredictionCard', () => {
         />,
       );
 
-      expect(getByText('5000 JPY')).toBeTruthy();
+      expect(getByText('¥5,000')).toBeTruthy();
     });
 
     it('formats EUR with 2 decimal places', async () => {
@@ -135,7 +137,7 @@ describe('SpendingPredictionCard', () => {
         />,
       );
 
-      expect(getByText('100.99 EUR')).toBeTruthy();
+      expect(getByText('€100.99')).toBeTruthy();
     });
 
     it('handles unknown currency with default 2 decimal places', async () => {
@@ -151,7 +153,7 @@ describe('SpendingPredictionCard', () => {
         />,
       );
 
-      expect(getByText('250.50 XYZ')).toBeTruthy();
+      expect(getByText('XYZ250.50')).toBeTruthy();
     });
   });
 
@@ -243,7 +245,7 @@ describe('SpendingPredictionCard', () => {
         />,
       );
 
-      const currentSpending = getByText('500.50 USD');
+      const currentSpending = getByText('$500.50');
       expect(currentSpending).toBeTruthy();
       expect(currentSpending.props.style).toEqual(
         expect.arrayContaining([

@@ -6,7 +6,7 @@ import { matchFont, RoundedRect } from '@shopify/react-native-skia';
 import { runOnJS } from 'react-native-reanimated';
 import { Gesture, GestureDetector } from 'react-native-gesture-handler';
 import Icon from '@expo/vector-icons/MaterialCommunityIcons';
-import currencies from '../../../assets/currencies.json';
+import * as Currency from '../../services/currency';
 import useMonthlyTrendSeries, { ALL_CATEGORIES } from '../../hooks/useMonthlyTrendSeries';
 import { BORDER_RADIUS, FONT_SIZE, HORIZONTAL_PADDING, SPACING } from '../../styles/designTokens';
 import { comparisonSeriesColor, ledgerSeriesColors } from '../../styles/chartPalette';
@@ -30,20 +30,14 @@ const screenWidth = Dimensions.get('window').width;
 // directly above this card write theirs. Spelled out in full, a seven-digit
 // total ran the width of the card and disagreed with the figure sitting one row
 // higher on the same screen.
-const formatCurrency = (amount, currency) => {
-  const currencyInfo = currencies[currency];
-  const decimals = currencyInfo?.decimal_digits ?? 2;
-  const symbol = currencyInfo?.symbol ?? currency;
-  const value = parseFloat(amount);
-  if (!Number.isFinite(value)) return `${symbol}${(0).toFixed(decimals)}`;
-  const magnitude = Math.abs(value);
-  // The crossing point is where the K form *rounds* to a million, not where the
-  // value reaches one: 999,950 written to one decimal is "1000.0K", which is
-  // wider than the "1.0M" it turns into a cent later.
-  if (magnitude >= 999950) return `${symbol}${(value / 1000000).toFixed(1)}M`;
-  if (magnitude >= 1000) return `${symbol}${(value / 1000).toFixed(1)}K`;
-  return `${symbol}${value.toFixed(decimals)}`;
-};
+// Non-finite input used to print a zero rather than propagate NaN; formatMoney
+// has no such guard, so it stays here.
+const formatCurrency = (amount, currency, language) => (
+  Currency.formatMoney(Number.isFinite(parseFloat(amount)) ? amount : 0, currency, {
+    language,
+    compact: true,
+  })
+);
 
 const BAR_HEIGHT = 90;
 const LABEL_HEIGHT = 18;
@@ -584,6 +578,7 @@ const ALL_SERIES_ICON = { income: 'arrow-bottom-left', expense: 'arrow-top-right
 const TrendsCard = ({
   colors,
   t,
+  language,
   selectedCurrency,
   selectedSeries,
   onSeriesChange,
@@ -847,7 +842,7 @@ const TrendsCard = ({
             </TouchableOpacity>
             {!hideBalances && (
               <Text style={[styles.currentAmount, { color: colors.text }]} numberOfLines={1}>
-                {formatCurrency(displayedTotal, selectedCurrency)}
+                {formatCurrency(displayedTotal, selectedCurrency, language)}
               </Text>
             )}
           </View>
@@ -861,7 +856,7 @@ const TrendsCard = ({
             >
               {vs ? (
                 <>
-                  <Text style={[styles.vsText, { color: colors.mutedText }]}>vs</Text>
+                  <Text style={[styles.vsText, { color: colors.mutedText }]}>{t('vs')}</Text>
                   <View style={[styles.seriesDot, { backgroundColor: vsColor }]} />
                   {vsIcon && (
                     <Icon name={vsIcon} size={14} color={colors.text} />
@@ -873,7 +868,7 @@ const TrendsCard = ({
               ) : (
                 <>
                   <Icon name="plus-circle-outline" size={13} color={colors.mutedText} />
-                  <Text style={[styles.vsText, { color: colors.mutedText }]}>vs</Text>
+                  <Text style={[styles.vsText, { color: colors.mutedText }]}>{t('vs')}</Text>
                 </>
               )}
             </TouchableOpacity>
@@ -964,6 +959,7 @@ TrendBarChart.propTypes = {
 };
 
 TrendsCard.propTypes = {
+  language: PropTypes.string,
   colors: PropTypes.object.isRequired,
   t: PropTypes.func.isRequired,
   selectedCurrency: PropTypes.string.isRequired,

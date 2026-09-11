@@ -76,7 +76,7 @@ const OperationsScreen = () => {
   const { colors } = useThemeColors();
   const insets = useSafeAreaInsets();
 
-  const { t } = useLocalization();
+  const { t, language } = useLocalization();
   const { showDialog } = useDialog();
   const {
     operations,
@@ -517,9 +517,21 @@ const OperationsScreen = () => {
         const account = accounts.find(acc => acc.id === operation.accountId);
         if (account) {
           const currency = account.currency || 'USD';
-          const amount = parseFloat(operation.amount);
-          if (!isNaN(amount)) {
-            currentGroup.spendingSums[currency] = (currentGroup.spendingSums[currency] || 0) + amount;
+          // Summed with decimal.js, not `+` on floats: a day of 0.1 + 0.2 rows
+          // is exactly the case the repo uses Currency for everywhere else, and
+          // this total is printed beside the rows it adds up. Kept as a string
+          // for the same reason.
+          //
+          // No currency argument: that rounds to the currency's precision on
+          // EVERY addition, so three ₽100.50 rows (a 0-decimal currency, which
+          // a CSV/JSON restore can still carry fractional amounts for) would
+          // total ₽303 instead of ₽302. Accumulate exact, round once at
+          // display, as OperationsDB does.
+          if (!isNaN(parseFloat(operation.amount))) {
+            currentGroup.spendingSums[currency] = Currency.add(
+              currentGroup.spendingSums[currency] || '0',
+              operation.amount,
+            );
           }
         }
       }
@@ -910,13 +922,13 @@ const OperationsScreen = () => {
         }
 
         if (!rateToUse) {
-          showDialog(t('error'), t('exchange_rate_unavailable'), [{ text: 'OK' }]);
+          showDialog(t('error'), t('exchange_rate_unavailable'), [{ text: t('ok') }]);
           return;
         }
 
         const homeAmount = Currency.convertAmount(foreignAmount, foreignCurrency, homeCurrency, rateToUse);
         if (!homeAmount) {
-          showDialog(t('error'), t('exchange_rate_unavailable'), [{ text: 'OK' }]);
+          showDialog(t('error'), t('exchange_rate_unavailable'), [{ text: t('ok') }]);
           return;
         }
 
@@ -956,7 +968,7 @@ const OperationsScreen = () => {
         setQuickAddFlash({ field: flashField, token: quickAddFlashTokenRef.current });
         return;
       }
-      showDialog(t('error'), error, [{ text: 'OK' }]);
+      showDialog(t('error'), error, [{ text: t('ok') }]);
       return;
     }
 
@@ -1521,6 +1533,7 @@ const OperationsScreen = () => {
         groupedOperations={groupedOperations}
         accounts={accounts}
         categories={categories}
+        language={language}
         colors={colors}
         t={t}
         initialLoading={operationsLoading}
@@ -1590,6 +1603,7 @@ const OperationsScreen = () => {
             onClearGroup={handleClearFilterGroup}
             colors={colors}
             t={t}
+            language={language}
           />
         )}
       </View>
@@ -1636,8 +1650,8 @@ const OperationsScreen = () => {
           ]}
           onPress={scrollToTop}
           accessibilityRole="button"
-          accessibilityLabel="Scroll to top"
-          accessibilityHint="Scroll to the top of the list"
+          accessibilityLabel={t('scroll_to_top')}
+          accessibilityHint={t('scroll_to_top_hint')}
         >
           <Icon name="chevron-up" size={24} color={colors.text} />
         </TouchableOpacity>
@@ -1688,6 +1702,7 @@ const OperationsScreen = () => {
         topOffset={searchBarAreaHeight}
         colors={colors}
         t={t}
+        language={language}
         onClose={handleCloseSearch}
       />
     </View>

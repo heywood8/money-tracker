@@ -96,6 +96,8 @@ const IncomePieChart = ({
           data={incomeChartData}
           currency={selectedCurrency}
           colors={colors}
+          language={language}
+          t={t}
           onItemPress={onLegendItemPress}
           isClickable
         />

@@ -31,9 +31,14 @@ jest.mock('../../../app/components/operations/DateSeparator', () => {
   const React = require('react');
   /* eslint-disable react/prop-types */
   return function MockDateSeparator({ date, formatDate, onPress }) {
-    // invoke formatDate so coverage counters inside that callback are hit
-    if (formatDate) formatDate(date);
-    return React.createElement('Pressable', { testID: `date-sep-${date}`, onPress });
+    // invoke formatDate so coverage counters inside that callback are hit, and
+    // surface its result so the label itself can be asserted on
+    const label = formatDate ? formatDate(date) : '';
+    return React.createElement(
+      'Pressable',
+      { onPress },
+      React.createElement('Text', { testID: `date-sep-${date}` }, label),
+    );
   };
   /* eslint-enable react/prop-types */
 });
@@ -42,11 +47,16 @@ jest.mock('../../../app/components/operations/OperationListItem', () => {
   const React = require('react');
   /* eslint-disable react/prop-types */
   return function MockOperationListItem({ operation, formatCurrency, getCategoryInfo, getAccountName }) {
-    // invoke utility callbacks so their coverage counters are hit
-    if (formatCurrency) formatCurrency(operation.accountId, operation.amount);
+    // invoke utility callbacks so their coverage counters are hit, and surface
+    // the formatted amount so the money formatting itself can be asserted on
+    const amount = formatCurrency ? formatCurrency(operation.accountId, operation.amount) : '';
     if (getCategoryInfo) getCategoryInfo(operation.categoryId);
     if (getAccountName) getAccountName(operation.accountId);
-    return React.createElement('View', { testID: `op-item-${operation.id}` });
+    return React.createElement(
+      'View',
+      { testID: `op-item-${operation.id}` },
+      React.createElement('Text', { testID: `op-amount-${operation.id}` }, amount),
+    );
   };
   /* eslint-enable react/prop-types */
 });
@@ -665,4 +675,50 @@ describe('OperationsList', () => {
       });
     });
   });
+
+  // Regression for issue #1711. The list formatted dates with
+  // `toLocaleDateString(undefined, …)` — the DEVICE locale — so a user running
+  // Penny in Russian on an English phone read "Mon, Sep 1" here and
+  // "1 сентября" in the Graphs drill-down. Money had the same problem in
+  // reverse: a private `toFixed` formatter with no grouping.
+  describe('formats in the app language, not the device locale (#1711)', () => {
+    const ops = [{ id: 'op-i18n', type: 'expense', amount: '1234.5', accountId: 'acc-usd', categoryId: 'cat-1' }];
+    const sectionFor = (date) => toSection(makeGroup(date, ops));
+
+    const labelFor = async (date, language) => {
+      const { sp } = await getSectionListProps({
+        groupedOperations: [makeGroup(date, ops)],
+        language,
+      });
+      const { getByTestId } = await render(sp.renderSectionHeader({ section: sectionFor(date) }));
+      return getByTestId(`date-sep-${date}`).props.children;
+    };
+
+    it('renders the date separator label in the given language', async () => {
+      const label = await labelFor(OLD_DATE, 'ru');
+      const opts = { weekday: 'short', month: 'short', day: 'numeric' };
+      const date = new Date(`${OLD_DATE}T00:00:00`);
+
+      expect(label).toBe(date.toLocaleDateString('ru', opts));
+      // …and it is genuinely different from the English rendering.
+      expect(label).not.toBe(date.toLocaleDateString('en', opts));
+    });
+
+    it('still says Today and Yesterday through t()', async () => {
+      expect(await labelFor(TODAY, 'ru')).toBe('today');
+      expect(await labelFor(YESTERDAY, 'ru')).toBe('yesterday');
+    });
+
+    it('groups amounts through the shared money formatter', async () => {
+      const { sp } = await getSectionListProps({
+        groupedOperations: [makeGroup(OLD_DATE, ops)],
+        language: 'en',
+      });
+
+      const row = sp.renderItem({ item: ops[0], index: 0, section: sectionFor(OLD_DATE) });
+      const { getByTestId } = await render(row);
+      expect(getByTestId('op-amount-op-i18n').props.children).toBe('$1,234.50');
+    });
+  });
+
 });

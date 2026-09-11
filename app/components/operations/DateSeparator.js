@@ -1,16 +1,10 @@
 import React, { memo, useCallback } from 'react';
 import { View, Text, StyleSheet, Pressable } from 'react-native';
 import PropTypes from 'prop-types';
-import currencies from '../../../assets/currencies.json';
+import * as Currency from '../../services/currency';
 import { SPACING, FONT_SIZE, FONT_WEIGHT } from '../../styles/designTokens';
 
-const getCurrencySymbol = (currencyCode) => {
-  if (!currencyCode) return '';
-  const currency = currencies[currencyCode];
-  return currency ? currency.symbol : currencyCode;
-};
-
-const DateSeparator = ({ date, spendingSums, formatDate, colors, onPress }) => {
+const DateSeparator = ({ date, spendingSums, formatDate, colors, language, t = (key) => key, onPress }) => {
   const hasSpending = spendingSums && Object.keys(spendingSums).length > 0;
 
   // Bind the date here so the parent can pass a STABLE onPress (onDateSeparatorPress)
@@ -22,8 +16,8 @@ const DateSeparator = ({ date, spendingSums, formatDate, colors, onPress }) => {
       style={({ pressed }) => [styles.container, pressed && styles.pressed]}
       onPress={handlePress}
       accessibilityRole="button"
-      accessibilityLabel={`${formatDate(date)}, press to select date`}
-      accessibilityHint="Opens date picker to jump to a specific date"
+      accessibilityLabel={formatDate(date)}
+      accessibilityHint={t('jump_to_date_hint')}
     >
       <Text style={[styles.dateText, { color: colors.mutedText }]}>
         {formatDate(date).toUpperCase()}
@@ -31,12 +25,11 @@ const DateSeparator = ({ date, spendingSums, formatDate, colors, onPress }) => {
       {hasSpending && (
         <Text style={[styles.totalText, { color: colors.mutedText }]}>
           {Object.entries(spendingSums)
-            .map(([currency, amount]) => {
-              const symbol = getCurrencySymbol(currency);
-              const currencyInfo = currencies[currency];
-              const decimals = currencyInfo?.decimal_digits ?? 2;
-              return `-${symbol}${amount.toFixed(decimals)}`;
-            })
+            .map(([currency, amount]) => (
+              // The sum arrives as a decimal.js string; formatMoney puts the
+              // sign ahead of the symbol and groups it in the app's language.
+              Currency.formatMoney(Currency.multiply(amount, -1, currency), currency, { language })
+            ))
             .join(', ')}
         </Text>
       )}
@@ -45,6 +38,8 @@ const DateSeparator = ({ date, spendingSums, formatDate, colors, onPress }) => {
 };
 
 DateSeparator.propTypes = {
+  language: PropTypes.string,
+  t: PropTypes.func,
   date: PropTypes.string.isRequired,
   spendingSums: PropTypes.object,
   formatDate: PropTypes.func.isRequired,

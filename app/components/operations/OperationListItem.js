@@ -213,6 +213,7 @@ const OperationListItem = ({
         <DescriptionSuggestionRow
           chips={suggestionChips}
           colors={colors}
+          t={t}
           onApply={onApplySuggestion}
           onDismiss={onDismissSuggestion}
         />

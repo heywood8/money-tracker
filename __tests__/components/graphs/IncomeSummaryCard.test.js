@@ -91,7 +91,8 @@ describe('IncomeSummaryCard', () => {
         <IncomeSummaryCard {...defaultProps} totalIncome={150000.99} selectedCurrency="JPY" />,
       );
 
-      expect(getByText(/¥150\.0K/)).toBeTruthy();
+      // Shared formatter: ~3 significant characters, trailing zeros stripped.
+      expect(getByText(/¥150K/)).toBeTruthy();
     });
 
     it('formats BTC with full decimals when small', async () => {
@@ -107,7 +108,8 @@ describe('IncomeSummaryCard', () => {
         <IncomeSummaryCard {...defaultProps} totalIncome={999.999} selectedCurrency="XYZ" />,
       );
 
-      expect(getByText(/XYZ1000\.00/)).toBeTruthy();
+      // Grouped now, like every other money figure in the app.
+      expect(getByText(/XYZ1,000\.00/)).toBeTruthy();
     });
   });
 

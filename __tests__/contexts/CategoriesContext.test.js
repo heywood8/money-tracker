@@ -400,9 +400,9 @@ describe('CategoriesContext', () => {
       expect(error).toBeDefined();
       expect(error.message).toBe('Create failed');
       expect(mockShowDialog).toHaveBeenCalledWith(
-        'Error',
-        'Failed to create category. Please try again.',
-        [{ text: 'OK' }],
+        'error',
+        'failed_to_create_category',
+        [{ text: 'ok' }],
       );
     });
 

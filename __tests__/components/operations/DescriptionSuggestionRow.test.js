@@ -49,7 +49,7 @@ describe('DescriptionSuggestionRow', () => {
     const { getByLabelText } = await render(
       <DescriptionSuggestionRow {...baseProps} onDismiss={onDismiss} />,
     );
-    await fireEvent.press(getByLabelText('dismiss suggestion'));
+    await fireEvent.press(getByLabelText('dismiss_suggestion'));
     expect(onDismiss).toHaveBeenCalledTimes(1);
   });
 

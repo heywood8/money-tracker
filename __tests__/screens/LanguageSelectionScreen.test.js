@@ -361,7 +361,7 @@ describe('LanguageSelectionScreen', () => {
       );
 
       // Select English via accessibility label (nativeName == name, both 'English')
-      await fireEvent.press(getByLabelText('Select English'));
+      await fireEvent.press(getByLabelText(/English$/));
 
       // Press continue
       await fireEvent.press(getByText('Continue'));
@@ -388,7 +388,7 @@ describe('LanguageSelectionScreen', () => {
       expect(queryByText('✓')).toBeNull();
 
       // Select English
-      await fireEvent.press(getByLabelText('Select English'));
+      await fireEvent.press(getByLabelText(/English$/));
 
       // Checkmark should appear
       expect(getByText('✓')).toBeTruthy();
@@ -399,7 +399,7 @@ describe('LanguageSelectionScreen', () => {
         <LanguageSelectionScreen onLanguageSelected={mockOnLanguageSelected} />,
       );
 
-      await fireEvent.press(getByLabelText('Select Russian'));
+      await fireEvent.press(getByLabelText(/Russian$/));
       await fireEvent.press(getByText('Продолжить'));
 
       expect(mockOnLanguageSelected).toHaveBeenCalledWith('ru');
@@ -411,11 +411,11 @@ describe('LanguageSelectionScreen', () => {
       );
 
       // Select English first
-      await fireEvent.press(getByLabelText('Select English'));
+      await fireEvent.press(getByLabelText(/English$/));
       expect(getAllByText('✓')).toHaveLength(1);
 
       // Select Russian
-      await fireEvent.press(getByLabelText('Select Russian'));
+      await fireEvent.press(getByLabelText(/Russian$/));
       expect(getAllByText('✓')).toHaveLength(1);
 
       // Continue uses the latest selection
@@ -429,7 +429,7 @@ describe('LanguageSelectionScreen', () => {
       );
 
       // Select German (mocked with empty translations)
-      await fireEvent.press(getByLabelText('Select German'));
+      await fireEvent.press(getByLabelText(/German$/));
 
       // 'welcome_title' is not in the de.json mock → key is returned as-is
       expect(getByText('welcome_title')).toBeTruthy();

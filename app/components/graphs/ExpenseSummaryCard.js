@@ -11,6 +11,7 @@ const ExpenseSummaryCard = ({
   loading,
   totalExpenses,
   selectedCurrency,
+  language,
   onPress,
   expanded = false,
 }) => (
@@ -24,6 +25,7 @@ const ExpenseSummaryCard = ({
     amount={totalExpenses}
     loading={loading}
     selectedCurrency={selectedCurrency}
+    language={language}
     onPress={onPress}
     expanded={expanded}
   />
@@ -35,6 +37,7 @@ ExpenseSummaryCard.propTypes = {
   loading: PropTypes.bool.isRequired,
   totalExpenses: PropTypes.number.isRequired,
   selectedCurrency: PropTypes.string.isRequired,
+  language: PropTypes.string,
   onPress: PropTypes.func.isRequired,
   expanded: PropTypes.bool,
 };

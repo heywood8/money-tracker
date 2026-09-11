@@ -132,6 +132,7 @@ jest.mock('../../app/components/operations/OperationsList', () => {
       pendingSuggestions: props.pendingSuggestions,
       onApplySuggestion: props.onApplySuggestion,
       onDismissSuggestion: props.onDismissSuggestion,
+      groupedOperations: props.groupedOperations,
     }, props.headerComponent);
   });
 });
@@ -278,8 +279,14 @@ jest.mock('../../app/utils/calculatorUtils', () => ({
   evaluateExpression: jest.fn((expr) => expr),
 }));
 
+// Only the rate lookups are stubbed. The arithmetic is real: the day totals
+// this screen builds are summed with Currency.add (#1711), and a mock that
+// replaced it would be testing the mock rather than the sum.
 jest.mock('../../app/services/currency', () => ({
   formatAmount: jest.fn((amount) => amount),
+  add: jest.requireActual('../../app/services/currency').add,
+  multiply: jest.requireActual('../../app/services/currency').multiply,
+  formatMoney: jest.requireActual('../../app/services/currency').formatMoney,
   getExchangeRate: jest.fn(() => null),
   convertAmount: jest.fn(() => null),
   fetchLiveExchangeRate: jest.fn().mockResolvedValue({ rate: null, source: 'none' }),
@@ -301,6 +308,14 @@ jest.mock('../../assets/currencies.json', () => ({
 describe('OperationsScreen', () => {
   beforeEach(() => {
     jest.clearAllMocks();
+    // `clearAllMocks` drops calls but keeps implementations, so a test that
+    // overrides useLocalization (the ru_ prefix one below) leaked its `t` into
+    // every test after it. Restore the identity default here so each test gets
+    // the keys back.
+    require('../../app/contexts/LocalizationContext').useLocalization.mockReturnValue({
+      t: (key) => key,
+      language: 'en',
+    });
   });
 
   describe('Component Structure', () => {
@@ -1463,7 +1478,7 @@ describe('OperationsScreen', () => {
       });
 
       // After scrolling down past 250px, scroll-to-top button should be visible
-      const scrollToTopButton = queryByLabelText('Scroll to top');
+      const scrollToTopButton = queryByLabelText('scroll_to_top');
       expect(scrollToTopButton).toBeTruthy();
     });
 
@@ -1503,7 +1518,7 @@ describe('OperationsScreen', () => {
       });
 
       // Scroll button should not be visible when scrolled less than 250px
-      const scrollToTopButton = queryByLabelText('Scroll to top');
+      const scrollToTopButton = queryByLabelText('scroll_to_top');
       expect(scrollToTopButton).toBeNull();
     });
 
@@ -1628,7 +1643,7 @@ describe('OperationsScreen', () => {
       });
 
       // Press scroll to top button
-      const scrollToTopButton = getByLabelText('Scroll to top');
+      const scrollToTopButton = getByLabelText('scroll_to_top');
       await fireEvent.press(scrollToTopButton);
 
       // Button should still be visible (will be hidden after scroll completes)
@@ -1930,6 +1945,54 @@ describe('OperationsScreen', () => {
 
       // Component should render without errors with operations
       await render(<OperationsScreen />);
+    });
+
+    // The day total keeps its fractional part through the sum. What must NOT
+    // happen — rounding at each addition — is pinned in currency.test.js, where
+    // the module is not mocked; this file's `formatAmount` mock hides it.
+    it('accumulates the day total exactly, rounding only at display', async () => {
+      const OperationsScreen = require('../../app/screens/OperationsScreen').default;
+      const { useOperationsData } = require('../../app/contexts/OperationsDataContext');
+      const { useOperationsActions } = require('../../app/contexts/OperationsActionsContext');
+      const { useAccountsData } = require('../../app/contexts/AccountsDataContext');
+
+      const mockAccounts = [{ id: 'acc-rub', name: 'RUB', balance: '0', currency: 'RUB' }];
+      const mockOperations = [
+        { id: '1', type: 'expense', amount: '100.50', accountId: 'acc-rub', date: '2024-01-15' },
+        { id: '2', type: 'expense', amount: '100.50', accountId: 'acc-rub', date: '2024-01-15' },
+        { id: '3', type: 'expense', amount: '100.50', accountId: 'acc-rub', date: '2024-01-15' },
+      ];
+
+      useAccountsData.mockReturnValue({
+        accounts: mockAccounts,
+        visibleAccounts: mockAccounts,
+        loading: false,
+      });
+      useOperationsData.mockReturnValue({
+        operations: mockOperations,
+        loading: false,
+        loadingMore: false,
+        hasMoreOperations: false,
+        activeFilters: {},
+        filtersActive: false,
+      });
+      useOperationsActions.mockReturnValue({
+        deleteOperation: jest.fn(),
+        addOperation: jest.fn(),
+        validateOperation: jest.fn(() => null),
+        loadMoreOperations: jest.fn(),
+        jumpToDate: jest.fn(),
+        updateFilters: jest.fn(),
+        clearFilters: jest.fn(),
+        getActiveFilterCount: jest.fn(() => 0),
+      });
+
+      const { getByTestId } = await render(<OperationsScreen />);
+      const groups = getByTestId('operations-list').props.groupedOperations;
+      const day = groups.find(g => g.date === '2024-01-15');
+
+      // 301.50 exactly, not 303 (three separately-rounded 101s).
+      expect(Number(day.spendingSums.RUB)).toBeCloseTo(301.5, 5);
     });
 
     it('handles operations with different currencies in spending sums', async () => {

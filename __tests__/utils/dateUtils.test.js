@@ -134,3 +134,40 @@ describe('no UTC day slices are left in the date-bearing paths', () => {
     expect(src).toContain('todayLocalDate');
   });
 });
+
+describe('localDateWithOffset (#1711)', () => {
+  const { localDateWithOffset, todayLocalDate } = require('../../app/utils/dateUtils');
+
+  afterEach(() => { jest.useRealTimers(); });
+
+  it('returns today for an offset of zero', () => {
+    expect(localDateWithOffset(0)).toBe(todayLocalDate());
+  });
+
+  it('walks back one calendar day', () => {
+    jest.useFakeTimers().setSystemTime(new Date(2024, 5, 20, 12, 0, 0));
+    expect(localDateWithOffset(-1)).toBe('2024-06-19');
+    expect(localDateWithOffset(1)).toBe('2024-06-21');
+  });
+
+  it('crosses a month boundary', () => {
+    jest.useFakeTimers().setSystemTime(new Date(2024, 6, 1, 9, 30, 0));
+    expect(localDateWithOffset(-1)).toBe('2024-06-30');
+  });
+
+  it('crosses a year boundary', () => {
+    jest.useFakeTimers().setSystemTime(new Date(2024, 0, 1, 0, 5, 0));
+    expect(localDateWithOffset(-1)).toBe('2023-12-31');
+  });
+
+  // The regression: OperationsList derived "Today"/"Yesterday" from
+  // Math.floor((today - date) / 86400000). On a spring-forward day that
+  // quotient is 0.96 of a day, so yesterday floored to 0 and read as "Today".
+  // setDate walks the calendar instead and is immune.
+  it('is a calendar walk, not a subtraction of fixed milliseconds', () => {
+    jest.useFakeTimers().setSystemTime(new Date(2024, 2, 31, 12, 0, 0));
+    const yesterday = localDateWithOffset(-1);
+    expect(yesterday).toBe('2024-03-30');
+    expect(yesterday).not.toBe(localDateWithOffset(0));
+  });
+});

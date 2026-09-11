@@ -303,7 +303,12 @@ export default function SettingsScreen({ setSubPanelActive }) {
   let headerRightSlot = <View style={styles.backButton} />;
   if (panelRefresh) {
     headerRightSlot = (
-      <TouchableOpacity onPress={panelRefresh} style={styles.backButton}>
+      <TouchableOpacity
+        onPress={panelRefresh}
+        style={styles.backButton}
+        accessibilityRole="button"
+        accessibilityLabel={t('refresh')}
+      >
         <Ionicons name="refresh-outline" size={22} color={colors.text} />
       </TouchableOpacity>
     );
@@ -334,6 +339,9 @@ export default function SettingsScreen({ setSubPanelActive }) {
               style={styles.backButton}
               testID="settings-subpanel-back"
               disabled={isBackDisabled}
+              accessibilityRole="button"
+              accessibilityLabel={t('back')}
+              accessibilityState={{ disabled: isBackDisabled }}
             >
               <Ionicons name="arrow-back" size={24} color={colors.text} />
             </TouchableOpacity>
@@ -439,11 +447,13 @@ export default function SettingsScreen({ setSubPanelActive }) {
 }
 
 const styles = StyleSheet.create({
+  // HEIGHTS.input (48), not 40: an icon-only control still owes the platform's
+  // minimum touch target, and 40dp is under it in both directions.
   backButton: {
     alignItems: 'center',
-    height: 40,
+    height: HEIGHTS.input,
     justifyContent: 'center',
-    width: 40,
+    width: HEIGHTS.input,
   },
   container: {
     flex: 1,

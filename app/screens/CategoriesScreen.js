@@ -313,7 +313,7 @@ const CategoriesScreen = ({ onBackStateChange }) => {
         onLongPress={() => handleCategoryLongPress(category)}
         activeOpacity={0.7}
         accessibilityRole="button"
-        accessibilityLabel={`${name} category`}
+        accessibilityLabel={`${name} ${t('category')}`}
       >
         <Icon name={category.icon} size={28} color={colors.text} accessible={false} />
         <Text style={[styles.gridCellName, { color: colors.text }]} numberOfLines={2}>
@@ -362,7 +362,7 @@ const CategoriesScreen = ({ onBackStateChange }) => {
               style={styles.backButton}
               hitSlop={{ top: 8, bottom: 8, left: 8, right: 8 }}
               accessibilityRole="button"
-              accessibilityLabel="Back to all categories"
+              accessibilityLabel={t('back_to_all_categories')}
             >
               <Icon name="chevron-left" size={18} color={colors.primary} />
               <Text style={[styles.backLabel, { color: colors.primary }]}>
@@ -404,7 +404,7 @@ const CategoriesScreen = ({ onBackStateChange }) => {
         >
           {/* Form header */}
           <View style={[styles.formPanelHeader, { borderBottomColor: colors.border }]}>
-            <TouchableOpacity onPress={handleCancelForm} style={styles.formPanelBack} accessibilityRole="button" accessibilityLabel="Back">
+            <TouchableOpacity onPress={handleCancelForm} style={styles.formPanelBack} accessibilityRole="button" accessibilityLabel={t('back')}>
               <Icon name="arrow-left" size={24} color={colors.text} />
             </TouchableOpacity>
             <Text style={[styles.formPanelTitle, { color: colors.text }]}>

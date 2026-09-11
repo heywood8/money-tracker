@@ -583,7 +583,9 @@ describe('TrendsCard', () => {
         <TrendsCard {...defaultProps} selectedCurrency="JPY" />,
       );
 
-      expect(getAllByText('¥5.0K').length).toBeGreaterThan(0);
+      // The shared formatter keeps ~3 significant characters and strips
+      // trailing zeros, so an exact 5,000 reads "5K" rather than "5.0K".
+      expect(getAllByText('¥5K').length).toBeGreaterThan(0);
     });
 
     it('collapses a millions figure to M rather than spelling out seven digits', async () => {
@@ -600,7 +602,7 @@ describe('TrendsCard', () => {
         <TrendsCard {...defaultProps} selectedCurrency="JPY" />,
       );
 
-      expect(getAllByText('¥2.3M').length).toBeGreaterThan(0);
+      expect(getAllByText('¥2.27M').length).toBeGreaterThan(0);
     });
 
     it('crosses to M where the K form would round to a thousand', async () => {
@@ -620,7 +622,7 @@ describe('TrendsCard', () => {
         <TrendsCard {...defaultProps} selectedCurrency="JPY" />,
       );
 
-      expect(getAllByText('¥1.0M').length).toBeGreaterThan(0);
+      expect(getAllByText('¥1M').length).toBeGreaterThan(0);
     });
   });
 

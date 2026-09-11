@@ -5,7 +5,7 @@ import PropTypes from 'prop-types';
 import { HORIZONTAL_PADDING } from '../../styles/designTokens';
 import { CHIP, CHIP_TEXT } from '../../styles/componentStyles';
 
-const formatDateLabel = (dateRange) => {
+const formatDateLabel = (dateRange, language) => {
   const { startDate, endDate } = dateRange;
   // Parse "YYYY-MM-DD" as local time so the displayed day doesn't shift in
   // timezones west of UTC (where new Date("YYYY-MM-DD") yields the previous day).
@@ -13,7 +13,8 @@ const formatDateLabel = (dateRange) => {
     if (!d) return '';
     const [y, m, day] = d.split('-').map(Number);
     if (!y || !m || !day) return '';
-    return new Date(y, m - 1, day).toLocaleDateString(undefined, { month: 'short', day: 'numeric' });
+    // The APP's language, not the device's — see OperationsList.formatDate.
+    return new Date(y, m - 1, day).toLocaleDateString(language || undefined, { month: 'short', day: 'numeric' });
   };
   if (startDate && endDate) return `${fmt(startDate)} – ${fmt(endDate)}`;
   if (startDate) return `${fmt(startDate)} –`;
@@ -29,7 +30,7 @@ const formatAmountLabel = (amountRange) => {
   return null;
 };
 
-const FilterChipStrip = ({ searchState, onClearGroup, colors, t }) => {
+const FilterChipStrip = ({ searchState, onClearGroup, colors, t, language }) => {
   const chips = [];
 
   if (searchState.text && searchState.text.trim().length > 0) {
@@ -47,7 +48,7 @@ const FilterChipStrip = ({ searchState, onClearGroup, colors, t }) => {
   }
 
   if (searchState.dateRange.startDate || searchState.dateRange.endDate) {
-    chips.push({ key: 'dateRange', label: formatDateLabel(searchState.dateRange) });
+    chips.push({ key: 'dateRange', label: formatDateLabel(searchState.dateRange, language) });
   }
 
   if (searchState.amountRange.min !== null || searchState.amountRange.max !== null) {
@@ -100,6 +101,7 @@ const FilterChipStrip = ({ searchState, onClearGroup, colors, t }) => {
 };
 
 FilterChipStrip.propTypes = {
+  language: PropTypes.string,
   searchState: PropTypes.shape({
     text: PropTypes.string,
     types: PropTypes.array.isRequired,
