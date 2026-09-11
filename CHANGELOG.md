@@ -1,5 +1,12 @@
 # Changelog
 
+## [0.284.8](https://github.com/heywood8/money-tracker/compare/penny-v0.284.7...penny-v0.284.8) (2026-09-11)
+
+
+### Performance Improvements
+
+* **updates:** throttle update checks and use conditional requests ([#1747](https://github.com/heywood8/money-tracker/issues/1747)) ([50b3efa](https://github.com/heywood8/money-tracker/commit/50b3efa8d885cb088898cc04adcb043acdd18526))
+
 ## [0.284.7](https://github.com/heywood8/money-tracker/compare/penny-v0.284.6...penny-v0.284.7) (2026-09-11)
 
 
