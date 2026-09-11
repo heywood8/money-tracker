@@ -5,18 +5,10 @@ import PropTypes from 'prop-types';
 import DateSeparator from './DateSeparator';
 import OperationListItem from './OperationListItem';
 import OperationsListPlaceholder from './OperationsListPlaceholder';
-import currencies from '../../../assets/currencies.json';
+import * as Currency from '../../services/currency';
 import { BORDER_RADIUS, FONT_SIZE, HEIGHTS, SPACING } from '../../styles/designTokens';
 import EmptyState from '../EmptyState';
-
-/**
- * Get currency symbol from currency code
- */
-const getCurrencySymbol = (currencyCode) => {
-  if (!currencyCode) return '';
-  const currency = currencies[currencyCode];
-  return currency ? currency.symbol : currencyCode;
-};
+import { localDateWithOffset } from '../../utils/dateUtils';
 
 // ── getItemLayout constants ────────────────────────────────────────────────
 // The SectionList flattens to [sectionHeader, ...rows, sectionFooter] per
@@ -67,6 +59,7 @@ const OperationsList = forwardRef(({
   groupedOperations,
   accounts,
   categories,
+  language,
   colors,
   t,
   initialLoading = false,
@@ -96,41 +89,31 @@ const OperationsList = forwardRef(({
   // (today's section would read "Yesterday" in UTC-negative timezones).
   const formatDate = useCallback((dateString) => {
     const date = new Date(`${dateString}T00:00:00`);
-    const today = new Date();
-    today.setHours(0, 0, 0, 0);
 
-    const compareDate = new Date(date);
-    compareDate.setHours(0, 0, 0, 0);
+    // Compared as YYYY-MM-DD strings rather than by dividing a millisecond
+    // difference by 86,400,000: on the spring-forward day that quotient is 0.96
+    // of a day, so `Math.floor` made yesterday read as today.
+    if (dateString === localDateWithOffset(0)) return t('today');
+    if (dateString === localDateWithOffset(-1)) return t('yesterday');
 
-    const diffDays = Math.floor((today - compareDate) / 86400000);
-
-    if (diffDays === 0) {
-      return t('today');
-    } else if (diffDays === 1) {
-      return t('yesterday');
-    } else {
-      return date.toLocaleDateString(undefined, {
-        weekday: 'short',
-        month: 'short',
-        day: 'numeric',
-      });
-    }
-  }, [t]);
+    // The APP's language, not the device's: a user who set Penny to Russian on
+    // an English phone was reading "Mon, Sep 1" here and "1 сентября" in the
+    // Graphs drill-down.
+    return date.toLocaleDateString(language || undefined, {
+      weekday: 'short',
+      month: 'short',
+      day: 'numeric',
+    });
+  }, [t, language]);
 
   // Format amount with currency symbol
   const formatCurrency = useCallback((accountId, amount) => {
     const account = accounts.find(acc => acc.id === accountId);
     if (!account) return amount;
+    if (isNaN(parseFloat(amount))) return amount;
 
-    const numAmount = parseFloat(amount);
-    if (isNaN(numAmount)) return amount;
-
-    const currency = currencies[account.currency];
-    const decimals = currency?.decimal_digits ?? 2;
-
-    const symbol = getCurrencySymbol(account.currency || 'USD');
-    return `${symbol}${numAmount.toFixed(decimals)}`;
-  }, [accounts]);
+    return Currency.formatMoney(amount, account.currency || 'USD', { language });
+  }, [accounts, language]);
 
   // Get category info (icon + name)
   const getCategoryInfo = useCallback((categoryId) => {
@@ -314,6 +297,8 @@ const OperationsList = forwardRef(({
         spendingSums={section.spendingSums}
         formatDate={formatDate}
         colors={colors}
+        language={language}
+        t={t}
         onPress={onDateSeparatorPress}
       />
       {/* Top of the card surface — provides border, radius, and background */}
@@ -506,6 +491,7 @@ const OperationsList = forwardRef(({
 OperationsList.displayName = 'OperationsList';
 
 OperationsList.propTypes = {
+  language: PropTypes.string,
   groupedOperations: PropTypes.arrayOf(PropTypes.object).isRequired,
   accounts: PropTypes.arrayOf(PropTypes.object).isRequired,
   categories: PropTypes.arrayOf(PropTypes.object).isRequired,

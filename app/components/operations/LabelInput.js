@@ -231,7 +231,7 @@ const LabelInput = forwardRef(({
                 onPress={() => handleSuggestionPress(label)}
                 activeOpacity={0.65}
                 accessibilityRole="button"
-                accessibilityLabel={`label: ${displayLabel(label)}`}
+                accessibilityLabel={`${t ? t('label') : 'label'}: ${displayLabel(label)}`}
                 testID={`label-suggestion-${label}`}
               >
                 <Icon name="plus" size={12} color={colors.primary} />

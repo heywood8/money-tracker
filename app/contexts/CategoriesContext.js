@@ -143,13 +143,13 @@ export const CategoriesProvider = ({ children }) => {
       console.error('Failed to add category:', error);
       setSaveError(error.message);
       showDialog(
-        'Error',
-        'Failed to create category. Please try again.',
-        [{ text: 'OK' }],
+        t('error'),
+        t('failed_to_create_category'),
+        [{ text: t('ok') }],
       );
       throw error;
     }
-  }, [showDialog]);
+  }, [showDialog, t]);
 
   const updateCategory = useCallback(async (id, updates) => {
     try {
@@ -162,13 +162,13 @@ export const CategoriesProvider = ({ children }) => {
       console.error('Failed to update category:', error);
       setSaveError(error.message);
       showDialog(
-        'Error',
-        'Failed to update category. Please try again.',
-        [{ text: 'OK' }],
+        t('error'),
+        t('failed_to_update_category'),
+        [{ text: t('ok') }],
       );
       throw error;
     }
-  }, [showDialog]);
+  }, [showDialog, t]);
 
   const deleteCategory = useCallback(async (id) => {
     try {

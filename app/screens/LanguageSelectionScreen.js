@@ -108,7 +108,7 @@ const LanguageSelectionScreen = ({ onLanguageSelected }) => {
                   ]}
                   onPress={() => handleLanguageSelect(language.code)}
                   accessibilityRole="button"
-                  accessibilityLabel={`Select ${language.name}`}
+                  accessibilityLabel={`${t('select')} ${language.name}`}
                   accessibilityState={{ selected: selectedLanguage === language.code }}
                 >
                   <Text style={styles.flag}>{language.flag}</Text>

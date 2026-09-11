@@ -2,16 +2,10 @@ import React from 'react';
 import { View, Text, StyleSheet } from 'react-native';
 import PropTypes from 'prop-types';
 import Icon from '@expo/vector-icons/MaterialCommunityIcons';
-import currencies from '../../../assets/currencies.json';
+import * as Currency from '../../services/currency';
 import { BORDER_RADIUS, FONT_SIZE, SPACING } from '../../styles/designTokens';
 
-const formatCurrency = (amount, currency) => {
-  const currencyInfo = currencies[currency];
-  const decimals = currencyInfo?.decimal_digits ?? 2;
-  return `${parseFloat(amount).toFixed(decimals)} ${currency}`;
-};
-
-const SpendingPredictionCard = ({ colors, t, spendingPrediction, selectedCurrency, selectedAccount, accounts }) => {
+const SpendingPredictionCard = ({ colors, t, language, spendingPrediction, selectedCurrency, selectedAccount, accounts }) => {
   if (!spendingPrediction) {
     return null;
   }
@@ -44,7 +38,7 @@ const SpendingPredictionCard = ({ colors, t, spendingPrediction, selectedCurrenc
             {t('current_spending')}
           </Text>
           <Text style={[styles.predictionStatValue, { color: colors.expense }]}>
-            {formatCurrency(spendingPrediction.currentSpending, selectedCurrency)}
+            {Currency.formatMoney(spendingPrediction.currentSpending, selectedCurrency, { language })}
           </Text>
         </View>
         <Icon name="arrow-right" size={20} color={colors.mutedText} style={styles.predictionArrow} />
@@ -53,7 +47,7 @@ const SpendingPredictionCard = ({ colors, t, spendingPrediction, selectedCurrenc
             {t('predicted_spending')}
           </Text>
           <Text style={[styles.predictionStatValue, { color: colors.text }]}>
-            {formatCurrency(spendingPrediction.predictedRemaining, selectedCurrency)}
+            {Currency.formatMoney(spendingPrediction.predictedRemaining, selectedCurrency, { language })}
           </Text>
         </View>
       </View>
@@ -72,7 +66,7 @@ const SpendingPredictionCard = ({ colors, t, spendingPrediction, selectedCurrenc
           />
         </View>
         <Text style={[styles.predictionProgressText, { color: colors.mutedText }]}>
-          {spendingPrediction.daysElapsed} / {spendingPrediction.daysInMonth} {t('days_elapsed').toLowerCase()} • {t('daily_average')}: <Text style={[styles.dailyAverageValue, { color: colors.text }]}>{formatCurrency(spendingPrediction.dailyAverage, selectedCurrency)}</Text>
+          {spendingPrediction.daysElapsed} / {spendingPrediction.daysInMonth} {t('days_elapsed').toLowerCase()} • {t('daily_average')}: <Text style={[styles.dailyAverageValue, { color: colors.text }]}>{Currency.formatMoney(spendingPrediction.dailyAverage, selectedCurrency, { language })}</Text>
         </Text>
       </View>
     </View>
@@ -80,6 +74,7 @@ const SpendingPredictionCard = ({ colors, t, spendingPrediction, selectedCurrenc
 };
 
 SpendingPredictionCard.propTypes = {
+  language: PropTypes.string,
   colors: PropTypes.object.isRequired,
   t: PropTypes.func.isRequired,
   spendingPrediction: PropTypes.shape({

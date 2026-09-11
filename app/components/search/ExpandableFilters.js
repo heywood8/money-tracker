@@ -15,6 +15,7 @@ const ExpandableFilters = ({
   accounts,
   colors,
   t,
+  language,
   isExpanded = true,
   onCloseSearch = null,
 }) => {
@@ -119,7 +120,8 @@ const ExpandableFilters = ({
     if (!dateStr) return '';
     const [y, m, d] = dateStr.split('-').map(Number);
     if (!y || !m || !d) return '';
-    return new Date(y, m - 1, d).toLocaleDateString();
+    // The APP's language, not the device's — see OperationsList.formatDate.
+    return new Date(y, m - 1, d).toLocaleDateString(language || undefined);
   };
 
   const parseDateLocal = (dateStr) => {
@@ -397,6 +399,7 @@ ExpandableFilters.propTypes = {
     glassBorder: PropTypes.string,
   }).isRequired,
   t: PropTypes.func.isRequired,
+  language: PropTypes.string,
   isExpanded: PropTypes.bool,
   onCloseSearch: PropTypes.func,
 };

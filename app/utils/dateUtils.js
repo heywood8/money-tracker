@@ -47,3 +47,21 @@ export const localDateOf = (instant) => {
   if (Number.isNaN(d.getTime())) return null;
   return formatLocalDate(d);
 };
+
+/**
+ * The local calendar day `offset` days from today, as `YYYY-MM-DD`.
+ *
+ * `Date#setDate` walks the calendar, so it lands on the right day across DST
+ * boundaries and month/year ends. The alternative — subtracting 86,400,000 ms —
+ * is short by an hour on the spring-forward day, which is what made "Yesterday"
+ * read as "Today" in the operations list once a year.
+ *
+ * @param {number} offset - Days from today; negative for the past.
+ * @returns {string}
+ */
+export const localDateWithOffset = (offset) => {
+  const date = new Date();
+  date.setHours(0, 0, 0, 0);
+  date.setDate(date.getDate() + offset);
+  return formatLocalDate(date);
+};
