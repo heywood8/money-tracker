@@ -14,7 +14,7 @@ import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { useThemeConfig } from '../contexts/ThemeConfigContext';
 import { useThemeColors } from '../contexts/ThemeColorsContext';
 import { useDisplaySettings } from '../contexts/DisplaySettingsContext';
-import { BORDER_RADIUS, FONT_SIZE, HEIGHTS, HORIZONTAL_PADDING, SPACING, TOP_CONTENT_SPACING } from '../styles/designTokens';
+import { BORDER_RADIUS, FONT_SIZE, HEIGHTS, HORIZONTAL_PADDING, SPACING, TOP_CONTENT_SPACING, Z_INDEX } from '../styles/designTokens';
 import { useAccountsData } from '../contexts/AccountsDataContext';
 import { useAccountsActions } from '../contexts/AccountsActionsContext';
 import { useLocalization } from '../contexts/LocalizationContext';
@@ -1098,7 +1098,7 @@ export default function AccountsScreen({ onBackStateChange }) {
               blurOnSubmit={false}
               style={modalSharedStyles.textInput}
             />
-            {errors.name && <Text variant="bodySmall" style={styles.error}>{errors.name}</Text>}
+            {errors.name && <Text variant="bodySmall" style={[styles.error, { color: colors.destructive }]}>{errors.name}</Text>}
 
             {/* Balance */}
             <Text style={[modalSharedStyles.fieldLabel, { color: colors.mutedText }]}>
@@ -1120,7 +1120,7 @@ export default function AccountsScreen({ onBackStateChange }) {
               onSubmitEditing={Keyboard.dismiss}
               style={modalSharedStyles.textInput}
             />
-            {errors.balance && <Text variant="bodySmall" style={styles.error}>{errors.balance}</Text>}
+            {errors.balance && <Text variant="bodySmall" style={[styles.error, { color: colors.destructive }]}>{errors.balance}</Text>}
 
             {/* Currency selector */}
             <Text style={[modalSharedStyles.fieldLabel, { color: colors.mutedText }]}>
@@ -1136,7 +1136,7 @@ export default function AccountsScreen({ onBackStateChange }) {
                 <Icon name="chevron-right" size={22} color={colors.mutedText} />
               </View>
             </TouchableRipple>
-            {errors.currency && <Text variant="bodySmall" style={styles.error}>{errors.currency}</Text>}
+            {errors.currency && <Text variant="bodySmall" style={[styles.error, { color: colors.destructive }]}>{errors.currency}</Text>}
 
             {/* Card masks (for bank-notification matching) — an account can hold
                 several cards, so they are managed as a list. */}
@@ -1308,7 +1308,7 @@ export default function AccountsScreen({ onBackStateChange }) {
           </ScrollView>
 
           {/* Footer with Save/Cancel buttons */}
-          <View style={[styles.formPanelFooter, { borderTopColor: colors.border, paddingBottom: insets.bottom + 80 }]}>
+          <View style={[styles.formPanelFooter, { borderTopColor: colors.border, paddingBottom: insets.bottom + HEIGHTS.tabBar }]}>
             <TouchableRipple
               onPress={saving ? undefined : handleCloseModal}
               disabled={saving}
@@ -1579,7 +1579,7 @@ const styles = StyleSheet.create({
     position: 'absolute',
     right: 0,
     top: 0,
-    zIndex: 20,
+    zIndex: Z_INDEX.sticky,
   },
   currencyPanelHeader: {
     alignItems: 'center',
@@ -1611,8 +1611,9 @@ const styles = StyleSheet.create({
     paddingLeft: SPACING.sm,
     paddingVertical: SPACING.xs,
   },
+  // Colour comes from the host (colors.destructive, the app's one red). The
+  // bare CSS keyword `red` was #f00, a colour neither palette contains.
   error: {
-    color: 'red',
     marginBottom: SPACING.sm,
     marginLeft: SPACING.md,
   },
@@ -1643,7 +1644,7 @@ const styles = StyleSheet.create({
     position: 'absolute',
     right: 0,
     top: 0,
-    zIndex: 10,
+    zIndex: Z_INDEX.dropdown,
   },
   formPanelBack: {
     alignItems: 'center',
@@ -1726,7 +1727,7 @@ const styles = StyleSheet.create({
     right: SPACING.md,
     top: SPACING.md,
     width: 32,
-    zIndex: 1,
+    zIndex: Z_INDEX.dropdown,
   },
   netWorthLabel: {
     fontSize: 11,

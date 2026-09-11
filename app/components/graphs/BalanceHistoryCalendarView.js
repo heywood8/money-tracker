@@ -1,10 +1,52 @@
-import React, { useState, useEffect, useRef } from 'react';
+import React, { useState, useEffect, useMemo, useRef } from 'react';
 import { View, Text, StyleSheet, TouchableOpacity, TextInput } from 'react-native';
+import MaterialCommunityIcons from '@expo/vector-icons/MaterialCommunityIcons';
 import PropTypes from 'prop-types';
 import currencies from '../../../assets/currencies.json';
-import { BORDER_RADIUS, FONT_SIZE } from '../../styles/designTokens';
+import { BORDER_RADIUS, FONT_SIZE, HEIGHTS, ICON_SIZE, SPACING } from '../../styles/designTokens';
+import { withAlpha } from '../../utils/colorUtils';
 
-const DAY_HEADERS = ['M', 'T', 'W', 'T', 'F', 'S', 'Su'];
+// Which day the calendar week starts on. `Intl.Locale#getWeekInfo` would answer
+// this, but Hermes does not ship it, so the app's eleven languages are listed
+// out from CLDR (en-US, ja-JP, ko-KR and pt-BR start on Sunday; the other seven,
+// Simplified Chinese included, on Monday) and anything unrecognised falls back
+// to Monday (ISO-8601), which is what this grid hardcoded for every locale.
+const SUNDAY_FIRST_LANGUAGES = new Set(['en', 'ja', 'ko', 'pt']);
+
+const startsOnSunday = (language) => (
+  SUNDAY_FIRST_LANGUAGES.has(String(language || 'en').slice(0, 2).toLowerCase())
+);
+
+// 2024-01-01 was a Monday and 2023-12-31 a Sunday, so one of these plus an
+// offset walks a full week in the right order without any weekday arithmetic.
+const FIRST_MONDAY = Date.UTC(2024, 0, 1);
+const FIRST_SUNDAY = Date.UTC(2023, 11, 31);
+
+/**
+ * Single-letter weekday headers in the app's language, starting on the day that
+ * language's week starts on. Falls back to the English letters if Intl cannot
+ * format narrow weekdays (an older JSC, a stripped ICU build).
+ */
+const weekdayHeaders = (language) => {
+  const start = startsOnSunday(language) ? FIRST_SUNDAY : FIRST_MONDAY;
+  try {
+    const formatter = new Intl.DateTimeFormat(language || undefined, {
+      weekday: 'narrow',
+      timeZone: 'UTC',
+    });
+    const labels = Array.from({ length: 7 }, (_, i) => (
+      formatter.format(new Date(start + i * 86400000))
+    ));
+    if (labels.every(label => label && label.length <= 3)) return labels;
+  } catch {
+    // fall through
+  }
+  const fallback = ['M', 'T', 'W', 'T', 'F', 'S', 'S'];
+  return startsOnSunday(language) ? [fallback[6], ...fallback.slice(0, 6)] : fallback;
+};
+
+const getDateStr = (year, month, day) =>
+  `${year}-${String(month + 1).padStart(2, '0')}-${String(day).padStart(2, '0')}`;
 
 const formatBalanceCompact = (balance) => {
   const num = parseFloat(balance);
@@ -16,11 +58,10 @@ const formatBalanceCompact = (balance) => {
   return Math.round(num).toString();
 };
 
-const getDateStr = (year, month, day) =>
-  `${year}-${String(month + 1).padStart(2, '0')}-${String(day).padStart(2, '0')}`;
-
 const BalanceHistoryCalendarView = ({
   colors,
+  t,
+  language,
   selectedYear,
   selectedMonth,
   balanceHistoryTableData,
@@ -34,8 +75,12 @@ const BalanceHistoryCalendarView = ({
 }) => {
   const decimalDigits = currencies[currency]?.decimal_digits ?? 2;
 
+  const dayHeaders = useMemo(() => weekdayHeaders(language), [language]);
+  const sundayFirst = startsOnSunday(language);
+
   const daysInMonth = new Date(selectedYear, selectedMonth + 1, 0).getDate();
-  const firstDayOffset = (new Date(selectedYear, selectedMonth, 1).getDay() + 6) % 7;
+  const weekday = new Date(selectedYear, selectedMonth, 1).getDay(); // 0 = Sunday
+  const firstDayOffset = sundayFirst ? weekday : (weekday + 6) % 7;
 
   const now = new Date();
   const isCurrentMonth = now.getFullYear() === selectedYear && now.getMonth() === selectedMonth;
@@ -97,10 +142,17 @@ const BalanceHistoryCalendarView = ({
 
   const selectedEntry = selectedDay !== null ? getEntry(selectedDay) : null;
 
+  // `colors.primary + '22'` assumed the accent is a plain hex; withAlpha keeps
+  // the tint working (and falls back to a real colour) for any palette where it
+  // is not. Translucent on purpose here — unlike a chip, a day cell sits
+  // directly on the card, so there is only one thing behind it to tint toward.
+  const recordedTint = withAlpha(colors.primary, 0.13, colors.selected);
+  const selectedTint = withAlpha(colors.primary, 0.27, colors.selected);
+
   return (
     <View>
       <View style={styles.headerRow}>
-        {DAY_HEADERS.map((label, i) => (
+        {dayHeaders.map((label, i) => (
           <View key={i} style={styles.cell}>
             <Text style={[styles.dayHeader, { color: colors.mutedText }]}>{label}</Text>
           </View>
@@ -123,12 +175,17 @@ const BalanceHistoryCalendarView = ({
                 style={[
                   styles.cell,
                   styles.dayCell,
-                  entry && { backgroundColor: colors.primary + '22' },
+                  entry && { backgroundColor: recordedTint },
                   isToday && [{ borderColor: colors.primary }, styles.todayBorder],
-                  isSelected && { backgroundColor: colors.primary + '44' },
+                  isSelected && { backgroundColor: selectedTint },
                 ]}
                 onPress={() => handleDayPress(day)}
                 activeOpacity={0.7}
+                accessibilityRole="button"
+                accessibilityState={{ selected: isSelected }}
+                accessibilityLabel={entry?.balance
+                  ? `${day}, ${entry.balance}`
+                  : String(day)}
               >
                 <Text style={[styles.dayNumber, { color: entry ? colors.text : colors.mutedText }]}>
                   {day}
@@ -136,7 +193,7 @@ const BalanceHistoryCalendarView = ({
                 {entry?.balance && (
                   <Text
                     testID={`day-balance-${day}`}
-                    style={[styles.dayBalance, { color: colors.primary }]}
+                    style={[styles.dayBalance, { color: colors.primaryStrong }]}
                     numberOfLines={1}
                   >
                     {formatBalanceCompact(entry.balance)}
@@ -153,8 +210,14 @@ const BalanceHistoryCalendarView = ({
           testID="calendar-edit-row"
           style={[styles.editRow, { borderColor: colors.primary, backgroundColor: colors.surface }]}
         >
-          <TouchableOpacity testID="calendar-cancel-btn" onPress={handleCancel} style={styles.cancelBtn}>
-            <Text style={[styles.cancelBtnText, { color: colors.mutedText }]}>↩</Text>
+          <TouchableOpacity
+            testID="calendar-cancel-btn"
+            onPress={handleCancel}
+            style={styles.iconBtn}
+            accessibilityRole="button"
+            accessibilityLabel={t('cancel')}
+          >
+            <MaterialCommunityIcons name="keyboard-return" size={ICON_SIZE.sm} color={colors.mutedText} />
           </TouchableOpacity>
           <Text style={[styles.editDateLabel, { color: colors.mutedText }]}>
             {selectedDay}
@@ -170,21 +233,30 @@ const BalanceHistoryCalendarView = ({
             keyboardType="decimal-pad"
             placeholder={(0).toFixed(decimalDigits)}
             placeholderTextColor={colors.mutedText}
+            accessibilityLabel={t('balance')}
           />
           <TouchableOpacity
             testID="calendar-save-btn"
-            style={[styles.editBtn, { backgroundColor: colors.primary }]}
+            style={styles.iconBtn}
             onPress={handleSave}
+            accessibilityRole="button"
+            accessibilityLabel={t('save')}
           >
-            <Text style={styles.editBtnText}>✓</Text>
+            <View style={[styles.iconBtnFill, { backgroundColor: colors.primaryFill }]}>
+              <MaterialCommunityIcons name="check" size={ICON_SIZE.sm} color={colors.onPrimaryFill} />
+            </View>
           </TouchableOpacity>
           {selectedEntry?.balance && (
             <TouchableOpacity
               testID="calendar-delete-btn"
-              style={[styles.editBtn, { backgroundColor: colors.destructive }]}
+              style={styles.iconBtn}
               onPress={handleDelete}
+              accessibilityRole="button"
+              accessibilityLabel={t('delete')}
             >
-              <Text style={styles.editBtnText}>🗑</Text>
+              <View style={[styles.iconBtnFill, { backgroundColor: colors.destructive }]}>
+                <MaterialCommunityIcons name="trash-can-outline" size={ICON_SIZE.sm} color={colors.onPrimaryFill} />
+              </View>
             </TouchableOpacity>
           )}
         </View>
@@ -195,6 +267,8 @@ const BalanceHistoryCalendarView = ({
 
 BalanceHistoryCalendarView.propTypes = {
   colors: PropTypes.object.isRequired,
+  t: PropTypes.func.isRequired,
+  language: PropTypes.string,
   selectedYear: PropTypes.number.isRequired,
   selectedMonth: PropTypes.number.isRequired,
   balanceHistoryTableData: PropTypes.arrayOf(
@@ -214,19 +288,50 @@ BalanceHistoryCalendarView.propTypes = {
 };
 
 const styles = StyleSheet.create({
-  cancelBtn: { padding: 4 },
-  cancelBtnText: { fontSize: FONT_SIZE.lg },
   cell: { alignItems: 'center', flex: 1, justifyContent: 'center', paddingVertical: 2 },
-  dayBalance: { fontSize: 8, fontWeight: '600' },
+  // FONT_SIZE.xs is the floor: the balance under a day number used to be 8px,
+  // which no longer reads as text at arm's length.
+  dayBalance: { fontSize: FONT_SIZE.xs, fontWeight: '600' },
   dayCell: { borderRadius: BORDER_RADIUS.sm, minHeight: 46, paddingVertical: 6 },
   dayHeader: { fontSize: FONT_SIZE.xs, fontWeight: '600' },
-  dayNumber: { fontSize: 11 },
-  editBtn: { alignItems: 'center', borderRadius: BORDER_RADIUS.pill, height: 28, justifyContent: 'center', width: 28 },
-  editBtnText: { color: '#fff', fontSize: 13, fontWeight: '700' },
-  editDateLabel: { fontSize: FONT_SIZE.sm, marginRight: 8, minWidth: 24 },
-  editInput: { borderRadius: BORDER_RADIUS.sm, borderWidth: 1, flex: 1, fontSize: 13, marginRight: 8, paddingHorizontal: 8, paddingVertical: 4, textAlign: 'right' },
-  editRow: { alignItems: 'center', borderRadius: BORDER_RADIUS.md, borderWidth: 1, flexDirection: 'row', gap: 6, marginTop: 10, padding: 8 },
-  headerRow: { flexDirection: 'row', marginBottom: 4 },
+  dayNumber: { fontSize: FONT_SIZE.sm },
+  editDateLabel: { fontSize: FONT_SIZE.sm, marginRight: SPACING.sm, minWidth: 24 },
+  editInput: {
+    borderRadius: BORDER_RADIUS.sm,
+    borderWidth: 1,
+    flex: 1,
+    fontSize: FONT_SIZE.sm,
+    marginRight: SPACING.sm,
+    paddingHorizontal: SPACING.sm,
+    paddingVertical: SPACING.xs,
+    textAlign: 'right',
+  },
+  editRow: {
+    alignItems: 'center',
+    borderRadius: BORDER_RADIUS.md,
+    borderWidth: 1,
+    flexDirection: 'row',
+    gap: SPACING.xs,
+    marginTop: SPACING.sm,
+    padding: SPACING.sm,
+  },
+  headerRow: { flexDirection: 'row', marginBottom: SPACING.xs },
+  // The button's touch target is HEIGHTS.input (48) even though its coloured
+  // disc is smaller: these were 28dp glyphs with no role and no label, which
+  // TalkBack could neither name nor reliably hit.
+  iconBtn: {
+    alignItems: 'center',
+    height: HEIGHTS.input,
+    justifyContent: 'center',
+    minWidth: HEIGHTS.input,
+  },
+  iconBtnFill: {
+    alignItems: 'center',
+    borderRadius: BORDER_RADIUS.pill,
+    height: 28,
+    justifyContent: 'center',
+    width: 28,
+  },
   todayBorder: { borderWidth: 1 },
   weekRow: { flexDirection: 'row', marginBottom: 2 },
 });

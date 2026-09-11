@@ -105,7 +105,7 @@ export default function ImportProgressModal() {
         <Ionicons
           name="checkmark-circle"
           size={24}
-          color="#4CAF50"
+          color={colors.success}
           style={styles.stepIcon}
         />
       );

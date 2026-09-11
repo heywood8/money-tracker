@@ -958,6 +958,7 @@ BalanceChart.propTypes = {
 const BalanceHistoryCard = ({
   colors,
   t,
+  language,
   selectedAccount,
   onAccountChange,
   accountItems,
@@ -1298,6 +1299,8 @@ const BalanceHistoryCard = ({
             <View style={[styles.calendarContainer, { minHeight: contentHeight }]}>
               <BalanceHistoryCalendarView
                 colors={colors}
+                t={t}
+                language={language}
                 selectedYear={selectedYear}
                 selectedMonth={selectedMonth}
                 balanceHistoryTableData={balanceHistoryTableData}
@@ -1442,6 +1445,7 @@ const BalanceHistoryCard = ({
 BalanceHistoryCard.propTypes = {
   colors: PropTypes.object.isRequired,
   t: PropTypes.func.isRequired,
+  language: PropTypes.string,
   selectedAccount: PropTypes.string,
   onAccountChange: PropTypes.func.isRequired,
   accountItems: PropTypes.array.isRequired,

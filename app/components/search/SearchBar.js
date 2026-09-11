@@ -3,7 +3,7 @@ import { View, TextInput, TouchableOpacity, StyleSheet, Text, Keyboard, Platform
 import Animated, { useSharedValue, useAnimatedStyle, withTiming, Easing } from 'react-native-reanimated';
 import Icon from '@expo/vector-icons/MaterialCommunityIcons';
 import PropTypes from 'prop-types';
-import { FONT_SIZE, HORIZONTAL_PADDING, SPACING } from '../../styles/designTokens';
+import { BORDER_RADIUS, FONT_SIZE, HORIZONTAL_PADDING, SPACING } from '../../styles/designTokens';
 import { withAlpha } from '../../utils/colorUtils';
 import FilterBadge from './FilterBadge';
 
@@ -279,7 +279,7 @@ const styles = StyleSheet.create({
   },
   pill: {
     alignSelf: 'center',
-    borderRadius: SEARCH_PILL_HEIGHT / 2,
+    borderRadius: BORDER_RADIUS.pill,
     borderWidth: 1,
     flexDirection: 'row',
     height: SEARCH_PILL_HEIGHT,

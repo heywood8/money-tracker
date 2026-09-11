@@ -4,7 +4,7 @@ import PropTypes from 'prop-types';
 // doesn't apply here.
 // eslint-disable-next-line react-native/split-platform-components
 import { View, StyleSheet, TouchableOpacity, BackHandler, AppState, ToastAndroid } from 'react-native';
-import { HORIZONTAL_PADDING, SPACING } from '../styles/designTokens';
+import { HEIGHTS, HORIZONTAL_PADDING, SPACING, Z_INDEX } from '../styles/designTokens';
 import { Text, Divider } from 'react-native-paper';
 import Ionicons from '@expo/vector-icons/Ionicons';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
@@ -34,7 +34,7 @@ export default function SettingsScreen({ setSubPanelActive }) {
   // items clear the floating tab bar while the scroll viewport itself still
   // extends to the screen bottom — letting content scroll behind the
   // translucent bar exactly like the operations list does.
-  const scrollBottomInset = insets.bottom + 80;
+  const scrollBottomInset = insets.bottom + HEIGHTS.tabBar;
   const { colors } = useThemeColors();
   const { t } = useLocalization();
   // Subpanel navigation. The stack owns which panel is open and how deep into
@@ -481,7 +481,7 @@ const styles = StyleSheet.create({
     left: 0,
     position: 'absolute',
     top: 0,
-    zIndex: 10,
+    zIndex: Z_INDEX.dropdown,
   },
   subPanelTitle: {
     fontWeight: '600',

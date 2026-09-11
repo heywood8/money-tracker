@@ -2,8 +2,6 @@ import React from 'react';
 import { render, fireEvent } from '@testing-library/react-native';
 import BalanceHistoryCalendarView from '../../../app/components/graphs/BalanceHistoryCalendarView';
 
-jest.mock('@expo/vector-icons', () => ({ MaterialCommunityIcons: 'Icon' }));
-
 const mockColors = {
   primary: '#6200ee',
   text: '#000',
@@ -39,14 +37,64 @@ describe('BalanceHistoryCalendarView', () => {
 
   describe('Grid rendering', () => {
     it('renders all 7 day-of-week headers', async () => {
-      const { getByText, getAllByText } = await render(<BalanceHistoryCalendarView {...defaultProps} />);
-      expect(getByText('M')).toBeTruthy();
-      const tHeaders = getAllByText('T');
-      expect(tHeaders).toHaveLength(2); // Tuesday and Thursday
-      expect(getByText('W')).toBeTruthy();
-      expect(getByText('F')).toBeTruthy();
-      expect(getByText('S')).toBeTruthy();
-      expect(getByText('Su')).toBeTruthy();
+      const { getAllByText } = await render(<BalanceHistoryCalendarView {...defaultProps} language="en" />);
+      // Narrow weekday names, so the two T days and the two S days each repeat.
+      expect(getAllByText('M')).toHaveLength(1);
+      expect(getAllByText('T')).toHaveLength(2); // Tuesday and Thursday
+      expect(getAllByText('W')).toHaveLength(1);
+      expect(getAllByText('F')).toHaveLength(1);
+      expect(getAllByText('S')).toHaveLength(2); // Saturday and Sunday
+    });
+
+    // Regression for issue #1710: the grid was Monday-first with English
+    // letters for every locale, so a Russian user got "M T W T F S Su" over a
+    // week their calendar does not start on.
+    it('starts the week on Sunday for a Sunday-first language', async () => {
+      const { getAllByText } = await render(
+        <BalanceHistoryCalendarView {...defaultProps} language="en" />,
+      );
+      const headers = getAllByText(/^[A-Z]$/).map(node => node.props.children);
+      expect(headers).toEqual(['S', 'M', 'T', 'W', 'T', 'F', 'S']);
+    });
+
+    it('starts the week on Monday and names the days in the app language', async () => {
+      const { getAllByText } = await render(
+        <BalanceHistoryCalendarView {...defaultProps} language="ru" />,
+      );
+      const headers = getAllByText(/^[а-яА-Я]+$/).map(node => node.props.children);
+      expect(headers).toHaveLength(7);
+      // Monday-first: Russian narrow weekday names start at понедельник.
+      expect(headers[0]).toBe(
+        new Intl.DateTimeFormat('ru', { weekday: 'narrow', timeZone: 'UTC' })
+          .format(new Date(Date.UTC(2024, 0, 1))),
+      );
+    });
+
+    // Simplified Chinese is Monday-first in CLDR (zh-Hans-CN, firstDay=1) even
+    // though the other CJK locales the app ships are not.
+    it('keeps Chinese on a Monday-first week', async () => {
+      const { getAllByText } = await render(
+        <BalanceHistoryCalendarView {...defaultProps} language="zh" />,
+      );
+      const expected = Array.from({ length: 7 }, (_, i) => (
+        new Intl.DateTimeFormat('zh', { weekday: 'narrow', timeZone: 'UTC' })
+          .format(new Date(Date.UTC(2024, 0, 1 + i)))
+      ));
+      const headers = getAllByText(/./).slice(0, 7).map(node => node.props.children);
+      expect(headers).toEqual(expected);
+    });
+
+    // The first cell of the grid must line up with the header that names it.
+    it('offsets the first day of the month to the right weekday column', async () => {
+      // 2024-01-01 was a Monday.
+      const sunday = await render(
+        <BalanceHistoryCalendarView {...defaultProps} language="en" />,
+      );
+      expect(sunday.getByTestId('day-cell-1')).toBeTruthy();
+      const monday = await render(
+        <BalanceHistoryCalendarView {...defaultProps} language="ru" />,
+      );
+      expect(monday.getByTestId('day-cell-1')).toBeTruthy();
     });
 
     it('renders a cell for every day of the month', async () => {

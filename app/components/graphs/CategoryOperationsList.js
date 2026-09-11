@@ -307,7 +307,7 @@ const CategoryOperationsList = ({
         <TouchableRipple
           testID={`category-operation-${op.id}`}
           onPress={() => onOperationPress(op)}
-          rippleColor="rgba(0, 0, 0, .08)"
+          rippleColor={colors.ripple}
           accessibilityRole="button"
           accessibilityLabel={accessibilityLabel}
           accessibilityHint={t('graph_operation_row_hint')}

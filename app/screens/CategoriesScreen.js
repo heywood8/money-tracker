@@ -16,7 +16,7 @@ import { Text, TouchableRipple, TextInput as PaperTextInput } from 'react-native
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import Icon from '@expo/vector-icons/MaterialCommunityIcons';
 import { useThemeColors } from '../contexts/ThemeColorsContext';
-import { TOP_CONTENT_SPACING, SPACING, BORDER_RADIUS, FONT_SIZE } from '../styles/designTokens';
+import { TOP_CONTENT_SPACING, SPACING, BORDER_RADIUS, FONT_SIZE, HEIGHTS, Z_INDEX } from '../styles/designTokens';
 import { DURATION_ENTER, DURATION_EXIT } from '../utils/motion';
 import { motionDuration } from '../utils/reducedMotion';
 import AddFAB from '../components/AddFAB';
@@ -508,7 +508,7 @@ const CategoriesScreen = ({ onBackStateChange }) => {
           </ScrollView>
 
           {/* Form footer */}
-          <View style={[styles.formPanelFooter, { borderTopColor: colors.border, paddingBottom: insets.bottom + 80 }]}>
+          <View style={[styles.formPanelFooter, { borderTopColor: colors.border, paddingBottom: insets.bottom + HEIGHTS.tabBar }]}>
             <TouchableRipple
               onPress={saving ? undefined : handleCancelForm}
               disabled={saving}
@@ -702,7 +702,7 @@ const styles = StyleSheet.create({
     position: 'absolute',
     right: 0,
     top: 0,
-    zIndex: 10,
+    zIndex: Z_INDEX.dropdown,
   },
   formPanelBack: {
     alignItems: 'center',

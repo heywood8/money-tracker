@@ -7,6 +7,7 @@ import { formatDate } from '../../services/BalanceHistoryDB';
 import currencies from '../../../assets/currencies.json';
 import { CHIP, CHIP_TEXT, SECTION_LABEL } from '../../styles/componentStyles';
 import { BORDER_RADIUS, FONT_SIZE, SPACING } from '../../styles/designTokens';
+import { selectionTint } from '../../utils/colorUtils';
 
 const ExpandableFilters = ({
   filters,
@@ -141,6 +142,7 @@ const ExpandableFilters = ({
     + (filters.text ? 1 : 0);
 
   const tileStyle = [styles.section, { backgroundColor: colors.glassSurfaceStrong, borderColor: colors.glassBorder }];
+  const selectedBackground = selectionTint(colors.primary, colors.inputBackground);
 
   return (
     <View testID="expandable-filters" style={styles.container}>
@@ -153,16 +155,23 @@ const ExpandableFilters = ({
           <View style={styles.chipContainer}>
             {['expense', 'income', 'transfer'].map(type => {
               const isSelected = filters.types.includes(type);
+              // A selected chip is a tint of the accent carrying
+              // `colors.primaryStrong` text rather than white on a solid accent:
+              // white measures ~4.0:1 on the light accent and ~2.6:1 on the dark
+              // one, under WCAG AA for text this size. Same treatment as the
+              // category and account grids.
               const chipStyle = {
-                backgroundColor: isSelected ? colors.primary : colors.inputBackground,
-                borderColor: colors.glassBorder,
+                backgroundColor: isSelected ? selectedBackground : colors.inputBackground,
+                borderColor: isSelected ? colors.primary : colors.glassBorder,
               };
-              const chipTextColor = isSelected ? '#fff' : colors.text;
+              const chipTextColor = isSelected ? colors.primaryStrong : colors.text;
               return (
                 <TouchableOpacity
                   key={type}
                   style={[styles.chip, chipStyle]}
                   onPress={() => toggleType(type)}
+                  accessibilityRole="button"
+                  accessibilityState={{ selected: isSelected }}
                 >
                   <Icon
                     name={type === 'expense' ? 'minus-circle' : type === 'income' ? 'plus-circle' : 'swap-horizontal'}
@@ -266,15 +275,17 @@ const ExpandableFilters = ({
           <View style={styles.chipContainer}>
             {accounts.map(account => {
               const isSelected = filters.accountIds.includes(account.id);
-              const chipTextColor = isSelected ? '#fff' : colors.text;
+              const chipTextColor = isSelected ? colors.primaryStrong : colors.text;
               return (
                 <TouchableOpacity
                   key={account.id}
                   style={[styles.chip, {
-                    backgroundColor: isSelected ? colors.primary : colors.inputBackground,
-                    borderColor: colors.glassBorder,
+                    backgroundColor: isSelected ? selectedBackground : colors.inputBackground,
+                    borderColor: isSelected ? colors.primary : colors.glassBorder,
                   }]}
                   onPress={() => toggleAccount(account.id)}
+                  accessibilityRole="button"
+                  accessibilityState={{ selected: isSelected }}
                 >
                   <Text style={[styles.chipText, { color: chipTextColor }]}>
                     {account.name}
@@ -377,6 +388,8 @@ ExpandableFilters.propTypes = {
     mutedText: PropTypes.string,
     border: PropTypes.string,
     primary: PropTypes.string,
+    primaryStrong: PropTypes.string,
+    selected: PropTypes.string,
     inputBackground: PropTypes.string,
     inputBorder: PropTypes.string,
     glassSurface: PropTypes.string,

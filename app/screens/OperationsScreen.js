@@ -5,7 +5,7 @@ import Icon from '@expo/vector-icons/MaterialCommunityIcons';
 import DateTimePicker from '@react-native-community/datetimepicker';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { useThemeColors } from '../contexts/ThemeColorsContext';
-import { TOP_CONTENT_SPACING, HORIZONTAL_PADDING, SPACING, BORDER_RADIUS, HEIGHTS } from '../styles/designTokens';
+import { TOP_CONTENT_SPACING, HORIZONTAL_PADDING, SPACING, BORDER_RADIUS, HEIGHTS, Z_INDEX } from '../styles/designTokens';
 import { useLocalization } from '../contexts/LocalizationContext';
 import { useDialog } from '../contexts/DialogContext';
 import { useOperationsData } from '../contexts/OperationsDataContext';
@@ -1703,7 +1703,7 @@ const styles = StyleSheet.create({
     position: 'absolute',
     right: 0,
     top: 0,
-    zIndex: 100,
+    zIndex: Z_INDEX.toast,
   },
   floatingUndoArea: {
     // `bottom` is applied inline (safe-area inset + tab bar height) so the
@@ -1711,7 +1711,7 @@ const styles = StyleSheet.create({
     left: SPACING.lg,
     position: 'absolute',
     right: SPACING.lg,
-    zIndex: 90,
+    zIndex: Z_INDEX.popover,
   },
   scrollToTopButton: {
     alignItems: 'center',
@@ -1727,7 +1727,7 @@ const styles = StyleSheet.create({
     shadowOpacity: 0.3,
     shadowRadius: 8,
     width: 40,
-    zIndex: 10,
+    zIndex: Z_INDEX.dropdown,
   },
 });
 

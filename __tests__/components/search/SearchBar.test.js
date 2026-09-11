@@ -2,6 +2,7 @@ import React from 'react';
 import { StyleSheet } from 'react-native';
 import { render, fireEvent, act } from '@testing-library/react-native';
 import SearchBar from '../../../app/components/search/SearchBar';
+import { BORDER_RADIUS } from '../../../app/styles/designTokens';
 
 describe('SearchBar', () => {
   const mockColors = {
@@ -197,8 +198,10 @@ describe('SearchBar', () => {
       const pill = getByTestId('search-pill');
 
       const pillStyle = StyleSheet.flatten(pill.props.style);
-      // Fully-rounded pill: radius is half the fixed 38px height.
-      expect(pillStyle.borderRadius).toBe(19);
+      // Fully-rounded pill. BORDER_RADIUS.pill rather than a hand-computed half
+      // of the fixed height: it clamps to half, so it renders identically and
+      // cannot fall out of sync if the height changes (see CLAUDE.md).
+      expect(pillStyle.borderRadius).toBe(BORDER_RADIUS.pill);
       expect(pillStyle.borderWidth).toBe(1);
     });
 

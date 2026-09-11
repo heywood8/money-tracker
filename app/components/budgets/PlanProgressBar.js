@@ -2,6 +2,7 @@ import React, { useEffect } from 'react';
 import { View, StyleSheet } from 'react-native';
 import Animated, { useSharedValue, useAnimatedStyle, withTiming } from 'react-native-reanimated';
 import PropTypes from 'prop-types';
+import { BORDER_RADIUS } from '../../styles/designTokens';
 import { TIMING_ENTER } from '../../utils/motion';
 
 /**
@@ -120,7 +121,7 @@ const PlanProgressBar = ({
   const overStyle = useAnimatedStyle(() => ({ transform: [{ scaleX: overFill.value }] }));
 
   return (
-    <View style={[styles.track, { height, borderRadius: height / 2 }]} testID={testID}>
+    <View style={[styles.track, { height, borderRadius: BORDER_RADIUS.pill }]} testID={testID}>
       {/* Two track zones rather than one track plus a tick at the boundary, with
           BOUNDARY_GAP of bare card between them. The step in brightness plus that
           gap IS the target marker, so the bar reads "this much was the plan"
