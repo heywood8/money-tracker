@@ -151,6 +151,110 @@ describe('CategoriesContext', () => {
       expect(result.current.categories).toEqual([]);
     });
 
+    it('does not initialize defaults when RELOAD_ALL fires on first launch', async () => {
+      // Regression (#1701): AccountsDataContext seeds the default accounts and
+      // emits RELOAD_ALL while the language picker is still on screen. Language
+      // is still 'en' at that point and default category names are baked in at
+      // insert time, so initializing here would permanently seed English names.
+      mockIsFirstLaunch.mockReturnValue(true);
+
+      let reloadListener;
+      appEvents.on.mockImplementation((event, listener) => {
+        if (event === EVENTS.RELOAD_ALL) {
+          reloadListener = listener;
+        }
+        return jest.fn();
+      });
+
+      CategoriesDB.getAllCategories.mockResolvedValue([]);
+
+      const { result } = await renderHook(() => useCategories(), { wrapper });
+
+      await waitFor(() => {
+        expect(result.current.loading).toBe(false);
+      });
+
+      await act(async () => {
+        reloadListener();
+        await new Promise(resolve => setTimeout(resolve, 50));
+      });
+
+      expect(CategoriesDB.initializeDefaultCategories).not.toHaveBeenCalled();
+      expect(result.current.categories).toEqual([]);
+    });
+
+    it('initializes defaults when RELOAD_ALL fires after first launch', async () => {
+      mockIsFirstLaunch.mockReturnValue(false);
+      mockLanguage.mockReturnValue('ru');
+
+      let reloadListener;
+      appEvents.on.mockImplementation((event, listener) => {
+        if (event === EVENTS.RELOAD_ALL) {
+          reloadListener = listener;
+        }
+        return jest.fn();
+      });
+
+      CategoriesDB.getAllCategories.mockResolvedValue([]);
+
+      const { result } = await renderHook(() => useCategories(), { wrapper });
+
+      await waitFor(() => {
+        expect(result.current.loading).toBe(false);
+      });
+
+      CategoriesDB.initializeDefaultCategories.mockClear();
+
+      await act(async () => {
+        reloadListener();
+        await new Promise(resolve => setTimeout(resolve, 50));
+      });
+
+      expect(CategoriesDB.initializeDefaultCategories).toHaveBeenCalledWith('ru');
+    });
+
+    it('seeds defaults in the chosen language once first launch completes', async () => {
+      // The full first-install sequence: the picker is up (no init), the user
+      // taps Russian, and only then are the defaults written - in Russian.
+      mockIsFirstLaunch.mockReturnValue(true);
+      mockLanguage.mockReturnValue('en');
+
+      let reloadListener;
+      appEvents.on.mockImplementation((event, listener) => {
+        if (event === EVENTS.RELOAD_ALL) {
+          reloadListener = listener;
+        }
+        return jest.fn();
+      });
+
+      CategoriesDB.getAllCategories.mockResolvedValue([]);
+
+      const { result, rerender } = await renderHook(() => useCategories(), { wrapper });
+
+      await waitFor(() => {
+        expect(result.current.loading).toBe(false);
+      });
+
+      await act(async () => {
+        reloadListener();
+        await new Promise(resolve => setTimeout(resolve, 50));
+      });
+
+      expect(CategoriesDB.initializeDefaultCategories).not.toHaveBeenCalled();
+
+      // User picks Russian: isFirstLaunch flips and the language is applied.
+      mockIsFirstLaunch.mockReturnValue(false);
+      mockLanguage.mockReturnValue('ru');
+
+      await act(async () => {
+        rerender({});
+        await new Promise(resolve => setTimeout(resolve, 50));
+      });
+
+      expect(CategoriesDB.initializeDefaultCategories).toHaveBeenCalledWith('ru');
+      expect(CategoriesDB.initializeDefaultCategories).toHaveBeenCalledTimes(1);
+    });
+
     it('falls back to default categories on error', async () => {
       CategoriesDB.getAllCategories.mockRejectedValue(new Error('Load failed'));
 
