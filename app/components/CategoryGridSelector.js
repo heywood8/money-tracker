@@ -3,6 +3,7 @@ import PropTypes from 'prop-types';
 import { View, Text, Pressable, StyleSheet } from 'react-native';
 import Icon from '@expo/vector-icons/MaterialCommunityIcons';
 import { SPACING, BORDER_RADIUS, FONT_SIZE } from '../styles/designTokens';
+import { selectionTint } from '../utils/colorUtils';
 
 // Legacy (flat all-root) grid width vs. the quick-add-style suggestions grid,
 // which lays chips four-across to match the QuickAdd form.
@@ -13,15 +14,6 @@ const SUGGEST_COLUMNS = 4;
 // full 8 shortcuts when there are few enough categories to skip the entry.
 const TOP_WITH_ALL = 7;
 const TOP_WITHOUT_ALL = 8;
-
-// Chips carry their selection as a tint of the accent rather than a solid fill:
-// white-on-accent sits at ~2.8:1 in the dark theme, which is what a filled chip
-// used to be. Hex alpha suffix on `colors.primary` (a real hex in both themes —
-// see ThemeColorsContext), with a graceful fallback for any palette that isn't.
-const TINT = '1F';
-const tintOf = (primary, fallback) => (
-  typeof primary === 'string' && /^#[0-9a-f]{6}$/i.test(primary) ? primary + TINT : fallback
-);
 
 const DEFAULT_TEST_ID_PREFIX = 'category-grid';
 
@@ -184,7 +176,7 @@ export default function CategoryGridSelector({
   }, [onSelect, suggestMode, multiSelect]);
 
   const chipBackground = colors.inputBackground || colors.surface;
-  const selectedBackground = tintOf(colors.primary, colors.selected);
+  const selectedBackground = selectionTint(colors.primary, chipBackground);
 
   // Build the slot list for the current view, then chunk into rows and pad the
   // final row with invisible spacers so chips keep an even width.
@@ -273,7 +265,7 @@ export default function CategoryGridSelector({
     if (slot.kind === 'whole') {
       const folderId = slot.item.id;
       const isSelected = selectedIds.has(folderId);
-      const tone = isSelected ? colors.primary : colors.text;
+      const tone = isSelected ? colors.primaryStrong : colors.text;
       return (
         <Pressable
           key={key}
@@ -301,7 +293,7 @@ export default function CategoryGridSelector({
     const isFolder = item.type === 'folder';
     const isSelected = selectedIds.has(item.id);
     const name = displayName(item, t);
-    const tone = isSelected ? colors.primary : colors.text;
+    const tone = isSelected ? colors.primaryStrong : colors.text;
 
     return (
       <Pressable

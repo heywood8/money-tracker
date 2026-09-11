@@ -15,6 +15,7 @@ import Calculator from '../Calculator';
 import MultiCurrencyFields from '../modals/MultiCurrencyFields';
 import CurrencyPickerModal from './CurrencyPickerModal';
 import * as Currency from '../../services/currency';
+import { selectionTint, withAlpha } from '../../utils/colorUtils';
 import currencies from '../../../assets/currencies.json';
 
 const getCurrencySymbol = (code) => currencies[code]?.symbol || code;
@@ -121,6 +122,19 @@ const OperationFormFields = memo(({
     const timer = setTimeout(() => setFlashingField(null), 1500);
     return () => clearTimeout(timer);
   }, [flashError?.field, flashError?.token]);
+
+  // A selected chip is a tint of the accent carrying `colors.primaryStrong`
+  // text, not white on a solid accent: white measures ~4.0:1 on the light accent
+  // and ~2.6:1 on the dark one, under WCAG AA for text this size. Matches the
+  // category and account grids; the floors are pinned by
+  // __tests__/styles/contrast.test.js.
+  const selectedChipBackground = selectionTint(colors.primary, colors.inputBackground);
+
+  // The bar that stands in for a hidden balance. A tint of the TEXT colour, so
+  // it stays visible whatever it is laid on: `colors.secondary` is the same
+  // #333333 as `inputBackground` in the dark theme, which made the bar vanish
+  // into the chip it was redacting.
+  const redactionColor = withAlpha(colors.text, 0.25, colors.mutedText);
 
   // Red outline flashed on the field that failed validation on a QuickAdd attempt.
   const chipBorderColor = flashingField === 'category' ? colors.destructive : colors.border;
@@ -385,7 +399,7 @@ const OperationFormFields = memo(({
       </Text>
       {showAccountBalance && accountId && (
         hideBalances ? (
-          <View style={styles.hiddenBalance} />
+          <View style={[styles.hiddenBalance, { backgroundColor: redactionColor }]} />
         ) : (
           <Text style={[styles.accountBalanceText, { color: colors.mutedText }]} numberOfLines={1}>
             {getAccountBalance(accountId)}
@@ -470,7 +484,7 @@ const OperationFormFields = memo(({
       ? getCategoryInfo(item.id)
       : { name: item.nameKey ? t(item.nameKey) : item.name, icon: item.icon };
     const isSelected = !isFolder && values.categoryId === item.id;
-    const textColor = isSelected ? '#fff' : (disabled ? colors.mutedText : colors.text);
+    const textColor = isSelected ? colors.primaryStrong : (disabled ? colors.mutedText : colors.text);
 
     return (
       <Pressable
@@ -479,7 +493,10 @@ const OperationFormFields = memo(({
         style={[
           styles.categoryShortcutButton,
           compact && styles.categoryShortcutButtonCompact,
-          { backgroundColor: isSelected ? colors.primary : colors.inputBackground, borderColor: chipBorderColor },
+          {
+            backgroundColor: isSelected ? selectedChipBackground : colors.inputBackground,
+            borderColor: isSelected ? colors.primary : chipBorderColor,
+          },
           disabledStyle,
         ]}
         onPress={onPress}
@@ -495,7 +512,7 @@ const OperationFormFields = memo(({
         </Text>
         {isFolder && (
           <View style={styles.browseFolderBadge}>
-            <Icon name="folder-outline" size={11} color={isSelected ? 'rgba(255,255,255,0.85)' : colors.mutedText} />
+            <Icon name="folder-outline" size={11} color={isSelected ? colors.primaryStrong : colors.mutedText} />
           </View>
         )}
       </Pressable>
@@ -778,8 +795,8 @@ const OperationFormFields = memo(({
 
       const renderAccountChip = (account) => {
         const isSelected = values.toAccountId === account.id;
-        const textColor = isSelected ? '#fff' : (disabled ? colors.mutedText : colors.text);
-        const balanceColor = isSelected ? 'rgba(255,255,255,0.7)' : colors.mutedText;
+        const textColor = isSelected ? colors.primaryStrong : (disabled ? colors.mutedText : colors.text);
+        const balanceColor = colors.mutedText;
 
         return (
           <Pressable
@@ -788,7 +805,7 @@ const OperationFormFields = memo(({
               styles.accountShortcutButton,
               compact && styles.accountShortcutButtonCompact,
               {
-                backgroundColor: isSelected ? colors.primary : colors.inputBackground,
+                backgroundColor: isSelected ? selectedChipBackground : colors.inputBackground,
                 borderColor: isSelected ? colors.primary : toAccountChipBorderColor,
               },
               disabledStyle,
@@ -798,7 +815,7 @@ const OperationFormFields = memo(({
           >
             {getAccountBalance && (
               hideBalances ? (
-                <View style={styles.hiddenBalanceSmall} />
+                <View style={[styles.hiddenBalanceSmall, { backgroundColor: redactionColor }]} />
               ) : (
                 <Text
                   style={[styles.accountShortcutBalance, { color: balanceColor }]}
@@ -1115,15 +1132,16 @@ const styles = StyleSheet.create({
     fontSize: FONT_SIZE.md,
     fontWeight: '500',
   },
+  // Colour comes from the host (a tint of colors.text): a fixed grey was the
+  // same bar on both schemes, too dark on the light one and too light on the
+  // dark.
   hiddenBalance: {
-    backgroundColor: 'rgba(120, 120, 120, 0.25)',
     borderRadius: BORDER_RADIUS.sm,
     height: 12,
     width: 64,
   },
   hiddenBalanceSmall: {
-    backgroundColor: 'rgba(120, 120, 120, 0.25)',
-    borderRadius: 3,
+    borderRadius: BORDER_RADIUS.sm,
     height: 8,
     width: 40,
   },

@@ -44,6 +44,29 @@ export const lightTheme = {
     // `overspend` means "past the target".
     warning: '#C77700',
     overspend: '#C62828',
+    // Filled accent surfaces — a count badge, a small solid action button — and
+    // the text that sits on them. Separate from `primary` because `primary` is
+    // tuned to be READ as text on the page background, and white on it measures
+    // ~4.0:1 (light) / ~2.6:1 (dark), under WCAG AA for the small text these
+    // surfaces carry. The pair below clears AA in both schemes: a darkened blue
+    // under white here, the same light blue under near-black in the dark theme.
+    // Anything that only *tints* to show selection uses `selectionTint()`
+    // instead — see app/styles/semanticColors.js.
+    primaryFill: '#0062CC',
+    onPrimaryFill: '#ffffff',
+    // The accent as TEXT on an accent tint (a selected chip) or on a plain
+    // surface. `primary` itself only reaches ~3.4:1 there, so the tinted-chip
+    // pattern the grids introduced was an improvement on white-on-solid without
+    // actually clearing AA. Darkened here, lightened in the dark theme; the
+    // border of such a chip stays `primary`, which only owes 3:1 as a
+    // non-text UI component. Pinned by __tests__/styles/contrast.test.js.
+    primaryStrong: '#0057B8',
+    // Android touch feedback. A single rgba(0,0,0,.08) was invisible on the
+    // dark theme, where the ripple has to be lighter than what it ripples over.
+    ripple: 'rgba(0,0,0,0.08)',
+    // "This completed" — an import that finished, a backup that landed. Not the
+    // same as `income`, which is a money direction rather than an outcome.
+    success: '#2E7D32',
     selected: '#a8d0f5',
     altRow: '#ffffff', // Added for alternating rows
     expense: '#5a3030',
@@ -91,6 +114,19 @@ export const darkTheme = {
     // surface.
     warning: '#F2A93B',
     overspend: '#FF6B6B',
+    // See lightTheme note. The dark scheme keeps the light accent as the fill and
+    // flips the text on it to near-black, which is how a filled accent surface
+    // holds AA when the accent itself is light.
+    primaryFill: '#4da3ff',
+    onPrimaryFill: '#062038',
+    // See lightTheme note. Lifted rather than darkened, and far enough to clear
+    // AA over `inputBackground` (#333), which is the lightest thing a tinted
+    // chip sits on in this theme.
+    primaryStrong: '#8fc4ff',
+    // See lightTheme note. Light ripple over dark surfaces.
+    ripple: 'rgba(255,255,255,0.12)',
+    // See lightTheme note. Lifted so it reads against a near-black surface.
+    success: '#66bb6a',
     selected: '#003a7a',
     altRow: '#1a1a1a', // Added for alternating rows
     expense: '#e6cccc',

@@ -820,6 +820,7 @@ const GraphsScreen = () => {
               <BalanceHistoryCard
                 colors={colors}
                 t={t}
+                language={language}
                 selectedAccount={selectedAccount}
                 onAccountChange={setSelectedAccount}
                 accountItems={accountItems}

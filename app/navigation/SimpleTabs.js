@@ -161,7 +161,7 @@ const TabButton = memo(({ tab, isActive = false, colors, onPress = () => {}, isU
     <TouchableRipple
       style={styles.tab}
       onPressIn={handlePress}
-      rippleColor="rgba(0, 0, 0, .08)"
+      rippleColor={colors.ripple}
       borderless
       accessibilityRole="button"
       accessibilityState={{ selected: isActive }}
@@ -199,8 +199,9 @@ TabButton.propTypes = {
   }).isRequired,
   isActive: PropTypes.bool,
   colors: PropTypes.shape({
-    primary: PropTypes.string,
     mutedText: PropTypes.string,
+    primary: PropTypes.string,
+    ripple: PropTypes.string,
   }).isRequired,
   onPress: PropTypes.func,
   isUpdating: PropTypes.bool,

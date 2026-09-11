@@ -5,7 +5,7 @@ import {
 } from 'react-native';
 import Animated, { useSharedValue, useAnimatedStyle, withTiming, Easing } from 'react-native-reanimated';
 import PropTypes from 'prop-types';
-import { HORIZONTAL_PADDING } from '../../styles/designTokens';
+import { HORIZONTAL_PADDING, Z_INDEX } from '../../styles/designTokens';
 import ExpandableFilters from './ExpandableFilters';
 import { useOperationsData } from '../../contexts/OperationsDataContext';
 import { useOperationsActions } from '../../contexts/OperationsActionsContext';
@@ -116,7 +116,7 @@ const styles = StyleSheet.create({
     shadowOpacity: 0.35,
     shadowRadius: 10,
     top: 0,
-    zIndex: 50,
+    zIndex: Z_INDEX.popover,
   },
 });
 

@@ -6,7 +6,7 @@ import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { useThemeColors } from '../contexts/ThemeColorsContext';
 import { useLocalization } from '../contexts/LocalizationContext';
 import { useDriveBackup } from '../contexts/DriveBackupContext';
-import { BORDER_RADIUS, FONT_SIZE, SPACING } from '../styles/designTokens';
+import { BORDER_RADIUS, FONT_SIZE, SPACING, Z_INDEX } from '../styles/designTokens';
 
 /**
  * The "uploading to Drive" indicator.
@@ -98,7 +98,7 @@ const styles = StyleSheet.create({
     left: 0,
     position: 'absolute',
     right: 0,
-    zIndex: 10,
+    zIndex: Z_INDEX.dropdown,
   },
   label: {
     flexShrink: 1,

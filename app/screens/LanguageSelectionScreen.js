@@ -6,13 +6,14 @@ import {
   StyleSheet,
   ScrollView,
   TouchableOpacity,
-  StatusBar,
 } from 'react-native';
 import Animated, { FadeInDown, Easing, ReduceMotion } from 'react-native-reanimated';
 import { SafeAreaView } from 'react-native-safe-area-context';
+import { useThemeColors } from '../contexts/ThemeColorsContext';
 import { availableLanguages, loadTranslations } from '../contexts/LocalizationContext';
 import { NATIVE_LANGUAGE_NAMES, ENGLISH_LANGUAGE_NAMES, LANGUAGE_FLAGS } from '../utils/languages';
 import { BORDER_RADIUS, FONT_SIZE, TOP_CONTENT_SPACING } from '../styles/designTokens';
+import { selectionTint } from '../utils/colorUtils';
 
 // This is the only screen in the app a user sees exactly once, and it is where
 // the whole motion budget for first-run lives: everywhere else in Penny is a
@@ -51,6 +52,13 @@ const LANGUAGES = availableLanguages.map((code) => ({
 
 const LanguageSelectionScreen = ({ onLanguageSelected }) => {
   const [selectedLanguage, setSelectedLanguage] = useState(null);
+  // This screen used to carry its own hardcoded white palette plus a
+  // `barStyle="dark-content"` StatusBar, so the very first thing a dark-mode
+  // phone showed was a full-screen white flash. It renders inside
+  // ThemeColorsProvider like every other screen, so it just reads the theme;
+  // the status bar is App.js's ThemedStatusBar's job, as everywhere else.
+  const { colors } = useThemeColors();
+  const selectedBackground = selectionTint(colors.primary, colors.surface);
 
   const handleLanguageSelect = (code) => {
     setSelectedLanguage(code);
@@ -70,9 +78,8 @@ const LanguageSelectionScreen = ({ onLanguageSelected }) => {
   };
 
   return (
-    <SafeAreaView style={styles.safeArea}>
-      <StatusBar barStyle="dark-content" backgroundColor="#ffffff" />
-      <View style={styles.container}>
+    <SafeAreaView style={[styles.safeArea, { backgroundColor: colors.background }]}>
+      <View style={[styles.container, { backgroundColor: colors.background }]}>
         {/* Eleven cards do not fit a phone screen, so the list scrolls while the
             title and the Continue button stay put. The title scrolls with it
             rather than pinning: on the one screen where the whole point is
@@ -84,8 +91,8 @@ const LanguageSelectionScreen = ({ onLanguageSelected }) => {
         >
           {/* Title and subtitle lead the stagger at slots 0 and 1, so the cards
               below them read as continuing a movement rather than starting one. */}
-          <Animated.Text entering={entry(0)} style={styles.title}>{t('welcome_title')}</Animated.Text>
-          <Animated.Text entering={entry(1)} style={styles.subtitle}>{t('welcome_subtitle')}</Animated.Text>
+          <Animated.Text entering={entry(0)} style={[styles.title, { color: colors.text }]}>{t('welcome_title')}</Animated.Text>
+          <Animated.Text entering={entry(1)} style={[styles.subtitle, { color: colors.mutedText }]}>{t('welcome_subtitle')}</Animated.Text>
 
           <View style={styles.languagesContainer}>
             {LANGUAGES.map((language, index) => (
@@ -93,7 +100,11 @@ const LanguageSelectionScreen = ({ onLanguageSelected }) => {
                 <TouchableOpacity
                   style={[
                     styles.languageButton,
-                    selectedLanguage === language.code && styles.languageButtonSelected,
+                    { backgroundColor: colors.surface, borderColor: colors.border },
+                    selectedLanguage === language.code && {
+                      backgroundColor: selectedBackground,
+                      borderColor: colors.primary,
+                    },
                   ]}
                   onPress={() => handleLanguageSelect(language.code)}
                   accessibilityRole="button"
@@ -105,7 +116,7 @@ const LanguageSelectionScreen = ({ onLanguageSelected }) => {
                     <Text
                       style={[
                         styles.languageName,
-                        selectedLanguage === language.code && styles.languageNameSelected,
+                        { color: selectedLanguage === language.code ? colors.primaryStrong : colors.text },
                       ]}
                     >
                       {language.nativeName}
@@ -116,7 +127,7 @@ const LanguageSelectionScreen = ({ onLanguageSelected }) => {
                       <Text
                         style={[
                           styles.languageEnglishName,
-                          selectedLanguage === language.code && styles.languageEnglishNameSelected,
+                          { color: selectedLanguage === language.code ? colors.primaryStrong : colors.mutedText },
                         ]}
                       >
                         {language.name}
@@ -124,8 +135,8 @@ const LanguageSelectionScreen = ({ onLanguageSelected }) => {
                     )}
                   </View>
                   {selectedLanguage === language.code && (
-                    <View style={styles.checkmark}>
-                      <Text style={styles.checkmarkText}>✓</Text>
+                    <View style={[styles.checkmark, { backgroundColor: colors.primaryFill }]}>
+                      <Text style={[styles.checkmarkText, { color: colors.onPrimaryFill }]}>✓</Text>
                     </View>
                   )}
                 </TouchableOpacity>
@@ -138,7 +149,7 @@ const LanguageSelectionScreen = ({ onLanguageSelected }) => {
           <TouchableOpacity
             style={[
               styles.continueButton,
-              !selectedLanguage && styles.continueButtonDisabled,
+              { backgroundColor: selectedLanguage ? colors.primaryFill : colors.secondary },
             ]}
             onPress={handleContinue}
             disabled={!selectedLanguage}
@@ -149,7 +160,7 @@ const LanguageSelectionScreen = ({ onLanguageSelected }) => {
             <Text
               style={[
                 styles.continueButtonText,
-                !selectedLanguage && styles.continueButtonTextDisabled,
+                { color: selectedLanguage ? colors.onPrimaryFill : colors.mutedText },
               ]}
             >
               {t('continue')}
@@ -164,19 +175,16 @@ const LanguageSelectionScreen = ({ onLanguageSelected }) => {
 const styles = StyleSheet.create({
   checkmark: {
     alignItems: 'center',
-    backgroundColor: '#2196f3',
     borderRadius: BORDER_RADIUS.pill,
     height: 28,
     justifyContent: 'center',
     width: 28,
   },
   checkmarkText: {
-    color: '#ffffff',
     fontSize: FONT_SIZE.lg,
     fontWeight: 'bold',
   },
   container: {
-    backgroundColor: '#ffffff',
     flex: 1,
   },
   content: {
@@ -189,21 +197,13 @@ const styles = StyleSheet.create({
   },
   continueButton: {
     alignItems: 'center',
-    backgroundColor: '#2196f3',
     borderRadius: BORDER_RADIUS.lg,
     justifyContent: 'center',
     padding: 16,
   },
-  continueButtonDisabled: {
-    backgroundColor: '#e0e0e0',
-  },
   continueButtonText: {
-    color: '#ffffff',
     fontSize: FONT_SIZE.lg,
     fontWeight: '600',
-  },
-  continueButtonTextDisabled: {
-    color: '#9e9e9e',
   },
   flag: {
     fontSize: 40,
@@ -215,33 +215,19 @@ const styles = StyleSheet.create({
   },
   languageButton: {
     alignItems: 'center',
-    backgroundColor: '#f5f5f5',
-    borderColor: '#f5f5f5',
     borderRadius: BORDER_RADIUS.lg,
     borderWidth: 2,
     flexDirection: 'row',
     marginBottom: 16,
     padding: 20,
   },
-  languageButtonSelected: {
-    backgroundColor: '#e3f2fd',
-    borderColor: '#2196f3',
-  },
   languageEnglishName: {
-    color: '#666666',
     fontSize: FONT_SIZE.md,
   },
-  languageEnglishNameSelected: {
-    color: '#1976d2',
-  },
   languageName: {
-    color: '#1a1a1a',
     fontSize: FONT_SIZE.xl,
     fontWeight: '600',
     marginBottom: 4,
-  },
-  languageNameSelected: {
-    color: '#1565c0',
   },
   languageTextContainer: {
     flex: 1,
@@ -251,17 +237,14 @@ const styles = StyleSheet.create({
     width: '100%',
   },
   safeArea: {
-    backgroundColor: '#ffffff',
     flex: 1,
   },
   subtitle: {
-    color: '#666666',
     fontSize: FONT_SIZE.base,
     marginBottom: 48,
     textAlign: 'center',
   },
   title: {
-    color: '#1a1a1a',
     fontSize: 28,
     fontWeight: 'bold',
     marginBottom: 12,

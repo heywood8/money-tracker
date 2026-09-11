@@ -20,9 +20,9 @@ const FilterBadge = ({ count = 0, colors, testID = 'filter-badge', style }) => {
   return (
     <View
       testID={testID}
-      style={[styles.badge, { backgroundColor: colors.primary }, style]}
+      style={[styles.badge, { backgroundColor: colors.primaryFill }, style]}
     >
-      <Text style={styles.badgeText}>{count}</Text>
+      <Text style={[styles.badgeText, { color: colors.onPrimaryFill }]}>{count}</Text>
     </View>
   );
 };
@@ -30,7 +30,8 @@ const FilterBadge = ({ count = 0, colors, testID = 'filter-badge', style }) => {
 FilterBadge.propTypes = {
   count: PropTypes.number,
   colors: PropTypes.shape({
-    primary: PropTypes.string.isRequired,
+    onPrimaryFill: PropTypes.string.isRequired,
+    primaryFill: PropTypes.string.isRequired,
   }).isRequired,
   testID: PropTypes.string,
   style: PropTypes.oneOfType([PropTypes.object, PropTypes.array]),
@@ -44,10 +45,9 @@ const styles = StyleSheet.create({
     right: -4,
     top: -4,
   },
-  badgeText: {
-    ...BADGE_TEXT,
-    color: '#fff',
-  },
+  // Colour comes from the host (colors.onPrimaryFill): white on the accent is
+  // ~4.0:1 light / ~2.6:1 dark, under WCAG AA for 10px bold text.
+  badgeText: BADGE_TEXT,
 });
 
 export default FilterBadge;

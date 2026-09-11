@@ -6,18 +6,12 @@ import { useDisplaySettings } from '../contexts/DisplaySettingsContext';
 import * as Currency from '../services/currency';
 import currencies from '../../assets/currencies.json';
 import { SPACING, BORDER_RADIUS, FONT_SIZE, HEIGHTS } from '../styles/designTokens';
+import { selectionTint } from '../utils/colorUtils';
 
 // Three across, matching the category grid. An account chip carries a name AND a
 // balance, so the name gets two lines and the balance a smaller size than the
 // category chips need — at two across the row was mostly air.
 const COLUMNS = 3;
-
-// Selection is a tint of the accent rather than a solid fill: white-on-accent
-// sits at ~2.8:1 in the dark theme. Same treatment as CategoryGridSelector.
-const TINT = '1F';
-const tintOf = (primary, fallback) => (
-  typeof primary === 'string' && /^#[0-9a-f]{6}$/i.test(primary) ? primary + TINT : fallback
-);
 
 const DEFAULT_TEST_ID_PREFIX = 'account-grid';
 
@@ -116,7 +110,7 @@ export default function AccountGridSelector({
   // apart.
   const showHeaders = groups.length > 1;
 
-  const selectedBackground = tintOf(colors.primary, colors.selected);
+  const selectedBackground = selectionTint(colors.primary, colors.inputBackground || colors.surface);
 
   const renderChip = (account, key) => {
     if (!account) {
@@ -124,7 +118,7 @@ export default function AccountGridSelector({
     }
 
     const isSelected = selectedIds.has(String(account.id));
-    const tone = isSelected ? colors.primary : colors.text;
+    const tone = isSelected ? colors.primaryStrong : colors.text;
 
     return (
       <Pressable

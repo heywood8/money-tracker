@@ -142,7 +142,7 @@ export default function ListCard({
       <TouchableRipple
         onPress={onPress}
         onLongPress={onLongPress}
-        rippleColor="rgba(0, 0, 0, .12)"
+        rippleColor={colors.ripple}
         style={styles.touchable}
         accessibilityRole="button"
         accessibilityLabel={accessibilityLabel}
@@ -203,7 +203,7 @@ const styles = StyleSheet.create({
   },
   iconBackground: {
     alignItems: 'center',
-    borderRadius: ICON_SIZE.xl / 2,
+    borderRadius: BORDER_RADIUS.pill,
     height: ICON_SIZE.xl,
     justifyContent: 'center',
     width: ICON_SIZE.xl, // Circular background
