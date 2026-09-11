@@ -1,5 +1,12 @@
 # Changelog
 
+## [0.284.12](https://github.com/heywood8/money-tracker/compare/penny-v0.284.11...penny-v0.284.12) (2026-09-11)
+
+
+### Bug Fixes
+
+* **backup:** stop automatic backups from dying after a legitimate shrink ([#1754](https://github.com/heywood8/money-tracker/issues/1754)) ([aedc609](https://github.com/heywood8/money-tracker/commit/aedc60954aa7a15dc1119fe6d1d3f84d585897b8))
+
 ## [0.284.11](https://github.com/heywood8/money-tracker/compare/penny-v0.284.10...penny-v0.284.11) (2026-09-11)
 
 
