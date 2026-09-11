@@ -115,6 +115,16 @@ export const operations = sqliteTable('operations', {
   accountIdx: index('idx_operations_account').on(table.accountId),
   categoryIdx: index('idx_operations_category').on(table.categoryId),
   typeIdx: index('idx_operations_type').on(table.type),
+  // The other half of every transfer. Queries asking "did this account take
+  // part" read `account_id = ? OR to_account_id = ?`, and SQLite only uses an
+  // index for an OR when each disjunct has one, so without this the whole set
+  // (getOperationsByAccount, getTransferTotals, getAccountDayDeltas, the
+  // account-delete count, getTopTransferTargetAccounts) fell back to a table
+  // scan. Added by migration 0030.
+  toAccountIdx: index('idx_operations_to_account').on(table.toAccountId),
+  // Serves the date half of those same per-account lookups, which all order or
+  // window by date. Added by migration 0030.
+  accountDateIdx: index('idx_operations_account_date').on(table.accountId, table.date),
 }));
 
 /**

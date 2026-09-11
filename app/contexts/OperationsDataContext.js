@@ -15,6 +15,10 @@ import { useLocalization } from './LocalizationContext';
  * This context contains frequently-changing data (operations array, loading states, filters).
  * For stable action functions, use OperationsActionsContext.
  */
+// Operation types, in the same order as OperationsDB's own list. Used to resolve
+// a search term against the localized type labels.
+const OPERATION_TYPES = ['expense', 'income', 'transfer'];
+
 const OperationsDataContext = createContext();
 
 export const useOperationsData = () => {
@@ -58,6 +62,39 @@ export const OperationsDataProvider = ({ children }) => {
 
   // Legacy filter state tracking (for backwards compatibility)
   const [filtersActive, setFiltersActive] = useState(false);
+
+  // Operation types whose localized label matches the current query, so the SQL
+  // search can return them. The label ("transfer", "перевод", ...) lives in the
+  // translation files rather than in any column, so SQL cannot find it on its
+  // own; the in-memory pass below matches it, but that pass can only narrow the
+  // rows SQL returned, never add to them. Resolved here and handed to the query
+  // as `searchTypes` at the call site. Deliberately NOT part of `activeFilters`:
+  // that object is persisted verbatim to PreferencesDB, and a derived member
+  // would be written to disk and would fire the persistence effect on its own.
+  const searchTypes = useMemo(() => {
+    const trimmed = searchState.text ? searchState.text.trim() : '';
+    if (!trimmed) return [];
+    const needle = normalizeSearchText(trimmed);
+    return OPERATION_TYPES.filter(type => normalizeSearchText(t(type)).includes(needle));
+  }, [searchState.text, t]);
+
+  // Categories whose own name, or the name of ANY ancestor, matches the query.
+  // The SQL search joins the operation's category and its immediate parent, so
+  // on its own it stops one level up: a query naming a grandparent folder would
+  // miss everything filed under its grandchildren. Walking the tree here — the
+  // same walk the in-memory pass below does — covers any depth, and the ids go
+  // to the query alongside `searchTypes`.
+  const searchCategoryIds = useMemo(() => {
+    const trimmed = searchState.text ? searchState.text.trim() : '';
+    if (!trimmed) return [];
+    const needle = normalizeSearchText(trimmed);
+    return categories
+      .filter(category => getCategoryPath(category.id).some(ancestor => {
+        const name = ancestor.nameKey ? t(ancestor.nameKey) : ancestor.name;
+        return name && normalizeSearchText(name).includes(needle);
+      }))
+      .map(category => category.id);
+  }, [searchState.text, categories, getCategoryPath, t]);
 
   // activeFilters is now a computed property (alias) pointing to searchState
   // maintains backwards compatibility while having single source of truth
@@ -328,6 +365,8 @@ export const OperationsDataProvider = ({ children }) => {
 
     // New search state API
     searchState,
+    searchTypes,
+    searchCategoryIds,
     hasActiveSearch,
     getSearchFilterCount,
 
@@ -360,6 +399,8 @@ export const OperationsDataProvider = ({ children }) => {
     hasNewerOperations,
     filtersActive,
     searchState,
+    searchTypes,
+    searchCategoryIds,
     hasActiveSearch,
     oldestLoadedDate,
     newestLoadedDate,

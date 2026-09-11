@@ -2024,14 +2024,106 @@ describe('OperationsDB Service', () => {
       expect(sqlCall).toContain('LEFT JOIN categories pc ON c.parent_id = pc.id');
     });
 
-    it('parent JOIN is present even without search text (to support future use)', async () => {
+    it('emits the name JOINs only when there is search text', async () => {
+      queryAll.mockResolvedValue([]);
+
+      await OperationsDB.getFilteredOperationsByDateRange('2025-12-01', '2025-12-31', { searchText: 'coffee' });
+
+      const sqlCall = queryAll.mock.calls[0][0];
+      expect(sqlCall).toContain('LEFT JOIN accounts a ON o.account_id = a.id');
+      expect(sqlCall).toContain('LEFT JOIN accounts to_a ON o.to_account_id = to_a.id');
+      expect(sqlCall).toContain('LEFT JOIN categories c ON o.category_id = c.id');
+      expect(sqlCall).toContain('LEFT JOIN categories pc ON c.parent_id = pc.id');
+    });
+
+    it('matches operations whose localized type label was resolved by the caller', async () => {
+      queryAll.mockResolvedValue([]);
+
+      // A search for "перевод" cannot be folded in SQL — the label lives in the
+      // translation files, so the caller resolves it to type values and passes
+      // them as searchTypes.
+      await OperationsDB.getFilteredOperationsByDateRange('2025-12-01', '2025-12-31', {
+        searchText: 'перевод',
+        searchTypes: ['transfer'],
+      });
+
+      const [sqlCall, params] = queryAll.mock.calls[0];
+      expect(sqlCall).toContain('OR o.type IN (?)');
+      expect(params).toContain('transfer');
+    });
+
+    it('matches operations under a category the caller resolved by ancestor name', async () => {
+      queryAll.mockResolvedValue([]);
+
+      // The joins reach the operation's category and its immediate parent only.
+      // A grandparent folder's name is resolved by the caller, which walks the
+      // whole ancestor chain and hands down the concrete category ids.
+      await OperationsDB.getFilteredOperationsByDateRange('2025-12-01', '2025-12-31', {
+        searchText: 'travel',
+        searchCategoryIds: ['cat-flights', 'cat-hotels'],
+      });
+
+      const [sqlCall, params] = queryAll.mock.calls[0];
+      expect(sqlCall).toContain('OR o.category_id IN (?,?)');
+      expect(params).toContain('cat-flights');
+      expect(params).toContain('cat-hotels');
+    });
+
+    it('keeps the locally-resolved matches inside the search group, not as an extra AND', async () => {
+      queryAll.mockResolvedValue([]);
+
+      // A type/category match must WIDEN the search, never narrow the other
+      // filters: it belongs in the same OR group as the name and description
+      // LIKEs, so a type filter applied alongside it still applies.
+      await OperationsDB.getFilteredOperationsByDateRange('2025-12-01', '2025-12-31', {
+        types: ['expense'],
+        searchText: 'перевод',
+        searchTypes: ['transfer'],
+        searchCategoryIds: ['cat-1'],
+      });
+
+      const sqlCall = queryAll.mock.calls[0][0];
+      expect(sqlCall).toContain('AND o.type IN (?)');
+      // the widening disjuncts sit after an OR, inside the parenthesised group
+      expect(sqlCall).toContain('OR o.type IN (?)');
+      expect(sqlCall).toContain('OR o.category_id IN (?)');
+    });
+
+    it('does not add a category disjunct when the caller resolved no categories', async () => {
+      queryAll.mockResolvedValue([]);
+
+      await OperationsDB.getFilteredOperationsByDateRange('2025-12-01', '2025-12-31', {
+        searchText: 'coffee',
+        searchCategoryIds: [],
+      });
+
+      expect(queryAll.mock.calls[0][0]).not.toContain('OR o.category_id IN');
+    });
+
+    it('does not add a type disjunct when the caller resolved no types', async () => {
+      queryAll.mockResolvedValue([]);
+
+      await OperationsDB.getFilteredOperationsByDateRange('2025-12-01', '2025-12-31', {
+        searchText: 'coffee',
+        searchTypes: [],
+      });
+
+      expect(queryAll.mock.calls[0][0]).not.toContain('OR o.type IN');
+    });
+
+    it('omits the name JOINs when there is no search text', async () => {
       queryAll.mockResolvedValue([]);
 
       const filters = { types: ['expense'] };
       await OperationsDB.getFilteredOperationsByDateRange('2025-12-01', '2025-12-31', filters);
 
+      // The four joins exist only so a search term can match an account or a
+      // category name. Without one they are pure cost on every page load, so
+      // they are no longer emitted (this test previously asserted the opposite,
+      // "to support future use" — that future never arrived).
       const sqlCall = queryAll.mock.calls[0][0];
-      expect(sqlCall).toContain('LEFT JOIN categories pc ON c.parent_id = pc.id');
+      expect(sqlCall).not.toContain('LEFT JOIN categories pc ON c.parent_id = pc.id');
+      expect(sqlCall).not.toContain('LEFT JOIN accounts a ON o.account_id = a.id');
     });
 
     it('combines all filters correctly', async () => {
@@ -2916,14 +3008,19 @@ describe('OperationsDB Service', () => {
         expect(params).toContain("%'; drop table operations; --%");
       });
 
-      it('uses DISTINCT to avoid duplicates from JOINs', async () => {
+      it('does not use DISTINCT — the JOINs cannot duplicate a row', async () => {
         queryAll.mockResolvedValue([]);
 
         const filters = { searchText: 'test' };
         await OperationsDB.getFilteredOperationsByWeekFromDate('2025-12-05', filters);
 
+        // All four joins are LEFT JOINs onto a primary key (accounts.id,
+        // categories.id), so each matches at most one row and no operation can
+        // be duplicated. The DISTINCT this test used to assert removed nothing
+        // and cost a temp b-tree over every column of every result row.
         const sqlCall = queryAll.mock.calls[0][0];
-        expect(sqlCall).toContain('SELECT DISTINCT o.*');
+        expect(sqlCall).not.toContain('DISTINCT');
+        expect(sqlCall).toContain('SELECT o.*');
       });
 
       it('includes parent category JOIN for hierarchy-aware text search', async () => {

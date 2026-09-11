@@ -349,6 +349,23 @@ const isSchemaComplete = async (rawDb) => {
     );
     if (!dismissedIndex) return false;
 
+    // Migration 0030: adds idx_operations_to_account and
+    // idx_operations_account_date. Both are checked, for the same reason as
+    // operations' 0009 columns: applyPendingMigrations continues past a failed
+    // statement, so a database can carry the first index without the second,
+    // and that must not read as complete — it would stamp the fast-path
+    // fingerprint and lock in a schema where every transfer query keeps
+    // scanning the table. Both statements are IF NOT EXISTS, so re-running is
+    // harmless.
+    const opsToAccountIndex = await rawDb.getFirstAsync(
+      "SELECT name FROM sqlite_master WHERE type='index' AND name='idx_operations_to_account'",
+    );
+    if (!opsToAccountIndex) return false;
+    const opsAccountDateIndex = await rawDb.getFirstAsync(
+      "SELECT name FROM sqlite_master WHERE type='index' AND name='idx_operations_account_date'",
+    );
+    if (!opsAccountDateIndex) return false;
+
     // Check budget_plan_lines has BOTH effective_from and effective_to
     // (migration 0026 — the recurring line's effective month range). Both are
     // checked for the same reason as operations' 0009 columns: a database
@@ -868,6 +885,16 @@ const detectAppliedMigrations = async (rawDb) => {
   if ((await tableExists('dismissed_notifications'))
     && (await indexExists('idx_dismissed_notifications_fingerprint'))) {
     applied.push(29);
+  }
+
+  // Migration 0030: Adds idx_operations_to_account and
+  // idx_operations_account_date. Require BOTH — applyPendingMigrations
+  // continues past a failed statement, so a half-applied 0030 must re-run to
+  // create the missing index. Both statements are IF NOT EXISTS, so re-running
+  // is harmless.
+  if ((await indexExists('idx_operations_to_account'))
+    && (await indexExists('idx_operations_account_date'))) {
+    applied.push(30);
   }
 
   return applied.sort((a, b) => a - b);

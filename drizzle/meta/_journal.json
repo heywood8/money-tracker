@@ -211,6 +211,13 @@
       "when": 1768300000000,
       "tag": "0029_dismissed_notifications",
       "breakpoints": true
+    },
+    {
+      "idx": 30,
+      "version": "6",
+      "when": 1768400000000,
+      "tag": "0030_operations_transfer_indexes",
+      "breakpoints": true
     }
   ]
 }
