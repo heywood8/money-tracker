@@ -28,13 +28,28 @@ export const CategoriesProvider = ({ children }) => {
   const [dataLoaded, setDataLoaded] = useState(false);
   const [saveError, setSaveError] = useState(null);
 
-  // Reload categories from database
-  const reloadCategories = useCallback(async (language = 'en') => {
+  // Reload categories from database.
+  //
+  // `initializeIfEmpty` must be false while the first-launch language picker is
+  // still on screen. Default category names are baked in at insert time (there
+  // is no nameKey column on the row), so seeding an empty table before the user
+  // has chosen a language would permanently write English names that a later
+  // language change cannot translate.
+  const reloadCategories = useCallback(async (language = 'en', { initializeIfEmpty = true } = {}) => {
     try {
       setLoading(true);
       // Load all categories including shadow categories for display purposes
       // Shadow categories will be filtered out in UI components that allow category selection
       const categoriesData = await CategoriesDB.getAllCategories(true);
+
+      if (categoriesData.length === 0 && !initializeIfEmpty) {
+        // First launch: leave the table empty. The mount effect re-runs with the
+        // chosen language as soon as isFirstLaunch flips to false and seeds the
+        // defaults then.
+        console.log('Skipping default category initialization - waiting for language selection');
+        setCategories([]);
+        return;
+      }
 
       if (categoriesData.length === 0) {
         // Initialize with default categories in the specified language
@@ -92,11 +107,14 @@ export const CategoriesProvider = ({ children }) => {
   useEffect(() => {
     const unsubscribe = appEvents.on(EVENTS.RELOAD_ALL, () => {
       console.debug('Reloading categories due to RELOAD_ALL event with language:', language);
-      reloadCategories(language);
+      // AccountsDataContext emits RELOAD_ALL right after it seeds the default
+      // accounts, which on a fresh install happens while the language picker is
+      // still up. Load only in that window - never initialize.
+      reloadCategories(language, { initializeIfEmpty: !isFirstLaunch });
     });
 
     return unsubscribe;
-  }, [language, reloadCategories]);
+  }, [isFirstLaunch, language, reloadCategories]);
 
   // Listen for DATABASE_RESET event to clear categories
   useEffect(() => {
