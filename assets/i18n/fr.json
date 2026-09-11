@@ -735,5 +735,10 @@
   "resetting_database": "Réinitialisation…",
   "database_reset_done": "Base de données réinitialisée",
   "google_sheets_setup_export_now": "Exportez maintenant pour configurer",
-  "refresh": "Actualiser"
+  "refresh": "Actualiser",
+  "last_backup": "Dernière sauvegarde",
+  "no_backup_yet": "Aucune sauvegarde automatique pour le moment",
+  "backup_skipped_row_count": "Ignorée : les données ont diminué depuis la dernière sauvegarde",
+  "accept_new_baseline": "Accepter la nouvelle référence",
+  "backup_accept_failed": "Impossible de créer la sauvegarde. Réessayez."
 }

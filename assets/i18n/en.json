@@ -735,5 +735,10 @@
   "select": "Select",
   "view_details_for": "View details for",
   "vs": "vs",
-  "refresh": "Refresh"
+  "refresh": "Refresh",
+  "last_backup": "Last backup",
+  "no_backup_yet": "No automatic backup yet",
+  "backup_skipped_row_count": "Skipped: the data shrank since the last backup",
+  "accept_new_baseline": "Accept new baseline",
+  "backup_accept_failed": "Could not write a backup. Try again."
 }

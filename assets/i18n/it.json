@@ -735,5 +735,10 @@
   "resetting_database": "Ripristino…",
   "database_reset_done": "Database ripristinato",
   "google_sheets_setup_export_now": "Esporta ora per configurare",
-  "refresh": "Aggiorna"
+  "refresh": "Aggiorna",
+  "last_backup": "Ultimo backup",
+  "no_backup_yet": "Nessun backup automatico ancora",
+  "backup_skipped_row_count": "Saltato: i dati sono diminuiti dall'ultimo backup",
+  "accept_new_baseline": "Accetta il nuovo riferimento",
+  "backup_accept_failed": "Impossibile creare il backup. Riprova."
 }

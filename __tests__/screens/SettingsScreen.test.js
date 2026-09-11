@@ -123,6 +123,11 @@ const mockGetStoredBackups = jest.fn(() => Promise.resolve([]));
 jest.mock('../../app/services/DailyBackupService', () => ({
   getStoredBackups: (...args) => mockGetStoredBackups(...args),
   DAILY_BACKUP_DIR: '/mock/docs/daily_backups/',
+  // The export panel reads the automatic-backup status on mount (#1715).
+  getBackupStatus: jest.fn().mockResolvedValue({
+    lastDailyDate: null, lastWeeklyWeek: null, skipped: null,
+  }),
+  acceptBackupBaseline: jest.fn().mockResolvedValue(true),
 }));
 
 // Mock expo-file-system/legacy

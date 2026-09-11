@@ -10,6 +10,15 @@
 import * as FileSystem from 'expo-file-system/legacy';
 import { createBackup } from './BackupRestore';
 import { getPreference, setPreference } from './PreferencesDB';
+import {
+  acceptBaseline,
+  clearLastSkipped,
+  countRows,
+  getBaselineRows,
+  getLastSkipped,
+  setBaselineRows,
+  setLastSkipped,
+} from './backupBaseline';
 
 const LAST_DAILY_BACKUP_DATE_KEY = 'last_daily_backup_date';
 const LAST_WEEKLY_BACKUP_WEEK_KEY = 'last_weekly_backup_week';
@@ -168,6 +177,14 @@ export const isSnapshotValid = async (backup) => {
   ].sort();
   const latestUri = existingFiles[existingFiles.length - 1];
 
+  // What "normal" is measured against. The stored baseline is authoritative
+  // because a RESTORE moves it: measuring against the newest backup file alone
+  // meant that after a legitimate shrink every later snapshot was smaller than
+  // that file, nothing was ever written, the file never moved, and automatic
+  // backups stopped for good. The file is still the fallback for a database
+  // that predates the baseline. See app/services/backupBaseline.js.
+  const baselineRows = await getBaselineRows();
+
   // ── Layer 1: zero-account guard ───────────────────────────────────────────
   if (accountCount === 0) {
     if (!latestUri) {
@@ -183,6 +200,7 @@ export const isSnapshotValid = async (backup) => {
         console.warn(
           `[DailyBackup] Refusing empty snapshot: previous backup had ${prevAccounts} account(s) — skipping to protect existing backups`,
         );
+        await setLastSkipped({ baselineRows: countRows(prev), snapshotRows: newTotal });
         return false;
       }
     } catch {
@@ -193,29 +211,96 @@ export const isSnapshotValid = async (backup) => {
   }
 
   // ── Layer 2: row-count regression check ───────────────────────────────────
-  // Only meaningful when we have a prior backup to compare against.
-  if (latestUri) {
+  // Only meaningful when we have something to compare against.
+  let prevTotal = baselineRows;
+
+  if (prevTotal === null && latestUri) {
     try {
       const prevJson = await FileSystem.readAsStringAsync(latestUri);
       const prev = JSON.parse(prevJson);
-      const prevAccounts = prev?.data?.accounts?.length ?? 0;
-      const prevOperations = prev?.data?.operations?.length ?? 0;
-      const prevTotal = prevAccounts + prevOperations;
-
-      // Only fire when the previous snapshot was substantial (>0 rows) and the
-      // new one has dropped by more than half.
-      if (prevTotal > 0 && newTotal < prevTotal * 0.5) {
-        console.warn(
-          `[DailyBackup] Suspicious row-count drop: ${prevTotal} → ${newTotal} rows (>${50}% reduction) — skipping write to protect existing backups`,
-        );
-        return false;
-      }
+      prevTotal = countRows(prev);
     } catch {
       // Unreadable prior file — don't block the write
+      prevTotal = null;
     }
   }
 
+  // Only fire when what came before was substantial (>0 rows) and the new
+  // snapshot has dropped by more than half.
+  if (prevTotal !== null && prevTotal > 0 && newTotal < prevTotal * 0.5) {
+    console.warn(
+      `[DailyBackup] Suspicious row-count drop: ${prevTotal} → ${newTotal} rows (>${50}% reduction) — skipping write to protect existing backups`,
+    );
+    // Recorded, not just warned: the whole failure mode here is that the user
+    // believes they are backed up while every run is being skipped. Only the
+    // REFUSAL is recorded here — a refusal is a fact whoever asked, but an
+    // acceptance is only true once something is actually written, so that half
+    // belongs to the write sites below.
+    await setLastSkipped({ baselineRows: prevTotal, snapshotRows: newTotal });
+    return false;
+  }
+
   return true;
+};
+
+/**
+ * The state Settings shows for automatic backups: when the last one landed, and
+ * whether the guard is currently refusing to write.
+ *
+ * @returns {Promise<{lastDailyDate: string|null, lastWeeklyWeek: string|null,
+ *   skipped: {at: string, baselineRows: number, snapshotRows: number}|null}>}
+ */
+export const getBackupStatus = async () => {
+  const [lastDailyDate, lastWeeklyWeek, skipped] = await Promise.all([
+    getPreference(LAST_DAILY_BACKUP_DATE_KEY, null),
+    getPreference(LAST_WEEKLY_BACKUP_WEEK_KEY, null),
+    getLastSkipped(),
+  ]);
+  return { lastDailyDate, lastWeeklyWeek, skipped };
+};
+
+/**
+ * Take the current dataset as the new normal and write a backup immediately.
+ *
+ * This is the user answering the guard: the smaller dataset is the real one.
+ * Called from Settings when a skipped state is showing, and after a restore —
+ * a restore is the user deliberately choosing a dataset, so whatever its size,
+ * it is legitimate by definition.
+ *
+ * @returns {Promise<boolean>} true if a backup was written.
+ */
+export const acceptBackupBaseline = async () => {
+  try {
+    await ensureBackupDir();
+    const backup = await createBackup();
+
+    // Accepting a smaller dataset is the user's call; accepting an EMPTY one is
+    // not, because a snapshot with no accounts is the signature of the failed
+    // database read this guard exists for — and this path overwrites today's
+    // file and moves the last-good pin onto it, so getting it wrong destroys a
+    // good backup. Layer 1 of the guard still applies.
+    if ((backup?.data?.accounts?.length ?? 0) === 0) {
+      console.warn('[DailyBackup] Refusing to accept an empty snapshot as the new baseline');
+      return false;
+    }
+
+    const today = getTodayDateString();
+    const uri = `${DAILY_BACKUP_DIR}daily_${today}.json`;
+
+    // Write FIRST, then record. The other order clears the standing refusal
+    // before the write, so a failing write left Settings saying "all good"
+    // with nothing on disk to back it up.
+    await FileSystem.writeAsStringAsync(uri, JSON.stringify(backup));
+    await setPreference(LAST_DAILY_BACKUP_DATE_KEY, today);
+    await setPreference(LAST_GOOD_DAILY_BACKUP_DATE_KEY, today);
+    await acceptBaseline(countRows(backup));
+    await cleanupBackups(await getDailyBackups(), MAX_DAILY_BACKUPS, uri);
+    console.log('[DailyBackup] Baseline accepted; wrote a fresh daily backup');
+    return true;
+  } catch (error) {
+    console.error('[DailyBackup] Failed to accept new baseline:', error);
+    return false;
+  }
 };
 
 /**
@@ -282,6 +367,13 @@ export const performDailyBackupIfNeeded = async () => {
       console.log(`[DailyBackup] Weekly backup saved: weekly_${currentWeek}.json`);
       await cleanupBackups(await getWeeklyBackups(), MAX_WEEKLY_BACKUPS);
     }
+
+    // Something landed on disk, so this size is now what "normal" means and
+    // there is no standing refusal to report. Recorded HERE rather than in
+    // isSnapshotValid, which is only a verdict: the Drive backup asks the same
+    // guard, and a yes there says nothing about the local rotation.
+    await setBaselineRows(countRows(backup));
+    await clearLastSkipped();
 
     return true;
   } catch (error) {

@@ -735,5 +735,10 @@
   "resetting_database": "Wird zurückgesetzt…",
   "database_reset_done": "Datenbank zurückgesetzt",
   "google_sheets_setup_export_now": "Jetzt exportieren zum Einrichten",
-  "refresh": "Aktualisieren"
+  "refresh": "Aktualisieren",
+  "last_backup": "Letztes Backup",
+  "no_backup_yet": "Noch kein automatisches Backup",
+  "backup_skipped_row_count": "Übersprungen: die Daten sind seit dem letzten Backup geschrumpft",
+  "accept_new_baseline": "Neuen Referenzwert übernehmen",
+  "backup_accept_failed": "Backup konnte nicht geschrieben werden. Bitte erneut versuchen."
 }

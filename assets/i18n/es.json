@@ -735,5 +735,10 @@
   "resetting_database": "Restableciendo…",
   "database_reset_done": "Base de datos restablecida",
   "google_sheets_setup_export_now": "Exporta ahora para configurar",
-  "refresh": "Actualizar"
+  "refresh": "Actualizar",
+  "last_backup": "Última copia",
+  "no_backup_yet": "Aún no hay copias automáticas",
+  "backup_skipped_row_count": "Omitida: los datos se redujeron desde la última copia",
+  "accept_new_baseline": "Aceptar el nuevo tamaño",
+  "backup_accept_failed": "No se pudo crear la copia. Inténtalo de nuevo."
 }

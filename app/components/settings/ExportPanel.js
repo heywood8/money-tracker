@@ -9,9 +9,10 @@ import { useLocalization } from '../../contexts/LocalizationContext';
 import { useDialog } from '../../contexts/DialogContext';
 import { useDriveBackup } from '../../contexts/DriveBackupContext';
 import { exportBackup, createBackup } from '../../services/BackupRestore';
-import { DAILY_BACKUP_DIR } from '../../services/DailyBackupService';
+import { DAILY_BACKUP_DIR, acceptBackupBaseline, getBackupStatus } from '../../services/DailyBackupService';
 import { getValidAccessToken, signIn as googleSignIn, exportToSheets } from '../../services/GoogleSheetsService';
 import { BORDER_RADIUS, FONT_SIZE, SPACING } from '../../styles/designTokens';
+import { BUTTON, BUTTON_TEXT } from '../../styles/componentStyles';
 import SheetsProgressList, { sheetsErrorTextStyle } from './SheetsProgressList';
 import DriveBackupPanel from './DriveBackupPanel';
 import {
@@ -90,6 +91,99 @@ ExportRow.propTypes = {
   onPress: PropTypes.func,
   testID: PropTypes.string,
 };
+
+/**
+ * What the automatic backups are actually doing.
+ *
+ * They used to report nothing at all: the row-count guard that refuses a
+ * suspiciously small snapshot only wrote a `console.warn`, so a user whose
+ * backups had stopped — which is what a restore of a smaller dataset used to
+ * cause permanently — went on believing they were backed up. See issue #1715.
+ */
+function AutoBackupStatus() {
+  const { colors } = useThemeColors();
+  const { t } = useLocalization();
+  const [status, setStatus] = useState(null);
+  const [accepting, setAccepting] = useState(false);
+  const [acceptFailed, setAcceptFailed] = useState(false);
+
+  const load = useCallback(() => {
+    getBackupStatus().then(setStatus).catch(() => setStatus(null));
+  }, []);
+
+  useEffect(() => { load(); }, [load]);
+
+  const handleAccept = useCallback(async () => {
+    setAccepting(true);
+    setAcceptFailed(false);
+    try {
+      // The boolean matters: a refused or failed accept leaves the warning
+      // standing, and saying nothing would look exactly like success.
+      const written = await acceptBackupBaseline();
+      setAcceptFailed(!written);
+      load();
+    } finally {
+      setAccepting(false);
+    }
+  }, [load]);
+
+  if (!status) return null;
+
+  const lastLabel = status.lastDailyDate
+    ? `${t('last_backup') || 'Last backup'}: ${status.lastDailyDate}`
+    : (t('no_backup_yet') || 'No automatic backup yet');
+
+  return (
+    <View style={[styles.autoBackupStatus, { borderColor: colors.border }]} testID="auto-backup-status">
+      <View style={styles.formatItemRow}>
+        <Ionicons
+          name={status.skipped ? 'warning-outline' : 'shield-checkmark-outline'}
+          size={20}
+          color={status.skipped ? colors.destructive : colors.mutedText}
+        />
+        <View style={styles.formatTextContainer}>
+          <Text style={[styles.listItemText, { color: colors.text }]}>{lastLabel}</Text>
+          {status.skipped && (
+            <Text
+              style={[styles.formatDescription, { color: colors.destructive }]}
+              testID="auto-backup-skipped"
+            >
+              {t('backup_skipped_row_count') || 'Skipped: the data shrank since the last backup'}
+            </Text>
+          )}
+          {acceptFailed && (
+            <Text
+              style={[styles.formatDescription, { color: colors.destructive }]}
+              testID="auto-backup-accept-failed"
+            >
+              {t('backup_accept_failed') || 'Could not write a backup. Try again.'}
+            </Text>
+          )}
+        </View>
+      </View>
+      {status.skipped && (
+        <TouchableOpacity
+          onPress={accepting ? null : handleAccept}
+          disabled={accepting}
+          style={[styles.acceptBaselineButton, { backgroundColor: colors.primaryFill }]}
+          accessibilityRole="button"
+          accessibilityLabel={t('accept_new_baseline') || 'Accept new baseline'}
+          accessibilityState={{ disabled: accepting, busy: accepting }}
+          testID="auto-backup-accept-baseline"
+        >
+          {accepting ? (
+            <ActivityIndicator size="small" color={colors.onPrimaryFill} />
+          ) : (
+            <Text style={[styles.acceptBaselineButtonText, { color: colors.onPrimaryFill }]}>
+              {t('accept_new_baseline') || 'Accept new baseline'}
+            </Text>
+          )}
+        </TouchableOpacity>
+      )}
+    </View>
+  );
+}
+
 
 // The export subpanel: a list of destinations, plus a nested progress view for
 // the one destination that takes long enough to need it (Google Sheets).
@@ -275,6 +369,8 @@ export default function ExportPanel({
 
   return (
     <ScrollView style={styles.listContainer} contentContainerStyle={{ paddingBottom: bottomInset }}>
+      <AutoBackupStatus />
+
       <ExportRow
         icon="archive-outline"
         title={t('save_local_backup') || 'Save local backup'}
@@ -378,6 +474,17 @@ ExportPanel.propTypes = {
 };
 
 const styles = StyleSheet.create({
+  acceptBaselineButton: {
+    ...BUTTON,
+    marginTop: SPACING.sm,
+  },
+  acceptBaselineButtonText: BUTTON_TEXT,
+  autoBackupStatus: {
+    borderBottomWidth: StyleSheet.hairlineWidth,
+    paddingBottom: SPACING.md,
+    paddingHorizontal: SPACING.lg,
+    paddingTop: SPACING.sm,
+  },
   formatDescription: FORMAT_DESCRIPTION,
   formatItemRow: FORMAT_ITEM_ROW,
   formatTextContainer: FORMAT_TEXT_CONTAINER,

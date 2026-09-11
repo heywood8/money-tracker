@@ -735,5 +735,10 @@
   "resetting_database": "リセット中…",
   "database_reset_done": "データベースをリセットしました",
   "google_sheets_setup_export_now": "エクスポートして設定",
-  "refresh": "更新"
+  "refresh": "更新",
+  "last_backup": "最後のバックアップ",
+  "no_backup_yet": "自動バックアップはまだありません",
+  "backup_skipped_row_count": "スキップ: 前回のバックアップよりデータが減っています",
+  "accept_new_baseline": "新しい基準を受け入れる",
+  "backup_accept_failed": "バックアップを作成できませんでした。もう一度お試しください。"
 }

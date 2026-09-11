@@ -735,5 +735,10 @@
   "resetting_database": "Զրոյացվում է…",
   "database_reset_done": "Տվյալների բազան զրոյացված է",
   "google_sheets_setup_export_now": "Արտահանեք հիմա՝ կարգավորելու համար",
-  "refresh": "Թարմացնել"
+  "refresh": "Թարմացնել",
+  "last_backup": "Վերջին պահուստը",
+  "no_backup_yet": "Դեռ ավտոմատ պահուստ չկա",
+  "backup_skipped_row_count": "Բաց թողնված է՝ տվյալները նվազել են վերջին պահուստից հետո",
+  "accept_new_baseline": "Ընդունել նոր ելակետը",
+  "backup_accept_failed": "Չհաջողվեց ստեղծել պահուստը։ Փորձեք կրկին։"
 }

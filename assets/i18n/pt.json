@@ -735,5 +735,10 @@
   "resetting_database": "Redefinindo…",
   "database_reset_done": "Banco de dados redefinido",
   "google_sheets_setup_export_now": "Exporte agora para configurar",
-  "refresh": "Atualizar"
+  "refresh": "Atualizar",
+  "last_backup": "Último backup",
+  "no_backup_yet": "Ainda não há backup automático",
+  "backup_skipped_row_count": "Ignorado: os dados diminuíram desde o último backup",
+  "accept_new_baseline": "Aceitar o novo tamanho",
+  "backup_accept_failed": "Não foi possível gravar o backup. Tente novamente."
 }

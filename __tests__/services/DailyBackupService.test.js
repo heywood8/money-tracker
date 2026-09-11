@@ -5,6 +5,8 @@
  */
 
 import {
+  acceptBackupBaseline,
+  getBackupStatus,
   performDailyBackupIfNeeded,
   getStoredBackups,
   getDailyBackups,
@@ -79,14 +81,31 @@ const makeEmptyBackup = () => ({
  * Configure getPreference mock to return different values per key.
  * Pass null to simulate "no prior backup".
  */
-const mockPrefs = ({ daily = null, weekly = null, lastGood = null } = {}) => {
+const mockPrefs = ({ daily = null, weekly = null, lastGood = null, baseline = null, skipped = null } = {}) => {
   mockPreferencesDB.getPreference.mockImplementation((key, defaultVal = null) => {
     if (key === 'last_daily_backup_date') return Promise.resolve(daily);
     if (key === 'last_weekly_backup_week') return Promise.resolve(weekly);
     if (key === 'last_good_daily_backup_date') return Promise.resolve(lastGood);
+    if (key === 'backup_baseline_rows') return Promise.resolve(baseline);
+    if (key === 'backup_last_skipped') return Promise.resolve(skipped);
     return Promise.resolve(defaultVal);
   });
 };
+
+/** A backup payload with `rows` operations alongside one account. */
+const backupWithRows = (rows) => ({
+  version: 1,
+  timestamp: `${TODAY}T10:00:00.000Z`,
+  platform: 'native',
+  data: {
+    accounts: [{ id: 'acc-1', name: 'Checking', balance: '1000.00', currency: 'USD' }],
+    categories: [],
+    operations: Array.from({ length: rows }, (_, i) => ({ id: `op-${i}` })),
+    budgets: [],
+    app_metadata: [],
+    balance_history: [],
+  },
+});
 
 // ─── Tests ────────────────────────────────────────────────────────────────────
 
@@ -512,7 +531,7 @@ describe('DailyBackupService', () => {
         expect(mockFileSystem.writeAsStringAsync).not.toHaveBeenCalled();
       });
 
-      it('does not update preferences when the snapshot is rejected', async () => {
+      it('does not advance the backup bookkeeping when the snapshot is rejected', async () => {
         mockBackupRestore.createBackup.mockResolvedValue(makeEmptyBackup());
         mockFileSystem.readDirectoryAsync.mockResolvedValue(['daily_2026-02-25.json']);
         mockFileSystem.readAsStringAsync.mockResolvedValue(
@@ -521,7 +540,14 @@ describe('DailyBackupService', () => {
 
         await performDailyBackupIfNeeded();
 
-        expect(mockPreferencesDB.setPreference).not.toHaveBeenCalled();
+        const written = mockPreferencesDB.setPreference.mock.calls.map(([key]) => key);
+        expect(written).not.toContain('last_daily_backup_date');
+        expect(written).not.toContain('last_weekly_backup_week');
+        expect(written).not.toContain('last_good_daily_backup_date');
+        expect(written).not.toContain('backup_baseline_rows');
+        // The refusal itself IS recorded — that is the whole point of #1715:
+        // a skipped run used to be announced by nothing but a console.warn.
+        expect(written).toContain('backup_last_skipped');
       });
 
       it('does not trigger cleanup when the snapshot is rejected', async () => {
@@ -681,6 +707,183 @@ describe('DailyBackupService', () => {
 
         expect(result).toBe(true);
         expect(mockFileSystem.writeAsStringAsync).toHaveBeenCalled();
+      });
+    });
+
+    // Regression for issue #1715. The guard used to measure a new snapshot
+    // against the newest backup FILE. After a legitimate shrink — restoring an
+    // older or partial backup, a reset followed by a small import — every later
+    // snapshot was smaller than that file, so nothing was ever written, so the
+    // file never moved and the comparison never changed. Automatic backups
+    // stopped for good, announced by nothing but a console.warn.
+    describe('baseline re-anchoring after a restore (#1715)', () => {
+      it('writes a backup once a restore has re-anchored the baseline', async () => {
+        // The user restored a 10-row backup over a 101-row database.
+        mockPrefs({ daily: null, weekly: null, baseline: '11' });
+        mockBackupRestore.createBackup.mockResolvedValue(backupWithRows(10));
+
+        // The newest file on disk is still the big pre-restore one.
+        mockFileSystem.readDirectoryAsync.mockResolvedValue(['daily_2026-02-25.json']);
+        mockFileSystem.readAsStringAsync.mockResolvedValue(
+          JSON.stringify({
+            data: {
+              accounts: [{ id: 'acc-1' }],
+              operations: Array.from({ length: 100 }, (_, i) => ({ id: i })),
+            },
+          }),
+        );
+
+        const result = await performDailyBackupIfNeeded();
+
+        expect(result).toBe(true);
+        expect(mockFileSystem.writeAsStringAsync).toHaveBeenCalled();
+      });
+
+      it('still refuses a real collapse measured against the baseline', async () => {
+        // No restore: the baseline is the full database, and the snapshot has
+        // lost almost all of it — which is what the guard is for.
+        mockPrefs({ daily: null, weekly: null, baseline: '101' });
+        mockBackupRestore.createBackup.mockResolvedValue(backupWithRows(0));
+        mockFileSystem.readDirectoryAsync.mockResolvedValue(['daily_2026-02-25.json']);
+
+        const result = await performDailyBackupIfNeeded();
+
+        expect(result).toBe(false);
+        expect(mockFileSystem.writeAsStringAsync).not.toHaveBeenCalled();
+      });
+
+      it('records the refusal so Settings can show it', async () => {
+        mockPrefs({ daily: null, weekly: null, baseline: '101' });
+        mockBackupRestore.createBackup.mockResolvedValue(backupWithRows(0));
+        mockFileSystem.readDirectoryAsync.mockResolvedValue(['daily_2026-02-25.json']);
+
+        await performDailyBackupIfNeeded();
+
+        const skipWrite = mockPreferencesDB.setPreference.mock.calls
+          .find(([key]) => key === 'backup_last_skipped');
+        expect(skipWrite).toBeDefined();
+        expect(JSON.parse(skipWrite[1])).toMatchObject({ baselineRows: 101, snapshotRows: 1 });
+      });
+
+      it('advances the baseline and clears the refusal on an accepted snapshot', async () => {
+        mockPrefs({ daily: null, weekly: null, baseline: '5' });
+        mockBackupRestore.createBackup.mockResolvedValue(backupWithRows(9));
+        mockFileSystem.readDirectoryAsync.mockResolvedValue([]);
+
+        await performDailyBackupIfNeeded();
+
+        expect(mockPreferencesDB.setPreference).toHaveBeenCalledWith('backup_baseline_rows', '10');
+        expect(mockPreferencesDB.setPreference).toHaveBeenCalledWith('backup_last_skipped', '');
+      });
+
+      // Falls back to the file for a database that predates the baseline, so an
+      // upgrade does not silently drop the protection.
+      it('uses the newest backup file when no baseline is stored yet', async () => {
+        mockPrefs({ daily: null, weekly: null, baseline: null });
+        mockBackupRestore.createBackup.mockResolvedValue(backupWithRows(0));
+        mockFileSystem.readDirectoryAsync.mockResolvedValue(['daily_2026-02-25.json']);
+        mockFileSystem.readAsStringAsync.mockResolvedValue(
+          JSON.stringify({
+            data: {
+              accounts: [{ id: 'acc-1' }],
+              operations: Array.from({ length: 100 }, (_, i) => ({ id: i })),
+            },
+          }),
+        );
+
+        expect(await performDailyBackupIfNeeded()).toBe(false);
+      });
+    });
+
+    // isSnapshotValid is a verdict, not a write. The Drive backup asks the same
+    // guard (GoogleDriveBackupService), and a yes there says nothing about
+    // whether the local rotation wrote anything, so only a real write may
+    // advance the baseline.
+    describe('the guard is a verdict, not bookkeeping (#1715)', () => {
+      it('does not advance the baseline when nothing is written', async () => {
+        // Both up to date: performDailyBackupIfNeeded returns before any write.
+        mockPrefs({ daily: TODAY, weekly: THIS_WEEK, baseline: '5' });
+        mockBackupRestore.createBackup.mockResolvedValue(backupWithRows(9));
+
+        await performDailyBackupIfNeeded();
+
+        const written = mockPreferencesDB.setPreference.mock.calls.map(([key]) => key);
+        expect(written).not.toContain('backup_baseline_rows');
+      });
+    });
+
+    describe('getBackupStatus and acceptBackupBaseline (#1715)', () => {
+      it('reports the last backup and the current refusal', async () => {
+        mockPrefs({
+          daily: '2026-02-20',
+          weekly: '2026-W08',
+          skipped: JSON.stringify({ at: '2026-02-25T10:00:00.000Z', baselineRows: 101, snapshotRows: 10 }),
+        });
+
+        const status = await getBackupStatus();
+
+        expect(status.lastDailyDate).toBe('2026-02-20');
+        expect(status.lastWeeklyWeek).toBe('2026-W08');
+        expect(status.skipped).toMatchObject({ baselineRows: 101, snapshotRows: 10 });
+      });
+
+      it('reports no refusal once backups are landing again', async () => {
+        mockPrefs({ daily: TODAY, weekly: THIS_WEEK, skipped: '' });
+        expect((await getBackupStatus()).skipped).toBeNull();
+      });
+
+      // The user answering the guard: this smaller dataset is the real one.
+      it('takes the current size as the baseline and writes immediately', async () => {
+        mockPrefs({ daily: TODAY, weekly: THIS_WEEK, baseline: '101' });
+        mockBackupRestore.createBackup.mockResolvedValue(backupWithRows(9));
+        mockFileSystem.readDirectoryAsync.mockResolvedValue([]);
+
+        expect(await acceptBackupBaseline()).toBe(true);
+
+        expect(mockPreferencesDB.setPreference).toHaveBeenCalledWith('backup_baseline_rows', '10');
+        expect(mockPreferencesDB.setPreference).toHaveBeenCalledWith('backup_last_skipped', '');
+        expect(mockFileSystem.writeAsStringAsync).toHaveBeenCalledWith(
+          `${DAILY_BACKUP_DIR}daily_${TODAY}.json`,
+          expect.any(String),
+        );
+      });
+
+      it('reports failure rather than throwing when the write fails', async () => {
+        mockPrefs({ baseline: '101' });
+        mockBackupRestore.createBackup.mockResolvedValue(backupWithRows(9));
+        mockFileSystem.writeAsStringAsync.mockRejectedValue(new Error('disk full'));
+
+        expect(await acceptBackupBaseline()).toBe(false);
+      });
+
+      // The order matters: clearing the standing refusal before the write left
+      // Settings saying "all good" with nothing on disk behind it.
+      it('does not clear the refusal when the write fails', async () => {
+        mockPrefs({ baseline: '101', skipped: JSON.stringify({ at: 'x', baselineRows: 101, snapshotRows: 10 }) });
+        mockBackupRestore.createBackup.mockResolvedValue(backupWithRows(9));
+        mockFileSystem.writeAsStringAsync.mockRejectedValue(new Error('disk full'));
+
+        await acceptBackupBaseline();
+
+        const written = mockPreferencesDB.setPreference.mock.calls.map(([key]) => key);
+        expect(written).not.toContain('backup_last_skipped');
+        expect(written).not.toContain('backup_baseline_rows');
+      });
+
+      // Accepting a SMALLER dataset is the user's call; accepting an EMPTY one
+      // is the failed-database-read signature the guard exists for — and this
+      // path overwrites today's file and moves the last-good pin onto it.
+      it('refuses to accept a snapshot with no accounts', async () => {
+        mockPrefs({ baseline: '101' });
+        mockBackupRestore.createBackup.mockResolvedValue({
+          version: 1,
+          timestamp: `${TODAY}T10:00:00.000Z`,
+          platform: 'native',
+          data: { accounts: [], categories: [], operations: [], budgets: [], app_metadata: [], balance_history: [] },
+        });
+
+        expect(await acceptBackupBaseline()).toBe(false);
+        expect(mockFileSystem.writeAsStringAsync).not.toHaveBeenCalled();
       });
     });
 

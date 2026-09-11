@@ -735,5 +735,10 @@
   "resetting_database": "正在重置…",
   "database_reset_done": "数据库已重置",
   "google_sheets_setup_export_now": "立即导出以完成设置",
-  "refresh": "刷新"
+  "refresh": "刷新",
+  "last_backup": "上次备份",
+  "no_backup_yet": "尚无自动备份",
+  "backup_skipped_row_count": "已跳过：数据较上次备份减少",
+  "accept_new_baseline": "接受新的基准",
+  "backup_accept_failed": "无法写入备份，请重试。"
 }
