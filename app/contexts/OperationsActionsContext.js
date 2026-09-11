@@ -421,7 +421,14 @@ export const OperationsActionsProvider = ({ children }) => {
   useEffect(() => {
     const unsubscribe = appEvents.on(EVENTS.RELOAD_ALL, () => {
       allOpsCacheRef.current = null; // data may have changed; rebuild on next text search
-      loadInitialOperations();
+      // RELOAD_ALL is usually a background refresh (a balance edit, the
+      // bank-notification pipeline on every foreground, a category change) over
+      // a list that already holds valid rows: raising `loading` there swaps them
+      // for the skeleton and throws away the scroll position. With nothing on
+      // screen yet — the first launch, where seeding the categories and the
+      // default operations emits RELOAD_ALL — the skeleton is the right answer
+      // and the empty state would be a lie.
+      loadInitialOperations(undefined, operationsRef.current.length === 0);
     });
 
     return unsubscribe;
