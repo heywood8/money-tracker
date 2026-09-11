@@ -1,5 +1,12 @@
 # Changelog
 
+## [0.284.10](https://github.com/heywood8/money-tracker/compare/penny-v0.284.9...penny-v0.284.10) (2026-09-11)
+
+
+### Bug Fixes
+
+* **theme:** clear WCAG AA on selected chips and route colours through tokens ([#1751](https://github.com/heywood8/money-tracker/issues/1751)) ([bdb9bd5](https://github.com/heywood8/money-tracker/commit/bdb9bd5a4e0110dee39b9df020da08b44cf816a5))
+
 ## [0.284.9](https://github.com/heywood8/money-tracker/compare/penny-v0.284.8...penny-v0.284.9) (2026-09-11)
 
 
