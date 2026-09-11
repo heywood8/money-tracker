@@ -21,7 +21,17 @@ import UpdateAvailableModal from '../modals/UpdateAvailableModal';
 import ColdStartScreen, { hasColdStartPlayed } from '../components/startup/ColdStartScreen';
 
 // Poll for a newer release this often while the app is open and in the foreground.
-const UPDATE_CHECK_INTERVAL_MS = 60 * 1000;
+const UPDATE_CHECK_INTERVAL_MS = 3 * 60 * 1000;
+
+// Hard floor between two automatic network checks, persisted so it survives a restart and
+// covers the foreground-resume check as well as the timer. The GitHub releases endpoint is
+// called unauthenticated (60 requests/hour/IP), so an app that is opened and closed all day
+// must not get a fresh request every launch.
+//
+// Deliberately a little under the poll interval: a tick fires exactly on the interval
+// boundary while the previous check's timestamp was written just *before* its request went
+// out, so an exact floor would turn every other tick into a no-op.
+const UPDATE_CHECK_MIN_INTERVAL_MS = UPDATE_CHECK_INTERVAL_MS - 15 * 1000;
 
 // How long "Later" silences a specific version across app restarts. A newer version
 // bypasses the snooze; the same version stays quiet until this window elapses.
@@ -67,6 +77,10 @@ const AppInitializer = () => {
   const pendingUpdateRef = useRef(null);
   const isDownloadingRef = useRef(false);
   const isCheckingRef = useRef(false);
+  // Epoch ms of the last automatic check this session. Mirrors PREF_KEYS.UPDATE_LAST_CHECK_AT
+  // and is written *before* the request goes out, so a check that fails (rate limit, offline)
+  // still spends its slot instead of letting the next tick retry immediately.
+  const lastAutoCheckAtRef = useRef(0);
 
   useEffect(() => {
     pendingUpdateRef.current = pendingUpdate;
@@ -136,7 +150,7 @@ const AppInitializer = () => {
     return () => cancelIdleCallback(handle);
   }, [isFirstLaunch]);
 
-  // Poll for app updates every minute while the app is open, regardless of which screen
+  // Poll for app updates on a fixed interval while the app is open, regardless of which screen
   // the user is viewing. When a newer release is found we surface the update dialog. A
   // version the user dismisses is silenced for the rest of the session (handleUpdateDismiss),
   // while re-checks keep running so a still-newer release can prompt again.
@@ -147,6 +161,26 @@ const AppInitializer = () => {
 
     let cancelled = false;
 
+    // Epoch ms of the last check of any kind, automatic or the manual "Check for updates"
+    // row in settings (which writes the same preference). 0 when nothing has been recorded.
+    const readLastCheckAt = async () => {
+      try {
+        const stored = await getPreference(PREF_KEYS.UPDATE_LAST_CHECK_AT);
+        const parsed = stored ? Date.parse(stored) : NaN;
+        if (Number.isNaN(parsed)) {
+          return 0;
+        }
+        // A timestamp in the future is unusable — clock skew, or an app_metadata row restored
+        // from a device whose clock ran ahead. Treat it as no record at all: left as-is it
+        // would sit above the floor until the clock caught up, silencing automatic checks
+        // until the user hit "Check for updates" by hand.
+        return parsed > Date.now() ? 0 : parsed;
+      } catch (error) {
+        console.warn('[AppInitializer] Failed to read last update check time:', error);
+        return 0;
+      }
+    };
+
     const runUpdateCheck = async () => {
       // Never stack work or prompts, and never pop over an open task: skip while a check is
       // already running, a download is in progress, the update dialog is already on screen,
@@ -156,6 +190,18 @@ const AppInitializer = () => {
       }
       isCheckingRef.current = true;
       try {
+        // Rate limit: the timer tick and the foreground-resume check share one floor, so a
+        // user flipping in and out of the app cannot outrun UPDATE_CHECK_MIN_INTERVAL_MS.
+        const now = Date.now();
+        const lastCheckAt = Math.max(lastAutoCheckAtRef.current, await readLastCheckAt());
+        if (cancelled || now - lastCheckAt < UPDATE_CHECK_MIN_INTERVAL_MS) {
+          return;
+        }
+        lastAutoCheckAtRef.current = now;
+        // Persist before the request, not after: an error must still consume the slot.
+        Promise.resolve(setPreference(PREF_KEYS.UPDATE_LAST_CHECK_AT, new Date(now).toISOString()))
+          .catch((error) => console.warn('[AppInitializer] Failed to persist update check time:', error));
+
         const result = await checkForAppUpdate();
         if (cancelled || !result.success || !result.isUpdateAvailable) {
           return;
@@ -196,12 +242,14 @@ const AppInitializer = () => {
     };
 
     // Kick off the first check once the JS thread is idle (so it doesn't contend with the
-    // first data loads / interactive frame), then keep polling once a minute.
+    // first data loads / interactive frame), then keep polling on the interval above. Every
+    // path goes through the persisted floor, so a tick can be a no-op.
     const initialCheckHandle = requestIdleCallback(runUpdateCheck);
     const intervalId = setInterval(runUpdateCheck, UPDATE_CHECK_INTERVAL_MS);
 
-    // Re-check the moment the app returns to the foreground, so a user coming back to an
-    // open screen sees a current result without waiting for the next interval tick.
+    // Re-check when the app returns to the foreground, so a user coming back to an open
+    // screen sees a current result without waiting for the next interval tick. Still subject
+    // to the persisted floor: a quick flip out and back is a no-op.
     const subscription = AppState.addEventListener('change', (nextState) => {
       if (nextState === 'active') {
         runUpdateCheck();
