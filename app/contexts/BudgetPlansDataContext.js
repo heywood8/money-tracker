@@ -3,6 +3,8 @@ import PropTypes from 'prop-types';
 import * as BudgetPlansDB from '../services/BudgetPlansDB';
 import { appEvents, EVENTS } from '../services/eventEmitter';
 import { useBudgetsData } from './BudgetsDataContext';
+import { useTabFocusedEvent } from './TabFocusContext';
+import { currentMonthKey } from '../utils/monthUtils';
 
 const BudgetPlansDataContext = createContext();
 
@@ -41,6 +43,15 @@ export const BudgetPlansDataProvider = ({ children }) => {
   // DATABASE_RESET (so an in-flight refresh can't repopulate after a reset).
   const refreshTokenRef = useRef(0);
 
+  // The month the Budgets screen is showing. Statuses are computed for it alone:
+  // the screen reads one month, but every plan the user has ever had — one per
+  // month of history, each a full per-line walk — used to be recomputed on every
+  // operation change. Seeded with the current month so the first refresh (before
+  // the screen has reported anything) is the one the user will see.
+  const [statusMonth, setStatusMonth] = useState(() => currentMonthKey());
+  const statusMonthRef = useRef(statusMonth);
+  statusMonthRef.current = statusMonth;
+
   /**
    * Recompute plan-vs-actual statuses for all plans, in the tab's display
    * currency (falling back to each plan's own currency when none is chosen).
@@ -49,7 +60,8 @@ export const BudgetPlansDataProvider = ({ children }) => {
   const refreshPlanStatuses = useCallback(async () => {
     const token = ++refreshTokenRef.current;
     try {
-      const statusMap = await BudgetPlansDB.calculateAllPlanStatuses(
+      const statusMap = await BudgetPlansDB.calculatePlanStatusesForMonth(
+        statusMonthRef.current,
         convertAllRef.current,
         displayCurrencyRef.current,
       );
@@ -90,16 +102,13 @@ export const BudgetPlansDataProvider = ({ children }) => {
     convertAllRef.current = convertAllPlans;
     displayCurrencyRef.current = displayCurrency;
     refreshPlanStatuses();
-  }, [plans, convertAllPlans, displayCurrency, refreshPlanStatuses]);
+  }, [plans, convertAllPlans, displayCurrency, statusMonth, refreshPlanStatuses]);
 
-  // Refresh statuses when operations change, so actuals track reality live.
-  useEffect(() => {
-    const unsubscribe = appEvents.on(EVENTS.OPERATION_CHANGED, () => {
-      console.debug('Operation changed, refreshing plan statuses...');
-      refreshPlanStatuses();
-    });
-    return unsubscribe;
-  }, [refreshPlanStatuses]);
+  // Refresh statuses when operations change, so actuals track reality live —
+  // but only while the Budgets tab is on screen. Every tab stays mounted, so a
+  // quick-add on the Operations tab used to run the whole per-line walk for a
+  // screen nobody was looking at; it now runs once, when the user arrives.
+  useTabFocusedEvent('Budget', EVENTS.OPERATION_CHANGED, refreshPlanStatuses);
 
   // Reload on the global RELOAD_ALL signal (e.g. after a restore).
   useEffect(() => {
@@ -131,6 +140,9 @@ export const BudgetPlansDataProvider = ({ children }) => {
     saveError,
     reloadPlans,
     refreshPlanStatuses,
+    // Told by the Budgets screen which month it is showing, so statuses are
+    // computed for that one rather than for every month of history.
+    setStatusMonth,
     // Internal setters for the actions context.
     _setPlans: setPlans,
     _setSaveError: setSaveError,

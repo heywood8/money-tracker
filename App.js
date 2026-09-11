@@ -26,6 +26,7 @@ import { AppBlurProvider, useAppBlurState } from './app/contexts/AppBlurContext'
 import { OverlayHostProvider, OverlayOutlet, useOverlayHost } from './app/contexts/OverlayHostContext';
 import { DisplaySettingsProvider } from './app/contexts/DisplaySettingsContext';
 import { SearchProvider } from './app/contexts/SearchContext';
+import { TabFocusProvider } from './app/contexts/TabFocusContext';
 import ErrorBoundary from './app/components/ErrorBoundary';
 import ImportProgressModal from './app/modals/ImportProgressModal';
 import { StatusBar, Platform, StyleSheet, View } from 'react-native';
@@ -109,35 +110,41 @@ function App() {
             <ThemeConfigProvider>
               <DisplaySettingsProvider>
                 <ThemeColorsProvider>
-                  <AppBlurProvider>
-                    <OverlayHostProvider>
-                      <SearchProvider>
-                        <DialogProvider>
-                          <UpdateDownloadProvider>
-                            <DriveBackupProvider>
-                              <ImportProgressProvider>
-                                <AccountsDataProvider>
-                                  <AccountsActionsProvider>
-                                    <CategoriesProvider>
-                                      <OperationsDataProvider>
-                                        <OperationsActionsProvider>
-                                          <BudgetsProvider>
-                                            <BudgetPlansProvider>
-                                              <AppContent />
-                                            </BudgetPlansProvider>
-                                          </BudgetsProvider>
-                                        </OperationsActionsProvider>
-                                      </OperationsDataProvider>
-                                    </CategoriesProvider>
-                                  </AccountsActionsProvider>
-                                </AccountsDataProvider>
-                              </ImportProgressProvider>
-                            </DriveBackupProvider>
-                          </UpdateDownloadProvider>
-                        </DialogProvider>
-                      </SearchProvider>
-                    </OverlayHostProvider>
-                  </AppBlurProvider>
+                  {/* Above every data provider: several of them (the budget
+                      plans among them) wrap the navigator rather than sitting
+                      inside a tab, and still need to know which tab is showing
+                      so they can defer work for one nobody is looking at. */}
+                  <TabFocusProvider>
+                    <AppBlurProvider>
+                      <OverlayHostProvider>
+                        <SearchProvider>
+                          <DialogProvider>
+                            <UpdateDownloadProvider>
+                              <DriveBackupProvider>
+                                <ImportProgressProvider>
+                                  <AccountsDataProvider>
+                                    <AccountsActionsProvider>
+                                      <CategoriesProvider>
+                                        <OperationsDataProvider>
+                                          <OperationsActionsProvider>
+                                            <BudgetsProvider>
+                                              <BudgetPlansProvider>
+                                                <AppContent />
+                                              </BudgetPlansProvider>
+                                            </BudgetsProvider>
+                                          </OperationsActionsProvider>
+                                        </OperationsDataProvider>
+                                      </CategoriesProvider>
+                                    </AccountsActionsProvider>
+                                  </AccountsDataProvider>
+                                </ImportProgressProvider>
+                              </DriveBackupProvider>
+                            </UpdateDownloadProvider>
+                          </DialogProvider>
+                        </SearchProvider>
+                      </OverlayHostProvider>
+                    </AppBlurProvider>
+                  </TabFocusProvider>
                 </ThemeColorsProvider>
               </DisplaySettingsProvider>
             </ThemeConfigProvider>

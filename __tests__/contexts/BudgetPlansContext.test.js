@@ -8,6 +8,7 @@ import { renderHook, act, waitFor } from '@testing-library/react-native';
 import { BudgetPlansProvider, useBudgetPlans } from '../../app/contexts/BudgetPlansContext';
 import * as BudgetPlansDB from '../../app/services/BudgetPlansDB';
 import { appEvents, EVENTS } from '../../app/services/eventEmitter';
+import { currentMonthKey } from '../../app/utils/monthUtils';
 
 jest.mock('../../app/services/BudgetPlansDB');
 jest.mock('../../app/services/eventEmitter', () => ({
@@ -46,7 +47,7 @@ describe('BudgetPlansContext', () => {
 
     appEvents.on.mockReturnValue(jest.fn());
     BudgetPlansDB.getAllPlans.mockResolvedValue([]);
-    BudgetPlansDB.calculateAllPlanStatuses.mockResolvedValue(new Map());
+    BudgetPlansDB.calculatePlanStatusesForMonth.mockResolvedValue(new Map());
     BudgetPlansDB.validatePlan.mockReturnValue(null);
     BudgetPlansDB.createPlan.mockImplementation(async (plan) => ({ ...plan }));
     BudgetPlansDB.updatePlan.mockResolvedValue(undefined);
@@ -306,14 +307,17 @@ describe('BudgetPlansContext', () => {
       BudgetPlansDB.getAllPlans.mockResolvedValue([
         { id: 'p1', month: '2026-07', currency: 'USD', expectedIncome: '0' },
       ]);
-      BudgetPlansDB.calculateAllPlanStatuses.mockResolvedValue(new Map([['p1', STATUS]]));
+      BudgetPlansDB.calculatePlanStatusesForMonth.mockResolvedValue(new Map([['p1', STATUS]]));
 
       const { result } = await renderHook(() => useBudgetPlans(), { wrapper });
 
       await waitFor(() => expect(result.current.planStatuses.get('p1')).toEqual(STATUS));
       // No display currency chosen (no BudgetsData host here): every plan keeps
       // its own stored currency, which `null` selects.
-      expect(BudgetPlansDB.calculateAllPlanStatuses).toHaveBeenCalledWith(true, null);
+      // Scoped to the month on screen — the context seeds it with the current
+      // one until the Budgets screen reports which month it is showing.
+      expect(BudgetPlansDB.calculatePlanStatusesForMonth)
+        .toHaveBeenCalledWith(currentMonthKey(), true, null);
     });
 
     // Regression: the Budgets tab's currency chip was decorative. It converted
@@ -325,12 +329,13 @@ describe('BudgetPlansContext', () => {
       BudgetPlansDB.getAllPlans.mockResolvedValue([
         { id: 'p1', month: '2026-07', currency: 'RUB', expectedIncome: '0' },
       ]);
-      BudgetPlansDB.calculateAllPlanStatuses.mockResolvedValue(new Map());
+      BudgetPlansDB.calculatePlanStatusesForMonth.mockResolvedValue(new Map());
 
       const { result } = await renderHook(() => useBudgetPlans(), { wrapper });
 
       await waitFor(() => expect(result.current.loading).toBe(false));
-      expect(BudgetPlansDB.calculateAllPlanStatuses).toHaveBeenCalledWith(true, 'AMD');
+      expect(BudgetPlansDB.calculatePlanStatusesForMonth)
+        .toHaveBeenCalledWith(currentMonthKey(), true, 'AMD');
     });
 
     it('refreshes statuses when an operation changes (integration-style)', async () => {
@@ -346,7 +351,7 @@ describe('BudgetPlansContext', () => {
 
       // A new expense lands: the recompute returns an updated status map.
       const updated = { ...STATUS, totals: { totalActual: '365' } };
-      BudgetPlansDB.calculateAllPlanStatuses.mockResolvedValue(new Map([['p1', updated]]));
+      BudgetPlansDB.calculatePlanStatusesForMonth.mockResolvedValue(new Map([['p1', updated]]));
 
       await act(async () => { operationChangedCb(); });
 
@@ -357,12 +362,12 @@ describe('BudgetPlansContext', () => {
       const { result } = await renderHook(() => useBudgetPlans(), { wrapper });
       await waitFor(() => expect(result.current.loading).toBe(false));
 
-      BudgetPlansDB.calculateAllPlanStatuses.mockClear();
-      BudgetPlansDB.calculateAllPlanStatuses.mockResolvedValue(new Map([['p1', STATUS]]));
+      BudgetPlansDB.calculatePlanStatusesForMonth.mockClear();
+      BudgetPlansDB.calculatePlanStatusesForMonth.mockResolvedValue(new Map([['p1', STATUS]]));
 
       await act(async () => { await result.current.refreshPlanStatuses(); });
 
-      expect(BudgetPlansDB.calculateAllPlanStatuses).toHaveBeenCalledTimes(1);
+      expect(BudgetPlansDB.calculatePlanStatusesForMonth).toHaveBeenCalledTimes(1);
       expect(result.current.planStatuses.get('p1')).toEqual(STATUS);
     });
 
@@ -370,12 +375,12 @@ describe('BudgetPlansContext', () => {
       BudgetPlansDB.getAllPlans.mockResolvedValue([
         { id: 'p1', month: '2026-07', currency: 'USD', expectedIncome: '0' },
       ]);
-      BudgetPlansDB.calculateAllPlanStatuses.mockResolvedValue(new Map([['p1', STATUS]]));
+      BudgetPlansDB.calculatePlanStatusesForMonth.mockResolvedValue(new Map([['p1', STATUS]]));
 
       const { result } = await renderHook(() => useBudgetPlans(), { wrapper });
       await waitFor(() => expect(result.current.planStatuses.get('p1')).toEqual(STATUS));
 
-      BudgetPlansDB.calculateAllPlanStatuses.mockRejectedValue(new Error('rates offline'));
+      BudgetPlansDB.calculatePlanStatusesForMonth.mockRejectedValue(new Error('rates offline'));
       await act(async () => { await result.current.refreshPlanStatuses(); });
 
       expect(result.current.planStatuses.get('p1')).toEqual(STATUS);
@@ -385,7 +390,7 @@ describe('BudgetPlansContext', () => {
       BudgetPlansDB.getAllPlans.mockResolvedValue([
         { id: 'p1', month: '2026-07', currency: 'USD', expectedIncome: '0' },
       ]);
-      BudgetPlansDB.calculateAllPlanStatuses.mockResolvedValue(new Map([['p1', STATUS]]));
+      BudgetPlansDB.calculatePlanStatusesForMonth.mockResolvedValue(new Map([['p1', STATUS]]));
 
       const { result } = await renderHook(() => useBudgetPlans(), { wrapper });
       await waitFor(() => expect(result.current.planStatuses.get('p1')).toEqual(STATUS));
@@ -396,7 +401,7 @@ describe('BudgetPlansContext', () => {
 
       // First refresh (older token) stays pending; second (newer token) resolves
       // first with the fresh map, then the stale one resolves last.
-      BudgetPlansDB.calculateAllPlanStatuses
+      BudgetPlansDB.calculatePlanStatusesForMonth
         .mockReset()
         .mockImplementationOnce(() => new Promise((r) => { resolveStale = r; }))
         .mockResolvedValueOnce(freshMap);
@@ -421,14 +426,14 @@ describe('BudgetPlansContext', () => {
       BudgetPlansDB.getAllPlans.mockResolvedValue([
         { id: 'p1', month: '2026-07', currency: 'USD', expectedIncome: '0' },
       ]);
-      BudgetPlansDB.calculateAllPlanStatuses.mockResolvedValue(new Map([['p1', STATUS]]));
+      BudgetPlansDB.calculatePlanStatusesForMonth.mockResolvedValue(new Map([['p1', STATUS]]));
 
       const { result } = await renderHook(() => useBudgetPlans(), { wrapper });
       await waitFor(() => expect(result.current.planStatuses.size).toBe(1));
 
       // After the reset the tables are empty, so any follow-up recompute
       // (triggered by the plans list clearing) also returns an empty map.
-      BudgetPlansDB.calculateAllPlanStatuses.mockResolvedValue(new Map());
+      BudgetPlansDB.calculatePlanStatusesForMonth.mockResolvedValue(new Map());
       await act(async () => { resetCb(); });
       await waitFor(() => expect(result.current.planStatuses.size).toBe(0));
     });

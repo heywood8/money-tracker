@@ -21,6 +21,31 @@ import { appEvents } from '../../app/services/eventEmitter';
 
 // Mock dependencies
 jest.mock('../../app/services/OperationsDB');
+
+// Operation dates are stored as local YYYY-MM-DD strings.
+const toLocalDateString = (date) => (
+  `${date.getFullYear()}-${String(date.getMonth() + 1).padStart(2, '0')}-${String(date.getDate()).padStart(2, '0')}`
+);
+
+// A row as the database actually writes it: createOperation returns the written
+// columns, not the camelCase shape a SELECT is mapped into. The save path maps it
+// before placing it in the list, so the mock has to produce the real shape or the
+// mapping would never be exercised.
+const asWrittenRow = (operation, id) => ({
+  id,
+  type: operation.type,
+  amount: operation.amount,
+  account_id: operation.accountId ?? null,
+  category_id: operation.categoryId ?? null,
+  to_account_id: operation.toAccountId ?? null,
+  date: operation.date,
+  created_at: new Date().toISOString(),
+  description: operation.description ?? null,
+  exchange_rate: operation.exchangeRate ?? null,
+  destination_amount: operation.destinationAmount ?? null,
+  source_currency: operation.sourceCurrency ?? null,
+  destination_currency: operation.destinationCurrency ?? null,
+});
 jest.mock('../../app/services/AccountsDB');
 
 // Mock DialogContext
@@ -78,11 +103,13 @@ describe('Operation Management Integration Tests', () => {
 
     OperationsDB.getOperationsByWeekOffset.mockResolvedValue([]);
     OperationsDB.getNextOldestOperation.mockResolvedValue(null);
-    OperationsDB.createOperation.mockImplementation(async (operation) => ({
-      ...operation,
-      id: ++mockOperationIdCounter,
-      createdAt: new Date().toISOString(),
-    }));
+    OperationsDB.createOperation.mockImplementation(
+      async (operation) => asWrittenRow(operation, ++mockOperationIdCounter),
+    );
+    // The real mapper, so the save path's camelCase conversion is covered.
+    OperationsDB.mapCreatedOperation.mockImplementation(
+      jest.requireActual('../../app/services/OperationsDB').mapCreatedOperation,
+    );
     OperationsDB.updateOperation.mockResolvedValue(undefined);
     OperationsDB.deleteOperation.mockResolvedValue(undefined);
   });
@@ -102,9 +129,10 @@ describe('Operation Management Integration Tests', () => {
         Promise.resolve([...currentOperations]),
       );
       OperationsDB.createOperation.mockImplementation(async (operation) => {
-        const newOp = { ...operation, id: ++mockOperationIdCounter, createdAt: new Date().toISOString() };
-        currentOperations.push(newOp);
-        return newOp;
+        const row = asWrittenRow(operation, ++mockOperationIdCounter);
+        // The week query maps its rows, so the tracked list holds mapped ones.
+        currentOperations.push(OperationsDB.mapCreatedOperation(row));
+        return row;
       });
       OperationsDB.updateOperation.mockImplementation((id, updates) => {
         const op = currentOperations.find((o) => o.id === id);
@@ -154,12 +182,18 @@ describe('Operation Management Integration Tests', () => {
         });
       });
 
+      // Newest first: the list is kept in the order every query returns it,
+      // `date DESC, created_at DESC`. Both entries share a date, so the income
+      // just created sorts above the expense. (This used to read the other way
+      // round only because the mocked re-query handed back insertion order; the
+      // save no longer re-queries, it places the returned row itself.)
       expect(result.current.operations).toHaveLength(2);
-      expect(result.current.operations[1].type).toBe('income');
-      expect(result.current.operations[1].amount).toBe('2000.00');
+      expect(result.current.operations[0].type).toBe('income');
+      expect(result.current.operations[0].amount).toBe('2000.00');
+      expect(result.current.operations[1].type).toBe('expense');
 
-      // UPDATE: Modify first operation
-      const firstOpId = result.current.operations[0].id;
+      // UPDATE: Modify the expense
+      const firstOpId = result.current.operations[1].id;
       await act(async () => {
         await result.current.updateOperation(firstOpId, {
           amount: '75.00',
@@ -750,4 +784,83 @@ describe('Operation Management Integration Tests', () => {
       expect(result.current.operations.length).toBeGreaterThanOrEqual(3);
     });
   });
+
+  // Issue #1705: a save used to re-query the whole week for a row the write had
+  // just handed back. It now places that row itself — which only works if the row
+  // is mapped into the shape the list and the in-memory filters read.
+  describe('Save places the created row without re-querying', () => {
+    it('does not re-query the week after a save', async () => {
+      const { result } = await renderHook(() => useOperations(), { wrapper });
+      await waitFor(() => expect(result.current.loading).toBe(false));
+
+      OperationsDB.getOperationsByWeekOffset.mockClear();
+
+      await act(async () => {
+        await result.current.addOperation({
+          type: 'expense',
+          amount: '12.00',
+          accountId: 'account-1',
+          categoryId: 'category-1',
+          date: toLocalDateString(new Date()),
+          description: 'Coffee',
+        });
+      });
+
+      expect(result.current.operations).toHaveLength(1);
+      expect(OperationsDB.getOperationsByWeekOffset).not.toHaveBeenCalled();
+    });
+
+    it('places it in the camelCase shape the list renders', async () => {
+      const { result } = await renderHook(() => useOperations(), { wrapper });
+      await waitFor(() => expect(result.current.loading).toBe(false));
+
+      await act(async () => {
+        await result.current.addOperation({
+          type: 'transfer',
+          amount: '30.00',
+          accountId: 'account-1',
+          toAccountId: 'account-2',
+          date: toLocalDateString(new Date()),
+          description: 'Move',
+        });
+      });
+
+      // The written row is snake_case; without the mapping the row would render
+      // with no account, no category and no transfer target, and an account or
+      // category filter would hide an operation that matches it.
+      const [placed] = result.current.operations;
+      expect(placed.accountId).toBe('account-1');
+      expect(placed.toAccountId).toBe('account-2');
+      expect(placed.createdAt).toBeTruthy();
+      expect(placed.account_id).toBeUndefined();
+    });
+
+    it('falls back to a re-query for a back-dated entry', async () => {
+      const today = toLocalDateString(new Date());
+      OperationsDB.getOperationsByWeekOffset.mockResolvedValue([
+        { id: 99, type: 'expense', amount: '5.00', accountId: 'account-1', date: today, createdAt: '2020-01-01' },
+      ]);
+
+      const { result } = await renderHook(() => useOperations(), { wrapper });
+      await waitFor(() => expect(result.current.operations).toHaveLength(1));
+
+      OperationsDB.getOperationsByWeekOffset.mockClear();
+
+      await act(async () => {
+        await result.current.addOperation({
+          type: 'expense',
+          amount: '9.00',
+          accountId: 'account-1',
+          categoryId: 'category-1',
+          date: '2019-03-04',
+          description: 'Long ago',
+        });
+      });
+
+      // Placing it locally would leave a row hanging below the loaded window with
+      // nothing between it and the rest, so this one still re-reads.
+      expect(OperationsDB.getOperationsByWeekOffset).toHaveBeenCalled();
+    });
+  });
+
 });

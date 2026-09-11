@@ -821,39 +821,34 @@ describe('BudgetsContext', () => {
   });
 
   describe('Event Handling', () => {
-    it('listens to OPERATION_CHANGED event', async () => {
-      let operationChangedCallback;
-      appEvents.on.mockImplementation((event, callback) => {
-        if (event === EVENTS.OPERATION_CHANGED) {
-          operationChangedCallback = callback;
-        }
-        return jest.fn(); // Return unsubscribe function
-      });
-
+    it('does NOT listen to OPERATION_CHANGED', async () => {
+      // These are the legacy v1 per-category budgets, superseded by budget plan
+      // lines. Nothing in the app reads their statuses any more, but the
+      // subscription kept recomputing them on every save — a category-descendant
+      // expansion plus a SUM per budget, for figures nobody displayed.
       const { result } = await renderHook(() => useBudgets(), { wrapper });
 
       await waitFor(() => {
         expect(result.current.loading).toBe(false);
       });
 
-      expect(appEvents.on).toHaveBeenCalledWith(
+      expect(appEvents.on).not.toHaveBeenCalledWith(
         EVENTS.OPERATION_CHANGED,
         expect.any(Function),
       );
+    });
 
-      // Simulate operation change
+    it('still recomputes statuses when asked explicitly', async () => {
       const newStatuses = new Map([
         ['1', { budgetId: '1', spent: 600, remaining: 400 }],
       ]);
+      const { result } = await renderHook(() => useBudgets(), { wrapper });
+      await waitFor(() => expect(result.current.loading).toBe(false));
+
       BudgetsDB.calculateAllBudgetStatuses.mockResolvedValue(newStatuses);
+      await act(async () => { await result.current.refreshBudgetStatuses(); });
 
-      await act(async () => {
-        operationChangedCallback();
-      });
-
-      await waitFor(() => {
-        expect(BudgetsDB.calculateAllBudgetStatuses).toHaveBeenCalledTimes(2);
-      });
+      expect(result.current.budgetStatuses).toEqual(newStatuses);
     });
 
     it('listens to RELOAD_ALL event', async () => {
@@ -953,13 +948,14 @@ describe('BudgetsContext', () => {
 
       const { unmount } = await renderHook(() => useBudgets(), { wrapper });
 
+      // Two, not three: OPERATION_CHANGED is no longer subscribed (see above).
       await waitFor(() => {
-        expect(appEvents.on).toHaveBeenCalledTimes(3);
+        expect(appEvents.on).toHaveBeenCalledTimes(2);
       });
 
       await unmount();
 
-      expect(unsubscribeMocks.operationChanged).toHaveBeenCalled();
+      expect(unsubscribeMocks.operationChanged).not.toHaveBeenCalled();
       expect(unsubscribeMocks.reloadAll).toHaveBeenCalled();
       expect(unsubscribeMocks.databaseReset).toHaveBeenCalled();
     });

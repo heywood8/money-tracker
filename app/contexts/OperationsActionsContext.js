@@ -446,6 +446,20 @@ export const OperationsActionsProvider = ({ children }) => {
   // Note: Default operations are now created directly in AccountsDataContext
   // after default accounts are created, then RELOAD_ALL is emitted to refresh everything.
 
+  // Place a freshly created operation in the loaded list, in the order the list
+  // is kept in (date DESC, then created_at DESC — the same ORDER BY every query
+  // uses). Saving used to re-query the whole week instead, for a row the write
+  // had just handed back.
+  const insertInOrder = useCallback((list, operation) => {
+    const index = list.findIndex(existing => (
+      existing.date < operation.date
+      || (existing.date === operation.date
+        && String(existing.createdAt ?? '') < String(operation.createdAt ?? ''))
+    ));
+    if (index === -1) return [...list, operation];
+    return [...list.slice(0, index), operation, ...list.slice(index)];
+  }, []);
+
   const addOperation = useCallback(async (operation) => {
     const tempId = `_temp_${Date.now()}`;
     const optimisticOp = { ...operation, id: tempId };
@@ -460,7 +474,38 @@ export const OperationsActionsProvider = ({ children }) => {
         allOpsCacheRef.current = [createdOperation, ...allOpsCacheRef.current];
       }
 
-      await loadInitialOperations(activeFiltersRef.current, false);
+      // The write returned the row, so the list can be brought up to date
+      // without asking the database for it again. Only a back-dated entry — one
+      // older than the window currently loaded — still needs the re-query,
+      // because placing it locally would show a row hanging below the window
+      // with nothing between it and the rest.
+      //
+      // createOperation hands back the row as it was WRITTEN — snake_case
+      // columns — so it has to be mapped before it can be rendered: the list row
+      // and the in-memory filters read accountId / categoryId / toAccountId /
+      // createdAt, and an unmapped row would show no account, no category and no
+      // transfer target, and would be hidden by an account or category filter it
+      // actually matches.
+      const insertedOperation = createdOperation
+        ? OperationsDB.mapCreatedOperation(createdOperation)
+        : null;
+      const oldestLoaded = oldestLoadedDateRef.current;
+      const outsideLoadedWindow = !insertedOperation
+        || (oldestLoaded && insertedOperation.date < oldestLoaded);
+
+      if (outsideLoadedWindow) {
+        await loadInitialOperations(activeFiltersRef.current, false);
+      } else {
+        _setOperations(prev => insertInOrder(
+          prev.filter(op => op.id !== tempId),
+          insertedOperation,
+        ));
+        const newestLoaded = newestLoadedDateRef.current;
+        if (!newestLoaded || insertedOperation.date > newestLoaded) {
+          newestLoadedDateRef.current = insertedOperation.date;
+          _setNewestLoadedDate(insertedOperation.date);
+        }
+      }
 
       _setSaveError(null);
       await reloadAccounts();
@@ -478,7 +523,7 @@ export const OperationsActionsProvider = ({ children }) => {
       );
       throw error;
     }
-  }, [reloadAccounts, showDialog, loadInitialOperations, _setSaveError, _setOperations]);
+  }, [reloadAccounts, showDialog, loadInitialOperations, _setSaveError, _setOperations, insertInOrder, _setNewestLoadedDate]);
 
   // Insert a placeholder operation into the list immediately, before its DB write
   // completes. Used by the notification-suggestion flow so the binding card can

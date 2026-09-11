@@ -112,17 +112,14 @@ export const BudgetsDataProvider = ({ children }) => {
     reloadBudgets();
   }, [reloadBudgets]);
 
-  /**
-   * Listen for operation changes to refresh statuses
-   */
-  useEffect(() => {
-    const unsubscribe = appEvents.on(EVENTS.OPERATION_CHANGED, () => {
-      console.debug('Operation changed, refreshing budget statuses...');
-      refreshBudgetStatuses();
-    });
-
-    return unsubscribe;
-  }, [refreshBudgetStatuses]);
+  // Deliberately NOT subscribed to OPERATION_CHANGED.
+  //
+  // These are the legacy v1 per-category budgets, superseded by budget plan
+  // lines (Budgets v3). Nothing in the app reads `budgetStatuses` any more — the
+  // Budgets tab reads plan statuses — but the subscription kept recomputing them
+  // on every save: a category-descendant expansion plus a SUM per budget, for
+  // figures that were never displayed. `refreshBudgetStatuses` stays callable so
+  // anything that does want them can ask.
 
   /**
    * Listen for budget reload events

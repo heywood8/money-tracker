@@ -361,7 +361,9 @@ export default function SettingsScreen({ setSubPanelActive }) {
             styles.subPanelBody,
             (activeSubPanel === 'accounts' || activeSubPanel === 'categories') && styles.subPanelBodyFlush,
           ]}>
-            {activeSubPanel === 'accounts' && <AccountsScreen onBackStateChange={handleEmbeddedBackStateChange} />}
+            {activeSubPanel === 'accounts' && (
+              <AccountsScreen tabKey="Settings" onBackStateChange={handleEmbeddedBackStateChange} />
+            )}
             {activeSubPanel === 'categories' && <CategoriesScreen onBackStateChange={handleEmbeddedBackStateChange} />}
 
             {activeSubPanel === 'language' && (

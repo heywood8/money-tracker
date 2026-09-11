@@ -22,6 +22,7 @@ import { getDefaultAccountId, setDefaultAccountId } from '../services/Preference
 import { DURATION_ENTER, DURATION_EXIT } from '../utils/motion';
 import { motionDuration } from '../utils/reducedMotion';
 import { computeNetWorthSummary, getOperationsByDateRange } from '../services/OperationsDB';
+import { useTabFocusedEvent } from '../contexts/TabFocusContext';
 import { appEvents, EVENTS } from '../services/eventEmitter';
 import { parseCardMasks, serializeCardMasks, cardMaskLast4 } from '../utils/cardMask';
 import currencies from '../../assets/currencies.json';
@@ -214,7 +215,7 @@ ConfirmationDialog.propTypes = {
 };
 
 // Net worth summary card
-const NetWorthCard = memo(({ accounts = [], colors = {}, t = (k) => k }) => {
+const NetWorthCard = memo(({ accounts = [], colors = {}, t = (k) => k, tabKey = 'Accounts' }) => {
   const { hideBalances } = useDisplaySettings();
 
   // Net worth's monthly-change figure only depends on the CURRENT MONTH's
@@ -228,33 +229,39 @@ const NetWorthCard = memo(({ accounts = [], colors = {}, t = (k) => k }) => {
   // set is reloaded/reset. (issue #1346)
   const [monthOperations, setMonthOperations] = useState([]);
 
+  const mountedRef = useRef(true);
   useEffect(() => {
-    let cancelled = false;
-    const load = async () => {
-      const now = new Date();
-      const monthPrefix = `${now.getFullYear()}-${String(now.getMonth() + 1).padStart(2, '0')}`;
-      try {
-        // Loose upper bound: no real date exceeds "-31", and both summary paths
-        // re-filter by the exact monthPrefix, so a slightly wide range is harmless.
-        const ops = await getOperationsByDateRange(`${monthPrefix}-01`, `${monthPrefix}-31`);
-        if (!cancelled) setMonthOperations(ops || []);
-      } catch {
-        if (!cancelled) setMonthOperations([]);
-      }
-    };
-    load();
-    const unsubChanged = appEvents.on(EVENTS.OPERATION_CHANGED, load);
-    const unsubReload = appEvents.on(EVENTS.RELOAD_ALL, load);
-    const unsubReset = appEvents.on(EVENTS.DATABASE_RESET, () => {
-      if (!cancelled) setMonthOperations([]);
-    });
-    return () => {
-      cancelled = true;
-      unsubChanged();
-      unsubReload();
-      unsubReset();
-    };
+    mountedRef.current = true;
+    return () => { mountedRef.current = false; };
   }, []);
+
+  const loadMonthOperations = useCallback(async () => {
+    const now = new Date();
+    const monthPrefix = `${now.getFullYear()}-${String(now.getMonth() + 1).padStart(2, '0')}`;
+    try {
+      // Loose upper bound: no real date exceeds "-31", and both summary paths
+      // re-filter by the exact monthPrefix, so a slightly wide range is harmless.
+      const ops = await getOperationsByDateRange(`${monthPrefix}-01`, `${monthPrefix}-31`);
+      if (mountedRef.current) setMonthOperations(ops || []);
+    } catch {
+      if (mountedRef.current) setMonthOperations([]);
+    }
+  }, []);
+
+  useEffect(() => { loadMonthOperations(); }, [loadMonthOperations]);
+
+  // Deferred while this screen's tab is hidden. The summary it feeds
+  // (computeNetWorthSummary) can reach the network for a live rate, and this
+  // screen is mounted twice — as the Accounts tab and inside Settings — so an
+  // ungated refresh cost two month queries and two conversions per save, for a
+  // figure nobody was looking at.
+  useTabFocusedEvent(tabKey, [EVENTS.OPERATION_CHANGED, EVENTS.RELOAD_ALL], loadMonthOperations);
+
+  // Not deferred: clearing is cheap, and stale balances must never outlive the
+  // database they came from.
+  useEffect(() => appEvents.on(EVENTS.DATABASE_RESET, () => {
+    if (mountedRef.current) setMonthOperations([]);
+  }), []);
 
   // Determine display currency from first account (or default to USD)
   const displayCurrency = useMemo(() => {
@@ -402,6 +409,10 @@ NetWorthCard.propTypes = {
   accounts: PropTypes.array,
   colors: PropTypes.object,
   t: PropTypes.func,
+  // Which tab this card is on, so its month query can be deferred while that
+  // tab is hidden. AccountsScreen is mounted twice — as the Accounts tab and as
+  // a Settings subpanel — so the ungated version paid for both on every save.
+  tabKey: PropTypes.string,
 };
 
 // Memoized account row component
@@ -490,7 +501,7 @@ AccountRow.propTypes = {
   isDefault: PropTypes.bool,
 };
 
-export default function AccountsScreen({ onBackStateChange }) {
+export default function AccountsScreen({ onBackStateChange, tabKey = 'Accounts' }) {
 
   const [editingId, setEditingId] = useState(null);
   const [editValues, setEditValues] = useState({});
@@ -942,7 +953,7 @@ export default function AccountsScreen({ onBackStateChange }) {
   const keyExtractor = useCallback((item) => item.id, []);
 
   const listHeader = useMemo(() => (
-    <NetWorthCard accounts={accounts} colors={colors} t={t} />
+    <NetWorthCard accounts={accounts} colors={colors} t={t} tabKey={tabKey} />
   ), [accounts, colors, t]);
 
   const listFooter = useMemo(() => (
@@ -1419,6 +1430,10 @@ export default function AccountsScreen({ onBackStateChange }) {
 
 AccountsScreen.propTypes = {
   onBackStateChange: PropTypes.func,
+  // Which tab this instance lives on, so its refreshes can be deferred while
+  // that tab is hidden. The screen is mounted twice: as the Accounts tab, and
+  // as a Settings subpanel.
+  tabKey: PropTypes.string,
 };
 
 const styles = StyleSheet.create({

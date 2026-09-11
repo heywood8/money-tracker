@@ -2569,9 +2569,41 @@ export const calculatePlanStatus = async (planId, displayCurrency = null, conver
 };
 
 /**
+ * Compute the plan-vs-actual status for ONE month, keyed by plan ID so it drops
+ * into the same map the screen reads.
+ *
+ * The Budgets screen shows a single month, but its statuses were recomputed for
+ * every plan the user has ever had — one plan per month of history, each a full
+ * per-line walk — on every operation change. Months other than the one on screen
+ * are recomputed when the user navigates to them.
+ *
+ * @param {string} month - YYYY-MM.
+ * @param {boolean} [convertAll=false]
+ * @param {?string} [displayCurrency=null] - see calculateAllPlanStatuses.
+ * @returns {Promise<Map<string, Object>>} Empty when the month has no plan.
+ */
+export const calculatePlanStatusesForMonth = async (month, convertAll = false, displayCurrency = null) => {
+  const statusMap = new Map();
+  if (!month) return statusMap;
+  try {
+    const plan = await getPlanByMonth(month);
+    if (!plan) return statusMap;
+    const status = await calculatePlanStatus(plan.id, displayCurrency || plan.currency, convertAll);
+    statusMap.set(plan.id, status);
+    return statusMap;
+  } catch (error) {
+    console.error(`Failed to calculate status for month ${month}:`, error);
+    return statusMap;
+  }
+};
+
+/**
  * Compute plan-vs-actual statuses for all plans, keyed by plan ID. A single
  * failing plan is logged and skipped so the rest still refresh (same contract as
  * calculateAllBudgetStatuses).
+ *
+ * Kept for callers that genuinely need every month. The Budgets screen does not
+ * — see {@link calculatePlanStatusesForMonth}.
  * @param {boolean} [convertAll=false]
  * @param {?string} [displayCurrency=null] - Currency to express every status in.
  *   Null (the default) keeps each plan in its own stored currency. The Budgets

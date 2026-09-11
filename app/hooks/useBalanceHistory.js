@@ -2,6 +2,7 @@ import { useState, useCallback, useEffect, useMemo, useRef } from 'react';
 import { upsertBalanceHistory, deleteBalanceHistory, formatDate } from '../services/BalanceHistoryDB';
 import { createBalanceHistorySource, isNetWorthSelection } from '../services/BalanceHistorySource';
 import { appEvents, EVENTS } from '../services/eventEmitter';
+import { useTabFocusedEvent } from '../contexts/TabFocusContext';
 
 // Median of a numeric list; even counts average the two middle values.
 // Exported for unit testing.
@@ -756,14 +757,10 @@ const useBalanceHistory = (selectedAccount, selectedYear, selectedMonth, options
     }
   }, [selectedAccount, isNetWorth, loadBalanceHistory]);
 
-  // Listen for operation changes and reload balance history
-  useEffect(() => {
-    const unsubscribe = appEvents.on(EVENTS.OPERATION_CHANGED, () => {
-      loadBalanceHistory();
-    });
-
-    return unsubscribe;
-  }, [loadBalanceHistory]);
+  // Reload on an operation change, but only while the Graphs tab is on screen.
+  // In net-worth mode this fans out to one query per account plus a possible
+  // live-rate fetch; every quick-add on the Operations tab used to pay for it.
+  useTabFocusedEvent('Graphs', EVENTS.OPERATION_CHANGED, loadBalanceHistory);
 
   return {
     balanceHistoryData,

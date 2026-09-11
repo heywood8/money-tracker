@@ -2,6 +2,7 @@ import { useState, useCallback, useMemo, useEffect } from 'react';
 import { getIncomeByCategoryAndCurrency } from '../services/OperationsDB';
 import { formatDate } from '../services/BalanceHistoryDB';
 import { appEvents, EVENTS } from '../services/eventEmitter';
+import { useTabFocusedEvent } from '../contexts/TabFocusContext';
 import * as Currency from '../services/currency';
 import { seriesColorForSlot } from '../styles/chartPalette';
 import { getCategoryColorSlot } from '../utils/categoryUtils';
@@ -138,12 +139,8 @@ const useIncomeData = (selectedYear, selectedMonth, selectedCurrency, selectedIn
     [incomeChartData],
   );
 
-  useEffect(() => {
-    const unsubscribe = appEvents.on(EVENTS.OPERATION_CHANGED, () => {
-      loadIncomeData();
-    });
-    return unsubscribe;
-  }, [loadIncomeData]);
+  // Only while the Graphs tab is on screen; deferred to the next visit otherwise.
+  useTabFocusedEvent('Graphs', EVENTS.OPERATION_CHANGED, loadIncomeData);
 
   return {
     incomeChartData,

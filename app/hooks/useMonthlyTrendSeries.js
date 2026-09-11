@@ -3,6 +3,7 @@ import { getEarliestTrendMonth, getMonthlyTotalsHistoryByCategories } from '../s
 import * as Currency from '../services/currency';
 import { getAllDescendants } from '../services/CategoriesDB';
 import { appEvents, EVENTS } from '../services/eventEmitter';
+import { useTabFocusedEvent } from '../contexts/TabFocusContext';
 
 /**
  * Sentinel category id meaning "every category on this side of the ledger", not
@@ -145,14 +146,10 @@ const useMonthlyTrendSeries = (
     return parseFloat(total) || 0;
   }, [monthlyData]);
 
-  // Listen for operation changes and reload data
-  useEffect(() => {
-    const unsubscribe = appEvents.on(EVENTS.OPERATION_CHANGED, () => {
-      loadData();
-    });
-
-    return unsubscribe;
-  }, [loadData]);
+  // Reload on an operation change, but only while the Graphs tab is on screen.
+  // TrendsCard mounts two of these, each doing a descendant walk and a totals
+  // pass over the whole history.
+  useTabFocusedEvent('Graphs', EVENTS.OPERATION_CHANGED, loadData);
 
   // Load data when dependencies change
   useEffect(() => {
