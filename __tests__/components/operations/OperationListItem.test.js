@@ -50,21 +50,21 @@ describe('OperationListItem', () => {
   describe('Suggestion Row Rendering', () => {
     it('renders without suggestion row when suggestionChips is not provided', async () => {
       const { queryByLabelText } = await render(<OperationListItem {...baseProps} />);
-      expect(queryByLabelText('dismiss suggestion')).toBeNull();
+      expect(queryByLabelText('dismiss_suggestion')).toBeNull();
     });
 
     it('renders without suggestion row when suggestionChips is null', async () => {
       const { queryByLabelText } = await render(
         <OperationListItem {...baseProps} suggestionChips={null} />,
       );
-      expect(queryByLabelText('dismiss suggestion')).toBeNull();
+      expect(queryByLabelText('dismiss_suggestion')).toBeNull();
     });
 
     it('renders without suggestion row when suggestionChips is empty array', async () => {
       const { queryByLabelText } = await render(
         <OperationListItem {...baseProps} suggestionChips={[]} />,
       );
-      expect(queryByLabelText('dismiss suggestion')).toBeNull();
+      expect(queryByLabelText('dismiss_suggestion')).toBeNull();
     });
 
     it('renders suggestion row with chips when suggestionChips is provided', async () => {
@@ -76,7 +76,7 @@ describe('OperationListItem', () => {
           onDismissSuggestion={jest.fn()}
         />,
       );
-      expect(getByLabelText('dismiss suggestion')).toBeTruthy();
+      expect(getByLabelText('dismiss_suggestion')).toBeTruthy();
       expect(getByText('Monthly pass')).toBeTruthy();
       expect(getByText('Bus fare')).toBeTruthy();
     });
@@ -107,7 +107,7 @@ describe('OperationListItem', () => {
           onDismissSuggestion={onDismissSuggestion}
         />,
       );
-      await fireEvent.press(getByLabelText('dismiss suggestion'));
+      await fireEvent.press(getByLabelText('dismiss_suggestion'));
       expect(onDismissSuggestion).toHaveBeenCalledTimes(1);
     });
 
@@ -341,7 +341,7 @@ describe('OperationListItem', () => {
           onDismissSuggestion={undefined}
         />,
       );
-      expect(getByLabelText('dismiss suggestion')).toBeTruthy();
+      expect(getByLabelText('dismiss_suggestion')).toBeTruthy();
     });
   });
 

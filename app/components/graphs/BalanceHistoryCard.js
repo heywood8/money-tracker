@@ -20,7 +20,7 @@ import {
 import { runOnJS, useAnimatedReaction, useDerivedValue } from 'react-native-reanimated';
 import Icon from '@expo/vector-icons/MaterialCommunityIcons';
 import SimplePicker from '../SimplePicker';
-import currencies from '../../../assets/currencies.json';
+import * as Currency from '../../services/currency';
 import { useDisplaySettings } from '../../contexts/DisplaySettingsContext';
 import { getJsonPreference, setJsonPreference, PREF_KEYS } from '../../services/PreferencesDB';
 import { isNetWorthSelection } from '../../services/BalanceHistorySource';
@@ -51,23 +51,14 @@ const ACCOUNT_PICKER_HIT_SLOP = { bottom: 22, left: 8 };
 // view's labels are thinned against the width they actually have.
 const Y_AXIS_ALLOWANCE = 44;
 
-// Helper to format numbers compactly (e.g., 10K, 1.5M)
-const formatCompact = (value, currency) => {
-  if (value === null || value === undefined) return '-';
-  const currencyInfo = currencies[currency];
-  const decimals = currencyInfo?.decimal_digits ?? 2;
-
-  const absValue = Math.abs(value);
-  let formatted;
-  if (absValue >= 1000000) {
-    formatted = (value / 1000000).toFixed(1) + 'M';
-  } else if (absValue >= 1000) {
-    formatted = (value / 1000).toFixed(1) + 'K';
-  } else {
-    formatted = value.toFixed(Math.min(decimals, 2));
-  }
-  return formatted;
-};
+// Compact, no symbol: these sit in a table whose column header already names
+// the currency. The '-' for a missing figure is this card's own, formatMoney
+// has no opinion on absent data.
+const formatCompact = (value, currency, language) => (
+  value === null || value === undefined
+    ? '-'
+    : Currency.formatMoney(value, currency, { language, compact: true, symbol: false })
+);
 
 // Step sizes the y-axis is allowed to use, as multiples of the order of
 // magnitude. The half-steps matter: without them the ladder jumps straight from
@@ -105,23 +96,10 @@ const calculateNiceScale = (maxValue) => {
   return { max: niceMax, interval: niceInterval };
 };
 
-// Format balance for card header: symbol-prefixed, compact (e.g. ֏322.6K, $11.5M)
-const formatBalanceCompact = (amount, currency) => {
-  const currencyInfo = currencies[currency];
-  const symbol = currencyInfo?.symbol ?? currency;
-  const absValue = Math.abs(amount);
-  let formatted;
-  if (absValue >= 1_000_000_000) {
-    formatted = (amount / 1_000_000_000).toFixed(1) + 'B';
-  } else if (absValue >= 1_000_000) {
-    formatted = (amount / 1_000_000).toFixed(1) + 'M';
-  } else if (absValue >= 1_000) {
-    formatted = (amount / 1_000).toFixed(1) + 'K';
-  } else {
-    formatted = Math.round(amount).toString();
-  }
-  return `${symbol}${formatted}`;
-};
+// Card header: symbol-prefixed and compact (e.g. ֏322.6K, $11.5M).
+const formatBalanceCompact = (amount, currency, language) => (
+  Currency.formatMoney(amount, currency, { language, compact: true })
+);
 
 // One decimal on an axis tick, kept only when it says something: a 1.5M step
 // rounded to "2M" and printed the same label on two adjacent gridlines.
@@ -1163,7 +1141,7 @@ const BalanceHistoryCard = ({
   const balanceLabel = t('balance') || 'Balance';
   const balanceAccessibilityLabel = hideBalances || headerBalance === null
     ? balanceLabel
-    : `${balanceLabel}: ${formatBalanceCompact(headerBalance, currency)}`;
+    : `${balanceLabel}: ${formatBalanceCompact(headerBalance, currency, language)}`;
 
   const thirdLineLabel = effectiveThirdLine === 'prevMonth'
     ? (t('prev_month') || 'Prev Month')
@@ -1203,11 +1181,11 @@ const BalanceHistoryCard = ({
                 numberOfLines={1}
                 accessibilityLabel={balanceAccessibilityLabel}
               >
-                {hideBalances ? '••••' : formatBalanceCompact(headerBalance, currency)}
+                {hideBalances ? '••••' : formatBalanceCompact(headerBalance, currency, language)}
               </Text>
               {showDayContext && (
                 <Text style={[styles.balanceDayContext, { color: colors.mutedText }]}>
-                  {`day ${headerDay}/${headerDaysInMonth}`}
+                  {`${t('day')} ${headerDay}/${headerDaysInMonth}`}
                 </Text>
               )}
               {scrubMonthLabel !== null && (
@@ -1362,10 +1340,10 @@ const BalanceHistoryCard = ({
                       <View style={[styles.legendDot, { backgroundColor: colors.primary }]} />
                       <Text style={[styles.legendTableLabel, { color: colors.text }]}>{t('actual') || 'Actual'}</Text>
                     </View>
-                    <Text style={[styles.legendTableValue, { color: colors.text }]}>{formatCompact(chartComputed.maxBalance, currency)}</Text>
-                    <Text style={[styles.legendTableValue, { color: colors.text }]}>{formatCompact(chartComputed.actualCurrent, currency)}</Text>
-                    <Text style={[styles.legendTableValue, { color: colors.text }]}>{formatCompact(chartComputed.actualDailyAvg, currency)}</Text>
-                    <Text style={[styles.legendTableValue, { color: colors.text }]}>{formatCompact(chartComputed.hasForecastData ? chartComputed.forecastEnd : chartComputed.actualEnd, currency)}</Text>
+                    <Text style={[styles.legendTableValue, { color: colors.text }]}>{formatCompact(chartComputed.maxBalance, currency, language)}</Text>
+                    <Text style={[styles.legendTableValue, { color: colors.text }]}>{formatCompact(chartComputed.actualCurrent, currency, language)}</Text>
+                    <Text style={[styles.legendTableValue, { color: colors.text }]}>{formatCompact(chartComputed.actualDailyAvg, currency, language)}</Text>
+                    <Text style={[styles.legendTableValue, { color: colors.text }]}>{formatCompact(chartComputed.hasForecastData ? chartComputed.forecastEnd : chartComputed.actualEnd, currency, language)}</Text>
                   </View>
 
                   {/* Plain avg row — the burndown norm, month view only (see
@@ -1376,10 +1354,10 @@ const BalanceHistoryCard = ({
                         <View style={[styles.legendDot, { backgroundColor: chartLineColors.norm }]} />
                         <Text style={[styles.legendTableLabel, { color: colors.text }]}>{t('plain_avg') || 'Plain avg'}</Text>
                       </View>
-                      <Text style={[styles.legendTableValue, { color: colors.text }]}>{formatCompact(chartComputed.plainAvgMax, currency)}</Text>
-                      <Text style={[styles.legendTableValue, { color: colors.text }]}>{formatCompact(chartComputed.plainAvgCurrent, currency)}</Text>
-                      <Text style={[styles.legendTableValue, { color: colors.text }]}>{formatCompact(chartComputed.plainAvgDaily, currency)}</Text>
-                      <Text style={[styles.legendTableValue, { color: colors.text }]}>{formatCompact(0, currency)}</Text>
+                      <Text style={[styles.legendTableValue, { color: colors.text }]}>{formatCompact(chartComputed.plainAvgMax, currency, language)}</Text>
+                      <Text style={[styles.legendTableValue, { color: colors.text }]}>{formatCompact(chartComputed.plainAvgCurrent, currency, language)}</Text>
+                      <Text style={[styles.legendTableValue, { color: colors.text }]}>{formatCompact(chartComputed.plainAvgDaily, currency, language)}</Text>
+                      <Text style={[styles.legendTableValue, { color: colors.text }]}>{formatCompact(0, currency, language)}</Text>
                     </View>
                   )}
 
@@ -1390,10 +1368,10 @@ const BalanceHistoryCard = ({
                         <View style={[styles.legendDot, { backgroundColor: chartLineColors.prevMonth }]} />
                         <Text style={[styles.legendTableLabel, { color: colors.text }]}>{t('prev_year') || 'Prev Year'}</Text>
                       </View>
-                      <Text style={[styles.legendTableValue, { color: colors.text }]}>{formatCompact(chartComputed.prevYearMax, currency)}</Text>
-                      <Text style={[styles.legendTableValue, { color: colors.text }]}>{formatCompact(chartComputed.prevYearCurrent, currency)}</Text>
-                      <Text style={[styles.legendTableValue, { color: colors.text }]}>{formatCompact(chartComputed.prevYearDailyAvg, currency)}</Text>
-                      <Text style={[styles.legendTableValue, { color: colors.text }]}>{formatCompact(chartComputed.prevYearEnd, currency)}</Text>
+                      <Text style={[styles.legendTableValue, { color: colors.text }]}>{formatCompact(chartComputed.prevYearMax, currency, language)}</Text>
+                      <Text style={[styles.legendTableValue, { color: colors.text }]}>{formatCompact(chartComputed.prevYearCurrent, currency, language)}</Text>
+                      <Text style={[styles.legendTableValue, { color: colors.text }]}>{formatCompact(chartComputed.prevYearDailyAvg, currency, language)}</Text>
+                      <Text style={[styles.legendTableValue, { color: colors.text }]}>{formatCompact(chartComputed.prevYearEnd, currency, language)}</Text>
                     </View>
                   )}
 
@@ -1404,10 +1382,10 @@ const BalanceHistoryCard = ({
                         <View style={[styles.legendDot, { backgroundColor: chartLineColors.prevMonth }]} />
                         <Text style={[styles.legendTableLabel, { color: colors.text }]}>{t('prev_month') || 'Prev Month'}</Text>
                       </View>
-                      <Text style={[styles.legendTableValue, { color: colors.text }]}>{formatCompact(chartComputed.prevMonthMax, currency)}</Text>
-                      <Text style={[styles.legendTableValue, { color: colors.text }]}>{formatCompact(chartComputed.prevMonthCurrent, currency)}</Text>
-                      <Text style={[styles.legendTableValue, { color: colors.text }]}>{formatCompact(chartComputed.prevMonthDailyAvg, currency)}</Text>
-                      <Text style={[styles.legendTableValue, { color: colors.text }]}>{formatCompact(chartComputed.prevMonthEnd, currency)}</Text>
+                      <Text style={[styles.legendTableValue, { color: colors.text }]}>{formatCompact(chartComputed.prevMonthMax, currency, language)}</Text>
+                      <Text style={[styles.legendTableValue, { color: colors.text }]}>{formatCompact(chartComputed.prevMonthCurrent, currency, language)}</Text>
+                      <Text style={[styles.legendTableValue, { color: colors.text }]}>{formatCompact(chartComputed.prevMonthDailyAvg, currency, language)}</Text>
+                      <Text style={[styles.legendTableValue, { color: colors.text }]}>{formatCompact(chartComputed.prevMonthEnd, currency, language)}</Text>
                     </View>
                   )}
 
@@ -1418,10 +1396,10 @@ const BalanceHistoryCard = ({
                         <View style={[styles.legendDot, { backgroundColor: chartLineColors.yearAvg }]} />
                         <Text style={[styles.legendTableLabel, { color: colors.text }]}>{t('year_avg') || 'Year avg'}</Text>
                       </View>
-                      <Text style={[styles.legendTableValue, { color: colors.text }]}>{formatCompact(chartComputed.yearAvgMax, currency)}</Text>
-                      <Text style={[styles.legendTableValue, { color: colors.text }]}>{formatCompact(chartComputed.yearAvgCurrent, currency)}</Text>
-                      <Text style={[styles.legendTableValue, { color: colors.text }]}>{formatCompact(chartComputed.yearAvgDailyAvg, currency)}</Text>
-                      <Text style={[styles.legendTableValue, { color: colors.text }]}>{formatCompact(chartComputed.yearAvgEnd, currency)}</Text>
+                      <Text style={[styles.legendTableValue, { color: colors.text }]}>{formatCompact(chartComputed.yearAvgMax, currency, language)}</Text>
+                      <Text style={[styles.legendTableValue, { color: colors.text }]}>{formatCompact(chartComputed.yearAvgCurrent, currency, language)}</Text>
+                      <Text style={[styles.legendTableValue, { color: colors.text }]}>{formatCompact(chartComputed.yearAvgDailyAvg, currency, language)}</Text>
+                      <Text style={[styles.legendTableValue, { color: colors.text }]}>{formatCompact(chartComputed.yearAvgEnd, currency, language)}</Text>
                     </View>
                   )}
                 </View>

@@ -900,6 +900,7 @@ const OperationFormFields = memo(({
       {renderAccountPickers()}
       <View style={disabledStyle}>
         <Calculator
+          t={t}
           value={values.amount}
           onValueChange={onAmountChange}
           colors={colors}

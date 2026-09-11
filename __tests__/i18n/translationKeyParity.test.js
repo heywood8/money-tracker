@@ -65,20 +65,14 @@ describe('i18n translation key parity', () => {
     });
   });
 
-  // Pre-existing gaps, untranslated in every locale but en/ru. Listed rather
-  // than skipped so the check below still fails on any NEW missing key; shrink
-  // this list as the strings get translated, never grow it.
-  const KNOWN_UNTRANSLATED = [
-    'resetting_database',
-    'database_reset_done',
-    'google_sheets_setup_export_now',
-  ];
-
+  // The allowlist that used to sit here held `resetting_database`,
+  // `database_reset_done` and `google_sheets_setup_export_now`, untranslated in
+  // nine of the eleven locales. They are translated now (#1711), so parity is
+  // unconditional: every locale defines exactly en.json's key set. Do not
+  // reintroduce an exemption list — add the string in all eleven files instead.
   describe.each(Object.keys(TRANSLATED))('%s.json vs en.json', (lang) => {
     it('defines every key present in en.json', () => {
-      const missing = enKeys.filter(
-        (key) => !(key in TRANSLATED[lang]) && !KNOWN_UNTRANSLATED.includes(key),
-      );
+      const missing = enKeys.filter((key) => !(key in TRANSLATED[lang]));
       expect(missing).toEqual([]);
     });
 

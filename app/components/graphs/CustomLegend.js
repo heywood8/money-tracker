@@ -2,28 +2,11 @@ import React from 'react';
 import { View, Text, StyleSheet, TouchableOpacity } from 'react-native';
 import PropTypes from 'prop-types';
 import Icon from '@expo/vector-icons/MaterialCommunityIcons';
-import currencies from '../../../assets/currencies.json';
+import * as Currency from '../../services/currency';
 import { useDisplaySettings } from '../../contexts/DisplaySettingsContext';
 import { BORDER_RADIUS, FONT_SIZE, SPACING } from '../../styles/designTokens';
 
-const formatCurrency = (amount, currency) => {
-  const currencyInfo = currencies[currency];
-  const symbol = currencyInfo?.symbol ?? currency;
-  const value = parseFloat(amount);
-  if (value >= 1000000000) {
-    return `${symbol}${(value / 1000000000).toFixed(1)}B`;
-  }
-  if (value >= 1000000) {
-    return `${symbol}${(value / 1000000).toFixed(1)}M`;
-  }
-  if (value >= 1000) {
-    return `${symbol}${(value / 1000).toFixed(1)}K`;
-  }
-  const decimals = currencyInfo?.decimal_digits ?? 2;
-  return `${symbol}${value.toFixed(decimals)}`;
-};
-
-const CustomLegend = ({ data, currency, colors, onItemPress, isClickable }) => {
+const CustomLegend = ({ data, currency, colors, language, t = (key) => key, onItemPress, isClickable }) => {
   const { hideBalances } = useDisplaySettings();
   const total = data.reduce((sum, item) => sum + item.amount, 0);
 
@@ -41,10 +24,10 @@ const CustomLegend = ({ data, currency, colors, onItemPress, isClickable }) => {
           onPress: () => onItemPress(item.categoryId),
           activeOpacity: 0.7,
           accessibilityRole: 'button',
-          accessibilityLabel: `View details for ${item.name}`,
+          accessibilityLabel: `${t('view_details_for')} ${item.name}`,
           accessibilityHint: item.hasChildren
-            ? 'Double tap to filter by this category'
-            : 'Double tap to view operations',
+            ? t('double_tap_to_filter_category')
+            : t('double_tap_to_view_operations'),
         } : {};
 
         return (
@@ -76,7 +59,7 @@ const CustomLegend = ({ data, currency, colors, onItemPress, isClickable }) => {
             {/* Amount column (fixed width) */}
             <View style={styles.amountColumn}>
               <Text style={[styles.legendAmount, { color: colors.text }]} numberOfLines={1}>
-                {hideBalances ? '••••' : formatCurrency(item.amount, currency)}
+                {hideBalances ? '••••' : Currency.formatMoney(item.amount, currency, { language, compact: true })}
               </Text>
             </View>
 
@@ -97,6 +80,8 @@ const CustomLegend = ({ data, currency, colors, onItemPress, isClickable }) => {
 };
 
 CustomLegend.propTypes = {
+  language: PropTypes.string,
+  t: PropTypes.func,
   data: PropTypes.arrayOf(
     PropTypes.shape({
       name: PropTypes.string,

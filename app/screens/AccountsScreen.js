@@ -642,9 +642,11 @@ export default function AccountsScreen({ onBackStateChange }) {
 
         if (sameCurrencyAccounts.length === 0) {
           // No same-currency accounts to transfer to
-          setNoCurrencyMatchMessage(
-            t('no_same_currency_account') || `This account has ${count} transaction(s) but there are no other accounts with the same currency (${accountToDeleteData.currency}). Please create another ${accountToDeleteData.currency} account first, or delete the transactions.`,
-          );
+          // `t()` falls back to the KEY, never to a falsy value, so the English
+          // sentence that used to sit behind `||` was unreachable in every
+          // language — including English. The translated string carries the
+          // whole message; the count and currency are in the row above it.
+          setNoCurrencyMatchMessage(t('no_same_currency_account'));
           setNoCurrencyMatchVisible(true);
           return;
         }
@@ -895,7 +897,8 @@ export default function AccountsScreen({ onBackStateChange }) {
     const sourceAccount = accounts.find(a => a.id === accountToDelete);
     const destAccount = accounts.find(a => a.id === transferConfirmDestinationId);
     if (!sourceAccount || !destAccount) return '';
-    return `${t('confirm_delete_and_transfer_message') || `This will permanently delete "${sourceAccount.name}" and irreversibly move ${operationCount} transaction(s) to "${destAccount.name}".\n\nThis action cannot be undone.`}`;
+    // See the note on no_same_currency_account: the `||` fallback was dead code.
+    return t('confirm_delete_and_transfer_message');
   }, [accountToDelete, transferConfirmDestinationId, accounts, operationCount, t]);
 
   // The card the rows sit in is drawn by the rows themselves — surface and side

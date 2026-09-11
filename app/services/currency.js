@@ -141,8 +141,16 @@ export const formatCompact = (amount) => {
   const magnitude = decimal.abs();
   const value = magnitude.toNumber();
 
-  for (const { suffix, divisor } of COMPACT_UNITS) {
+  for (let i = 0; i < COMPACT_UNITS.length; i++) {
+    let { suffix, divisor } = COMPACT_UNITS[i];
     if (value < divisor) continue;
+    // The unit is chosen by the raw magnitude, but ROUNDING can push the result
+    // into the next one: 999,950 is under a million, yet at this unit's
+    // precision it prints "1000K" — wider than the "1.0M" it becomes a cent
+    // later, and read as a thousand thousands. Step up when that happens.
+    if (i > 0 && magnitude.div(divisor).toNumber() >= 999.5) {
+      ({ suffix, divisor } = COMPACT_UNITS[i - 1]);
+    }
     // Scaled with Decimal, not native division: 1575/1000 is a hair under 1.575
     // in binary, so Number#toFixed(2) rounds it DOWN to "1.57" while the
     // arbitrary-precision path gives the "1.58" a reader expects.
@@ -158,6 +166,71 @@ export const formatCompact = (amount) => {
   }
 
   return `${sign}${magnitude.toFixed(0)}`;
+};
+
+/**
+ * The currency's display symbol, falling back to its code when it has none.
+ *
+ * @param {string} currencyCode
+ * @returns {string}
+ */
+export const getCurrencySymbol = (currencyCode) => (
+  currenciesData[currencyCode]?.symbol ?? currencyCode ?? ''
+);
+
+/**
+ * The app's ONE money formatter.
+ *
+ * Seven private versions of this used to live in the components that print
+ * money, and they disagreed at the edges: some grouped thousands and some did
+ * not, some compacted negatives and some printed them in full, one had no "B"
+ * rung, one printed "123456.78 USD" with no symbol at all, and one could render
+ * "$1000.0K". Every one of those is a figure the user compares against another
+ * figure on the same screen.
+ *
+ * @param {Decimal|string|number} amount
+ * @param {string} currencyCode - e.g. 'USD'. Decides both symbol and precision.
+ * @param {Object} [options]
+ * @param {string} [options.language] - The APP's language, not the device's, so
+ *   grouping and decimal separators follow what the user chose in Settings.
+ * @param {boolean} [options.compact] - Short magnitudes (`1.24M`) for aggregate
+ *   figures in tight space. Never for a per-line amount: "99K / 100K" throws
+ *   away the digits that make the comparison possible.
+ * @param {boolean} [options.symbol] - Set false for a bare number.
+ * @returns {string} e.g. `$1,234.50`, `-֏322.6K`
+ */
+export const formatMoney = (amount, currencyCode = 'USD', options = {}) => {
+  const { language, compact = false, symbol = true } = options;
+  const decimal = toDecimal(amount);
+  // The sign leads, before the symbol: `${symbol}${signed}` yields "$-12.34".
+  const sign = decimal.isNegative() && !decimal.isZero() ? '-' : '';
+  const prefix = symbol ? getCurrencySymbol(currencyCode) : '';
+  const magnitude = decimal.abs();
+
+  const decimals = getDecimalPlaces(currencyCode);
+
+  // Compact only where compacting says something. Below the smallest unit there
+  // is no magnitude to shorten, and rounding "500.50" to "501" would drop the
+  // minor units from a figure that still has room for them.
+  if (compact && magnitude.gte(COMPACT_UNITS[COMPACT_UNITS.length - 1].divisor)) {
+    return `${sign}${prefix}${formatCompact(magnitude)}`;
+  }
+
+  const fixed = magnitude.toFixed(decimals);
+  let body = fixed;
+  try {
+    // Grouped through Intl so a Russian or French user gets their own
+    // separators. Fed the already-rounded string so the grouping step cannot
+    // reintroduce a floating-point artefact.
+    body = Number(fixed).toLocaleString(language || undefined, {
+      minimumFractionDigits: decimals,
+      maximumFractionDigits: decimals,
+    });
+  } catch {
+    // Intl unavailable or the language tag is junk: the fixed string is correct,
+    // just ungrouped.
+  }
+  return `${sign}${prefix}${body}`;
 };
 
 /**

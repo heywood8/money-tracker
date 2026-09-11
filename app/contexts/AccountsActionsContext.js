@@ -6,6 +6,7 @@ import { dropAllTables, getDatabase, closeDatabase } from '../services/db';
 import { forceDeleteDatabase } from '../utils/emergencyReset';
 import { appEvents, EVENTS } from '../services/eventEmitter';
 import { useDialog } from './DialogContext';
+import { useLocalization } from './LocalizationContext';
 import { useAccountsData } from './AccountsDataContext';
 import { getDefaultAccountId, setDefaultAccountId } from '../services/PreferencesDB';
 
@@ -21,6 +22,7 @@ function validateAccount(account, t = (key) => key) {
 
 export const AccountsActionsProvider = ({ children }) => {
   const { showDialog } = useDialog();
+  const { t } = useLocalization();
   const {
     accounts,
     visibleAccounts,
@@ -52,13 +54,13 @@ export const AccountsActionsProvider = ({ children }) => {
     } catch (err) {
       console.error('Failed to add account:', err);
       showDialog(
-        'Error',
-        'Failed to create account. Please try again.',
-        [{ text: 'OK' }],
+        t('error'),
+        t('failed_to_create_account'),
+        [{ text: t('ok') }],
       );
       throw err;
     }
-  }, [_setAccounts, showDialog]);
+  }, [_setAccounts, showDialog, t]);
 
   const reloadAccounts = useCallback(async () => {
     try {
@@ -137,13 +139,13 @@ export const AccountsActionsProvider = ({ children }) => {
     } catch (err) {
       console.error('Failed to update account:', err);
       showDialog(
-        'Error',
-        'Failed to update account. Please try again.',
-        [{ text: 'OK' }],
+        t('error'),
+        t('failed_to_update_account'),
+        [{ text: t('ok') }],
       );
       throw err;
     }
-  }, [reloadAccounts, showDialog]);
+  }, [reloadAccounts, showDialog, t]);
 
   const deleteAccount = useCallback(async (id, transferToAccountId = null) => {
     try {
@@ -164,13 +166,13 @@ export const AccountsActionsProvider = ({ children }) => {
     } catch (err) {
       console.error('Failed to delete account:', err);
       showDialog(
-        'Error',
-        'Failed to delete account. Please try again.',
-        [{ text: 'OK' }],
+        t('error'),
+        t('failed_to_delete_account'),
+        [{ text: t('ok') }],
       );
       throw err;
     }
-  }, [_setAccounts, reloadAccounts, showDialog]);
+  }, [_setAccounts, reloadAccounts, showDialog, t]);
 
   const reorderAccounts = useCallback(async (newOrder) => {
     try {
@@ -214,13 +216,13 @@ export const AccountsActionsProvider = ({ children }) => {
       // Reload accounts to restore correct order
       await reloadAccounts();
       showDialog(
-        'Error',
-        'Failed to save new account order. Please try again.',
-        [{ text: 'OK' }],
+        t('error'),
+        t('failed_to_reorder_accounts'),
+        [{ text: t('ok') }],
       );
       throw err;
     }
-  }, [_setAccounts, reloadAccounts, showDialog]);
+  }, [_setAccounts, reloadAccounts, showDialog, t]);
 
   const resetDatabase = useCallback(async () => {
     try {
@@ -284,22 +286,22 @@ export const AccountsActionsProvider = ({ children }) => {
       await reloadAccounts();
 
       showDialog(
-        'Success',
-        'Database has been reset successfully.',
-        [{ text: 'OK' }],
+        t('success'),
+        t('database_reset_done'),
+        [{ text: t('ok') }],
       );
     } catch (err) {
       console.error('Failed to reset database:', err);
       showDialog(
-        'Error',
-        `Failed to reset database: ${err.message}`,
-        [{ text: 'OK' }],
+        t('error'),
+        `${t('failed_to_reset_database')}: ${err.message}`,
+        [{ text: t('ok') }],
       );
       throw err;
     } finally {
       _setLoading(false);
     }
-  }, [_initializeDefaultAccounts, _setAccounts, _setLoading, reloadAccounts, showDialog]);
+  }, [_initializeDefaultAccounts, _setAccounts, _setLoading, reloadAccounts, showDialog, t]);
 
   const getOperationCount = useCallback(async (accountId) => {
     try {

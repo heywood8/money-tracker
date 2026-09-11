@@ -96,6 +96,8 @@ const ExpensePieChart = ({
           data={chartData}
           currency={selectedCurrency}
           colors={colors}
+          language={language}
+          t={t}
           onItemPress={onLegendItemPress}
           isClickable
         />

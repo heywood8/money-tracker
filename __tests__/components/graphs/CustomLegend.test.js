@@ -260,22 +260,22 @@ describe('CustomLegend', () => {
       const { getByLabelText } = await render(
         <CustomLegend {...defaultProps} isClickable={true} />,
       );
-      expect(getByLabelText('View details for Food')).toBeTruthy();
+      expect(getByLabelText('view_details_for Food')).toBeTruthy();
     });
 
     it('has accessibility hint for clickable items', async () => {
       const { getByLabelText } = await render(
         <CustomLegend {...defaultProps} isClickable={true} />,
       );
-      const item = getByLabelText('View details for Food');
-      expect(item.props.accessibilityHint).toBe('Double tap to filter by this category');
+      const item = getByLabelText('view_details_for Food');
+      expect(item.props.accessibilityHint).toBe('double_tap_to_filter_category');
     });
 
     it('has accessibility role button for clickable items', async () => {
       const { getByLabelText } = await render(
         <CustomLegend {...defaultProps} isClickable={true} />,
       );
-      const item = getByLabelText('View details for Food');
+      const item = getByLabelText('view_details_for Food');
       expect(item.props.accessibilityRole).toBe('button');
     });
   });
@@ -340,13 +340,14 @@ describe('CustomLegend', () => {
     it('handles very large amounts (millions)', async () => {
       const largeData = [{ name: 'Big', amount: 1000000, color: '#000', categoryId: 'cat-1' }];
       const { getByText } = await render(<CustomLegend {...defaultProps} data={largeData} />);
-      expect(getByText('$1.0M')).toBeTruthy();
+      // The shared formatter strips trailing zeros: "1M", not "1.0M".
+      expect(getByText('$1M')).toBeTruthy();
     });
 
     it('handles billions', async () => {
       const billionData = [{ name: 'Huge', amount: 2000000000, color: '#000', categoryId: 'cat-1' }];
       const { getByText } = await render(<CustomLegend {...defaultProps} data={billionData} />);
-      expect(getByText('$2.0B')).toBeTruthy();
+      expect(getByText('$2B')).toBeTruthy();
     });
 
     it('handles items with missing optional fields', async () => {

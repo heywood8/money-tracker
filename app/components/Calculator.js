@@ -163,7 +163,7 @@ CalcButton.propTypes = {
  * - Shows "=" button when expression contains operations
  * - Evaluates expression and replaces with result
  */
-export default function Calculator({ value = '', onValueChange = () => {}, colors, placeholder = '0', onAdd = null, addDisabled = false, containerBackground = null, compact = false, currencyCode, onCurrencyPress, flashError = false }) {
+export default function Calculator({ t = (key) => key, value = '', onValueChange = () => {}, colors, placeholder = '0', onAdd = null, addDisabled = false, containerBackground = null, compact = false, currencyCode, onCurrencyPress, flashError = false }) {
   const [expression, setExpression] = useState(value || '');
   const syncedFromPropRef = useRef(false);
 
@@ -308,7 +308,7 @@ export default function Calculator({ value = '', onValueChange = () => {}, color
               style={styles.equalsButton}
               onPress={handleEqualsPress}
               accessibilityRole="button"
-              accessibilityLabel="equals"
+              accessibilityLabel={t('equals')}
             >
               <Text style={equalsButtonTextStyle}>=</Text>
             </Pressable>
@@ -458,7 +458,7 @@ export default function Calculator({ value = '', onValueChange = () => {}, color
               onPress={addDisabled ? undefined : () => onAdd()}
               disabled={addDisabled}
               accessibilityRole="button"
-              accessibilityLabel="add"
+              accessibilityLabel={t('add')}
               accessibilityState={{ disabled: addDisabled, busy: addDisabled }}
             >
               {addDisabled ? (
@@ -479,6 +479,7 @@ export default function Calculator({ value = '', onValueChange = () => {}, color
 Calculator.displayName = 'Calculator';
 
 Calculator.propTypes = {
+  t: PropTypes.func,
   value: PropTypes.oneOfType([PropTypes.string, PropTypes.number]),
   onValueChange: PropTypes.func,
   colors: PropTypes.object.isRequired,

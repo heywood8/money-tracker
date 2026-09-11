@@ -99,7 +99,8 @@ describe('ExpenseSummaryCard', () => {
         <ExpenseSummaryCard {...defaultProps} totalExpenses={1000.99} selectedCurrency="JPY" />,
       );
 
-      expect(getByText(/¥1\.0K/)).toBeTruthy();
+      // Shared formatter: ~3 significant characters, trailing zeros stripped.
+      expect(getByText(/¥1K/)).toBeTruthy();
     });
 
     it('formats BTC with full decimals when small', async () => {

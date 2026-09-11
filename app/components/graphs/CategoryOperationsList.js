@@ -3,7 +3,7 @@ import { View, Text, StyleSheet, ActivityIndicator, TouchableOpacity } from 'rea
 import { TouchableRipple } from 'react-native-paper';
 import Icon from '@expo/vector-icons/MaterialCommunityIcons';
 import PropTypes from 'prop-types';
-import currencies from '../../../assets/currencies.json';
+import * as Currency from '../../services/currency';
 import { parseLabels, visibleListLabels, displayLabel, isHiddenLabel } from '../../utils/labelUtils';
 import { useDisplaySettings } from '../../contexts/DisplaySettingsContext';
 import { add as addAmounts } from '../../services/currency';
@@ -41,21 +41,13 @@ const sumOf = (ops) => ops.reduce((sum, op) => addAmounts(sum, amountOf(op)), '0
 // Group digits ("₽100 000", not "₽100000"). The amounts here are exact rather
 // than the compact "₽100.0K" the charts use — this is the one place in Graphs
 // that shows individual operations, so the figure has to be readable in full.
-const formatOpAmount = (amount, currency, language) => {
-  const info = currencies[currency];
-  const symbol = info?.symbol ?? currency;
-  const decimals = info?.decimal_digits ?? 2;
-  const value = parseFloat(amount);
-  if (Number.isNaN(value)) return `${symbol}${amount}`;
-  try {
-    return `${symbol}${value.toLocaleString(language || undefined, {
-      minimumFractionDigits: decimals,
-      maximumFractionDigits: decimals,
-    })}`;
-  } catch {
-    return `${symbol}${value.toFixed(decimals)}`;
-  }
-};
+// A non-numeric amount is echoed back rather than rendered as NaN; formatMoney
+// has no such guard.
+const formatOpAmount = (amount, currency, language) => (
+  Number.isNaN(parseFloat(amount))
+    ? `${Currency.getCurrencySymbol(currency)}${amount}`
+    : Currency.formatMoney(amount, currency, { language })
+);
 
 // Format "day month" in the app's language. Formatting day + month together lets
 // ICU pick the *genitive* month form used in dates ("5 июля", not the standalone

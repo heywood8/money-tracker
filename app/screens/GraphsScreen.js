@@ -698,6 +698,7 @@ const GraphsScreen = () => {
                   loading={loading}
                   totalExpenses={totalExpenses}
                   selectedCurrency={selectedCurrency}
+                  language={language}
                   onPress={handleToggleExpense}
                   expanded={expandedCard === 'expense'}
                 />
@@ -708,6 +709,7 @@ const GraphsScreen = () => {
                   loadingIncome={loadingIncome}
                   totalIncome={totalIncome}
                   selectedCurrency={selectedCurrency}
+                  language={language}
                   onPress={handleToggleIncome}
                   expanded={expandedCard === 'income'}
                 />
@@ -854,6 +856,7 @@ const GraphsScreen = () => {
             <TrendsCard
               colors={colors}
               t={t}
+              language={language}
               selectedCurrency={selectedCurrency}
               selectedSeries={trendSeries}
               onSeriesChange={setTrendSeries}

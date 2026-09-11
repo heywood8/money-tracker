@@ -16,7 +16,7 @@ import { CHIP, CHIP_TEXT } from '../../styles/componentStyles';
 // the timer clears.
 export const SUGGESTION_TIMEOUT_MS = 120000;
 
-const DescriptionSuggestionRow = ({ chips, colors, onApply, onDismiss }) => {
+const DescriptionSuggestionRow = ({ chips, colors, t = (key) => key, onApply, onDismiss }) => {
   // Entry polish only (rise into place). Like UndoSnackbar, this row is
   // inserted into an already-mounted virtualized list cell, where a
   // native-driver animation can fail to attach — so visibility must never
@@ -55,7 +55,7 @@ const DescriptionSuggestionRow = ({ chips, colors, onApply, onDismiss }) => {
             onPress={onDismiss}
             style={[styles.chip, styles.dismissChip, { borderColor: colors.border, backgroundColor: colors.surface }]}
             accessibilityRole="button"
-            accessibilityLabel="dismiss suggestion"
+            accessibilityLabel={t('dismiss_suggestion')}
           >
             <Text style={[styles.chipText, { color: colors.mutedText }]}>✕</Text>
           </TouchableOpacity>
@@ -74,7 +74,7 @@ const DescriptionSuggestionRow = ({ chips, colors, onApply, onDismiss }) => {
                 onPress={() => onApply(chip)}
                 style={[styles.chip, { borderColor: colors.border, backgroundColor: colors.surface }]}
                 accessibilityRole="button"
-                accessibilityLabel={`label: ${displayLabel(chip)}`}
+                accessibilityLabel={`${t('label')}: ${displayLabel(chip)}`}
               >
                 <Text style={[styles.chipText, { color: colors.primary }]} numberOfLines={1}>{displayLabel(chip)}</Text>
               </TouchableOpacity>
@@ -119,6 +119,7 @@ const styles = StyleSheet.create({
 });
 
 DescriptionSuggestionRow.propTypes = {
+  t: PropTypes.func,
   chips: PropTypes.arrayOf(PropTypes.string).isRequired,
   colors: PropTypes.shape({
     border: PropTypes.string.isRequired,

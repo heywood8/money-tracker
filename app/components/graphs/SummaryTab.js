@@ -2,23 +2,9 @@ import React from 'react';
 import { View, Text, StyleSheet, TouchableOpacity } from 'react-native';
 import Icon from '@expo/vector-icons/MaterialCommunityIcons';
 import PropTypes from 'prop-types';
-import currencies from '../../../assets/currencies.json';
+import * as Currency from '../../services/currency';
 import { useDisplaySettings } from '../../contexts/DisplaySettingsContext';
 import { FONT_SIZE, SPACING } from '../../styles/designTokens';
-
-const formatCurrency = (amount, currency) => {
-  const currencyInfo = currencies[currency];
-  const symbol = currencyInfo?.symbol ?? currency;
-  const value = parseFloat(amount);
-  if (value >= 1000000) {
-    return `${symbol}${(value / 1000000).toFixed(1)}M`;
-  }
-  if (value >= 1000) {
-    return `${symbol}${(value / 1000).toFixed(1)}K`;
-  }
-  const decimals = currencyInfo?.decimal_digits ?? 2;
-  return `${symbol}${value.toFixed(decimals)}`;
-};
 
 /**
  * One half of the income/expense tab strip. The whole tab is the press target —
@@ -40,6 +26,7 @@ const SummaryTab = ({
   amount,
   loading,
   selectedCurrency,
+  language,
   onPress,
   expanded = false,
 }) => {
@@ -63,7 +50,7 @@ const SummaryTab = ({
       <View style={styles.textContent}>
         <Text style={[styles.label, { color: colors.mutedText }]}>{label}</Text>
         <Text style={[styles.amount, { color: colors.text }]}>
-          {hideBalances ? '••••' : (loading ? '...' : formatCurrency(amount, selectedCurrency))}
+          {hideBalances ? '••••' : (loading ? '...' : Currency.formatMoney(amount, selectedCurrency, { language, compact: true }))}
         </Text>
       </View>
       <View style={styles.chevron} pointerEvents="none">
@@ -83,6 +70,7 @@ SummaryTab.propTypes = {
   amount: PropTypes.number.isRequired,
   loading: PropTypes.bool.isRequired,
   selectedCurrency: PropTypes.string.isRequired,
+  language: PropTypes.string,
   onPress: PropTypes.func.isRequired,
   expanded: PropTypes.bool,
 };

@@ -178,9 +178,9 @@ describe('AccountsContext', () => {
       })).rejects.toThrow('Add failed');
 
       expect(mockShowDialog).toHaveBeenCalledWith(
-        'Error',
-        'Failed to create account. Please try again.',
-        [{ text: 'OK' }],
+        'error',
+        'failed_to_create_account',
+        [{ text: 'ok' }],
       );
     });
   });
@@ -267,9 +267,9 @@ describe('AccountsContext', () => {
       })).rejects.toThrow('Update failed');
 
       expect(mockShowDialog).toHaveBeenCalledWith(
-        'Error',
-        'Failed to update account. Please try again.',
-        [{ text: 'OK' }],
+        'error',
+        'failed_to_update_account',
+        [{ text: 'ok' }],
       );
     });
   });
@@ -350,9 +350,9 @@ describe('AccountsContext', () => {
       })).rejects.toThrow('Delete failed');
 
       expect(mockShowDialog).toHaveBeenCalledWith(
-        'Error',
-        'Failed to delete account. Please try again.',
-        [{ text: 'OK' }],
+        'error',
+        'failed_to_delete_account',
+        [{ text: 'ok' }],
       );
     });
   });

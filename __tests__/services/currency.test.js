@@ -118,6 +118,101 @@ describe('Currency Service', () => {
     });
   });
 
+  describe('formatCompact rounding promotion (#1711)', () => {
+    // A value just under a million is not a million, but at the K unit's
+    // precision it PRINTS as one: "1000K" is wider than the "1.0M" it becomes a
+    // cent later and reads as a thousand thousands. CustomLegend and SummaryTab
+    // both shipped that; TrendsCard had fixed it privately.
+    it('steps up a unit when rounding reaches the next one', async () => {
+      expect(Currency.formatCompact('999950')).toBe('1M');
+      expect(Currency.formatCompact('999999')).toBe('1M');
+      expect(Currency.formatCompact('999999999')).toBe('1B');
+      expect(Currency.formatCompact('-999950')).toBe('-1M');
+    });
+
+    it('leaves values that do not round up on their own unit', async () => {
+      expect(Currency.formatCompact('999400')).toBe('999K');
+      expect(Currency.formatCompact('998000')).toBe('998K');
+    });
+
+    // Below the smallest unit there is no larger one to step into, so a value
+    // just under a thousand stays a plain integer.
+    it('does not promote out of the plain-integer range', async () => {
+      expect(Currency.formatCompact('999.6')).toBe('1000');
+    });
+  });
+
+  describe('add precision when accumulating (#1711)', () => {
+    // A running total must be summed EXACT and rounded once at display. Passing
+    // the currency to `add` rounds at every step, and for a 0-decimal currency
+    // (JPY, RUB, AMD, KRW — which a CSV or JSON restore can still carry
+    // fractional amounts for) the error compounds per row. This is why the day
+    // totals in OperationsScreen call the two-argument form.
+    const sumThree = (currencyCode) => {
+      let total = '0';
+      for (let i = 0; i < 3; i++) {
+        total = currencyCode
+          ? Currency.add(total, '100.50', currencyCode)
+          : Currency.add(total, '100.50');
+      }
+      return total;
+    };
+
+    it('keeps the exact total when no currency is given', async () => {
+      expect(sumThree(null)).toBe('301.50');
+    });
+
+    it('compounds a rounding error when the currency rounds every step', async () => {
+      // 303, not the 302 that 301.50 rounds to — three separate roundings.
+      expect(sumThree('JPY')).toBe('303');
+      expect(Currency.formatAmount('301.50', 'JPY')).toBe('302');
+    });
+  });
+
+  describe('formatMoney (#1711)', () => {
+    it('prefixes the symbol and groups thousands', async () => {
+      expect(Currency.formatMoney('1234.5', 'USD', { language: 'en' })).toBe('$1,234.50');
+      expect(Currency.formatMoney('0', 'USD', { language: 'en' })).toBe('$0.00');
+    });
+
+    it('honours the currency decimal digits', async () => {
+      // AMD has no minor unit.
+      expect(Currency.formatMoney('1234', 'AMD', { language: 'en' })).toBe('֏1,234');
+    });
+
+    it('puts the sign before the symbol, never after it', async () => {
+      expect(Currency.formatMoney('-12.34', 'USD', { language: 'en' })).toBe('-$12.34');
+      expect(Currency.formatMoney('-1500', 'USD', { language: 'en', compact: true })).toBe('-$1.5K');
+    });
+
+    it('compacts aggregates, negatives included', async () => {
+      expect(Currency.formatMoney('1240000', 'USD', { language: 'en', compact: true })).toBe('$1.24M');
+      // Below the smallest compact unit there is no magnitude to shorten, and
+      // dropping the minor units off a three-digit figure only loses detail.
+      expect(Currency.formatMoney('842', 'USD', { language: 'en', compact: true })).toBe('$842.00');
+      expect(Currency.formatMoney('500.5', 'USD', { language: 'en', compact: true })).toBe('$500.50');
+    });
+
+    it('omits the symbol on request', async () => {
+      expect(Currency.formatMoney('1234.5', 'USD', { language: 'en', symbol: false })).toBe('1,234.50');
+    });
+
+    it('groups in the app language rather than the device locale', async () => {
+      // Russian groups with a narrow no-break space and a comma decimal mark.
+      const ru = Currency.formatMoney('1234.5', 'USD', { language: 'ru' });
+      expect(ru).toContain(',5');
+      expect(ru).not.toBe(Currency.formatMoney('1234.5', 'USD', { language: 'en' }));
+    });
+
+    it('falls back to an ungrouped figure for a junk language tag', async () => {
+      expect(Currency.formatMoney('1234.5', 'USD', { language: '@@@' })).toBe('$1234.50');
+    });
+
+    it('renders an unknown currency code as its own prefix', async () => {
+      expect(Currency.formatMoney('10', 'XYZ', { language: 'en' })).toBe('XYZ10.00');
+    });
+  });
+
   describe('formatCompact', () => {
     it('leaves amounts below a thousand exact and integral', async () => {
       expect(Currency.formatCompact('0')).toBe('0');

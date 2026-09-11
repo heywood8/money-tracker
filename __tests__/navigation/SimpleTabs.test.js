@@ -404,13 +404,13 @@ describe('SimpleTabs Component Rendering', () => {
     expect(getByTestId('operations-screen')).toBeTruthy();
 
     // Switching tabs keeps each screen present
-    await act(async () => { fireEvent(getByTestId('tab-Graphs'), 'pressIn'); });
+    await act(async () => { fireEvent.press(getByTestId('tab-Graphs')); });
     await waitFor(() => expect(getByTestId('graphs-screen')).toBeTruthy());
 
-    await act(async () => { fireEvent(getByTestId('tab-budget'), 'pressIn'); });
+    await act(async () => { fireEvent.press(getByTestId('tab-budget')); });
     await waitFor(() => expect(getByTestId('budget-screen')).toBeTruthy());
 
-    await act(async () => { fireEvent(getByTestId('tab-settings'), 'pressIn'); });
+    await act(async () => { fireEvent.press(getByTestId('tab-settings')); });
     await waitFor(() => expect(getByTestId('settings-screen')).toBeTruthy());
   });
 
@@ -477,7 +477,7 @@ describe('SimpleTabs Component Rendering', () => {
     it('keeps the tab buttons tappable through the blocking wrapper', async () => {
       const { getByTestId } = await render(<SimpleTabs />);
 
-      await act(async () => { fireEvent(getByTestId('tab-Graphs'), 'pressIn'); });
+      await act(async () => { fireEvent.press(getByTestId('tab-Graphs')); });
 
       await waitFor(() => expect(getByTestId('graphs-screen')).toBeTruthy());
     });
@@ -543,9 +543,8 @@ describe('SimpleTabs Component Rendering', () => {
   it('handles tab press callback correctly', async () => {
     const { getByTestId } = await render(<SimpleTabs />);
 
-    // pressIn matches the actual onPressIn handler on TabButton
     await act(async () => {
-      fireEvent(getByTestId('tab-Graphs'), 'pressIn');
+      fireEvent.press(getByTestId('tab-Graphs'));
     });
 
     // Graphs screen is present after activating its tab
@@ -587,7 +586,7 @@ describe('SimpleTabs Component Rendering', () => {
     const { getByText, getByTestId } = await render(<SimpleTabs />);
 
     await act(async () => {
-      fireEvent(getByTestId('tab-Graphs'), 'pressIn');
+      fireEvent.press(getByTestId('tab-Graphs'));
     });
 
     await waitFor(() => {
@@ -633,11 +632,37 @@ describe('SimpleTabs Component Rendering', () => {
     expect(graphsTab.props.accessibilityLabel).toBe('Graphs');
   });
 
-  it('activates adjacent tab on pressIn', async () => {
+  // Regression for issue #1711: the tab bar handled `onPressIn` and nothing
+  // else. React Native routes an accessibility click to `onPress` only, so a
+  // TalkBack double-tap announced the tab and then did nothing at all.
+  it('switches tabs through onPress, the handler TalkBack activates', async () => {
+    const { getByTestId } = await render(<SimpleTabs />);
+    const graphsTab = getByTestId('tab-Graphs');
+    expect(graphsTab.props.accessibilityRole).toBe('button');
+
+    // fireEvent.press is the same path an accessibility click takes.
+    await act(async () => { fireEvent.press(graphsTab); });
+
+    await waitFor(() => {
+      expect(getByTestId('tab-Graphs').props.accessibilityState).toEqual({ selected: true });
+    });
+  });
+
+  // The other half: a swipe that merely STARTED on the bar used to switch tabs
+  // on touch-down, before the gesture could be recognised as a swipe.
+  it('does not switch on touch-down alone', async () => {
+    const { getByTestId } = await render(<SimpleTabs />);
+
+    await act(async () => { fireEvent(getByTestId('tab-Graphs'), 'pressIn'); });
+
+    expect(getByTestId('tab-Graphs').props.accessibilityState).toEqual({ selected: false });
+  });
+
+  it('activates adjacent tab on press', async () => {
     const { getByTestId } = await render(<SimpleTabs />);
 
     // Operations is active by default; Graphs is adjacent (distance=1)
-    fireEvent(getByTestId('tab-Graphs'), 'pressIn');
+    fireEvent.press(getByTestId('tab-Graphs'));
 
     await waitFor(() => {
       // Graphs tab should now be selected
@@ -645,11 +670,11 @@ describe('SimpleTabs Component Rendering', () => {
     });
   });
 
-  it('activates non-adjacent tab via overlay on pressIn', async () => {
+  it('activates non-adjacent tab via overlay on press', async () => {
     const { getByTestId } = await render(<SimpleTabs />);
 
     // Operations (index 0) → Budget (index 2) — distance=2, triggers overlay path
-    fireEvent(getByTestId('tab-budget'), 'pressIn');
+    fireEvent.press(getByTestId('tab-budget'));
 
     await waitFor(() => {
       expect(getByTestId('tab-budget').props.accessibilityState).toEqual({ selected: true });
@@ -1822,7 +1847,7 @@ describe('SimpleTabs deep link to the review deck', () => {
 
   it('switches to Operations when a tapped review notification routes here', async () => {
     const { getByTestId } = await render(<SimpleTabs />);
-    await act(async () => { fireEvent(getByTestId('tab-settings'), 'pressIn'); });
+    await act(async () => { fireEvent.press(getByTestId('tab-settings')); });
     await waitFor(() => {
       expect(getByTestId('tab-settings').props.accessibilityState).toEqual({ selected: true });
     });
@@ -1844,10 +1869,10 @@ describe('SimpleTabs deep link to the review deck', () => {
     const { getByTestId } = await render(<SimpleTabs />);
 
     // Operations (0) → Settings (3): the non-adjacent path, spring interrupted.
-    await act(async () => { fireEvent(getByTestId('tab-settings'), 'pressIn'); });
+    await act(async () => { fireEvent.press(getByTestId('tab-settings')); });
 
     global.__mockSpringFinished = true;
-    await act(async () => { fireEvent(getByTestId('tab-Graphs'), 'pressIn'); });
+    await act(async () => { fireEvent.press(getByTestId('tab-Graphs')); });
 
     await waitFor(() => {
       expect(getByTestId('tab-Graphs').props.accessibilityState).toEqual({ selected: true });
@@ -1856,7 +1881,7 @@ describe('SimpleTabs deep link to the review deck', () => {
 
   it('switches to Operations when a tapped "operations added" notification routes here', async () => {
     const { getByTestId } = await render(<SimpleTabs />);
-    await act(async () => { fireEvent(getByTestId('tab-settings'), 'pressIn'); });
+    await act(async () => { fireEvent.press(getByTestId('tab-settings')); });
     await waitFor(() => {
       expect(getByTestId('tab-settings').props.accessibilityState).toEqual({ selected: true });
     });
@@ -1874,7 +1899,7 @@ describe('SimpleTabs deep link to the review deck', () => {
     global.__mockSpringPending = true;
     const { getByTestId } = await render(<SimpleTabs />);
 
-    await act(async () => { fireEvent(getByTestId('tab-settings'), 'pressIn'); });
+    await act(async () => { fireEvent.press(getByTestId('tab-settings')); });
     await waitFor(() => {
       expect(getByTestId('tab-settings').props.accessibilityState).toEqual({ selected: true });
     });
@@ -1893,7 +1918,7 @@ describe('SimpleTabs deep link to the review deck', () => {
     global.__mockSpringPending = true;
     const { getByTestId } = await render(<SimpleTabs />);
 
-    await act(async () => { fireEvent(getByTestId('tab-settings'), 'pressIn'); });
+    await act(async () => { fireEvent.press(getByTestId('tab-settings')); });
     await waitFor(() => {
       expect(getByTestId('tab-settings').props.accessibilityState).toEqual({ selected: true });
     });

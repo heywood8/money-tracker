@@ -143,6 +143,11 @@ UpdateProgressIcon.propTypes = {
 
 // Memoized tab button with icon + label, pill active state
 const TabButton = memo(({ tab, isActive = false, colors, onPress = () => {}, isUpdating = false, updatePhase = null, updateProgress = null }) => {
+  // `onPress`, not `onPressIn`. Switching on touch-DOWN felt instant, but it
+  // broke the tab bar two ways: React Native routes an accessibility click to
+  // `onPress` only, so a TalkBack double-tap announced the tab and then nothing
+  // happened; and a swipe that merely *started* on the bar switched tabs before
+  // the gesture could be recognised as a swipe.
   const handlePress = useCallback(() => {
     onPress(tab.key);
   }, [onPress, tab.key]);
@@ -160,7 +165,7 @@ const TabButton = memo(({ tab, isActive = false, colors, onPress = () => {}, isU
   return (
     <TouchableRipple
       style={styles.tab}
-      onPressIn={handlePress}
+      onPress={handlePress}
       rippleColor={colors.ripple}
       borderless
       accessibilityRole="button"

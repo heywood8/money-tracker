@@ -112,7 +112,7 @@ describe('DateSeparator', () => {
       );
 
       // JPY has 0 decimal digits, USD has 2
-      expect(getByText('-¥1000, -$50.50')).toBeTruthy();
+      expect(getByText('-¥1,000, -$50.50')).toBeTruthy();
     });
 
     it('handles currency with many decimal places (BTC)', async () => {
@@ -161,7 +161,7 @@ describe('DateSeparator', () => {
         <DateSeparator {...defaultProps} spendingSums={spendingSums} />,
       );
 
-      expect(getByText('-₽1500.50')).toBeTruthy();
+      expect(getByText('-₽1,500.50')).toBeTruthy();
     });
 
     it('falls back to currency code for unknown currencies', async () => {
@@ -228,6 +228,9 @@ describe('DateSeparator', () => {
     });
   });
 
+  // Money and a11y strings now come from the shared formatter and t() (#1711):
+  // figures are grouped in the app's language, and the hint is a key the host's
+  // t() resolves (the identity default echoes it here).
   describe('Accessibility', () => {
     it('has button accessibility role', async () => {
       const { getByRole } = await render(<DateSeparator {...defaultProps} />);
@@ -239,7 +242,7 @@ describe('DateSeparator', () => {
       const { getByLabelText } = await render(<DateSeparator {...defaultProps} />);
 
       expect(
-        getByLabelText('Formatted: 2024-01-15, press to select date'),
+        getByLabelText('Formatted: 2024-01-15'),
       ).toBeTruthy();
     });
 
@@ -247,7 +250,7 @@ describe('DateSeparator', () => {
       const { getByA11yHint } = await render(<DateSeparator {...defaultProps} />);
 
       expect(
-        getByA11yHint('Opens date picker to jump to a specific date'),
+        getByA11yHint('jump_to_date_hint'),
       ).toBeTruthy();
     });
 
@@ -257,13 +260,13 @@ describe('DateSeparator', () => {
       );
 
       expect(
-        getByLabelText('Formatted: 2024-06-20, press to select date'),
+        getByLabelText('Formatted: 2024-06-20'),
       ).toBeTruthy();
 
       await rerender(<DateSeparator {...defaultProps} date="2024-12-25" />);
 
       expect(
-        getByLabelText('Formatted: 2024-12-25, press to select date'),
+        getByLabelText('Formatted: 2024-12-25'),
       ).toBeTruthy();
     });
   });
@@ -275,7 +278,7 @@ describe('DateSeparator', () => {
         <DateSeparator {...defaultProps} spendingSums={spendingSums} />,
       );
 
-      expect(getByText('-$999999999.99')).toBeTruthy();
+      expect(getByText('-$999,999,999.99')).toBeTruthy();
     });
 
     it('handles zero amount', async () => {
@@ -284,7 +287,7 @@ describe('DateSeparator', () => {
         <DateSeparator {...defaultProps} spendingSums={spendingSums} />,
       );
 
-      expect(getByText('-$0.00')).toBeTruthy();
+      expect(getByText('$0.00')).toBeTruthy();
     });
 
     it('handles many currencies at once', async () => {
@@ -299,7 +302,7 @@ describe('DateSeparator', () => {
       );
 
       expect(
-        getByText('-$100.00, -€85.00, -£70.00, -¥10000'),
+        getByText('-$100.00, -€85.00, -£70.00, -¥10,000'),
       ).toBeTruthy();
     });
 
