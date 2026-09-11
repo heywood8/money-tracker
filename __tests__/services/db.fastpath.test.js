@@ -71,6 +71,14 @@ const mockSchemaComplete = (db, storedUserVersion) => {
     if (typeof q === 'string' && q.includes('idx_dismissed_notifications_fingerprint')) {
       return Promise.resolve({ name: 'idx_dismissed_notifications_fingerprint' });
     }
+    // The two transfer/date indexes of migration 0030, checked one statement at
+    // a time for the same reason as 0029's index above.
+    if (typeof q === 'string' && q.includes('idx_operations_to_account')) {
+      return Promise.resolve({ name: 'idx_operations_to_account' });
+    }
+    if (typeof q === 'string' && q.includes('idx_operations_account_date')) {
+      return Promise.resolve({ name: 'idx_operations_account_date' });
+    }
     return Promise.resolve(null);
   });
   db.getAllAsync.mockImplementation((q) => {
