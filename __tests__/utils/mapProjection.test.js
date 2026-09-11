@@ -243,5 +243,46 @@ describe('mapProjection', () => {
       expect(minX).toBeLessThanOrEqual(0);
       expect(maxX).toBeGreaterThanOrEqual(400);
     });
+
+    describe('overscan', () => {
+      const region = { latitude: 40, longitude: 44, zoom: 12 };
+
+      it('adds tiles around the edges without moving anything', () => {
+        const plain = visibleTiles(region, 400, 800);
+        const wide = visibleTiles(region, 400, 800, null, TILE_SIZE);
+
+        expect(wide.length).toBeGreaterThan(plain.length);
+        // Every tile the plain grid had is present at the same screen position:
+        // the overscan changes what is prepared, never where anything sits.
+        for (const tile of plain) {
+          const same = wide.find(w => w.key === tile.key);
+          expect(same).toBeDefined();
+          expect(same.screenX).toBeCloseTo(tile.screenX);
+          expect(same.screenY).toBeCloseTo(tile.screenY);
+          expect(same.size).toBeCloseTo(tile.size);
+        }
+      });
+
+      it('covers a drag of the overscan distance in any direction', () => {
+        // The map pans as a transform and only re-tiles when the finger lifts,
+        // so a drag up to the overscan must not reveal bare background.
+        const overscan = TILE_SIZE;
+        const tiles = visibleTiles(region, 400, 800, null, overscan);
+        const minX = Math.min(...tiles.map(t => t.screenX));
+        const maxX = Math.max(...tiles.map(t => t.screenX + t.size));
+        const minY = Math.min(...tiles.map(t => t.screenY));
+        const maxY = Math.max(...tiles.map(t => t.screenY + t.size));
+
+        expect(minX).toBeLessThanOrEqual(-overscan);
+        expect(maxX).toBeGreaterThanOrEqual(400 + overscan);
+        expect(minY).toBeLessThanOrEqual(-overscan);
+        expect(maxY).toBeGreaterThanOrEqual(800 + overscan);
+      });
+
+      it('defaults to no overscan', () => {
+        expect(visibleTiles(region, 400, 800, null, 0))
+          .toEqual(visibleTiles(region, 400, 800));
+      });
+    });
   });
 });

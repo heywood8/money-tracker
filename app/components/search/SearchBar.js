@@ -1,5 +1,5 @@
 import React, { useState, useCallback, useEffect, useRef } from 'react';
-import { View, TextInput, TouchableOpacity, StyleSheet, Text, Keyboard, Platform, Dimensions } from 'react-native';
+import { View, TextInput, TouchableOpacity, StyleSheet, Text, Keyboard, Platform, useWindowDimensions } from 'react-native';
 import Animated, { useSharedValue, useAnimatedStyle, withTiming, Easing } from 'react-native-reanimated';
 import Icon from '@expo/vector-icons/MaterialCommunityIcons';
 import PropTypes from 'prop-types';
@@ -7,7 +7,6 @@ import { BORDER_RADIUS, FONT_SIZE, HORIZONTAL_PADDING, SPACING } from '../../sty
 import { withAlpha } from '../../utils/colorUtils';
 import FilterBadge from './FilterBadge';
 
-const SCREEN_WIDTH = Dimensions.get('window').width;
 
 // Both states share one pill of this height so the resting bar matches the
 // Расход/Доход/Перевод type buttons and the open bar is exactly the same size.
@@ -80,7 +79,11 @@ const SearchBar = ({
   // lays out exactly once — only the pill's visible width changes per frame,
   // which keeps open AND close animating identically (an animated percentage
   // re-flows the flex content every frame).
-  const [available, setAvailable] = useState(Math.max(0, SCREEN_WIDTH - 2 * HORIZONTAL_PADDING));
+  // Seed only — onLayout below replaces it with the real measurement. Read live
+  // rather than once at module load so a fold or rotation before the first
+  // layout does not seed the width of the screen the app started on.
+  const { width: screenWidth } = useWindowDimensions();
+  const [available, setAvailable] = useState(() => Math.max(0, screenWidth - 2 * HORIZONTAL_PADDING));
   // 0 = collapsed (~70%), 1 = open (100%). Driven by withTiming on the UI thread.
   const morph = useSharedValue(collapsed ? 0 : 1);
 

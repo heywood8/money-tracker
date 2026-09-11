@@ -1,9 +1,9 @@
 import React, { useMemo, useRef, useState, useCallback } from 'react';
-import { View, Text, StyleSheet, ActivityIndicator, Dimensions, TouchableOpacity, Modal, ScrollView } from 'react-native';
+import { View, Text, StyleSheet, ActivityIndicator, TouchableOpacity, Modal, ScrollView, useWindowDimensions } from 'react-native';
 import PropTypes from 'prop-types';
 import { CartesianChart, Bar, BarGroup } from 'victory-native';
 import { matchFont, RoundedRect } from '@shopify/react-native-skia';
-import { runOnJS } from 'react-native-reanimated';
+import { runOnJS, useSharedValue } from 'react-native-reanimated';
 import { Gesture, GestureDetector } from 'react-native-gesture-handler';
 import Icon from '@expo/vector-icons/MaterialCommunityIcons';
 import * as Currency from '../../services/currency';
@@ -23,8 +23,6 @@ import { useDisplaySettings } from '../../contexts/DisplaySettingsContext';
 import { useSwipeNavigationGesture } from '../../contexts/SwipeNavigationContext';
 import { CARD_SURFACE, SECTION_LABEL } from '../../styles/componentStyles';
 import EmptyState from '../EmptyState';
-
-const screenWidth = Dimensions.get('window').width;
 
 // Collapsed to K/M above a thousand, the same way the expense/income tabs
 // directly above this card write theirs. Spelled out in full, a seven-digit
@@ -314,15 +312,29 @@ const TrendBarChart = ({
     return swipeGesture ? native.blocksExternalGesture(swipeGesture) : native;
   }, [swipeGesture]);
 
+  // The pinch used to call applyPinch from every `onUpdate`, and each of those
+  // re-rendered this card and BOTH CartesianCharts — one re-layout of a
+  // multi-year plot per frame, which is what made the pinch stutter. The live
+  // scale now only moves a shared value; the pitch is recomputed once, when the
+  // fingers lift. The chart therefore holds still during the pinch and settles
+  // on release rather than tracking the fingers.
+  const pinchScale = useSharedValue(1);
   const pinchGesture = useMemo(
     () => Gesture.Pinch()
       .onStart(() => {
+        'worklet';
+        pinchScale.value = 1;
         runOnJS(beginPinch)();
       })
       .onUpdate((event) => {
-        runOnJS(applyPinch)(event.scale);
+        'worklet';
+        pinchScale.value = event.scale;
+      })
+      .onEnd(() => {
+        'worklet';
+        runOnJS(applyPinch)(pinchScale.value);
       }),
-    [beginPinch, applyPinch],
+    [beginPinch, applyPinch, pinchScale],
   );
 
   const containerGesture = useMemo(
@@ -475,36 +487,7 @@ const TrendBarChart = ({
       onAccessibilityAction={handleAccessibilityAction}
     >
       <View style={styles.chartRow}>
-        {/* Pinned scale. Its own canvas, sharing the height, y-domain and x-label
-            metrics of the scrolling one so Victory resolves both plots to the
-            same vertical geometry and the labels line up with the gridlines. */}
-        <View style={styles.axisColumn} pointerEvents="none" testID="trend-chart-axis">
-          <CartesianChart
-            data={AXIS_GUIDE_DATA}
-            xKey="x"
-            yKeys={AXIS_GUIDE_KEYS}
-            domain={domain}
-            domainPadding={AXIS_GUIDE_PADDING}
-            xAxis={{
-              font: axisFont,
-              lineWidth: 0,
-              // Reserves the month-label strip without drawing over it.
-              labelColor: colors.altRow,
-              tickCount: 2,
-              formatXLabel: spacerXLabel,
-            }}
-            yAxis={[{
-              font: axisFont,
-              lineWidth: 0,
-              labelColor: colors.mutedText,
-              tickCount: 5,
-              formatYLabel: formatYTick,
-            }]}
-            frame={{ lineWidth: 0 }}
-          >
-            {renderNothing}
-          </CartesianChart>
-        </View>
+        <TrendAxisColumn domain={domain} axisFont={axisFont} colors={colors} />
 
         <GestureDetector gesture={containerGesture}>
           <ScrollView
@@ -575,6 +558,55 @@ const DEFAULT_VS_SERIES = { type: 'expense', categoryId: ALL_CATEGORIES };
 // cards at the top of the same screen, so one glyph means one thing per screen.
 const ALL_SERIES_ICON = { income: 'arrow-bottom-left', expense: 'arrow-top-right' };
 
+/**
+ * The pinned y-scale beside the scrolling plot. Its own canvas, sharing the
+ * height, y-domain and x-label metrics of the scrolling one so Victory resolves
+ * both plots to the same vertical geometry and the labels line up with the
+ * gridlines.
+ *
+ * Memoised because it depends on none of what makes its parent re-render — the
+ * month pitch, the scroll position, the selected bar — and a Victory chart
+ * re-lays out its whole plot when it renders. Tapping a bar used to re-lay out
+ * this one too.
+ */
+const TrendAxisColumn = React.memo(function TrendAxisColumn({ domain, axisFont, colors }) {
+  return (
+    <View style={styles.axisColumn} pointerEvents="none" testID="trend-chart-axis">
+      <CartesianChart
+        data={AXIS_GUIDE_DATA}
+        xKey="x"
+        yKeys={AXIS_GUIDE_KEYS}
+        domain={domain}
+        domainPadding={AXIS_GUIDE_PADDING}
+        xAxis={{
+          font: axisFont,
+          lineWidth: 0,
+          // Reserves the month-label strip without drawing over it.
+          labelColor: colors.altRow,
+          tickCount: 2,
+          formatXLabel: spacerXLabel,
+        }}
+        yAxis={[{
+          font: axisFont,
+          lineWidth: 0,
+          labelColor: colors.mutedText,
+          tickCount: 5,
+          formatYLabel: formatYTick,
+        }]}
+        frame={{ lineWidth: 0 }}
+      >
+        {renderNothing}
+      </CartesianChart>
+    </View>
+  );
+});
+
+TrendAxisColumn.propTypes = {
+  domain: PropTypes.object.isRequired,
+  axisFont: PropTypes.object,
+  colors: PropTypes.object.isRequired,
+};
+
 const TrendsCard = ({
   colors,
   t,
@@ -585,6 +617,11 @@ const TrendsCard = ({
   categories,
   convertAllCurrencies = false,
 }) => {
+  // Read live rather than once at module load: a fold, a rotation or entering
+  // split-screen changes it, and a width captured at import time left the chart
+  // sized for the screen the app happened to start on.
+  const { width: screenWidth } = useWindowDimensions();
+
   // null = closed, 'primary' = picking the primary series, 'vs' = picking the
   // comparison one.
   const [pickerMode, setPickerMode] = useState(null);

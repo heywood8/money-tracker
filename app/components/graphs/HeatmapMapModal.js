@@ -1,4 +1,4 @@
-import React, { useState, useEffect, useRef, useCallback, useMemo } from 'react';
+import React, { useState, useEffect, useLayoutEffect, useRef, useCallback, useMemo } from 'react';
 import {
   View,
   Text,
@@ -11,6 +11,7 @@ import {
 import PropTypes from 'prop-types';
 import Icon from '@expo/vector-icons/MaterialCommunityIcons';
 import { Gesture, GestureDetector, GestureHandlerRootView } from 'react-native-gesture-handler';
+import Reanimated, { useAnimatedStyle, useSharedValue, runOnJS } from 'react-native-reanimated';
 import { Canvas, Circle, Group, BlurMask } from '@shopify/react-native-skia';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { getOperationCoordinates } from '../../services/OperationsDB';
@@ -24,6 +25,8 @@ import {
   fitBounds,
   translateRegion,
   scaleRegion,
+  latToWorldY,
+  TILE_SIZE,
   MIN_ZOOM,
   MAX_ZOOM,
 } from '../../utils/mapProjection';
@@ -48,6 +51,22 @@ const HEAT_COLOR = 'rgba(233, 30, 99, 0.35)';
 const MAX_HEAT_POINTS = 4000;
 // Blobs just off-screen still bleed their blur into view, so keep a margin.
 const HEAT_MARGIN = HEAT_RADIUS + HEAT_BLUR;
+
+// How far outside the viewport the tile grid and the heat blobs are prepared.
+// Pan and pinch run as a transform on the UI thread and only commit the new
+// region when the finger lifts, so whatever the gesture reveals has to have been
+// rendered before it started.
+//
+// Half the viewport's longer side is what a full zoom level out needs: the
+// prepared strip shrinks with the content, and (W + 2·O)·s ≥ W holds down to
+// s = 0.5 exactly when O = W/2. The same figure covers a drag of half a screen.
+// Past either — a pinch beyond one zoom level out, or a longer drag — the
+// leading edge shows background until the finger lifts, which is the price of
+// never re-tiling mid-gesture. The floor keeps a very small viewport (a split
+// screen, a test) from preparing nothing at all.
+const GESTURE_OVERSCAN_MIN_PX = 256;
+const gestureOverscan = (width, height) =>
+  Math.max(GESTURE_OVERSCAN_MIN_PX, Math.max(width, height) / 2);
 
 // Adjacent-zoom-level prefetch: fire only after the camera has been still
 // this long (every move resets the timer), and never more than this many
@@ -127,6 +146,9 @@ const HeatmapMapModal = ({
   regionRef.current = region;
   const sizeRef = useRef(size);
   sizeRef.current = size;
+  // The same measurement, readable from a gesture worklet.
+  const sizeSV = useSharedValue(size);
+  useEffect(() => { sizeSV.value = size; }, [size, sizeSV]);
   // Set when a new point set arrives; consumed once the viewport is measured.
   const fitPendingRef = useRef(false);
   // True once the user pans/zooms — from then on nothing may move the camera
@@ -215,6 +237,94 @@ const HeatmapMapModal = ({
       prev.width === width && prev.height === height ? prev : { width, height });
   }, []);
 
+  // ---------------------------------------------------------------------
+  // Gestures.
+  //
+  // Pan and pinch used to run `.runOnJS(true)` and call `setRegion` from every
+  // `onUpdate`. Each of those re-rendered the modal, re-projected every point
+  // on the JS thread and rebuilt one Skia node per point, and handed every
+  // MapTile a new screenX/screenY — so the `memo` on MapTile never helped
+  // during a drag. A few hundred geotagged operations stuttered under the
+  // finger; a few thousand were unusable.
+  //
+  // Now the gesture only moves three shared values, and the whole map layer
+  // (tiles and heat canvas together) is drawn through one transform on the UI
+  // thread. React sees nothing until the finger lifts, when the accumulated
+  // transform is folded into `region` exactly once.
+  //
+  // The transform is, in screen space:
+  //
+  //     screen' = (screen - F) * s + F + P
+  //
+  // with F the pinch anchor, s the accumulated scale and P the accumulated
+  // pan. A React Native `scale` transform is anchored on the view's centre C,
+  // so the equivalent translate is `P + (F - C) * (1 - s)`.
+  const panX = useSharedValue(0);
+  const panY = useSharedValue(0);
+  const gestureScale = useSharedValue(1);
+  const anchorX = useSharedValue(0);
+  const anchorY = useSharedValue(0);
+  // Zoom bounds as a SCALE relative to the committed region, so the worklet can
+  // clamp without knowing about zoom levels. Without this the map would keep
+  // growing under the fingers past MAX_ZOOM and then snap back on release.
+  const minScale = useSharedValue(1);
+  const maxScale = useSharedValue(1);
+  // Vertical pan bounds, in screen pixels, mirroring the latitude clamp that
+  // translateRegion applies at commit: the centre's world Y may only travel
+  // within [0, worldSize]. Without them the world could be dragged clear off
+  // the screen at low zoom and would snap back when the finger lifted.
+  // Longitude wraps, so X needs no bound.
+  const minPanY = useSharedValue(-Infinity);
+  const maxPanY = useSharedValue(Infinity);
+  useEffect(() => {
+    minScale.value = Math.pow(2, MIN_ZOOM - region.zoom);
+    maxScale.value = Math.pow(2, MAX_ZOOM - region.zoom);
+    const worldY = latToWorldY(region.latitude, region.zoom);
+    const worldSpan = TILE_SIZE * Math.pow(2, region.zoom);
+    minPanY.value = worldY - worldSpan;
+    maxPanY.value = worldY;
+  }, [region.latitude, region.zoom, minScale, maxScale, minPanY, maxPanY]);
+
+  const animatedLayerStyle = useAnimatedStyle(() => {
+    const s = gestureScale.value;
+    const cx = sizeSV.value.width / 2;
+    const cy = sizeSV.value.height / 2;
+    return {
+      transform: [
+        { translateX: panX.value + (anchorX.value - cx) * (1 - s) },
+        { translateY: panY.value + (anchorY.value - cy) * (1 - s) },
+        { scale: s },
+      ],
+    };
+  });
+
+  // Fold the gesture's transform into the committed region. Applied in the same
+  // order the transform composes it — scale about the anchor, then translate —
+  // so what the user watched during the drag is exactly what lands.
+  //
+  // The transform is NOT reset here. It is reset in a layout effect once React
+  // has the new region (see below), so the identity transform and the tiles'
+  // new positions reach the native view hierarchy in the same batch. Resetting
+  // here would let the reset paint against the old positions, flashing the map
+  // back to where the gesture started.
+  const commitGesture = useCallback((px, py, scale, ax, ay) => {
+    interactedRef.current = true;
+    const { width, height } = sizeRef.current;
+    if (!width || !height) return;
+    let next = regionRef.current;
+    if (scale !== 1) next = scaleRegion(next, scale, ax, ay, width, height);
+    if (px !== 0 || py !== 0) next = translateRegion(next, px, py);
+    setRegion(next);
+  }, []);
+
+  useLayoutEffect(() => {
+    panX.value = 0;
+    panY.value = 0;
+    gestureScale.value = 1;
+  }, [region, panX, panY, gestureScale]);
+
+  const markInteracted = useCallback(() => { interactedRef.current = true; }, []);
+
   // Strict split by finger count: ONE finger pans, TWO fingers pinch. The pan
   // is capped at one pointer because letting it run alongside the pinch made
   // the two fight — pan activates first (its ~10px threshold beats the scale
@@ -222,11 +332,13 @@ const HeatmapMapModal = ({
   // contribution drowns. The pinch handler therefore does BOTH two-finger
   // jobs itself: focal-point movement between events is the two-finger pan,
   // the scale delta is the zoom around the current focal point.
-  // Every handler applies the DELTA since its previous event to the current
-  // region (no touch-down snapshots), so gesture hand-offs — lifting to one
-  // finger mid-pinch, adding a second finger mid-pan — never jump.
-  const panLast = useRef({ x: 0, y: 0 });
-  const pinchLast = useRef({ scale: 1, fx: 0, fy: 0, pointers: 2 });
+  const panStart = useSharedValue({ x: 0, y: 0 });
+  const pinchLast = useSharedValue({ scale: 1, fx: 0, fy: 0, pointers: 2 });
+  // Pan and pinch run simultaneously and share one accumulated transform, so the
+  // transform may only be folded into the region when the LAST of them lets go.
+  // Committing on the first `onEnd` wiped the scale a still-running pinch was
+  // accumulating, and reset the pan out from under the next gesture's baseline.
+  const activeGestures = useSharedValue(0);
 
   // A finger landing or lifting mid-gesture TELEPORTS the pinch centroid
   // toward the remaining/added finger — that is not the user dragging, and
@@ -237,64 +349,91 @@ const HeatmapMapModal = ({
   const FOCAL_TELEPORT_PX = 48;
 
   const composedGesture = useMemo(() => {
+    // Folds the accumulated transform into the region, but only once every
+    // gesture has finished. `onFinalize` rather than `onEnd` so a cancelled
+    // gesture (a system interruption, a failed recognition) still balances its
+    // onStart and cannot strand the counter above zero.
+    const finalize = () => {
+      'worklet';
+      activeGestures.value = Math.max(0, activeGestures.value - 1);
+      if (activeGestures.value > 0) return;
+      runOnJS(commitGesture)(panX.value, panY.value, gestureScale.value, anchorX.value, anchorY.value);
+    };
+
     const pan = Gesture.Pan()
-      .runOnJS(true)
       .maxPointers(1)
       .onStart(() => {
-        interactedRef.current = true;
-        panLast.current = { x: 0, y: 0 };
+        'worklet';
+        activeGestures.value += 1;
+        panStart.value = { x: panX.value, y: panY.value };
+        runOnJS(markInteracted)();
       })
       .onUpdate((e) => {
-        const last = panLast.current;
-        const dx = e.translationX - last.x;
-        const dy = e.translationY - last.y;
-        panLast.current = { x: e.translationX, y: e.translationY };
-        setRegion(translateRegion(regionRef.current, dx, dy));
-      });
+        'worklet';
+        panX.value = panStart.value.x + e.translationX;
+        panY.value = Math.max(
+          minPanY.value,
+          Math.min(maxPanY.value, panStart.value.y + e.translationY),
+        );
+      })
+      .onFinalize(finalize);
+
     const pinch = Gesture.Pinch()
-      .runOnJS(true)
       .onStart((e) => {
-        interactedRef.current = true;
-        const { width, height } = sizeRef.current;
-        pinchLast.current = {
-          scale: 1,
-          fx: e.focalX ?? width / 2,
-          fy: e.focalY ?? height / 2,
-          pointers: e.numberOfPointers ?? 2,
-        };
+        'worklet';
+        activeGestures.value += 1;
+        const fx = e.focalX ?? sizeSV.value.width / 2;
+        const fy = e.focalY ?? sizeSV.value.height / 2;
+        // The first pinch of a gesture sets the anchor; a later one re-anchors
+        // by folding the old anchor's contribution into the pan, so the picture
+        // on screen does not move at the moment of re-anchoring.
+        const s = gestureScale.value;
+        panX.value += (fx - anchorX.value) * (s - 1);
+        panY.value += (fy - anchorY.value) * (s - 1);
+        anchorX.value = fx;
+        anchorY.value = fy;
+        pinchLast.value = { scale: e.scale, fx, fy, pointers: e.numberOfPointers ?? 2 };
+        runOnJS(markInteracted)();
       })
       .onUpdate((e) => {
-        const { width, height } = sizeRef.current;
-        if (!width || !height) return;
-        const last = pinchLast.current;
+        'worklet';
+        const last = pinchLast.value;
         const fx = e.focalX ?? last.fx;
         const fy = e.focalY ?? last.fy;
         const pointers = e.numberOfPointers ?? last.pointers;
-        // Centroid teleport (finger count changed, or the focal jumped
-        // farther than a finger can move in one frame): re-baseline both the
-        // focal point and the scale on the new configuration and apply
-        // nothing — the next event's deltas are trustworthy again.
+        // Centroid teleport (finger count changed, or the focal jumped farther
+        // than a finger can move in one frame): re-baseline both the focal point
+        // and the scale on the new configuration and apply nothing — the next
+        // event's deltas are trustworthy again.
         const teleported = pointers !== last.pointers ||
           Math.abs(fx - last.fx) > FOCAL_TELEPORT_PX ||
           Math.abs(fy - last.fy) > FOCAL_TELEPORT_PX;
         if (teleported) {
-          pinchLast.current = { scale: e.scale, fx, fy, pointers };
+          pinchLast.value = { scale: e.scale, fx, fy, pointers };
           return;
         }
         // Two-finger pan: how far the pinch centroid moved since last event.
-        let next = translateRegion(regionRef.current, fx - last.fx, fy - last.fy);
-        // Zoom by the scale delta, anchored on the current focal point.
+        panX.value += fx - last.fx;
+        panY.value = Math.max(
+          minPanY.value,
+          Math.min(maxPanY.value, panY.value + (fy - last.fy)),
+        );
+        // Zoom by the scale delta, clamped to the projection's zoom range.
         const factor = e.scale / (last.scale || 1);
-        next = scaleRegion(next, factor, fx, fy, width, height);
-        pinchLast.current = { scale: e.scale, fx, fy, pointers };
-        setRegion(next);
-      });
+        const nextScale = gestureScale.value * factor;
+        gestureScale.value = Math.max(minScale.value, Math.min(maxScale.value, nextScale));
+        pinchLast.value = { scale: e.scale, fx, fy, pointers };
+      })
+      .onFinalize(finalize);
+
     return Gesture.Simultaneous(pan, pinch);
-  }, []);
+  }, [panStart, panX, panY, gestureScale, anchorX, anchorY, minScale, maxScale, minPanY, maxPanY, pinchLast, activeGestures, commitGesture, markInteracted]);
+
+  const overscan = gestureOverscan(size.width, size.height);
 
   const tiles = useMemo(
-    () => visibleTiles(region, size.width, size.height),
-    [region, size],
+    () => visibleTiles(region, size.width, size.height, null, overscan),
+    [region, size, overscan],
   );
 
   // Underlay: while zooming across an integer tile level, the level being
@@ -315,8 +454,10 @@ const HeatmapMapModal = ({
       ? underZoomRef.current
       : null;
   const underlayTiles = useMemo(
-    () => (underlayZoom === null ? [] : visibleTiles(region, size.width, size.height, underlayZoom)),
-    [region, size, underlayZoom],
+    () => (underlayZoom === null
+      ? []
+      : visibleTiles(region, size.width, size.height, underlayZoom, overscan)),
+    [region, size, underlayZoom, overscan],
   );
 
   // ONE flat keyed list, underlay first so the current level draws on top.
@@ -357,18 +498,26 @@ const HeatmapMapModal = ({
     return () => clearTimeout(timer);
   }, [tiles]);
 
+  // Projected once per committed region, never during a gesture — the drag moves
+  // these through the layer transform instead. The cull margin carries the same
+  // overscan as the tiles, so a blob the drag is about to bring into view is
+  // already in the list; the canvas below is grown and offset to match, or the
+  // extra blobs would be clipped and the point budget spent on nothing.
+  // Coordinates are therefore CANVAS-relative: the canvas origin sits at
+  // (-overscan, -overscan) in the layer.
+  const heatMargin = HEAT_MARGIN + overscan;
   const heatPoints = useMemo(() => {
     if (!size.width || !size.height) return [];
     const projected = [];
     for (const p of points) {
       const sp = pointToScreen(p.latitude, p.longitude, region, size.width, size.height);
-      if (sp.x < -HEAT_MARGIN || sp.x > size.width + HEAT_MARGIN ||
-          sp.y < -HEAT_MARGIN || sp.y > size.height + HEAT_MARGIN) continue;
-      projected.push(sp);
+      if (sp.x < -heatMargin || sp.x > size.width + heatMargin ||
+          sp.y < -heatMargin || sp.y > size.height + heatMargin) continue;
+      projected.push({ x: sp.x + overscan, y: sp.y + overscan });
       if (projected.length >= MAX_HEAT_POINTS) break;
     }
     return projected;
-  }, [points, region, size]);
+  }, [points, region, size, heatMargin, overscan]);
 
   const empty = !loading && points.length === 0;
 
@@ -387,30 +536,44 @@ const HeatmapMapModal = ({
           <View style={styles.mapArea} onLayout={handleLayout}>
             <GestureDetector gesture={composedGesture}>
               <View style={styles.mapSurface} collapsable={false} testID="heatmap-map-surface">
-                {renderTiles.map((tile) => (
-                  <MapTile
-                    key={tile.key}
-                    z={tile.z}
-                    x={tile.x}
-                    y={tile.y}
-                    screenX={tile.screenX}
-                    screenY={tile.screenY}
-                    size={tile.size}
-                  />
-                ))}
-                {heatPoints.length > 0 && (
-                  <Canvas
-                    pointerEvents="none"
-                    style={[styles.heatCanvas, { height: size.height, width: size.width }]}
-                  >
-                    <Group>
-                      <BlurMask blur={HEAT_BLUR} style="normal" />
-                      {heatPoints.map((p, index) => (
-                        <Circle key={index} cx={p.x} cy={p.y} r={HEAT_RADIUS} color={HEAT_COLOR} />
-                      ))}
-                    </Group>
-                  </Canvas>
-                )}
+                {/* Tiles and heat blobs move as ONE layer under a single UI-thread
+                    transform, so a drag repositions nothing per tile and
+                    re-projects nothing per point. */}
+                <Reanimated.View
+                  style={[styles.mapLayer, animatedLayerStyle]}
+                  pointerEvents="none"
+                  testID="heatmap-map-layer"
+                >
+                  {renderTiles.map((tile) => (
+                    <MapTile
+                      key={tile.key}
+                      z={tile.z}
+                      x={tile.x}
+                      y={tile.y}
+                      screenX={tile.screenX}
+                      screenY={tile.screenY}
+                      size={tile.size}
+                    />
+                  ))}
+                  {heatPoints.length > 0 && (
+                    <Canvas
+                      pointerEvents="none"
+                      style={[styles.heatCanvas, {
+                        height: size.height + overscan * 2,
+                        left: -overscan,
+                        top: -overscan,
+                        width: size.width + overscan * 2,
+                      }]}
+                    >
+                      <Group>
+                        <BlurMask blur={HEAT_BLUR} style="normal" />
+                        {heatPoints.map((p, index) => (
+                          <Circle key={index} cx={p.x} cy={p.y} r={HEAT_RADIUS} color={HEAT_COLOR} />
+                        ))}
+                      </Group>
+                    </Canvas>
+                  )}
+                </Reanimated.View>
               </View>
             </GestureDetector>
 
@@ -567,13 +730,24 @@ const styles = StyleSheet.create({
     width: 40,
   },
   heatCanvas: {
-    left: 0,
+    // left/top/width/height are set inline: the canvas is grown by the gesture
+    // overscan on every side so a blob the drag is about to reveal is painted
+    // rather than clipped at the viewport edge.
     position: 'absolute',
-    top: 0,
   },
   mapArea: {
     flex: 1,
     overflow: 'hidden',
+  },
+  // Covers the map area exactly, so the RN `scale` transform is anchored on the
+  // viewport's centre — which is what the anchor maths in animatedLayerStyle
+  // corrects against to pin the zoom on the pinch focal point instead.
+  mapLayer: {
+    bottom: 0,
+    left: 0,
+    position: 'absolute',
+    right: 0,
+    top: 0,
   },
   mapSurface: {
     flex: 1,

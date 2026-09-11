@@ -1,7 +1,7 @@
 import React, { useCallback, useEffect } from 'react';
 import {
   StyleSheet,
-  Dimensions,
+  useWindowDimensions,
 } from 'react-native';
 import Animated, { useSharedValue, useAnimatedStyle, withTiming, Easing } from 'react-native-reanimated';
 import PropTypes from 'prop-types';
@@ -11,8 +11,6 @@ import { useOperationsData } from '../../contexts/OperationsDataContext';
 import { useOperationsActions } from '../../contexts/OperationsActionsContext';
 import { useAccountsData } from '../../contexts/AccountsDataContext';
 import { useSearch } from '../../contexts/SearchContext';
-
-const SCREEN_HEIGHT = Dimensions.get('window').height;
 
 // The panel is pulled up under the search area (which sits at a higher zIndex)
 // so its rounded top tucks behind the pill/chip strip and the sheet reads as a
@@ -26,15 +24,20 @@ const SearchOverlay = ({ colors, t, language, visible, onHeightChange = null, to
   const { updateSearchFilters } = useOperationsActions();
   const { visibleAccounts } = useAccountsData();
 
-  const translateY = useSharedValue(-SCREEN_HEIGHT);
+  // Read live rather than once at module load: a fold, a rotation or entering
+  // split-screen changes it, and a height captured at import time left the
+  // panel sized — and parked off-screen by — the screen the app started on.
+  const { height: screenHeight } = useWindowDimensions();
+
+  const translateY = useSharedValue(-screenHeight);
 
   useEffect(() => {
     if (visible) {
       translateY.value = withTiming(0, { duration: 320, easing: Easing.out(Easing.cubic) });
     } else {
-      translateY.value = withTiming(-SCREEN_HEIGHT, { duration: 250, easing: Easing.in(Easing.cubic) });
+      translateY.value = withTiming(-screenHeight, { duration: 250, easing: Easing.in(Easing.cubic) });
     }
-  }, [visible]);
+  }, [visible, screenHeight]);
 
   const animatedStyle = useAnimatedStyle(() => ({
     transform: [{ translateY: translateY.value }],
@@ -65,6 +68,7 @@ const SearchOverlay = ({ colors, t, language, visible, onHeightChange = null, to
         {
           backgroundColor: colors.glassSurface || colors.background,
           borderColor: colors.glassBorder || colors.border,
+          maxHeight: screenHeight * 0.62,
           top: Math.max(0, topOffset - PANEL_OVERLAP),
         },
         animatedStyle,
@@ -110,7 +114,6 @@ const styles = StyleSheet.create({
     borderWidth: StyleSheet.hairlineWidth,
     elevation: 8,
     left: HORIZONTAL_PADDING,
-    maxHeight: SCREEN_HEIGHT * 0.62,
     position: 'absolute',
     right: HORIZONTAL_PADDING,
     shadowColor: '#000',

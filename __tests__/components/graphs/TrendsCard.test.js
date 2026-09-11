@@ -1,5 +1,6 @@
 import React from 'react';
-import { render, fireEvent, within } from '@testing-library/react-native';
+import { render, fireEvent, within, act } from '@testing-library/react-native';
+import { Gesture } from 'react-native-gesture-handler';
 import TrendsCard, { canLabelYear, formatYTick, resolveScrollTarget, resolveTapIndex } from '../../../app/components/graphs/TrendsCard';
 import useMonthlyTrendSeries from '../../../app/hooks/useMonthlyTrendSeries';
 
@@ -829,4 +830,92 @@ describe('TrendsCard', () => {
       expect(resolveScrollTarget(null, 576, 296)).toBeNull();
     });
   });
+
+  // Issue #1707: the pinch called `setMonthWidth` from every `onUpdate`, and
+  // each of those re-rendered this card and BOTH CartesianCharts — one re-layout
+  // of a multi-year plot per frame. The live scale now only moves a shared value
+  // and the pitch is recomputed once, on release.
+  describe('Pinch commits once, on release', () => {
+    // jest.setup's gesture-handler mock throws the handlers away; override only
+    // its Pinch factory so the real callbacks can be driven here.
+    const pinchHandlers = {};
+
+    const recordingPinch = () => {
+      const self = {};
+      for (const method of ['onStart', 'onUpdate', 'onEnd']) {
+        self[method] = (fn) => { pinchHandlers[method] = fn; return self; };
+      }
+      for (const method of ['onFinalize', 'runOnJS', 'enabled']) {
+        self[method] = () => self;
+      }
+      return self;
+    };
+
+    beforeEach(() => {
+      for (const key of Object.keys(pinchHandlers)) delete pinchHandlers[key];
+      Gesture.Pinch.mockImplementation(recordingPinch);
+    });
+
+    afterEach(() => {
+      Gesture.Pinch.mockReset();
+    });
+
+    // The chart canvas is as wide as the month pitch times the month count, so
+    // its width is a direct read of the committed pitch.
+    const canvasWidth = (view) => {
+      const style = view.getByTestId('trend-chart-canvas').props.style;
+      return [].concat(style).find(entry => entry && entry.width)?.width;
+    };
+
+    const pinch = async (scales) => {
+      await act(async () => { pinchHandlers.onStart({ scale: 1 }); });
+      await act(async () => {
+        for (const scale of scales) pinchHandlers.onUpdate({ scale });
+      });
+    };
+
+    it('registers an onEnd, which is the only place the pitch changes', async () => {
+      await render(<TrendsCard {...defaultProps} />);
+
+      expect(typeof pinchHandlers.onUpdate).toBe('function');
+      expect(typeof pinchHandlers.onEnd).toBe('function');
+    });
+
+    it('leaves the chart alone while the pinch is in flight', async () => {
+      const view = await render(<TrendsCard {...defaultProps} />);
+
+      const before = canvasWidth(view);
+      expect(before).toBeGreaterThan(0);
+
+      await pinch([1.2, 1.4, 1.6, 1.8, 2.0, 2.2, 2.4]);
+
+      expect(canvasWidth(view)).toBe(before);
+    });
+
+    it('applies the final scale when the fingers lift', async () => {
+      const view = await render(<TrendsCard {...defaultProps} />);
+
+      const before = canvasWidth(view);
+
+      await pinch([1.2, 1.4, 1.6, 1.8, 2.0]);
+      await act(async () => { pinchHandlers.onEnd({}); });
+
+      expect(canvasWidth(view)).toBeGreaterThan(before);
+    });
+
+    it('shrinks the pitch on a pinch in', async () => {
+      const view = await render(<TrendsCard {...defaultProps} />);
+
+      // Widen first so there is room to come back down from.
+      await pinch([2.5]);
+      await act(async () => { pinchHandlers.onEnd({}); });
+      const widened = canvasWidth(view);
+
+      await pinch([0.5]);
+      await act(async () => { pinchHandlers.onEnd({}); });
+
+      expect(canvasWidth(view)).toBeLessThan(widened);
+    });
+  });
+
 });
