@@ -156,10 +156,17 @@ export const fitBounds = (points, width, height, padding = 48) => {
  * the new level's tiles stream in, so crossing levels never flashes bare
  * background.
  *
+ * `overscanPx` widens the grid by that many SCREEN pixels on each side without
+ * moving anything: the returned screen coordinates are unchanged, there are
+ * simply more tiles around the edges. The map pans and pinches as a transform
+ * on the UI thread and only commits the new region when the gesture ends, so
+ * the grid has to already cover where the finger is about to drag the viewport
+ * — otherwise the leading edge is bare background until the finger lifts.
+ *
  * @returns {Array<{key: string, z: number, x: number, y: number,
  *                  screenX: number, screenY: number, size: number}>}
  */
-export const visibleTiles = (region, width, height, tileZoomOverride = null) => {
+export const visibleTiles = (region, width, height, tileZoomOverride = null, overscanPx = 0) => {
   if (!width || !height) return [];
   const tileZoom = tileZoomOverride ?? Math.round(clampZoom(region.zoom));
   const scale = Math.pow(2, region.zoom - tileZoom);
@@ -170,8 +177,8 @@ export const visibleTiles = (region, width, height, tileZoomOverride = null) => 
   // whose scaled footprint intersects the viewport.
   const cx = lonToWorldX(region.longitude, tileZoom);
   const cy = latToWorldY(region.latitude, tileZoom);
-  const halfW = width / 2 / scale;
-  const halfH = height / 2 / scale;
+  const halfW = (width / 2 + overscanPx) / scale;
+  const halfH = (height / 2 + overscanPx) / scale;
 
   const minX = Math.floor((cx - halfW) / TILE_SIZE);
   const maxX = Math.floor((cx + halfW) / TILE_SIZE);
