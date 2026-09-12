@@ -1,5 +1,12 @@
 # Changelog
 
+## [0.285.1](https://github.com/heywood8/money-tracker/compare/penny-v0.285.0...penny-v0.285.1) (2026-09-12)
+
+
+### Bug Fixes
+
+* **updates:** stop the update check hashing 53MB while the user waits ([#1770](https://github.com/heywood8/money-tracker/issues/1770)) ([29942fc](https://github.com/heywood8/money-tracker/commit/29942fcf4f741471f78f27aa0feab2c6a1b5e0ae))
+
 ## [0.285.0](https://github.com/heywood8/money-tracker/compare/penny-v0.284.17...penny-v0.285.0) (2026-09-12)
 
 
