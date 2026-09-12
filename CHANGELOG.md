@@ -1,5 +1,12 @@
 # Changelog
 
+## [0.284.17](https://github.com/heywood8/money-tracker/compare/penny-v0.284.16...penny-v0.284.17) (2026-09-12)
+
+
+### Documentation
+
+* **operations:** record why recurring operation rules are out of scope ([#1766](https://github.com/heywood8/money-tracker/issues/1766)) ([3ce35aa](https://github.com/heywood8/money-tracker/commit/3ce35aaf5ca4c76ddab7cff2093e58ca15fac671))
+
 ## [0.284.16](https://github.com/heywood8/money-tracker/compare/penny-v0.284.15...penny-v0.284.16) (2026-09-12)
 
 
