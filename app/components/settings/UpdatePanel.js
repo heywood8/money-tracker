@@ -11,6 +11,7 @@ import {
   installApk,
   verifyCachedApk,
 } from '../../services/AppUpdateService';
+import { describeUpdateError } from '../../utils/updateErrors';
 import { setPreference, PREF_KEYS } from '../../services/PreferencesDB';
 import UpdateContentPanel from '../UpdateContentPanel';
 
@@ -53,7 +54,12 @@ export default function UpdatePanel({ onRegisterTitle, onDone, bottomInset }) {
       console.error('Failed to install APK:', error);
       showDialog(
         t('error') || 'Error',
-        t('update_download_failed') || 'Could not install the APK. The file may have been removed.',
+        describeUpdateError(
+          error,
+          t,
+          'update_install_failed',
+          'The update was downloaded, but Android would not open the installer.',
+        ),
         [{ text: t('ok') || 'OK' }],
       );
     }
@@ -149,10 +155,15 @@ export default function UpdatePanel({ onRegisterTitle, onDone, bottomInset }) {
     onDone();
     startDownload(downloadUrl, {
       checksumUrl: checksumUrl || null,
-      onError: () => {
+      onError: (error) => {
         showDialog(
           t('error') || 'Error',
-          t('update_download_failed') || 'Could not download the update. Please try again.',
+          describeUpdateError(
+            error,
+            t,
+            'update_download_failed',
+            'Could not download the update. Please try again.',
+          ),
           [{ text: t('ok') || 'OK' }],
         );
       },

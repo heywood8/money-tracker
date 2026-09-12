@@ -20,6 +20,9 @@ import {
   fetchActiveBuildRuns,
   fetchBuildStateByVersion,
   resetEtagCache,
+  launchApkInstaller,
+  installApk,
+  UPDATE_ERROR,
 } from '../../app/services/AppUpdateService';
 
 jest.mock('expo-file-system/legacy', () => ({
@@ -1797,5 +1800,92 @@ describe('AppUpdateService', () => {
       expect(result).toEqual({});
     });
   });
-});
 
+  // Regression: every update attempt died right after the checksum step and the UI blamed the
+  // download. The APK was fine — the installer launch was what failed, because a result that
+  // never came back (or came back before expo-intent-launcher stored its promise) left the module
+  // refusing every later launch with "IntentLauncher activity is already started".
+  describe('launchApkInstaller', () => {
+    const IntentLauncher = require('expo-intent-launcher');
+    const APK = 'file:///cache/penny-v1.0.0.apk';
+
+    beforeEach(() => {
+      FileSystem.getInfoAsync.mockResolvedValue({ exists: true, size: 40_000_000 });
+      FileSystem.getContentUriAsync.mockResolvedValue('content://penny.apk');
+      jest.spyOn(console, 'log').mockImplementation(() => {});
+      jest.spyOn(console, 'warn').mockImplementation(() => {});
+      jest.spyOn(console, 'error').mockImplementation(() => {});
+    });
+
+    it('does not ask for the installer to run in its own task', async () => {
+      IntentLauncher.startActivityAsync.mockResolvedValue({ resultCode: 0 });
+
+      await launchApkInstaller(APK);
+
+      // FLAG_ACTIVITY_NEW_TASK (268435456) makes Android cancel the activity result outright,
+      // which is what wedged the launcher. Only FLAG_GRANT_READ_URI_PERMISSION belongs here.
+      expect(IntentLauncher.startActivityAsync).toHaveBeenCalledWith(
+        'android.intent.action.VIEW',
+        expect.objectContaining({ flags: 1, type: 'application/vnd.android.package-archive' }),
+      );
+    });
+
+    it('reports the launch as done when no activity result ever arrives', async () => {
+      // The pre-fix hang: the promise simply never settles.
+      IntentLauncher.startActivityAsync.mockReturnValue(new Promise(() => {}));
+
+      await expect(launchApkInstaller(APK, { timeoutMs: 10 }))
+        .resolves.toEqual({ resultDelivered: false });
+    });
+
+    it('retries once when the launcher says an activity is already started', async () => {
+      IntentLauncher.startActivityAsync
+        .mockRejectedValueOnce(new Error('IntentLauncher activity is already started.'))
+        .mockResolvedValueOnce({ resultCode: 0 });
+
+      await expect(launchApkInstaller(APK, { timeoutMs: 10 }))
+        .resolves.toEqual({ resultDelivered: true });
+      expect(IntentLauncher.startActivityAsync).toHaveBeenCalledTimes(2);
+    });
+
+    it('throws INSTALLER_BUSY when the launcher stays wedged', async () => {
+      IntentLauncher.startActivityAsync
+        .mockRejectedValue(new Error('IntentLauncher activity is already started.'));
+
+      await expect(launchApkInstaller(APK, { timeoutMs: 10 }))
+        .rejects.toMatchObject({ code: UPDATE_ERROR.INSTALLER_BUSY });
+    });
+
+    it('throws INSTALL_FAILED for any other launch failure', async () => {
+      IntentLauncher.startActivityAsync.mockRejectedValue(new Error('No Activity found to handle Intent'));
+
+      await expect(launchApkInstaller(APK, { timeoutMs: 10 }))
+        .rejects.toMatchObject({ code: UPDATE_ERROR.INSTALL_FAILED });
+      expect(IntentLauncher.startActivityAsync).toHaveBeenCalledTimes(1);
+    });
+
+    it('recognises the busy launcher by its error code alone', async () => {
+      IntentLauncher.startActivityAsync.mockRejectedValue(
+        Object.assign(new Error('Call to function has been rejected'), { code: 'ERR_ACTIVITY_ALREADY_STARTED' }),
+      );
+
+      await expect(launchApkInstaller(APK, { timeoutMs: 10 }))
+        .rejects.toMatchObject({ code: UPDATE_ERROR.INSTALLER_BUSY });
+    });
+
+    it('throws FILE_MISSING when the cached APK is gone', async () => {
+      // Telling the user to install it again from the downloaded builds would be a loop with no
+      // end: there is nothing left on disk to install.
+      FileSystem.getInfoAsync.mockResolvedValue({ exists: false });
+
+      await expect(launchApkInstaller(APK)).rejects.toMatchObject({ code: UPDATE_ERROR.FILE_MISSING });
+      expect(IntentLauncher.startActivityAsync).not.toHaveBeenCalled();
+    });
+
+    it('throws INSTALL_FAILED when the APK cannot be exposed to the installer', async () => {
+      FileSystem.getContentUriAsync.mockRejectedValue(new Error('file not found'));
+
+      await expect(installApk(APK)).rejects.toMatchObject({ code: UPDATE_ERROR.INSTALL_FAILED });
+    });
+  });
+});

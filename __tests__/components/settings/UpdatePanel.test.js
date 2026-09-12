@@ -269,7 +269,32 @@ describe('UpdatePanel', () => {
       const { onError } = mockStartDownload.mock.calls[0][1];
       await act(async () => { onError(); });
 
-      expect(mockShowDialog).toHaveBeenCalled();
+      expect(mockShowDialog).toHaveBeenCalledWith(
+        'error',
+        'update_download_failed',
+        expect.anything(),
+      );
+    });
+
+    // Regression: an APK that downloaded and passed its checksum but could not reach Android's
+    // installer was reported as a failed download, which sent people re-downloading a file that
+    // was already on disk and intact.
+    it('blames the installer, not the download, when the install step is what failed', async () => {
+      await setup();
+      await waitFor(() => expect(lastContentProps.updateResult?.type).toBe('available'));
+
+      await act(async () => {
+        await lastContentProps.onUpdate('https://apk', null, '1.1.0');
+      });
+      const { onError } = mockStartDownload.mock.calls[0][1];
+      const busy = Object.assign(new Error('still pending'), { code: 'installer_busy' });
+      await act(async () => { onError(busy); });
+
+      expect(mockShowDialog).toHaveBeenCalledWith(
+        'error',
+        'update_installer_busy',
+        expect.anything(),
+      );
     });
   });
 
@@ -283,7 +308,31 @@ describe('UpdatePanel', () => {
       await lastContentProps.onInstallApk('file:///gone.apk');
     });
 
-    expect(mockShowDialog).toHaveBeenCalled();
+    expect(mockShowDialog).toHaveBeenCalledWith(
+      'error',
+      'update_install_failed',
+      expect.anything(),
+    );
+    consoleError.mockRestore();
+  });
+
+  it('tells the user to close a stale install prompt when the launcher is still busy', async () => {
+    mockInstallApk.mockImplementation(() => Promise.reject(
+      Object.assign(new Error('still pending'), { code: 'installer_busy' }),
+    ));
+    const consoleError = jest.spyOn(console, 'error').mockImplementation(() => {});
+    await setup();
+    await waitFor(() => expect(lastContentProps).not.toBeNull());
+
+    await act(async () => {
+      await lastContentProps.onInstallApk('file:///cache/penny-1.1.0.apk');
+    });
+
+    expect(mockShowDialog).toHaveBeenCalledWith(
+      'error',
+      'update_installer_busy',
+      expect.anything(),
+    );
     consoleError.mockRestore();
   });
 });
