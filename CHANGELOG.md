@@ -1,5 +1,12 @@
 # Changelog
 
+## [0.284.15](https://github.com/heywood8/money-tracker/compare/penny-v0.284.14...penny-v0.284.15) (2026-09-12)
+
+
+### Performance Improvements
+
+* **operations:** stop one save fanning out across every mounted tab ([#1761](https://github.com/heywood8/money-tracker/issues/1761)) ([0dc1e2f](https://github.com/heywood8/money-tracker/commit/0dc1e2f9e62fd4656659947193cc29e617a38348))
+
 ## [0.284.14](https://github.com/heywood8/money-tracker/compare/penny-v0.284.13...penny-v0.284.14) (2026-09-12)
 
 
