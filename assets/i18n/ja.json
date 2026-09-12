@@ -559,6 +559,7 @@
   "error_loading_accounts": "アカウントの読み込みに失敗しました",
   "undo": "元に戻す",
   "operation_added": "取引を追加しました",
+  "operation_deleted": "取引を削除しました",
   "loading_accounts": "アカウントを読み込み中...",
   "loading_categories": "カテゴリを読み込み中...",
   "none": "なし",

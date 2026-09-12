@@ -562,6 +562,7 @@
   "error_loading_accounts": "Failed to load accounts",
   "undo": "Undo",
   "operation_added": "Operation added",
+  "operation_deleted": "Operation deleted",
   "loading_accounts": "Loading accounts...",
   "loading_categories": "Loading categories...",
   "none": "None",

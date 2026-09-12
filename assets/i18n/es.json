@@ -559,6 +559,7 @@
   "error_loading_accounts": "Error al cargar las cuentas",
   "undo": "Deshacer",
   "operation_added": "Operación añadida",
+  "operation_deleted": "Operación eliminada",
   "loading_accounts": "Cargando cuentas...",
   "loading_categories": "Cargando categorías...",
   "none": "Ninguno",
