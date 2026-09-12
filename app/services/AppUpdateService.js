@@ -630,6 +630,13 @@ export const deleteDownloadedApk = async (localUri) => {
 //      fall back to a lightweight ZIP-structure check that still catches truncated downloads.
 // A file that fails either layer is deleted so callers re-download cleanly.
 //
+// `deepVerify: false` runs layer 2 only. Layer 1 costs a network round trip plus a SHA-256 of
+// the whole 50MB+ APK, and Hermes has no native digest, so the hash is a pure-JS loop over every
+// byte — tens of seconds of JS-thread work. That is fine right after a download (the file is
+// unproven and the UI says "verifying"), and far too expensive on a path the user is waiting on,
+// which is what turned "Checking for updates…" into a minute-long freeze. Layer 2 reads 4 bytes
+// and the trailing 64KB, and catches the truncation that actually breaks installs.
+//
 // Returns one of:
 //   { exists: false }                          — no usable cached file (absent or zero-size)
 //   { exists: false, corrupted: true }         — cached file failed verification and was deleted
@@ -637,7 +644,12 @@ export const deleteDownloadedApk = async (localUri) => {
 //   { exists: true, uri, verified: false }     — checksum unavailable but the file is structurally intact
 export const verifyCachedApk = async (
   downloadUrl,
-  { checksumUrl = null, cacheDir = FileSystem.cacheDirectory, fetchImpl = fetch } = {},
+  {
+    checksumUrl = null,
+    cacheDir = FileSystem.cacheDirectory,
+    fetchImpl = fetch,
+    deepVerify = true,
+  } = {},
 ) => {
   const localUri = await checkAlreadyDownloaded(downloadUrl, cacheDir);
   if (!localUri) {
@@ -645,7 +657,7 @@ export const verifyCachedApk = async (
   }
 
   // Layer 1: checksum verification when a checksum is available — the strongest proof.
-  if (checksumUrl) {
+  if (checksumUrl && deepVerify) {
     const filename = localUri.split('/').pop();
     const expectedHash = await fetchExpectedChecksum(checksumUrl, filename, fetchImpl);
     if (expectedHash) {
@@ -925,11 +937,22 @@ export const computeSha256 = async (fileUri, { chunkBytes = HASH_CHUNK_BYTES } =
   return hasher ? hasher.digest() : toHex(await subtle.digest('SHA-256', buffer.buffer));
 };
 
+// How long to wait for the checksum file. Release assets come from GitHub's CDN, which on a weak
+// mobile connection will accept the socket and then stall without ever failing; a bare fetch
+// there hangs forever, and the caller hangs with it.
+//
+// Far more patient than UPDATE_CHECK_TIMEOUT_MS on purpose. The file is ~100 bytes, so a slow
+// read here is a stalled connection rather than a slow link, and nobody is watching a spinner
+// on it: every caller has either just downloaded 50MB or is about to install it. Giving up
+// early would mean installing an APK that nothing has checked, which is the opposite of the
+// point — the deadline is here to break a stall, not to abandon a connection still moving.
+const CHECKSUM_FETCH_TIMEOUT_MS = 30000;
+
 // Downloads the sha256sum-format checksum file and returns the expected hex hash for apkFilename.
 // Returns null if the checksum cannot be fetched or parsed.
 export const fetchExpectedChecksum = async (checksumUrl, apkFilename, fetchImpl = fetch) => {
   try {
-    const response = await fetchImpl(checksumUrl);
+    const response = await fetchWithTimeout(checksumUrl, {}, CHECKSUM_FETCH_TIMEOUT_MS, fetchImpl);
     if (!response.ok) return null;
     const text = await response.text();
     for (const line of text.trim().split('\n')) {

@@ -115,6 +115,25 @@ describe('UpdatePanel', () => {
       expect(lastContentProps.updateResult.localUri).toBe('file:///a.apk');
     });
 
+    // Checksumming the 50MB+ cached APK is a pure-JS pass over every byte on Hermes, and it
+    // used to run right here with the user watching the spinner. It must not come back — not
+    // on this path and not alongside it, where it would still be hashing (and able to delete)
+    // a file the user is already tapping Install or Re-download on.
+    it('checks the cached APK structurally and never checksums it', async () => {
+      mockCheckForAppUpdate.mockImplementation(() => Promise.resolve(AVAILABLE));
+      mockVerifyCachedApk.mockImplementation(() => Promise.resolve({ exists: true, uri: 'file:///a.apk' }));
+
+      await setup();
+
+      await waitFor(() => expect(lastContentProps.updateResult?.type).toBe('available'));
+      expect(mockVerifyCachedApk).toHaveBeenCalledTimes(1);
+      expect(mockVerifyCachedApk).toHaveBeenCalledWith(
+        'https://apk',
+        expect.objectContaining({ deepVerify: false }),
+      );
+      expect(mockVerifyCachedApk.mock.calls[0][1].checksumUrl).toBeUndefined();
+    });
+
     it('surfaces a thrown check as an error rather than an empty panel', async () => {
       mockCheckForAppUpdate.mockImplementation(() => Promise.reject(new Error('offline')));
 
@@ -158,18 +177,30 @@ describe('UpdatePanel', () => {
       await setup();
       await waitFor(() => expect(mockCheckForAppUpdate).toHaveBeenCalledTimes(1));
 
-      await act(async () => { jest.advanceTimersByTime(5000); });
+      await act(async () => { jest.advanceTimersByTime(30000); });
       expect(mockCheckForAppUpdate).toHaveBeenCalledTimes(2);
 
-      await act(async () => { jest.advanceTimersByTime(5000); });
+      await act(async () => { jest.advanceTimersByTime(30000); });
       expect(mockCheckForAppUpdate).toHaveBeenCalledTimes(3);
+    });
+
+    // Each poll costs two unauthenticated GitHub requests against a 60/hour/IP limit. A panel
+    // left open on a ~17-minute build must not spend the quota the background check shares.
+    it('polls no more than twice a minute', async () => {
+      mockCheckForAppUpdate.mockImplementation(() => Promise.resolve(BUILDING));
+      await setup();
+      await waitFor(() => expect(mockCheckForAppUpdate).toHaveBeenCalledTimes(1));
+
+      await act(async () => { jest.advanceTimersByTime(60000); });
+
+      expect(mockCheckForAppUpdate).toHaveBeenCalledTimes(3); // the opening check plus two polls
     });
 
     it('does not poll when nothing is building', async () => {
       await setup();
       await waitFor(() => expect(mockCheckForAppUpdate).toHaveBeenCalledTimes(1));
 
-      await act(async () => { jest.advanceTimersByTime(20000); });
+      await act(async () => { jest.advanceTimersByTime(120000); });
       expect(mockCheckForAppUpdate).toHaveBeenCalledTimes(1);
     });
 
@@ -179,7 +210,7 @@ describe('UpdatePanel', () => {
       await waitFor(() => expect(mockCheckForAppUpdate).toHaveBeenCalledTimes(1));
 
       await act(async () => { unmount(); });
-      await act(async () => { jest.advanceTimersByTime(20000); });
+      await act(async () => { jest.advanceTimersByTime(120000); });
 
       expect(mockCheckForAppUpdate).toHaveBeenCalledTimes(1);
     });
