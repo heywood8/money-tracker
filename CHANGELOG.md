@@ -1,5 +1,12 @@
 # Changelog
 
+## [0.284.14](https://github.com/heywood8/money-tracker/compare/penny-v0.284.13...penny-v0.284.14) (2026-09-12)
+
+
+### Bug Fixes
+
+* **updates:** keep the installer launch from wedging the update flow ([#1762](https://github.com/heywood8/money-tracker/issues/1762)) ([e1747a4](https://github.com/heywood8/money-tracker/commit/e1747a4ef5f1b690631b2de2ac43493fa8e5ce72))
+
 ## [0.284.13](https://github.com/heywood8/money-tracker/compare/penny-v0.284.12...penny-v0.284.13) (2026-09-11)
 
 
