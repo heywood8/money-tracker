@@ -968,6 +968,26 @@ describe('AppUpdateService', () => {
       const hash = await fetchExpectedChecksum('https://example.com/checksum.sha256', 'penny-v1.0.0.apk', fetchImpl);
       expect(hash).toBeNull();
     });
+
+    it('deadlines the request so a stalled CDN connection cannot hang the caller', async () => {
+      const checksumText = 'abc123def456abc123def456abc123def456abc123def456abc123def456abcd  penny-v1.0.0.apk\n';
+      const fetchImpl = jest.fn().mockResolvedValue({ ok: true, text: async () => checksumText });
+
+      await fetchExpectedChecksum('https://example.com/checksum.sha256', 'penny-v1.0.0.apk', fetchImpl);
+
+      const [, options] = fetchImpl.mock.calls[0];
+      expect(options.signal).toBeInstanceOf(AbortSignal);
+    });
+
+    it('returns null when the request is aborted by its deadline', async () => {
+      const abortError = new Error('Aborted');
+      abortError.name = 'AbortError';
+      const fetchImpl = jest.fn().mockRejectedValue(abortError);
+
+      const hash = await fetchExpectedChecksum('https://example.com/checksum.sha256', 'penny-v1.0.0.apk', fetchImpl);
+
+      expect(hash).toBeNull();
+    });
   });
 
   describe('checkAlreadyDownloaded - path traversal prevention', () => {
@@ -1278,6 +1298,44 @@ describe('AppUpdateService', () => {
 
       expect(result).toEqual({ exists: true, uri: 'file:///cache/penny-v1.0.0.apk', verified: false });
       expect(FileSystem.deleteAsync).not.toHaveBeenCalled();
+    });
+
+    describe('deepVerify: false', () => {
+      it('never fetches the checksum or hashes the file, even with a checksum URL', async () => {
+        FileSystem.getInfoAsync.mockResolvedValue({ exists: true, size: 53_000_000 });
+        mockIntactApkStructure();
+        const fetchImpl = jest.fn();
+
+        const result = await verifyCachedApk(URL, {
+          checksumUrl: 'https://example.com/penny-v1.0.0.apk.sha256',
+          cacheDir: 'file:///cache/',
+          fetchImpl,
+          deepVerify: false,
+        });
+
+        expect(result).toEqual({ exists: true, uri: 'file:///cache/penny-v1.0.0.apk', verified: false });
+        expect(fetchImpl).not.toHaveBeenCalled();
+        // Head (4 bytes) and tail (<=64KB) only — never a pass over all 53MB.
+        expect(FileSystem.readAsStringAsync).toHaveBeenCalledTimes(2);
+      });
+
+      it('still deletes a structurally truncated file', async () => {
+        jest.spyOn(console, 'warn').mockImplementation(() => {});
+        FileSystem.getInfoAsync.mockResolvedValue({ exists: true, size: 53_000_000 });
+        FileSystem.deleteAsync.mockResolvedValue();
+        FileSystem.readAsStringAsync
+          .mockResolvedValueOnce(APK_HEAD_B64)
+          .mockResolvedValueOnce('AAAAAAAA'); // no EOCD signature
+
+        const result = await verifyCachedApk(URL, {
+          checksumUrl: 'https://example.com/penny-v1.0.0.apk.sha256',
+          cacheDir: 'file:///cache/',
+          fetchImpl: jest.fn(),
+          deepVerify: false,
+        });
+
+        expect(result).toEqual({ exists: false, corrupted: true });
+      });
     });
   });
 

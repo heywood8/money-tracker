@@ -1044,7 +1044,7 @@ describe('SettingsScreen', () => {
 
         // Advancing past the poll interval triggers a silent re-check that updates the percent.
         await act(async () => {
-          jest.advanceTimersByTime(5000);
+          jest.advanceTimersByTime(30000);
         });
 
         await waitFor(() => {
@@ -1090,7 +1090,7 @@ describe('SettingsScreen', () => {
         });
 
         await act(async () => {
-          jest.advanceTimersByTime(5000);
+          jest.advanceTimersByTime(30000);
         });
 
         await waitFor(() => {
@@ -1100,7 +1100,7 @@ describe('SettingsScreen', () => {
 
         // The build is done — no further polling should occur.
         await act(async () => {
-          jest.advanceTimersByTime(60000);
+          jest.advanceTimersByTime(120000);
         });
         expect(checkForAppUpdate).toHaveBeenCalledTimes(2);
       } finally {

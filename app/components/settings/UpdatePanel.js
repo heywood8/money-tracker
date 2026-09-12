@@ -16,7 +16,14 @@ import { setPreference, PREF_KEYS } from '../../services/PreferencesDB';
 import UpdateContentPanel from '../UpdateContentPanel';
 
 // How often to re-poll CI build progress while the panel shows an in-progress build.
-const BUILD_PROGRESS_POLL_MS = 5000;
+//
+// A full APK build takes ~17 minutes, and every poll costs two unauthenticated GitHub API
+// requests (the releases listing and the workflow runs). At five seconds that is 24 requests a
+// minute against a 60-per-hour-per-IP limit: the panel used to exhaust the quota inside three
+// minutes and then show "rate limited" for the rest of the hour — including to the automatic
+// check running in the background. Thirty seconds still advances the percentage ~34 times
+// across a build while leaving the quota intact.
+const BUILD_PROGRESS_POLL_MS = 30000;
 
 // The update subpanel. Its content is UpdateContentPanel; what lives here is the
 // check itself — running it, polling a release that is still building, and
@@ -95,10 +102,25 @@ export default function UpdatePanel({ onRegisterTitle, onDone, bottomInset }) {
           releasesUrl: result.releasesUrl || null,
         });
       } else {
-        // Verify any cached APK against the release checksum. A corrupt leftover download is
-        // deleted here so we offer a fresh "Update now" (re-download) instead of an "Install now"
+        // Check any cached APK for the corruption that breaks an install — a leftover truncated
+        // download — so we offer a fresh "Update now" (re-download) rather than an "Install now"
         // that would launch a broken installer.
-        const cached = await verifyCachedApk(result.downloadUrl, { checksumUrl: result.checksumUrl });
+        //
+        // Structure only (`deepVerify: false`): four bytes and the trailing 64KB. The checksum
+        // layer re-reads all 50MB+ through a pure-JS SHA-256, because Hermes ships no native
+        // digest, and running it here is what held this panel on "Checking for updates…" for
+        // tens of seconds with the whole app frozen behind it.
+        //
+        // Skipping it here costs less than it looks. A file only reaches this cache through
+        // downloadAndInstallApk, which checksums it on arrival and deletes it on mismatch, so
+        // this would be re-proving a file that was already proven once — and a background pass
+        // is worse than no pass, because it is still running, and still able to delete the
+        // file, while the user is tapping Install or Re-download on that same file. What the
+        // structural check catches is the corruption that actually reaches this path: a
+        // truncated write. Beyond it, Android's own installer refuses an APK whose signature
+        // does not verify, and the panel's re-download button is there for a cached copy that
+        // turns out to be bad anyway.
+        const cached = await verifyCachedApk(result.downloadUrl, { deepVerify: false });
         // Re-scan the cache so the per-release install buttons reflect reality: a corrupt file just
         // deleted by verifyCachedApk drops out, and a freshly verified one shows as installable.
         await loadDownloadedApks();
