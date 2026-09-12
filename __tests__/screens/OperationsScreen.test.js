@@ -2883,6 +2883,7 @@ describe('OperationsScreen', () => {
   describe('Pending-operations deep link', () => {
     const { act, fireEvent } = require('@testing-library/react-native');
     const { appEvents, EVENTS } = require('../../app/services/eventEmitter');
+    const { QUICK_ADD_UNCLIPPED } = require('../../app/screens/OperationsScreen');
 
     const mockSuggestionsHook = (overrides = {}) => {
       const usePendingOperationSuggestions =
@@ -2978,6 +2979,157 @@ describe('OperationsScreen', () => {
       });
 
       expect(refresh).not.toHaveBeenCalled();
+    });
+
+    // Regression (2026-09-12 log): a bank notification queued a suggestion while
+    // the app was in the background. The block opened for the deck behind a
+    // stopped activity, where a shared-value change never reaches the view, and
+    // the tapped alert landed the user on a page showing no cards and no +
+    // button (it stands down for a deck that was in the tree all along). Nothing
+    // re-issued the open: `quickAddCollapsed` was already false, so the deep
+    // link's setQuickAddExpanded(true) moved nothing. Opening and closing search
+    // moved the clip again and the panel appeared.
+    //
+    // Reanimated's mock hands back a fresh box on every render, which loses the
+    // write history these need, so useSharedValue is re-mocked onto a ref-backed
+    // box with the identity the real hook has. The quick-add clip is the one
+    // created at the unclipped ceiling.
+    const trackSharedValues = () => {
+      const reanimated = require('react-native-reanimated');
+      const previous = reanimated.useSharedValue.getMockImplementation();
+      const boxes = [];
+      reanimated.useSharedValue.mockImplementation((initial) => {
+        // Legal: this runs during render, in the hook slot the real one uses.
+        const ref = React.useRef(null);
+        if (!ref.current) {
+          let current = initial;
+          const box = { initial, commits: 0, modify: () => { box.commits += 1; } };
+          Object.defineProperty(box, 'value', {
+            get: () => current,
+            set: (next) => {
+              // Reanimated's own semantics: an equal write commits nothing.
+              if (next === current) return;
+              current = next;
+              box.commits += 1;
+            },
+          });
+          ref.current = box;
+          boxes.push(box);
+        }
+        return ref.current;
+      });
+      return {
+        clip: () => boxes.find((box) => box.initial === QUICK_ADD_UNCLIPPED),
+        restore: () => reanimated.useSharedValue.mockImplementation(previous),
+      };
+    };
+
+    // An earlier test in this block leaves search open, which collapses the
+    // panel (and the deck with it) regardless of everything below.
+    const withSearchClosed = () => {
+      const { useSearch } = require('../../app/contexts/SearchContext');
+      useSearch.mockReturnValue({
+        searchMode: 'collapsed',
+        filtersExpanded: false,
+        openSearch: jest.fn(),
+        closeSearch: jest.fn(),
+        reopenSearch: jest.fn(),
+        toggleFilters: jest.fn(),
+        registerSearchHandler: jest.fn(),
+      });
+      return () => useSearch.mockReturnValue({
+        registerSearchHandler: jest.fn(),
+        openSearch: jest.fn(),
+      });
+    };
+
+    // What these assert is the COMMIT, not the value. The value was already
+    // right in the failure — a re-write of it commits nothing, which is exactly
+    // how the deck stayed invisible over correct state.
+
+    it('re-commits the clip when a deck that arrived in the background comes back', async () => {
+      const OperationsScreen = require('../../app/screens/OperationsScreen').default;
+      mockSuggestionsHook({ suggestions: [{ id: 'p1', type: 'expense', amount: '10' }] });
+      const restoreSearch = withSearchClosed();
+      const tracker = trackSharedValues();
+      const handlers = [];
+      jest.spyOn(AppState, 'addEventListener').mockImplementation((event, handler) => {
+        if (event === 'change') handlers.push(handler);
+        return { remove: jest.fn() };
+      });
+
+      try {
+        await render(<OperationsScreen />);
+        const clip = tracker.clip();
+        await act(async () => { handlers.forEach((handler) => handler('background')); });
+
+        const before = clip.commits;
+        await act(async () => { handlers.forEach((handler) => handler('active')); });
+
+        expect(clip.commits).toBeGreaterThan(before);
+        expect(clip.value).toBe(QUICK_ADD_UNCLIPPED);
+      } finally {
+        AppState.addEventListener.mockRestore();
+        tracker.restore();
+        restoreSearch();
+      }
+    });
+
+    it('re-commits the clip on the deep link, whose state change a deck swallows', async () => {
+      const OperationsScreen = require('../../app/screens/OperationsScreen').default;
+      mockSuggestionsHook({ suggestions: [{ id: 'p1', type: 'expense', amount: '10' }] });
+      const restoreSearch = withSearchClosed();
+      const tracker = trackSharedValues();
+
+      try {
+        await render(<OperationsScreen />);
+        const clip = tracker.clip();
+        const before = clip.commits;
+
+        await act(async () => {
+          appEvents.emit(EVENTS.OPEN_PENDING_OPERATIONS);
+        });
+
+        expect(clip.commits).toBeGreaterThan(before);
+        expect(clip.value).toBe(QUICK_ADD_UNCLIPPED);
+      } finally {
+        tracker.restore();
+        restoreSearch();
+      }
+    });
+
+    it('re-commits a collapsed clip as collapsed — the return must not open it', async () => {
+      const OperationsScreen = require('../../app/screens/OperationsScreen').default;
+      mockSuggestionsHook();
+      const restoreSearch = withSearchClosed();
+      const tracker = trackSharedValues();
+      const handlers = [];
+      jest.spyOn(AppState, 'addEventListener').mockImplementation((event, handler) => {
+        if (event === 'change') handlers.push(handler);
+        return { remove: jest.fn() };
+      });
+
+      try {
+        // No deck and the panel setting off: nothing holds the block open.
+        const { useDisplaySettings } = require('../../app/contexts/DisplaySettingsContext');
+        useDisplaySettings.mockReturnValue({ attachLocation: false, showQuickAddPanel: false });
+
+        await render(<OperationsScreen />);
+        const clip = tracker.clip();
+        await act(async () => { handlers.forEach((handler) => handler('background')); });
+
+        const before = clip.commits;
+        await act(async () => { handlers.forEach((handler) => handler('active')); });
+
+        expect(clip.commits).toBeGreaterThan(before);
+        expect(clip.value).toBe(0);
+      } finally {
+        AppState.addEventListener.mockRestore();
+        tracker.restore();
+        restoreSearch();
+        require('../../app/contexts/DisplaySettingsContext').useDisplaySettings
+          .mockReturnValue({ attachLocation: false });
+      }
     });
   });
 

@@ -39,9 +39,10 @@ import useOperationPicker from '../hooks/useOperationPicker';
 import useQuickAddForm from '../hooks/useQuickAddForm';
 import useQuickAddLocation from '../hooks/useQuickAddLocation';
 import usePendingOperationSuggestions from '../hooks/usePendingOperationSuggestions';
+import useOnForeground from '../hooks/useOnForeground';
 import { useSearch } from '../contexts/SearchContext';
 import { useDisplaySettings } from '../contexts/DisplaySettingsContext';
-import { TIMING_ENTER, TIMING_EXIT, DURATION_ENTER, DURATION_EXIT, SPRING_SETTLE } from '../utils/motion';
+import { TIMING_ENTER, TIMING_EXIT, DURATION_ENTER, DURATION_EXIT, SPRING_SETTLE, recommitSharedValue } from '../utils/motion';
 import AddFAB, { FAB_BOTTOM_OFFSET } from '../components/AddFAB';
 
 // Note: dynamic createStyles removed to keep linting stable.
@@ -51,7 +52,10 @@ import AddFAB, { FAB_BOTTOM_OFFSET } from '../components/AddFAB';
 // fields appear, a suggestion deck stacks over it) and pinning it to whatever it
 // measured last would slice those off. The collapse animation never travels from
 // here — it starts at the block's measured height (see the searchMode effect).
-const QUICK_ADD_UNCLIPPED = 1000;
+//
+// Exported so a test can tell an open clip from a collapsed one by the value the
+// shared value holds, rather than by repeating the number.
+export const QUICK_ADD_UNCLIPPED = 1000;
 
 // How long after a deck arrives its landing is inspected — long enough for the
 // clip, the card entrance and the layout pass that measures them to settle.
@@ -287,6 +291,36 @@ const OperationsScreen = () => {
       ? withSpring(measured, SPRING_SETTLE, release)
       : withTiming(measured, { ...TIMING_ENTER, duration: DURATION_ENTER }, release);
   }, [quickAddMaxHeight, quickAddTranslateY]);
+
+  // Put the clip's current geometry back on the screen, without moving it.
+  //
+  // applyQuickAddCollapse only runs on a CHANGE of the collapsed state, and a
+  // change written while the app is in the background never reaches the view
+  // (see recommitSharedValue): the value is right, the pixels are the ones from
+  // before the app was paused. That is a deck's normal arrival — a bank
+  // notification queues a suggestion while the user is away, the block opens for
+  // it behind a stopped activity, and when the tapped alert brings the app
+  // forward the panel is still collapsed. Nothing repairs it on its own either:
+  // the deck holds `quickAddCollapsed` false on its own, so the deep link's
+  // setQuickAddExpanded(true) changes nothing and the motion effect has nothing
+  // to play. On 2026-09-12 that left the review deck invisible (with the +
+  // button already stood down for it) until the user opened and closed search.
+  //
+  // So the two moments where this screen comes back into view re-commit what
+  // they find: the return to the foreground, and the deep link itself.
+  const reassertQuickAddClip = useCallback((reason) => {
+    const collapsed = quickAddCollapsedRef.current;
+    const slide = quickAddClipHeightRef.current || 0;
+    console.log('[deck] clip re-assert', { reason, collapsed, slide });
+    // Open re-commits the ceiling rather than the measured height, which is
+    // where an uninterrupted open animation hands it back anyway.
+    recommitSharedValue(quickAddMaxHeight, collapsed ? 0 : QUICK_ADD_UNCLIPPED);
+    recommitSharedValue(quickAddTranslateY, collapsed ? -slide : 0);
+  }, [quickAddMaxHeight, quickAddTranslateY]);
+
+  useOnForeground(useCallback(() => {
+    reassertQuickAddClip('foreground');
+  }, [reassertQuickAddClip]));
 
   // Outer view: clips the content as height collapses
   const animatedQuickAddClipStyle = useAnimatedStyle(() => ({
@@ -1501,12 +1535,17 @@ const OperationsScreen = () => {
     if (isSearchOpen) handleCloseSearch();
     else scrollToTop();
     // The deck is laid over the quick-add form, so a collapsed panel would swallow
-    // the very cards this event exists to show. No-op when the panel is pinned.
+    // the very cards this event exists to show. No-op when the panel is pinned —
+    // and also when a deck already holds the block open, which is the ordinary
+    // case here and the reason for the line below: a state that does not change
+    // plays no motion, so an open that never reached the screen is never retried.
     setQuickAddExpanded(true);
+    reassertQuickAddClip('open-pending');
     refreshSuggestions();
   }, [
     isSearchOpen, handleCloseSearch, scrollToTop, refreshSuggestions,
     showQuickAddPanel, quickAddExpanded, operationSuggestions.length,
+    reassertQuickAddClip,
   ]);
 
   useEffect(
