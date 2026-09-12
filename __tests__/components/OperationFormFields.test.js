@@ -861,4 +861,5 @@ describe('OperationFormFields', () => {
       expect(() => rerender(<OperationFormFields {...props} flashError={{ field: 'category', token: 2 }} />)).not.toThrow();
     });
   });
+
 });

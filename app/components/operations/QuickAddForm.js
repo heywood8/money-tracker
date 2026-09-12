@@ -2,6 +2,7 @@ import React, { memo } from 'react';
 import PropTypes from 'prop-types';
 import { View, StyleSheet } from 'react-native';
 import OperationFormFields from './OperationFormFields';
+import { useQuickAddValues } from '../../hooks/useQuickAddValuesStore';
 import { SPACING, BORDER_RADIUS } from '../../styles/designTokens';
 
 /**
@@ -16,11 +17,16 @@ import { SPACING, BORDER_RADIUS } from '../../styles/designTokens';
  * NOTE: This component uses OperationFormFields for rendering form inputs.
  * If modifying form field behavior, check if changes should be made in
  * OperationFormFields instead to benefit all consumers.
+ *
+ * The form's values come from an external store rather than from a prop, so
+ * typing re-renders this subtree and nothing above it — the form sits in the
+ * Operations list header, and taking the values as a prop meant every character
+ * re-rendered OperationsScreen and handed the SectionList a new header element.
  */
 const QuickAddForm = memo(({
   colors,
   t,
-  quickAddValues,
+  valuesStore,
   setQuickAddValues,
   accounts: visibleAccounts,
   filteredCategories,
@@ -45,6 +51,8 @@ const QuickAddForm = memo(({
   flashError,
   saving = false,
 }) => {
+  const quickAddValues = useQuickAddValues(valuesStore);
+
   const containerThemed = React.useMemo(() => ({
     backgroundColor: colors.background,
   }), [colors]);
@@ -102,7 +110,7 @@ QuickAddForm.displayName = 'QuickAddForm';
 QuickAddForm.propTypes = {
   colors: PropTypes.object.isRequired,
   t: PropTypes.func.isRequired,
-  quickAddValues: PropTypes.object.isRequired,
+  valuesStore: PropTypes.object.isRequired,
   setQuickAddValues: PropTypes.func.isRequired,
   accounts: PropTypes.array,
   filteredCategories: PropTypes.array,

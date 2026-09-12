@@ -1,4 +1,5 @@
 import { useState, useEffect, useCallback, useMemo, useRef } from 'react';
+import { useQuickAddValuesStore } from './useQuickAddValuesStore';
 import { getLastAccessedAccount } from '../services/LastAccount';
 import { getDefaultAccountId } from '../services/PreferencesDB';
 import { getCategoryDisplayName, getCategoryNames } from '../utils/categoryUtils';
@@ -21,19 +22,47 @@ const getCurrencySymbol = (currencyCode) => {
  * Custom hook for managing quick add form state and helpers
  * Handles form values, account/category lookups, and initialization
  */
+const INITIAL_VALUES = {
+  type: 'expense',
+  amount: '',
+  accountId: '',
+  categoryId: '',
+  description: '',
+  toAccountId: '',
+  exchangeRate: '',
+  destinationAmount: '',
+  operationCurrency: '',
+};
+
+// The fields a re-render of the Operations screen actually depends on. They all
+// change on a tap (switching type, picking an account or a category), never on a
+// keystroke. Everything else — amount, exchange rate, destination amount,
+// description — is typed, and only the form itself has to repaint for those, so
+// it subscribes to the store directly.
+const STRUCTURAL_FIELDS = ['type', 'accountId', 'toAccountId', 'categoryId', 'operationCurrency'];
+
+const pickStructural = (values) => {
+  const picked = {};
+  for (const field of STRUCTURAL_FIELDS) picked[field] = values[field];
+  return picked;
+};
+
+const structuralEqual = (a, b) => STRUCTURAL_FIELDS.every(field => a[field] === b[field]);
+
 const useQuickAddForm = (visibleAccounts, accounts, categories, t) => {
-  // Quick add form state
-  const [quickAddValues, setQuickAddValues] = useState({
-    type: 'expense',
-    amount: '',
-    accountId: '',
-    categoryId: '',
-    description: '',
-    toAccountId: '',
-    exchangeRate: '',
-    destinationAmount: '',
-    operationCurrency: '',
-  });
+  // The full form values live in an external store rather than in state, so a
+  // character typed into the amount re-renders the form and nothing above it.
+  // See useQuickAddValuesStore for why.
+  const quickAddValuesStore = useQuickAddValuesStore(INITIAL_VALUES);
+
+  // The structural projection of those values, as ordinary state — this is what
+  // the screen and this hook's own memos read.
+  const [quickAddValues, setStructuralValues] = useState(() => pickStructural(INITIAL_VALUES));
+
+  const setQuickAddValues = useCallback((updater) => {
+    const next = quickAddValuesStore.setValues(updater);
+    setStructuralValues(prev => (structuralEqual(prev, next) ? prev : pickStructural(next)));
+  }, [quickAddValuesStore]);
 
   // Foreign currency preview state
   const [foreignRateSource, setForeignRateSource] = useState(null);
@@ -300,7 +329,10 @@ const useQuickAddForm = (visibleAccounts, accounts, categories, t) => {
   }, [accounts]);
 
   return {
+    // Structural fields only — see STRUCTURAL_FIELDS. Read `quickAddValuesStore`
+    // for the typed fields.
     quickAddValues,
+    quickAddValuesStore,
     setQuickAddValues,
     getAccountName,
     getAccountBalance,

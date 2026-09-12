@@ -24,6 +24,7 @@ import ListCard from '../components/ListCard';
 import OperationsList from '../components/operations/OperationsList';
 import OperationActionMenu from '../components/operations/OperationActionMenu';
 import QuickAddForm from '../components/operations/QuickAddForm';
+import QuickAddRateSync from '../components/operations/QuickAddRateSync';
 import NotificationBindingStack, { deckPeekAllowance, deckCardHeight } from '../components/operations/NotificationBindingStack';
 import PickerModal from '../components/operations/PickerModal';
 import UndoSnackbar, { UNDO_DURATION_MS } from '../components/operations/UndoSnackbar';
@@ -295,7 +296,11 @@ const OperationsScreen = () => {
 
   // Custom hooks for form and picker management
   const {
+    // Structural fields only (type / accounts / category / currency). The typed
+    // fields live in quickAddValuesStore so a keystroke does not re-render this
+    // screen — see useQuickAddValuesStore.
     quickAddValues,
+    quickAddValuesStore,
     setQuickAddValues,
     getAccountName,
     getAccountBalance,
@@ -607,102 +612,11 @@ const OperationsScreen = () => {
     }
   }, [pendingScroll, scrollToDateString, listLoading, groupedOperations]);
 
-  // Clear a stale exchange rate when the transfer's currency PAIR changes (e.g.
-  // destination switched from a EUR account to an AMD account). The auto-populate
-  // effect below only fires when exchangeRate is empty, so without this reset the
-  // old pair's rate would be applied to the new pair.
-  const ratePairRef = useRef(null);
-  useEffect(() => {
-    if (!isMultiCurrencyTransfer || !sourceAccount || !destinationAccount) {
-      ratePairRef.current = null;
-      return;
-    }
-    const pair = `${sourceAccount.currency}:${destinationAccount.currency}`;
-    if (ratePairRef.current && ratePairRef.current !== pair && quickAddValues.exchangeRate) {
-      setQuickAddValues(v => ({ ...v, exchangeRate: '', destinationAmount: '' }));
-      setLastEditedField(null);
-    }
-    ratePairRef.current = pair;
-  }, [isMultiCurrencyTransfer, sourceAccount, destinationAccount, quickAddValues.exchangeRate]);
-
-  // Auto-populate exchange rate when multi-currency transfer accounts change (async with live rate)
-  useEffect(() => {
-    if (!isMultiCurrencyTransfer || !sourceAccount || !destinationAccount || quickAddValues.exchangeRate) {
-      return;
-    }
-
-    let cancelled = false;
-    setRateSource('loading');
-
-    Currency.fetchLiveExchangeRate(sourceAccount.currency, destinationAccount.currency)
-      .then(({ rate, source }) => {
-        if (cancelled) return;
-        if (rate) {
-          setQuickAddValues(v => ({ ...v, exchangeRate: rate }));
-          setLastEditedField('exchangeRate');
-        }
-        setRateSource(source === 'live' ? 'live' : 'offline');
-      })
-      .catch(() => {
-        if (cancelled) return;
-        const rate = Currency.getExchangeRate(sourceAccount.currency, destinationAccount.currency);
-        if (rate) {
-          setQuickAddValues(v => ({ ...v, exchangeRate: rate }));
-          setLastEditedField('exchangeRate');
-        }
-        setRateSource('offline');
-      });
-
-    return () => { cancelled = true; };
-  }, [isMultiCurrencyTransfer, sourceAccount, destinationAccount, quickAddValues.exchangeRate]);
-
-  // Auto-calculate multi-currency fields based on which field was last edited
-  useEffect(() => {
-    if (!isMultiCurrencyTransfer) {
-      // Clear exchange rate fields for same-currency transfers
-      if (quickAddValues.exchangeRate || quickAddValues.destinationAmount) {
-        setQuickAddValues(v => ({ ...v, exchangeRate: '', destinationAmount: '' }));
-        setLastEditedField(null);
-      }
-      return;
-    }
-
-    if (!sourceAccount || !destinationAccount) return;
-
-    // If user edited destination amount, calculate the rate
-    if (lastEditedField === 'destinationAmount') {
-      if (quickAddValues.amount && quickAddValues.destinationAmount) {
-        const sourceAmount = parseFloat(quickAddValues.amount);
-        const destAmount = parseFloat(quickAddValues.destinationAmount);
-
-        if (!isNaN(sourceAmount) && !isNaN(destAmount) && sourceAmount > 0) {
-          const calculatedRate = (destAmount / sourceAmount).toFixed(6);
-          const currentRate = parseFloat(quickAddValues.exchangeRate || '0');
-          const newRate = parseFloat(calculatedRate);
-          if (Math.abs(currentRate - newRate) > 0.000001) {
-            setQuickAddValues(v => ({ ...v, exchangeRate: calculatedRate }));
-          }
-        }
-      }
-    }
-    // If user edited amount or rate, calculate destination amount.
-    // Skip while the amount holds an unevaluated calculator expression ("10+5"):
-    // convertAmount would coerce it to 0 and persist destinationAmount "0.00".
-    else if (lastEditedField === 'amount' || lastEditedField === 'exchangeRate') {
-      if (quickAddValues.amount && quickAddValues.exchangeRate && !hasOperation(quickAddValues.amount)) {
-        const converted = Currency.convertAmount(
-          quickAddValues.amount,
-          sourceAccount.currency,
-          destinationAccount.currency,
-          quickAddValues.exchangeRate,
-        );
-        if (converted && converted !== quickAddValues.destinationAmount) {
-          setQuickAddValues(v => ({ ...v, destinationAmount: converted }));
-        }
-      }
-    }
-  }, [isMultiCurrencyTransfer, quickAddValues.amount, quickAddValues.exchangeRate, quickAddValues.destinationAmount, sourceAccount, destinationAccount, lastEditedField]);
-
+  // The three effects that keep a cross-currency transfer's rate and destination
+  // amount in step with the typed amount now live in <QuickAddRateSync />, a
+  // headless component mounted inside the quick-add subtree. They depended on
+  // the typed fields, so keeping them here made every keystroke re-render this
+  // whole screen.
 
   const handleEditOperation = useCallback((operation) => {
     setEditingOperation(operation);
@@ -821,10 +735,20 @@ const OperationsScreen = () => {
     }
   }, [groupedOperations, jumpToDate]);
 
-  // Quick add handlers
-  const performQuickAdd = useCallback(async (overrideCategoryId, overrideToAccountId) => {
+  // Quick add handlers.
+  //
+  // `capturedValues` is the form's values as of the moment the add was
+  // requested. The auto-add shortcuts clear the form before calling, so they
+  // capture first and pass them in; everything else reads the current snapshot.
+  // This used to work by accident: the values were `useState` on this screen, so
+  // a caller that reset the form still held the pre-reset render's values. They
+  // are an external store now, where a write is visible immediately, so the
+  // ordering is spelled out instead of inferred.
+  const performQuickAdd = useCallback(async (overrideCategoryId, overrideToAccountId, capturedValues) => {
+    const formValues = capturedValues ?? quickAddValuesStore.getSnapshot();
+
     // Automatically evaluate any pending math operation before saving
-    let finalAmount = quickAddValues.amount;
+    let finalAmount = formValues.amount;
 
     if (hasOperation(finalAmount)) {
       const evaluated = evaluateExpression(finalAmount, Currency.getDecimalPlaces(sourceAccount?.currency));
@@ -834,12 +758,12 @@ const OperationsScreen = () => {
     }
 
     const operationData = {
-      ...quickAddValues,
+      ...formValues,
       amount: finalAmount, // Use the evaluated amount
       // Use override categoryId if provided (for auto-add from category selection)
-      categoryId: overrideCategoryId !== undefined ? overrideCategoryId : quickAddValues.categoryId,
+      categoryId: overrideCategoryId !== undefined ? overrideCategoryId : formValues.categoryId,
       // Use override toAccountId if provided (for auto-add from transfer target shortcuts)
-      toAccountId: overrideToAccountId !== undefined ? overrideToAccountId : quickAddValues.toAccountId,
+      toAccountId: overrideToAccountId !== undefined ? overrideToAccountId : formValues.toAccountId,
       date: toDateString(new Date()),
     };
 
@@ -986,8 +910,8 @@ const OperationsScreen = () => {
       }
 
       // Save last accessed account
-      if (quickAddValues.accountId) {
-        setLastAccessedAccount(quickAddValues.accountId);
+      if (formValues.accountId) {
+        setLastAccessedAccount(formValues.accountId);
       }
 
       // Reset form but keep account and type
@@ -1018,18 +942,18 @@ const OperationsScreen = () => {
       // Errors from addOperation are already shown via dialog.
       // Errors from getDistinctLabels are non-critical — suggestion row simply won't appear.
     }
-  }, [quickAddValues, validateOperation, addOperation, t, showDialog, accounts, resetForm, lastEditedField, getQuickAddLocation]);
+  }, [quickAddValuesStore, sourceAccount, validateOperation, addOperation, t, showDialog, accounts, resetForm, lastEditedField, getQuickAddLocation]);
 
   // A second tap on Add while the first save is still pending used to book the same
   // operation twice — the DB write is async, and a cross-currency entry awaits a live
   // exchange-rate fetch before it even reaches the write. Guard every entry point
   // (the Add button and both auto-add shortcuts route through here).
-  const handleQuickAdd = useCallback(async (overrideCategoryId, overrideToAccountId) => {
+  const handleQuickAdd = useCallback(async (overrideCategoryId, overrideToAccountId, capturedValues) => {
     if (quickAddSavingRef.current) return;
     quickAddSavingRef.current = true;
     setQuickAddSaving(true);
     try {
-      await performQuickAdd(overrideCategoryId, overrideToAccountId);
+      await performQuickAdd(overrideCategoryId, overrideToAccountId, capturedValues);
     } finally {
       quickAddSavingRef.current = false;
       setQuickAddSaving(false);
@@ -1038,22 +962,27 @@ const OperationsScreen = () => {
 
   // Handler for auto-add with category (from picker)
   const handleAutoAddWithCategory = useCallback(async (categoryId) => {
-    // Clear form immediately to avoid showing old values during save
+    // Capture BEFORE clearing: the form is cleared immediately so the user never
+    // sees stale values during the save, and the store makes that clear visible
+    // at once.
+    const capturedValues = quickAddValuesStore.getSnapshot();
     resetForm();
     closePicker();
 
     // Pass the selected categoryId directly to avoid race conditions
-    await handleQuickAdd(categoryId);
-  }, [resetForm, closePicker, handleQuickAdd]);
+    await handleQuickAdd(categoryId, undefined, capturedValues);
+  }, [quickAddValuesStore, resetForm, closePicker, handleQuickAdd]);
 
   // Handler for auto-add with target account (from transfer target shortcuts)
   const handleAutoAddWithAccount = useCallback(async (toAccountId) => {
+    // Captured before the reset, for the same reason as above.
+    const capturedValues = quickAddValuesStore.getSnapshot();
     resetForm();
     closePicker();
 
     // Pass undefined for categoryId override, pass toAccountId override
-    await handleQuickAdd(undefined, toAccountId);
-  }, [resetForm, closePicker, handleQuickAdd]);
+    await handleQuickAdd(undefined, toAccountId, capturedValues);
+  }, [quickAddValuesStore, resetForm, closePicker, handleQuickAdd]);
 
   // Apply a suggested label by APPENDING it to the operation's existing labels.
   // The row stays open so the user can add several labels in a row; the applied
@@ -1292,7 +1221,7 @@ const OperationsScreen = () => {
               <QuickAddForm
                 colors={colors}
                 t={t}
-                quickAddValues={quickAddValues}
+                valuesStore={quickAddValuesStore}
                 setQuickAddValues={setQuickAddValues}
                 accounts={visibleAccounts}
                 filteredCategories={filteredCategories}
@@ -1317,6 +1246,16 @@ const OperationsScreen = () => {
                 flashError={quickAddFlash}
                 saving={quickAddSaving}
               />
+              <QuickAddRateSync
+                valuesStore={quickAddValuesStore}
+                setValues={setQuickAddValues}
+                isMultiCurrencyTransfer={isMultiCurrencyTransfer}
+                sourceAccount={sourceAccount}
+                destinationAccount={destinationAccount}
+                lastEditedField={lastEditedField}
+                setLastEditedField={setLastEditedField}
+                setRateSource={setRateSource}
+              />
             </View>
             {hasSuggestions && (
               <NotificationBindingStack
@@ -1338,7 +1277,7 @@ const OperationsScreen = () => {
       </Animated.View>
       {filtersExpanded && filterPanelHeight > 0 && <View style={{ height: filterPanelHeight }} />}
     </>
-  ), [animatedQuickAddClipStyle, animatedQuickAddSlideStyle, handleQuickAddClipLayout, quickAddCollapsed, colors, t, quickAddValues, visibleAccounts, filteredCategories, topCategoriesForType, getCategoryInfo, getAccountName, getAccountBalance, getCategoryName, openPicker, handleQuickAdd, handleAmountChange, handleExchangeRateChange, handleDestinationAmountChange, handleAutoAddWithCategory, topTransferAccountsForForm, handleAutoAddWithAccount, TYPES, rateSource, handleOperationCurrencyChange, foreignRateSource, foreignExchangeRate, filterPanelHeight, filtersExpanded, quickAddFlash, quickAddSaving, operationSuggestions, hasSuggestions, quickAddHeight, handleQuickAddLayout, handleDeckHostLayout, accounts, categories, suggestionSaveErrors, suggestionChoices, setSuggestionChoice, acceptSuggestion, dismissSuggestion]);
+  ), [animatedQuickAddClipStyle, animatedQuickAddSlideStyle, handleQuickAddClipLayout, quickAddCollapsed, colors, t, quickAddValuesStore, setQuickAddValues, isMultiCurrencyTransfer, sourceAccount, destinationAccount, lastEditedField, setLastEditedField, setRateSource, visibleAccounts, filteredCategories, topCategoriesForType, getCategoryInfo, getAccountName, getAccountBalance, getCategoryName, openPicker, handleQuickAdd, handleAmountChange, handleExchangeRateChange, handleDestinationAmountChange, handleAutoAddWithCategory, topTransferAccountsForForm, handleAutoAddWithAccount, TYPES, rateSource, handleOperationCurrencyChange, foreignRateSource, foreignExchangeRate, filterPanelHeight, filtersExpanded, quickAddFlash, quickAddSaving, operationSuggestions, hasSuggestions, quickAddHeight, handleQuickAddLayout, handleDeckHostLayout, accounts, categories, suggestionSaveErrors, suggestionChoices, setSuggestionChoice, acceptSuggestion, dismissSuggestion]);
 
   // Auto-scroll to top when filter panel closes, but only if the user is still
   // near the top (hasn't scrolled into past dates). The threshold is filterPanelHeight:
@@ -1620,6 +1559,7 @@ const OperationsScreen = () => {
         onSelectToAccount={handleSelectToAccount}
         categoryType={quickAddValues.type === 'income' ? 'income' : 'expense'}
         quickAddValues={quickAddValues}
+        valuesStore={quickAddValuesStore}
         onSelectCategory={handleSelectCategory}
         onAutoAddWithCategory={handleAutoAddWithCategory}
         onAutoAddWithAccount={handleAutoAddWithAccount}

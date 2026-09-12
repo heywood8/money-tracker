@@ -80,7 +80,15 @@ describe('useQuickAddForm', () => {
         useQuickAddForm(mockAccounts, mockAccounts, mockCategories, mockT),
       );
 
+      // `quickAddValues` carries the structural fields only — the ones the
+      // Operations screen has to re-render for. The typed fields live in the
+      // store, so a keystroke never reaches the screen.
       expect(result.current.quickAddValues).toMatchObject({
+        type: 'expense',
+        categoryId: '',
+        toAccountId: '',
+      });
+      expect(result.current.quickAddValuesStore.getSnapshot()).toMatchObject({
         type: 'expense',
         amount: '',
         categoryId: '',
@@ -589,11 +597,14 @@ describe('useQuickAddForm', () => {
 
       expect(result.current.quickAddValues).toMatchObject({
         type: 'income',
-        amount: '',
         accountId: 'acc-2',
         categoryId: '',
-        description: '',
         toAccountId: '',
+      });
+      // The typed fields are cleared in the store.
+      expect(result.current.quickAddValuesStore.getSnapshot()).toMatchObject({
+        amount: '',
+        description: '',
         exchangeRate: '',
         destinationAmount: '',
       });
@@ -614,7 +625,8 @@ describe('useQuickAddForm', () => {
         }));
       });
 
-      expect(result.current.quickAddValues.amount).toBe('50');
+      // The typed field goes to the store; the structural one to state.
+      expect(result.current.quickAddValuesStore.getSnapshot().amount).toBe('50');
       expect(result.current.quickAddValues.categoryId).toBe('cat-1');
     });
   });
@@ -1011,7 +1023,7 @@ describe('useQuickAddForm', () => {
       });
 
       expect(result.current.quickAddValues.operationCurrency).toBe('USD');
-      expect(result.current.quickAddValues.amount).toBe('');
+      expect(result.current.quickAddValuesStore.getSnapshot().amount).toBe('');
     });
   });
 
@@ -1086,7 +1098,7 @@ describe('useQuickAddForm', () => {
 
       expect(result.current.quickAddValues.accountId).toBe('acc-2');
       expect(result.current.quickAddValues.operationCurrency).toBe('EUR');
-      expect(result.current.quickAddValues.amount).toBe('42');
+      expect(result.current.quickAddValuesStore.getSnapshot().amount).toBe('42');
     });
 
     it('re-picks a default when the chosen account disappears from the visible list', async () => {
@@ -1128,8 +1140,8 @@ describe('useQuickAddForm', () => {
 
       rerender();
 
-      expect(result.current.quickAddValues.amount).toBe('100');
-      expect(result.current.quickAddValues.description).toBe('Test');
+      expect(result.current.quickAddValuesStore.getSnapshot().amount).toBe('100');
+      expect(result.current.quickAddValuesStore.getSnapshot().description).toBe('Test');
     });
   });
 
