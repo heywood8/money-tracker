@@ -14,7 +14,9 @@ import { motionDuration } from '../../utils/reducedMotion';
 /**
  * UndoSnackbar
  *
- * A transient "just-added" snackbar. It is rendered by OperationsScreen as a
+ * A transient "just did that" snackbar — a just-added operation, or a just-
+ * deleted one whose deletion is deferred until this bar's window closes (see
+ * OperationsScreen's deferred-delete handlers). It is rendered by OperationsScreen as a
  * floating overlay pinned just above the tab bar — deliberately OUTSIDE the
  * operations SectionList. Rendering it inline inside a virtualized list cell
  * used to fight `getItemLayout` + `removeClippedSubviews`: the cell's reported
@@ -31,7 +33,7 @@ import { motionDuration } from '../../utils/reducedMotion';
  *    the exit animation completes (whether dismissed by timeout or Undo tap).
  *
  * Mount this conditionally with a changing `key` (e.g. an incrementing token)
- * so each new operation restarts the entry animation and countdown cleanly.
+ * so each new action restarts the entry animation and countdown cleanly.
  */
 // Shared with OperationsScreen's fallback cleanup: a belt-and-suspenders timer
 // that clears the parent's undo state even if this component's exit animation
@@ -42,6 +44,10 @@ const UndoSnackbar = ({
   operationId,
   message,
   actionLabel,
+  // What the bar is reporting. Defaults to the "added" tick; a deferred delete
+  // passes its own glyph so the bar reads as the undo window for a removal
+  // rather than a confirmation that something was created.
+  icon = 'check-circle',
   // Must be an ES6 default, not defaultProps: React 19 removed defaultProps for
   // function components, so an omitted `duration` would arrive as undefined and
   // collapse the visible window to a couple of frames (setTimeout(fn, undefined)
@@ -128,7 +134,7 @@ const UndoSnackbar = ({
     >
       <View style={styles.content}>
         <Icon
-          name="check-circle"
+          name={icon}
           size={ICON_SIZE.md}
           color={colors.primary}
         />
@@ -213,6 +219,7 @@ UndoSnackbar.propTypes = {
   operationId: PropTypes.string.isRequired,
   message: PropTypes.string.isRequired,
   actionLabel: PropTypes.string.isRequired,
+  icon: PropTypes.string,
   duration: PropTypes.number,
   colors: PropTypes.shape({
     surface: PropTypes.string.isRequired,

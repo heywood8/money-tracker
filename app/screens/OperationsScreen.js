@@ -1,5 +1,5 @@
 import React, { useState, useMemo, useCallback, useEffect, useRef } from 'react';
-import { View, StyleSheet, FlatList, TouchableOpacity, TextInput, Pressable, Modal, Keyboard, BackHandler } from 'react-native';
+import { View, StyleSheet, FlatList, TouchableOpacity, TextInput, Pressable, Modal, Keyboard, BackHandler, AppState } from 'react-native';
 import Animated, { useSharedValue, useAnimatedStyle, withTiming, withSpring } from 'react-native-reanimated';
 import Icon from '@expo/vector-icons/MaterialCommunityIcons';
 import DateTimePicker from '@react-native-community/datetimepicker';
@@ -150,11 +150,22 @@ const OperationsScreen = () => {
   // a ref so applying a label does not depend on the freshly-created operation
   // having already been re-loaded into `operations` (which is async).
   const pendingOpDescRef = useRef('');
-  // Undo bar for a just-added operation. `token` bumps on every add so the
-  // snackbar remounts (restarting its countdown/animation) when operations are
-  // added back-to-back within the 5-second window.
-  const [undoInfo, setUndoInfo] = useState(null); // null | { id, token }
+  // Undo bar for the last reversible action — a just-added operation or a
+  // just-deleted one. `token` bumps on every action so the snackbar remounts
+  // (restarting its countdown/animation) when actions land back-to-back within
+  // the 5-second window.
+  const [undoInfo, setUndoInfo] = useState(null); // null | { kind: 'add' | 'delete', id, token }
   const undoTokenRef = useRef(0);
+  // Operations hidden from the list because a delete is in flight for them. An
+  // id goes in the moment Delete is tapped and comes out either on Undo (the
+  // row returns untouched) or once the committed delete has actually dropped it
+  // from `operations` — never in between, or the row would flash back for the
+  // frames between commit and reload.
+  const [hiddenOperationIds, setHiddenOperationIds] = useState(() => new Set());
+  // The single id whose deletion is still deferred (its undo window is open).
+  // A ref, not state: the commit path has to read it synchronously from an
+  // unmount cleanup and from a second delete landing in the same frame.
+  const pendingDeleteRef = useRef(null);
   // Long-press quick-action menu on a row: null | { operation, layout, row }
   const [actionMenu, setActionMenu] = useState(null);
   const [filterPanelHeight, setFilterPanelHeight] = useState(0);
@@ -500,7 +511,13 @@ const OperationsScreen = () => {
   // reference it in their dependency arrays; declaring later would put it in
   // the Temporal Dead Zone when those arrays are evaluated during render.
   const groupedOperations = useMemo(() => {
-    const sorted = [...operations].sort((a, b) => new Date(b.date) - new Date(a.date));
+    // Rows whose delete is in flight are dropped here rather than at the list:
+    // the day's spending sums are accumulated in this same pass, so filtering
+    // further down would leave a deleted row's amount in the header total.
+    const visible = hiddenOperationIds.size === 0
+      ? operations
+      : operations.filter(operation => !hiddenOperationIds.has(operation.id));
+    const sorted = [...visible].sort((a, b) => new Date(b.date) - new Date(a.date));
     const groups = [];
     let currentGroup = null;
 
@@ -543,7 +560,7 @@ const OperationsScreen = () => {
     });
 
     return groups;
-  }, [operations, accounts]);
+  }, [operations, accounts, hiddenOperationIds]);
 
   // Scroll to date after operations are loaded
   useEffect(() => {
@@ -624,20 +641,120 @@ const OperationsScreen = () => {
     setModalVisible(true);
   }, []);
 
+  // Drop any label suggestions aimed at an operation that is going away, so the
+  // suggestion row never points at a row the user can no longer see.
+  const dropSuggestionsFor = useCallback((operationId) => {
+    setPendingSuggestionId((prev) => {
+      if (prev === operationId) {
+        setPendingSuggestions([]);
+        return null;
+      }
+      return prev;
+    });
+  }, []);
+
+  const unhideOperation = useCallback((operationId) => {
+    setHiddenOperationIds((prev) => {
+      if (!prev.has(operationId)) return prev;
+      const next = new Set(prev);
+      next.delete(operationId);
+      return next;
+    });
+  }, []);
+
+  // Run the deferred delete for real. Every path that closes an undo window
+  // funnels through here, and the ref flips before the call so a timeout racing
+  // an unmount (or a second delete) can only commit once.
+  const commitPendingDelete = useCallback(() => {
+    const id = pendingDeleteRef.current;
+    if (!id) return;
+    pendingDeleteRef.current = null;
+    // The id deliberately stays in `hiddenOperationIds` until the delete lands
+    // and drops it from `operations`; clearing it here would flash the row back
+    // for the frames between the two.
+    dropSuggestionsFor(id);
+    // deleteOperation reports its own failures via dialog and then rethrows, so
+    // catch here: an uncaught rejection from this fire-and-forget call would be
+    // noise, and a row that is still in the ledger has to become visible again.
+    Promise.resolve(deleteOperation(id)).catch(() => unhideOperation(id));
+  }, [deleteOperation, dropSuggestionsFor, unhideOperation]);
+
+  // A single bar serves every undoable action, so raising a new one closes the
+  // previous one's window — a deferred delete losing its bar must be committed
+  // here, not silently dropped.
+  const showUndo = useCallback((kind, id) => {
+    commitPendingDelete();
+    undoTokenRef.current += 1;
+    setUndoInfo({ kind, id, token: undoTokenRef.current });
+  }, [commitPendingDelete]);
+
+  // Delete is optimistic: the row leaves the list at once and the real delete
+  // waits out the undo window, so the common case costs one tap instead of a
+  // blocking confirmation. Nothing has touched the database yet, which is why
+  // Undo restores the row, the balance and the balance-history point exactly.
   const handleDeleteOperation = useCallback((operation) => {
-    showDialog(
-      t('delete_operation'),
-      t('delete_operation_confirm'),
-      [
-        { text: t('cancel'), style: 'cancel' },
-        {
-          text: t('delete'),
-          style: 'destructive',
-          onPress: () => deleteOperation(operation.id),
-        },
-      ],
-    );
-  }, [t, showDialog, deleteOperation]);
+    const id = operation?.id;
+    if (!id) return;
+    // Commits any delete still pending (showUndo) before this one takes the bar.
+    showUndo('delete', id);
+    pendingDeleteRef.current = id;
+    setHiddenOperationIds((prev) => {
+      if (prev.has(id)) return prev;
+      const next = new Set(prev);
+      next.add(id);
+      return next;
+    });
+  }, [showUndo]);
+
+  // Undo a deferred delete: the operation was never touched, so un-hiding the
+  // row is the whole restore — balance and balance-history point included.
+  const handleUndoDelete = useCallback((operationId) => {
+    if (pendingDeleteRef.current === operationId) pendingDeleteRef.current = null;
+    unhideOperation(operationId);
+  }, [unhideOperation]);
+
+  // Stop hiding ids the committed delete has actually removed from `operations`.
+  // The pending id is exempt: it is still in the list on purpose.
+  useEffect(() => {
+    setHiddenOperationIds((prev) => {
+      if (prev.size === 0) return prev;
+      const next = new Set();
+      prev.forEach((id) => {
+        if (id === pendingDeleteRef.current || operations.some(op => op.id === id)) next.add(id);
+      });
+      return next.size === prev.size ? prev : next;
+    });
+  }, [operations]);
+
+  // Close the window for good: commit whatever delete was deferred and retire the
+  // bar. The token bump invalidates the outgoing bar's pending `onClosed` so it
+  // cannot reopen or re-commit anything.
+  const endUndoWindow = useCallback(() => {
+    commitPendingDelete();
+    undoTokenRef.current += 1;
+    setUndoInfo(null);
+  }, [commitPendingDelete]);
+
+  // The undo window does not outlive the app being put away. SimpleTabs keeps
+  // this screen mounted for the whole session, so backgrounding — not unmounting
+  // — is what normally ends it, and Android freezes JS timers on pause: a bar
+  // left standing would return still counting down, with an Undo that silently
+  // does nothing (the delete is committed) or, for an add, deletes an operation
+  // the user logged minutes ago. So commit and dismiss on the way out. The ref
+  // keeps the subscription mount-scoped instead of re-subscribing on every
+  // deleteOperation identity.
+  const endUndoWindowRef = useRef(endUndoWindow);
+  useEffect(() => { endUndoWindowRef.current = endUndoWindow; });
+  useEffect(() => {
+    const subscription = AppState.addEventListener('change', (nextState) => {
+      if (nextState === 'background' || nextState === 'inactive') endUndoWindowRef.current();
+    });
+    return () => {
+      // A stubbed AppState (unit environments) hands back nothing to remove.
+      subscription?.remove?.();
+      endUndoWindowRef.current();
+    };
+  }, []);
 
   // Duplicate an existing operation onto today — a one-tap "log this again" for
   // recurring daily entries. All money-bearing fields (amount, accounts,
@@ -651,13 +768,12 @@ const OperationsScreen = () => {
     try {
       const createdOperation = await addOperation(duplicate);
       if (createdOperation?.id) {
-        undoTokenRef.current += 1;
-        setUndoInfo({ id: createdOperation.id, token: undoTokenRef.current });
+        showUndo('add', createdOperation.id);
       }
     } catch (error) {
       // addOperation already surfaces failures via dialog.
     }
-  }, [addOperation]);
+  }, [addOperation, showUndo]);
 
   // Long-press on a row lifts it above a blurred backdrop and floats an icon
   // action bar over it (OperationActionMenu). Edit repeats the tap behaviour;
@@ -905,8 +1021,7 @@ const OperationsScreen = () => {
 
       // Offer a brief window to undo the just-created operation.
       if (createdOperation?.id) {
-        undoTokenRef.current += 1;
-        setUndoInfo({ id: createdOperation.id, token: undoTokenRef.current });
+        showUndo('add', createdOperation.id);
       }
 
       // Save last accessed account
@@ -942,7 +1057,7 @@ const OperationsScreen = () => {
       // Errors from addOperation are already shown via dialog.
       // Errors from getDistinctLabels are non-critical — suggestion row simply won't appear.
     }
-  }, [quickAddValuesStore, sourceAccount, validateOperation, addOperation, t, showDialog, accounts, resetForm, lastEditedField, getQuickAddLocation]);
+  }, [quickAddValuesStore, sourceAccount, validateOperation, addOperation, t, showDialog, accounts, resetForm, lastEditedField, getQuickAddLocation, showUndo]);
 
   // A second tap on Add while the first save is still pending used to book the same
   // operation twice — the DB write is async, and a cross-currency entry awaits a live
@@ -1030,21 +1145,31 @@ const OperationsScreen = () => {
   // Undo a just-added operation: delete it and drop any label suggestions that
   // targeted it (otherwise the suggestion row would point at a deleted op).
   const handleUndoAdd = useCallback((operationId) => {
-    deleteOperation(operationId);
-    setPendingSuggestionId((prev) => {
-      if (prev === operationId) {
-        setPendingSuggestions([]);
-        return null;
-      }
-      return prev;
-    });
-  }, [deleteOperation]);
+    // deleteOperation reports its own failure via dialog and then rethrows; the
+    // catch keeps this fire-and-forget call from raising an unhandled rejection.
+    Promise.resolve(deleteOperation(operationId)).catch(() => {});
+    dropSuggestionsFor(operationId);
+  }, [deleteOperation, dropSuggestionsFor]);
 
-  // `operationId` guards against a stale close: a previous bar finishing its
-  // exit fade must not clear the undo state of a newer operation's bar.
-  const handleUndoClosed = useCallback((operationId) => {
-    setUndoInfo(prev => (prev && operationId != null && prev.id !== operationId) ? prev : null);
-  }, []);
+  // Keyed on the bar's token — `undoTokenRef` always holds the newest one — so a
+  // previous bar finishing its exit fade neither clears nor commits the window a
+  // newer bar now owns. The operation id cannot do this job: deleting a row,
+  // undoing, and deleting it again all inside one 200ms fade produces two bars
+  // for the same id, and the outgoing one would close the incoming one's window.
+  const handleUndoClosed = useCallback((token) => {
+    if (token !== undoTokenRef.current) return;
+    // The window closed without an Undo tap, so the deferred delete is final.
+    // (Undo clears the ref first, so this is a no-op on that path.)
+    commitPendingDelete();
+    setUndoInfo(null);
+  }, [commitPendingDelete]);
+
+  // One closure per bar, so the memoized snackbar is not handed a new callback
+  // on every parent render while its countdown is running.
+  const handleBarClosed = useMemo(() => {
+    const token = undoInfo?.token;
+    return () => handleUndoClosed(token);
+  }, [undoInfo?.token, handleUndoClosed]);
 
   // Fallback cleanup: the snackbar's onClosed is the normal path, but it won't
   // fire if the exit animation drops its completion callback. Without this, a
@@ -1052,9 +1177,9 @@ const OperationsScreen = () => {
   // window has long since passed.
   useEffect(() => {
     if (!undoInfo) return undefined;
-    const timer = setTimeout(() => setUndoInfo(null), UNDO_DURATION_MS + 1500);
+    const timer = setTimeout(() => handleUndoClosed(undoInfo.token), UNDO_DURATION_MS + 1500);
     return () => clearTimeout(timer);
-  }, [undoInfo]);
+  }, [undoInfo, handleUndoClosed]);
 
   // Keep the suggestion row in sync with the operation's current labels. When the
   // op is (re)loaded, refresh the ref and drop any suggestions already applied —
@@ -1508,11 +1633,12 @@ const OperationsScreen = () => {
           <UndoSnackbar
             key={undoInfo.token}
             operationId={undoInfo.id}
-            message={t('operation_added')}
+            message={undoInfo.kind === 'delete' ? t('operation_deleted') : t('operation_added')}
+            icon={undoInfo.kind === 'delete' ? 'trash-can-outline' : 'check-circle'}
             actionLabel={t('undo')}
             colors={colors}
-            onUndo={handleUndoAdd}
-            onClosed={handleUndoClosed}
+            onUndo={undoInfo.kind === 'delete' ? handleUndoDelete : handleUndoAdd}
+            onClosed={handleBarClosed}
           />
         </View>
       )}

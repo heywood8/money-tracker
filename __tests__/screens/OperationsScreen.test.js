@@ -5,8 +5,10 @@
  */
 
 import React from 'react';
-import { render, waitFor, act } from '@testing-library/react-native';
+import { Animated, AppState } from 'react-native';
+import { render, waitFor, act, fireEvent } from '@testing-library/react-native';
 import { SUGGESTION_TIMEOUT_MS } from '../../app/components/operations/DescriptionSuggestionRow';
+import { UNDO_DURATION_MS } from '../../app/components/operations/UndoSnackbar';
 
 // Mock all dependencies
 jest.mock('../../app/contexts/ThemeColorsContext', () => ({
@@ -990,10 +992,11 @@ describe('OperationsScreen', () => {
       const { useOperationsActions } = require('../../app/contexts/OperationsActionsContext');
 
       const mockShowDialog = jest.fn();
+      const mockDeleteOperation = jest.fn();
       useDialog.mockReturnValue({ showDialog: mockShowDialog });
 
       useOperationsData.mockReturnValue({
-        operations: [],
+        operations: [{ id: '1', type: 'expense', amount: '100.00', accountId: 'acc-1', date: '2024-01-15' }],
         loading: false,
         loadingMore: false,
         hasMoreOperations: false,
@@ -1002,7 +1005,7 @@ describe('OperationsScreen', () => {
       });
 
       useOperationsActions.mockReturnValue({
-        deleteOperation: jest.fn(),
+        deleteOperation: mockDeleteOperation,
         addOperation: jest.fn(),
         validateOperation: jest.fn(() => null),
         loadMoreOperations: jest.fn(),
@@ -1022,8 +1025,12 @@ describe('OperationsScreen', () => {
         modal.props.onDelete({ id: '1', type: 'expense', amount: '100.00' });
       });
 
-      // Verify showDialog was called (translation key may vary based on mock)
-      expect(mockShowDialog).toHaveBeenCalled();
+      // Issue #1712: delete no longer blocks on a confirmation dialog — the row
+      // leaves the list at once and the undo bar owns the window.
+      expect(mockShowDialog).not.toHaveBeenCalled();
+      expect(mockDeleteOperation).not.toHaveBeenCalled();
+      expect(getByTestId('undo-snackbar')).toBeTruthy();
+      expect(getByTestId('operations-list').props.groupedOperations).toEqual([]);
     });
 
     it('handleCloseOperationModal sets operation modal not visible', async () => {
@@ -3352,6 +3359,235 @@ describe('OperationsScreen', () => {
       // header element.
       expect(headerComponentsSeen.length).toBe(headersBefore);
       expect(headerComponentsSeen[headerComponentsSeen.length - 1]).toBe(headerBefore);
+    });
+  });
+
+  // Issue #1712: deleting an operation swapped its blocking confirmation dialog
+  // for the same undo bar an add gets. Nothing touches the database until the
+  // window closes, which is why Undo restores the row, the balance and the
+  // balance-history point exactly — there is nothing to restore.
+  describe('Delete with undo', () => {
+    const OP_A = { id: 'op-a', type: 'expense', amount: '10.00', accountId: 'acc-1', date: '2024-01-15' };
+    const OP_B = { id: 'op-b', type: 'expense', amount: '25.00', accountId: 'acc-1', date: '2024-01-15' };
+
+    let deleteOperation;
+
+    const renderScreen = async (operations = [OP_A, OP_B]) => {
+      const OperationsScreen = require('../../app/screens/OperationsScreen').default;
+      const { useOperationsData } = require('../../app/contexts/OperationsDataContext');
+      const { useOperationsActions } = require('../../app/contexts/OperationsActionsContext');
+      const { useAccountsData } = require('../../app/contexts/AccountsDataContext');
+
+      const accounts = [{ id: 'acc-1', name: 'Cash', balance: '1000.00', currency: 'USD' }];
+      useAccountsData.mockReturnValue({ accounts, visibleAccounts: accounts, loading: false });
+      useOperationsData.mockReturnValue({
+        operations,
+        loading: false,
+        loadingMore: false,
+        hasMoreOperations: false,
+        activeFilters: {},
+        filtersActive: false,
+      });
+      useOperationsActions.mockReturnValue({
+        deleteOperation,
+        addOperation: jest.fn(() => Promise.resolve({ id: 'new-op', description: '' })),
+        updateOperation: jest.fn(() => Promise.resolve()),
+        validateOperation: jest.fn(() => null),
+        loadMoreOperations: jest.fn(),
+        jumpToDate: jest.fn(),
+        updateFilters: jest.fn(),
+        clearFilters: jest.fn(),
+        getActiveFilterCount: jest.fn(() => 0),
+      });
+
+      return render(<OperationsScreen />);
+    };
+
+    const visibleIds = (utils) => utils.getByTestId('operations-list').props.groupedOperations
+      .flatMap(group => group.operations.map(op => op.id));
+
+    const deleteOp = async (utils, operation) => {
+      await act(async () => { utils.getByTestId('operation-modal').props.onDelete(operation); });
+    };
+
+    beforeEach(() => {
+      deleteOperation = jest.fn();
+      jest.useFakeTimers();
+      // Resolve the bar's entry/exit animations synchronously so `onClosed`
+      // (and therefore the commit) fires deterministically off the timer.
+      jest.spyOn(Animated, 'timing').mockImplementation(() => ({
+        start: (cb) => { if (cb) cb({ finished: true }); },
+      }));
+    });
+
+    afterEach(() => {
+      Animated.timing.mockRestore();
+      jest.useRealTimers();
+    });
+
+    it('hides the row and offers Undo without deleting anything yet', async () => {
+      const utils = await renderScreen();
+      await deleteOp(utils, OP_A);
+
+      expect(visibleIds(utils)).toEqual(['op-b']);
+      expect(utils.getByTestId('undo-snackbar')).toBeTruthy();
+      expect(deleteOperation).not.toHaveBeenCalled();
+    });
+
+    it('drops the hidden row from the day total while the window is open', async () => {
+      const utils = await renderScreen();
+      await deleteOp(utils, OP_A);
+
+      const day = utils.getByTestId('operations-list').props.groupedOperations
+        .find(group => group.date === '2024-01-15');
+      // 25.00 alone — the 10.00 row is gone from the header sum, not just the list.
+      expect(Number(day.spendingSums.USD)).toBeCloseTo(25, 5);
+    });
+
+    it('restores the row on Undo and never deletes', async () => {
+      const utils = await renderScreen();
+      await deleteOp(utils, OP_A);
+
+      await act(async () => { fireEvent.press(utils.getByLabelText('undo')); });
+
+      expect(visibleIds(utils)).toEqual(['op-a', 'op-b']);
+      expect(deleteOperation).not.toHaveBeenCalled();
+
+      // The window elapsing after an Undo must not resurrect the commit.
+      await act(async () => { jest.advanceTimersByTime(UNDO_DURATION_MS * 2); });
+      expect(deleteOperation).not.toHaveBeenCalled();
+    });
+
+    it('commits the delete exactly once when the window elapses', async () => {
+      const utils = await renderScreen();
+      await deleteOp(utils, OP_A);
+
+      await act(async () => { jest.advanceTimersByTime(UNDO_DURATION_MS); });
+      expect(deleteOperation).toHaveBeenCalledTimes(1);
+      expect(deleteOperation).toHaveBeenCalledWith('op-a');
+
+      // The screen's belt-and-suspenders cleanup timer fires later; it must not
+      // commit a second time.
+      await act(async () => { jest.advanceTimersByTime(UNDO_DURATION_MS * 2); });
+      expect(deleteOperation).toHaveBeenCalledTimes(1);
+    });
+
+    it('keeps the row hidden after the commit until the reload drops it', async () => {
+      const utils = await renderScreen();
+      await deleteOp(utils, OP_A);
+      await act(async () => { jest.advanceTimersByTime(UNDO_DURATION_MS); });
+
+      // The context has not reloaded yet, so the operation is still in `operations`.
+      // It must stay hidden, or the row flashes back between commit and reload.
+      expect(visibleIds(utils)).toEqual(['op-b']);
+    });
+
+    it('commits the first delete when a second one takes the bar', async () => {
+      const utils = await renderScreen();
+      await deleteOp(utils, OP_A);
+      await deleteOp(utils, OP_B);
+
+      expect(deleteOperation).toHaveBeenCalledTimes(1);
+      expect(deleteOperation).toHaveBeenCalledWith('op-a');
+      expect(visibleIds(utils)).toEqual([]);
+
+      // The second one is still undoable and commits on its own window.
+      await act(async () => { jest.advanceTimersByTime(UNDO_DURATION_MS); });
+      expect(deleteOperation).toHaveBeenCalledTimes(2);
+      expect(deleteOperation).toHaveBeenLastCalledWith('op-b');
+    });
+
+    it('undoes only the operation the bar is currently offering', async () => {
+      const utils = await renderScreen();
+      await deleteOp(utils, OP_A);
+      await deleteOp(utils, OP_B);
+
+      await act(async () => { fireEvent.press(utils.getByLabelText('undo')); });
+
+      // op-a was already committed; op-b comes back.
+      expect(visibleIds(utils)).toEqual(['op-b']);
+      expect(deleteOperation).toHaveBeenCalledTimes(1);
+      expect(deleteOperation).toHaveBeenCalledWith('op-a');
+    });
+
+    it('commits a pending delete when leaving the screen', async () => {
+      const utils = await renderScreen();
+      await deleteOp(utils, OP_A);
+
+      await act(async () => { utils.unmount(); });
+
+      expect(deleteOperation).toHaveBeenCalledTimes(1);
+      expect(deleteOperation).toHaveBeenCalledWith('op-a');
+    });
+
+    // Regression: the close guard used to key on the operation id, so deleting a
+    // row, undoing, and deleting it again inside the first bar's 200ms exit fade
+    // let the outgoing bar commit and dismiss the incoming one's window.
+    it('lets a re-delete during the previous bar\'s exit fade keep its own window', async () => {
+      const pendingExits = [];
+      Animated.timing.mockImplementation(() => ({
+        start: (cb) => { if (cb) pendingExits.push(cb); },
+      }));
+
+      const utils = await renderScreen();
+      await deleteOp(utils, OP_A);
+      await act(async () => { fireEvent.press(utils.getByLabelText('undo')); });
+
+      // The undo landed, but the first bar's exit fade has not finished.
+      expect(visibleIds(utils)).toEqual(['op-a', 'op-b']);
+
+      await deleteOp(utils, OP_A);
+      await act(async () => { pendingExits.splice(0).forEach(cb => cb({ finished: true })); });
+
+      expect(deleteOperation).not.toHaveBeenCalled();
+      expect(utils.getByTestId('undo-snackbar')).toBeTruthy();
+      expect(visibleIds(utils)).toEqual(['op-b']);
+    });
+
+    it('commits a pending delete when the app goes to the background', async () => {
+      const handlers = [];
+      jest.spyOn(AppState, 'addEventListener').mockImplementation((event, handler) => {
+        if (event === 'change') handlers.push(handler);
+        return { remove: jest.fn() };
+      });
+
+      try {
+        const utils = await renderScreen();
+        await deleteOp(utils, OP_A);
+
+        // SimpleTabs keeps this screen mounted for the session, so the app being
+        // swiped away is the only thing that ends the window here.
+        await act(async () => { handlers.forEach(handler => handler('background')); });
+
+        expect(deleteOperation).toHaveBeenCalledTimes(1);
+        expect(deleteOperation).toHaveBeenCalledWith('op-a');
+        // The bar goes with it: Android freezes JS timers on pause, so one left
+        // standing would come back still counting down over a finished delete.
+        expect(utils.queryByTestId('undo-snackbar')).toBeNull();
+      } finally {
+        AppState.addEventListener.mockRestore();
+      }
+    });
+
+    it('puts the row back when the commit fails', async () => {
+      deleteOperation.mockRejectedValue(new Error('db down'));
+      const utils = await renderScreen();
+      await deleteOp(utils, OP_A);
+
+      await act(async () => { jest.advanceTimersByTime(UNDO_DURATION_MS); });
+
+      // The operation is still in the ledger, so hiding it would strand the user
+      // with a row they cannot see and cannot delete again.
+      expect(deleteOperation).toHaveBeenCalledWith('op-a');
+      expect(visibleIds(utils)).toEqual(['op-a', 'op-b']);
+    });
+
+    it('ignores a delete for an operation with no id', async () => {
+      const utils = await renderScreen();
+      await deleteOp(utils, null);
+
+      expect(utils.queryByTestId('undo-snackbar')).toBeNull();
+      expect(visibleIds(utils)).toEqual(['op-a', 'op-b']);
     });
   });
 

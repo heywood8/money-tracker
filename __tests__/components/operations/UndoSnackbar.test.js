@@ -55,6 +55,15 @@ describe('UndoSnackbar', () => {
     expect(style.opacity).toBe(1);
   });
 
+  it('shows the caller\'s icon, defaulting to the added tick', async () => {
+    const { getByTestId, queryByTestId } = await render(<UndoSnackbar {...baseProps} />);
+    expect(getByTestId('icon-check-circle')).toBeTruthy();
+
+    const withIcon = await render(<UndoSnackbar {...baseProps} icon="trash-can-outline" />);
+    expect(withIcon.getByTestId('icon-trash-can-outline')).toBeTruthy();
+    expect(queryByTestId('icon-trash-can-outline')).toBeNull();
+  });
+
   it('calls onUndo with the operation id when Undo is pressed', async () => {
     const onUndo = jest.fn();
     const { getByLabelText } = await render(

@@ -562,6 +562,7 @@
   "error_loading_accounts": "Не удалось загрузить счета",
   "undo": "Отменить",
   "operation_added": "Операция добавлена",
+  "operation_deleted": "Операция удалена",
   "loading_accounts": "Загрузка счетов...",
   "loading_categories": "Загрузка категорий...",
   "none": "Нет",
