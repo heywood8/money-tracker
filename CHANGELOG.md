@@ -1,5 +1,12 @@
 # Changelog
 
+## [0.284.16](https://github.com/heywood8/money-tracker/compare/penny-v0.284.15...penny-v0.284.16) (2026-09-12)
+
+
+### Performance Improvements
+
+* **operations:** stop quick-add keystrokes re-rendering the whole screen ([#1759](https://github.com/heywood8/money-tracker/issues/1759)) ([546b7d8](https://github.com/heywood8/money-tracker/commit/546b7d8d8eef84cfd550df87d7ea60cf6d5d6682))
+
 ## [0.284.15](https://github.com/heywood8/money-tracker/compare/penny-v0.284.14...penny-v0.284.15) (2026-09-12)
 
 
