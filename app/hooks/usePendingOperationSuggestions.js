@@ -126,13 +126,28 @@ export default function usePendingOperationSuggestions({
     reloadSeqRef.current = seq;
     const started = Date.now();
     try {
+      // An empty queue is by far the common case — the deck is usually not
+      // showing anything — and it has nothing to reconcile, no ATM target worth
+      // resolving and no per-item lookups to do. Read it first and stop there:
+      // this runs on every operation change, and the three queries below were
+      // paid for a deck with nothing in it.
+      const queued = await getPendingNotifications();
+      if (!Array.isArray(queued) || queued.length === 0) {
+        if (!mountedRef.current || seq !== reloadSeqRef.current) return;
+        setSuggestions((prev) => (prev.length === 0 ? prev : []));
+        return;
+      }
+
       // Drop any card the user has already recorded by hand before reading the
       // queue, so a matching operation makes its suggestion disappear at once.
       // Always, including right after an ingestion pass: that pass reconciles at
       // its start, so anything it went on to book is still queued here.
       const pruned = await reconcilePendingNotifications();
       const [items, atmAccount] = await Promise.all([
-        getPendingNotifications(),
+        // Re-read only when something was actually pruned; otherwise the queue
+        // is exactly what was read a moment ago, so the pre-read above costs
+        // nothing on this path either.
+        pruned > 0 ? getPendingNotifications() : Promise.resolve(queued),
         resolveAtmTargetAccount().catch(() => null),
       ]);
       const list = Array.isArray(items) ? items : [];

@@ -1,5 +1,6 @@
 import { renderHook, act, waitFor } from '@testing-library/react-native';
 import useQuickAddForm from '../../app/hooks/useQuickAddForm';
+import { __resetTopCategoryStores } from '../../app/hooks/useTopCategoryIds';
 import * as LastAccount from '../../app/services/LastAccount';
 import * as Currency from '../../app/services/currency';
 import { appEvents, EVENTS } from '../../app/services/eventEmitter';
@@ -64,6 +65,10 @@ describe('useQuickAddForm', () => {
 
   beforeEach(() => {
     jest.clearAllMocks();
+    // The top-category history is loaded through a store shared by every
+    // consumer (see useTopCategoryIds), which lives at module scope and so
+    // outlives a test's render.
+    __resetTopCategoryStores();
     Currency.formatAmount.mockImplementation((amount) => String(amount));
     Currency.fetchLiveExchangeRate.mockResolvedValue({ rate: '1.08', source: 'live' });
     Currency.getExchangeRate.mockReturnValue('1.08');

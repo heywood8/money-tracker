@@ -72,6 +72,22 @@ const mapOperationFields = (dbOperation) => {
 };
 
 /**
+ * Map a row returned by {@link createOperation} into the camelCase shape every
+ * read path produces.
+ *
+ * `createOperation` hands back the row as it was WRITTEN — snake_case columns —
+ * which was harmless while the only consumer re-read the list from the database
+ * afterwards. The save path now places that row into the list itself, and the
+ * list row and the in-memory filters read `accountId` / `categoryId` /
+ * `toAccountId` / `createdAt`, so it has to go through the same mapping a SELECT
+ * would.
+ *
+ * @param {Object} dbOperation - Row as written.
+ * @returns {Object|null} Mapped operation, or null for an invalid type.
+ */
+export const mapCreatedOperation = (dbOperation) => mapOperationFields(dbOperation);
+
+/**
  * Get all operations
  * @returns {Promise<Array>}
  */

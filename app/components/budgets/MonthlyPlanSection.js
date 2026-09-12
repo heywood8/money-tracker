@@ -84,6 +84,7 @@ const MonthlyPlanSection = forwardRef(function MonthlyPlanSection({
     updateLineGroup,
     deleteLineGroup,
     reorderLineGroups,
+    setStatusMonth,
   } = useBudgetPlans();
 
   // Month is controlled by the host when `monthProp` is provided; otherwise the
@@ -91,6 +92,12 @@ const MonthlyPlanSection = forwardRef(function MonthlyPlanSection({
   const controlledMonth = monthProp != null;
   const [internalMonth, setInternalMonth] = useState(currentMonthKey);
   const month = controlledMonth ? monthProp : internalMonth;
+
+  // Tell the context which month is on screen, so plan statuses are computed for
+  // it alone rather than for every month the user has ever had.
+  useEffect(() => {
+    setStatusMonth?.(month);
+  }, [month, setStatusMonth]);
   const [lines, setLines] = useState([]);
   // Groups are global (not month-scoped), but they are loaded alongside the
   // month's lines: the two are read together on every render below, and fetching

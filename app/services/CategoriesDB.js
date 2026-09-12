@@ -427,25 +427,26 @@ export const moveCategory = async (id, newParentId) => {
  */
 export const getAllDescendants = async (id) => {
   try {
-    const descendants = [];
-    const queue = [id];
-    // Track visited ids so a corrupted parent cycle in existing data degrades
-    // to a bounded walk instead of an infinite loop.
-    const visited = new Set([id]);
-
-    while (queue.length > 0) {
-      const currentId = queue.shift();
-      const children = await getChildCategories(currentId);
-
-      for (const child of children) {
-        if (visited.has(child.id)) continue;
-        visited.add(child.id);
-        descendants.push(child);
-        queue.push(child.id);
-      }
-    }
-
-    return descendants;
+    // One recursive CTE rather than a breadth-first walk issuing a SELECT per
+    // node. The walk was the N+1 behind the budget plan status loop: every
+    // tracked category on every line re-descended its subtree a query at a time,
+    // and a plan with ~15 lines on parent categories ran 200+ sequential awaits.
+    //
+    // `UNION` (not UNION ALL) de-duplicates, which is also what makes a corrupt
+    // parent cycle in existing data terminate instead of looping forever — the
+    // same guarantee the `visited` set gave the old walk.
+    const rows = await queryAll(
+      `WITH RECURSIVE descendants(id) AS (
+         SELECT id FROM categories WHERE parent_id = ?
+         UNION
+         SELECT c.id FROM categories c JOIN descendants d ON c.parent_id = d.id
+       )
+       SELECT * FROM categories
+       WHERE id IN (SELECT id FROM descendants)
+       ORDER BY created_at ASC`,
+      [id],
+    );
+    return (rows || []).map(mapCategoryFields);
   } catch (error) {
     console.error('Failed to get descendants:', error);
     throw error;

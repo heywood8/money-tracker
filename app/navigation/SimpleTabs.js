@@ -39,6 +39,7 @@ import BudgetScreen from '../screens/BudgetScreen';
 import { useThemeColors } from '../contexts/ThemeColorsContext';
 import { useLocalization } from '../contexts/LocalizationContext';
 import { useDisplaySettings } from '../contexts/DisplaySettingsContext';
+import { useSetActiveTab } from '../contexts/TabFocusContext';
 import { useUpdateDownload } from '../contexts/UpdateDownloadContext';
 import { SwipeNavigationGestureProvider } from '../contexts/SwipeNavigationContext';
 import Header from '../components/Header';
@@ -285,6 +286,12 @@ export default function SimpleTabs() {
   // re-subscribe on every switch. Diagnostics only.
   const activeRef = useRef(active);
   activeRef.current = active;
+
+  // Publish the active tab so the data hooks of a hidden screen can hold off
+  // until the user actually arrives — see TabFocusContext. Reported after the
+  // switch commits, so this never adds work to the transition itself.
+  const setActiveTab = useSetActiveTab();
+  React.useEffect(() => { setActiveTab(active); }, [active, setActiveTab]);
 
   // Guard ref — updated synchronously so handleTabPress never reads stale state.
   const isTransitioningRef = useRef(false);

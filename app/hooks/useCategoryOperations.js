@@ -2,6 +2,7 @@ import { useState, useCallback, useEffect } from 'react';
 import { getOperationsByCategoryAndCurrency } from '../services/OperationsDB';
 import { formatDate } from '../services/BalanceHistoryDB';
 import { appEvents, EVENTS } from '../services/eventEmitter';
+import { useTabFocusedEvent } from '../contexts/TabFocusContext';
 
 /**
  * Load the individual operations of a single (leaf) category for the Graphs
@@ -61,12 +62,9 @@ const useCategoryOperations = (selectedYear, selectedMonth, selectedCurrency, ca
     loadOperations();
   }, [loadOperations]);
 
-  useEffect(() => {
-    const unsubscribe = appEvents.on(EVENTS.OPERATION_CHANGED, () => {
-      loadOperations();
-    });
-    return unsubscribe;
-  }, [loadOperations]);
+  // Only while the Graphs tab is on screen. GraphsScreen mounts two of these
+  // (the expense and income drill-downs), so a save paid for both.
+  useTabFocusedEvent('Graphs', EVENTS.OPERATION_CHANGED, loadOperations);
 
   return {
     operations,

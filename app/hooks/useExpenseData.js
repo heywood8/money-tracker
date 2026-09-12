@@ -2,6 +2,7 @@ import { useState, useCallback, useMemo, useEffect } from 'react';
 import { getSpendingByCategoryAndCurrency } from '../services/OperationsDB';
 import { formatDate } from '../services/BalanceHistoryDB';
 import { appEvents, EVENTS } from '../services/eventEmitter';
+import { useTabFocusedEvent } from '../contexts/TabFocusContext';
 import * as Currency from '../services/currency';
 import { adjustmentSliceColor, seriesColorForSlot } from '../styles/chartPalette';
 import { getCategoryColorSlot } from '../utils/categoryUtils';
@@ -168,12 +169,8 @@ const useExpenseData = (selectedYear, selectedMonth, selectedCurrency, selectedC
     [chartData],
   );
 
-  useEffect(() => {
-    const unsubscribe = appEvents.on(EVENTS.OPERATION_CHANGED, () => {
-      loadExpenseData();
-    });
-    return unsubscribe;
-  }, [loadExpenseData]);
+  // Only while the Graphs tab is on screen; deferred to the next visit otherwise.
+  useTabFocusedEvent('Graphs', EVENTS.OPERATION_CHANGED, loadExpenseData);
 
   return {
     chartData,

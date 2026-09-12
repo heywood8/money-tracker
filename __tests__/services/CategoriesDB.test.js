@@ -804,17 +804,14 @@ describe('CategoriesDB', () => {
 
   describe('getAllDescendants', () => {
     it('returns all descendants recursively', async () => {
-      // Setup tree: parent -> [child1, child2], child1 -> [grandchild]
-      mockDb.queryAll
-        .mockResolvedValueOnce([
-          { id: 'child1', parent_id: 'parent' },
-          { id: 'child2', parent_id: 'parent' },
-        ])
-        .mockResolvedValueOnce([
-          { id: 'grandchild', parent_id: 'child1' },
-        ])
-        .mockResolvedValueOnce([]); // child2 has no children
-      // .mockResolvedValueOnce([]); // grandchild has no children
+      // Tree: parent -> [child1, child2], child1 -> [grandchild]. The whole
+      // subtree comes back from ONE recursive query; it used to be a SELECT per
+      // node, which is the N+1 the budget plan status loop paid for on every line.
+      mockDb.queryAll.mockResolvedValueOnce([
+        { id: 'child1', parent_id: 'parent' },
+        { id: 'child2', parent_id: 'parent' },
+        { id: 'grandchild', parent_id: 'child1' },
+      ]);
 
       const result = await CategoriesDB.getAllDescendants('parent');
 
@@ -822,6 +819,21 @@ describe('CategoriesDB', () => {
       expect(result.map(c => c.id)).toContain('child1');
       expect(result.map(c => c.id)).toContain('child2');
       expect(result.map(c => c.id)).toContain('grandchild');
+      expect(mockDb.queryAll).toHaveBeenCalledTimes(1);
+      expect(mockDb.queryAll.mock.calls[0][0]).toContain('WITH RECURSIVE');
+      expect(mockDb.queryAll.mock.calls[0][1]).toEqual(['parent']);
+    });
+
+    it('terminates on a corrupt parent cycle', async () => {
+      // UNION (not UNION ALL) is what bounds the recursion; assert the query
+      // keeps it, since a cycle in the data would otherwise loop forever.
+      mockDb.queryAll.mockResolvedValueOnce([]);
+
+      await CategoriesDB.getAllDescendants('cat-1');
+
+      const sql = mockDb.queryAll.mock.calls[0][0];
+      expect(sql).toMatch(/\bUNION\b/);
+      expect(sql).not.toMatch(/\bUNION\s+ALL\b/);
     });
 
     it('returns empty array when category has no descendants', async () => {

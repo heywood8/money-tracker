@@ -5,6 +5,7 @@ import { getCategoryDisplayName, getCategoryNames } from '../utils/categoryUtils
 import * as Currency from '../services/currency';
 import * as OperationsDB from '../services/OperationsDB';
 import { appEvents, EVENTS } from '../services/eventEmitter';
+import useTopCategoryIds from './useTopCategoryIds';
 import currencies from '../../assets/currencies.json';
 
 /**
@@ -184,19 +185,16 @@ const useQuickAddForm = (visibleAccounts, accounts, categories, t) => {
     return displayName || t('select_category');
   }, [categories, t]);
 
-  // Top most used categories from last 30 days (fetch extra to account for type filtering)
-  const [topCategories, setTopCategories] = useState([]);
+  // Top most used categories (fetch extra to account for type filtering). Shared
+  // with every other consumer of the same history signal — this hook used to
+  // issue getTopCategoriesFromLastMonth(10) itself, so the Operations screen ran
+  // the identical query twice on mount and again on every operation change.
+  const topCategoryIds = useTopCategoryIds(10);
+
   // Top transfer target accounts from last 90 days
   const [topTransferTargets, setTopTransferTargets] = useState([]);
 
   const loadSuggestions = useCallback(async () => {
-    try {
-      const topCats = await OperationsDB.getTopCategoriesFromLastMonth(10);
-      setTopCategories(topCats);
-    } catch (error) {
-      console.error('Failed to load top categories:', error);
-      setTopCategories([]);
-    }
     try {
       const targets = await OperationsDB.getTopTransferTargetAccounts(10);
       setTopTransferTargets(targets);
@@ -237,8 +235,8 @@ const useQuickAddForm = (visibleAccounts, accounts, categories, t) => {
     if (quickAddValues.type === 'transfer') return [];
 
     // Filter top categories to match current type and exclude shadow categories
-    const fromHistory = topCategories
-      .map(tc => categories.find(cat => cat.id === tc.categoryId))
+    const fromHistory = topCategoryIds
+      .map(id => categories.find(cat => cat.id === id))
       .filter(cat => cat && cat.categoryType === quickAddValues.type && !cat.isShadow && cat.type !== 'folder')
       .slice(0, 8);
 
@@ -251,7 +249,7 @@ const useQuickAddForm = (visibleAccounts, accounts, categories, t) => {
       .slice(0, 8 - fromHistory.length);
 
     return [...fromHistory, ...fillers];
-  }, [topCategories, categories, quickAddValues.type]);
+  }, [topCategoryIds, categories, quickAddValues.type]);
 
   // Get top transfer target accounts. The candidate pool is exactly what the form
   // lets the user pick — visible accounts minus the source — and history only
