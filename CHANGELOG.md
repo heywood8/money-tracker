@@ -1,5 +1,12 @@
 # Changelog
 
+## [0.285.0](https://github.com/heywood8/money-tracker/compare/penny-v0.284.17...penny-v0.285.0) (2026-09-12)
+
+
+### Features
+
+* **operations:** undo snackbar for delete instead of a confirm dialog ([#1768](https://github.com/heywood8/money-tracker/issues/1768)) ([6441bfc](https://github.com/heywood8/money-tracker/commit/6441bfcbdd0181f34a7f9c0e23afbbf9b7d1e817))
+
 ## [0.284.17](https://github.com/heywood8/money-tracker/compare/penny-v0.284.16...penny-v0.284.17) (2026-09-12)
 
 
