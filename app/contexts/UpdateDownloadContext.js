@@ -23,6 +23,11 @@ export function UpdateDownloadProvider({ children }) {
         },
       });
     } catch (e) {
+      // The only record of what actually went wrong: the panel that shows the failure has long
+      // since closed, and without this line a failed update leaves nothing in the logs between
+      // "pre-update backup saved" and silence — which is exactly how the field report of
+      // 2026-09-12 had to be diagnosed from the absence of entries.
+      console.error(`[AppUpdate] update failed (${e?.code || 'unknown'}):`, e?.message);
       onError?.(e);
     } finally {
       isDownloadingRef.current = false;

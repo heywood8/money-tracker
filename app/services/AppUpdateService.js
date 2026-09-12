@@ -1,5 +1,6 @@
 import * as FileSystem from 'expo-file-system/legacy';
 import * as IntentLauncher from 'expo-intent-launcher';
+import { UPDATE_ERROR } from '../utils/updateErrors';
 
 const APP_VERSION = require('../../package.json').version;
 
@@ -946,14 +947,122 @@ export const fetchExpectedChecksum = async (checksumUrl, apkFilename, fetchImpl 
   }
 };
 
-export const installApk = async (localUri) => {
-  const contentUri = await FileSystem.getContentUriAsync(localUri);
-  await IntentLauncher.startActivityAsync('android.intent.action.VIEW', {
+// Re-exported so the update service stays the one import a caller needs for both the work and
+// the reason it failed; the codes themselves live with their messages in utils/updateErrors.
+export { UPDATE_ERROR };
+
+const updateError = (code, message, cause = null) => {
+  const error = new Error(message);
+  error.code = code;
+  if (cause) error.cause = cause;
+  return error;
+};
+
+// expo-intent-launcher permits a single in-flight activity and rejects a second launch until the
+// first one's result arrives. Its ActivityAlreadyStartedException carries the code; the message is
+// matched too so a reworded (or re-wrapped) rejection still gets the remedy that actually helps.
+const isActivityBusyError = (error) => /ACTIVITY_ALREADY_STARTED/i.test(error?.code || '')
+  || /already started/i.test(error?.message || '');
+
+// How long to wait for the installer's activity result before treating the launch as done.
+// Android reports a result when the user leaves the installer, but that is not something we may
+// depend on, so waiting for it is strictly a courtesy: by the time this elapses the installer is
+// on screen and the download flow has nothing left to do.
+const INSTALLER_RESULT_TIMEOUT_MS = 2500;
+
+// One retry covers the honest race — two taps in quick succession, the first result still in
+// flight. A launcher left wedged by a result that never arrives will not recover from a retry,
+// and that case gets its own error code so the UI can say what actually helps.
+const INSTALLER_RETRY_DELAY_MS = 500;
+
+const wait = (ms) => new Promise((resolve) => setTimeout(resolve, ms));
+
+// Awaits a promise but gives up after timeoutMs. Every outcome becomes a value, so a rejection
+// that lands after the timeout cannot surface as an unhandled rejection; the timer is cleared
+// either way so a launch that answered at once leaves nothing pending behind it.
+const settleWithin = (promise, timeoutMs) => {
+  let timer = null;
+  const timedOut = new Promise((resolve) => {
+    timer = setTimeout(() => resolve({ status: 'pending' }), timeoutMs);
+  });
+  const settled = promise.then(
+    () => ({ status: 'resolved' }),
+    (error) => ({ status: 'rejected', error }),
+  );
+  return Promise.race([settled, timedOut]).finally(() => clearTimeout(timer));
+};
+
+// Hands the APK to Android's package installer.
+//
+// Two things about that handoff went wrong in the field (report of 2026-09-12, where every update
+// attempt died silently just after the checksum step):
+//
+//   1. FLAG_ACTIVITY_NEW_TASK. Asking for a result from an activity launched into a new task is
+//      something Android refuses: it cancels the result the instant the installer starts. That
+//      cancellation races expo-intent-launcher's own bookkeeping, which stores the promise it
+//      intends to resolve *after* calling startActivityForResult — so the result can be delivered
+//      before there is anything to resolve, and the promise then stays pending for the life of
+//      the process. The await here never returned (the update froze on "Verifying APK"), and
+//      every later launch was refused as "already started". The installer has no need of its own
+//      task, since we start it from our own activity, so the flag is gone.
+//   2. Nothing may depend on that result arriving at all. The race below counts "no result yet"
+//      as a successful launch, which is what it is.
+export const launchApkInstaller = async (localUri, { timeoutMs = INSTALLER_RESULT_TIMEOUT_MS } = {}) => {
+  // A build listed in the panel can be gone by the time it is tapped — the cache is the OS's to
+  // reclaim, and our own cleanup prunes it. That needs its own verdict: telling the user to
+  // "install it again from the downloaded builds" when there is nothing left to install sends
+  // them round a loop that cannot end.
+  const info = await FileSystem.getInfoAsync(localUri).catch(() => null);
+  if (info && (!info.exists || info.size === 0)) {
+    throw updateError(UPDATE_ERROR.FILE_MISSING, `APK is no longer on disk: ${localUri}`);
+  }
+
+  let contentUri;
+  try {
+    contentUri = await FileSystem.getContentUriAsync(localUri);
+  } catch (e) {
+    throw updateError(
+      UPDATE_ERROR.INSTALL_FAILED,
+      `Could not expose the APK to the installer: ${e.message}`,
+      e,
+    );
+  }
+
+  const startInstaller = () => IntentLauncher.startActivityAsync('android.intent.action.VIEW', {
     data: contentUri,
-    flags: 1 | 268435456, // FLAG_GRANT_READ_URI_PERMISSION | FLAG_ACTIVITY_NEW_TASK
+    flags: 1, // FLAG_GRANT_READ_URI_PERMISSION — the installer reads the APK through our provider
     type: 'application/vnd.android.package-archive',
   });
+
+  let outcome = await settleWithin(startInstaller(), timeoutMs);
+  if (outcome.status === 'rejected' && isActivityBusyError(outcome.error)) {
+    // The one retry covers the honest race: a launch whose result is still in flight. If that
+    // result lands during the wait, the retry succeeds and the installer opens — which is what
+    // the user asked for by tapping install, so re-opening it is the right outcome, not a
+    // surprise. A launcher wedged for good fails again and gets its own error code below.
+    console.warn('[AppUpdate] installer activity busy; retrying once');
+    await wait(INSTALLER_RETRY_DELAY_MS);
+    outcome = await settleWithin(startInstaller(), timeoutMs);
+  }
+
+  if (outcome.status === 'rejected') {
+    const busy = isActivityBusyError(outcome.error);
+    console.error('[AppUpdate] could not start the installer:', outcome.error?.message);
+    throw updateError(
+      busy ? UPDATE_ERROR.INSTALLER_BUSY : UPDATE_ERROR.INSTALL_FAILED,
+      busy
+        ? 'Another installer activity is still pending'
+        : `Installer could not be started: ${outcome.error?.message}`,
+      outcome.error,
+    );
+  }
+
+  console.log(`[AppUpdate] installer launched for ${localUri} (${outcome.status === 'resolved' ? 'result delivered' : 'awaiting user'})`);
+  return { resultDelivered: outcome.status === 'resolved' };
 };
+
+// The name the UI installs by; the launch mechanics live in launchApkInstaller.
+export const installApk = (localUri) => launchApkInstaller(localUri);
 
 export const downloadAndInstallApk = async (downloadUrl, onProgress, { checksumUrl = null, fetchImpl = fetch, onPhaseChange = null } = {}) => {
   const raw = (downloadUrl.split('/').pop().split('?')[0]) || null;
@@ -973,8 +1082,9 @@ export const downloadAndInstallApk = async (downloadUrl, onProgress, { checksumU
 
   const result = await downloadResumable.downloadAsync();
   if (!result?.uri) {
-    throw new Error('Download failed');
+    throw updateError(UPDATE_ERROR.DOWNLOAD_FAILED, 'Download failed');
   }
+  console.log('[AppUpdate] download finished:', result.uri);
 
   let verified = false;
   if (checksumUrl) {
@@ -997,7 +1107,7 @@ export const downloadAndInstallApk = async (downloadUrl, onProgress, { checksumU
         } catch (e) {
           console.warn('[AppUpdate] could not delete the mismatched APK', e.message);
         }
-        throw new Error('APK checksum mismatch — file discarded');
+        throw updateError(UPDATE_ERROR.CHECKSUM_MISMATCH, 'APK checksum mismatch — file discarded');
       }
       verified = !!actualHash;
     } else {
@@ -1005,13 +1115,15 @@ export const downloadAndInstallApk = async (downloadUrl, onProgress, { checksumU
     }
   }
 
+  console.log(`[AppUpdate] checksum verification: ${verified ? 'passed' : 'unavailable'}`);
+
   // Nothing proved this download whole, so at least confirm it is a complete archive. A truncated
   // APK is what Android rejects with "There's a problem with the app file"; deleting it here is
   // what makes the next attempt re-download instead of offering to install the same broken file.
   if (!verified) {
     if (!(await verifyApkStructure(result.uri))) {
       await FileSystem.deleteAsync(result.uri, { idempotent: true });
-      throw new Error('Downloaded APK is incomplete — file deleted');
+      throw updateError(UPDATE_ERROR.INCOMPLETE_DOWNLOAD, 'Downloaded APK is incomplete — file deleted');
     }
   }
 
@@ -1043,10 +1155,5 @@ export const downloadAndInstallApk = async (downloadUrl, onProgress, { checksumU
 
   await cleanupOldApks();
 
-  const contentUri = await FileSystem.getContentUriAsync(result.uri);
-  await IntentLauncher.startActivityAsync('android.intent.action.VIEW', {
-    data: contentUri,
-    flags: 1 | 268435456, // FLAG_GRANT_READ_URI_PERMISSION | FLAG_ACTIVITY_NEW_TASK
-    type: 'application/vnd.android.package-archive',
-  });
+  await launchApkInstaller(result.uri);
 };

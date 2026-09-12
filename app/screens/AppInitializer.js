@@ -10,6 +10,7 @@ import { performDriveBackupIfNeeded } from '../services/GoogleDriveBackupService
 import { getValidAccessToken } from '../services/GoogleSheetsService';
 import { useDialog } from '../contexts/DialogContext';
 import { checkForAppUpdate } from '../services/AppUpdateService';
+import { describeUpdateError } from '../utils/updateErrors';
 import { useUpdateDownload } from '../contexts/UpdateDownloadContext';
 import { useSqliteFileImport } from '../hooks/useSqliteFileImport';
 import useNotificationResponseRouter from '../hooks/useNotificationResponseRouter';
@@ -346,10 +347,15 @@ const AppInitializer = () => {
     setPendingUpdate(null);
     startDownload(downloadUrl, {
       checksumUrl,
-      onError: () => {
+      onError: (error) => {
         showDialog(
           t('error') || 'Error',
-          t('update_download_failed') || 'Could not download the update. Please try again.',
+          describeUpdateError(
+            error,
+            t,
+            'update_download_failed',
+            'Could not download the update. Please try again.',
+          ),
           [{ text: t('ok') || 'OK' }],
         );
       },
