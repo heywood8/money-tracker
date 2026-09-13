@@ -611,6 +611,75 @@ describe('useQuickAddForm', () => {
     });
   });
 
+  describe('quick-add date', () => {
+    it('starts as null so the day is resolved at save time, not at mount', async () => {
+      const { result } = await renderHook(() =>
+        useQuickAddForm(mockAccounts, mockAccounts, mockCategories, mockT),
+      );
+
+      expect(result.current.quickAddValuesStore.getSnapshot().date).toBeNull();
+    });
+
+    it('keeps a back-dated day across an add, so a run of back-fills costs one pick', async () => {
+      const { result } = await renderHook(() =>
+        useQuickAddForm(mockAccounts, mockAccounts, mockCategories, mockT),
+      );
+
+      await waitFor(() => {
+        expect(result.current.quickAddValues.accountId).toBeTruthy();
+      });
+
+      await act(async () => {
+        result.current.setQuickAddValues(v => ({ ...v, date: '2026-09-04', amount: '12' }));
+      });
+
+      await act(async () => {
+        result.current.resetForm();
+      });
+
+      expect(result.current.quickAddValuesStore.getSnapshot()).toMatchObject({
+        amount: '',
+        date: '2026-09-04',
+      });
+    });
+
+    it('clearDate drops the form back to today', async () => {
+      const { result } = await renderHook(() =>
+        useQuickAddForm(mockAccounts, mockAccounts, mockCategories, mockT),
+      );
+
+      await act(async () => {
+        result.current.setQuickAddValues(v => ({ ...v, date: '2026-09-04' }));
+      });
+
+      await act(async () => {
+        result.current.clearDate();
+      });
+
+      expect(result.current.quickAddValuesStore.getSnapshot().date).toBeNull();
+    });
+
+    it('clearDate on an already-today form writes nothing', async () => {
+      const { result } = await renderHook(() =>
+        useQuickAddForm(mockAccounts, mockAccounts, mockCategories, mockT),
+      );
+
+      await waitFor(() => {
+        expect(result.current.quickAddValues.accountId).toBeTruthy();
+      });
+
+      const before = result.current.quickAddValuesStore.getSnapshot();
+
+      await act(async () => {
+        result.current.clearDate();
+      });
+
+      // Same object identity: the store compares before notifying, so an effect
+      // that calls this on every collapse cannot churn the form.
+      expect(result.current.quickAddValuesStore.getSnapshot()).toBe(before);
+    });
+  });
+
   describe('setQuickAddValues', () => {
     it('should update quick add values', async () => {
       const { result } = await renderHook(() =>

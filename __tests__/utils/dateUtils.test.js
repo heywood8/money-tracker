@@ -171,3 +171,58 @@ describe('localDateWithOffset (#1711)', () => {
     expect(yesterday).not.toBe(localDateWithOffset(0));
   });
 });
+
+describe('relativeDayLabel', () => {
+  const { relativeDayLabel } = require('../../app/utils/dateUtils');
+  const t = (key) => key;
+
+  afterEach(() => {
+    jest.useRealTimers();
+  });
+
+  it('names today and yesterday rather than printing a date', () => {
+    jest.useFakeTimers().setSystemTime(new Date(2024, 5, 20, 12, 0, 0));
+
+    expect(relativeDayLabel('2024-06-20', { t, language: 'en' })).toBe('today');
+    expect(relativeDayLabel('2024-06-19', { t, language: 'en' })).toBe('yesterday');
+  });
+
+  it('formats any other day in the app language', () => {
+    jest.useFakeTimers().setSystemTime(new Date(2024, 5, 20, 12, 0, 0));
+
+    expect(relativeDayLabel('2024-06-10', { t, language: 'en' })).toContain('Jun');
+  });
+
+  it('drops the weekday when the label has to fit a chip', () => {
+    jest.useFakeTimers().setSystemTime(new Date(2024, 5, 20, 12, 0, 0));
+
+    const withWeekday = relativeDayLabel('2024-06-10', { t, language: 'en' });
+    const short = relativeDayLabel('2024-06-10', { t, language: 'en', withWeekday: false });
+
+    expect(short.length).toBeLessThan(withWeekday.length);
+    expect(short).toContain('10');
+  });
+
+  it('names the year only where the caller asked, and only when it differs', () => {
+    jest.useFakeTimers().setSystemTime(new Date(2024, 5, 20, 12, 0, 0));
+
+    // A chip that is the only report of a date about to be committed.
+    expect(relativeDayLabel('2020-06-10', { t, language: 'en', markOtherYears: true })).toContain('2020');
+    // Same year: the year would be noise.
+    expect(relativeDayLabel('2024-06-10', { t, language: 'en', markOtherYears: true })).not.toContain('2024');
+    // A list separator the user scrolled to keeps its own context.
+    expect(relativeDayLabel('2020-06-10', { t, language: 'en' })).not.toContain('2020');
+  });
+
+  // The regression the shared helper inherits from OperationsList: a bare
+  // YYYY-MM-DD parses as UTC, so west of Greenwich the label was a day behind.
+  it('anchors the bare date to local midnight', () => {
+    jest.useFakeTimers().setSystemTime(new Date(2024, 5, 20, 12, 0, 0));
+
+    const label = relativeDayLabel('2024-06-10', { t, language: 'en' });
+
+    expect(label).toBe(new Date(2024, 5, 10).toLocaleDateString('en', {
+      weekday: 'short', month: 'short', day: 'numeric',
+    }));
+  });
+});

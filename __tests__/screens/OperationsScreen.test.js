@@ -158,6 +158,7 @@ jest.mock('../../app/components/operations/QuickAddForm', () => {
     return React.createElement('QuickAddForm', {
       testID: 'quick-add-form',
       handleQuickAdd: props.handleQuickAdd,
+      onAutoAddWithCategory: props.onAutoAddWithCategory,
       saving: props.saving,
     });
   };
@@ -198,6 +199,12 @@ jest.mock('../../app/components/operations/PickerModal', () => {
 
 // Location wiring: default to the feature off / no fix so existing tests are
 // unaffected; the location-specific test overrides these.
+// Every tab stays mounted, so the screen asks this whether it is the one on
+// screen — it is what retires a parked quick-add date when the user walks away.
+jest.mock('../../app/contexts/TabFocusContext', () => ({
+  useTabFocused: jest.fn(() => true),
+}));
+
 jest.mock('../../app/contexts/DisplaySettingsContext', () => ({
   useDisplaySettings: jest.fn(() => ({ attachLocation: false })),
 }));
@@ -263,6 +270,7 @@ jest.mock('../../app/hooks/useQuickAddForm', () => jest.fn(() => ({
   getCategoryName: jest.fn(() => 'Food'),
   filteredCategories: [],
   resetForm: jest.fn(),
+  clearDate: jest.fn(),
 })));
 
 jest.mock('../../app/hooks/useOperationPicker', () => jest.fn(() => ({
@@ -1087,6 +1095,7 @@ describe('OperationsScreen', () => {
         getCategoryName: jest.fn(() => 'Food'),
         filteredCategories: [],
         resetForm: jest.fn(),
+        clearDate: jest.fn(),
       });
 
       useOperationsData.mockReturnValue({
@@ -1137,6 +1146,7 @@ describe('OperationsScreen', () => {
         getCategoryName: jest.fn(() => 'Food'),
         filteredCategories: [],
         resetForm: jest.fn(),
+        clearDate: jest.fn(),
       });
 
       useOperationsData.mockReturnValue({
@@ -1267,6 +1277,7 @@ describe('OperationsScreen', () => {
         getCategoryName: jest.fn(() => 'Food'),
         filteredCategories: [],
         resetForm: jest.fn(),
+        clearDate: jest.fn(),
       });
 
       useAccountsData.mockReturnValue({
@@ -1315,6 +1326,7 @@ describe('OperationsScreen', () => {
         getCategoryName: jest.fn(() => 'Food'),
         filteredCategories: [],
         resetForm: jest.fn(),
+        clearDate: jest.fn(),
       });
 
       useAccountsData.mockReturnValue({
@@ -1350,6 +1362,192 @@ describe('OperationsScreen', () => {
       });
 
       expect(getByTestId('quick-add-form').props.saving).toBe(false);
+    });
+  });
+
+  describe('Quick-add date chip (issue #1713)', () => {
+    const { act, fireEvent } = require('@testing-library/react-native');
+
+    const mountWithValues = async (values) => {
+      const OperationsScreen = require('../../app/screens/OperationsScreen').default;
+      const { useOperationsData } = require('../../app/contexts/OperationsDataContext');
+      const { useOperationsActions } = require('../../app/contexts/OperationsActionsContext');
+      const { useAccountsData } = require('../../app/contexts/AccountsDataContext');
+      const useQuickAddForm = require('../../app/hooks/useQuickAddForm');
+
+      const addOperation = jest.fn(() => Promise.resolve({ id: 'new-op' }));
+      const clearDate = jest.fn();
+      useQuickAddForm.mockReturnValue({
+        quickAddValues: { type: 'expense', amount: '100', accountId: 'acc-1', categoryId: 'cat-1' },
+        quickAddValuesStore: makeMockQuickAddStore(values),
+        setQuickAddValues: jest.fn(),
+        getAccountName: jest.fn(() => 'Cash'),
+        getAccountBalance: jest.fn(() => '$1000.00'),
+        getCategoryInfo: jest.fn(() => ({ name: 'Food', icon: 'food' })),
+        getCategoryName: jest.fn(() => 'Food'),
+        filteredCategories: [],
+        resetForm: jest.fn(),
+        clearDate,
+      });
+
+      useAccountsData.mockReturnValue({
+        accounts: [{ id: 'acc-1', currency: 'USD' }],
+        visibleAccounts: [{ id: 'acc-1', currency: 'USD' }],
+        loading: false,
+      });
+      useOperationsData.mockReturnValue({
+        operations: [], loading: false, loadingMore: false, hasMoreOperations: false,
+      });
+      useOperationsActions.mockReturnValue({
+        deleteOperation: jest.fn(),
+        addOperation,
+        validateOperation: jest.fn(() => null),
+        loadMoreOperations: jest.fn(),
+        jumpToDate: jest.fn(),
+      });
+
+      const utils = await render(<OperationsScreen />);
+      return { ...utils, addOperation, clearDate };
+    };
+
+    const BASE_VALUES = { type: 'expense', amount: '100', accountId: 'acc-1', categoryId: 'cat-1' };
+
+    it('books the day the chip parked in the form', async () => {
+      const { getByTestId, addOperation } = await mountWithValues({ ...BASE_VALUES, date: '2026-09-04' });
+
+      await act(async () => {
+        await getByTestId('quick-add-form').props.handleQuickAdd();
+      });
+
+      expect(addOperation).toHaveBeenCalledWith(expect.objectContaining({ date: '2026-09-04' }));
+    });
+
+    it('stamps today when the chip is on Today, resolved at save time', async () => {
+      const { localDateWithOffset } = require('../../app/utils/dateUtils');
+      const { getByTestId, addOperation } = await mountWithValues({ ...BASE_VALUES, date: null });
+
+      await act(async () => {
+        await getByTestId('quick-add-form').props.handleQuickAdd();
+      });
+
+      expect(addOperation).toHaveBeenCalledWith(
+        expect.objectContaining({ date: localDateWithOffset(0) }),
+      );
+    });
+
+    it('carries the parked date through an auto-add from a category tap', async () => {
+      const { getByTestId, addOperation } = await mountWithValues({ ...BASE_VALUES, categoryId: '', date: '2026-09-04' });
+
+      await act(async () => {
+        await getByTestId('quick-add-form').props.onAutoAddWithCategory('cat-2');
+      });
+
+      expect(addOperation).toHaveBeenCalledWith(
+        expect.objectContaining({ date: '2026-09-04', categoryId: 'cat-2' }),
+      );
+    });
+
+    it('retires a parked date when the app goes to the background', async () => {
+      const handlers = [];
+      jest.spyOn(AppState, 'addEventListener').mockImplementation((event, handler) => {
+        if (event === 'change') handlers.push(handler);
+        return { remove: jest.fn() };
+      });
+
+      try {
+        const { clearDate } = await mountWithValues({ ...BASE_VALUES, date: '2026-09-04' });
+        clearDate.mockClear();
+
+        await act(async () => { handlers.forEach(handler => handler('background')); });
+
+        expect(clearDate).toHaveBeenCalled();
+      } finally {
+        AppState.addEventListener.mockRestore();
+      }
+    });
+
+    it('retires a parked date when another tab takes the screen', async () => {
+      const { useTabFocused } = require('../../app/contexts/TabFocusContext');
+      useTabFocused.mockReturnValue(false);
+
+      try {
+        const { clearDate } = await mountWithValues({ ...BASE_VALUES, date: '2026-09-04' });
+
+        expect(clearDate).toHaveBeenCalled();
+      } finally {
+        useTabFocused.mockReturnValue(true);
+      }
+    });
+
+    it('retires a parked date when search takes the screen', async () => {
+      const { useSearch } = require('../../app/contexts/SearchContext');
+      useSearch.mockReturnValue({
+        searchMode: 'open',
+        filtersExpanded: false,
+        openSearch: jest.fn(),
+        closeSearch: jest.fn(),
+        reopenSearch: jest.fn(),
+        toggleFilters: jest.fn(),
+        registerSearchHandler: jest.fn(),
+      });
+
+      try {
+        const { clearDate } = await mountWithValues({ ...BASE_VALUES, date: '2026-09-04' });
+
+        expect(clearDate).toHaveBeenCalled();
+      } finally {
+        useSearch.mockReturnValue({ registerSearchHandler: jest.fn(), openSearch: jest.fn() });
+      }
+    });
+
+    it('retires a parked date when the + button dismisses the form by hand', async () => {
+      // Panel setting off, so the + button exists. Dismissing the summoned form
+      // is the user saying they are done — unlike the fold after an add.
+      const { useDisplaySettings } = require('../../app/contexts/DisplaySettingsContext');
+      useDisplaySettings.mockReturnValue({ attachLocation: false, showQuickAddPanel: false });
+
+      try {
+        const { getByTestId, clearDate } = await mountWithValues({ ...BASE_VALUES, date: '2026-09-04' });
+
+        await act(async () => { fireEvent.press(getByTestId('quick-add-fab')); });
+        clearDate.mockClear();
+        await act(async () => { fireEvent.press(getByTestId('quick-add-fab')); });
+
+        expect(clearDate).toHaveBeenCalled();
+      } finally {
+        useDisplaySettings.mockReturnValue({ attachLocation: false });
+      }
+    });
+
+    it('leaves a parked date alone while the form is open on the Operations tab', async () => {
+      const { clearDate } = await mountWithValues({ ...BASE_VALUES, date: '2026-09-04' });
+
+      expect(clearDate).not.toHaveBeenCalled();
+    });
+
+    it('keeps the parked date when the summoned form folds itself away after an add', async () => {
+      // Panel setting off: the form is summoned for one entry and folds itself
+      // back behind the + button once it lands. That fold is not the user
+      // walking away, so the day they picked has to survive it — otherwise
+      // back-filling six entries means picking the day six times.
+      const { useDisplaySettings } = require('../../app/contexts/DisplaySettingsContext');
+      useDisplaySettings.mockReturnValue({ attachLocation: false, showQuickAddPanel: false });
+
+      try {
+        const { getByTestId, clearDate } = await mountWithValues({ ...BASE_VALUES, date: '2026-09-04' });
+
+        // Summon the form, which is the sitting the parked date belongs to.
+        await act(async () => { fireEvent.press(getByTestId('quick-add-fab')); });
+        clearDate.mockClear();
+
+        await act(async () => {
+          await getByTestId('quick-add-form').props.handleQuickAdd();
+        });
+
+        expect(clearDate).not.toHaveBeenCalled();
+      } finally {
+        useDisplaySettings.mockReturnValue({ attachLocation: false });
+      }
     });
   });
 
@@ -1390,6 +1588,7 @@ describe('OperationsScreen', () => {
         getCategoryName: jest.fn(() => 'Food'),
         filteredCategories: [],
         resetForm: jest.fn(),
+        clearDate: jest.fn(),
       });
 
       useAccountsData.mockReturnValue({
@@ -1454,6 +1653,7 @@ describe('OperationsScreen', () => {
         getCategoryName: jest.fn(() => 'Food'),
         filteredCategories: [],
         resetForm: jest.fn(),
+        clearDate: jest.fn(),
       });
 
       useAccountsData.mockReturnValue({
@@ -1760,6 +1960,7 @@ describe('OperationsScreen', () => {
         getCategoryName: jest.fn(() => 'Food'),
         filteredCategories: [],
         resetForm: jest.fn(),
+        clearDate: jest.fn(),
       });
 
       useMultiCurrencyTransfer.mockReturnValue({
@@ -1820,6 +2021,7 @@ describe('OperationsScreen', () => {
         getCategoryName: jest.fn(() => 'Food'),
         filteredCategories: [],
         resetForm: jest.fn(),
+        clearDate: jest.fn(),
       });
 
       useMultiCurrencyTransfer.mockReturnValue({
@@ -2586,6 +2788,7 @@ describe('OperationsScreen', () => {
         filteredCategories: [],
         topCategoriesForType: [],
         resetForm: jest.fn(),
+        clearDate: jest.fn(),
       });
 
       useMultiCurrencyTransferMock.mockReturnValue({
@@ -2623,6 +2826,7 @@ describe('OperationsScreen', () => {
         filteredCategories: [],
         topCategoriesForType: [],
         resetForm: jest.fn(),
+        clearDate: jest.fn(),
       });
 
       useMultiCurrencyTransferMock.mockReturnValue({
@@ -2655,6 +2859,7 @@ describe('OperationsScreen', () => {
         filteredCategories: [],
         topCategoriesForType: [],
         resetForm: jest.fn(),
+        clearDate: jest.fn(),
       });
 
       useMultiCurrencyTransferMock.mockReturnValue({
@@ -2690,6 +2895,7 @@ describe('OperationsScreen', () => {
         filteredCategories: [],
         topCategoriesForType: [],
         resetForm: jest.fn(),
+        clearDate: jest.fn(),
       });
 
       useMultiCurrencyTransferMock.mockReturnValue({
@@ -2730,6 +2936,7 @@ describe('OperationsScreen', () => {
         filteredCategories: [],
         topCategoriesForType: [],
         resetForm: jest.fn(),
+        clearDate: jest.fn(),
       });
 
       useMultiCurrencyTransferMock.mockReturnValue({
@@ -2819,6 +3026,7 @@ describe('OperationsScreen', () => {
         getCategoryName: jest.fn(() => 'Food'),
         filteredCategories: [],
         resetForm: jest.fn(),
+        clearDate: jest.fn(),
       });
     };
 
@@ -3254,6 +3462,7 @@ describe('OperationsScreen', () => {
         getCategoryName: jest.fn(() => 'Food'),
         filteredCategories: [],
         resetForm: jest.fn(),
+        clearDate: jest.fn(),
       });
 
       useAccountsData.mockReturnValue({
@@ -3339,6 +3548,7 @@ describe('OperationsScreen', () => {
         filteredCategories: [],
         topCategoriesForType: [],
         resetForm: jest.fn(),
+        clearDate: jest.fn(),
       });
 
       await render(<OperationsScreen />);

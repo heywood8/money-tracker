@@ -732,6 +732,7 @@
   "failed_to_update_account": "更新账户失败，请重试。",
   "failed_to_update_category": "更新分类失败，请重试。",
   "jump_to_date_hint": "打开日期选择器以跳转到指定日期",
+  "quick_add_date_hint": "选择此条目的日期",
   "label": "标签",
   "scroll_to_top": "回到顶部",
   "scroll_to_top_hint": "滚动到列表顶部",

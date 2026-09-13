@@ -732,6 +732,7 @@
   "failed_to_update_account": "Konto konnte nicht aktualisiert werden. Bitte erneut versuchen.",
   "failed_to_update_category": "Kategorie konnte nicht aktualisiert werden. Bitte erneut versuchen.",
   "jump_to_date_hint": "Öffnet die Datumsauswahl, um zu einem bestimmten Tag zu springen",
+  "quick_add_date_hint": "Datum für diesen Eintrag wählen",
   "label": "Label",
   "scroll_to_top": "Nach oben",
   "scroll_to_top_hint": "Zum Anfang der Liste scrollen",

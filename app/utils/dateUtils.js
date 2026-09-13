@@ -65,3 +65,53 @@ export const localDateWithOffset = (offset) => {
   date.setDate(date.getDate() + offset);
   return formatLocalDate(date);
 };
+
+const WEEKDAY_DAY_OPTIONS = { weekday: 'short', month: 'short', day: 'numeric' };
+const SHORT_DAY_OPTIONS = { month: 'short', day: 'numeric' };
+
+/**
+ * Human label for a `YYYY-MM-DD` calendar day: "Today", "Yesterday", or the
+ * date itself.
+ *
+ * The comparison is string-to-string rather than a millisecond difference
+ * divided by 86,400,000: on the spring-forward day that quotient is 0.96 of a
+ * day, so `Math.floor` made yesterday read as today.
+ *
+ * The date is formatted in the APP's language, not the device's — a user who
+ * set Penny to Russian on an English phone was reading "Mon, Sep 1" in the
+ * operations list and "1 сентября" in the Graphs drill-down.
+ *
+ * @param {string} dateString - A local calendar day, `YYYY-MM-DD`.
+ * @param {Object} options
+ * @param {Function} options.t - Translation function.
+ * @param {string} [options.language] - App language code.
+ * @param {boolean} [options.withWeekday=true] - Include the weekday in the
+ *   fallback format. Off where the label has to fit a chip.
+ * @param {boolean} [options.markOtherYears=false] - Add the year when the day is
+ *   not in the current one. For a label that is the only report of a date the
+ *   user is about to commit to; a list the user scrolled into has its own
+ *   context and does not need it on every separator.
+ * @returns {string}
+ */
+export const relativeDayLabel = (dateString, {
+  t,
+  language,
+  withWeekday = true,
+  markOtherYears = false,
+}) => {
+  if (dateString === localDateWithOffset(0)) return t('today');
+  if (dateString === localDateWithOffset(-1)) return t('yesterday');
+  // T00:00:00 anchors the bare string to local midnight; a bare date parses as
+  // UTC, which shifts the day west of Greenwich.
+  const date = new Date(`${dateString}T00:00:00`);
+  const options = withWeekday ? WEEKDAY_DAY_OPTIONS : SHORT_DAY_OPTIONS;
+  // A day in another year says so where the caller asked. Without it "Sep 4" is
+  // the same label whether the date-picker wheel landed on this year or the last
+  // one, and on the quick-add chip that label is the only report of what the
+  // next entry will be booked as.
+  const offYear = markOtherYears && date.getFullYear() !== new Date().getFullYear();
+  return date.toLocaleDateString(
+    language || undefined,
+    offYear ? { ...options, year: 'numeric' } : options,
+  );
+};

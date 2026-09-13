@@ -12,6 +12,7 @@ import { useOperationsData } from '../contexts/OperationsDataContext';
 import { useOperationsActions } from '../contexts/OperationsActionsContext';
 import { useAccountsData } from '../contexts/AccountsDataContext';
 import { useCategories } from '../contexts/CategoriesContext';
+import { useTabFocused } from '../contexts/TabFocusContext';
 import { setLastAccessedAccount } from '../services/LastAccount';
 import { appEvents, EVENTS } from '../services/eventEmitter';
 import { formatDate as toDateString } from '../services/BalanceHistoryDB';
@@ -321,6 +322,7 @@ const OperationsScreen = () => {
     topCategoriesForType,
     topTransferAccountsForForm,
     resetForm,
+    clearDate: clearQuickAddDate,
     foreignRateSource,
     foreignExchangeRate,
   } = useQuickAddForm(visibleAccounts, accounts, categories, t);
@@ -404,6 +406,35 @@ const OperationsScreen = () => {
   quickAddCollapsedRef.current = quickAddCollapsed;
   const suggestionsCountRef = useRef(0);
   suggestionsCountRef.current = operationSuggestions.length;
+
+  // The quick-add date chip is sticky *within a sitting*: back-filling yesterday
+  // is rarely one entry, so the chosen day survives an add (see `resetForm`).
+  // What it must not survive is the user leaving the form — a "Yesterday" still
+  // armed on the next visit would silently mis-date an entry, and after a night
+  // in the background it would mis-date it by two days.
+  //
+  // Each way of leaving clears at its own source rather than through the derived
+  // `quickAddCollapsed`: that flag is also raised by the summoned form folding
+  // itself away after every add, which is the one collapse that must NOT end the
+  // sitting (it is what back-filling six entries looks like). The sources are
+  // search taking the screen, another tab taking it (here), the app going to the
+  // background (below) and the + button dismissing the form
+  // (`handleToggleQuickAddPanel`).
+  const operationsTabFocused = useTabFocused('Operations');
+  useEffect(() => {
+    if (operationsTabFocused && !isSearchOpen) return;
+    clearQuickAddDate();
+  }, [operationsTabFocused, isSearchOpen, clearQuickAddDate]);
+
+  const clearQuickAddDateRef = useRef(clearQuickAddDate);
+  useEffect(() => { clearQuickAddDateRef.current = clearQuickAddDate; });
+  useEffect(() => {
+    const subscription = AppState.addEventListener('change', (nextState) => {
+      if (nextState === 'background' || nextState === 'inactive') clearQuickAddDateRef.current();
+    });
+    // A stubbed AppState (unit environments) hands back nothing to remove.
+    return () => subscription?.remove?.();
+  }, []);
 
   // Measured height of the quick-add wrapper — the binding cards pin their frame
   // to it so the deck reads as cards stacked over the form. Rounded, and only
@@ -880,7 +911,11 @@ const OperationsScreen = () => {
       categoryId: overrideCategoryId !== undefined ? overrideCategoryId : formValues.categoryId,
       // Use override toAccountId if provided (for auto-add from transfer target shortcuts)
       toAccountId: overrideToAccountId !== undefined ? overrideToAccountId : formValues.toAccountId,
-      date: toDateString(new Date()),
+      // The quick-add date chip parks a back-dated entry in `formValues.date`;
+      // null (the usual case) means today, resolved here rather than when the
+      // form was opened, so a session left open across midnight still books the
+      // day the user is actually in.
+      date: formValues.date || toDateString(new Date()),
     };
 
     // Determine multi-currency status using effective account IDs (including overrides)
@@ -1036,6 +1071,8 @@ const OperationsScreen = () => {
 
       // The summoned form has done its job — fold it away. A no-op when the
       // panel is pinned open by the setting, which is why it is unconditional.
+      // Deliberately does NOT retire a parked date: the reset above kept it, and
+      // this fold is the middle of a back-fill, not the end of one.
       setQuickAddExpanded(false);
 
       Keyboard.dismiss();
@@ -1480,12 +1517,15 @@ const OperationsScreen = () => {
   const handleToggleQuickAddPanel = useCallback(() => {
     if (quickAddExpanded) {
       Keyboard.dismiss();
+      // Dismissing the form by hand ends the sitting, so a parked back-date goes
+      // with it — unlike the automatic fold after an add.
+      clearQuickAddDate();
       setQuickAddExpanded(false);
       return;
     }
     scrollToTop();
     setQuickAddExpanded(true);
-  }, [quickAddExpanded, scrollToTop]);
+  }, [quickAddExpanded, scrollToTop, clearQuickAddDate]);
 
   // A tapped "transactions to review" notification lands here (SimpleTabs switches
   // to this tab on the same event): put the suggestion deck in front of the user

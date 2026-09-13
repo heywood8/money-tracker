@@ -14,6 +14,7 @@ import Icon from '@expo/vector-icons/MaterialCommunityIcons';
 import Calculator from '../Calculator';
 import MultiCurrencyFields from '../modals/MultiCurrencyFields';
 import CurrencyPickerModal from './CurrencyPickerModal';
+import QuickAddDateChip from './QuickAddDateChip';
 import * as Currency from '../../services/currency';
 import { selectionTint, withAlpha } from '../../utils/colorUtils';
 import currencies from '../../../assets/currencies.json';
@@ -30,12 +31,16 @@ import { BORDER_RADIUS, FONT_SIZE, SPACING } from '../../styles/designTokens';
  * into the amount — the value it displays lives in `values` — while these three
  * buttons depend on nothing that a keystroke changes.
  */
-const TypeButton = memo(({ type, isSelected, disabled, colors, buttonStyle, onPress }) => {
+const TypeButton = memo(({ type, isSelected, disabled, tight, colors, buttonStyle, onPress }) => {
   const textColor = isSelected ? colors.text : (disabled ? colors.mutedText : colors.text);
   return (
     <Pressable
       style={[
         styles.typeButton,
+        // The date chip shares this row, so the three buttons give up the padding
+        // it costs rather than the label: at 360 dp the German "Überweisung"
+        // already fills what is left.
+        tight && styles.typeButtonTight,
         {
           backgroundColor: isSelected ? colors.selected : colors.inputBackground,
           borderColor: colors.border,
@@ -46,7 +51,19 @@ const TypeButton = memo(({ type, isSelected, disabled, colors, buttonStyle, onPr
       disabled={disabled}
     >
       <Icon name={type.icon} size={18} color={textColor} />
-      <Text style={[styles.typeButtonText, { color: textColor }]}>{type.label}</Text>
+      {/* One line always: a wrapped label would grow the row's height, and this
+          row sits above a form whose height the screen measures. Sharing the row
+          with the date chip, the label shrinks a little before it ellipsizes —
+          "Überweisung" at a smaller size still reads; "Übe…" does not. */}
+      <Text
+        style={[styles.typeButtonText, { color: textColor }]}
+        numberOfLines={1}
+        ellipsizeMode="tail"
+        adjustsFontSizeToFit={tight}
+        minimumFontScale={0.8}
+      >
+        {type.label}
+      </Text>
     </Pressable>
   );
 });
@@ -55,6 +72,7 @@ TypeButton.propTypes = {
   type: PropTypes.object.isRequired,
   isSelected: PropTypes.bool,
   disabled: PropTypes.bool,
+  tight: PropTypes.bool,
   colors: PropTypes.object.isRequired,
   buttonStyle: PropTypes.any,
   onPress: PropTypes.func.isRequired,
@@ -278,6 +296,7 @@ const OperationFormFields = memo(({
   foreignCurrencyEditable = false,
   flashError = null,
   addDisabled = false,
+  showDateChip = false,
 }) => {
   const { hideBalances } = useDisplaySettings();
 
@@ -580,19 +599,37 @@ const OperationFormFields = memo(({
     });
   }, [setValues]);
 
+  // `null` means "today, resolved when the operation is saved" — see
+  // QuickAddDateChip.
+  const handleDateChange = useCallback((date) => {
+    setValues(v => (v.date === date ? v : { ...v, date }));
+  }, [setValues]);
+
   const renderTypeSelector = () => (
-    <View style={[styles.typeSelector, compact && styles.typeSelectorCompact]}>
+    <View style={[styles.typeSelector, compact && styles.typeSelectorCompact, showDateChip && styles.typeSelectorWithChip]}>
       {TYPES.map(type => (
         <TypeButton
           key={type.key}
           type={type}
           isSelected={values.type === type.key}
           disabled={disabled}
+          tight={showDateChip}
           colors={colors}
           buttonStyle={disabledStyle}
           onPress={handleTypePress}
         />
       ))}
+      {/* Quick-add only: the full OperationModal has its own date field, and a
+          second one here would be two places to read the same value from. */}
+      {showDateChip && (
+        <QuickAddDateChip
+          date={values.date || null}
+          onChange={handleDateChange}
+          colors={colors}
+          t={t}
+          disabled={disabled}
+        />
+      )}
     </View>
   );
 
@@ -1158,6 +1195,8 @@ OperationFormFields.propTypes = {
     exchangeRate: PropTypes.string,
     destinationAmount: PropTypes.string,
     operationCurrency: PropTypes.string,
+    /** Local `YYYY-MM-DD`; absent or null means today (quick-add only). */
+    date: PropTypes.string,
   }).isRequired,
   setValues: PropTypes.func.isRequired,
   accounts: PropTypes.array.isRequired,
@@ -1190,6 +1229,8 @@ OperationFormFields.propTypes = {
   foreignRateSource: PropTypes.oneOf(['loading', 'live', 'offline']),
   foreignExchangeRate: PropTypes.string,
   foreignCurrencyEditable: PropTypes.bool,
+  /** Quick-add only: render the date chip at the end of the type-selector row. */
+  showDateChip: PropTypes.bool,
   flashError: PropTypes.shape({
     field: PropTypes.oneOf(['category', 'account', 'toAccount', 'amount']),
     token: PropTypes.number,
@@ -1360,8 +1401,13 @@ const styles = StyleSheet.create({
     paddingVertical: SPACING.sm,
   },
   typeButtonText: {
+    flexShrink: 1,
     fontSize: FONT_SIZE.md,
     fontWeight: '500',
+  },
+  typeButtonTight: {
+    gap: SPACING.xs,
+    paddingHorizontal: SPACING.sm,
   },
   typeSelector: {
     flexDirection: 'row',
@@ -1370,6 +1416,9 @@ const styles = StyleSheet.create({
   },
   typeSelectorCompact: {
     marginBottom: SPACING.sm,
+  },
+  typeSelectorWithChip: {
+    gap: SPACING.xs,
   },
 });
 
