@@ -1,5 +1,12 @@
 # Changelog
 
+## [0.286.0](https://github.com/heywood8/money-tracker/compare/penny-v0.285.1...penny-v0.286.0) (2026-09-13)
+
+
+### Features
+
+* **quick-add:** date chip for back-dated entries ([#1773](https://github.com/heywood8/money-tracker/issues/1773)) ([93bae70](https://github.com/heywood8/money-tracker/commit/93bae7032ab3c026051a2101151c09ae5546eaf3))
+
 ## [0.285.1](https://github.com/heywood8/money-tracker/compare/penny-v0.285.0...penny-v0.285.1) (2026-09-12)
 
 
