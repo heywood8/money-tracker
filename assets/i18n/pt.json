@@ -732,6 +732,7 @@
   "failed_to_update_account": "Não foi possível atualizar a conta. Tente novamente.",
   "failed_to_update_category": "Não foi possível atualizar a categoria. Tente novamente.",
   "jump_to_date_hint": "Abre o seletor para ir a uma data específica",
+  "quick_add_date_hint": "Escolha a data deste lançamento",
   "label": "Rótulo",
   "scroll_to_top": "Ir para o topo",
   "scroll_to_top_hint": "Rolar para o início da lista",

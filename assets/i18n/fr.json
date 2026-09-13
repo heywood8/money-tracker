@@ -732,6 +732,7 @@
   "failed_to_update_account": "Échec de la mise à jour du compte. Réessayez.",
   "failed_to_update_category": "Échec de la mise à jour de la catégorie. Réessayez.",
   "jump_to_date_hint": "Ouvre le sélecteur pour aller à une date précise",
+  "quick_add_date_hint": "Choisir la date de cette saisie",
   "label": "Étiquette",
   "scroll_to_top": "Revenir en haut",
   "scroll_to_top_hint": "Faire défiler jusqu'en haut de la liste",

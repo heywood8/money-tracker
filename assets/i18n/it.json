@@ -732,6 +732,7 @@
   "failed_to_update_account": "Aggiornamento del conto non riuscito. Riprova.",
   "failed_to_update_category": "Aggiornamento della categoria non riuscito. Riprova.",
   "jump_to_date_hint": "Apre il selettore per andare a una data specifica",
+  "quick_add_date_hint": "Scegli la data di questa voce",
   "label": "Etichetta",
   "scroll_to_top": "Torna in cima",
   "scroll_to_top_hint": "Scorri all'inizio dell'elenco",

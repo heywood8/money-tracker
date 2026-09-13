@@ -8,7 +8,7 @@ import OperationsListPlaceholder from './OperationsListPlaceholder';
 import * as Currency from '../../services/currency';
 import { BORDER_RADIUS, FONT_SIZE, HEIGHTS, SPACING } from '../../styles/designTokens';
 import EmptyState from '../EmptyState';
-import { localDateWithOffset } from '../../utils/dateUtils';
+import { relativeDayLabel } from '../../utils/dateUtils';
 
 // ── getItemLayout constants ────────────────────────────────────────────────
 // The SectionList flattens to [sectionHeader, ...rows, sectionFooter] per
@@ -83,28 +83,13 @@ const OperationsList = forwardRef(({
   onDismissSuggestion = NOOP,
 }, ref) => {
 
-  // Format date label for the separator header.
-  // Append T00:00:00 so the bare YYYY-MM-DD string parses as LOCAL midnight —
-  // bare date strings parse as UTC, which shifts the day west of Greenwich
-  // (today's section would read "Yesterday" in UTC-negative timezones).
-  const formatDate = useCallback((dateString) => {
-    const date = new Date(`${dateString}T00:00:00`);
-
-    // Compared as YYYY-MM-DD strings rather than by dividing a millisecond
-    // difference by 86,400,000: on the spring-forward day that quotient is 0.96
-    // of a day, so `Math.floor` made yesterday read as today.
-    if (dateString === localDateWithOffset(0)) return t('today');
-    if (dateString === localDateWithOffset(-1)) return t('yesterday');
-
-    // The APP's language, not the device's: a user who set Penny to Russian on
-    // an English phone was reading "Mon, Sep 1" here and "1 сентября" in the
-    // Graphs drill-down.
-    return date.toLocaleDateString(language || undefined, {
-      weekday: 'short',
-      month: 'short',
-      day: 'numeric',
-    });
-  }, [t, language]);
+  // Format date label for the separator header. Shared with the quick-add date
+  // chip — see relativeDayLabel for why the day comparison is string-to-string
+  // and why the date is formatted in the app's language rather than the device's.
+  const formatDate = useCallback(
+    (dateString) => relativeDayLabel(dateString, { t, language }),
+    [t, language],
+  );
 
   // Format amount with currency symbol
   const formatCurrency = useCallback((accountId, amount) => {

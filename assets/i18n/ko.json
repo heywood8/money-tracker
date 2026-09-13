@@ -732,6 +732,7 @@
   "failed_to_update_account": "계좌를 업데이트하지 못했습니다. 다시 시도해 주세요.",
   "failed_to_update_category": "카테고리를 업데이트하지 못했습니다. 다시 시도해 주세요.",
   "jump_to_date_hint": "날짜 선택기를 열어 특정 날짜로 이동합니다",
+  "quick_add_date_hint": "이 항목의 날짜를 선택합니다",
   "label": "라벨",
   "scroll_to_top": "맨 위로",
   "scroll_to_top_hint": "목록 맨 위로 스크롤",

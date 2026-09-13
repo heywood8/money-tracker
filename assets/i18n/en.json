@@ -735,6 +735,7 @@
   "failed_to_update_account": "Failed to update account. Please try again.",
   "failed_to_update_category": "Failed to update category. Please try again.",
   "jump_to_date_hint": "Opens date picker to jump to a specific date",
+  "quick_add_date_hint": "Choose the date for this entry",
   "label": "Label",
   "scroll_to_top": "Scroll to top",
   "scroll_to_top_hint": "Scroll to the top of the list",

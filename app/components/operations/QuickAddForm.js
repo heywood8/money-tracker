@@ -99,6 +99,7 @@ const QuickAddForm = memo(({
           foreignExchangeRate={foreignExchangeRate}
           flashError={flashError}
           addDisabled={saving}
+          showDateChip={true}
         />
       </View>
     </View>

@@ -732,6 +732,7 @@
   "failed_to_update_account": "No se pudo actualizar la cuenta. Inténtalo de nuevo.",
   "failed_to_update_category": "No se pudo actualizar la categoría. Inténtalo de nuevo.",
   "jump_to_date_hint": "Abre el selector para ir a una fecha concreta",
+  "quick_add_date_hint": "Elige la fecha de este registro",
   "label": "Etiqueta",
   "scroll_to_top": "Ir arriba",
   "scroll_to_top_hint": "Desplázate al inicio de la lista",

@@ -24,6 +24,11 @@ const getCurrencySymbol = (currencyCode) => {
  */
 const INITIAL_VALUES = {
   type: 'expense',
+  // null, not today's string: the form sits open for as long as the user keeps
+  // the Operations tab, so a date stamped here would book the previous day for
+  // anyone whose session crossed midnight. The stamp happens at save time
+  // instead (see `performQuickAdd` in OperationsScreen).
+  date: null,
   amount: '',
   accountId: '',
   categoryId: '',
@@ -308,7 +313,13 @@ const useQuickAddForm = (visibleAccounts, accounts, categories, t) => {
     return [...fromHistory, ...fillers];
   }, [topTransferTargets, visibleAccounts, quickAddValues.type, quickAddValues.accountId]);
 
-  // Reset form but keep account and type; restore operationCurrency to account currency
+  // Reset form but keep account, type and date; restore operationCurrency to
+  // account currency.
+  //
+  // The date is deliberately sticky across an add: back-filling yesterday is
+  // rarely one entry, and re-picking the day for each of six would make the chip
+  // worse than the modal it replaces. It is cleared when the form collapses or
+  // the user leaves the screen instead — see `clearDate`.
   const resetForm = useCallback(() => {
     setQuickAddValues(prev => {
       const acc = accounts.find(a => a.id === prev.accountId);
@@ -322,11 +333,19 @@ const useQuickAddForm = (visibleAccounts, accounts, categories, t) => {
         exchangeRate: '',
         destinationAmount: '',
         operationCurrency: acc?.currency || prev.operationCurrency,
+        date: prev.date,
       };
     });
     setForeignRateSource(null);
     setForeignExchangeRate('');
   }, [accounts]);
+
+  // Drop a back-dated quick-add back to today. Returning `prev` unchanged is a
+  // real no-op in the store (it compares by identity before notifying), so this
+  // is safe to call from an effect that runs on every collapse.
+  const clearDate = useCallback(() => {
+    setQuickAddValues(prev => (prev.date ? { ...prev, date: null } : prev));
+  }, [setQuickAddValues]);
 
   return {
     // Structural fields only — see STRUCTURAL_FIELDS. Read `quickAddValuesStore`
@@ -342,6 +361,7 @@ const useQuickAddForm = (visibleAccounts, accounts, categories, t) => {
     topCategoriesForType,
     topTransferAccountsForForm,
     resetForm,
+    clearDate,
     foreignRateSource,
     foreignExchangeRate,
   };

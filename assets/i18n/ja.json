@@ -732,6 +732,7 @@
   "failed_to_update_account": "口座を更新できませんでした。もう一度お試しください。",
   "failed_to_update_category": "カテゴリを更新できませんでした。もう一度お試しください。",
   "jump_to_date_hint": "日付ピッカーを開いて指定の日付に移動します",
+  "quick_add_date_hint": "この入力の日付を選択します",
   "label": "ラベル",
   "scroll_to_top": "先頭へ",
   "scroll_to_top_hint": "リストの先頭までスクロール",
