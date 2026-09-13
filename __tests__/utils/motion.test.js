@@ -2,6 +2,7 @@
 import {
   rubberband,
   clampWithRubberband,
+  recommitSharedValue,
   RUBBERBAND_CONSTANT,
   SPRING_SETTLE,
   ANIMATED_SPRING_SETTLE,
@@ -159,4 +160,93 @@ describe('motion', () => {
       expect(0.3 * PAN_VELOCITY_TO_PER_SECOND).toBe(300);
     });
   });
+
+  // Reanimated commits a shared value to its view when the value CHANGES: a
+  // write of the value already held is dropped by `valueSetter` so mappers do
+  // not re-run for a non-change. A clip opened while the app was in the
+  // background is exactly that case — the value is right, the pixels are not —
+  // so the repair has to force the commit rather than re-write the value.
+  describe('recommitSharedValue', () => {
+    // Stands in for a shared value with Reanimated's own semantics: an equal
+    // write commits nothing, `modify()` commits without moving the value.
+    const tracked = (initial) => {
+      let current = initial;
+      const box = { commits: 0, modify: () => { box.commits += 1; } };
+      Object.defineProperty(box, 'value', {
+        get: () => current,
+        set: (next) => {
+          if (next === current) return;
+          current = next;
+          box.commits += 1;
+        },
+      });
+      return box;
+    };
+
+    it('leaves the value where it was asked to', () => {
+      const shared = tracked(1000);
+      recommitSharedValue(shared, 1000);
+      expect(shared.value).toBe(1000);
+    });
+
+    it('commits a target the value already holds — the whole point', () => {
+      const shared = tracked(1000);
+      recommitSharedValue(shared, 1000);
+      expect(shared.commits).toBeGreaterThan(0);
+    });
+
+    it('commits a target of zero it already holds (the collapsed clip)', () => {
+      const shared = tracked(0);
+      recommitSharedValue(shared, 0);
+      expect(shared.commits).toBeGreaterThan(0);
+      expect(shared.value).toBe(0);
+    });
+
+    it('never passes through an in-between value', () => {
+      // Every write is recorded, equal ones included: a repair that stepped the
+      // value off its target and back would show the step here, and that step is
+      // a frame of the quick-add block (and the deck over it) clipped to zero.
+      const seen = [];
+      const shared = {
+        modify: () => {},
+        get value() { return 1000; },
+        set value(next) { seen.push(next); },
+      };
+      recommitSharedValue(shared, 1000);
+      expect(seen).toEqual([1000]);
+    });
+
+    it('lands on a target the value was not already holding', () => {
+      const shared = tracked(0);
+      recommitSharedValue(shared, 1000);
+      expect(shared.value).toBe(1000);
+      expect(shared.commits).toBeGreaterThan(0);
+    });
+
+    it('re-commits a negative target (the collapsed slide)', () => {
+      const shared = tracked(-437);
+      recommitSharedValue(shared, -437);
+      expect(shared.value).toBe(-437);
+      expect(shared.commits).toBeGreaterThan(0);
+    });
+
+    it('still assigns to a shared value with no modify()', () => {
+      const shared = { value: 0 };
+      expect(() => recommitSharedValue(shared, 1000)).not.toThrow();
+      expect(shared.value).toBe(1000);
+    });
+
+    it('ignores a missing shared value rather than throwing', () => {
+      expect(() => recommitSharedValue(null, 1000)).not.toThrow();
+      expect(() => recommitSharedValue(undefined, 1000)).not.toThrow();
+    });
+
+    it('ignores a non-numeric target — there is no geometry to re-commit', () => {
+      const shared = tracked(1000);
+      recommitSharedValue(shared, undefined);
+      expect(shared.commits).toBe(0);
+      expect(shared.value).toBe(1000);
+    });
+  });
+
 });

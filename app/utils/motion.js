@@ -209,3 +209,45 @@ export function clampWithRubberband(value, min, max, dimension, constant) {
   if (value < min) return min + rubberband(value - min, dimension, constant);
   return value;
 }
+
+/**
+ * Re-commit a shared value's current target, so the view it drives is painted
+ * with it. Moves nothing: the value ends where it already stood.
+ *
+ * Reanimated pushes a shared value to a view by committing the props its
+ * animated style derives, and it does that when the value CHANGES. Two things
+ * follow from that, and this function exists between them.
+ *
+ * The first is the failure. A change written while the Android activity is
+ * stopped — the app in the background, its window gone — has no frame to commit
+ * into, and nothing re-issues it when the window comes back. The value is right
+ * on the JS side and the pixels are the ones from before the app was paused,
+ * and they stay that way until something moves the value again. The review deck
+ * hit this: a bank notification queued a suggestion while the user was away, the
+ * quick-add clip opened for the deck behind a stopped activity, and when they
+ * tapped the alert the panel was still collapsed over cards that were in the
+ * tree (the + button had already stood down for them). Opening and closing
+ * search moved the value, and the panel they had been sent to appeared.
+ *
+ * The second is why the repair cannot be a plain re-write of the target:
+ * `valueSetter` drops a write of the value already held precisely so that
+ * mappers do not re-run for a non-change. `modify()` is Reanimated's own way
+ * past that — it re-runs the setter with `forceUpdate`, so the mappers fire and
+ * the props are committed again with the value unchanged. Nothing passes through
+ * an in-between value, so there is no stray frame to be lucky about.
+ *
+ * Call it where a surface comes back into view (an AppState return, a deep link
+ * arriving at a surface whose state says it is already open), not on a state
+ * change — a change commits itself.
+ *
+ * @param {{ value: number, modify?: (modifier?: unknown, forceUpdate?: boolean) => void }} sharedValue
+ * @param {number} target The value it should hold, and end up holding.
+ */
+export function recommitSharedValue(sharedValue, target) {
+  if (!sharedValue || typeof target !== 'number') return;
+  // Lands the target when it has actually moved...
+  sharedValue.value = target;
+  // ...and forces the commit when it has not. Optional so a plain `{ value }`
+  // stand-in (tests, a non-Reanimated caller) still gets the assignment.
+  sharedValue.modify?.();
+}
