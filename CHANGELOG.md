@@ -1,5 +1,13 @@
 # Changelog
 
+## [0.286.1](https://github.com/heywood8/money-tracker/compare/penny-v0.286.0...penny-v0.286.1) (2026-09-14)
+
+
+### Bug Fixes
+
+* **operations:** land the review deck when it opened in the background ([#1772](https://github.com/heywood8/money-tracker/issues/1772)) ([b3ca84c](https://github.com/heywood8/money-tracker/commit/b3ca84cbbf61686f25241c671df53ce9a46f8ea1))
+* **quick-add:** restore the type selector labels on android ([#1777](https://github.com/heywood8/money-tracker/issues/1777)) ([63352b2](https://github.com/heywood8/money-tracker/commit/63352b2674f5af71b0934f17b490ca6e7a2f2b31))
+
 ## [0.286.0](https://github.com/heywood8/money-tracker/compare/penny-v0.285.1...penny-v0.286.0) (2026-09-13)
 
 
