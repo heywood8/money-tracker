@@ -53,14 +53,18 @@ const TypeButton = memo(({ type, isSelected, disabled, tight, colors, buttonStyl
       <Icon name={type.icon} size={18} color={textColor} />
       {/* One line always: a wrapped label would grow the row's height, and this
           row sits above a form whose height the screen measures. Sharing the row
-          with the date chip, the label shrinks a little before it ellipsizes —
-          "Überweisung" at a smaller size still reads; "Übe…" does not. */}
+          with the date chip, the label steps down one size before it ellipsizes —
+          "Überweisung" at FONT_SIZE.sm still reads; "Übe…" does not.
+
+          The step is an explicit fontSize, NOT `adjustsFontSizeToFit`. Android
+          under the New Architecture ignores `minimumFontScale` and autosizes a
+          flex-shrinking Text down to its own floor, which rendered these three
+          labels as a few-pixel superscript pinned to the top of the button. An
+          explicit size measures the same on both platforms and in tests. */}
       <Text
-        style={[styles.typeButtonText, { color: textColor }]}
+        style={[styles.typeButtonText, tight && styles.typeButtonTextTight, { color: textColor }]}
         numberOfLines={1}
         ellipsizeMode="tail"
-        adjustsFontSizeToFit={tight}
-        minimumFontScale={0.8}
       >
         {type.label}
       </Text>
@@ -1404,6 +1408,9 @@ const styles = StyleSheet.create({
     flexShrink: 1,
     fontSize: FONT_SIZE.md,
     fontWeight: '500',
+  },
+  typeButtonTextTight: {
+    fontSize: FONT_SIZE.sm,
   },
   typeButtonTight: {
     gap: SPACING.xs,
