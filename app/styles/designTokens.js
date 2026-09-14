@@ -119,10 +119,17 @@ export const TOP_CONTENT_SPACING = SPACING.sm; // 12px - top margin for content
  * ~48px with Android's three-button navigation — a fixed guess is either dead
  * space on one and an overlap on the other.
  *
- * This is NOT the number for a screen that also renders <AddFAB />: the FAB
- * floats above the bar (bottom: 100, HEIGHTS.fab tall) and needs more. Those
- * screens carry their own larger padding — Graphs used to copy it despite
- * rendering no FAB, which read as a strip of dead scroll under the last card.
+ * A screen that also renders <AddFAB /> has a choice. Padding the content clear
+ * of the FAB's own footprint (FAB_BOTTOM_OFFSET plus HEIGHTS.fab, 172 from the
+ * screen edge) guarantees nothing ever sits under the button, at the cost of a
+ * strip of dead scroll below the last item on every list — Graphs used to copy
+ * that number despite rendering no FAB at all, and Accounts carried a rounded-up
+ * 180 from the days of a full-width "Add account" button. The alternative, and
+ * what Accounts does now, is this clearance plus a way to reach whatever the FAB
+ * overlaps: the list ends just above the bar and the FAB floats over its tail,
+ * the way a FAB is meant to. There is no value in between — a row is either
+ * wholly above the FAB or partly behind it — so pick the larger number only when
+ * the last item's right edge carries something that has to stay legible.
  */
 export const TAB_BAR_CLEARANCE = 84;
 

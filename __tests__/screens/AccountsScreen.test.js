@@ -1297,6 +1297,13 @@ describe('AccountsScreen', () => {
       { id: 'acc-2', name: 'Second', balance: '200', currency: 'USD', order: 1 },
     ];
 
+    afterEach(() => {
+      // Restored here rather than at the end of a test body: the assertion in
+      // between is the one that can fail, and a leaked inset mock would take
+      // every later test in the file down with it.
+      jest.restoreAllMocks();
+    });
+
     const renderScreen = async (dataOverrides = {}) => {
       const AccountsScreen = require('../../app/screens/AccountsScreen').default;
       const { useAccountsData } = require('../../app/contexts/AccountsDataContext');
@@ -1340,6 +1347,78 @@ describe('AccountsScreen', () => {
 
       expect(getByText('show_archived_accounts')).toBeTruthy();
       expect(getByText('First')).toBeTruthy();
+    });
+
+    // Regression: the list padded a flat 180 below its last row — the height of
+    // the full-width "Add account" button this screen used to end with. The
+    // button became a floating FAB long ago, so all that padding did was park
+    // the archived toggle a FAB's height above the tab bar with nothing in the
+    // gap. The clearance is the bar plus the bottom inset, same as Graphs.
+    it.each([[0], [24], [48]])(
+      'clears the tab bar and a %ipx bottom inset below the last row, nothing more',
+      async (bottom) => {
+        const safeArea = require('react-native-safe-area-context');
+        jest.spyOn(safeArea, 'useSafeAreaInsets')
+          .mockReturnValue({ top: 0, bottom, left: 0, right: 0 });
+
+        const { StyleSheet } = require('react-native');
+        const { TAB_BAR_CLEARANCE } = require('../../app/styles/designTokens');
+
+        await renderScreen();
+
+        const props = mockDraggableProps[mockDraggableProps.length - 1];
+        const padding = StyleSheet.flatten(props.contentContainerStyle);
+
+        expect(padding.paddingBottom).toBe(bottom + TAB_BAR_CLEARANCE);
+        // Never the FAB clearance again.
+        expect(padding.paddingBottom).toBeLessThan(180);
+      },
+    );
+
+    // A long press that never moved still ends a drag, and the whole row body
+    // is a long-press target now. Persisting that "reorder" would rewrite
+    // display_order and push hidden accounts to the end of the list.
+    it('ignores a drag that ended where it started', async () => {
+      const { useAccountsActions } = require('../../app/contexts/AccountsActionsContext');
+      const reorderAccounts = jest.fn();
+      useAccountsActions.mockReturnValue(createAccountsActionsMock({ reorderAccounts }));
+
+      await renderScreen();
+
+      const props = mockDraggableProps[mockDraggableProps.length - 1];
+      props.onDragEnd({ data: mockAccounts, from: 1, to: 1 });
+
+      expect(reorderAccounts).not.toHaveBeenCalled();
+    });
+
+    it('persists a drag that actually moved a row', async () => {
+      const { useAccountsActions } = require('../../app/contexts/AccountsActionsContext');
+      const reorderAccounts = jest.fn();
+      useAccountsActions.mockReturnValue(createAccountsActionsMock({ reorderAccounts }));
+
+      await renderScreen();
+
+      const reordered = [mockAccounts[1], mockAccounts[0]];
+      const props = mockDraggableProps[mockDraggableProps.length - 1];
+      props.onDragEnd({ data: reordered, from: 1, to: 0 });
+
+      expect(reorderAccounts).toHaveBeenCalledWith(reordered);
+    });
+
+    // The last row now scrolls up level with the FAB, which covers its drag
+    // handle. Dragging has to work from the row body or that account can never
+    // be reordered.
+    it('starts a reorder from a long press on the row body, not just the handle', async () => {
+      await renderScreen();
+
+      const props = mockDraggableProps[mockDraggableProps.length - 1];
+      const drag = jest.fn();
+      // Render one row the way the list does mid-drag, with a real `drag`.
+      const row = await render(props.renderItem({ item: mockAccounts[1], drag, isActive: false }));
+
+      fireEvent(row.getByTestId('account-row-second'), 'longPress');
+
+      expect(drag).toHaveBeenCalled();
     });
   });
 
