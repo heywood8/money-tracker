@@ -1,5 +1,12 @@
 # Changelog
 
+## [0.286.2](https://github.com/heywood8/money-tracker/compare/penny-v0.286.1...penny-v0.286.2) (2026-09-14)
+
+
+### Performance Improvements
+
+* **updates:** replace in-app SHA-256 of APKs with a native digest ([#1779](https://github.com/heywood8/money-tracker/issues/1779)) ([6f49935](https://github.com/heywood8/money-tracker/commit/6f4993531a3f1779be64b8c5fea8063b31875994))
+
 ## [0.286.1](https://github.com/heywood8/money-tracker/compare/penny-v0.286.0...penny-v0.286.1) (2026-09-14)
 
 
