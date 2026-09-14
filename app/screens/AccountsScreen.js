@@ -14,7 +14,7 @@ import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { useThemeConfig } from '../contexts/ThemeConfigContext';
 import { useThemeColors } from '../contexts/ThemeColorsContext';
 import { useDisplaySettings } from '../contexts/DisplaySettingsContext';
-import { BORDER_RADIUS, FONT_SIZE, HEIGHTS, HORIZONTAL_PADDING, SPACING, TOP_CONTENT_SPACING, Z_INDEX } from '../styles/designTokens';
+import { BORDER_RADIUS, FONT_SIZE, HEIGHTS, HORIZONTAL_PADDING, SPACING, TAB_BAR_CLEARANCE, TOP_CONTENT_SPACING, Z_INDEX } from '../styles/designTokens';
 import { useAccountsData } from '../contexts/AccountsDataContext';
 import { useAccountsActions } from '../contexts/AccountsActionsContext';
 import { useLocalization } from '../contexts/LocalizationContext';
@@ -437,6 +437,11 @@ const AccountRow = memo(({ item, colors = {}, onPress = () => {}, t = (k) => k, 
       <TouchableOpacity
         testID={`account-row-${(item.name ?? '').toLowerCase().replace(/\s+/g, '-')}`}
         onPress={handlePress}
+        // The body starts a reorder too, not just the handle on the right: the
+        // list now scrolls its last row up to the tab bar, so the FAB floats
+        // over that row's right edge and its handle is the one thing down there
+        // a finger cannot reach. Long-pressing anywhere on the row drags it.
+        onLongPress={drag}
         activeOpacity={0.7}
         style={styles.accountTouchableArea}
         accessibilityRole="button"
@@ -946,7 +951,13 @@ export default function AccountsScreen({ onBackStateChange, tabKey = 'Accounts' 
     );
   }, [colors, startEdit, t, defaultAccountId, firstAccountId, lastAccountId]);
 
-  const handleDragEnd = useCallback(({ data }) => {
+  const handleDragEnd = useCallback(({ data, from, to }) => {
+    // A long press that never moved still ends a drag, and the row body is a
+    // long-press target now, so this fires on strays. Writing that "reorder"
+    // back is not a no-op: reorderAccounts persists display_order for the rows
+    // it is handed and appends everything else — with archived accounts hidden
+    // that silently shuffles them to the end of the list.
+    if (typeof from === 'number' && from === to) return;
     reorderAccounts(data);
   }, [reorderAccounts]);
 
@@ -986,6 +997,16 @@ export default function AccountsScreen({ onBackStateChange, tabKey = 'Accounts' 
       <EmptyState icon="bank-outline" message={t('no_accounts') || 'No accounts yet.'} />
     </View>
   ), [colors, t]);
+
+  // Clearance below the last row: the floating tab bar plus the bottom inset,
+  // nothing more. The screen used to reserve a flat 180 — room for a full-width
+  // "Add account" button that has since become the floating <AddFAB />, which
+  // overlays the list the way a FAB is meant to. Keeping that number left a
+  // visible strip of dead scroll under the last card on every account list.
+  const listContentStyle = useMemo(
+    () => ({ paddingBottom: insets.bottom + TAB_BAR_CLEARANCE }),
+    [insets.bottom],
+  );
 
   // Report internal back capability to an embedding parent (the Settings subpanel)
   // so a swipe / hardware-back pops one level here (currency picker → edit form)
@@ -1048,7 +1069,7 @@ export default function AccountsScreen({ onBackStateChange, tabKey = 'Accounts' 
         onDragEnd={handleDragEnd}
         activationDistance={20}
         containerStyle={styles.listContainer}
-        contentContainerStyle={styles.scrollContent}
+        contentContainerStyle={listContentStyle}
         showsVerticalScrollIndicator={false}
         keyboardShouldPersistTaps="handled"
         style={{ backgroundColor: colors.background }}
@@ -1800,9 +1821,6 @@ const styles = StyleSheet.create({
     gap: SPACING.xs,
     marginTop: 4,
     padding: 4,
-  },
-  scrollContent: {
-    paddingBottom: 180,
   },
   settingHint: {
     fontSize: FONT_SIZE.sm,
