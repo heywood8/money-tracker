@@ -1,6 +1,4 @@
-import { createHash } from 'crypto';
 import {
-  createSha256,
   parseVersionFromRelease,
   compareVersions,
   extractApkAsset,
@@ -13,7 +11,7 @@ import {
   deleteDownloadedApk,
   sanitizeFilename,
   fetchExpectedChecksum,
-  computeSha256,
+  computeFileMd5,
   downloadAndInstallApk,
   fetchBuildProgress,
   fetchBuildProgressByVersion,
@@ -422,7 +420,7 @@ describe('AppUpdateService', () => {
             tag_name: 'v0.50.5',
             assets: [
               { name: 'penny-v0.50.5.apk', browser_download_url: 'https://example.com/penny-v0.50.5.apk' },
-              { name: 'penny-v0.50.5.apk.sha256', browser_download_url: 'https://example.com/penny-v0.50.5.apk.sha256' },
+              { name: 'penny-v0.50.5.apk.md5', browser_download_url: 'https://example.com/penny-v0.50.5.apk.md5' },
             ],
             html_url: 'https://github.com/heywood8/money-tracker/releases/tag/v0.50.5',
             body: 'New features in 0.50.5',
@@ -441,12 +439,12 @@ describe('AppUpdateService', () => {
       // The candidate exposes its APK + checksum so the panel offers a per-release download button.
       expect(result.releaseNotes[0].version).toBe('0.50.5');
       expect(result.releaseNotes[0].downloadUrl).toBe('https://example.com/penny-v0.50.5.apk');
-      expect(result.releaseNotes[0].checksumUrl).toBe('https://example.com/penny-v0.50.5.apk.sha256');
+      expect(result.releaseNotes[0].checksumUrl).toBe('https://example.com/penny-v0.50.5.apk.md5');
 
       // Older releases in the recent list carry their own URLs too (checksum null when not attached).
       const recent = Object.fromEntries(result.recentReleaseNotes.map((r) => [r.version, r]));
       expect(recent['0.50.5'].downloadUrl).toBe('https://example.com/penny-v0.50.5.apk');
-      expect(recent['0.50.5'].checksumUrl).toBe('https://example.com/penny-v0.50.5.apk.sha256');
+      expect(recent['0.50.5'].checksumUrl).toBe('https://example.com/penny-v0.50.5.apk.md5');
       expect(recent['0.50.3'].downloadUrl).toBe('https://example.com/penny-v0.50.3.apk');
       expect(recent['0.50.3'].checksumUrl).toBeNull();
     });
@@ -853,7 +851,7 @@ describe('AppUpdateService', () => {
             tag_name: 'v1.0.0',
             assets: [
               { name: 'penny-v1.0.0.apk', browser_download_url: 'https://example.com/penny-v1.0.0.apk' },
-              { name: 'penny-v1.0.0.apk.sha256', browser_download_url: 'https://example.com/penny-v1.0.0.apk.sha256' },
+              { name: 'penny-v1.0.0.apk.md5', browser_download_url: 'https://example.com/penny-v1.0.0.apk.md5' },
             ],
             html_url: 'https://github.com/heywood8/money-tracker/releases/tag/v1.0.0',
           },
@@ -862,7 +860,7 @@ describe('AppUpdateService', () => {
 
       const result = await checkForAppUpdate({ currentVersion: '0.50.3', fetchImpl });
 
-      expect(result.checksumUrl).toBe('https://example.com/penny-v1.0.0.apk.sha256');
+      expect(result.checksumUrl).toBe('https://example.com/penny-v1.0.0.apk.md5');
     });
 
     it('returns checksumUrl null when no checksum asset present', async () => {
@@ -919,10 +917,21 @@ describe('AppUpdateService', () => {
     it('finds a checksum asset matching the APK filename', async () => {
       const assets = [
         { name: 'penny-v1.0.0.apk', browser_download_url: 'https://example.com/penny.apk' },
-        { name: 'penny-v1.0.0.apk.sha256', browser_download_url: 'https://example.com/penny.apk.sha256' },
+        { name: 'penny-v1.0.0.apk.md5', browser_download_url: 'https://example.com/penny.apk.md5' },
       ];
       const asset = extractChecksumAsset(assets, 'penny-v1.0.0.apk');
-      expect(asset.browser_download_url).toBe('https://example.com/penny.apk.sha256');
+      expect(asset.browser_download_url).toBe('https://example.com/penny.apk.md5');
+    });
+
+    it('ignores the .sha256 asset, which the app has no cheap way to verify', async () => {
+      // The pipeline still publishes it for people checking a download by hand; in the app a
+      // SHA-256 meant a pure-JS pass over every byte of the APK. A release from before the
+      // .md5 existed simply has no usable checksum, and falls back to the structural check.
+      const assets = [
+        { name: 'penny-v1.0.0.apk', browser_download_url: 'https://example.com/penny.apk' },
+        { name: 'penny-v1.0.0.apk.sha256', browser_download_url: 'https://example.com/penny.apk.sha256' },
+      ];
+      expect(extractChecksumAsset(assets, 'penny-v1.0.0.apk')).toBeNull();
     });
 
     it('returns null when no checksum asset is present', async () => {
@@ -936,44 +945,53 @@ describe('AppUpdateService', () => {
   });
 
   describe('fetchExpectedChecksum', () => {
-    it('parses sha256sum output and returns the hash for a matching filename', async () => {
-      const checksumText = 'abc123def456abc123def456abc123def456abc123def456abc123def456abcd  penny-v1.0.0.apk\n';
+    it('parses md5sum output and returns the hash for a matching filename', async () => {
+      const checksumText = 'abc123def456abc123def456abc123de  penny-v1.0.0.apk\n';
       const fetchImpl = jest.fn().mockResolvedValue({ ok: true, text: async () => checksumText });
-      const hash = await fetchExpectedChecksum('https://example.com/checksum.sha256', 'penny-v1.0.0.apk', fetchImpl);
-      expect(hash).toBe('abc123def456abc123def456abc123def456abc123def456abc123def456abcd');
+      const hash = await fetchExpectedChecksum('https://example.com/checksum.md5', 'penny-v1.0.0.apk', fetchImpl);
+      expect(hash).toBe('abc123def456abc123def456abc123de');
     });
 
-    it('handles binary-mode indicator (*) in sha256sum output', async () => {
-      const checksumText = 'abc123def456abc123def456abc123def456abc123def456abc123def456abcd *penny-v1.0.0.apk\n';
+    it('handles binary-mode indicator (*) in md5sum output', async () => {
+      const checksumText = 'abc123def456abc123def456abc123de *penny-v1.0.0.apk\n';
       const fetchImpl = jest.fn().mockResolvedValue({ ok: true, text: async () => checksumText });
-      const hash = await fetchExpectedChecksum('https://example.com/checksum.sha256', 'penny-v1.0.0.apk', fetchImpl);
-      expect(hash).toBe('abc123def456abc123def456abc123def456abc123def456abc123def456abcd');
+      const hash = await fetchExpectedChecksum('https://example.com/checksum.md5', 'penny-v1.0.0.apk', fetchImpl);
+      expect(hash).toBe('abc123def456abc123def456abc123de');
+    });
+
+    it('rejects a digest that is not md5-shaped', async () => {
+      // A SHA-256 served under an .md5 name would otherwise be compared against an MD5 and
+      // condemn every download as a mismatch.
+      const sha = 'abc123def456abc123def456abc123def456abc123def456abc123def456abcd';
+      const fetchImpl = jest.fn().mockResolvedValue({ ok: true, text: async () => `${sha}  penny-v1.0.0.apk\n` });
+      const hash = await fetchExpectedChecksum('https://example.com/checksum.md5', 'penny-v1.0.0.apk', fetchImpl);
+      expect(hash).toBeNull();
     });
 
     it('returns null when filename does not match', async () => {
-      const checksumText = 'abc123def456abc123def456abc123def456abc123def456abc123def456abcd  other-file.apk\n';
+      const checksumText = 'abc123def456abc123def456abc123de  other-file.apk\n';
       const fetchImpl = jest.fn().mockResolvedValue({ ok: true, text: async () => checksumText });
-      const hash = await fetchExpectedChecksum('https://example.com/checksum.sha256', 'penny-v1.0.0.apk', fetchImpl);
+      const hash = await fetchExpectedChecksum('https://example.com/checksum.md5', 'penny-v1.0.0.apk', fetchImpl);
       expect(hash).toBeNull();
     });
 
     it('returns null when fetch fails', async () => {
       const fetchImpl = jest.fn().mockResolvedValue({ ok: false });
-      const hash = await fetchExpectedChecksum('https://example.com/checksum.sha256', 'penny-v1.0.0.apk', fetchImpl);
+      const hash = await fetchExpectedChecksum('https://example.com/checksum.md5', 'penny-v1.0.0.apk', fetchImpl);
       expect(hash).toBeNull();
     });
 
     it('returns null when network error occurs', async () => {
       const fetchImpl = jest.fn().mockRejectedValue(new Error('network error'));
-      const hash = await fetchExpectedChecksum('https://example.com/checksum.sha256', 'penny-v1.0.0.apk', fetchImpl);
+      const hash = await fetchExpectedChecksum('https://example.com/checksum.md5', 'penny-v1.0.0.apk', fetchImpl);
       expect(hash).toBeNull();
     });
 
     it('deadlines the request so a stalled CDN connection cannot hang the caller', async () => {
-      const checksumText = 'abc123def456abc123def456abc123def456abc123def456abc123def456abcd  penny-v1.0.0.apk\n';
+      const checksumText = 'abc123def456abc123def456abc123de  penny-v1.0.0.apk\n';
       const fetchImpl = jest.fn().mockResolvedValue({ ok: true, text: async () => checksumText });
 
-      await fetchExpectedChecksum('https://example.com/checksum.sha256', 'penny-v1.0.0.apk', fetchImpl);
+      await fetchExpectedChecksum('https://example.com/checksum.md5', 'penny-v1.0.0.apk', fetchImpl);
 
       const [, options] = fetchImpl.mock.calls[0];
       expect(options.signal).toBeInstanceOf(AbortSignal);
@@ -984,7 +1002,7 @@ describe('AppUpdateService', () => {
       abortError.name = 'AbortError';
       const fetchImpl = jest.fn().mockRejectedValue(abortError);
 
-      const hash = await fetchExpectedChecksum('https://example.com/checksum.sha256', 'penny-v1.0.0.apk', fetchImpl);
+      const hash = await fetchExpectedChecksum('https://example.com/checksum.md5', 'penny-v1.0.0.apk', fetchImpl);
 
       expect(hash).toBeNull();
     });
@@ -1019,113 +1037,59 @@ describe('AppUpdateService', () => {
     });
   });
 
-  describe('createSha256', () => {
-    const nodeSha = (buf) => createHash('sha256').update(buf).digest('hex');
+  describe('computeFileMd5', () => {
+    const FILE = 'file:///cache/penny.apk';
+    const MD5 = '5d41402abc4b2a76b9719d911017c592'; // md5("hello")
 
-    // Block-boundary sizes are where a hand-written SHA-256 goes wrong: 55 and 56 straddle the
-    // point where the length field no longer fits in the final block, 64 fills it exactly.
-    it.each([0, 1, 3, 55, 56, 63, 64, 65, 127, 128, 1000, 100000])(
-      'matches the reference digest for %i bytes',
-      (size) => {
-        const bytes = Uint8Array.from({ length: size }, (unused, i) => (i * 37) % 256);
-        const hasher = createSha256();
-        hasher.update(bytes);
-        expect(hasher.digest()).toBe(nodeSha(Buffer.from(bytes)));
-      },
-    );
+    it('asks the platform for the digest instead of hashing in JavaScript', async () => {
+      // Regression: the digest used to be a pure-JS SHA-256 fed by base64 slice reads, so it
+      // walked all 55MB of an APK on the JS thread and dominated the time an update took. One
+      // native call, no file reads.
+      FileSystem.getInfoAsync.mockResolvedValue({ exists: true, size: 5, md5: MD5 });
 
-    it('is independent of how the input is split across updates', () => {
-      const bytes = Uint8Array.from({ length: 5000 }, (unused, i) => (i * 91) % 256);
-      const expected = nodeSha(Buffer.from(bytes));
+      await expect(computeFileMd5(FILE)).resolves.toBe(MD5);
 
-      for (const step of [1, 7, 64, 100, 4096]) {
-        const hasher = createSha256();
-        for (let i = 0; i < bytes.length; i += step) {
-          hasher.update(bytes.subarray(i, Math.min(i + step, bytes.length)));
-        }
-        expect(hasher.digest()).toBe(expected);
-      }
-    });
-  });
-
-  describe('computeSha256', () => {
-    // SHA-256("hello") and SHA-256("hello world"), both known constants.
-    const HELLO_SHA = '2cf24dba5fb0a30e26e83b2ac5b9e29e1b161e5c1fa7425e73043362938b9824';
-    const HELLO_WORLD_SHA = 'b94d27b9934d3e08a52e52d7da7dabfac484efe37a5380ee9088f7ace2efcde9';
-
-    // Serves positional base64 reads out of `content`, the way the native file system does.
-    const mockFileContent = (content) => {
-      FileSystem.getInfoAsync.mockResolvedValue({ exists: true, size: content.length });
-      FileSystem.readAsStringAsync.mockImplementation(async (uri, { position, length }) =>
-        Buffer.from(content.slice(position, position + length)).toString('base64'));
-    };
-
-    it('returns the SHA-256 hex digest of the file', async () => {
-      mockFileContent('hello');
-
-      const result = await computeSha256('file:///cache/penny.apk');
-
-      expect(result).toBe(HELLO_SHA);
-    });
-
-    it('reads the file in slices instead of loading it whole', async () => {
-      // Regression: a single whole-file base64 read asks for a ~150MB string on a 55MB APK and
-      // OOMs ("Failed to allocate a 149232328 byte allocation"), leaving every update unverified.
-      mockFileContent('hello world');
-
-      const result = await computeSha256('file:///cache/penny.apk', { chunkBytes: 4 });
-
-      expect(result).toBe(HELLO_WORLD_SHA);
-      expect(FileSystem.readAsStringAsync.mock.calls.map(([, options]) => options)).toEqual([
-        { encoding: 'base64', position: 0, length: 4 },
-        { encoding: 'base64', position: 4, length: 4 },
-        { encoding: 'base64', position: 8, length: 3 },
-      ]);
-    });
-
-    it('never asks for more than one slice at a time', async () => {
-      mockFileContent('x'.repeat(1000));
-
-      await computeSha256('file:///cache/penny.apk', { chunkBytes: 64 });
-
-      for (const [, options] of FileSystem.readAsStringAsync.mock.calls) {
-        expect(options.length).toBeLessThanOrEqual(64);
-      }
-    });
-
-    it('hashes without crypto.subtle, which Hermes does not provide', async () => {
-      const nativeCrypto = globalThis.crypto;
-      globalThis.crypto = undefined;
-      try {
-        mockFileContent('hello world');
-
-        const result = await computeSha256('file:///cache/penny.apk', { chunkBytes: 4 });
-
-        expect(result).toBe(HELLO_WORLD_SHA);
-      } finally {
-        globalThis.crypto = nativeCrypto;
-      }
-    });
-
-    it('propagates read errors to the caller', async () => {
-      FileSystem.getInfoAsync.mockResolvedValue({ exists: true, size: 5 });
-      FileSystem.readAsStringAsync.mockRejectedValue(new Error('read failed'));
-
-      await expect(computeSha256('file:///cache/penny.apk')).rejects.toThrow('read failed');
-    });
-
-    it('throws rather than looping when the file cannot be sized', async () => {
-      FileSystem.getInfoAsync.mockResolvedValue({ exists: false });
-
-      await expect(computeSha256('file:///cache/penny.apk')).rejects.toThrow('Cannot hash file');
+      expect(FileSystem.getInfoAsync).toHaveBeenCalledTimes(1);
+      expect(FileSystem.getInfoAsync).toHaveBeenCalledWith(FILE, { md5: true });
       expect(FileSystem.readAsStringAsync).not.toHaveBeenCalled();
     });
 
-    it('throws rather than looping when a slice comes back empty', async () => {
-      FileSystem.getInfoAsync.mockResolvedValue({ exists: true, size: 5000 });
-      FileSystem.readAsStringAsync.mockResolvedValue('');
+    it('lowercases the digest so it compares equal to the checksum file', async () => {
+      FileSystem.getInfoAsync.mockResolvedValue({ exists: true, size: 5, md5: MD5.toUpperCase() });
 
-      await expect(computeSha256('file:///cache/penny.apk')).rejects.toThrow('Cannot hash file');
+      await expect(computeFileMd5(FILE)).resolves.toBe(MD5);
+    });
+
+    it('throws when the file is missing', async () => {
+      FileSystem.getInfoAsync.mockResolvedValue({ exists: false });
+
+      await expect(computeFileMd5(FILE)).rejects.toThrow('Cannot hash file');
+    });
+
+    it('throws when the file is empty', async () => {
+      FileSystem.getInfoAsync.mockResolvedValue({ exists: true, size: 0 });
+
+      await expect(computeFileMd5(FILE)).rejects.toThrow('Cannot hash file');
+    });
+
+    it('throws rather than inventing a digest the platform did not return', async () => {
+      // A missing digest read as a hash would compare unequal to every checksum and condemn
+      // good downloads; the caller must see "could not verify" instead.
+      FileSystem.getInfoAsync.mockResolvedValue({ exists: true, size: 5 });
+
+      await expect(computeFileMd5(FILE)).rejects.toThrow('no digest returned');
+    });
+
+    it('throws when the platform returns a malformed digest', async () => {
+      FileSystem.getInfoAsync.mockResolvedValue({ exists: true, size: 5, md5: 'not-a-digest' });
+
+      await expect(computeFileMd5(FILE)).rejects.toThrow('no digest returned');
+    });
+
+    it('propagates read errors to the caller', async () => {
+      FileSystem.getInfoAsync.mockRejectedValue(new Error('read failed'));
+
+      await expect(computeFileMd5(FILE)).rejects.toThrow('read failed');
     });
   });
 
@@ -1153,9 +1117,9 @@ describe('AppUpdateService', () => {
 
   describe('verifyCachedApk', () => {
     const URL = 'https://example.com/penny-v1.0.0.apk';
-    // 'aGVsbG8=' = base64("hello"); SHA-256("hello") is this known constant
-    const HELLO_B64 = 'aGVsbG8=';
-    const HELLO_SHA = '2cf24dba5fb0a30e26e83b2ac5b9e29e1b161e5c1fa7425e73043362938b9824';
+    const CHECKSUM_URL = 'https://example.com/penny-v1.0.0.apk.md5';
+    const FILE_MD5 = '5d41402abc4b2a76b9719d911017c592';
+    const OTHER_MD5 = 'ffffffffffffffffffffffffffffffff';
     // Base64 of the ZIP signatures used by the structural integrity fallback.
     const APK_HEAD_B64 = 'UEsDBA=='; // PK\x03\x04 — local file header
     const APK_EOCD_B64 = 'UEsFBg=='; // PK\x05\x06 — End Of Central Directory record
@@ -1165,12 +1129,27 @@ describe('AppUpdateService', () => {
         .mockResolvedValueOnce(APK_HEAD_B64)
         .mockResolvedValueOnce(APK_EOCD_B64);
     };
+    // getInfoAsync now answers two different questions: plain size/existence reads, and the
+    // `{ md5: true }` digest request that replaced the in-app SHA-256.
+    const mockInfo = ({ size = 12345, md5 = null, digestError = null } = {}) => {
+      FileSystem.getInfoAsync.mockImplementation(async (uri, options) => {
+        if (options?.md5) {
+          if (digestError) throw digestError;
+          return { exists: true, size, md5 };
+        }
+        return { exists: true, size };
+      });
+    };
+    const checksumResponse = (digest) => jest.fn().mockResolvedValue({
+      ok: true,
+      text: async () => `${digest}  penny-v1.0.0.apk\n`,
+    });
 
     it('reports exists:false when no cached APK is present', async () => {
       FileSystem.getInfoAsync.mockResolvedValue({ exists: false, size: 0 });
 
       const result = await verifyCachedApk(URL, {
-        checksumUrl: 'https://example.com/penny-v1.0.0.apk.sha256',
+        checksumUrl: CHECKSUM_URL,
         cacheDir: 'file:///cache/',
         fetchImpl: jest.fn(),
       });
@@ -1207,35 +1186,29 @@ describe('AppUpdateService', () => {
     });
 
     it('returns verified:true when the cached APK matches the checksum', async () => {
-      FileSystem.getInfoAsync.mockResolvedValue({ exists: true, size: 5 });
-      FileSystem.readAsStringAsync.mockResolvedValue(HELLO_B64);
-      const fetchImpl = jest.fn().mockResolvedValue({
-        ok: true,
-        text: async () => `${HELLO_SHA}  penny-v1.0.0.apk\n`,
-      });
+      mockInfo({ size: 5, md5: FILE_MD5 });
+      const fetchImpl = checksumResponse(FILE_MD5);
 
       const result = await verifyCachedApk(URL, {
-        checksumUrl: 'https://example.com/penny-v1.0.0.apk.sha256',
+        checksumUrl: CHECKSUM_URL,
         cacheDir: 'file:///cache/',
         fetchImpl,
       });
 
       expect(result).toEqual({ exists: true, uri: 'file:///cache/penny-v1.0.0.apk', verified: true });
       expect(FileSystem.deleteAsync).not.toHaveBeenCalled();
+      // The whole point of the change: verification reads no file content at all.
+      expect(FileSystem.readAsStringAsync).not.toHaveBeenCalled();
     });
 
     it('deletes the file and reports corrupted when the checksum does not match', async () => {
       jest.spyOn(console, 'warn').mockImplementation(() => {});
-      FileSystem.getInfoAsync.mockResolvedValue({ exists: true, size: 5 });
-      FileSystem.readAsStringAsync.mockResolvedValue(HELLO_B64);
+      mockInfo({ size: 5, md5: FILE_MD5 });
       FileSystem.deleteAsync.mockResolvedValue();
-      const fetchImpl = jest.fn().mockResolvedValue({
-        ok: true,
-        text: async () => 'ffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffff  penny-v1.0.0.apk\n',
-      });
+      const fetchImpl = checksumResponse(OTHER_MD5);
 
       const result = await verifyCachedApk(URL, {
-        checksumUrl: 'https://example.com/penny-v1.0.0.apk.sha256',
+        checksumUrl: CHECKSUM_URL,
         cacheDir: 'file:///cache/',
         fetchImpl,
       });
@@ -1253,7 +1226,7 @@ describe('AppUpdateService', () => {
       const fetchImpl = jest.fn().mockResolvedValue({ ok: false });
 
       const result = await verifyCachedApk(URL, {
-        checksumUrl: 'https://example.com/penny-v1.0.0.apk.sha256',
+        checksumUrl: CHECKSUM_URL,
         cacheDir: 'file:///cache/',
         fetchImpl,
       });
@@ -1272,7 +1245,7 @@ describe('AppUpdateService', () => {
       const fetchImpl = jest.fn().mockResolvedValue({ ok: false });
 
       const result = await verifyCachedApk(URL, {
-        checksumUrl: 'https://example.com/penny-v1.0.0.apk.sha256',
+        checksumUrl: CHECKSUM_URL,
         cacheDir: 'file:///cache/',
         fetchImpl,
       });
@@ -1281,17 +1254,14 @@ describe('AppUpdateService', () => {
       expect(FileSystem.deleteAsync).toHaveBeenCalled();
     });
 
-    it('keeps the file (verified:false) when hashing throws (OOM / read error)', async () => {
+    it('keeps the file (verified:false) when the digest cannot be computed', async () => {
       jest.spyOn(console, 'warn').mockImplementation(() => {});
-      FileSystem.getInfoAsync.mockResolvedValue({ exists: true, size: 50_000_000 });
-      FileSystem.readAsStringAsync.mockRejectedValue(new RangeError('Array buffer allocation failed'));
-      const fetchImpl = jest.fn().mockResolvedValue({
-        ok: true,
-        text: async () => `${HELLO_SHA}  penny-v1.0.0.apk\n`,
-      });
+      mockInfo({ size: 50_000_000, digestError: new Error('could not read file') });
+      mockIntactApkStructure();
+      const fetchImpl = checksumResponse(FILE_MD5);
 
       const result = await verifyCachedApk(URL, {
-        checksumUrl: 'https://example.com/penny-v1.0.0.apk.sha256',
+        checksumUrl: CHECKSUM_URL,
         cacheDir: 'file:///cache/',
         fetchImpl,
       });
@@ -1307,7 +1277,7 @@ describe('AppUpdateService', () => {
         const fetchImpl = jest.fn();
 
         const result = await verifyCachedApk(URL, {
-          checksumUrl: 'https://example.com/penny-v1.0.0.apk.sha256',
+          checksumUrl: CHECKSUM_URL,
           cacheDir: 'file:///cache/',
           fetchImpl,
           deepVerify: false,
@@ -1317,6 +1287,9 @@ describe('AppUpdateService', () => {
         expect(fetchImpl).not.toHaveBeenCalled();
         // Head (4 bytes) and tail (<=64KB) only — never a pass over all 53MB.
         expect(FileSystem.readAsStringAsync).toHaveBeenCalledTimes(2);
+        for (const [, options] of FileSystem.getInfoAsync.mock.calls) {
+          expect(options?.md5).toBeFalsy();
+        }
       });
 
       it('still deletes a structurally truncated file', async () => {
@@ -1328,7 +1301,7 @@ describe('AppUpdateService', () => {
           .mockResolvedValueOnce('AAAAAAAA'); // no EOCD signature
 
         const result = await verifyCachedApk(URL, {
-          checksumUrl: 'https://example.com/penny-v1.0.0.apk.sha256',
+          checksumUrl: CHECKSUM_URL,
           cacheDir: 'file:///cache/',
           fetchImpl: jest.fn(),
           deepVerify: false,
@@ -1408,43 +1381,59 @@ describe('AppUpdateService', () => {
 
   describe('downloadAndInstallApk - checksum error handling', () => {
     const IntentLauncher = require('expo-intent-launcher');
-    const HELLO_B64 = 'aGVsbG8='; // base64("hello")
+    const CHECKSUM_URL = 'https://example.com/penny-v1.0.0.apk.md5';
+    const FILE_MD5 = '5d41402abc4b2a76b9719d911017c592';
+    const OTHER_MD5 = 'ffffffffffffffffffffffffffffffff';
     // Base64 of the ZIP signatures the structural check looks for.
     const APK_HEAD_B64 = 'UEsDBA=='; // PK\x03\x04 — local file header
     const APK_EOCD_B64 = 'UEsFBg=='; // PK\x05\x06 — End Of Central Directory record
+    // getInfoAsync answers both the plain size/existence reads and the `{ md5: true }` digest
+    // request that replaced the in-app SHA-256.
+    const mockInfo = ({ size = 12345, md5 = null, digestError = null } = {}) => {
+      FileSystem.getInfoAsync.mockImplementation(async (uri, options) => {
+        if (options?.md5) {
+          if (digestError) throw digestError;
+          return { exists: true, size, md5 };
+        }
+        return { exists: true, size };
+      });
+    };
     // Make the structural check (head read, then tail read) see a complete archive.
     const mockIntactApkStructure = () => {
-      FileSystem.getInfoAsync.mockResolvedValue({ exists: true, size: 12345 });
       FileSystem.readAsStringAsync
         .mockResolvedValueOnce(APK_HEAD_B64)
         .mockResolvedValueOnce(APK_EOCD_B64);
     };
+    const checksumResponse = (digest) => jest.fn().mockResolvedValue({
+      ok: true,
+      text: async () => `${digest}  penny-v1.0.0.apk\n`,
+    });
+    const mockDownload = (uri = 'file:///cache/penny-v1.0.0.apk') => {
+      FileSystem.createDownloadResumable.mockReturnValue({
+        downloadAsync: jest.fn().mockResolvedValue({ uri }),
+      });
+    };
 
     beforeEach(() => {
-      FileSystem.getInfoAsync.mockResolvedValue({ exists: true, size: 5 });
+      mockInfo({ size: 5, md5: FILE_MD5 });
       FileSystem.readDirectoryAsync.mockResolvedValue([]);
       FileSystem.getContentUriAsync.mockResolvedValue('content://penny.apk');
       IntentLauncher.startActivityAsync.mockResolvedValue();
     });
 
-    it('proceeds to install when computeSha256 throws and the file cannot be inspected', async () => {
+    it('proceeds to install when the digest throws and the file cannot be inspected', async () => {
       jest.spyOn(console, 'warn').mockImplementation(() => {});
-      FileSystem.createDownloadResumable.mockReturnValue({
-        downloadAsync: jest.fn().mockResolvedValue({ uri: 'file:///cache/penny-v1.0.0.apk' }),
-      });
-      FileSystem.getInfoAsync.mockResolvedValue({ exists: true, size: 50_000_000 });
-      FileSystem.readAsStringAsync.mockRejectedValue(new RangeError('Array buffer allocation failed'));
+      mockDownload();
+      mockInfo({ size: 50_000_000, digestError: new Error('could not read file') });
+      FileSystem.readAsStringAsync.mockRejectedValue(new Error('could not read file'));
 
-      const fetchImpl = jest.fn().mockResolvedValue({
-        ok: true,
-        text: async () => 'abc123def456abc123def456abc123def456abc123def456abc123def456abcd  penny-v1.0.0.apk\n',
-      });
+      const fetchImpl = checksumResponse(FILE_MD5);
 
       await expect(
         downloadAndInstallApk(
           'https://example.com/penny-v1.0.0.apk',
           null,
-          { checksumUrl: 'https://example.com/penny-v1.0.0.apk.sha256', fetchImpl },
+          { checksumUrl: CHECKSUM_URL, fetchImpl },
         ),
       ).resolves.toBeUndefined();
 
@@ -1453,23 +1442,15 @@ describe('AppUpdateService', () => {
     });
 
     it('deletes the file and throws when checksum does not match', async () => {
-      FileSystem.createDownloadResumable.mockReturnValue({
-        downloadAsync: jest.fn().mockResolvedValue({ uri: 'file:///cache/penny-v1.0.0.apk' }),
-      });
+      mockDownload();
       FileSystem.deleteAsync.mockResolvedValue();
-      // 'aGVsbG8=' = base64("hello"); real SHA-256 ≠ 'ffff...'
-      FileSystem.readAsStringAsync.mockResolvedValue('aGVsbG8=');
-
-      const fetchImpl = jest.fn().mockResolvedValue({
-        ok: true,
-        text: async () => 'ffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffff  penny-v1.0.0.apk\n',
-      });
+      const fetchImpl = checksumResponse(OTHER_MD5);
 
       await expect(
         downloadAndInstallApk(
           'https://example.com/penny-v1.0.0.apk',
           null,
-          { checksumUrl: 'https://example.com/penny-v1.0.0.apk.sha256', fetchImpl },
+          { checksumUrl: CHECKSUM_URL, fetchImpl },
         ),
       ).rejects.toThrow('APK checksum mismatch — file discarded');
 
@@ -1483,22 +1464,15 @@ describe('AppUpdateService', () => {
       // The mismatch is the verdict; a failed cleanup must not let the file through as merely
       // "unverified" and get waved past by the structural check.
       jest.spyOn(console, 'warn').mockImplementation(() => {});
-      FileSystem.createDownloadResumable.mockReturnValue({
-        downloadAsync: jest.fn().mockResolvedValue({ uri: 'file:///cache/penny-v1.0.0.apk' }),
-      });
+      mockDownload();
       FileSystem.deleteAsync.mockRejectedValue(new Error('EBUSY'));
-      FileSystem.readAsStringAsync.mockResolvedValue(HELLO_B64);
-
-      const fetchImpl = jest.fn().mockResolvedValue({
-        ok: true,
-        text: async () => 'ffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffff  penny-v1.0.0.apk\n',
-      });
+      const fetchImpl = checksumResponse(OTHER_MD5);
 
       await expect(
         downloadAndInstallApk(
           'https://example.com/penny-v1.0.0.apk',
           null,
-          { checksumUrl: 'https://example.com/penny-v1.0.0.apk.sha256', fetchImpl },
+          { checksumUrl: CHECKSUM_URL, fetchImpl },
         ),
       ).rejects.toThrow('APK checksum mismatch — file discarded');
 
@@ -1506,30 +1480,22 @@ describe('AppUpdateService', () => {
     });
 
     it('calls onPhaseChange("verifying") before computing the hash', async () => {
-      FileSystem.createDownloadResumable.mockReturnValue({
-        downloadAsync: jest.fn().mockResolvedValue({ uri: 'file:///cache/penny-v1.0.0.apk' }),
-      });
-      FileSystem.readAsStringAsync.mockResolvedValue('aGVsbG8=');
-
-      const fetchImpl = jest.fn().mockResolvedValue({
-        ok: true,
-        text: async () => '2cf24dba5fb0a30e26e83b2ac5b9e29e1b161e5c1fa7425e73043362938b9824  penny-v1.0.0.apk\n',
-      });
+      mockDownload();
+      const fetchImpl = checksumResponse(FILE_MD5);
       const onPhaseChange = jest.fn();
 
       await downloadAndInstallApk(
         'https://example.com/penny-v1.0.0.apk',
         null,
-        { checksumUrl: 'https://example.com/penny-v1.0.0.apk.sha256', fetchImpl, onPhaseChange },
+        { checksumUrl: CHECKSUM_URL, fetchImpl, onPhaseChange },
       );
 
       expect(onPhaseChange).toHaveBeenCalledWith('verifying');
     });
 
     it('calls onPhaseChange("backing_up") but not "verifying" when no checksumUrl is provided', async () => {
-      FileSystem.createDownloadResumable.mockReturnValue({
-        downloadAsync: jest.fn().mockResolvedValue({ uri: 'file:///cache/penny-v1.0.0.apk' }),
-      });
+      mockDownload();
+      mockInfo({ size: 12345 });
       mockIntactApkStructure();
 
       const onPhaseChange = jest.fn();
@@ -1548,11 +1514,9 @@ describe('AppUpdateService', () => {
       // Without this, a half-written APK stays in the cache and the update panel keeps offering
       // to install it — the user can never get a fresh download.
       jest.spyOn(console, 'warn').mockImplementation(() => {});
-      FileSystem.createDownloadResumable.mockReturnValue({
-        downloadAsync: jest.fn().mockResolvedValue({ uri: 'file:///cache/penny-v1.0.0.apk' }),
-      });
+      mockDownload();
       FileSystem.deleteAsync.mockResolvedValue();
-      FileSystem.getInfoAsync.mockResolvedValue({ exists: true, size: 12345 });
+      mockInfo({ size: 12345 });
       FileSystem.readAsStringAsync
         .mockResolvedValueOnce(APK_HEAD_B64)
         .mockResolvedValueOnce('AAAAAAAA'); // decodes to zero bytes — no EOCD, so truncated
@@ -1570,29 +1534,128 @@ describe('AppUpdateService', () => {
 
     it('deletes a truncated download when the checksum could not be computed', async () => {
       jest.spyOn(console, 'warn').mockImplementation(() => {});
-      FileSystem.createDownloadResumable.mockReturnValue({
-        downloadAsync: jest.fn().mockResolvedValue({ uri: 'file:///cache/penny-v1.0.0.apk' }),
-      });
+      mockDownload();
       FileSystem.deleteAsync.mockResolvedValue();
-      FileSystem.getInfoAsync.mockResolvedValue({ exists: true, size: 12345 });
+      mockInfo({ size: 12345, digestError: new Error('could not read file') });
       FileSystem.readAsStringAsync
-        .mockRejectedValueOnce(new RangeError('Array buffer allocation failed')) // hashing
         .mockResolvedValueOnce(APK_HEAD_B64)
         .mockResolvedValueOnce('AAAAAAAA'); // no EOCD
-      const fetchImpl = jest.fn().mockResolvedValue({
-        ok: true,
-        text: async () => 'abc123def456abc123def456abc123def456abc123def456abc123def456abcd  penny-v1.0.0.apk\n',
-      });
+      const fetchImpl = checksumResponse(FILE_MD5);
 
       await expect(
         downloadAndInstallApk(
           'https://example.com/penny-v1.0.0.apk',
           null,
-          { checksumUrl: 'https://example.com/penny-v1.0.0.apk.sha256', fetchImpl },
+          { checksumUrl: CHECKSUM_URL, fetchImpl },
         ),
       ).rejects.toThrow('Downloaded APK is incomplete — file deleted');
 
       expect(IntentLauncher.startActivityAsync).not.toHaveBeenCalled();
+    });
+
+    describe('expected-size check', () => {
+      // The transfer reports the size it is working towards on every progress tick. Comparing
+      // the finished file against it costs one stat call and needs no checksum asset at all,
+      // which is what catches a truncated download on a release published before the pipeline
+      // started attaching an .md5.
+      const mockDownloadReporting = (expectedBytes, uri = 'file:///cache/penny-v1.0.0.apk') => {
+        FileSystem.createDownloadResumable.mockImplementation(
+          (url, target, options, onProgress) => ({
+            downloadAsync: jest.fn().mockImplementation(async () => {
+              onProgress({ totalBytesWritten: expectedBytes, totalBytesExpectedToWrite: expectedBytes });
+              return { uri };
+            }),
+          }),
+        );
+      };
+
+      it('deletes a file shorter than the transfer announced and never fetches the checksum', async () => {
+        jest.spyOn(console, 'warn').mockImplementation(() => {});
+        mockDownloadReporting(50_000_000);
+        FileSystem.deleteAsync.mockResolvedValue();
+        mockInfo({ size: 12_000_000 });
+        const fetchImpl = checksumResponse(FILE_MD5);
+
+        await expect(
+          downloadAndInstallApk(
+            'https://example.com/penny-v1.0.0.apk',
+            null,
+            { checksumUrl: CHECKSUM_URL, fetchImpl },
+          ),
+        ).rejects.toThrow('Downloaded APK is incomplete (12000000 of 50000000 bytes) — file deleted');
+
+        expect(FileSystem.deleteAsync).toHaveBeenCalledWith(
+          'file:///cache/penny-v1.0.0.apk',
+          { idempotent: true },
+        );
+        // Cheapest verdict first: no round trip for a checksum we already know cannot match.
+        expect(fetchImpl).not.toHaveBeenCalled();
+        expect(IntentLauncher.startActivityAsync).not.toHaveBeenCalled();
+      });
+
+      it('keeps the incomplete-download verdict even when deleting the file fails', async () => {
+        // A failed cleanup must not replace the typed error with a raw one — the UI can only
+        // describe an untyped failure as "something went wrong".
+        jest.spyOn(console, 'warn').mockImplementation(() => {});
+        mockDownloadReporting(50_000_000);
+        FileSystem.deleteAsync.mockRejectedValue(new Error('EBUSY'));
+        mockInfo({ size: 12_000_000 });
+
+        await expect(
+          downloadAndInstallApk(
+            'https://example.com/penny-v1.0.0.apk',
+            null,
+            { checksumUrl: CHECKSUM_URL, fetchImpl: checksumResponse(FILE_MD5) },
+          ),
+        ).rejects.toMatchObject({ code: UPDATE_ERROR.INCOMPLETE_DOWNLOAD });
+
+        expect(IntentLauncher.startActivityAsync).not.toHaveBeenCalled();
+      });
+
+      it('installs a file that matches the announced size', async () => {
+        mockDownloadReporting(50_000_000);
+        mockInfo({ size: 50_000_000, md5: FILE_MD5 });
+        const fetchImpl = checksumResponse(FILE_MD5);
+
+        await downloadAndInstallApk(
+          'https://example.com/penny-v1.0.0.apk',
+          null,
+          { checksumUrl: CHECKSUM_URL, fetchImpl },
+        );
+
+        expect(FileSystem.deleteAsync).not.toHaveBeenCalled();
+        expect(IntentLauncher.startActivityAsync).toHaveBeenCalled();
+      });
+
+      it('leaves a file longer than announced to the checksum and structure checks', async () => {
+        // Only "short" is a truncation. A longer file is something else, and the digest is
+        // better placed to judge it than a size comparison.
+        mockDownloadReporting(50_000_000);
+        mockInfo({ size: 50_000_001, md5: FILE_MD5 });
+        const fetchImpl = checksumResponse(FILE_MD5);
+
+        await downloadAndInstallApk(
+          'https://example.com/penny-v1.0.0.apk',
+          null,
+          { checksumUrl: CHECKSUM_URL, fetchImpl },
+        );
+
+        expect(IntentLauncher.startActivityAsync).toHaveBeenCalled();
+      });
+
+      it('still reports progress to the caller', async () => {
+        mockDownloadReporting(50_000_000);
+        mockInfo({ size: 50_000_000, md5: FILE_MD5 });
+        const onProgress = jest.fn();
+
+        await downloadAndInstallApk(
+          'https://example.com/penny-v1.0.0.apk',
+          onProgress,
+          { checksumUrl: CHECKSUM_URL, fetchImpl: checksumResponse(FILE_MD5) },
+        );
+
+        expect(onProgress).toHaveBeenCalledWith(1);
+      });
     });
   });
 
