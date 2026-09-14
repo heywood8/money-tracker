@@ -120,13 +120,23 @@ jobs:
           echo "Renamed to: $NEW_NAME"
           ls -lh "$NEW_NAME"
 
-      - name: 🔒 Generate SHA-256 checksum
+      # Two digests, for two different readers. The .sha256 is for people verifying a download
+      # by hand. The .md5 is what the app checks: Hermes has no native digest, so a SHA-256 in
+      # the app was a pure-JS loop over every byte of a 55MB APK, while expo-file-system will
+      # compute an MD5 natively. Neither file establishes authenticity (it ships in the same
+      # release, behind the same TLS, as the APK) — that is the APK signature's job, verified by
+      # Android's installer. These only have to catch a truncated or damaged download, and MD5
+      # does that just as well for a hundredth of the cost on device.
+      - name: 🔒 Generate checksums
         id: checksum
         run: |
           APK="${{ steps.find_apk.outputs.apk_path }}"
           sha256sum "$APK" > "${APK}.sha256"
+          md5sum "$APK" > "${APK}.md5"
           echo "checksum_path=${APK}.sha256" >> $GITHUB_OUTPUT
+          echo "md5_path=${APK}.md5" >> $GITHUB_OUTPUT
           echo "SHA-256: $(cat ${APK}.sha256)"
+          echo "MD5: $(cat ${APK}.md5)"
 
       # Makes the APK downloadable from every run — including manual
       # workflow_dispatch runs off a branch, where there is no release/tag to
@@ -139,16 +149,18 @@ jobs:
           path: |
             ${{ steps.find_apk.outputs.apk_path }}
             ${{ steps.checksum.outputs.checksum_path }}
+            ${{ steps.checksum.outputs.md5_path }}
           retention-days: 7
           if-no-files-found: error
 
-      - name: 📤 Upload APK and checksum to Release
+      - name: 📤 Upload APK and checksums to Release
         if: github.ref_type == 'tag'
         uses: softprops/action-gh-release@v3
         with:
           files: |
             ${{ steps.find_apk.outputs.apk_path }}
             ${{ steps.checksum.outputs.checksum_path }}
+            ${{ steps.checksum.outputs.md5_path }}
           token: ${{ secrets.GITHUB_TOKEN }}
 
       - name: Post build summary
@@ -159,6 +171,7 @@ jobs:
           REF_NAME: ${{ github.ref_name }}
           APK_PATH: ${{ steps.find_apk.outputs.apk_path }}
           CHECKSUM_PATH: ${{ steps.checksum.outputs.checksum_path }}
+          MD5_PATH: ${{ steps.checksum.outputs.md5_path }}
         run: |
           echo "## 🚀 Android Build Completed (EAS)" >> $GITHUB_STEP_SUMMARY
           echo "" >> $GITHUB_STEP_SUMMARY
@@ -166,3 +179,4 @@ jobs:
           echo "**Tag:** $REF_NAME" >> $GITHUB_STEP_SUMMARY
           echo "**APK:** $APK_PATH" >> $GITHUB_STEP_SUMMARY
           echo "**SHA-256:** $(cat "$CHECKSUM_PATH")" >> $GITHUB_STEP_SUMMARY
+          echo "**MD5:** $(cat "$MD5_PATH")" >> $GITHUB_STEP_SUMMARY

@@ -89,13 +89,18 @@ export const extractApkAsset = (assets = []) => {
   );
 };
 
-// Finds a SHA-256 checksum asset matching the APK filename.
-// The release pipeline uploads "<apkName>.sha256" produced by sha256sum.
+// Finds the checksum asset matching the APK filename.
+//
+// The release pipeline uploads "<apkName>.md5" produced by md5sum, beside the "<apkName>.sha256"
+// it has always published for people verifying a download by hand. The app reads the .md5 one
+// because that is the only digest the platform will compute for us natively — see computeFileMd5
+// for why a cheaper digest loses nothing here. A release published before the pipeline started
+// attaching .md5 has no usable checksum, and falls back to the structural check.
 export const extractChecksumAsset = (assets = [], apkFilename) => {
   if (!Array.isArray(assets) || !apkFilename) {
     return null;
   }
-  const expected = `${apkFilename}.sha256`;
+  const expected = `${apkFilename}.md5`;
   return assets.find((asset) => {
     if (!asset || typeof asset.name !== 'string') return false;
     return asset.name === expected && !!asset.browser_download_url;
@@ -625,17 +630,16 @@ export const deleteDownloadedApk = async (localUri) => {
 // that Android rejects with "There's a problem with the app file".
 //
 // Two layers of defence:
-//   1. Checksum — when the release ships a .sha256 we hash the file and compare (strongest signal).
-//   2. Structure — when no checksum is usable (asset missing, unfetchable, or hashing OOMed) we
-//      fall back to a lightweight ZIP-structure check that still catches truncated downloads.
+//   1. Checksum — when the release ships a .md5 we digest the file and compare (strongest signal).
+//   2. Structure — when no checksum is usable (asset missing, unfetchable, or the digest failed)
+//      we fall back to a lightweight ZIP-structure check that still catches truncated downloads.
 // A file that fails either layer is deleted so callers re-download cleanly.
 //
-// `deepVerify: false` runs layer 2 only. Layer 1 costs a network round trip plus a SHA-256 of
-// the whole 50MB+ APK, and Hermes has no native digest, so the hash is a pure-JS loop over every
-// byte — tens of seconds of JS-thread work. That is fine right after a download (the file is
-// unproven and the UI says "verifying"), and far too expensive on a path the user is waiting on,
-// which is what turned "Checking for updates…" into a minute-long freeze. Layer 2 reads 4 bytes
-// and the trailing 64KB, and catches the truncation that actually breaks installs.
+// `deepVerify: false` runs layer 2 only. Layer 1 still costs a network round trip for the
+// checksum file, which is the part worth skipping on a path the user is waiting on; the digest
+// itself is now a native call over the file and no longer the minute-long JS-thread freeze it
+// was. Layer 2 needs no network at all: it reads 4 bytes and the trailing 64KB, and catches the
+// truncation that actually breaks installs.
 //
 // Returns one of:
 //   { exists: false }                          — no usable cached file (absent or zero-size)
@@ -666,7 +670,7 @@ export const verifyCachedApk = async (
       // delete must not be mistaken for a failure to hash.
       let actualHash = null;
       try {
-        actualHash = await computeSha256(localUri);
+        actualHash = await computeFileMd5(localUri);
       } catch (e) {
         console.warn('[AppUpdate] cached APK checksum computation failed; falling back to structure check', e.message);
       }
@@ -776,165 +780,35 @@ export const verifyApkStructure = async (fileUri) => {
   }
 };
 
-// How much of the APK is read per hashing step. Reading the file in one call asks the platform
-// for a base64 string of ~4/3 its size, and a Java string costs two bytes per character: a 55MB
-// APK therefore needs a ~150MB contiguous allocation, which is exactly what died on mid-range
-// devices with "Failed to allocate a 149232328 byte allocation". A slice is a multiple of 3 so
-// each read base64-encodes without interior padding.
-const HASH_CHUNK_BYTES = 3 * 1024 * 1024;
+// An md5sum-format digest: 32 lowercase hex characters.
+const MD5_HEX = /^[0-9a-f]{32}$/i;
 
-// SHA-256 round constants: the first 32 bits of the fractional parts of the cube roots of the
-// first 64 primes (FIPS 180-4, §4.2.2).
-const SHA256_K = new Uint32Array([
-  0x428a2f98, 0x71374491, 0xb5c0fbcf, 0xe9b5dba5, 0x3956c25b, 0x59f111f1, 0x923f82a4, 0xab1c5ed5,
-  0xd807aa98, 0x12835b01, 0x243185be, 0x550c7dc3, 0x72be5d74, 0x80deb1fe, 0x9bdc06a7, 0xc19bf174,
-  0xe49b69c1, 0xefbe4786, 0x0fc19dc6, 0x240ca1cc, 0x2de92c6f, 0x4a7484aa, 0x5cb0a9dc, 0x76f988da,
-  0x983e5152, 0xa831c66d, 0xb00327c8, 0xbf597fc7, 0xc6e00bf3, 0xd5a79147, 0x06ca6351, 0x14292967,
-  0x27b70a85, 0x2e1b2138, 0x4d2c6dfc, 0x53380d13, 0x650a7354, 0x766a0abb, 0x81c2c92e, 0x92722c85,
-  0xa2bfe8a1, 0xa81a664b, 0xc24b8b70, 0xc76c51a3, 0xd192e819, 0xd6990624, 0xf40e3585, 0x106aa070,
-  0x19a4c116, 0x1e376c08, 0x2748774c, 0x34b0bcb5, 0x391c0cb3, 0x4ed8aa4a, 0x5b9cca4f, 0x682e6ff3,
-  0x748f82ee, 0x78a5636f, 0x84c87814, 0x8cc70208, 0x90befffa, 0xa4506ceb, 0xbef9a3f7, 0xc67178f2,
-]);
-
-// Streaming SHA-256. The APK is hashed slice by slice, so this never needs the file in one piece —
-// it carries only the 64-byte block that straddles two slices. Used when the runtime has no
-// crypto.subtle (Hermes ships no Web Crypto, and nothing in this app polyfills one), which is the
-// difference between verifying every download and silently verifying none.
-export const createSha256 = () => {
-  const state = new Uint32Array([
-    0x6a09e667, 0xbb67ae85, 0x3c6ef372, 0xa54ff53a, 0x510e527f, 0x9b05688c, 0x1f83d9ab, 0x5be0cd19,
-  ]);
-  const w = new Uint32Array(64);
-  const pending = new Uint8Array(64); // bytes left over from the previous update
-  let pendingLen = 0;
-  let totalBytes = 0;
-
-  const compress = (bytes, at) => {
-    for (let i = 0; i < 16; i += 1) {
-      const p = at + i * 4;
-      w[i] = (bytes[p] << 24) | (bytes[p + 1] << 16) | (bytes[p + 2] << 8) | bytes[p + 3];
-    }
-    for (let i = 16; i < 64; i += 1) {
-      const x = w[i - 15];
-      const y = w[i - 2];
-      const s0 = ((x >>> 7) | (x << 25)) ^ ((x >>> 18) | (x << 14)) ^ (x >>> 3);
-      const s1 = ((y >>> 17) | (y << 15)) ^ ((y >>> 19) | (y << 13)) ^ (y >>> 10);
-      w[i] = (w[i - 16] + s0 + w[i - 7] + s1) | 0;
-    }
-
-    let a = state[0]; let b = state[1]; let c = state[2]; let d = state[3];
-    let e = state[4]; let f = state[5]; let g = state[6]; let h = state[7];
-    for (let i = 0; i < 64; i += 1) {
-      const s1 = ((e >>> 6) | (e << 26)) ^ ((e >>> 11) | (e << 21)) ^ ((e >>> 25) | (e << 7));
-      const ch = (e & f) ^ (~e & g);
-      const t1 = (h + s1 + ch + SHA256_K[i] + w[i]) | 0;
-      const s0 = ((a >>> 2) | (a << 30)) ^ ((a >>> 13) | (a << 19)) ^ ((a >>> 22) | (a << 10));
-      const maj = (a & b) ^ (a & c) ^ (b & c);
-      const t2 = (s0 + maj) | 0;
-      h = g; g = f; f = e; e = (d + t1) | 0;
-      d = c; c = b; b = a; a = (t1 + t2) | 0;
-    }
-    state[0] += a; state[1] += b; state[2] += c; state[3] += d;
-    state[4] += e; state[5] += f; state[6] += g; state[7] += h;
-  };
-
-  return {
-    update(chunk) {
-      totalBytes += chunk.length;
-      let i = 0;
-      if (pendingLen) {
-        const need = Math.min(64 - pendingLen, chunk.length);
-        pending.set(chunk.subarray(0, need), pendingLen);
-        pendingLen += need;
-        i = need;
-        if (pendingLen === 64) {
-          compress(pending, 0);
-          pendingLen = 0;
-        }
-      }
-      for (; i + 64 <= chunk.length; i += 64) {
-        compress(chunk, i);
-      }
-      if (i < chunk.length) {
-        pending.set(chunk.subarray(i), 0);
-        pendingLen = chunk.length - i;
-      }
-    },
-
-    digest() {
-      // Append the 0x80 terminator and the message length in bits as a 64-bit big-endian field,
-      // spilling into a second block when the length no longer fits after the terminator.
-      const block = new Uint8Array(pendingLen < 56 ? 64 : 128);
-      block.set(pending.subarray(0, pendingLen));
-      block[pendingLen] = 0x80;
-      const bitsHigh = Math.floor(totalBytes / 0x20000000); // totalBytes * 8 / 2^32
-      const bitsLow = (totalBytes * 8) >>> 0;
-      const end = block.length;
-      block[end - 8] = (bitsHigh >>> 24) & 0xff;
-      block[end - 7] = (bitsHigh >>> 16) & 0xff;
-      block[end - 6] = (bitsHigh >>> 8) & 0xff;
-      block[end - 5] = bitsHigh & 0xff;
-      block[end - 4] = (bitsLow >>> 24) & 0xff;
-      block[end - 3] = (bitsLow >>> 16) & 0xff;
-      block[end - 2] = (bitsLow >>> 8) & 0xff;
-      block[end - 1] = bitsLow & 0xff;
-      for (let i = 0; i < end; i += 64) {
-        compress(block, i);
-      }
-
-      let hex = '';
-      for (let i = 0; i < 8; i += 1) {
-        hex += (state[i] >>> 0).toString(16).padStart(8, '0');
-      }
-      return hex;
-    },
-  };
-};
-
-const toHex = (buffer) => Array.from(new Uint8Array(buffer))
-  .map((b) => b.toString(16).padStart(2, '0'))
-  .join('');
-
-// SHA-256 of a file, hashed from fixed-size slices so the whole file is never held as base64.
-// Where the runtime offers crypto.subtle its native digest is far faster, at the cost of holding
-// the file's bytes at once; without it we fall back to hashing each slice as it arrives, which
-// needs no full buffer at all. Either way the huge base64 string that OOMed is gone.
-export const computeSha256 = async (fileUri, { chunkBytes = HASH_CHUNK_BYTES } = {}) => {
-  const info = await FileSystem.getInfoAsync(fileUri);
-  const size = info?.size;
-  if (!info?.exists || !Number.isFinite(size) || size <= 0) {
+// Digest of a file, computed by the platform rather than in JavaScript.
+//
+// expo-file-system's `md5` option streams the file through a platform MessageDigest, so a 55MB
+// APK costs one native call, constant memory and no JS-thread work. What it replaced
+// was a pure-JS SHA-256: Hermes ships no Web Crypto and no native digest, so every
+// byte of the APK had to be base64-decoded and run through 64 rounds of hand-written mixing on
+// the JS thread. That loop, not the download, was most of the wait an update took.
+//
+// MD5 is the right digest here because this is a corruption check, not a security boundary.
+// The checksum file sits in the same GitHub release, behind the same TLS, as the APK it
+// describes — anyone who can swap one can swap the other — so it never established
+// authenticity. That is Android's job, and the installer does it properly by verifying the
+// APK's own signature over the whole file. What this needs to catch is a truncated or damaged
+// download before the installer rejects it with "There's a problem with the app file", and for
+// that MD5 is exactly as good as SHA-256 and roughly a hundred times cheaper.
+export const computeFileMd5 = async (fileUri) => {
+  const info = await FileSystem.getInfoAsync(fileUri, { md5: true });
+  if (!info?.exists || !Number.isFinite(info?.size) || info.size <= 0) {
     throw new Error('Cannot hash file: missing, empty, or unreadable');
   }
-
-  const subtle = globalThis.crypto?.subtle;
-  const buffer = subtle ? new Uint8Array(size) : null;
-  const hasher = subtle ? null : createSha256();
-
-  let offset = 0;
-  while (offset < size) {
-    const remaining = size - offset;
-    const sliceB64 = await FileSystem.readAsStringAsync(fileUri, {
-      encoding: FileSystem.EncodingType.Base64,
-      position: offset,
-      length: Math.min(chunkBytes, remaining),
-    });
-    const read = base64ToBytes(sliceB64 || '');
-    if (!read.length) {
-      // A read that yields nothing would loop forever — the file shrank or became unreadable.
-      throw new Error('Cannot hash file: read returned no data');
-    }
-    // A slice never runs past the size we measured; if the file grew under us, ignore the excess
-    // so the digest still describes the file we sized.
-    const slice = read.length > remaining ? read.subarray(0, remaining) : read;
-    if (buffer) {
-      buffer.set(slice, offset);
-    } else {
-      hasher.update(slice);
-    }
-    offset += slice.length;
+  if (typeof info.md5 !== 'string' || !MD5_HEX.test(info.md5)) {
+    // A platform that answers without a digest (or with a malformed one) must not be read as
+    // "hash of an empty file" — that would silently fail every comparison below.
+    throw new Error('Cannot hash file: no digest returned');
   }
-
-  return hasher ? hasher.digest() : toHex(await subtle.digest('SHA-256', buffer.buffer));
+  return info.md5.toLowerCase();
 };
 
 // How long to wait for the checksum file. Release assets come from GitHub's CDN, which on a weak
@@ -948,8 +822,10 @@ export const computeSha256 = async (fileUri, { chunkBytes = HASH_CHUNK_BYTES } =
 // point — the deadline is here to break a stall, not to abandon a connection still moving.
 const CHECKSUM_FETCH_TIMEOUT_MS = 30000;
 
-// Downloads the sha256sum-format checksum file and returns the expected hex hash for apkFilename.
-// Returns null if the checksum cannot be fetched or parsed.
+// Downloads the md5sum-format checksum file and returns the expected hex digest for apkFilename.
+// Returns null if the checksum cannot be fetched or parsed. The format is the one every *sum
+// tool writes — "<hex>  <name>", one entry per line — so only the digest's width changed when
+// the release pipeline started publishing an .md5 beside the .sha256 it already published.
 export const fetchExpectedChecksum = async (checksumUrl, apkFilename, fetchImpl = fetch) => {
   try {
     const response = await fetchWithTimeout(checksumUrl, {}, CHECKSUM_FETCH_TIMEOUT_MS, fetchImpl);
@@ -960,7 +836,7 @@ export const fetchExpectedChecksum = async (checksumUrl, apkFilename, fetchImpl 
       if (parts.length < 2) continue;
       const hash = parts[0];
       const name = parts[parts.length - 1].replace(/^\*/, ''); // strip binary-mode indicator
-      if ((name === apkFilename || name.endsWith(`/${apkFilename}`)) && /^[0-9a-f]{64}$/i.test(hash)) {
+      if ((name === apkFilename || name.endsWith(`/${apkFilename}`)) && MD5_HEX.test(hash)) {
         return hash.toLowerCase();
       }
     }
@@ -1092,13 +968,21 @@ export const downloadAndInstallApk = async (downloadUrl, onProgress, { checksumU
   const filename = sanitizeFilename(raw);
   const localUri = `${FileSystem.cacheDirectory}${filename}`;
 
+  // The transfer reports the size it is working towards on every progress tick. Remembering the
+  // last one gives the check below an expected size for free, with no extra request and nothing
+  // to parse.
+  let expectedBytes = 0;
+
   const downloadResumable = FileSystem.createDownloadResumable(
     downloadUrl,
     localUri,
     {},
     ({ totalBytesWritten, totalBytesExpectedToWrite }) => {
-      if (onProgress && totalBytesExpectedToWrite > 0) {
-        onProgress(totalBytesWritten / totalBytesExpectedToWrite);
+      if (totalBytesExpectedToWrite > 0) {
+        expectedBytes = totalBytesExpectedToWrite;
+        if (onProgress) {
+          onProgress(totalBytesWritten / totalBytesExpectedToWrite);
+        }
       }
     },
   );
@@ -1109,18 +993,40 @@ export const downloadAndInstallApk = async (downloadUrl, onProgress, { checksumU
   }
   console.log('[AppUpdate] download finished:', result.uri);
 
+  // A file shorter than the transfer announced is a truncated download, full stop — and this
+  // costs one stat call, so it runs before the checksum round trip rather than after it. Only
+  // "short" is a verdict: a file that came out longer than announced is something other than a
+  // cut-off transfer, and the checksum and structure checks below are better placed to judge it.
+  if (expectedBytes > 0) {
+    const downloaded = await FileSystem.getInfoAsync(result.uri).catch(() => null);
+    if (downloaded?.exists && Number.isFinite(downloaded.size) && downloaded.size < expectedBytes) {
+      // The short file is the verdict; a cleanup that fails must not turn it into an untyped
+      // error the UI can only describe as "something went wrong".
+      try {
+        await FileSystem.deleteAsync(result.uri, { idempotent: true });
+      } catch (e) {
+        console.warn('[AppUpdate] could not delete the truncated APK', e.message);
+      }
+      throw updateError(
+        UPDATE_ERROR.INCOMPLETE_DOWNLOAD,
+        `Downloaded APK is incomplete (${downloaded.size} of ${expectedBytes} bytes) — file deleted`,
+      );
+    }
+  }
+
   let verified = false;
   if (checksumUrl) {
     const expectedHash = await fetchExpectedChecksum(checksumUrl, filename, fetchImpl);
     if (expectedHash) {
-      // Hashing reads the file, so it can still fail on a device under memory pressure. Treat
-      // that as "unable to verify" rather than a download failure — the structural check below
-      // is the floor that keeps a broken file from reaching the installer. A hash we did get,
-      // though, is the last word: nothing after this may install a file it disagrees with.
+      // Hashing reads the file, so it can still fail on a device whose cache was reclaimed
+      // under it. Treat that as "unable to verify" rather than a download failure — the
+      // structural check below is the floor that keeps a broken file from reaching the
+      // installer. A hash we did get, though, is the last word: nothing after this may install
+      // a file it disagrees with.
       let actualHash = null;
       try {
         onPhaseChange?.('verifying');
-        actualHash = await computeSha256(result.uri);
+        actualHash = await computeFileMd5(result.uri);
       } catch (e) {
         console.warn('[AppUpdate] checksum computation failed; falling back to structure check', e.message);
       }

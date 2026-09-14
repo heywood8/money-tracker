@@ -106,10 +106,11 @@ export default function UpdatePanel({ onRegisterTitle, onDone, bottomInset }) {
         // download — so we offer a fresh "Update now" (re-download) rather than an "Install now"
         // that would launch a broken installer.
         //
-        // Structure only (`deepVerify: false`): four bytes and the trailing 64KB. The checksum
-        // layer re-reads all 50MB+ through a pure-JS SHA-256, because Hermes ships no native
-        // digest, and running it here is what held this panel on "Checking for updates…" for
-        // tens of seconds with the whole app frozen behind it.
+        // Structure only (`deepVerify: false`): four bytes and the trailing 64KB, no network.
+        // The checksum layer would add a round trip for the release's .md5 on a path the user
+        // is already waiting on — cheap now that the digest itself is native, but still a stall
+        // on a weak connection, which is the shape of what once held this panel on "Checking
+        // for updates…" with the whole app frozen behind it.
         //
         // Skipping it here costs less than it looks. A file only reaches this cache through
         // downloadAndInstallApk, which checksums it on arrival and deletes it on mismatch, so
