@@ -39,4 +39,10 @@ export const BRAND = {
   surface: '#001329',
   coin: '#f7b06f',
   coinEdge: '#d98b3f',
+  // Sampled from the artwork itself: `ink` is the outline brown every stroke
+  // of the mark is drawn in, `limb` the lighter core inside an arm or a leg.
+  // The cold-start screen redraws Penny's arm as an SVG stroke so she can
+  // wave, and those two have to match the PNG she is drawn over exactly.
+  ink: '#512e15',
+  limb: '#f39746',
 };

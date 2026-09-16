@@ -8,6 +8,7 @@ import Animated, {
   useReducedMotion,
   useSharedValue,
   withDelay,
+  withRepeat,
   withSequence,
   withTiming,
 } from 'react-native-reanimated';
@@ -18,6 +19,8 @@ import { useOperationsData } from '../../contexts/OperationsDataContext';
 import { useThemeConfig } from '../../contexts/ThemeConfigContext';
 import { BORDER_RADIUS, COLD_START, FONT_SIZE, SPACING, Z_INDEX } from '../../styles/designTokens';
 import { BRAND } from '../../styles/semanticColors';
+import PennyMark from './PennyMark';
+import { ARM_RAISED, ARM_REST, WAVE_BACK, WAVE_OUT } from './pennyArm';
 
 const T = COLD_START;
 
@@ -38,9 +41,10 @@ const COIN_RISE = 52;   // how far above its resting place a coin starts
 // STACK_GAP is larger than COIN_RISE, so a coin's whole fall happens below the
 // mark: the two never overlap in any frame.
 
-const MARK = require('../../../assets/splash-icon.png');
-
-const SPIN_EASING = Easing.bezier(0.2, 0, 0, 1);
+// A wave is a rock back and forth, so it wants an easing that is slow at both
+// ends of every swing; the raise is a single gesture and gets a little overshoot.
+const SWING_EASING = Easing.inOut(Easing.sin);
+const RAISE_EASING = Easing.out(Easing.back(1.4));
 
 /**
  * Whether the cold-start sequence has already run in this launch.
@@ -55,29 +59,24 @@ let played = false;
 export const hasColdStartPlayed = () => played;
 
 /**
- * What to do when the data lands while the sequence is still running.
+ * What to do with the coins when the data lands while they are still falling.
  *
  * Pure, and separated from the component on purpose: it is the subtle part of
  * the screen, and this way it can be checked against real numbers rather than
  * through mocked animations.
  *
- * @param {number} angle    the mark's current rotation, in degrees
+ * The arm is not in here. It has no state to resolve — wherever the wave has
+ * got to, it is animated back to rest, and that ride happens underneath the
+ * cross-fade rather than delaying it. A coin is different: it is mid-fall with
+ * nothing beneath it, and cutting to a fade would drop it out of the air.
+ *
  * @param {Array<{opacity: number, y: number}>} coins  each coin's live state
- * @returns {{spinTarget: number|null, hidden: boolean[], tail: number}}
- *   `spinTarget` is the angle to settle on (null: leave the mark alone),
+ * @returns {{hidden: boolean[], tail: number}}
  *   `hidden[i]` marks a coin that never appeared and so never should, and
- *   `tail` is how long the motion still needs before the cross-fade.
+ *   `tail` is how long the fall still needs before the cross-fade.
  */
-export const planWindDown = (angle, coins) => {
+export const planWindDown = (coins) => {
   let tail = 0;
-  let spinTarget = null;
-
-  // The mark finishes the half-turn it is in: a turn cut off at an arbitrary
-  // angle reads as a hang. A mark that has not started turning stays put.
-  if (angle > 0 && angle < 360) {
-    spinTarget = Math.min(360, (Math.floor(angle / 180) + 1) * 180);
-    tail = Math.max(T.minHalfTurn, ((spinTarget - angle) / 360) * T.spin);
-  }
 
   // A coin that has not appeared never appears; one already in the air is left
   // alone to land, and the screen waits for it.
@@ -90,7 +89,7 @@ export const planWindDown = (angle, coins) => {
     return false;
   });
 
-  return { spinTarget, hidden, tail };
+  return { hidden, tail };
 };
 
 const useCoin = () => {
@@ -108,8 +107,8 @@ const useCoin = () => {
  * The screen shown while the first database reads of a launch are in flight.
  *
  * It continues the native splash rather than replacing it — same mark, same
- * size, same position, same background — turns the mark once and drops three
- * coins into a stack beneath it, then cross-fades into the app.
+ * size, same position, same background — has Penny raise her arm and wave,
+ * drops three coins into a stack beneath her, then cross-fades into the app.
  *
  * The whole sequence is handed to the UI thread as one set of delayed
  * animations at mount. That is the point of the screen: the JS thread is busy
@@ -125,8 +124,8 @@ const ColdStartScreen = ({ onFinish }) => {
 
   const ready = !languageLoading && !accountsLoading && !categoriesLoading && !operationsLoading;
 
-  const rotation = useSharedValue(0);
-  const markScale = useSharedValue(1);
+  const armRaise = useSharedValue(ARM_REST);
+  const armWave = useSharedValue(ARM_REST);
   const overlayOpacity = useSharedValue(1);
   const captionOpacity = useSharedValue(0);
 
@@ -182,14 +181,20 @@ const ColdStartScreen = ({ onFinish }) => {
     played = true;
 
     if (reduced) {
-      // No turn and no fall; the mark and a full stack simply stand there.
+      // No wave and no fall; Penny and a full stack simply stand there.
       coins.forEach(settleCoin);
     } else {
-      rotation.value = withDelay(T.hold, withTiming(360, { duration: T.spin, easing: SPIN_EASING }));
-      markScale.value = withDelay(T.hold, withSequence(
-        withTiming(0.95, { duration: T.spin / 2, easing: Easing.out(Easing.quad) }),
-        withTiming(1, { duration: T.spin / 2, easing: Easing.in(Easing.quad) }),
-      ));
+      armRaise.value = withDelay(
+        T.hold,
+        withTiming(ARM_RAISED, { duration: T.armRaise, easing: RAISE_EASING }),
+      );
+      // The wave repeats for as long as the reads take. Nothing here knows how
+      // long that is, and an animation that ran out would leave her standing
+      // still in front of a screen that is plainly still working.
+      armWave.value = withDelay(T.hold + T.armRaise, withRepeat(withSequence(
+        withTiming(WAVE_OUT, { duration: T.armSwing, easing: SWING_EASING }),
+        withTiming(WAVE_BACK, { duration: T.armSwing, easing: SWING_EASING }),
+      ), -1, false));
       coins.forEach((coin, index) => {
         const at = T.firstCoin + index * T.coinStagger;
         coin.opacity.value = withDelay(at, withTiming(1, { duration: T.coinFadeIn }));
@@ -210,8 +215,8 @@ const ColdStartScreen = ({ onFinish }) => {
 
     return () => {
       if (dissolveTimer.current) clearTimeout(dissolveTimer.current);
-      cancelAnimation(rotation);
-      cancelAnimation(markScale);
+      cancelAnimation(armRaise);
+      cancelAnimation(armWave);
       cancelAnimation(overlayOpacity);
       cancelAnimation(captionOpacity);
       coins.forEach(stopCoin);
@@ -231,22 +236,15 @@ const ColdStartScreen = ({ onFinish }) => {
       return;
     }
 
-    const { spinTarget, hidden, tail } = planWindDown(
-      rotation.value,
+    const { hidden, tail } = planWindDown(
       coins.map((coin) => ({ opacity: coin.opacity.value, y: coin.y.value })),
     );
 
-    if (spinTarget === null) {
-      // The mark either never started or has already come to rest.
-      cancelAnimation(rotation);
-      cancelAnimation(markScale);
-    } else {
-      const spinTail = Math.max(T.minHalfTurn, ((spinTarget - rotation.value) / 360) * T.spin);
-      rotation.value = withTiming(spinTarget, {
-        duration: spinTail,
-        easing: Easing.out(Easing.cubic),
-      });
-    }
+    // The arm comes down from wherever the wave had got to. Assigning over a
+    // shared value replaces whatever it was running, the endless repeat
+    // included, so there is nothing to cancel first.
+    armRaise.value = withTiming(ARM_REST, { duration: T.armLower, easing: Easing.out(Easing.quad) });
+    armWave.value = withTiming(ARM_REST, { duration: T.armLower, easing: Easing.out(Easing.quad) });
 
     hidden.forEach((isHidden, index) => {
       if (isHidden) stopCoin(coins[index]);
@@ -257,16 +255,9 @@ const ColdStartScreen = ({ onFinish }) => {
     } else {
       startDissolve();
     }
-  }, [ready, reduced, captionOpacity, coins, markScale, rotation, startDissolve, stopCoin]);
+  }, [ready, reduced, armRaise, armWave, captionOpacity, coins, startDissolve, stopCoin]);
 
   const overlayStyle = useAnimatedStyle(() => ({ opacity: overlayOpacity.value }));
-  const markStyle = useAnimatedStyle(() => ({
-    transform: [
-      { perspective: 800 },
-      { rotateY: `${rotation.value}deg` },
-      { scale: markScale.value },
-    ],
-  }));
   const captionStyle = useAnimatedStyle(() => ({ opacity: captionOpacity.value }));
 
   const caption = t ? t('loading_operations') : '';
@@ -284,12 +275,10 @@ const ColdStartScreen = ({ onFinish }) => {
       accessibilityLabel={caption}
     >
       <Animated.View style={[styles.overlay, overlayStyle]}>
-        <Animated.Image
-          source={MARK}
-          style={[styles.mark, markStyle]}
-          resizeMode="contain"
-          accessibilityIgnoresInvertColors
-        />
+        {/* Centred by the overlay, and nothing else shares its flow, so the
+            stack below cannot push her off the spot the native splash left
+            her in. */}
+        <PennyMark size={MARK_SIZE} raise={armRaise} wave={armWave} />
         <View style={styles.stackAnchor} pointerEvents="none">
           <View style={styles.stack}>
             <Animated.View style={[styles.coin, styles.coinTop, coinTop.style]} />
@@ -338,12 +327,6 @@ const styles = StyleSheet.create({
   host: {
     ...StyleSheet.absoluteFill,
     zIndex: Z_INDEX.overlay,
-  },
-  // The mark is centred by the overlay and nothing else shares its flow, so the
-  // stack below cannot push it off the spot the native splash left it in.
-  mark: {
-    height: MARK_SIZE,
-    width: MARK_SIZE,
   },
   overlay: {
     alignItems: 'center',

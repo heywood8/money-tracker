@@ -13,7 +13,7 @@
 
 import React from 'react';
 import { render, act } from '@testing-library/react-native';
-import { useReducedMotion, withDelay, withTiming } from 'react-native-reanimated';
+import { useReducedMotion, withDelay, withRepeat, withTiming } from 'react-native-reanimated';
 import ColdStartScreen, {
   hasColdStartPlayed,
   planWindDown,
@@ -23,6 +23,12 @@ import { useAccountsData } from '../../app/contexts/AccountsDataContext';
 import { useCategories } from '../../app/contexts/CategoriesContext';
 import { useOperationsData } from '../../app/contexts/OperationsDataContext';
 import { useThemeConfig } from '../../app/contexts/ThemeConfigContext';
+import {
+  ARM_RAISED,
+  ARM_REST,
+  WAVE_BACK,
+  WAVE_OUT,
+} from '../../app/components/startup/pennyArm';
 import { COLD_START } from '../../app/styles/designTokens';
 
 jest.mock('../../app/contexts/LocalizationContext', () => ({ useLocalization: jest.fn() }));
@@ -76,14 +82,33 @@ describe('ColdStartScreen', () => {
   });
 
   describe('The sequence is handed to the UI thread', () => {
-    it('starts the turn after the hold, and turns exactly once', async () => {
+    it('raises the arm after the hold', async () => {
       await render(<ColdStartScreen onFinish={jest.fn()} />);
 
-      expect(withTiming).toHaveBeenCalledWith(360, expect.objectContaining({ duration: T.spin }));
+      expect(withTiming).toHaveBeenCalledWith(
+        ARM_RAISED,
+        expect.objectContaining({ duration: T.armRaise }),
+      );
       expect(delaysUsed()).toContain(T.hold);
     });
 
-    it('schedules the three coins staggered, all after the turn has begun', async () => {
+    it('waves once the arm is up, and keeps waving for as long as the reads take', async () => {
+      await render(<ColdStartScreen onFinish={jest.fn()} />);
+
+      // The wave starts where the raise finishes, not where it started.
+      expect(delaysUsed()).toContain(T.hold + T.armRaise);
+      [WAVE_OUT, WAVE_BACK].forEach((angle) => {
+        expect(withTiming).toHaveBeenCalledWith(
+          angle,
+          expect.objectContaining({ duration: T.armSwing }),
+        );
+      });
+      // -1: the screen has no idea how long the reads will take, and a wave
+      // that ran out would leave her still in front of a working screen.
+      expect(withRepeat).toHaveBeenCalledWith(expect.anything(), -1, false);
+    });
+
+    it('schedules the three coins staggered, all after the hold', async () => {
       await render(<ColdStartScreen onFinish={jest.fn()} />);
 
       const expected = [0, 1, 2].map((i) => T.firstCoin + i * T.coinStagger);
@@ -130,6 +155,24 @@ describe('ColdStartScreen', () => {
 
       expect(withTiming).toHaveBeenCalledWith(0, expect.objectContaining({ duration: T.dissolve }));
       expect(onFinish).not.toHaveBeenCalled();
+      await advance(T.dissolve);
+      expect(onFinish).toHaveBeenCalledTimes(1);
+    });
+
+    it('brings the arm down without making the cross-fade wait for it', async () => {
+      const onFinish = jest.fn();
+      const { rerender } = await render(<ColdStartScreen onFinish={onFinish} />);
+
+      setLoading(false);
+      await act(async () => { await rerender(<ColdStartScreen onFinish={onFinish} />); });
+
+      // Both channels are sent home from wherever the wave had got to.
+      expect(withTiming).toHaveBeenCalledWith(
+        ARM_REST,
+        expect.objectContaining({ duration: T.armLower }),
+      );
+      // The lowering rides the fade rather than delaying it: a cold start is
+      // not the place to spend 220 ms finishing a gesture nobody is waiting on.
       await advance(T.dissolve);
       expect(onFinish).toHaveBeenCalledTimes(1);
     });
@@ -193,10 +236,11 @@ describe('ColdStartScreen with reduced motion', () => {
     jest.useRealTimers();
   });
 
-  it('never schedules a turn or a fall', async () => {
+  it('never schedules a wave or a fall', async () => {
     await render(<ColdStartScreen onFinish={jest.fn()} />);
 
-    expect(withTiming).not.toHaveBeenCalledWith(360, expect.anything());
+    expect(withRepeat).not.toHaveBeenCalled();
+    expect(withTiming).not.toHaveBeenCalledWith(ARM_RAISED, expect.anything());
     expect(withTiming).not.toHaveBeenCalledWith(
       0,
       expect.objectContaining({ duration: T.coinFall }),
@@ -227,53 +271,34 @@ describe('planWindDown', () => {
   const landed = { opacity: 1, y: 0 };
   const falling = (fraction) => ({ opacity: 1, y: -COIN_RISE * fraction });
 
-  it('leaves everything alone and asks for no wait when nothing has moved', () => {
-    const { spinTarget, hidden, tail } = planWindDown(0, [still, still, still]);
+  it('asks for no wait when nothing has moved', () => {
+    const { hidden, tail } = planWindDown([still, still, still]);
 
-    expect(spinTarget).toBeNull();
     expect(hidden).toEqual([true, true, true]);
     expect(tail).toBe(0);
   });
 
-  it('finishes the half-turn the mark is in', () => {
-    expect(planWindDown(30, [still, still, still]).spinTarget).toBe(180);
-    expect(planWindDown(179, [still, still, still]).spinTarget).toBe(180);
-    expect(planWindDown(181, [still, still, still]).spinTarget).toBe(360);
-    expect(planWindDown(359, [still, still, still]).spinTarget).toBe(360);
-  });
-
-  it('never cuts the turn shorter than the floor', () => {
-    // 359° is one degree from home, which would be an invisible flick.
-    expect(planWindDown(359, [still, still, still]).tail).toBe(T.minHalfTurn);
-  });
-
-  it('leaves a mark that has already come to rest alone', () => {
-    expect(planWindDown(360, [landed, landed, landed]).spinTarget).toBeNull();
-  });
-
   it('hides only the coins that never appeared', () => {
-    const { hidden } = planWindDown(360, [landed, falling(0.5), still]);
+    const { hidden } = planWindDown([landed, falling(0.5), still]);
 
     expect(hidden).toEqual([false, false, true]);
   });
 
   it('waits for a coin still in the air, in proportion to how far it has left', () => {
-    const halfway = planWindDown(360, [landed, falling(0.5), still]).tail;
-    const nearlyDown = planWindDown(360, [landed, falling(0.1), still]).tail;
+    const halfway = planWindDown([landed, falling(0.5), still]).tail;
+    const nearlyDown = planWindDown([landed, falling(0.1), still]).tail;
 
     expect(halfway).toBeCloseTo(T.coinFall * 0.5 + T.coinSquash * 2);
     expect(nearlyDown).toBeLessThan(halfway);
   });
 
-  it('waits for whichever of the mark and the coins takes longest', () => {
-    // A fresh coin needs the whole fall; a mark one degree short needs the floor.
-    const { tail } = planWindDown(359, [falling(1), landed, landed]);
+  it('waits for whichever coin takes longest', () => {
+    const { tail } = planWindDown([falling(1), falling(0.2), landed]);
 
     expect(tail).toBe(T.coinFall + T.coinSquash * 2);
-    expect(tail).toBeGreaterThan(T.minHalfTurn);
   });
 
-  it('asks for no wait once every coin has landed and the mark has stopped', () => {
-    expect(planWindDown(360, [landed, landed, landed]).tail).toBe(0);
+  it('asks for no wait once every coin has landed', () => {
+    expect(planWindDown([landed, landed, landed]).tail).toBe(0);
   });
 });

@@ -230,14 +230,17 @@ export const Z_INDEX = {
  * scale of independent transition speeds.
  *
  *   0-60     hold — the frame still matches the native splash
- *   60-360   the mark turns once
+ *   60-300   Penny raises her arm
+ *   300-     she waves, one 115 ms swing after another, for as long as the
+ *            reads take: the screen has no idea how long that is
  *   120-440  three coins fall into a stack, 70 ms apart
- *   440-560  cross-fade into the app
+ *   then     the arm comes down while the surface cross-fades into the app
  */
 export const COLD_START = {
   hold: 60,               // motionless; reads finishing inside it show no animation at all
-  spin: 300,              // one full turn of the mark
-  minHalfTurn: 150,       // floor for finishing the current half-turn when data arrives early
+  armRaise: 240,          // Penny lifts her arm clear of her side
+  armSwing: 115,          // one swing of the wave, out or back; it repeats until the data lands
+  armLower: 220,          // and the arm comes back down, riding the cross-fade
   firstCoin: 120,         // first coin leaves, measured from the start of the sequence
   coinStagger: 70,        // between coins
   coinFall: 150,          // the fall itself
