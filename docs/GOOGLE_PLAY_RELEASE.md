@@ -145,16 +145,32 @@ eas build:version:set --platform android
 
 ## Releasing
 
-Run **Actions → Publish to Google Play → Run workflow** and pick a track:
+**Every release tag publishes itself.** release-please cuts `penny-v*`, the tag
+push triggers this workflow, and the bundle goes to the **closed testing** track
+— the one that counts toward the 12-testers/14-days production-access
+requirement. Nothing to press.
 
+A tag push carries no workflow inputs, so what an automatic run targets is the
+`|| 'closed'` fallback. It appears **three** times in `play-release.yml` — twice
+on `SUBMIT_PROFILE` and once in the job's display name — and all three have to
+change together, or runs end up labelled with one track while submitting to
+another.
+
+Runs are serialised through a `play-release` concurrency group. Release tags
+arrive in bursts, and two ~33 minute builds in parallel would race into the same
+track with two different `versionCode`s. Queued rather than cancelled, so build
+order stays equal to tag order and no run is killed mid-submit.
+
+For a one-off publish — a different track, or a rerun of a bundle that is already
+built — run **Actions → Publish to Google Play → Run workflow** and pick a track:
+
+- **`closed`** — closed testing (Play's `alpha` track). The default, and what a
+  release tag publishes to on its own. It is the track that counts toward the
+  12-testers/14-days production-access requirement; an upload to `internal` does
+  nothing for that clock. If the closed track has been renamed from the default
+  in Play Console, change `submit.closed.android.track` in `eas.json` to match.
 - **`internal`** — internal testing. Live immediately, no review, no tester
-  minimum. The default, and the right choice for ordinary releases.
-- **`closed`** — closed testing (Play's `alpha` track). This is a *different*
-  track from internal testing, and it is the one that counts toward the
-  12-testers/14-days production-access requirement — an upload to `internal`
-  does nothing for that clock. Use this while the app is in closed testing.
-  If the closed track has been renamed from the default in Play Console, change
-  `submit.closed.android.track` in `eas.json` to match.
+  minimum. Useful for trying a bundle out without touching the closed test.
 - **`production`** — uploads a **draft** release. Nothing reaches users until
   you promote it by hand in Play Console. Deliberate: this repo cuts releases
   roughly twice a day, and pushing each one to production users is neither
@@ -171,17 +187,11 @@ bundle and goes straight to the submit step.
 
 Leave `aab_run_id` empty for an ordinary release.
 
-The workflow is manual on purpose. Once a dispatched run has succeeded end to
-end, you can make it fire on every release tag by adding to `play-release.yml`:
-
-```yaml
-  push:
-    tags:
-      - 'penny-v*'
-```
-
-Until the upload key and service account are proven, an automatic trigger would
-just paint CI red twice a day.
+Each automatic run costs a ~33 minute build, and this repo cuts releases roughly
+twice a day. That is affordable — the repo is public, so GitHub Actions minutes
+are unlimited — but it does mean a broken submit turns CI red on that cadence
+until it is fixed. The usual culprits are a `versionCode` Play already holds
+(`eas build:version:set`) and a service account permission that was revoked.
 
 ## First submission checklist
 

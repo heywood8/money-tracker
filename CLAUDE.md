@@ -224,7 +224,7 @@ The `withR8Config.js` plugin sets Gradle JVM memory limits optimized for GitHub 
 
 - `.github/workflows/build-release-apk.yml` - Local APK builds with EAS (`--local`)
 - `.github/workflows/eas-build-android.yml` - Cloud builds with EAS
-- `.github/workflows/play-release.yml` - Production AAB (built `--local`) submitted to Google Play via EAS Submit
+- `.github/workflows/play-release.yml` - Production AAB (built `--local`) submitted to Google Play via EAS Submit, automatically on every `penny-v*` tag (closed testing track)
 
 **Two distribution channels:**
 

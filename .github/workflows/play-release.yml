@@ -9,36 +9,52 @@ name: Publish to Google Play
 # happily takes a locally built artifact via `--path`, so publishing to Play costs
 # no EAS quota at all.
 #
-# Deliberately manual for now. Flip it to fire on every release tag by adding:
-#
-#   push:
-#     tags:
-#       - 'penny-v*'
-#
-# once a dispatched run has succeeded end to end — until the upload key and the
-# service account are confirmed to match what Play expects, an automatic trigger
-# would just paint CI red twice a day. See docs/GOOGLE_PLAY_RELEASE.md.
+# Every release tag publishes itself. release-please cuts `penny-v*`, the tag push
+# lands here, and the bundle goes to closed testing without anyone pressing a
+# button — the same track that feeds the 12-testers/14-days production-access
+# requirement. A dispatched run can still pick a different track, or reuse an
+# earlier run's bundle; see docs/GOOGLE_PLAY_RELEASE.md.
 on:
+  push:
+    tags:
+      - 'penny-v*'
   workflow_dispatch:
     inputs:
       submit_profile:
-        description: 'Play track to publish to. "internal" = internal testing, instant, no review, no tester minimum. "closed" = closed testing (the alpha track), which is what feeds the 12-testers/14-days production-access requirement. "production" uploads a draft release you promote by hand.'
+        description: 'Play track to publish to. "closed" = closed testing (the alpha track), which is what feeds the 12-testers/14-days production-access requirement, and what a release tag publishes to on its own. "internal" = internal testing, instant, no review, no tester minimum. "production" uploads a draft release you promote by hand.'
         required: true
-        default: 'internal'
+        default: 'closed'
         type: choice
         options:
-          - internal
           - closed
+          - internal
           - production
       aab_run_id:
         description: 'Optional. Reuse the AAB from an earlier run of this workflow instead of building a new one — paste that run''s id. The build takes ~33 minutes and the submit that follows takes ~90 seconds, so a submit that failed on credentials or Play permissions should not cost a second build. Leave empty to build from this ref.'
         required: false
         type: string
 
+# One publish at a time, queued rather than cancelled. Release tags arrive in
+# bursts — penny-v0.288.0 and penny-v0.288.1 were 53 seconds apart — and two
+# builds in parallel would race into the same track: `autoIncrement` reserves a
+# versionCode per build, so whichever submits first decides whether the other is
+# rejected as a lower code or quietly leaves testers on the older bundle.
+# Queuing keeps build order, and therefore versionCode order, equal to tag order.
+#
+# `cancel-in-progress: false` on purpose: cancelling would also be able to kill a
+# run during its submit step, after the bundle has been handed to Play.
+concurrency:
+  group: play-release
+  cancel-in-progress: false
+
 jobs:
   publish:
-    name: Build AAB and submit to Play (${{ github.event.inputs.submit_profile }})
+    name: Build AAB and submit to Play (${{ github.event.inputs.submit_profile || 'closed' }})
     runs-on: ubuntu-latest
+    # The build alone takes ~33 minutes. Without a bound, a Gradle build that hangs
+    # (a documented failure mode here — see CLAUDE.md) would sit on the default six
+    # hours, unattended, twice a day, holding the concurrency slot the whole time.
+    timeout-minutes: 60
     permissions:
       contents: read
       # Required to download the `penny-aab` artifact from an earlier run.
@@ -56,6 +72,8 @@ jobs:
         with:
           node-version: '22.x'
 
+      # `aab_run_id` only exists on a dispatched run: a tag push carries no inputs at
+      # all, so this reads as empty there and the build path is what runs.
       - name: 🏗 Setup Java
         if: github.event.inputs.aab_run_id == ''
         uses: actions/setup-java@v6.0.0
@@ -145,7 +163,7 @@ jobs:
       # alternative of keeping the key in a repository secret.
       - name: 🚀 Submit to Google Play
         env:
-          SUBMIT_PROFILE: ${{ github.event.inputs.submit_profile }}
+          SUBMIT_PROFILE: ${{ github.event.inputs.submit_profile || 'closed' }}
         run: |
           eas submit --platform android --profile "$SUBMIT_PROFILE" \
             --path "$AAB_PATH" --non-interactive
@@ -162,7 +180,7 @@ jobs:
       - name: Post summary
         if: always()
         env:
-          SUBMIT_PROFILE: ${{ github.event.inputs.submit_profile }}
+          SUBMIT_PROFILE: ${{ github.event.inputs.submit_profile || 'closed' }}
         run: |
           echo "## 🚀 Google Play submission" >> $GITHUB_STEP_SUMMARY
           echo "" >> $GITHUB_STEP_SUMMARY
