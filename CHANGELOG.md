@@ -1,5 +1,12 @@
 # Changelog
 
+## [0.287.0](https://github.com/heywood8/money-tracker/compare/penny-v0.286.3...penny-v0.287.0) (2026-09-16)
+
+
+### Features
+
+* **release:** publish to google play via eas submit ([#1783](https://github.com/heywood8/money-tracker/issues/1783)) ([a01ff6c](https://github.com/heywood8/money-tracker/commit/a01ff6c36b850f704bbbf3ad8792f3ff8d65abb4))
+
 ## [0.286.3](https://github.com/heywood8/money-tracker/compare/penny-v0.286.2...penny-v0.286.3) (2026-09-16)
 
 

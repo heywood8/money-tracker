@@ -30,7 +30,7 @@ module.exports = {
   expo: {
     name: 'Penny',
     slug: 'app',
-    version: '0.286.3', // x-release-please-version
+    version: '0.287.0', // x-release-please-version
     orientation: 'portrait',
     icon: './assets/icon.png',
     userInterfaceStyle: 'light',
