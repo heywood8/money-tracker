@@ -10,6 +10,7 @@ import { performDriveBackupIfNeeded } from '../services/GoogleDriveBackupService
 import { getValidAccessToken } from '../services/GoogleSheetsService';
 import { useDialog } from '../contexts/DialogContext';
 import { checkForAppUpdate } from '../services/AppUpdateService';
+import { openStoreListing, supportsInAppUpdates } from '../services/distribution';
 import { describeUpdateError } from '../utils/updateErrors';
 import { useUpdateDownload } from '../contexts/UpdateDownloadContext';
 import { useSqliteFileImport } from '../hooks/useSqliteFileImport';
@@ -344,7 +345,32 @@ const AppInitializer = () => {
       dismissedVersionsRef.current.add(pendingUpdate.latestVersion);
     }
     const checksumUrl = pendingUpdate?.checksumUrl || null;
+    const promptedVersion = pendingUpdate?.latestVersion;
     setPendingUpdate(null);
+    // A Play build may not fetch and install an APK itself, so "update now" means
+    // "take me to the listing" and Play does the rest. The prompt still comes from
+    // the GitHub releases check, which is what knows a newer version was cut.
+    if (!supportsInAppUpdates()) {
+      // Unlike a download, this does not change the installed version — the user may
+      // never tap Update in Play, and on the production track Play may not even be
+      // serving the new build yet. Without the same persisted snooze "Later" writes,
+      // the prompt would return on every launch until Play caught up.
+      if (promptedVersion) {
+        const skipUntil = new Date(Date.now() + UPDATE_SNOOZE_MS).toISOString();
+        persistedSnoozeRef.current = { version: promptedVersion, skipUntil };
+        setPreference(PREF_KEYS.UPDATE_LAST_PROMPTED_VERSION, promptedVersion).catch(() => {});
+        setPreference(PREF_KEYS.UPDATE_SKIP_UNTIL, skipUntil).catch(() => {});
+      }
+      openStoreListing().then((opened) => {
+        if (opened) return;
+        showDialog(
+          t('error') || 'Error',
+          t('update_open_play_failed') || 'Could not open Google Play on this device.',
+          [{ text: t('ok') || 'OK' }],
+        );
+      });
+      return;
+    }
     startDownload(downloadUrl, {
       checksumUrl,
       onError: (error) => {

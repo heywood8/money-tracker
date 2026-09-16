@@ -63,6 +63,9 @@ buck-out/
 
 # EAS Credentials (if using local credentials)
 credentials.json
+# Google Play service account key, written by play-release.yml and referenced by
+# eas.json. A Release-manager private key must never reach a commit.
+google-play-service-account.json
 *.keystore.base64.txt
 
 # Test coverage (keep badge SVGs)

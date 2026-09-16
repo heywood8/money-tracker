@@ -96,12 +96,15 @@ npx eas-cli build --platform android --profile development
 ### Build Profiles
 
 - **preview**: Creates APK files for internal distribution and testing
-- **production**: Creates AAB files for Google Play Store
+- **production**: Creates AAB files for Google Play Store. This profile also drops
+  `REQUEST_INSTALL_PACKAGES` and switches the in-app updater to a Play deeplink -
+  see [Publishing to Google Play](GOOGLE_PLAY_RELEASE.md)
 - **development**: Creates development builds with Expo Dev Client
 
 ## Further Reading
 
 - **[Database Architecture](DATABASE.md)** - SQLite/Drizzle ORM implementation, schema design, and workflow
 - **[EAS Credentials Setup](EAS_CREDENTIALS_SETUP.md)** - Android signing credentials for EAS builds
+- **[Publishing to Google Play](GOOGLE_PLAY_RELEASE.md)** - AAB builds, EAS Submit, and why the Play build has no in-app updater
 - **[Commit Message Guidelines](COMMIT_MESSAGE_GUIDELINES.md)** - Conventional commits guide
 - **[R8/CI-CD Setup](R8_CICD_SETUP.md)** - R8/ProGuard configuration for CI builds

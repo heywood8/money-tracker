@@ -14,6 +14,7 @@ import {
 import { describeUpdateError } from '../../utils/updateErrors';
 import { setPreference, PREF_KEYS } from '../../services/PreferencesDB';
 import UpdateContentPanel from '../UpdateContentPanel';
+import { openStoreListing, supportsInAppUpdates } from '../../services/distribution';
 
 // How often to re-poll CI build progress while the panel shows an in-progress build.
 //
@@ -50,6 +51,11 @@ export default function UpdatePanel({ onRegisterTitle, onDone, bottomInset }) {
   }, [isChecking, updateResult, onRegisterTitle, t]);
 
   const loadDownloadedApks = useCallback(async () => {
+    // A Play build never downloads an APK, so there is no cache to list and no
+    // "Downloaded APKs" section to render.
+    if (!supportsInAppUpdates()) {
+      return;
+    }
     const apks = await listDownloadedApks();
     setDownloadedApks(apks);
   }, []);
@@ -121,7 +127,11 @@ export default function UpdatePanel({ onRegisterTitle, onDone, bottomInset }) {
         // truncated write. Beyond it, Android's own installer refuses an APK whose signature
         // does not verify, and the panel's re-download button is there for a cached copy that
         // turns out to be bad anyway.
-        const cached = await verifyCachedApk(result.downloadUrl, { deepVerify: false });
+        // Nothing is ever cached on a Play build, so skip the verification round trip
+        // and present the release with no local copy attached.
+        const cached = supportsInAppUpdates()
+          ? await verifyCachedApk(result.downloadUrl, { deepVerify: false })
+          : { exists: false, corrupted: false, uri: null };
         // Re-scan the cache so the per-release install buttons reflect reality: a corrupt file just
         // deleted by verifyCachedApk drops out, and a freshly verified one shows as installable.
         await loadDownloadedApks();
@@ -176,6 +186,18 @@ export default function UpdatePanel({ onRegisterTitle, onDone, bottomInset }) {
     // The download continues app-wide, reported on the settings row, so the panel
     // has nothing left to show.
     onDone();
+    // On Play the update is Play's to deliver: hand the user to the listing instead.
+    if (!supportsInAppUpdates()) {
+      const opened = await openStoreListing();
+      if (!opened) {
+        showDialog(
+          t('error') || 'Error',
+          t('update_open_play_failed') || 'Could not open Google Play on this device.',
+          [{ text: t('ok') || 'OK' }],
+        );
+      }
+      return;
+    }
     startDownload(downloadUrl, {
       checksumUrl: checksumUrl || null,
       onError: (error) => {

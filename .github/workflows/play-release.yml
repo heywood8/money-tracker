@@ -1,0 +1,150 @@
+name: Publish to Google Play
+
+# Builds the production App Bundle and hands it to Google Play through EAS Submit.
+#
+# The build runs with `--local`, on this runner, exactly like build-release-apk.yml:
+# EAS cloud builds are metered (15 Android builds/month on the free plan, ~$1 each
+# on paid plans) and this repo cuts a release roughly twice a day, so a cloud build
+# per release is not affordable. EAS Submit, by contrast, is free on every plan and
+# happily takes a locally built artifact via `--path`, so publishing to Play costs
+# no EAS quota at all.
+#
+# Deliberately manual for now. Flip it to fire on every release tag by adding:
+#
+#   push:
+#     tags:
+#       - 'penny-v*'
+#
+# once a dispatched run has succeeded end to end — until the upload key and the
+# service account are confirmed to match what Play expects, an automatic trigger
+# would just paint CI red twice a day. See docs/GOOGLE_PLAY_RELEASE.md.
+on:
+  workflow_dispatch:
+    inputs:
+      submit_profile:
+        description: 'Play track to publish to. "internal" goes live to internal testers with no review; "production" uploads a draft release that you promote by hand in Play Console.'
+        required: true
+        default: 'internal'
+        type: choice
+        options:
+          - internal
+          - production
+
+jobs:
+  publish:
+    name: Build AAB and submit to Play (${{ github.event.inputs.submit_profile }})
+    runs-on: ubuntu-latest
+    permissions:
+      contents: read
+
+    steps:
+      - name: 🏗 Setup repo
+        uses: actions/checkout@v7
+
+      - name: 🏗 Setup Bun
+        uses: oven-sh/setup-bun@v2
+
+      - name: 🏗 Setup Node
+        uses: actions/setup-node@v7
+        with:
+          node-version: '22.x'
+
+      - name: 🏗 Setup Java
+        uses: actions/setup-java@v6.0.0
+        with:
+          distribution: 'temurin'
+          java-version: '17'
+
+      - name: 📦 Install dependencies
+        run: bun install
+
+      - name: 🏗 Setup EAS
+        uses: expo/expo-github-action@v9
+        with:
+          eas-version: latest
+          token: ${{ secrets.EXPO_TOKEN }}
+
+      # The same upload keystore the APK workflow signs with. Play App Signing
+      # re-signs the bundle with the app signing key on Google's side, so what
+      # matters here is only that this key matches the upload certificate
+      # registered for com.heywood8.monkeep.
+      - name: 🔐 Setup credentials.json for signing
+        run: |
+          mkdir -p android/app
+          echo "${{ secrets.MYAPP_UPLOAD_STORE_BASE64 }}" | base64 --decode > android/app/keystore.jks
+          cat > credentials.json << EOF
+          {
+            "android": {
+              "keystore": {
+                "keystorePath": "android/app/keystore.jks",
+                "keystorePassword": "${{ secrets.MYAPP_UPLOAD_STORE_PASSWORD }}",
+                "keyAlias": "${{ secrets.MYAPP_UPLOAD_KEY_ALIAS }}",
+                "keyPassword": "${{ secrets.MYAPP_UPLOAD_KEY_PASSWORD }}"
+              }
+            }
+          }
+          EOF
+
+      # DISTRIBUTION_CHANNEL=play comes from the profile itself (eas.json) and is what
+      # drops REQUEST_INSTALL_PACKAGES and the in-app updater from this binary —
+      # Play forbids an app updating itself by any route other than Play.
+      - name: 🏗 Build production AAB with EAS
+        env:
+          NODE_OPTIONS: --max_old_space_size=4096
+          SENTRY_AUTH_TOKEN: ${{ secrets.SENTRY_AUTH_TOKEN }}
+          SENTRY_ORG: ${{ secrets.SENTRY_ORG }}
+          SENTRY_PROJECT: ${{ secrets.SENTRY_PROJECT }}
+          SENTRY_DSN: ${{ secrets.SENTRY_DSN }}
+        run: |
+          eas build --platform android --local --profile production \
+            --non-interactive --output "${{ runner.temp }}/penny.aab"
+          ls -lh "${{ runner.temp }}/penny.aab"
+
+      # Written to the workspace because eas.json references it by relative path.
+      # Removed again in the cleanup step below, which runs even if submit fails.
+      - name: 🔐 Write Google Play service account key
+        env:
+          SERVICE_ACCOUNT_KEY: ${{ secrets.GOOGLE_PLAY_SERVICE_ACCOUNT_JSON }}
+        run: |
+          if [ -z "$SERVICE_ACCOUNT_KEY" ]; then
+            echo "::error::GOOGLE_PLAY_SERVICE_ACCOUNT_JSON secret is not set. See docs/GOOGLE_PLAY_RELEASE.md."
+            exit 1
+          fi
+          printf '%s' "$SERVICE_ACCOUNT_KEY" > google-play-service-account.json
+          # Fail early with a clear message rather than deep inside eas submit.
+          node -e "JSON.parse(require('fs').readFileSync('google-play-service-account.json','utf8'))" \
+            || { echo "::error::Service account secret is not valid JSON."; exit 1; }
+
+      - name: 🚀 Submit to Google Play
+        env:
+          SUBMIT_PROFILE: ${{ github.event.inputs.submit_profile }}
+        run: |
+          eas submit --platform android --profile "$SUBMIT_PROFILE" \
+            --path "${{ runner.temp }}/penny.aab" --non-interactive
+
+      - name: 🧹 Remove service account key
+        if: always()
+        run: rm -f google-play-service-account.json
+
+      - name: 📦 Upload AAB as workflow artifact
+        if: always()
+        uses: actions/upload-artifact@v7
+        with:
+          name: penny-aab
+          path: ${{ runner.temp }}/penny.aab
+          retention-days: 7
+          if-no-files-found: warn
+
+      - name: Post summary
+        if: always()
+        env:
+          SUBMIT_PROFILE: ${{ github.event.inputs.submit_profile }}
+        run: |
+          echo "## 🚀 Google Play submission" >> $GITHUB_STEP_SUMMARY
+          echo "" >> $GITHUB_STEP_SUMMARY
+          echo "**Submit profile:** $SUBMIT_PROFILE" >> $GITHUB_STEP_SUMMARY
+          echo "**Ref:** ${{ github.ref_name }}" >> $GITHUB_STEP_SUMMARY
+          if [ "$SUBMIT_PROFILE" = "production" ]; then
+            echo "" >> $GITHUB_STEP_SUMMARY
+            echo "The production release was uploaded as a **draft**. Promote it in Play Console when you are ready." >> $GITHUB_STEP_SUMMARY
+          fi
