@@ -1,5 +1,12 @@
 # Changelog
 
+## [0.286.3](https://github.com/heywood8/money-tracker/compare/penny-v0.286.2...penny-v0.286.3) (2026-09-16)
+
+
+### Bug Fixes
+
+* **accounts:** drop the dead scroll space under the account list ([#1781](https://github.com/heywood8/money-tracker/issues/1781)) ([8d4c776](https://github.com/heywood8/money-tracker/commit/8d4c77611bd6bb00da04ce73756fae203b176309))
+
 ## [0.286.2](https://github.com/heywood8/money-tracker/compare/penny-v0.286.1...penny-v0.286.2) (2026-09-14)
 
 
