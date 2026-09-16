@@ -1,5 +1,12 @@
 # Changelog
 
+## [0.288.0](https://github.com/heywood8/money-tracker/compare/penny-v0.287.0...penny-v0.288.0) (2026-09-16)
+
+
+### Features
+
+* **build:** add dex optimization measurement for play 2027 requirement ([#1785](https://github.com/heywood8/money-tracker/issues/1785)) ([e02a142](https://github.com/heywood8/money-tracker/commit/e02a1421c18ee9fddd32e337ac2f6f16d4261fe3))
+
 ## [0.287.0](https://github.com/heywood8/money-tracker/compare/penny-v0.286.3...penny-v0.287.0) (2026-09-16)
 
 
