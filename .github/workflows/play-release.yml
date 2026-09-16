@@ -22,12 +22,13 @@ on:
   workflow_dispatch:
     inputs:
       submit_profile:
-        description: 'Play track to publish to. "internal" goes live to internal testers with no review; "production" uploads a draft release that you promote by hand in Play Console.'
+        description: 'Play track to publish to. "internal" = internal testing, instant, no review, no tester minimum. "closed" = closed testing (the alpha track), which is what feeds the 12-testers/14-days production-access requirement. "production" uploads a draft release you promote by hand.'
         required: true
         default: 'internal'
         type: choice
         options:
           - internal
+          - closed
           - production
 
 jobs:
@@ -100,31 +101,20 @@ jobs:
             --non-interactive --output "${{ runner.temp }}/penny.aab"
           ls -lh "${{ runner.temp }}/penny.aab"
 
-      # Written to the workspace because eas.json references it by relative path.
-      # Removed again in the cleanup step below, which runs even if submit fails.
-      - name: 🔐 Write Google Play service account key
-        env:
-          SERVICE_ACCOUNT_KEY: ${{ secrets.GOOGLE_PLAY_SERVICE_ACCOUNT_JSON }}
-        run: |
-          if [ -z "$SERVICE_ACCOUNT_KEY" ]; then
-            echo "::error::GOOGLE_PLAY_SERVICE_ACCOUNT_JSON secret is not set. See docs/GOOGLE_PLAY_RELEASE.md."
-            exit 1
-          fi
-          printf '%s' "$SERVICE_ACCOUNT_KEY" > google-play-service-account.json
-          # Fail early with a clear message rather than deep inside eas submit.
-          node -e "JSON.parse(require('fs').readFileSync('google-play-service-account.json','utf8'))" \
-            || { echo "::error::Service account secret is not valid JSON."; exit 1; }
-
+      # No service account key is handled here. EAS stores the Google Service
+      # Account key with the project's Android credentials (encrypted at rest on
+      # Expo's servers) and reuses it for every submission, which is Expo's own
+      # documented setup and keeps a Play Release-manager private key out of CI
+      # entirely. Add it once at
+      # https://expo.dev/accounts/lopatinikita/projects/app/credentials, or with
+      # `eas credentials -p android`. docs/GOOGLE_PLAY_RELEASE.md also covers the
+      # alternative of keeping the key in a repository secret.
       - name: 🚀 Submit to Google Play
         env:
           SUBMIT_PROFILE: ${{ github.event.inputs.submit_profile }}
         run: |
           eas submit --platform android --profile "$SUBMIT_PROFILE" \
             --path "${{ runner.temp }}/penny.aab" --non-interactive
-
-      - name: 🧹 Remove service account key
-        if: always()
-        run: rm -f google-play-service-account.json
 
       - name: 📦 Upload AAB as workflow artifact
         if: always()

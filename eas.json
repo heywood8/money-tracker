@@ -64,14 +64,18 @@
   "submit": {
     "internal": {
       "android": {
-        "serviceAccountKeyPath": "./google-play-service-account.json",
         "track": "internal",
+        "releaseStatus": "completed"
+      }
+    },
+    "closed": {
+      "android": {
+        "track": "alpha",
         "releaseStatus": "completed"
       }
     },
     "production": {
       "android": {
-        "serviceAccountKeyPath": "./google-play-service-account.json",
         "track": "production",
         "releaseStatus": "draft"
       }

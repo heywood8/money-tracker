@@ -87,19 +87,36 @@ not a config change.
 
 ### 1. Google service account
 
-EAS Submit authenticates to Play with a service account key.
+EAS Submit authenticates to Play with a service account key. **It is stored on
+the EAS side, not in this repository** — Expo keeps it with the project's Android
+credentials, encrypted at rest, and reuses it for every submission. Check whether
+one is already there before creating anything:
+
+```bash
+eas credentials -p android     # Service Credentials → Google Service Account Key
+```
+
+or open the project's **Credentials** page in the EAS dashboard.
+
+If there is none:
 
 1. In Play Console: **Setup → API access**, link (or create) a Google Cloud
    project, then create a service account.
 2. Grant it the **Release manager** role, or at minimum "Release apps to testing
    tracks" and "Manage production releases" for `com.heywood8.monkeep`.
 3. Create a JSON key for the service account and download it.
-4. Add the whole JSON file contents as the repository secret
-   **`GOOGLE_PLAY_SERVICE_ACCOUNT_JSON`**.
+4. Upload it in the EAS dashboard: **Credentials → Android → com.heywood8.monkeep
+   → Service Credentials → Add a Google Service Account Key**.
 
-Never commit the key. The workflow writes it to
-`google-play-service-account.json` for the duration of the run and deletes it in
-an `if: always()` step; `eas.json` references that path.
+Because the key lives on EAS, the workflow needs no Play secret of its own and no
+Release-manager private key ever touches a CI runner.
+
+**Alternative: keep the key in a repository secret.** If you would rather not
+store it on Expo's servers, add the JSON as a secret, have the workflow write it
+to `google-play-service-account.json` (already in `.gitignore`) and delete it in
+an `if: always()` step, and point the submit profiles at it with
+`"serviceAccountKeyPath": "./google-play-service-account.json"`. That path is
+supported, just noisier.
 
 ### 2. Upload key
 
@@ -130,8 +147,14 @@ eas build:version:set --platform android
 
 Run **Actions → Publish to Google Play → Run workflow** and pick a track:
 
-- **`internal`** — goes live to internal testers immediately, no review. This is
-  the default and the right choice for ordinary releases.
+- **`internal`** — internal testing. Live immediately, no review, no tester
+  minimum. The default, and the right choice for ordinary releases.
+- **`closed`** — closed testing (Play's `alpha` track). This is a *different*
+  track from internal testing, and it is the one that counts toward the
+  12-testers/14-days production-access requirement — an upload to `internal`
+  does nothing for that clock. Use this while the app is in closed testing.
+  If the closed track has been renamed from the default in Play Console, change
+  `submit.closed.android.track` in `eas.json` to match.
 - **`production`** — uploads a **draft** release. Nothing reaches users until
   you promote it by hand in Play Console. Deliberate: this repo cuts releases
   roughly twice a day, and pushing each one to production users is neither
