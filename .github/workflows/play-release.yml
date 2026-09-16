@@ -1,0 +1,140 @@
+name: Publish to Google Play
+
+# Builds the production App Bundle and hands it to Google Play through EAS Submit.
+#
+# The build runs with `--local`, on this runner, exactly like build-release-apk.yml:
+# EAS cloud builds are metered (15 Android builds/month on the free plan, ~$1 each
+# on paid plans) and this repo cuts a release roughly twice a day, so a cloud build
+# per release is not affordable. EAS Submit, by contrast, is free on every plan and
+# happily takes a locally built artifact via `--path`, so publishing to Play costs
+# no EAS quota at all.
+#
+# Deliberately manual for now. Flip it to fire on every release tag by adding:
+#
+#   push:
+#     tags:
+#       - 'penny-v*'
+#
+# once a dispatched run has succeeded end to end — until the upload key and the
+# service account are confirmed to match what Play expects, an automatic trigger
+# would just paint CI red twice a day. See docs/GOOGLE_PLAY_RELEASE.md.
+on:
+  workflow_dispatch:
+    inputs:
+      submit_profile:
+        description: 'Play track to publish to. "internal" = internal testing, instant, no review, no tester minimum. "closed" = closed testing (the alpha track), which is what feeds the 12-testers/14-days production-access requirement. "production" uploads a draft release you promote by hand.'
+        required: true
+        default: 'internal'
+        type: choice
+        options:
+          - internal
+          - closed
+          - production
+
+jobs:
+  publish:
+    name: Build AAB and submit to Play (${{ github.event.inputs.submit_profile }})
+    runs-on: ubuntu-latest
+    permissions:
+      contents: read
+
+    steps:
+      - name: 🏗 Setup repo
+        uses: actions/checkout@v7
+
+      - name: 🏗 Setup Bun
+        uses: oven-sh/setup-bun@v2
+
+      - name: 🏗 Setup Node
+        uses: actions/setup-node@v7
+        with:
+          node-version: '22.x'
+
+      - name: 🏗 Setup Java
+        uses: actions/setup-java@v6.0.0
+        with:
+          distribution: 'temurin'
+          java-version: '17'
+
+      - name: 📦 Install dependencies
+        run: bun install
+
+      - name: 🏗 Setup EAS
+        uses: expo/expo-github-action@v9
+        with:
+          eas-version: latest
+          token: ${{ secrets.EXPO_TOKEN }}
+
+      # The same upload keystore the APK workflow signs with. Play App Signing
+      # re-signs the bundle with the app signing key on Google's side, so what
+      # matters here is only that this key matches the upload certificate
+      # registered for com.heywood8.monkeep.
+      - name: 🔐 Setup credentials.json for signing
+        run: |
+          mkdir -p android/app
+          echo "${{ secrets.MYAPP_UPLOAD_STORE_BASE64 }}" | base64 --decode > android/app/keystore.jks
+          cat > credentials.json << EOF
+          {
+            "android": {
+              "keystore": {
+                "keystorePath": "android/app/keystore.jks",
+                "keystorePassword": "${{ secrets.MYAPP_UPLOAD_STORE_PASSWORD }}",
+                "keyAlias": "${{ secrets.MYAPP_UPLOAD_KEY_ALIAS }}",
+                "keyPassword": "${{ secrets.MYAPP_UPLOAD_KEY_PASSWORD }}"
+              }
+            }
+          }
+          EOF
+
+      # DISTRIBUTION_CHANNEL=play comes from the profile itself (eas.json) and is what
+      # drops REQUEST_INSTALL_PACKAGES and the in-app updater from this binary —
+      # Play forbids an app updating itself by any route other than Play.
+      - name: 🏗 Build production AAB with EAS
+        env:
+          NODE_OPTIONS: --max_old_space_size=4096
+          SENTRY_AUTH_TOKEN: ${{ secrets.SENTRY_AUTH_TOKEN }}
+          SENTRY_ORG: ${{ secrets.SENTRY_ORG }}
+          SENTRY_PROJECT: ${{ secrets.SENTRY_PROJECT }}
+          SENTRY_DSN: ${{ secrets.SENTRY_DSN }}
+        run: |
+          eas build --platform android --local --profile production \
+            --non-interactive --output "${{ runner.temp }}/penny.aab"
+          ls -lh "${{ runner.temp }}/penny.aab"
+
+      # No service account key is handled here. EAS stores the Google Service
+      # Account key with the project's Android credentials (encrypted at rest on
+      # Expo's servers) and reuses it for every submission, which is Expo's own
+      # documented setup and keeps a Play Release-manager private key out of CI
+      # entirely. Add it once at
+      # https://expo.dev/accounts/lopatinikita/projects/app/credentials, or with
+      # `eas credentials -p android`. docs/GOOGLE_PLAY_RELEASE.md also covers the
+      # alternative of keeping the key in a repository secret.
+      - name: 🚀 Submit to Google Play
+        env:
+          SUBMIT_PROFILE: ${{ github.event.inputs.submit_profile }}
+        run: |
+          eas submit --platform android --profile "$SUBMIT_PROFILE" \
+            --path "${{ runner.temp }}/penny.aab" --non-interactive
+
+      - name: 📦 Upload AAB as workflow artifact
+        if: always()
+        uses: actions/upload-artifact@v7
+        with:
+          name: penny-aab
+          path: ${{ runner.temp }}/penny.aab
+          retention-days: 7
+          if-no-files-found: warn
+
+      - name: Post summary
+        if: always()
+        env:
+          SUBMIT_PROFILE: ${{ github.event.inputs.submit_profile }}
+        run: |
+          echo "## 🚀 Google Play submission" >> $GITHUB_STEP_SUMMARY
+          echo "" >> $GITHUB_STEP_SUMMARY
+          echo "**Submit profile:** $SUBMIT_PROFILE" >> $GITHUB_STEP_SUMMARY
+          echo "**Ref:** ${{ github.ref_name }}" >> $GITHUB_STEP_SUMMARY
+          if [ "$SUBMIT_PROFILE" = "production" ]; then
+            echo "" >> $GITHUB_STEP_SUMMARY
+            echo "The production release was uploaded as a **draft**. Promote it in Play Console when you are ready." >> $GITHUB_STEP_SUMMARY
+          fi

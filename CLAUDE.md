@@ -224,6 +224,24 @@ The `withR8Config.js` plugin sets Gradle JVM memory limits optimized for GitHub 
 
 - `.github/workflows/build-release-apk.yml` - Local APK builds with EAS (`--local`)
 - `.github/workflows/eas-build-android.yml` - Cloud builds with EAS
+- `.github/workflows/play-release.yml` - Production AAB (built `--local`) submitted to Google Play via EAS Submit
+
+**Two distribution channels:**
+
+The app ships as two different binaries and the difference is not cosmetic:
+
+- **GitHub Releases** (`preview`/`emulator`/`x86` profiles) - APK that declares
+  `REQUEST_INSTALL_PACKAGES` and updates itself through `AppUpdateService`
+- **Google Play** (`production` profile) - App Bundle with that permission removed,
+  because Play forbids an app updating itself by any route other than Play
+
+`app.config.js` keys both off `DISTRIBUTION_CHANNEL` (set only by eas.json's `production`
+profile, *not* off `APP_VARIANT`) and writes `extra.distributionChannel`;
+`app/services/distribution.js` reads it at runtime. Anything that downloads or
+installs an APK must go through `supportsInAppUpdates()` first. The update *check*
+still runs on Play builds - only the action changes, to opening the Play listing.
+
+See `docs/GOOGLE_PLAY_RELEASE.md` for the full setup and release procedure.
 
 **Local Builds on CI:**
 

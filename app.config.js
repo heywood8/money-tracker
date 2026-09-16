@@ -14,6 +14,18 @@ const ANDROID_ARCHITECTURES = IS_PREVIEW
       ? ['x86_64']
       : undefined; // undefined = all architectures
 
+// Whether this binary is the one going to Google Play. Its own variable rather
+// than a reading of APP_VARIANT: APP_VARIANT describes the build's shape (which
+// ABIs, which R8 settings) and emulator-screenshots.yml already prebuilds with
+// APP_VARIANT=production without being a store build at all. Only eas.json's
+// `production` profile sets this.
+//
+// The distinction is not cosmetic. Google Play's Device and Network Abuse policy
+// forbids an app updating itself by any route other than Play, so the Play build
+// must drop both REQUEST_INSTALL_PACKAGES and the in-app updater that needs it
+// (see app/services/distribution.js for the runtime half of this).
+const IS_PLAY = process.env.DISTRIBUTION_CHANNEL === 'play';
+
 module.exports = {
   expo: {
     name: 'Penny',
@@ -43,7 +55,11 @@ module.exports = {
       edgeToEdgeEnabled: true,
       package: 'com.heywood8.monkeep',
       permissions: [
-        'android.permission.REQUEST_INSTALL_PACKAGES',
+        // Lets the GitHub-distributed build hand a downloaded APK to Android's
+        // installer. Declared only there — on Play it is both unnecessary and
+        // disallowed, and merely declaring it triggers a Play Console review
+        // form the app cannot satisfy.
+        ...(IS_PLAY ? [] : ['android.permission.REQUEST_INSTALL_PACKAGES']),
         // Foreground-only location for the opt-in "attach location to operations"
         // feature. COARSE is enough for ~150 m proximity recall; FINE refines the
         // fix when the user grants precise location. No background location.
@@ -55,6 +71,10 @@ module.exports = {
       eas: {
         projectId: '89372eb2-93f5-475a-a630-9caa827d8406',
       },
+      // Which store this binary was built for, read at runtime by
+      // app/services/distribution.js. It is what gates the in-app updater, so it
+      // has to be baked in at build time rather than inferred on device.
+      distributionChannel: IS_PLAY ? 'play' : 'github',
       // Sentry runtime config, read by app/services/sentry.js via expo-constants.
       // The DSN is a public client key — it ships inside every release APK
       // regardless, so it is safe to commit. An env var can override it.

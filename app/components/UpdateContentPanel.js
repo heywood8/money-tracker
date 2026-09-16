@@ -8,6 +8,7 @@ import { useLocalization } from '../contexts/LocalizationContext';
 import { BORDER_RADIUS, FONT_SIZE, HORIZONTAL_PADDING, SPACING } from '../styles/designTokens';
 import { BUTTON_COMPACT, BUTTON_TEXT } from '../styles/componentStyles';
 import { motionDuration } from '../utils/reducedMotion';
+import { supportsInAppUpdates } from '../services/distribution';
 
 const DATE_RE = /(\d{4}-\d{2}-\d{2})/;
 const PR_RE = /#(\d+)/g;
@@ -162,7 +163,11 @@ function ReleaseCard({ version, notes, publishedAt, releaseUrl, badge, buildProg
   // otherwise we download it first. The currently installed version offers no action — there is
   // nothing to install over what is already running.
   const isCached = !!matchedApk;
-  const canAct = !isInstalled && (isCached || !!downloadUrl);
+  // On Play every button leads to the same listing, and the listing only ever offers
+  // the current release. Leaving the older cards actionable would promise a version
+  // Play will not hand back, so only the release being recommended gets a button.
+  const canAct = !isInstalled && (isCached || !!downloadUrl)
+    && (supportsInAppUpdates() || isUpdateCandidate);
   const actionFilled = isUpdateCandidate; // the recommended update gets the prominent filled button
   const actionColor = actionFilled ? '#fff' : colors.primary;
   const handleActionPress = () => {
@@ -296,11 +301,24 @@ function ReleaseCard({ version, notes, publishedAt, releaseUrl, badge, buildProg
                   : { borderColor: colors.primary, borderWidth: StyleSheet.hairlineWidth },
               ]}
               accessibilityRole="button"
-              accessibilityLabel={isCached ? `Install version ${version}` : `Download version ${version}`}
+              accessibilityLabel={
+                !supportsInAppUpdates()
+                  ? `Update version ${version} in Google Play`
+                  : (isCached ? `Install version ${version}` : `Download version ${version}`)
+              }
             >
-              <Ionicons name={isCached ? 'archive-outline' : 'cloud-download-outline'} size={15} color={actionColor} />
+              <Ionicons
+                name={!supportsInAppUpdates()
+                  ? 'logo-google-playstore'
+                  : (isCached ? 'archive-outline' : 'cloud-download-outline')}
+                size={15}
+                color={actionColor}
+              />
               <Text style={[styles.releaseActionText, { color: actionColor }]}>
-                {isCached ? (t('install') || 'Install') : (t('download') || 'Download')}
+                {/* A Play build cannot install anything itself; the button is a doorway. */}
+                {!supportsInAppUpdates()
+                  ? (t('update_in_play') || 'Update in Google Play')
+                  : (isCached ? (t('install') || 'Install') : (t('download') || 'Download'))}
               </Text>
             </TouchableOpacity>
           </View>

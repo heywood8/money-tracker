@@ -8,6 +8,7 @@ import { useLocalization } from '../contexts/LocalizationContext';
 import { BORDER_RADIUS, FONT_SIZE, SPACING } from '../styles/designTokens';
 import { parseReleaseNotes, formatReleaseDateTime } from '../components/UpdateContentPanel';
 import { BUTTON, MODAL_TITLE } from '../styles/componentStyles';
+import { supportsInAppUpdates } from '../services/distribution';
 
 // Picks the release-note entry describing the version we're prompting the user to install.
 // Prefers the entry whose version matches the latest release; otherwise falls back to the
@@ -130,7 +131,10 @@ export default function UpdateAvailableModal({ visible, onDismiss, onUpdate, upd
               </ScrollView>
             ) : (
               <Text style={[styles.emptyNotes, { color: colors.mutedText }]}>
-                {(t('update_available_message') || 'A newer app version ({latestVersion}) is available. Download and install the APK from GitHub.').replace('{latestVersion}', `v${latestVersion}`)}
+                {(supportsInAppUpdates()
+                  ? (t('update_available_message') || 'A newer app version ({latestVersion}) is available. Download and install the APK from GitHub.')
+                  : (t('update_available_message_play') || 'A newer app version ({latestVersion}) is available. Update it in Google Play.')
+                ).replace('{latestVersion}', `v${latestVersion}`)}
               </Text>
             )}
 
@@ -151,9 +155,17 @@ export default function UpdateAvailableModal({ visible, onDismiss, onUpdate, upd
                 accessibilityRole="button"
                 accessibilityLabel={`${t('update_now') || 'Update now'} v${latestVersion}`}
               >
-                <Ionicons name="cloud-download-outline" size={18} color="#fff" />
+                <Ionicons
+                  name={supportsInAppUpdates() ? 'cloud-download-outline' : 'logo-google-playstore'}
+                  size={18}
+                  color="#fff"
+                />
                 <Text style={styles.updateText}>
-                  {t('update_now') || 'Update now'}
+                  {/* On Play the button leaves the app rather than starting a download, so it
+                      says where it goes instead of promising an install we cannot perform. */}
+                  {supportsInAppUpdates()
+                    ? (t('update_now') || 'Update now')
+                    : (t('update_in_play') || 'Update in Google Play')}
                 </Text>
               </TouchableOpacity>
             </View>
