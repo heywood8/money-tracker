@@ -94,6 +94,11 @@ module.exports = {
       // ColdStartScreen took over. `imageWidth` must stay equal to MARK_SIZE in
       // app/components/startup/ColdStartScreen.js, and the background is the
       // brand navy (BRAND.surface) in both themes so the handover has no seam.
+      //
+      // This image is also the frame ColdStartScreen opens on: it redraws the
+      // same mark as assets/penny-body.png plus Penny's arm as a stroke (see
+      // app/components/startup/pennyArm.js) so she can wave. Re-export one of
+      // those two and the other has to follow, or the handover gains a seam.
       [
         'expo-splash-screen',
         {

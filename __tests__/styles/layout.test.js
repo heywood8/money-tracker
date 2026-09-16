@@ -350,14 +350,22 @@ describe('Design Tokens', () => {
       });
     });
 
-    it('COLD_START adds up to the ~560 ms budget for the sequence', async () => {
-      const lastCoinLands = COLD_START.firstCoin
-        + COLD_START.coinStagger * 2
-        + COLD_START.coinFall
-        + COLD_START.coinSquash * 2;
-      const markStops = COLD_START.hold + COLD_START.spin;
+    const lastCoinLands = () => COLD_START.firstCoin
+      + COLD_START.coinStagger * 2
+      + COLD_START.coinFall
+      + COLD_START.coinSquash * 2;
 
-      expect(Math.max(lastCoinLands, markStops) + COLD_START.dissolve).toBeLessThanOrEqual(600);
+    it('COLD_START adds up to the ~560 ms budget for the sequence', async () => {
+      // What the screen has to *finish* before it can hand over. The wave is
+      // deliberately not in here: it repeats for as long as the reads take and
+      // comes back down underneath the cross-fade, so it gates nothing.
+      expect(lastCoinLands() + COLD_START.dissolve).toBeLessThanOrEqual(600);
+    });
+
+    it('has Penny up and waving while the coins are still falling', async () => {
+      const armIsUp = COLD_START.hold + COLD_START.armRaise;
+
+      expect(armIsUp).toBeLessThan(lastCoinLands());
     });
   });
 
