@@ -160,6 +160,17 @@ Run **Actions → Publish to Google Play → Run workflow** and pick a track:
   roughly twice a day, and pushing each one to production users is neither
   useful nor reviewable.
 
+### Retrying a submit without rebuilding
+
+The build takes about 33 minutes; the submit that follows takes about 90 seconds.
+When a submit fails for a reason that has nothing to do with the bundle — a
+missing service account key, a Play permission not granted yet — rebuilding is
+pure waste. Every run uploads its bundle as the `penny-aab` artifact, so paste
+that run's id into the **aab_run_id** input and the workflow downloads the
+bundle and goes straight to the submit step.
+
+Leave `aab_run_id` empty for an ordinary release.
+
 The workflow is manual on purpose. Once a dispatched run has succeeded end to
 end, you can make it fire on every release tag by adding to `play-release.yml`:
 

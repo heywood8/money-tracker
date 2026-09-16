@@ -30,6 +30,10 @@ on:
           - internal
           - closed
           - production
+      aab_run_id:
+        description: 'Optional. Reuse the AAB from an earlier run of this workflow instead of building a new one — paste that run''s id. The build takes ~33 minutes and the submit that follows takes ~90 seconds, so a submit that failed on credentials or Play permissions should not cost a second build. Leave empty to build from this ref.'
+        required: false
+        type: string
 
 jobs:
   publish:
@@ -37,6 +41,8 @@ jobs:
     runs-on: ubuntu-latest
     permissions:
       contents: read
+      # Required to download the `penny-aab` artifact from an earlier run.
+      actions: read
 
     steps:
       - name: 🏗 Setup repo
@@ -51,6 +57,7 @@ jobs:
           node-version: '22.x'
 
       - name: 🏗 Setup Java
+        if: github.event.inputs.aab_run_id == ''
         uses: actions/setup-java@v6.0.0
         with:
           distribution: 'temurin'
@@ -70,6 +77,7 @@ jobs:
       # matters here is only that this key matches the upload certificate
       # registered for com.heywood8.monkeep.
       - name: 🔐 Setup credentials.json for signing
+        if: github.event.inputs.aab_run_id == ''
         run: |
           mkdir -p android/app
           echo "${{ secrets.MYAPP_UPLOAD_STORE_BASE64 }}" | base64 --decode > android/app/keystore.jks
@@ -90,6 +98,7 @@ jobs:
       # drops REQUEST_INSTALL_PACKAGES and the in-app updater from this binary —
       # Play forbids an app updating itself by any route other than Play.
       - name: 🏗 Build production AAB with EAS
+        if: github.event.inputs.aab_run_id == ''
         env:
           NODE_OPTIONS: --max_old_space_size=4096
           SENTRY_AUTH_TOKEN: ${{ secrets.SENTRY_AUTH_TOKEN }}
@@ -100,6 +109,31 @@ jobs:
           eas build --platform android --local --profile production \
             --non-interactive --output "${{ runner.temp }}/penny.aab"
           ls -lh "${{ runner.temp }}/penny.aab"
+          echo "AAB_PATH=${{ runner.temp }}/penny.aab" >> "$GITHUB_ENV"
+
+      # The bundle an earlier run already produced. Identical to rebuilding the same
+      # ref, so a submit that failed for a reason outside the bundle — a missing
+      # service account key, a Play permission not yet granted — is retried in
+      # seconds rather than after another full build.
+      - name: 📥 Reuse the AAB from run ${{ github.event.inputs.aab_run_id }}
+        if: github.event.inputs.aab_run_id != ''
+        uses: actions/download-artifact@v7
+        with:
+          name: penny-aab
+          run-id: ${{ github.event.inputs.aab_run_id }}
+          github-token: ${{ secrets.GITHUB_TOKEN }}
+          path: ${{ runner.temp }}/reused-aab
+
+      - name: 📥 Locate the reused AAB
+        if: github.event.inputs.aab_run_id != ''
+        run: |
+          AAB="${{ runner.temp }}/reused-aab/penny.aab"
+          if [ ! -f "$AAB" ]; then
+            echo "::error::No penny.aab in the artifact from run ${{ github.event.inputs.aab_run_id }}."
+            exit 1
+          fi
+          ls -lh "$AAB"
+          echo "AAB_PATH=$AAB" >> "$GITHUB_ENV"
 
       # No service account key is handled here. EAS stores the Google Service
       # Account key with the project's Android credentials (encrypted at rest on
@@ -114,10 +148,10 @@ jobs:
           SUBMIT_PROFILE: ${{ github.event.inputs.submit_profile }}
         run: |
           eas submit --platform android --profile "$SUBMIT_PROFILE" \
-            --path "${{ runner.temp }}/penny.aab" --non-interactive
+            --path "$AAB_PATH" --non-interactive
 
       - name: 📦 Upload AAB as workflow artifact
-        if: always()
+        if: always() && github.event.inputs.aab_run_id == ''
         uses: actions/upload-artifact@v7
         with:
           name: penny-aab
