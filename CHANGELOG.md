@@ -1,5 +1,12 @@
 # Changelog
 
+## [0.289.0](https://github.com/heywood8/money-tracker/compare/penny-v0.288.3...penny-v0.289.0) (2026-09-16)
+
+
+### Features
+
+* **cold-start:** have penny wave instead of spinning the mark ([#1792](https://github.com/heywood8/money-tracker/issues/1792)) ([c5041a2](https://github.com/heywood8/money-tracker/commit/c5041a2a359dcfe6cbb2c03d08599cbb91752158))
+
 ## [0.288.3](https://github.com/heywood8/money-tracker/compare/penny-v0.288.2...penny-v0.288.3) (2026-09-16)
 
 
