@@ -1,5 +1,12 @@
 # Changelog
 
+## [0.288.3](https://github.com/heywood8/money-tracker/compare/penny-v0.288.2...penny-v0.288.3) (2026-09-16)
+
+
+### Continuous Integration
+
+* **release:** publish every release tag to google play ([#1790](https://github.com/heywood8/money-tracker/issues/1790)) ([05e9109](https://github.com/heywood8/money-tracker/commit/05e9109ceb554934970f15de207b47681957de42))
+
 ## [0.288.2](https://github.com/heywood8/money-tracker/compare/penny-v0.288.1...penny-v0.288.2) (2026-09-16)
 
 
