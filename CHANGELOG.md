@@ -1,5 +1,12 @@
 # Changelog
 
+## [0.288.2](https://github.com/heywood8/money-tracker/compare/penny-v0.288.1...penny-v0.288.2) (2026-09-16)
+
+
+### Continuous Integration
+
+* **release:** let a failed play submit retry without rebuilding ([#1788](https://github.com/heywood8/money-tracker/issues/1788)) ([83c4709](https://github.com/heywood8/money-tracker/commit/83c4709a926cb16fdc92057b506cf0e39f8fcab3))
+
 ## [0.288.1](https://github.com/heywood8/money-tracker/compare/penny-v0.288.0...penny-v0.288.1) (2026-09-16)
 
 
