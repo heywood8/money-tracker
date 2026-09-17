@@ -113,15 +113,6 @@ jest.mock('../app/modals/ImportProgressModal', () => {
   };
 });
 
-// Mock the Drive backup indicator: it reads the localization and theme contexts,
-// which this file stubs down to bare providers.
-jest.mock('../app/components/DriveBackupStatusBanner', () => {
-  const React = require('react');
-  return function MockDriveBackupStatusBanner() {
-    return React.createElement('DriveBackupStatusBanner', { testID: 'drive-backup-status-banner' });
-  };
-});
-
 // Mock useMaterialTheme hook
 jest.mock('../app/hooks/useMaterialTheme', () => ({
   useMaterialTheme: jest.fn(() => ({

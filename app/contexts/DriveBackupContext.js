@@ -3,6 +3,7 @@ import PropTypes from 'prop-types';
 import { getValidAccessToken, signIn as googleSignIn } from '../services/GoogleSheetsService';
 import {
   performDriveBackup,
+  cancelDriveBackup,
   getLastDriveBackupResult,
   DRIVE_BACKUP_PROGRESS_EVENT,
 } from '../services/GoogleDriveBackupService';
@@ -26,6 +27,10 @@ const DriveBackupContext = createContext(null);
 export function DriveBackupProvider({ children }) {
   const [progress, setProgress] = useState(null);
   const [lastResult, setLastResult] = useState(null);
+  // A cancel is asked for, not done: the run only stops at its next checkpoint,
+  // which can be a whole file's upload away. Tracked so the status line can say
+  // so immediately rather than leaving the tap looking ignored.
+  const [cancelling, setCancelling] = useState(false);
 
   useEffect(() => {
     let cancelled = false;
@@ -39,9 +44,11 @@ export function DriveBackupProvider({ children }) {
     const unsubscribe = appEvents.on(DRIVE_BACKUP_PROGRESS_EVENT, (payload) => {
       const terminal = payload.phase === 'done'
         || payload.phase === 'error'
-        || payload.phase === 'skipped';
+        || payload.phase === 'skipped'
+        || payload.phase === 'cancelled';
       setProgress(terminal ? null : payload);
       if (terminal) {
+        setCancelling(false);
         // The service has already persisted the outcome by the time it emits, so
         // re-reading it keeps one source of truth for what the status line shows.
         getLastDriveBackupResult().then(setLastResult);
@@ -61,6 +68,7 @@ export function DriveBackupProvider({ children }) {
   // Overlapping runs are refused by the service itself, which is the only guard
   // that also covers the run started at app launch, before this provider exists.
   const startBackup = useCallback(async ({ mode = 'manual', interactive = true } = {}) => {
+    setCancelling(false);
     return performDriveBackup({
       mode,
       getAccessToken: async () => {
@@ -78,13 +86,23 @@ export function DriveBackupProvider({ children }) {
     });
   }, []);
 
+  /**
+   * Ask the run in flight to stop. Safe to call twice — the second tap lands on
+   * a flag that is already set — and a no-op when nothing is running.
+   */
+  const cancelBackup = useCallback(() => {
+    if (cancelDriveBackup()) setCancelling(true);
+  }, []);
+
   const value = useMemo(() => ({
     progress,
     isRunning: progress !== null,
+    cancelling,
     lastResult,
     startBackup,
+    cancelBackup,
     refreshLastResult: () => getLastDriveBackupResult().then(setLastResult),
-  }), [progress, lastResult, startBackup]);
+  }), [progress, cancelling, lastResult, startBackup, cancelBackup]);
 
   return (
     <DriveBackupContext.Provider value={value}>

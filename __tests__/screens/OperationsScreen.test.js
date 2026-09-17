@@ -90,6 +90,18 @@ jest.mock('../../app/contexts/SearchContext', () => ({
   })),
 }));
 
+// The screen reads the Drive backup state to decide whether the resting search
+// pill shows a backup status instead of the search affordance. Idle by default —
+// the status itself is covered in SearchBar's own tests.
+jest.mock('../../app/contexts/DriveBackupContext', () => ({
+  useDriveBackup: jest.fn(() => ({
+    isRunning: false,
+    progress: null,
+    cancelling: false,
+    cancelBackup: jest.fn(),
+  })),
+}));
+
 jest.mock('../../app/services/LastAccount', () => ({
   getLastAccessedAccount: jest.fn(() => Promise.resolve(null)),
   setLastAccessedAccount: jest.fn(() => Promise.resolve()),
@@ -3953,4 +3965,70 @@ describe('OperationsScreen', () => {
     });
   });
 
+
+  describe('Drive backup status in the search pill', () => {
+    // The standalone banner that used to float above the search bar is gone; the
+    // resting pill carries the status instead, which is why the search
+    // affordance has to disappear while a backup runs.
+    const setDriveBackupState = (state) => {
+      require('../../app/contexts/DriveBackupContext').useDriveBackup.mockReturnValue({
+        isRunning: false,
+        progress: null,
+        cancelling: false,
+        cancelBackup: jest.fn(),
+        ...state,
+      });
+    };
+
+    afterEach(() => setDriveBackupState({}));
+
+    it('leaves the search pill alone while no backup is running', async () => {
+      const OperationsScreen = require('../../app/screens/OperationsScreen').default;
+      const { queryByTestId, getByTestId } = await render(<OperationsScreen />);
+
+      expect(queryByTestId('search-bar-status')).toBeNull();
+      expect(getByTestId('search-input-container')).toBeTruthy();
+    });
+
+    it('takes the pill over and names the phase while a backup runs', async () => {
+      setDriveBackupState({
+        isRunning: true,
+        progress: { phase: 'uploading', current: 2, total: 3 },
+      });
+      const OperationsScreen = require('../../app/screens/OperationsScreen').default;
+      const { getByTestId, getByText, queryByTestId } = await render(<OperationsScreen />);
+
+      expect(getByTestId('search-bar-status')).toBeTruthy();
+      expect(getByText('drive_backup_status_uploading 2/3')).toBeTruthy();
+      // Search is out of reach for as long as the status holds the pill.
+      expect(queryByTestId('search-input-container')).toBeNull();
+    });
+
+    it('cancels the run from the pill', async () => {
+      const cancelBackup = jest.fn();
+      setDriveBackupState({ isRunning: true, progress: { phase: 'preparing' }, cancelBackup });
+      const OperationsScreen = require('../../app/screens/OperationsScreen').default;
+      const { getByTestId } = await render(<OperationsScreen />);
+
+      await fireEvent.press(getByTestId('cancel-status-button'));
+
+      expect(cancelBackup).toHaveBeenCalled();
+    });
+
+    it('hands search back the moment cancel is tapped, without waiting for the run', async () => {
+      // The service only notices a cancel between files, which can be a whole
+      // multi-megabyte upload away — holding the pill until then would leave
+      // search unreachable for exactly as long as the tap was meant to fix.
+      setDriveBackupState({
+        isRunning: true,
+        cancelling: true,
+        progress: { phase: 'uploading', current: 1, total: 3 },
+      });
+      const OperationsScreen = require('../../app/screens/OperationsScreen').default;
+      const { getByTestId, queryByTestId } = await render(<OperationsScreen />);
+
+      expect(queryByTestId('search-bar-status')).toBeNull();
+      expect(getByTestId('search-input-container')).toBeTruthy();
+    });
+  });
 });

@@ -9,6 +9,7 @@
 
 import {
   performDriveBackup,
+  cancelDriveBackup,
   performDriveBackupIfNeeded,
   ensureBackupFolder,
   cleanupDriveBackups,
@@ -711,6 +712,118 @@ describe('GoogleDriveBackupService', () => {
       unsubscribe();
 
       expect(phases[phases.length - 1]).toBe('error');
+    });
+  });
+
+  describe('Cancellation', () => {
+    it('does nothing when there is no run to cancel', () => {
+      expect(cancelDriveBackup()).toBe(false);
+    });
+
+    it('stops at the next checkpoint and reports a cancelled run', async () => {
+      // Hold the first upload open so the cancel lands mid-run, exactly as a tap
+      // on the search pill would.
+      let releaseUpload;
+      const gate = new Promise(resolve => { releaseUpload = resolve; });
+      const base = global.fetch;
+      let uploads = 0;
+      global.fetch = jest.fn(async (url, options) => {
+        if (url.includes('/upload/')) {
+          uploads += 1;
+          if (uploads === 1) await gate;
+        }
+        return base(url, options);
+      });
+
+      const phases = [];
+      const unsubscribe = appEvents.on(DRIVE_BACKUP_PROGRESS_EVENT, (p) => phases.push(p.phase));
+
+      const run = performDriveBackup({ mode: 'manual', getAccessToken });
+      // Let the run reach the gated upload before asking it to stop.
+      await Promise.resolve();
+      await new Promise(resolve => setTimeout(resolve, 0));
+
+      expect(cancelDriveBackup()).toBe(true);
+      releaseUpload();
+      const result = await run;
+      unsubscribe();
+
+      expect(result.status).toBe('cancelled');
+      expect(phases[phases.length - 1]).toBe('cancelled');
+      // The file that was already streaming finished; the ones after it never started.
+      expect(uploads).toBe(1);
+    });
+
+    it('records the cancellation as the last outcome', async () => {
+      let releaseUpload;
+      const gate = new Promise(resolve => { releaseUpload = resolve; });
+      const base = global.fetch;
+      global.fetch = jest.fn(async (url, options) => {
+        if (url.includes('/upload/')) await gate;
+        return base(url, options);
+      });
+
+      const run = performDriveBackup({ mode: 'manual', getAccessToken });
+      await new Promise(resolve => setTimeout(resolve, 0));
+      cancelDriveBackup();
+      releaseUpload();
+      await run;
+
+      const stored = mockPreferencesDB.setPreference.mock.calls
+        .find(([key]) => key === 'drive_backup_last_result');
+      expect(JSON.parse(stored[1])).toMatchObject({ status: 'cancelled' });
+    });
+
+    it('finishes and rotates a run whose files have all landed', async () => {
+      // The last checkpoint is between files, so a cancel that lands during the
+      // final upload arrives with nothing left to skip. Reporting that as
+      // cancelled would call a finished backup a failure and, worse, skip the
+      // rotation — which the next launch will not redo, because the day is
+      // already marked.
+      setPreferences({ drive_backup_last_weekly_week: THIS_WEEK });
+      const files = [];
+      for (let day = 1; day <= 10; day += 1) {
+        files.push({ id: `json-${day}`, name: `penny_daily_2026-02-${String(day).padStart(2, '0')}.json` });
+      }
+      const deleted = [];
+      routeFetch([
+        { method: 'GET', match: (u) => u.includes(`/files/${FOLDER_ID}?`), body: { id: FOLDER_ID, trashed: false } },
+        { method: 'GET', match: (u) => u.includes('in+parents') || u.includes('in%20parents'), body: { files } },
+        { method: 'GET', match: (u) => u.includes('q='), body: { files: [] } },
+        { method: 'POST', match: (u) => u.includes('/upload/drive/v3/files'), body: { id: 'uploaded-file' } },
+        { method: 'PATCH', match: (u) => u.includes('/upload/drive/v3/files'), body: { id: 'uploaded-file' } },
+        { method: 'DELETE', match: (u) => { deleted.push(u.split('/').pop()); return true; }, body: {} },
+      ]);
+      // SQLite is the last format, so the tap lands while the final file streams.
+      mockFileSystem.uploadAsync.mockImplementationOnce(async () => {
+        cancelDriveBackup();
+        return { status: 200, body: '{"id":"file-db"}' };
+      });
+
+      const result = await performDriveBackup({ mode: 'auto', getAccessToken });
+
+      expect(result.status).toBe('success');
+      expect(deleted.length).toBeGreaterThan(0);
+    });
+
+    it('does not carry a cancel over into the next run', async () => {
+      let releaseUpload;
+      const gate = new Promise(resolve => { releaseUpload = resolve; });
+      const base = global.fetch;
+      global.fetch = jest.fn(async (url, options) => {
+        if (url.includes('/upload/')) await gate;
+        return base(url, options);
+      });
+
+      const first = performDriveBackup({ mode: 'manual', getAccessToken });
+      await new Promise(resolve => setTimeout(resolve, 0));
+      cancelDriveBackup();
+      releaseUpload();
+      await first;
+
+      global.fetch = base;
+      const second = await performDriveBackup({ mode: 'manual', getAccessToken });
+      expect(second.status).toBe('success');
     });
   });
 });
