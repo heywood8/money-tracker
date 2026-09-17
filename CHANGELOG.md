@@ -1,5 +1,12 @@
 # Changelog
 
+## [0.289.1](https://github.com/heywood8/money-tracker/compare/penny-v0.289.0...penny-v0.289.1) (2026-09-17)
+
+
+### Tests
+
+* **backup:** guard backup coverage against schema drift ([#1794](https://github.com/heywood8/money-tracker/issues/1794)) ([aedec8b](https://github.com/heywood8/money-tracker/commit/aedec8beab2e990bac325d406868e8d5552ff76f))
+
 ## [0.289.0](https://github.com/heywood8/money-tracker/compare/penny-v0.288.3...penny-v0.289.0) (2026-09-16)
 
 
