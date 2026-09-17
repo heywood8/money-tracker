@@ -19,6 +19,7 @@ import { formatDate as toDateString } from '../services/BalanceHistoryDB';
 import { getDistinctLabels } from '../services/OperationsDB';
 import { parseLabels, serializeLabels, addLabel, hasLabel } from '../utils/labelUtils';
 import { buildRepeatedOperation } from '../utils/operationUtils';
+import { getDriveBackupStatusLabel } from '../utils/driveBackupStatus';
 import OperationModal from '../modals/OperationModal';
 import Calculator from '../components/Calculator';
 import ListCard from '../components/ListCard';
@@ -42,6 +43,7 @@ import useQuickAddLocation from '../hooks/useQuickAddLocation';
 import usePendingOperationSuggestions from '../hooks/usePendingOperationSuggestions';
 import useOnForeground from '../hooks/useOnForeground';
 import { useSearch } from '../contexts/SearchContext';
+import { useDriveBackup } from '../contexts/DriveBackupContext';
 import { useDisplaySettings } from '../contexts/DisplaySettingsContext';
 import { TIMING_ENTER, TIMING_EXIT, DURATION_ENTER, DURATION_EXIT, SPRING_SETTLE, recommitSharedValue } from '../utils/motion';
 import AddFAB, { FAB_BOTTOM_OFFSET } from '../components/AddFAB';
@@ -189,6 +191,30 @@ const OperationsScreen = () => {
 
   const { searchMode, filtersExpanded, openSearch, closeSearch, reopenSearch, toggleFilters } = useSearch();
   const isSearchOpen = searchMode === 'open';
+
+  // The Drive backup reports itself through the resting search pill rather than a
+  // second bar floating above it: two stacked pills at the top of the screen for
+  // something that happens once a day was one pill too many, and the pill is idle
+  // exactly when the backup has something to say.
+  //
+  // The pill is also the only way into search, so the cancel button hands it back
+  // the moment it is tapped rather than holding it through a "Cancelling…" that
+  // can outlast a multi-megabyte upload: the service only notices a cancel
+  // between files, and nothing gives a stalled Drive request a deadline. The run
+  // unwinds on its own, and the settings panel is where its dying breath is
+  // reported.
+  const {
+    isRunning: driveBackupRunning,
+    progress: driveBackupProgress,
+    cancelling: driveBackupCancelling,
+    cancelBackup: cancelDriveBackup,
+  } = useDriveBackup();
+  const driveBackupLabel = useMemo(
+    () => (driveBackupRunning && !driveBackupCancelling
+      ? getDriveBackupStatusLabel(driveBackupProgress, t)
+      : null),
+    [driveBackupRunning, driveBackupCancelling, driveBackupProgress, t],
+  );
   // With the panel setting off, the form lives behind the + button: it is
   // summoned for one entry and folds itself away again once that entry lands.
   // Meaningless while the setting is on, where the panel never leaves.
@@ -1740,6 +1766,8 @@ const OperationsScreen = () => {
           t={t}
           collapsed={!isSearchOpen}
           onCollapsedPress={handleCollapsedPress}
+          statusLabel={driveBackupLabel}
+          onCancelStatus={cancelDriveBackup}
         />
         {isSearchOpen && hasActiveSearch && (
           <FilterChipStrip

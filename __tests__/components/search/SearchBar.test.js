@@ -279,4 +279,56 @@ describe('SearchBar', () => {
       // No assertion needed; exercising the false branch is the goal
     });
   });
+
+  describe('Background-job status', () => {
+    // The Drive backup used to announce itself in a second pill floating above
+    // this one. It now borrows the resting bar instead, which is why the status
+    // replaces the search affordance rather than sitting beside it.
+    const statusProps = { ...defaultProps, collapsed: true, statusLabel: 'Uploading to Drive 2/3' };
+
+    it('shows the status line in place of the resting search affordance', async () => {
+      const { getByTestId, getByText, queryByTestId } = await render(<SearchBar {...statusProps} />);
+
+      expect(getByTestId('search-bar-status')).toBeTruthy();
+      expect(getByText('Uploading to Drive 2/3')).toBeTruthy();
+      expect(queryByTestId('search-input-container')).toBeNull();
+    });
+
+    it('calls onCancelStatus when the cancel button is pressed', async () => {
+      const onCancelStatus = jest.fn();
+      const { getByTestId } = await render(
+        <SearchBar {...statusProps} onCancelStatus={onCancelStatus} />,
+      );
+
+      await fireEvent.press(getByTestId('cancel-status-button'));
+
+      expect(onCancelStatus).toHaveBeenCalled();
+    });
+
+    it('omits the cancel button when the job cannot be cancelled', async () => {
+      const { queryByTestId } = await render(<SearchBar {...statusProps} />);
+      expect(queryByTestId('cancel-status-button')).toBeNull();
+    });
+
+    it('leaves an open search alone so a query is never swallowed mid-word', async () => {
+      const { getByPlaceholderText, queryByTestId } = await render(
+        <SearchBar {...defaultProps} collapsed={false} statusLabel="Uploading to Drive 2/3" />,
+      );
+
+      expect(queryByTestId('search-bar-status')).toBeNull();
+      expect(getByPlaceholderText('search_operations_placeholder')).toBeTruthy();
+    });
+
+    it('goes back to the search affordance once the job ends', async () => {
+      const { getByTestId, queryByTestId, rerender } = await render(<SearchBar {...statusProps} />);
+      expect(getByTestId('search-bar-status')).toBeTruthy();
+
+      await act(async () => {
+        rerender(<SearchBar {...statusProps} statusLabel={null} />);
+      });
+
+      expect(queryByTestId('search-bar-status')).toBeNull();
+      expect(getByTestId('search-input-container')).toBeTruthy();
+    });
+  });
 });

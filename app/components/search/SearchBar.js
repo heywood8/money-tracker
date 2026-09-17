@@ -1,5 +1,5 @@
 import React, { useState, useCallback, useEffect, useRef } from 'react';
-import { View, TextInput, TouchableOpacity, StyleSheet, Text, Keyboard, Platform, useWindowDimensions } from 'react-native';
+import { View, TextInput, TouchableOpacity, StyleSheet, Text, Keyboard, Platform, ActivityIndicator, useWindowDimensions } from 'react-native';
 import Animated, { useSharedValue, useAnimatedStyle, withTiming, Easing } from 'react-native-reanimated';
 import Icon from '@expo/vector-icons/MaterialCommunityIcons';
 import PropTypes from 'prop-types';
@@ -27,6 +27,8 @@ const SearchBar = ({
   t,
   collapsed = false,
   onCollapsedPress = undefined,
+  statusLabel = null,
+  onCancelStatus = undefined,
 }) => {
   const [localText, setLocalText] = useState(searchText);
   // Track the last value we sent to the parent so we can distinguish
@@ -71,6 +73,13 @@ const SearchBar = ({
     };
   }, []);
 
+  // A background job (today: the Drive backup) borrows the pill to say what it is
+  // doing. It takes over only the resting bar: a pill the user has opened is one
+  // they are typing into, and a status that swallowed the query mid-word would
+  // cost more than the notice is worth. The job is still running when they close
+  // search, and the status appears then.
+  const showStatus = Boolean(statusLabel) && collapsed;
+
   // ---- width morph between collapsed (~70%) and open (100%) ----
   // The width is animated in PIXELS (smooth numeric tween, both directions) via
   // Reanimated, so the tween runs on the UI thread and stays smooth even while
@@ -84,8 +93,11 @@ const SearchBar = ({
   // layout does not seed the width of the screen the app started on.
   const { width: screenWidth } = useWindowDimensions();
   const [available, setAvailable] = useState(() => Math.max(0, screenWidth - 2 * HORIZONTAL_PADDING));
+  // Full width for the open bar and for a status line, which carries a label, a
+  // spinner and a cancel button and would clip at the resting 70%.
+  const expanded = !collapsed || showStatus;
   // 0 = collapsed (~70%), 1 = open (100%). Driven by withTiming on the UI thread.
-  const morph = useSharedValue(collapsed ? 0 : 1);
+  const morph = useSharedValue(expanded ? 1 : 0);
 
   // Only animate on actual open/close transitions, not on first mount — the bar
   // should appear in its current state without animating in.
@@ -93,14 +105,14 @@ const SearchBar = ({
   useEffect(() => {
     if (!morphMountedRef.current) {
       morphMountedRef.current = true;
-      morph.value = collapsed ? 0 : 1;
+      morph.value = expanded ? 1 : 0;
       return;
     }
-    morph.value = withTiming(collapsed ? 0 : 1, {
+    morph.value = withTiming(expanded ? 1 : 0, {
       duration: MORPH_DURATION,
       easing: Easing.out(Easing.cubic),
     });
-  }, [collapsed, morph]);
+  }, [expanded, morph]);
 
   const handleContainerLayout = useCallback((e) => {
     setAvailable(Math.max(0, e.nativeEvent.layout.width - 2 * HORIZONTAL_PADDING));
@@ -142,7 +154,33 @@ const SearchBar = ({
         {/* Fixed-width content holder — laid out once at the full width and
             clipped by the (animating) pill, so only the pill's width changes. */}
         <View style={[styles.contentHolder, { width: available }]}>
-          {collapsed ? (
+          {showStatus ? (
+            <View style={styles.statusRow} testID="search-bar-status">
+              <ActivityIndicator size="small" color={colors.primary} />
+              {/* Live region rather than a progressbar role: the phase changes
+                  several times during a run, and TalkBack should read the new
+                  line without the user having to go looking for it. */}
+              <Text
+                style={[styles.statusLabel, { color: colors.text }]}
+                numberOfLines={1}
+                accessibilityLiveRegion="polite"
+              >
+                {statusLabel}
+              </Text>
+              {!!onCancelStatus && (
+                <TouchableOpacity
+                  testID="cancel-status-button"
+                  onPress={onCancelStatus}
+                  style={styles.iconButton}
+                  hitSlop={{ top: 10, bottom: 10, left: 10, right: 10 }}
+                  accessibilityRole="button"
+                  accessibilityLabel={t('cancel')}
+                >
+                  <Icon name="close" size={22} color={colors.text} />
+                </TouchableOpacity>
+              )}
+            </View>
+          ) : collapsed ? (
             <TouchableOpacity
               testID="search-input-container"
               activeOpacity={0.6}
@@ -229,6 +267,8 @@ SearchBar.propTypes = {
   t: PropTypes.func.isRequired,
   collapsed: PropTypes.bool,
   onCollapsedPress: PropTypes.func,
+  statusLabel: PropTypes.string,
+  onCancelStatus: PropTypes.func,
 };
 
 const styles = StyleSheet.create({
@@ -312,6 +352,18 @@ const styles = StyleSheet.create({
     flexDirection: 'row',
     gap: SPACING.md,
     height: '100%',
+  },
+  statusLabel: {
+    flex: 1,
+    fontSize: FONT_SIZE.md,
+  },
+  statusRow: {
+    alignItems: 'center',
+    flex: 1,
+    flexDirection: 'row',
+    gap: SPACING.md,
+    paddingLeft: SPACING.lg,
+    paddingRight: SPACING.xs,
   },
 });
 

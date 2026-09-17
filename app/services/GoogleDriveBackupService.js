@@ -436,6 +436,10 @@ const uploadSnapshot = async (accessToken, { folderId, label, backup, formats, o
   const total = formats.length;
 
   for (let index = 0; index < formats.length; index += 1) {
+    // Between files, not inside one: a format already uploaded stays uploaded,
+    // and the one being streamed finishes rather than landing truncated.
+    throwIfCancelled();
+
     const format = formats[index];
     const { ext, mimeType } = FORMAT_META[format];
     const name = `penny_${label}.${ext}`;
@@ -479,6 +483,50 @@ const uploadSnapshot = async (accessToken, { folderId, label, backup, formats, o
 let runInFlight = false;
 
 /**
+ * Cancellation.
+ *
+ * A run is a sequence of awaits — build the snapshot, upload one file per
+ * format, rotate old copies — so stopping it means not starting the next step
+ * rather than tearing down the one in flight: a half-written Drive upload would
+ * leave a truncated file under a name the rotation trusts. The flag is read at
+ * each checkpoint and unwinds the run through the normal error path, which is
+ * also why it is a module-level flag and not an AbortController: the run the
+ * user cancels may be the one started at app launch, before any React tree that
+ * could hold a controller exists.
+ *
+ * So a cancel is a request, not a stop: the file being streamed when it lands
+ * finishes, and a run whose last file has already landed finishes too. Nothing
+ * in the UI waits on the run to acknowledge it (see OperationsScreen).
+ */
+const CANCELLED_CODE = 'cancelled';
+
+class BackupCancelledError extends Error {
+  constructor() {
+    super(CANCELLED_CODE);
+    this.name = 'BackupCancelledError';
+  }
+}
+
+let cancelRequested = false;
+
+const throwIfCancelled = () => {
+  if (cancelRequested) throw new BackupCancelledError();
+};
+
+/**
+ * Ask the run in flight to stop at its next checkpoint.
+ *
+ * Returns false when there is nothing to cancel, so a caller can tell a request
+ * that will produce a 'cancelled' event from one that will produce nothing.
+ * @returns {boolean}
+ */
+export const cancelDriveBackup = () => {
+  if (!runInFlight) return false;
+  cancelRequested = true;
+  return true;
+};
+
+/**
  * Run the Drive backup.
  *
  * `mode` is 'auto' for the scheduled run (which skips when the day and week are
@@ -486,13 +534,14 @@ let runInFlight = false;
  * a timestamped file and never touches the daily/weekly rotation.
  *
  * Never throws: the caller is app startup or a button, and neither should be able
- * to break on a network hiccup. The outcome is reported through the progress
- * event and the stored last-result instead.
+ * to break on a network hiccup — a cancel included, which comes back as a
+ * 'cancelled' status rather than a rejection. The outcome is reported through
+ * the progress event and the stored last-result instead.
  *
  * @param {Object} options
  * @param {'auto'|'manual'} [options.mode]
  * @param {() => Promise<string>} options.getAccessToken - Supplies a valid token
- * @returns {Promise<{status: 'success'|'skipped'|'error', files?: string[], error?: string}>}
+ * @returns {Promise<{status: 'success'|'skipped'|'error'|'cancelled', files?: string[], error?: string}>}
  */
 export const performDriveBackup = async ({ mode = 'auto', getAccessToken }) => {
   const onProgress = (payload) => emitProgress({ mode, ...payload });
@@ -502,6 +551,9 @@ export const performDriveBackup = async ({ mode = 'auto', getAccessToken }) => {
     return { status: 'skipped', reason: 'already_running' };
   }
   runInFlight = true;
+  // Cleared here rather than in `finally` as well: a cancel that lands between
+  // two runs must not carry over and kill the next one before it starts.
+  cancelRequested = false;
 
   try {
     // The toggle governs the *scheduled* run. A manual tap is the user asking
@@ -534,11 +586,15 @@ export const performDriveBackup = async ({ mode = 'auto', getAccessToken }) => {
     // The token comes first because it is the cheapest thing that can fail and
     // the likeliest: once a Google session is revoked, every launch would
     // otherwise build a full database snapshot only to throw it away.
+    throwIfCancelled();
     onProgress({ phase: 'folder' });
     const accessToken = await getAccessToken();
 
+    throwIfCancelled();
     onProgress({ phase: 'preparing' });
     const backup = await createBackup();
+
+    throwIfCancelled();
 
     // The same guard the local rotation uses: a snapshot that looks like a failed
     // database read must not be uploaded, or it overwrites a good remote copy
@@ -580,6 +636,11 @@ export const performDriveBackup = async ({ mode = 'auto', getAccessToken }) => {
       // Rotation runs after the marks are set, so a failure here cannot make the
       // next launch re-upload files that are already safely in Drive. Manual
       // backups are deliberately not rotated — same contract as the local ones.
+      //
+      // Deliberately past the last checkpoint: every file has landed by now, so
+      // the run is a success whatever the user tapped a second ago, and honouring
+      // a cancel here would both report a finished backup as cancelled and leave
+      // the folder unrotated for a day (the next launch sees the marks and skips).
       await cleanupDriveBackups(accessToken, folderId, 'penny_daily_', MAX_DAILY_BACKUPS);
       await cleanupDriveBackups(accessToken, folderId, 'penny_weekly_', MAX_WEEKLY_BACKUPS);
     }
@@ -594,6 +655,16 @@ export const performDriveBackup = async ({ mode = 'auto', getAccessToken }) => {
     console.log(`[DriveBackup] Uploaded ${uploaded.length} file(s):`, uploaded.join(', '));
     return { ...result, files: uploaded };
   } catch (error) {
+    if (error instanceof BackupCancelledError) {
+      // Whatever the run had already uploaded stays in Drive, and the daily /
+      // weekly marks for those files are already set — the next scheduled run
+      // picks up exactly where this one stopped.
+      console.log('[DriveBackup] Backup cancelled by the user');
+      const result = { status: CANCELLED_CODE, at: new Date().toISOString() };
+      await setLastDriveBackupResult(result).catch(() => {});
+      onProgress({ phase: CANCELLED_CODE });
+      return result;
+    }
     const code = error?.message || 'unknown_error';
     console.error('[DriveBackup] Backup failed:', code);
     const result = { status: 'error', at: new Date().toISOString(), error: code };

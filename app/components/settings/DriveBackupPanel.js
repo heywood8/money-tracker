@@ -20,6 +20,7 @@ import { getValidAccessToken, signIn as googleSignIn } from '../../services/Goog
 import { SettingToggleRow, SETTINGS_LIST_CONTENT } from './SettingsRows';
 import { SECTION_LABEL } from '../../styles/componentStyles';
 import { BORDER_RADIUS, FONT_SIZE, HORIZONTAL_PADDING, SPACING } from '../../styles/designTokens';
+import { getDriveBackupStatusLabel } from '../../utils/driveBackupStatus';
 
 // The colour a finished run's status line takes. Matches ExportPanel's success tint.
 const SUCCESS_GREEN = '#4caf50';
@@ -43,7 +44,7 @@ const FORMAT_ROWS = [
 export default function DriveBackupPanel({ bottomInset }) {
   const { colors } = useThemeColors();
   const { t } = useLocalization();
-  const { startBackup, isRunning, progress, lastResult } = useDriveBackup();
+  const { startBackup, cancelBackup, isRunning, cancelling, progress, lastResult } = useDriveBackup();
 
   const [enabled, setEnabled] = useState(false);
   const [formats, setFormats] = useState(BACKUP_FORMATS);
@@ -106,24 +107,15 @@ export default function DriveBackupPanel({ bottomInset }) {
   }, [formats]);
 
   // Deliberately not awaited: the point of the button is that the upload carries
-  // on while the user goes back to using the app. The banner and the status line
-  // report it from here on.
+  // on while the user goes back to using the app. The status line here and the
+  // search pill on the Operations screen report it from here on.
   const handleBackupNow = useCallback(() => {
     setSignInError(null);
     startBackup({ mode: 'manual', interactive: true });
   }, [startBackup]);
 
   const statusLine = (() => {
-    if (isRunning) {
-      switch (progress?.phase) {
-      case 'preparing': return t('drive_backup_status_preparing') || 'Preparing backup…';
-      case 'folder': return t('drive_backup_status_connecting') || 'Connecting to Google Drive…';
-      case 'uploading':
-        return `${t('drive_backup_status_uploading') || 'Uploading to Drive'} ${progress.current}/${progress.total}`;
-      case 'cleanup': return t('drive_backup_status_cleanup') || 'Tidying up old backups…';
-      default: return t('drive_backup_status_running') || 'Backing up to Google Drive…';
-      }
-    }
+    if (isRunning) return getDriveBackupStatusLabel(progress, t, { cancelling });
     if (!lastResult) return t('drive_backup_never_run') || 'No backup uploaded yet';
     const when = new Date(lastResult.at).toLocaleString();
     if (lastResult.status === 'success') {
@@ -131,6 +123,9 @@ export default function DriveBackupPanel({ bottomInset }) {
     }
     if (lastResult.status === 'error') {
       return `${t('drive_backup_last_error') || 'Last backup failed'}: ${when}`;
+    }
+    if (lastResult.status === 'cancelled') {
+      return `${t('drive_backup_last_cancelled') || 'Last run cancelled'}: ${when}`;
     }
     return `${t('drive_backup_last_skipped') || 'Last run skipped'}: ${when}`;
   })();
@@ -212,7 +207,22 @@ export default function DriveBackupPanel({ bottomInset }) {
           color={statusColor}
         />
         <Text style={[styles.statusText, { color: statusColor }]}>{statusLine}</Text>
-        {isRunning && <ActivityIndicator size="small" color={colors.primary} />}
+        {isRunning && (
+          <>
+            <ActivityIndicator size="small" color={colors.primary} />
+            {/* The "Back up now" button is disabled while a run is in flight, so
+                without this the panel is a spinner with no way out of it. */}
+            <TouchableOpacity
+              onPress={cancelBackup}
+              hitSlop={{ top: 10, bottom: 10, left: 10, right: 10 }}
+              accessibilityRole="button"
+              accessibilityLabel={t('cancel')}
+              testID="drive-backup-cancel-button"
+            >
+              <Ionicons name="close" size={18} color={colors.mutedText} />
+            </TouchableOpacity>
+          </>
+        )}
       </View>
 
       {lastResult?.status === 'error' && !isRunning && (
