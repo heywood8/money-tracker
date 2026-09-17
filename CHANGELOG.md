@@ -1,5 +1,12 @@
 # Changelog
 
+## [0.290.0](https://github.com/heywood8/money-tracker/compare/penny-v0.289.1...penny-v0.290.0) (2026-09-17)
+
+
+### Features
+
+* **backup:** show drive backup status in the search pill ([#1796](https://github.com/heywood8/money-tracker/issues/1796)) ([9a9e2c7](https://github.com/heywood8/money-tracker/commit/9a9e2c72a19e73c1553c00f831219b471bbe3d88))
+
 ## [0.289.1](https://github.com/heywood8/money-tracker/compare/penny-v0.289.0...penny-v0.289.1) (2026-09-17)
 
 
