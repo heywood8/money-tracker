@@ -540,6 +540,7 @@
   "delete_backup_confirm": "Supprimer cette sauvegarde ? Cette action est irréversible.",
   "net_worth": "Valeur Nette",
   "this_month": "ce mois-ci",
+  "net_worth_since": "depuis le {date}",
   "keep_filters_active": "Conserver les filtres actifs ?",
   "keep_filters": "Conserver les Filtres",
   "biometric_prompt": "Authentifiez-vous pour afficher les soldes",

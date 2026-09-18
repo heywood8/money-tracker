@@ -536,6 +536,7 @@
   "delete_backup_confirm": "Dieses Backup löschen? Dies kann nicht rückgängig gemacht werden.",
   "net_worth": "Nettovermögen",
   "this_month": "diesen Monat",
+  "net_worth_since": "seit {date}",
   "keep_filters_active": "Filter aktiv halten?",
   "keep_filters": "Filter Behalten",
   "biometric_prompt": "Authentifizieren, um Guthaben anzuzeigen",

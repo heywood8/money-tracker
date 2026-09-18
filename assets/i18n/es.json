@@ -536,6 +536,7 @@
   "delete_backup_confirm": "¿Eliminar esta copia de seguridad? Esta acción no se puede deshacer.",
   "net_worth": "Patrimonio Neto",
   "this_month": "este mes",
+  "net_worth_since": "desde el {date}",
   "keep_filters_active": "¿Mantener filtros activos?",
   "keep_filters": "Mantener Filtros",
   "biometric_prompt": "Autenticar para mostrar saldos",

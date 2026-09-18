@@ -21,7 +21,8 @@ import { useLocalization } from '../contexts/LocalizationContext';
 import { getDefaultAccountId, setDefaultAccountId } from '../services/PreferencesDB';
 import { DURATION_ENTER, DURATION_EXIT } from '../utils/motion';
 import { motionDuration } from '../utils/reducedMotion';
-import { computeNetWorthSummary, getOperationsByDateRange } from '../services/OperationsDB';
+import { computeNetWorthSummary } from '../services/OperationsDB';
+import { relativeDayLabel, sameDayPreviousMonth } from '../utils/dateUtils';
 import { useTabFocusedEvent } from '../contexts/TabFocusContext';
 import { appEvents, EVENTS } from '../services/eventEmitter';
 import { parseCardMasks, serializeCardMasks, cardMaskLast4 } from '../utils/cardMask';
@@ -215,53 +216,14 @@ ConfirmationDialog.propTypes = {
 };
 
 // Net worth summary card
-const NetWorthCard = memo(({ accounts = [], colors = {}, t = (k) => k, tabKey = 'Accounts' }) => {
+const NetWorthCard = memo(({ accounts = [], colors = {}, t = (k) => k, language, tabKey = 'Accounts' }) => {
   const { hideBalances } = useDisplaySettings();
-
-  // Net worth's monthly-change figure only depends on the CURRENT MONTH's
-  // income/expense operations. Sourcing that from the Operations feed was wrong on
-  // two counts: the feed is (a) the SEARCH-FILTERED set, so the figure silently
-  // tracked whatever the user was searching, and (b) lazy-loaded a week at a time,
-  // so every load-more-while-scrolling re-ran the async currency conversion and the
-  // month total was incomplete until enough pages were loaded. Instead we fetch the
-  // whole current month directly from the DB, decoupled from search and pagination,
-  // and refresh only when operations actually mutate (OPERATION_CHANGED) or the data
-  // set is reloaded/reset. (issue #1346)
-  const [monthOperations, setMonthOperations] = useState([]);
 
   const mountedRef = useRef(true);
   useEffect(() => {
     mountedRef.current = true;
     return () => { mountedRef.current = false; };
   }, []);
-
-  const loadMonthOperations = useCallback(async () => {
-    const now = new Date();
-    const monthPrefix = `${now.getFullYear()}-${String(now.getMonth() + 1).padStart(2, '0')}`;
-    try {
-      // Loose upper bound: no real date exceeds "-31", and both summary paths
-      // re-filter by the exact monthPrefix, so a slightly wide range is harmless.
-      const ops = await getOperationsByDateRange(`${monthPrefix}-01`, `${monthPrefix}-31`);
-      if (mountedRef.current) setMonthOperations(ops || []);
-    } catch {
-      if (mountedRef.current) setMonthOperations([]);
-    }
-  }, []);
-
-  useEffect(() => { loadMonthOperations(); }, [loadMonthOperations]);
-
-  // Deferred while this screen's tab is hidden. The summary it feeds
-  // (computeNetWorthSummary) can reach the network for a live rate, and this
-  // screen is mounted twice — as the Accounts tab and inside Settings — so an
-  // ungated refresh cost two month queries and two conversions per save, for a
-  // figure nobody was looking at.
-  useTabFocusedEvent(tabKey, [EVENTS.OPERATION_CHANGED, EVENTS.RELOAD_ALL], loadMonthOperations);
-
-  // Not deferred: clearing is cheap, and stale balances must never outlive the
-  // database they came from.
-  useEffect(() => appEvents.on(EVENTS.DATABASE_RESET, () => {
-    if (mountedRef.current) setMonthOperations([]);
-  }), []);
 
   // Determine display currency from first account (or default to USD)
   const displayCurrency = useMemo(() => {
@@ -281,64 +243,77 @@ const NetWorthCard = memo(({ accounts = [], colors = {}, t = (k) => k, tabKey = 
     [accounts, displayCurrency],
   );
 
-  // Same-currency-only summary (the pre-conversion behaviour): sums just the
-  // display-currency accounts and their operations. Used when the toggle is off,
-  // and as the seed for the converted state so the card never flashes $0 before
-  // the async conversion resolves.
-  const baseCurrencySummary = useMemo(() => {
-    const now = new Date();
-    // Compare the YYYY-MM prefix of the stored local date string directly.
-    // Parsing "YYYY-MM-DD" with new Date() yields UTC midnight, which shifts
-    // ops dated the 1st into the previous month in UTC-negative timezones.
-    const monthPrefix = `${now.getFullYear()}-${String(now.getMonth() + 1).padStart(2, '0')}`;
-    const sameCurrencyIds = new Set();
-    let total = 0;
-    for (const acc of accounts) {
-      if ((acc.currency || displayCurrency) === displayCurrency) {
-        sameCurrencyIds.add(acc.id);
-        total += parseFloat(acc.balance || '0');
-      }
-    }
-    let change = 0;
-    for (const op of monthOperations) {
-      if (!sameCurrencyIds.has(op.accountId)) continue;
-      if (typeof op.date === 'string' && op.date.startsWith(monthPrefix)) {
-        const amount = parseFloat(op.amount || '0');
-        if (op.type === 'income') change += amount;
-        else if (op.type === 'expense') change -= amount; // transfers don't affect net worth
-      }
-    }
-    return { total: total.toString(), monthlyChange: change.toString(), unconvertible: [] };
-  }, [accounts, monthOperations, displayCurrency]);
-
-  // When the toggle is on, every balance/operation is converted to the display
-  // currency at the current rate (offline first, live fallback) — the same path
-  // Graphs uses — so foreign-currency accounts are included, not silently dropped.
-  // Conversion is async (may hit the network), so results land in state.
+  // When the toggle is on, every balance is converted to the display currency at
+  // the current rate (offline first, live fallback) — the same path Graphs uses —
+  // so foreign-currency accounts are included, not silently dropped. Off, the
+  // summary covers only the display currency's own accounts (the pre-conversion
+  // behaviour), which is the one case that needs no rate at all.
   const [convertAll, setConvertAll] = useState(true);
-  const [convertedSummary, setConvertedSummary] = useState(baseCurrencySummary);
+  const summaryAccounts = useMemo(() => (
+    convertAll
+      ? accounts
+      : accounts.filter(acc => (acc.currency || displayCurrency) === displayCurrency)
+  ), [accounts, convertAll, displayCurrency]);
+
+  // Synchronous seed for the headline figure: the summary below can reach the
+  // network for a rate, and the card must not flash a zero while it resolves.
+  // Only same-currency accounts can be summed without a rate, so this is the
+  // floor of the real total, never a wrong-by-conversion one.
+  const seedTotal = useMemo(() => {
+    let total = 0;
+    for (const acc of summaryAccounts) {
+      if ((acc.currency || displayCurrency) !== displayCurrency) continue;
+      total += parseFloat(acc.balance || '0');
+    }
+    return total;
+  }, [summaryAccounts, displayCurrency]);
+
+  // The summary is computed in the DB layer (one query for the movement, one
+  // rate lookup per foreign currency), so it lands in state rather than being
+  // derived at render.
+  const [summary, setSummary] = useState(null);
+  const [reloadKey, setReloadKey] = useState(0);
+  const reload = useCallback(() => {
+    if (mountedRef.current) setReloadKey(key => key + 1);
+  }, []);
 
   useEffect(() => {
-    if (!convertAll) return undefined;
     let cancelled = false;
-    const now = new Date();
-    const currentMonthPrefix = `${now.getFullYear()}-${String(now.getMonth() + 1).padStart(2, '0')}`;
-
-    computeNetWorthSummary(accounts, monthOperations, displayCurrency, currentMonthPrefix)
+    // Resolved per load, not memoized: this card outlives midnight, and the
+    // comparison has to follow the calendar rather than the mount time.
+    const since = sameDayPreviousMonth();
+    computeNetWorthSummary(summaryAccounts, displayCurrency, since)
       .then((result) => {
-        if (!cancelled) setConvertedSummary(result);
+        // Tagged with the toggle it was computed under, so flipping the toggle
+        // falls back to the synchronous seed instead of leaving the other
+        // currency mode's total on screen until the next load resolves.
+        if (!cancelled && mountedRef.current) setSummary({ ...result, since, convertAll });
       })
       .catch(() => {
-        if (!cancelled) setConvertedSummary(baseCurrencySummary);
+        if (!cancelled && mountedRef.current) setSummary(null);
       });
-
     return () => { cancelled = true; };
-  }, [convertAll, accounts, monthOperations, displayCurrency, baseCurrencySummary]);
+  }, [summaryAccounts, convertAll, displayCurrency, reloadKey]);
 
-  const summary = convertAll ? convertedSummary : baseCurrencySummary;
-  const totalBalance = parseFloat(summary.total || '0');
-  const monthlyChange = parseFloat(summary.monthlyChange || '0');
-  const unconvertible = convertAll ? summary.unconvertible : [];
+  // Deferred while this screen's tab is hidden. The summary reaches the DB and
+  // can reach the network for a live rate, and this screen is mounted twice — as
+  // the Accounts tab and inside Settings — so an ungated refresh cost two
+  // conversions per save, for a figure nobody was looking at. (issue #1346)
+  useTabFocusedEvent(tabKey, [EVENTS.OPERATION_CHANGED, EVENTS.RELOAD_ALL], reload);
+
+  // Not deferred: clearing is cheap, and stale balances must never outlive the
+  // database they came from.
+  useEffect(() => appEvents.on(EVENTS.DATABASE_RESET, () => {
+    if (mountedRef.current) setSummary(null);
+  }), []);
+
+  // The change is the movement since the same day of the previous month, so it
+  // only means anything once the summary that carries its date has resolved —
+  // and only while that summary still describes the currency mode on screen.
+  const current = summary?.convertAll === convertAll ? summary : null;
+  const totalBalance = current ? parseFloat(current.total || '0') : seedTotal;
+  const change = current ? parseFloat(current.change || '0') : 0;
+  const unconvertible = convertAll ? (current?.unconvertible || []) : [];
 
   const isNegative = totalBalance < 0;
   const abs = Math.abs(totalBalance);
@@ -346,11 +321,26 @@ const NetWorthCard = memo(({ accounts = [], colors = {}, t = (k) => k, tabKey = 
   const formattedInt = intPart.replace(/\B(?=(\d{3})+(?!\d))/g, ',');
   const formatted = decPart ? `${formattedInt}.${decPart}` : formattedInt;
 
-  const changeIsPositive = monthlyChange >= 0;
-  const absChange = Math.abs(monthlyChange);
+  const changeIsPositive = change >= 0;
+  const absChange = Math.abs(change);
   const [changeIntPart, changeDecPart] = absChange.toFixed(decimals).split('.');
   const formattedChangeInt = changeIntPart.replace(/\B(?=(\d{3})+(?!\d))/g, ',');
   const formattedChange = changeDecPart ? `${formattedChangeInt}.${changeDecPart}` : formattedChangeInt;
+
+  // Names the day the change is measured from, because "the same day last month"
+  // is not self-evident from a bare figure — and on the 29th to 31st it is not
+  // even the same day number (see sameDayPreviousMonth).
+  //
+  // An unresolved key makes `t` hand back the key itself, which carries no
+  // placeholder and would swallow the date with it — so a template that does not
+  // name {date} is replaced by the English one rather than rendered as-is.
+  const sinceTemplate = t('net_worth_since');
+  const sinceLabel = current?.since
+    ? (sinceTemplate?.includes('{date}') ? sinceTemplate : 'since {date}').replace(
+      '{date}',
+      relativeDayLabel(current.since, { t, language, withWeekday: false, markOtherYears: true }),
+    )
+    : null;
 
   return (
     <View style={[styles.netWorthCard, { backgroundColor: colors.surface, borderColor: colors.border }]}>
@@ -382,10 +372,10 @@ const NetWorthCard = memo(({ accounts = [], colors = {}, t = (k) => k, tabKey = 
           <Text style={[styles.netWorthAmount, { color: isNegative ? colors.expense : colors.text }]}>
             {isNegative ? '-' : ''}{currencySymbol}{formatted}
           </Text>
-          {monthlyChange !== 0 && (
+          {change !== 0 && sinceLabel && (
             <View style={styles.monthlyChangeRow}>
               <Text style={[styles.monthlyChangeText, { color: changeIsPositive ? colors.income : colors.expense }]}>
-                {changeIsPositive ? '↗' : '↘'} {changeIsPositive ? '+' : '-'}{currencySymbol}{formattedChange} {t('this_month') || 'this month'}
+                {changeIsPositive ? '↗' : '↘'} {changeIsPositive ? '+' : '-'}{currencySymbol}{formattedChange} {sinceLabel}
               </Text>
             </View>
           )}
@@ -409,7 +399,10 @@ NetWorthCard.propTypes = {
   accounts: PropTypes.array,
   colors: PropTypes.object,
   t: PropTypes.func,
-  // Which tab this card is on, so its month query can be deferred while that
+  // App language, for the comparison date's label. The date is formatted in the
+  // APP's language, not the device's (see relativeDayLabel).
+  language: PropTypes.string,
+  // Which tab this card is on, so its summary query can be deferred while that
   // tab is hidden. AccountsScreen is mounted twice — as the Accounts tab and as
   // a Settings subpanel — so the ungated version paid for both on every save.
   tabKey: PropTypes.string,
@@ -544,7 +537,7 @@ export default function AccountsScreen({ onBackStateChange, tabKey = 'Accounts' 
   const { paperInputTheme } = makeModalStyles(colors);
   const { accounts, displayedAccounts, hiddenAccounts, showHiddenAccounts, loading, error } = useAccountsData();
   const { toggleShowHiddenAccounts, addAccount, updateAccount, deleteAccount, reorderAccounts, validateAccount, getOperationCount } = useAccountsActions();
-  const { t } = useLocalization();
+  const { t, language } = useLocalization();
 
   const balanceInputRef = useRef(null);
 
@@ -964,7 +957,7 @@ export default function AccountsScreen({ onBackStateChange, tabKey = 'Accounts' 
   const keyExtractor = useCallback((item) => item.id, []);
 
   const listHeader = useMemo(() => (
-    <NetWorthCard accounts={accounts} colors={colors} t={t} tabKey={tabKey} />
+    <NetWorthCard accounts={accounts} colors={colors} t={t} language={language} tabKey={tabKey} />
   ), [accounts, colors, t]);
 
   const listFooter = useMemo(() => (

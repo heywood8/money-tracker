@@ -226,3 +226,51 @@ describe('relativeDayLabel', () => {
     }));
   });
 });
+
+describe('sameDayPreviousMonth', () => {
+  const { sameDayPreviousMonth } = require('../../app/utils/dateUtils');
+
+  it('steps back to the same day number a month earlier', () => {
+    expect(sameDayPreviousMonth(new Date(2026, 8, 18))).toBe('2026-08-18');
+  });
+
+  it('rolls the year back from January', () => {
+    expect(sameDayPreviousMonth(new Date(2026, 0, 15))).toBe('2025-12-15');
+  });
+
+  // The corner cases the clamp exists for: the target day does not exist in the
+  // previous month, so it lands on that month's last day instead.
+  it.each([
+    // [from,                        expected,       why]
+    [new Date(2026, 2, 31), '2026-02-28', '31 March in a common year'],
+    [new Date(2028, 2, 31), '2028-02-29', '31 March in a leap year'],
+    [new Date(2026, 2, 30), '2026-02-28', '30 March'],
+    [new Date(2026, 2, 29), '2026-02-28', '29 March'],
+    [new Date(2026, 4, 31), '2026-04-30', '31 May, a 30-day previous month'],
+    [new Date(2026, 6, 31), '2026-06-30', '31 July, a 30-day previous month'],
+    [new Date(2026, 0, 31), '2025-12-31', '31 January, which December has'],
+  ])('clamps %s to %s (%s)', (from, expected) => {
+    expect(sameDayPreviousMonth(from)).toBe(expected);
+  });
+
+  // Clamping DOWN is the point: JS's own month arithmetic rolls 31 March forward
+  // into 3 March, which is a day in the *current* month — the comparison would
+  // silently measure four days instead of a month.
+  it('never lands inside the month it started from', () => {
+    for (let month = 0; month < 12; month++) {
+      const from = new Date(2026, month, 31); // JS normalizes short months itself
+      const result = sameDayPreviousMonth(from);
+      const [year, resultMonth] = result.split('-').map(Number);
+      const expected = new Date(from.getFullYear(), from.getMonth() - 1, 1);
+      expect([year, resultMonth - 1]).toEqual([expected.getFullYear(), expected.getMonth()]);
+    }
+  });
+
+  it('defaults to today', () => {
+    jest.useFakeTimers().setSystemTime(new Date(2026, 8, 18, 22, 9));
+
+    expect(sameDayPreviousMonth()).toBe('2026-08-18');
+
+    jest.useRealTimers();
+  });
+});

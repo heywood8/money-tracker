@@ -1342,58 +1342,163 @@ export const getUnconvertibleCurrencies = async (fromCurrencies, targetCurrency)
 };
 
 /**
+ * What the destination account of a transfer actually gained, in ITS currency.
+ *
+ * `destination_amount` carries it for every transfer the app writes today. Rows
+ * from the old schema, a CSV/SQLite import, or an earlier UI bug can leave it
+ * NULL, and a cross-currency transfer then has to be re-derived from the
+ * operation's own `exchange_rate` — which is exactly what
+ * `calculateBalanceChanges` does when it applies the transfer to the balances.
+ * Crediting the raw source amount instead would report a movement no balance
+ * ever made (50,000 RUB landing as 50,000 AMD).
+ *
+ * @returns {string|null} the credit, or null when it is genuinely unknowable
+ *   (no destination amount and no rate) so the caller can drop the whole row
+ */
+const transferCreditAmount = (row, amount, currencyByAccountId) => {
+  if (row.destination_amount) return String(row.destination_amount);
+  const from = currencyByAccountId.get(String(row.account_id));
+  const to = currencyByAccountId.get(String(row.to_account_id));
+  if (!from || !to || from === to) return amount;
+  if (!row.exchange_rate) return null;
+  return Currency.convertAmount(amount, from, to, row.exchange_rate) || null;
+};
+
+/**
+ * Net balance movement per account since `sinceDate`, keyed by account id and
+ * expressed in each account's OWN currency.
+ *
+ * "Since" excludes the date itself: `sinceDate` names a closing balance, so an
+ * operation booked *on* it is part of what the balance was, not of what moved
+ * afterwards. The predicate is doubled deliberately — `date >= ?` is a plain
+ * string compare that `idx_operations_date` can seek on (every row this loses is
+ * one `date(date)` would have dropped anyway), and `date(date) > date(?)` then
+ * trims the boundary day, including the rows a CSV/SQLite import can leave a
+ * timestamp on (#773). The string compare alone would keep "2026-08-18T09:00",
+ * counting the boundary day twice; `date(date)` alone would full-scan.
+ *
+ * Every operation type counts, transfers included. A same-currency transfer
+ * between two of the user's accounts nets to exactly zero, so it costs nothing
+ * to carry; a CROSS-currency one does not, because the source loses `amount`
+ * and the destination gains its own figure, and those two sides only cancel in
+ * the display currency if the transfer's rate matched today's. That residue
+ * really did move net worth, so it stays in.
+ *
+ * Failures resolve to "no movement" rather than rejecting: the total is the
+ * card's primary figure and must not be lost to a comparison that could not be
+ * computed.
+ *
+ * @param {string} sinceDate - `YYYY-MM-DD`, exclusive
+ * @param {Map<string, string>} currencyByAccountId
+ * @returns {Promise<Map<string, string>>} account id (as a string) → signed delta
+ */
+const getBalanceMovementsSince = async (sinceDate, currencyByAccountId) => {
+  const movementByAccount = new Map();
+  const move = (accountId, delta) => {
+    if (accountId === null || accountId === undefined) return;
+    const key = String(accountId);
+    movementByAccount.set(key, Currency.add(movementByAccount.get(key) || '0', delta));
+  };
+
+  try {
+    const rows = await queryAll(
+      `SELECT account_id, to_account_id, type, amount, destination_amount, exchange_rate
+       FROM operations
+       WHERE date >= ? AND date(date) > date(?)`,
+      [sinceDate, sinceDate],
+    );
+
+    for (const row of rows || []) {
+      const amount = String(row.amount ?? '0');
+      if (row.type === 'income') {
+        move(row.account_id, amount);
+      } else if (row.type === 'expense') {
+        move(row.account_id, Currency.subtract('0', amount));
+      } else if (row.type === 'transfer') {
+        const credit = transferCreditAmount(row, amount, currencyByAccountId);
+        // Unpriceable: drop BOTH sides. Debiting the source on its own would
+        // report a loss the portfolio never took.
+        if (credit === null) continue;
+        move(row.account_id, Currency.subtract('0', amount));
+        move(row.to_account_id, credit);
+      }
+    }
+  } catch (error) {
+    console.error('Failed to read balance movements for the net-worth change:', error);
+    return new Map();
+  }
+  return movementByAccount;
+};
+
+/**
  * Compute a net-worth summary across ALL accounts, converting foreign-currency
  * balances to `targetCurrency` at the current rate (offline first, live fallback)
  * — the same conversion path the Graphs screen uses, so the two surfaces agree.
- * A single rate map is built once and reused for both balances and the monthly
- * change, so operations are converted from their own account's currency too.
+ * A single rate map is built once and reused for both the balances and the
+ * change, so each account's movement is converted from its own currency.
  *
- * Accounts (and operations) whose currency has no available rate are excluded
- * from the totals and their currency codes reported in `unconvertible`, so the
- * UI can flag the omission instead of silently dropping them.
+ * `change` is the movement since `sinceDate`, i.e. `total` minus what the
+ * portfolio was worth at the end of that day. It is derived from the operations
+ * booked after the date rather than from the balance-history snapshots the
+ * Graphs chart reads, and that is deliberate:
+ *
+ * - Snapshots are only ever written under *today's* date
+ *   (`BalanceHistoryDB.updateTodayBalance`), so a back-dated or retroactively
+ *   edited operation never reaches the historical rows it belongs to. Walking
+ *   the ledger reflects the corrections; the snapshots preserve whatever the app
+ *   believed at the time.
+ * - An account with no snapshot on or before the date contributes nothing to a
+ *   snapshot-based reading, which turns "I added an account" into a jump in net
+ *   worth. Here a newly added account simply has no operations to reverse, so it
+ *   reports no movement — its opening balance is not growth, it is money that
+ *   was already there.
+ *
+ * Historical balances are reconstructed at TODAY's exchange rate, so the figure
+ * answers "how much more do I have than a month ago, priced today" and never
+ * moves on rate drift alone. Whichever accounts cannot be priced at all are
+ * skipped and reported in `unconvertible`, so the UI can flag the omission
+ * instead of silently dropping them.
  *
  * @param {Array<{id: string, currency: string, balance: string}>} accounts
- * @param {Array<{accountId: string, type: string, amount: string, date: string}>} operations
  * @param {string} targetCurrency - display/base currency to express totals in
- * @param {string} monthPrefix - `YYYY-MM` prefix selecting the current month's ops
- * @returns {Promise<{ total: string, monthlyChange: string, unconvertible: string[] }>}
+ * @param {string} [sinceDate] - `YYYY-MM-DD` to measure the change from
+ *   (exclusive); omitted reports a zero change
+ * @returns {Promise<{ total: string, change: string, unconvertible: string[] }>}
  */
-export const computeNetWorthSummary = async (accounts, operations, targetCurrency, monthPrefix) => {
+export const computeNetWorthSummary = async (accounts, targetCurrency, sinceDate) => {
   const accountList = accounts || [];
-  const rateByCurrency = await fetchRatesToTarget(
-    accountList.map(acc => acc.currency),
-    targetCurrency,
+  const currencyByAccountId = new Map(
+    accountList.map(acc => [String(acc.id), acc.currency || targetCurrency]),
   );
-  const currencyByAccountId = new Map(accountList.map(acc => [acc.id, acc.currency]));
+  // No accounts means nothing to compare, and the movement scan would be pure
+  // waste — the card is mounted (twice) before the accounts list has loaded.
+  const wantsChange = !!sinceDate && accountList.length > 0;
+  const [rateByCurrency, movementByAccount] = await Promise.all([
+    fetchRatesToTarget(accountList.map(acc => acc.currency), targetCurrency),
+    wantsChange ? getBalanceMovementsSince(sinceDate, currencyByAccountId) : Promise.resolve(new Map()),
+  ]);
   const unconvertible = new Set();
 
   let total = '0';
+  let change = '0';
   for (const acc of accountList) {
     const currency = acc.currency || targetCurrency;
-    const converted = convertWithRateMap(String(acc.balance ?? '0'), currency, targetCurrency, rateByCurrency);
-    if (converted === null) {
+    const balance = convertWithRateMap(String(acc.balance ?? '0'), currency, targetCurrency, rateByCurrency);
+    if (balance === null) {
       unconvertible.add(currency);
-      continue;
+      continue; // unpriceable: out of the total, and out of the change with it
     }
-    total = Currency.add(total, converted);
+    total = Currency.add(total, balance);
+
+    const movement = movementByAccount.get(String(acc.id));
+    if (movement === undefined) continue; // untouched since the date
+    // Converted once per account, not once per operation, so the change and the
+    // total round the same way and `total - change` is the portfolio as it stood.
+    const converted = convertWithRateMap(movement, currency, targetCurrency, rateByCurrency);
+    if (converted !== null) change = Currency.add(change, converted);
   }
 
-  let monthlyChange = '0';
-  for (const op of operations || []) {
-    if (op.type !== 'income' && op.type !== 'expense') continue; // transfers don't affect net worth
-    if (typeof op.date !== 'string' || !op.date.startsWith(monthPrefix)) continue;
-    const currency = currencyByAccountId.get(op.accountId);
-    if (!currency) continue; // op for an account not in the list
-    const converted = convertWithRateMap(String(op.amount ?? '0'), currency, targetCurrency, rateByCurrency);
-    // A null rate here means this account's currency is unrateable; the balance
-    // loop above already recorded it in `unconvertible`, so just skip the amount.
-    if (converted === null) continue;
-    monthlyChange = op.type === 'income'
-      ? Currency.add(monthlyChange, converted)
-      : Currency.subtract(monthlyChange, converted);
-  }
-
-  return { total, monthlyChange, unconvertible: [...unconvertible] };
+  return { total, change, unconvertible: [...unconvertible] };
 };
 
 /**

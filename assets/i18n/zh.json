@@ -536,6 +536,7 @@
   "delete_backup_confirm": "删除此备份？此操作无法撤销。",
   "net_worth": "净资产",
   "this_month": "本月",
+  "net_worth_since": "自{date}以来",
   "keep_filters_active": "保持筛选器活动状态？",
   "keep_filters": "保持筛选器",
   "biometric_prompt": "验证身份以显示余额",

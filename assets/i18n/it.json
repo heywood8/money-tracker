@@ -540,6 +540,7 @@
   "delete_backup_confirm": "Eliminare questo backup? Questa azione non può essere annullata.",
   "net_worth": "Patrimonio Netto",
   "this_month": "questo mese",
+  "net_worth_since": "dal {date}",
   "keep_filters_active": "Mantenere i filtri attivi?",
   "keep_filters": "Mantieni Filtri",
   "biometric_prompt": "Autenticati per mostrare i saldi",

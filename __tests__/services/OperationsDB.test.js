@@ -1292,6 +1292,7 @@ describe('OperationsDB Service', () => {
           // the RATES-based convertAmount above already returns 2dp strings.
           Currency.add.mockImplementation((a, b) => (parseFloat(a) + parseFloat(b)).toString());
           Currency.subtract.mockImplementation((a, b) => (parseFloat(a) - parseFloat(b)).toString());
+          queryAll.mockResolvedValue([]);
         });
 
         it('includes foreign-currency accounts, converted to the display currency', async () => {
@@ -1303,29 +1304,174 @@ describe('OperationsDB Service', () => {
             { id: 'a4', currency: 'EUR', balance: '100' }, // 100 * 1.1 = 110
           ];
 
-          const result = await OperationsDB.computeNetWorthSummary(accounts, [], 'USD', '2025-12');
+          const result = await OperationsDB.computeNetWorthSummary(accounts, 'USD', '2025-11-18');
 
           // 858 + 5100 + 100 + 110 = 6168 — the EUR account is no longer dropped.
           expect(parseFloat(result.total)).toBeCloseTo(6168);
           expect(result.unconvertible).toEqual([]);
         });
 
-        it('converts foreign-account operations into the monthly change', async () => {
+        it('measures the change from the operations booked after the date', async () => {
           const accounts = [
-            { id: 'usd', currency: 'USD', balance: '1000' },
+            { id: 'usd', currency: 'USD', balance: '1200' },
             { id: 'eur', currency: 'EUR', balance: '0' },
           ];
-          const operations = [
-            { accountId: 'usd', type: 'income', amount: '200', date: '2025-12-10' },
-            { accountId: 'eur', type: 'expense', amount: '50', date: '2025-12-11' }, // 50 * 1.1 = 55
-            { accountId: 'usd', type: 'transfer', amount: '999', date: '2025-12-12' }, // ignored
-            { accountId: 'usd', type: 'income', amount: '10', date: '2025-11-30' }, // wrong month
-          ];
+          queryAll.mockResolvedValue([
+            { account_id: 'usd', type: 'income', amount: '200' },
+            { account_id: 'eur', type: 'expense', amount: '50' }, // 50 * 1.1 = 55
+          ]);
 
-          const result = await OperationsDB.computeNetWorthSummary(accounts, operations, 'USD', '2025-12');
+          const result = await OperationsDB.computeNetWorthSummary(accounts, 'USD', '2025-11-18');
 
           // +200 (income) − 55 (converted expense) = 145
-          expect(parseFloat(result.monthlyChange)).toBeCloseTo(145);
+          expect(parseFloat(result.change)).toBeCloseTo(145);
+          // Exclusive of the comparison day itself: it names a closing balance.
+          expect(queryAll).toHaveBeenCalledWith(
+            expect.stringContaining('date(date) > date(?)'),
+            expect.arrayContaining(['2025-11-18']),
+          );
+        });
+
+        it('nets a same-currency transfer to zero', async () => {
+          const accounts = [
+            { id: 'a', currency: 'USD', balance: '400' },
+            { id: 'b', currency: 'USD', balance: '600' },
+          ];
+          queryAll.mockResolvedValue([
+            { account_id: 'a', to_account_id: 'b', type: 'transfer', amount: '100', destination_amount: null },
+          ]);
+
+          const result = await OperationsDB.computeNetWorthSummary(accounts, 'USD', '2025-11-18');
+
+          // Moving money between the user's own accounts is not a change in what
+          // they own, so the two sides must cancel exactly.
+          expect(parseFloat(result.change)).toBeCloseTo(0);
+        });
+
+        it('keeps the rate residue of a cross-currency transfer', async () => {
+          const accounts = [
+            { id: 'eur', currency: 'EUR', balance: '0' },
+            { id: 'usd', currency: 'USD', balance: '120' },
+          ];
+          // 100 EUR left the source and 120 USD arrived. At the 1.1 rate the
+          // source side is worth 110 USD, so the transfer really did add 10 USD
+          // of net worth and the figure must show it.
+          queryAll.mockResolvedValue([
+            { account_id: 'eur', to_account_id: 'usd', type: 'transfer', amount: '100', destination_amount: '120' },
+          ]);
+
+          const result = await OperationsDB.computeNetWorthSummary(accounts, 'USD', '2025-11-18');
+
+          expect(parseFloat(result.change)).toBeCloseTo(10);
+        });
+
+        // A cross-currency transfer whose destination_amount was lost (old schema,
+        // CSV/SQLite import, or the UI bug that wrote NULL) must be re-derived
+        // from its own exchange_rate, exactly as calculateBalanceChanges does when
+        // it applies the transfer. Crediting the raw source amount would report a
+        // movement no balance ever made.
+        it('re-derives a legacy transfer credit from its exchange rate', async () => {
+          const accounts = [
+            { id: 'eur', currency: 'EUR', balance: '0' },
+            { id: 'usd', currency: 'USD', balance: '110' },
+          ];
+          queryAll.mockResolvedValue([
+            {
+              account_id: 'eur',
+              to_account_id: 'usd',
+              type: 'transfer',
+              amount: '100',
+              destination_amount: null,
+              exchange_rate: '1.1',
+            },
+          ]);
+
+          const result = await OperationsDB.computeNetWorthSummary(accounts, 'USD', '2025-11-18');
+
+          // −100 EUR (= −110 USD at the display rate) + 110 USD credited = 0.
+          // Crediting the bare "100" would have read as a 10 USD loss.
+          expect(parseFloat(result.change)).toBeCloseTo(0);
+        });
+
+        it('drops both sides of a transfer it cannot price', async () => {
+          const accounts = [
+            { id: 'eur', currency: 'EUR', balance: '0' },
+            { id: 'usd', currency: 'USD', balance: '0' },
+          ];
+          queryAll.mockResolvedValue([
+            {
+              account_id: 'eur',
+              to_account_id: 'usd',
+              type: 'transfer',
+              amount: '100',
+              destination_amount: null,
+              exchange_rate: null, // unknowable
+            },
+          ]);
+
+          const result = await OperationsDB.computeNetWorthSummary(accounts, 'USD', '2025-11-18');
+
+          // Debiting the source alone would report a 110 USD loss the portfolio
+          // never took, so the whole row is skipped.
+          expect(parseFloat(result.change)).toBeCloseTo(0);
+        });
+
+        it('keeps the total when the movement query fails', async () => {
+          const accounts = [{ id: 'a1', currency: 'USD', balance: '500' }];
+          queryAll.mockRejectedValue(new Error('database is locked'));
+
+          const result = await OperationsDB.computeNetWorthSummary(accounts, 'USD', '2025-11-18');
+
+          // The total is the card's primary figure: a comparison that could not
+          // be computed must not take it down with it.
+          expect(parseFloat(result.total)).toBeCloseTo(500);
+          expect(parseFloat(result.change)).toBeCloseTo(0);
+        });
+
+        it('does not scan operations before the accounts have loaded', async () => {
+          const result = await OperationsDB.computeNetWorthSummary([], 'USD', '2025-11-18');
+
+          expect(parseFloat(result.total)).toBeCloseTo(0);
+          expect(queryAll).not.toHaveBeenCalled();
+        });
+
+        // The predicate is doubled so idx_operations_date can seek on the plain
+        // string compare while date() still trims the boundary day — including the
+        // rows an import leaves a timestamp on (#773).
+        it('bounds the scan with an index-seekable compare as well as date()', async () => {
+          await OperationsDB.computeNetWorthSummary(
+            [{ id: 'a1', currency: 'USD', balance: '1' }], 'USD', '2025-11-18',
+          );
+
+          const [sql, params] = queryAll.mock.calls[0];
+          expect(sql).toContain('date >= ?');
+          expect(sql).toContain('date(date) > date(?)');
+          expect(params).toEqual(['2025-11-18', '2025-11-18']);
+        });
+
+        it('reports no change for an account with no operations since the date', async () => {
+          // A newly added account has nothing to reverse, so its opening balance
+          // counts as money that was already there rather than as growth — the
+          // snapshot-based reading on the Graphs chart is what jumps here.
+          const accounts = [{ id: 'new', currency: 'USD', balance: '338000' }];
+          queryAll.mockResolvedValue([
+            { account_id: 'other', type: 'income', amount: '999' }, // not in the list
+          ]);
+
+          const result = await OperationsDB.computeNetWorthSummary(accounts, 'USD', '2025-11-18');
+
+          expect(parseFloat(result.total)).toBeCloseTo(338000);
+          expect(parseFloat(result.change)).toBeCloseTo(0);
+        });
+
+        it('skips the movement query entirely without a comparison date', async () => {
+          const accounts = [{ id: 'a1', currency: 'USD', balance: '500' }];
+
+          const result = await OperationsDB.computeNetWorthSummary(accounts, 'USD');
+
+          expect(parseFloat(result.total)).toBeCloseTo(500);
+          expect(parseFloat(result.change)).toBeCloseTo(0);
+          expect(queryAll).not.toHaveBeenCalled();
         });
 
         it('excludes accounts whose currency has no rate and reports them', async () => {
@@ -1333,10 +1479,16 @@ describe('OperationsDB Service', () => {
             { id: 'a1', currency: 'USD', balance: '500' },
             { id: 'a2', currency: 'XYZ', balance: '999' }, // no offline/live rate
           ];
+          // The unpriceable account's own movement must drop out with its balance,
+          // or the change would describe a portfolio the total does not.
+          queryAll.mockResolvedValue([
+            { account_id: 'a2', type: 'income', amount: '999' },
+          ]);
 
-          const result = await OperationsDB.computeNetWorthSummary(accounts, [], 'USD', '2025-12');
+          const result = await OperationsDB.computeNetWorthSummary(accounts, 'USD', '2025-11-18');
 
           expect(parseFloat(result.total)).toBeCloseTo(500);
+          expect(parseFloat(result.change)).toBeCloseTo(0);
           expect(result.unconvertible).toEqual(['XYZ']);
         });
       });
