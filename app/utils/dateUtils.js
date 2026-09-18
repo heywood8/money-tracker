@@ -115,3 +115,30 @@ export const relativeDayLabel = (dateString, {
     offYear ? { ...options, year: 'numeric' } : options,
   );
 };
+
+/**
+ * The same day of the month, one month back, as a local `YYYY-MM-DD`.
+ *
+ * Months are not the same length, so "the same day last month" does not always
+ * exist: there is no 31 February. The day is clamped DOWN to the previous
+ * month's last day, so 31 March compares against 28 February (29 in a leap
+ * year) and 31 May against 30 April.
+ *
+ * Clamping down rather than letting the date roll is the whole point of doing
+ * this by hand: `setMonth(month - 1)` on 31 March lands on 3 March, which is a
+ * day in the *current* month — the comparison would silently measure four days
+ * instead of a month.
+ *
+ * @param {Date} [from=new Date()] - The day to step back from.
+ * @returns {string} local calendar day, `YYYY-MM-DD`
+ */
+export const sameDayPreviousMonth = (from = new Date()) => {
+  const year = from.getFullYear();
+  const month = from.getMonth();
+  // Day 0 of this month is the last day of the previous one, and the Date
+  // constructor rolls a month of -1 back into December of the previous year —
+  // so January needs no special case here.
+  const lastDayOfPreviousMonth = new Date(year, month, 0).getDate();
+  const day = Math.min(from.getDate(), lastDayOfPreviousMonth);
+  return formatLocalDate(new Date(year, month - 1, day));
+};

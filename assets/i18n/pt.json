@@ -540,6 +540,7 @@
   "delete_backup_confirm": "Excluir este backup? Esta ação não pode ser desfeita.",
   "net_worth": "Patrimônio Líquido",
   "this_month": "este mês",
+  "net_worth_since": "desde {date}",
   "keep_filters_active": "Manter filtros ativos?",
   "keep_filters": "Manter Filtros",
   "biometric_prompt": "Autentique-se para mostrar saldos",

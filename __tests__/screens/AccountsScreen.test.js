@@ -126,14 +126,13 @@ jest.mock('../../app/services/PreferencesDB', () => ({
   setDefaultAccountId: jest.fn(() => Promise.resolve()),
 }));
 
-// NetWorthCard sources its month operations directly from the DB (decoupled from
-// the search-filtered Operations feed — issue #1346). Mock those two entry points so
-// tests can control/observe what net worth is computed over. Safe defaults keep the
+// NetWorthCard computes its summary directly in the DB layer (decoupled from the
+// search-filtered Operations feed — issue #1346). Mock that entry point so tests
+// can control/observe what net worth is computed over. A safe default keeps the
 // unrelated toggle tests working.
 jest.mock('../../app/services/OperationsDB', () => ({
-  getOperationsByDateRange: jest.fn(() => Promise.resolve([])),
   computeNetWorthSummary: jest.fn(() =>
-    Promise.resolve({ total: '0', monthlyChange: '0', unconvertible: [] })),
+    Promise.resolve({ total: '0', change: '0', unconvertible: [] })),
 }));
 
 // Helper functions to create complete mocks for split contexts
@@ -294,21 +293,20 @@ describe('AccountsScreen', () => {
     });
   });
 
-  // Regression coverage for issue #1346: net worth must be computed over the whole
-  // current month sourced directly from the DB, NOT over the search-filtered, lazily
-  // paginated Operations feed. This locks the corrected data source.
+  // Regression coverage for issue #1346: net worth must be computed in the DB
+  // layer over the whole ledger, NOT over the search-filtered, lazily paginated
+  // Operations feed. This locks the corrected data source.
   describe('Net worth data source (issue #1346)', () => {
     const OperationsDB = require('../../app/services/OperationsDB');
     const { appEvents, EVENTS } = require('../../app/services/eventEmitter');
 
     beforeEach(() => {
-      OperationsDB.getOperationsByDateRange.mockResolvedValue([]);
       OperationsDB.computeNetWorthSummary.mockResolvedValue({
-        total: '0', monthlyChange: '0', unconvertible: [],
+        total: '0', change: '0', unconvertible: [],
       });
     });
 
-    it('computes net worth over DB-fetched current-month operations, not the feed', async () => {
+    it('computes net worth in the DB layer, against the same day last month', async () => {
       const AccountsScreen = require('../../app/screens/AccountsScreen').default;
       const { useAccountsData } = require('../../app/contexts/AccountsDataContext');
 
@@ -321,32 +319,18 @@ describe('AccountsScreen', () => {
         displayedAccounts: accounts,
       }));
 
-      // The card's own DB source returns the complete month; the search feed is
-      // irrelevant to net worth and is never consulted.
-      const monthOps = [
-        { accountId: '1', type: 'income', amount: '200', date: '2026-07-05' },
-      ];
-      OperationsDB.getOperationsByDateRange.mockResolvedValue(monthOps);
-
       await render(<AccountsScreen />);
 
-      const now = new Date();
-      const prefix = `${now.getFullYear()}-${String(now.getMonth() + 1).padStart(2, '0')}`;
+      const { sameDayPreviousMonth } = require('../../app/utils/dateUtils');
 
-      await waitFor(() => {
-        expect(OperationsDB.getOperationsByDateRange)
-          .toHaveBeenCalledWith(`${prefix}-01`, `${prefix}-31`);
-      });
-
-      // computeNetWorthSummary must receive the DB month set — never a filtered feed.
       await waitFor(() => {
         expect(OperationsDB.computeNetWorthSummary).toHaveBeenCalledWith(
-          accounts, monthOps, 'USD', prefix,
+          accounts, 'USD', sameDayPreviousMonth(),
         );
       });
     });
 
-    it('refetches the month when an operation changes', async () => {
+    it('recomputes when an operation changes', async () => {
       const AccountsScreen = require('../../app/screens/AccountsScreen').default;
       const { useAccountsData } = require('../../app/contexts/AccountsDataContext');
 
@@ -361,14 +345,79 @@ describe('AccountsScreen', () => {
       await render(<AccountsScreen />);
 
       await waitFor(() => {
-        expect(OperationsDB.getOperationsByDateRange).toHaveBeenCalledTimes(1);
+        expect(OperationsDB.computeNetWorthSummary).toHaveBeenCalledTimes(1);
       });
 
       appEvents.emit(EVENTS.OPERATION_CHANGED);
 
       await waitFor(() => {
-        expect(OperationsDB.getOperationsByDateRange).toHaveBeenCalledTimes(2);
+        expect(OperationsDB.computeNetWorthSummary).toHaveBeenCalledTimes(2);
       });
+    });
+
+    // Flipping the convert toggle changes which accounts the figure covers, so the
+    // previous mode's total must not sit on screen until the new one resolves.
+    it('falls back to the same-currency total while the toggle flips', async () => {
+      const { act } = require('@testing-library/react-native');
+      const AccountsScreen = require('../../app/screens/AccountsScreen').default;
+      const { useAccountsData } = require('../../app/contexts/AccountsDataContext');
+
+      const accounts = [
+        { id: '1', name: 'USD', balance: '1000.00', currency: 'USD', order: 0 },
+        { id: '2', name: 'EUR', balance: '100.00', currency: 'EUR', order: 1 },
+      ];
+      useAccountsData.mockReturnValue(createAccountsDataMock({
+        accounts,
+        displayedAccounts: accounts,
+      }));
+      // Converted: the EUR account folded in at 1.1.
+      OperationsDB.computeNetWorthSummary.mockResolvedValue({
+        total: '1110.00', change: '0', unconvertible: [],
+      });
+
+      const { getByLabelText, getByText, queryByText, getAllByText } = await render(<AccountsScreen />);
+
+      await waitFor(() => expect(getByText('$1,110.00')).toBeTruthy());
+
+      // Never resolves, so the render below is the one the toggle flip produced.
+      OperationsDB.computeNetWorthSummary.mockReturnValue(new Promise(() => {}));
+      await act(async () => {
+        fireEvent.press(getByLabelText('graphs_convert_currencies'));
+      });
+
+      // The converted total is gone the moment the toggle says it no longer
+      // applies, replaced by the synchronous USD-only seed. ("$1,000.00" also
+      // labels the USD account's own row, hence getAllByText.)
+      expect(queryByText('$1,110.00')).toBeNull();
+      expect(getAllByText('$1,000.00').length).toBeGreaterThan(1);
+    });
+
+    // The card used to label its figure "this month", which measured the current
+    // month's income minus expenses — a different quantity from the month-over-month
+    // comparison the Graphs screen shows, which is what made the two pages disagree.
+    it('labels the change with the day it is measured from', async () => {
+      const AccountsScreen = require('../../app/screens/AccountsScreen').default;
+      const { useAccountsData } = require('../../app/contexts/AccountsDataContext');
+
+      const accounts = [
+        { id: '1', name: 'USD', balance: '1000.00', currency: 'USD', order: 0 },
+      ];
+      useAccountsData.mockReturnValue(createAccountsDataMock({
+        accounts,
+        displayedAccounts: accounts,
+      }));
+      OperationsDB.computeNetWorthSummary.mockResolvedValue({
+        total: '1000.00', change: '250.00', unconvertible: [],
+      });
+
+      const { getByText } = await render(<AccountsScreen />);
+
+      // The stub `t` returns the key, so the rendered label is the raw template
+      // with the formatted date substituted for its placeholder.
+      await waitFor(() => {
+        expect(getByText(/\+\$250\.00 since /)).toBeTruthy();
+      });
+      expect(() => getByText(/this_month/)).toThrow();
     });
   });
 

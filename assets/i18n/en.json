@@ -543,6 +543,7 @@
   "delete_backup_confirm": "Delete this backup? This cannot be undone.",
   "net_worth": "Net Worth",
   "this_month": "this month",
+  "net_worth_since": "since {date}",
   "keep_filters_active": "Keep filters active?",
   "keep_filters": "Keep Filters",
   "biometric_prompt": "Authenticate to show balances",

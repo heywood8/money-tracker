@@ -540,6 +540,7 @@
   "delete_backup_confirm": "このバックアップを削除しますか？この操作は取り消せません。",
   "net_worth": "純資産",
   "this_month": "今月",
+  "net_worth_since": "{date}から",
   "keep_filters_active": "フィルターを維持しますか？",
   "keep_filters": "フィルターを維持",
   "biometric_prompt": "残高を表示するために認証",

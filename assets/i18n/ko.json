@@ -540,6 +540,7 @@
   "delete_backup_confirm": "이 백업을 삭제하시겠습니까? 이 작업은 취소할 수 없습니다.",
   "net_worth": "순자산",
   "this_month": "이번 달",
+  "net_worth_since": "{date} 이후",
   "keep_filters_active": "필터를 유지하시겠습니까?",
   "keep_filters": "필터 유지",
   "biometric_prompt": "잔액을 표시하려면 인증하세요",
