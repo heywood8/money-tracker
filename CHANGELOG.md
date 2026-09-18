@@ -1,5 +1,12 @@
 # Changelog
 
+## [0.291.0](https://github.com/heywood8/money-tracker/compare/penny-v0.290.0...penny-v0.291.0) (2026-09-18)
+
+
+### Features
+
+* **accounts:** compare net worth to the same day last month ([#1798](https://github.com/heywood8/money-tracker/issues/1798)) ([0d1bf68](https://github.com/heywood8/money-tracker/commit/0d1bf6858449e6ab2ad17cb59150bdf14a8c0e91))
+
 ## [0.290.0](https://github.com/heywood8/money-tracker/compare/penny-v0.289.1...penny-v0.290.0) (2026-09-17)
 
 
