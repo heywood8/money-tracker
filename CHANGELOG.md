@@ -1,5 +1,12 @@
 # Changelog
 
+## [0.292.0](https://github.com/heywood8/money-tracker/compare/penny-v0.291.2...penny-v0.292.0) (2026-09-19)
+
+
+### Features
+
+* **notifications:** add "change category" to the auto-added receipt ([#1803](https://github.com/heywood8/money-tracker/issues/1803)) ([67b04bb](https://github.com/heywood8/money-tracker/commit/67b04bb4cb2910fac546d97e9d3fe12d3bf52fe9))
+
 ## [0.291.2](https://github.com/heywood8/money-tracker/compare/penny-v0.291.1...penny-v0.291.2) (2026-09-19)
 
 
