@@ -134,44 +134,64 @@ appId: com.heywood8.monkeep
     timeout: 3000
 - takeScreenshot: 02_graphs_light
 
-# Navigate to Accounts tab
-- tapOn: "Accounts"
+# Settings is a TAB now, not a modal behind a header button — `settings-button`
+# and `settings-close-button` have not existed for a long time.
+- tapOn: "Settings"
+- waitForAnimationToEnd:
+    timeout: 3000
+- takeScreenshot: 07_settings_light
+
+# Accounts and Categories are subpanels of Settings now, not tabs of their own.
+# (The Accounts TAB still exists, but it is off by default — see
+# DisplaySettingsContext — so tapping it on a fresh install finds nothing.)
+- tapOn:
+    id: "settings-accounts-row"
 - waitForAnimationToEnd:
     timeout: 3000
 - takeScreenshot: 03_accounts_light
+- tapOn:
+    id: "settings-subpanel-back"
+- waitForAnimationToEnd:
+    timeout: 1000
 
-# Navigate to Categories tab
-- tapOn: "Categories"
+- tapOn:
+    id: "settings-categories-row"
 - waitForAnimationToEnd:
     timeout: 3000
 - takeScreenshot: 04_categories_light
+- tapOn:
+    id: "settings-subpanel-back"
+- waitForAnimationToEnd:
+    timeout: 1000
 
-# Navigate to Planned tab
-- tapOn: "Planned"
+# The Planned tab is the Budget tab now. It is on by default, unlike Accounts.
+- tapOn: "Budget"
 - waitForAnimationToEnd:
     timeout: 3000
-- takeScreenshot: 08_planned_light
-
-# Open Settings modal
-- tapOn:
-    id: "settings-button"
-- waitForAnimationToEnd:
-    timeout: 2000
-- takeScreenshot: 07_settings_light
-
-# Close Settings modal
-- tapOn:
-    id: "settings-close-button"
-- waitForAnimationToEnd:
-    timeout: 2000
+- takeScreenshot: 08_budget_light
 
 # ============================================
 # SWITCH TO DARK MODE
 # ============================================
 
-# Tap the theme toggle button (sun/moon icon in header)
+# The sun/moon button in the header is gone — the theme is a toggle row under
+# Settings -> Appearance now. The light half ends on the Budget tab, so the flow
+# goes back through Settings to flip it.
+- tapOn: "Settings"
+- waitForAnimationToEnd:
+    timeout: 3000
 - tapOn:
-    id: "theme-toggle-button"
+    id: "settings-appearance-row"
+- waitForAnimationToEnd:
+    timeout: 2000
+- tapOn:
+    id: "settings-theme-row"
+- waitForAnimationToEnd:
+    timeout: 2000
+- tapOn:
+    id: "settings-subpanel-back"
+- waitForAnimationToEnd:
+    timeout: 1000
 
 # ============================================
 # DARK MODE SCREENSHOTS
@@ -239,10 +259,11 @@ appId: com.heywood8.monkeep
     timeout: 2000
 - takeScreenshot: 05_transfer_dark
 
-# Screenshot 6 dark: Multi-currency transfer
-- tapOn: "All accounts"
-- waitForAnimationToEnd:
-    timeout: 2000
+# Screenshot 6 dark: Multi-currency transfer. Same as the light half — the
+# "All accounts" picker only renders past 8 accounts and the seed has 4, so the
+# target comes straight off the shortcut row. The light half was fixed for this
+# and the dark half was left behind, which no one saw because the run never got
+# this far.
 - tapOn: "EUR Cash"
 - waitForAnimationToEnd:
     timeout: 2000
@@ -263,43 +284,35 @@ appId: com.heywood8.monkeep
     timeout: 3000
 - takeScreenshot: 02_graphs_dark
 
-# Navigate to Accounts tab
-- tapOn: "Accounts"
+# Settings is a TAB now, not a modal behind a header button.
+- tapOn: "Settings"
+- waitForAnimationToEnd:
+    timeout: 3000
+- takeScreenshot: 07_settings_dark
+
+# Accounts and Categories are subpanels of Settings now, not tabs of their own.
+- tapOn:
+    id: "settings-accounts-row"
 - waitForAnimationToEnd:
     timeout: 3000
 - takeScreenshot: 03_accounts_dark
+- tapOn:
+    id: "settings-subpanel-back"
+- waitForAnimationToEnd:
+    timeout: 1000
 
-# Navigate to Categories tab
-- tapOn: "Categories"
+- tapOn:
+    id: "settings-categories-row"
 - waitForAnimationToEnd:
     timeout: 3000
-# Scroll slightly to force FlatList to re-render cells with dark theme
-# Use larger swipe distance to avoid being interpreted as a tap on a category row
-- swipe:
-    start: 50%, 70%
-    end: 50%, 40%
-- swipe:
-    start: 50%, 40%
-    end: 50%, 70%
-- waitForAnimationToEnd:
-    timeout: 2000
 - takeScreenshot: 04_categories_dark
+- tapOn:
+    id: "settings-subpanel-back"
+- waitForAnimationToEnd:
+    timeout: 1000
 
-# Navigate to Planned tab
-- tapOn: "Planned"
+# The Planned tab is the Budget tab now.
+- tapOn: "Budget"
 - waitForAnimationToEnd:
     timeout: 3000
-- takeScreenshot: 08_planned_dark
-
-# Open Settings modal
-- tapOn:
-    id: "settings-button"
-- waitForAnimationToEnd:
-    timeout: 2000
-- takeScreenshot: 07_settings_dark
-
-# Close Settings modal
-- tapOn:
-    id: "settings-close-button"
-- waitForAnimationToEnd:
-    timeout: 2000
+- takeScreenshot: 08_budget_dark
