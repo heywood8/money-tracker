@@ -3351,6 +3351,332 @@ describe('OperationsScreen', () => {
           .mockReturnValue({ attachLocation: false });
       }
     });
+
+    // Regression (2026-09-18 log, and the four exports before it): the deck went
+    // on being invisible over state that was already correct. At 09:06:05 the
+    // return to the foreground logged `clip re-assert {collapsed: false}` — the
+    // repair above, doing exactly what it was written to do — and the user still
+    // had to open and close search at 09:06:16 before the card appeared.
+    //
+    // Re-committing the value cannot fix it: a shared value reaches a view
+    // through a diff of the props its animated style derives, and re-writing the
+    // value it already holds yields no diff, so nothing reaches the mounting
+    // layer. The tests above assert the commit against a mock that counts
+    // `modify()` as one — which is how a green suite sat on top of a live bug for
+    // five attempts. They stay (the re-assert is still right for the form), but
+    // the deck no longer depends on any of it: while a deck owns the panel, the
+    // clip and the slide render from STATIC styles, and React commits those with
+    // the render that produced them.
+    const withAnimatedStyleSentinel = () => {
+      const reanimated = require('react-native-reanimated');
+      const previous = reanimated.useAnimatedStyle.getMockImplementation();
+      reanimated.useAnimatedStyle.mockImplementation(() => ({ animated: true }));
+      return () => reanimated.useAnimatedStyle.mockImplementation(previous);
+    };
+
+    const styleOf = (element) => {
+      const { style } = element.props;
+      return Array.isArray(style)
+        ? Object.assign({}, ...style.filter(Boolean))
+        : (style || {});
+    };
+
+    const panelStyles = (getByTestId) => ({
+      clip: styleOf(getByTestId('quick-add-clip', { includeHiddenElements: true })),
+      slide: styleOf(getByTestId('quick-add-slide', { includeHiddenElements: true })),
+    });
+
+    it('renders the panel from a static style while a deck owns it', async () => {
+      const OperationsScreen = require('../../app/screens/OperationsScreen').default;
+      mockSuggestionsHook({ suggestions: [{ id: 'p1', type: 'expense', amount: '10' }] });
+      const restoreSearch = withSearchClosed();
+      const restoreStyle = withAnimatedStyleSentinel();
+
+      try {
+        const { getByTestId } = await render(<OperationsScreen />);
+        const { clip, slide } = panelStyles(getByTestId);
+
+        // Nothing the shared value drives, and no ceiling to be cut by.
+        expect(clip.animated).toBeUndefined();
+        expect(clip.maxHeight).toBeUndefined();
+        expect(slide.animated).toBeUndefined();
+        expect(slide.transform).toBeUndefined();
+      } finally {
+        restoreStyle();
+        restoreSearch();
+      }
+    });
+
+    it('hands the panel back to the animated style once the deck empties', async () => {
+      const OperationsScreen = require('../../app/screens/OperationsScreen').default;
+      mockSuggestionsHook({ suggestions: [] });
+      const restoreSearch = withSearchClosed();
+      const restoreStyle = withAnimatedStyleSentinel();
+
+      try {
+        const { getByTestId } = await render(<OperationsScreen />);
+        const { clip, slide } = panelStyles(getByTestId);
+
+        // The form's own open/close is still animated — only the deck is not.
+        expect(clip.animated).toBe(true);
+        expect(slide.animated).toBe(true);
+      } finally {
+        restoreStyle();
+        restoreSearch();
+      }
+    });
+
+    it('leaves search in charge of the clip even with a deck queued', async () => {
+      const OperationsScreen = require('../../app/screens/OperationsScreen').default;
+      const { useSearch } = require('../../app/contexts/SearchContext');
+      useSearch.mockReturnValue({
+        searchMode: 'open',
+        filtersExpanded: false,
+        openSearch: jest.fn(),
+        closeSearch: jest.fn(),
+        reopenSearch: jest.fn(),
+        toggleFilters: jest.fn(),
+        registerSearchHandler: jest.fn(),
+      });
+      mockSuggestionsHook({ suggestions: [{ id: 'p1', type: 'expense', amount: '10' }] });
+      const restoreStyle = withAnimatedStyleSentinel();
+
+      try {
+        const { getByTestId } = await render(<OperationsScreen />);
+        const { clip } = panelStyles(getByTestId);
+
+        // Search collapses the panel on the shared curves it shares with the
+        // pill and the list, so the animated style has to be the one in place.
+        expect(clip.animated).toBe(true);
+      } finally {
+        restoreStyle();
+        useSearch.mockReturnValue({ registerSearchHandler: jest.fn(), openSearch: jest.fn() });
+      }
+    });
+
+    // The deck sits in the list header. A deck that filled behind a stopped
+    // activity had its arrival scroll dropped along with every other thing that
+    // needed a frame, so the list can come back sitting where the user left it,
+    // with the header — and the cards in it — above the top of the screen. That
+    // is the second way the reported page shows no cards and no + button, and
+    // opening and closing search hid it too: closing search scrolls to the top.
+    it('scrolls the deck back into view when the app returns with the list scrolled', async () => {
+      const OperationsScreen = require('../../app/screens/OperationsScreen').default;
+      mockSuggestionsHook({ suggestions: [{ id: 'p1', type: 'expense', amount: '10' }] });
+      const restoreSearch = withSearchClosed();
+      const handlers = [];
+      jest.spyOn(AppState, 'addEventListener').mockImplementation((event, handler) => {
+        if (event === 'change') handlers.push(handler);
+        return { remove: jest.fn() };
+      });
+
+      try {
+        const { getByTestId } = await render(<OperationsScreen />);
+        await act(async () => {
+          fireEvent.scroll(getByTestId('operations-list'), {
+            nativeEvent: {
+              contentOffset: { y: 1200 },
+              contentSize: { height: 4000, width: 400 },
+              layoutMeasurement: { height: 800, width: 400 },
+            },
+          });
+        });
+        mockScrollToOffset.mockClear();
+
+        await act(async () => { handlers.forEach((handler) => handler('background')); });
+        await act(async () => { handlers.forEach((handler) => handler('active')); });
+
+        // Unanimated: an animated scroll asked for on the way back from the
+        // background is exactly the kind of request that gets dropped.
+        expect(mockScrollToOffset).toHaveBeenCalledWith({ offset: 0, animated: false });
+      } finally {
+        AppState.addEventListener.mockRestore();
+        restoreSearch();
+      }
+    });
+
+    it('leaves the scroll alone on a return with no deck queued', async () => {
+      const OperationsScreen = require('../../app/screens/OperationsScreen').default;
+      mockSuggestionsHook({ suggestions: [] });
+      const restoreSearch = withSearchClosed();
+      const handlers = [];
+      jest.spyOn(AppState, 'addEventListener').mockImplementation((event, handler) => {
+        if (event === 'change') handlers.push(handler);
+        return { remove: jest.fn() };
+      });
+
+      try {
+        const { getByTestId } = await render(<OperationsScreen />);
+        await act(async () => {
+          fireEvent.scroll(getByTestId('operations-list'), {
+            nativeEvent: {
+              contentOffset: { y: 1200 },
+              contentSize: { height: 4000, width: 400 },
+              layoutMeasurement: { height: 800, width: 400 },
+            },
+          });
+        });
+        mockScrollToOffset.mockClear();
+
+        await act(async () => { handlers.forEach((handler) => handler('background')); });
+        await act(async () => { handlers.forEach((handler) => handler('active')); });
+
+        // Nothing to bring into view, and the user's place in the list is theirs.
+        expect(mockScrollToOffset).not.toHaveBeenCalled();
+      } finally {
+        AppState.addEventListener.mockRestore();
+        restoreSearch();
+      }
+    });
+
+    // The diagnostic log is a 500-entry ring buffer, and this handler runs on
+    // every frame of a LayoutAnimation. The 2026-09-18 export spent 180 of its
+    // 500 entries on one collapse walking 450 → 444 a pixel at a time, and had
+    // evicted the deck's arrival — the only part of it worth reading — before it
+    // was ever uploaded. That is why five attempts were made without evidence.
+    it('logs one line for a layout animation, not one per frame', async () => {
+      const OperationsScreen = require('../../app/screens/OperationsScreen').default;
+      mockSuggestionsHook({ suggestions: [{ id: 'p1', type: 'expense', amount: '10' }] });
+      const restoreSearch = withSearchClosed();
+      const logs = jest.spyOn(console, 'log').mockImplementation(() => {});
+
+      try {
+        const { getByTestId } = await render(<OperationsScreen />);
+        const wrapper = getByTestId('quick-add-measure', { includeHiddenElements: true });
+        logs.mockClear();
+
+        // A full collapse, a pixel per frame — the shape the 180 lines had. The
+        // distance is the point: an epsilon measured against the last line it
+        // printed re-baselines on every crossing and spends a line per 8dp.
+        for (let height = 450; height >= 300; height -= 1) {
+          await act(async () => {
+            fireEvent(wrapper, 'layout', { nativeEvent: { layout: { height } } });
+          });
+        }
+
+        const measured = logs.mock.calls.filter((call) => call[0] === '[deck] quick-add measured');
+        expect(measured).toHaveLength(1);
+        expect(measured[0][1]).toEqual({ height: 450 });
+      } finally {
+        logs.mockRestore();
+        restoreSearch();
+      }
+    });
+
+    it('still reports a real one-off resize', async () => {
+      const OperationsScreen = require('../../app/screens/OperationsScreen').default;
+      mockSuggestionsHook({ suggestions: [{ id: 'p1', type: 'expense', amount: '10' }] });
+      const restoreSearch = withSearchClosed();
+      const logs = jest.spyOn(console, 'log').mockImplementation(() => {});
+
+      try {
+        const { getByTestId } = await render(<OperationsScreen />);
+        const wrapper = getByTestId('quick-add-measure', { includeHiddenElements: true });
+        await act(async () => {
+          fireEvent(wrapper, 'layout', { nativeEvent: { layout: { height: 300 } } });
+        });
+        logs.mockClear();
+
+        // Transfer fields appearing, not an animation: one pass, one line.
+        await act(async () => {
+          fireEvent(wrapper, 'layout', { nativeEvent: { layout: { height: 444 } } });
+        });
+
+        const measured = logs.mock.calls.filter((call) => call[0] === '[deck] quick-add measured');
+        expect(measured).toEqual([['[deck] quick-add measured', { height: 444 }]]);
+      } finally {
+        logs.mockRestore();
+        restoreSearch();
+      }
+    });
+
+    it('leaves a search-result scroll position alone on a return', async () => {
+      const OperationsScreen = require('../../app/screens/OperationsScreen').default;
+      const { useSearch } = require('../../app/contexts/SearchContext');
+      useSearch.mockReturnValue({
+        searchMode: 'open',
+        filtersExpanded: false,
+        openSearch: jest.fn(),
+        closeSearch: jest.fn(),
+        reopenSearch: jest.fn(),
+        toggleFilters: jest.fn(),
+        registerSearchHandler: jest.fn(),
+      });
+      mockSuggestionsHook({ suggestions: [{ id: 'p1', type: 'expense', amount: '10' }] });
+      const handlers = [];
+      jest.spyOn(AppState, 'addEventListener').mockImplementation((event, handler) => {
+        if (event === 'change') handlers.push(handler);
+        return { remove: jest.fn() };
+      });
+
+      try {
+        const { getByTestId } = await render(<OperationsScreen />);
+        await act(async () => {
+          fireEvent.scroll(getByTestId('operations-list'), {
+            nativeEvent: {
+              contentOffset: { y: 1200 },
+              contentSize: { height: 4000, width: 400 },
+              layoutMeasurement: { height: 800, width: 400 },
+            },
+          });
+        });
+        mockScrollToOffset.mockClear();
+
+        await act(async () => { handlers.forEach((handler) => handler('background')); });
+        await act(async () => { handlers.forEach((handler) => handler('active')); });
+
+        // Search owns the screen; the deck is clipped under it either way, and
+        // closing search scrolls to the top on its own.
+        expect(mockScrollToOffset).not.toHaveBeenCalled();
+      } finally {
+        AppState.addEventListener.mockRestore();
+        useSearch.mockReturnValue({ registerSearchHandler: jest.fn(), openSearch: jest.fn() });
+      }
+    });
+
+    // A zero from an OPEN block is a transient pass, never the truth — the form
+    // is always laid out there. Kept, it poisoned the clip height, which is how
+    // the 2026-09-18 log reported `slide: 0` on a block that measured 444 one
+    // frame later, and left every collapse animating from the fallback height.
+    it('ignores a transient zero on the clip height while the block is open', async () => {
+      const OperationsScreen = require('../../app/screens/OperationsScreen').default;
+      const { useSearch } = require('../../app/contexts/SearchContext');
+      mockSuggestionsHook({ suggestions: [{ id: 'p1', type: 'expense', amount: '10' }] });
+      const restoreSearch = withSearchClosed();
+      const logs = jest.spyOn(console, 'log').mockImplementation(() => {});
+
+      try {
+        const { getByTestId, rerender } = await render(<OperationsScreen />);
+        const slide = getByTestId('quick-add-slide', { includeHiddenElements: true });
+        await act(async () => {
+          fireEvent(slide, 'layout', { nativeEvent: { layout: { height: 444 } } });
+        });
+        await act(async () => {
+          fireEvent(slide, 'layout', { nativeEvent: { layout: { height: 0 } } });
+        });
+
+        // Search taking the screen is what makes the clip report its travel.
+        logs.mockClear();
+        useSearch.mockReturnValue({
+          searchMode: 'open',
+          filtersExpanded: false,
+          openSearch: jest.fn(),
+          closeSearch: jest.fn(),
+          reopenSearch: jest.fn(),
+          toggleFilters: jest.fn(),
+          registerSearchHandler: jest.fn(),
+        });
+        await act(async () => { rerender(<OperationsScreen />); });
+
+        const clipLines = logs.mock.calls.filter((call) => call[0] === '[deck] clip');
+        expect(clipLines.length).toBeGreaterThan(0);
+        expect(clipLines[clipLines.length - 1][1].slide).toBe(444);
+      } finally {
+        logs.mockRestore();
+        restoreSearch();
+        useSearch.mockReturnValue({ registerSearchHandler: jest.fn(), openSearch: jest.fn() });
+      }
+    });
   });
 
   // The "Show Quick add panel on operations screen" setting. On (the default and
