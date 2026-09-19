@@ -53,36 +53,6 @@ appId: com.heywood8.monkeep
 - waitForAnimationToEnd:
     timeout: 1000
 
-# Screenshot: the operation editor and its category picker. The picker used to be
-# a SECOND bottom sheet stacked on this one, landing its rounded top edge in the
-# middle of the form; it is now a subpanel that covers the whole card. These two
-# frames are the regression check for that (see OperationModal's overlayPanel).
-- tapOn:
-    id: "operation-item-0"
-- waitForAnimationToEnd:
-    timeout: 2000
-- takeScreenshot: screenshots/11_operation_modal_light
-# Guarded: a transfer shows a destination-account row where the category button
-# sits, and a miss here would abort every screenshot after it.
-- runFlow:
-    when:
-      visible:
-        id: "category-input"
-    commands:
-      - tapOn:
-          id: "category-input"
-      - waitForAnimationToEnd:
-          timeout: 2000
-      - takeScreenshot: screenshots/12_category_picker_light
-      # Back closes the PANEL, not the sheet under it — this is onBackIntercept.
-      - back
-      - waitForAnimationToEnd:
-          timeout: 1000
-# Second back leaves the operation editor.
-- back
-- waitForAnimationToEnd:
-    timeout: 1000
-
 # Screenshot 1b: Transfer mode of QuickAdd (shows target account shortcuts below calculator)
 - tapOn: "Transfer"
 - waitForAnimationToEnd:
@@ -175,36 +145,6 @@ appId: com.heywood8.monkeep
 - waitForAnimationToEnd:
     timeout: 3000
 - takeScreenshot: screenshots/01_operations_dark
-
-# Screenshot: the operation editor and its category picker. The picker used to be
-# a SECOND bottom sheet stacked on this one, landing its rounded top edge in the
-# middle of the form; it is now a subpanel that covers the whole card. These two
-# frames are the regression check for that (see OperationModal's overlayPanel).
-- tapOn:
-    id: "operation-item-0"
-- waitForAnimationToEnd:
-    timeout: 2000
-- takeScreenshot: screenshots/11_operation_modal_dark
-# Guarded: a transfer shows a destination-account row where the category button
-# sits, and a miss here would abort every screenshot after it.
-- runFlow:
-    when:
-      visible:
-        id: "category-input"
-    commands:
-      - tapOn:
-          id: "category-input"
-      - waitForAnimationToEnd:
-          timeout: 2000
-      - takeScreenshot: screenshots/12_category_picker_dark
-      # Back closes the PANEL, not the sheet under it — this is onBackIntercept.
-      - back
-      - waitForAnimationToEnd:
-          timeout: 1000
-# Second back leaves the operation editor.
-- back
-- waitForAnimationToEnd:
-    timeout: 1000
 
 # Screenshot: Filter modal (dark)
 - tapOn:
