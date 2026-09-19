@@ -6,7 +6,7 @@ appId: com.heywood8.monkeep
     timeout: 30000
 
 # Screenshot 0: Language selection screen (only captured once, no dark/light variant)
-- takeScreenshot: screenshots/00_language_selection
+- takeScreenshot: 00_language_selection
 
 # Select English and continue
 - tapOn: "English"
@@ -36,7 +36,7 @@ appId: com.heywood8.monkeep
 # ============================================
 
 # Screenshot 1: Operations screen (default first tab)
-- takeScreenshot: screenshots/01_operations_light
+- takeScreenshot: 01_operations_light
 
 # Screenshot 1a: long-press action menu. The lifted clone must sit exactly on top of
 # the row it copies — this frame is the regression check for that (see
@@ -46,7 +46,7 @@ appId: com.heywood8.monkeep
     id: "operation-item-0"
 - waitForAnimationToEnd:
     timeout: 2000
-- takeScreenshot: screenshots/10_action_menu_light
+- takeScreenshot: 10_action_menu_light
 # Dismiss with the hardware back button: the overlay is not a native window, so this
 # also exercises the BackHandler the menu wires up in place of onRequestClose.
 - back
@@ -57,13 +57,16 @@ appId: com.heywood8.monkeep
 # a SECOND bottom sheet stacked on this one, landing its rounded top edge in the
 # middle of the form; it is now a subpanel that covers the whole card. These two
 # frames are the regression check for that (see OperationModal's overlayPanel).
+# Row 1, not row 0: the seed data's last operation is a transfer, and a transfer
+# has a destination-account row where the category button sits — row 0 opened the
+# editor but never the picker.
 - tapOn:
-    id: "operation-item-0"
+    id: "operation-item-1"
 - waitForAnimationToEnd:
     timeout: 2000
-- takeScreenshot: screenshots/11_operation_modal_light
-# Guarded: a transfer shows a destination-account row where the category button
-# sits, and a miss here would abort every screenshot after it.
+- takeScreenshot: 11_operation_modal_light
+# Guarded anyway — if the seed order ever shifts, this skips instead of aborting
+# every screenshot after it.
 - runFlow:
     when:
       visible:
@@ -73,7 +76,7 @@ appId: com.heywood8.monkeep
           id: "category-input"
       - waitForAnimationToEnd:
           timeout: 2000
-      - takeScreenshot: screenshots/12_category_picker_light
+      - takeScreenshot: 12_category_picker_light
       # Back closes the PANEL, not the sheet under it — this is onBackIntercept.
       - back
       - waitForAnimationToEnd:
@@ -87,7 +90,7 @@ appId: com.heywood8.monkeep
 - tapOn: "Transfer"
 - waitForAnimationToEnd:
     timeout: 2000
-- takeScreenshot: screenshots/05_transfer_light
+- takeScreenshot: 05_transfer_light
 
 # Screenshot 1c: Multi-currency transfer (select different-currency account, enter amount)
 # "All accounts" only renders past 8 accounts (OperationFormFields), and the seed data
@@ -102,7 +105,7 @@ appId: com.heywood8.monkeep
     id: "calc-btn-2"
 - waitForAnimationToEnd:
     timeout: 2000
-- takeScreenshot: screenshots/06_multicurrency_transfer_light
+- takeScreenshot: 06_multicurrency_transfer_light
 # Switch back to expense type for the rest of the flow
 - tapOn: "Expense"
 - waitForAnimationToEnd:
@@ -110,14 +113,18 @@ appId: com.heywood8.monkeep
 
 # Screenshot: Filter modal
 - tapOn:
-    id: "filter-fab"
+    id: "search-input-container"
 - waitForAnimationToEnd:
     timeout: 2000
-- takeScreenshot: screenshots/09_filter_modal_light
+- tapOn:
+    id: "filters-toggle-button"
+- waitForAnimationToEnd:
+    timeout: 2000
+- takeScreenshot: 09_filter_modal_light
 
 # Close filter modal
 - tapOn:
-    id: "close-filter-modal"
+    id: "close-search-button"
 - waitForAnimationToEnd:
     timeout: 1000
 
@@ -125,46 +132,66 @@ appId: com.heywood8.monkeep
 - tapOn: "Graphs"
 - waitForAnimationToEnd:
     timeout: 3000
-- takeScreenshot: screenshots/02_graphs_light
+- takeScreenshot: 02_graphs_light
 
-# Navigate to Accounts tab
-- tapOn: "Accounts"
+# Settings is a TAB now, not a modal behind a header button — `settings-button`
+# and `settings-close-button` have not existed for a long time.
+- tapOn: "Settings"
 - waitForAnimationToEnd:
     timeout: 3000
-- takeScreenshot: screenshots/03_accounts_light
+- takeScreenshot: 07_settings_light
 
-# Navigate to Categories tab
-- tapOn: "Categories"
-- waitForAnimationToEnd:
-    timeout: 3000
-- takeScreenshot: screenshots/04_categories_light
-
-# Navigate to Planned tab
-- tapOn: "Planned"
-- waitForAnimationToEnd:
-    timeout: 3000
-- takeScreenshot: screenshots/08_planned_light
-
-# Open Settings modal
+# Accounts and Categories are subpanels of Settings now, not tabs of their own.
+# (The Accounts TAB still exists, but it is off by default — see
+# DisplaySettingsContext — so tapping it on a fresh install finds nothing.)
 - tapOn:
-    id: "settings-button"
+    id: "settings-accounts-row"
 - waitForAnimationToEnd:
-    timeout: 2000
-- takeScreenshot: screenshots/07_settings_light
-
-# Close Settings modal
+    timeout: 3000
+- takeScreenshot: 03_accounts_light
 - tapOn:
-    id: "settings-close-button"
+    id: "settings-subpanel-back"
 - waitForAnimationToEnd:
-    timeout: 2000
+    timeout: 1000
+
+- tapOn:
+    id: "settings-categories-row"
+- waitForAnimationToEnd:
+    timeout: 3000
+- takeScreenshot: 04_categories_light
+- tapOn:
+    id: "settings-subpanel-back"
+- waitForAnimationToEnd:
+    timeout: 1000
+
+# The Planned tab is the Budget tab now. It is on by default, unlike Accounts.
+- tapOn: "Budget"
+- waitForAnimationToEnd:
+    timeout: 3000
+- takeScreenshot: 08_budget_light
 
 # ============================================
 # SWITCH TO DARK MODE
 # ============================================
 
-# Tap the theme toggle button (sun/moon icon in header)
+# The sun/moon button in the header is gone — the theme is a toggle row under
+# Settings -> Appearance now. The light half ends on the Budget tab, so the flow
+# goes back through Settings to flip it.
+- tapOn: "Settings"
+- waitForAnimationToEnd:
+    timeout: 3000
 - tapOn:
-    id: "theme-toggle-button"
+    id: "settings-appearance-row"
+- waitForAnimationToEnd:
+    timeout: 2000
+- tapOn:
+    id: "settings-theme-row"
+- waitForAnimationToEnd:
+    timeout: 2000
+- tapOn:
+    id: "settings-subpanel-back"
+- waitForAnimationToEnd:
+    timeout: 1000
 
 # ============================================
 # DARK MODE SCREENSHOTS
@@ -174,19 +201,22 @@ appId: com.heywood8.monkeep
 - tapOn: "Operations"
 - waitForAnimationToEnd:
     timeout: 3000
-- takeScreenshot: screenshots/01_operations_dark
+- takeScreenshot: 01_operations_dark
 
 # Screenshot: the operation editor and its category picker. The picker used to be
 # a SECOND bottom sheet stacked on this one, landing its rounded top edge in the
 # middle of the form; it is now a subpanel that covers the whole card. These two
 # frames are the regression check for that (see OperationModal's overlayPanel).
+# Row 1, not row 0: the seed data's last operation is a transfer, and a transfer
+# has a destination-account row where the category button sits — row 0 opened the
+# editor but never the picker.
 - tapOn:
-    id: "operation-item-0"
+    id: "operation-item-1"
 - waitForAnimationToEnd:
     timeout: 2000
-- takeScreenshot: screenshots/11_operation_modal_dark
-# Guarded: a transfer shows a destination-account row where the category button
-# sits, and a miss here would abort every screenshot after it.
+- takeScreenshot: 11_operation_modal_dark
+# Guarded anyway — if the seed order ever shifts, this skips instead of aborting
+# every screenshot after it.
 - runFlow:
     when:
       visible:
@@ -196,7 +226,7 @@ appId: com.heywood8.monkeep
           id: "category-input"
       - waitForAnimationToEnd:
           timeout: 2000
-      - takeScreenshot: screenshots/12_category_picker_dark
+      - takeScreenshot: 12_category_picker_dark
       # Back closes the PANEL, not the sheet under it — this is onBackIntercept.
       - back
       - waitForAnimationToEnd:
@@ -208,14 +238,18 @@ appId: com.heywood8.monkeep
 
 # Screenshot: Filter modal (dark)
 - tapOn:
-    id: "filter-fab"
+    id: "search-input-container"
 - waitForAnimationToEnd:
     timeout: 2000
-- takeScreenshot: screenshots/09_filter_modal_dark
+- tapOn:
+    id: "filters-toggle-button"
+- waitForAnimationToEnd:
+    timeout: 2000
+- takeScreenshot: 09_filter_modal_dark
 
 # Close filter modal
 - tapOn:
-    id: "close-filter-modal"
+    id: "close-search-button"
 - waitForAnimationToEnd:
     timeout: 1000
 
@@ -223,12 +257,13 @@ appId: com.heywood8.monkeep
 - tapOn: "Transfer"
 - waitForAnimationToEnd:
     timeout: 2000
-- takeScreenshot: screenshots/05_transfer_dark
+- takeScreenshot: 05_transfer_dark
 
-# Screenshot 6 dark: Multi-currency transfer
-- tapOn: "All accounts"
-- waitForAnimationToEnd:
-    timeout: 2000
+# Screenshot 6 dark: Multi-currency transfer. Same as the light half — the
+# "All accounts" picker only renders past 8 accounts and the seed has 4, so the
+# target comes straight off the shortcut row. The light half was fixed for this
+# and the dark half was left behind, which no one saw because the run never got
+# this far.
 - tapOn: "EUR Cash"
 - waitForAnimationToEnd:
     timeout: 2000
@@ -238,7 +273,7 @@ appId: com.heywood8.monkeep
     id: "calc-btn-2"
 - waitForAnimationToEnd:
     timeout: 2000
-- takeScreenshot: screenshots/06_multicurrency_transfer_dark
+- takeScreenshot: 06_multicurrency_transfer_dark
 - tapOn: "Expense"
 - waitForAnimationToEnd:
     timeout: 2000
@@ -247,45 +282,37 @@ appId: com.heywood8.monkeep
 - tapOn: "Graphs"
 - waitForAnimationToEnd:
     timeout: 3000
-- takeScreenshot: screenshots/02_graphs_dark
+- takeScreenshot: 02_graphs_dark
 
-# Navigate to Accounts tab
-- tapOn: "Accounts"
+# Settings is a TAB now, not a modal behind a header button.
+- tapOn: "Settings"
 - waitForAnimationToEnd:
     timeout: 3000
-- takeScreenshot: screenshots/03_accounts_dark
+- takeScreenshot: 07_settings_dark
 
-# Navigate to Categories tab
-- tapOn: "Categories"
-- waitForAnimationToEnd:
-    timeout: 3000
-# Scroll slightly to force FlatList to re-render cells with dark theme
-# Use larger swipe distance to avoid being interpreted as a tap on a category row
-- swipe:
-    start: 50%, 70%
-    end: 50%, 40%
-- swipe:
-    start: 50%, 40%
-    end: 50%, 70%
-- waitForAnimationToEnd:
-    timeout: 2000
-- takeScreenshot: screenshots/04_categories_dark
-
-# Navigate to Planned tab
-- tapOn: "Planned"
-- waitForAnimationToEnd:
-    timeout: 3000
-- takeScreenshot: screenshots/08_planned_dark
-
-# Open Settings modal
+# Accounts and Categories are subpanels of Settings now, not tabs of their own.
 - tapOn:
-    id: "settings-button"
+    id: "settings-accounts-row"
 - waitForAnimationToEnd:
-    timeout: 2000
-- takeScreenshot: screenshots/07_settings_dark
-
-# Close Settings modal
+    timeout: 3000
+- takeScreenshot: 03_accounts_dark
 - tapOn:
-    id: "settings-close-button"
+    id: "settings-subpanel-back"
 - waitForAnimationToEnd:
-    timeout: 2000
+    timeout: 1000
+
+- tapOn:
+    id: "settings-categories-row"
+- waitForAnimationToEnd:
+    timeout: 3000
+- takeScreenshot: 04_categories_dark
+- tapOn:
+    id: "settings-subpanel-back"
+- waitForAnimationToEnd:
+    timeout: 1000
+
+# The Planned tab is the Budget tab now.
+- tapOn: "Budget"
+- waitForAnimationToEnd:
+    timeout: 3000
+- takeScreenshot: 08_budget_dark
