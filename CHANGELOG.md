@@ -1,5 +1,12 @@
 # Changelog
 
+## [0.292.1](https://github.com/heywood8/money-tracker/compare/penny-v0.292.0...penny-v0.292.1) (2026-09-19)
+
+
+### Code Refactoring
+
+* **budget:** drop the summary hero and reword its legend ([#1807](https://github.com/heywood8/money-tracker/issues/1807)) ([ba03010](https://github.com/heywood8/money-tracker/commit/ba03010edb1efae0027e1cdf5a42a9936cce71a3))
+
 ## [0.292.0](https://github.com/heywood8/money-tracker/compare/penny-v0.291.2...penny-v0.292.0) (2026-09-19)
 
 
