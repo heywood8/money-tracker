@@ -12,7 +12,10 @@
  *   transaction from the queue without opening the app.
  * - **operations added** — the run booked fully-matched operations on its own.
  *   Without it the silent auto-create path is invisible until the user next opens
- *   the app; tapping lands on the operations list where the new rows are.
+ *   the app; tapping lands on the operations list where the new rows are. When the
+ *   run booked exactly one categorizable operation the receipt also carries
+ *   "Change category", which opens that operation's form with the category picker
+ *   already up — the one thing an auto-guessed booking usually gets wrong.
  *
  * They are separate notifications (distinct identifiers) because they ask for
  * different things: one is a task, the other is a receipt.
@@ -74,8 +77,7 @@ export const SELECT_PENDING_ACTION_ID = 'select-pending';
 export const PENDING_IDS_KEY = 'pendingIds';
 
 /**
- * Category (action-button set) attached to the "operations added" receipt, and
- * the id of its single action.
+ * The "operations added" receipt's default button set, and the id of its action.
  *
  * The receipt is a statement, not a task, so its one useful reply is "seen" —
  * the messenger "mark as read" gesture. The action declares
@@ -87,6 +89,29 @@ export const PENDING_IDS_KEY = 'pendingIds';
  */
 export const ADDED_ALERT_CATEGORY_ID = 'bank-operations-added';
 export const ACKNOWLEDGE_ACTION_ID = 'acknowledge';
+
+/**
+ * The receipt's other button set: "Acknowledged" plus "Change category".
+ *
+ * A booking the pipeline made on its own guessed the category from the merchant,
+ * and that guess is the part a user most often wants to correct — but correcting
+ * it meant finding the row in the list first. The button jumps straight to that
+ * operation's form with the category picker open.
+ *
+ * It names *one* operation, so it is offered only on a receipt about a single
+ * booking (a batch receipt does not say which row the button would edit), and
+ * only when that operation has a category at all — a transfer does not, so its
+ * receipt keeps the acknowledge-only set. Unlike "Acknowledged" it declares
+ * `opensAppToForeground: true`: picking a category happens in the app.
+ */
+export const ADDED_ALERT_RECATEGORIZE_CATEGORY_ID = 'bank-operations-added-category';
+export const CHANGE_CATEGORY_ACTION_ID = 'change-category';
+
+/**
+ * Data key carrying the id of the operation "Change category" edits. Only
+ * populated for the single-booking receipt (see the category above).
+ */
+export const OPERATION_ID_KEY = 'operationId';
 
 // A fixed identifier so a fresh alert replaces the previous one instead of
 // stacking a new row every background run.
@@ -170,28 +195,43 @@ export const ensureBankAlertsChannelAsync = async (name) => {
 };
 
 /**
- * Register (or relabel) the category carrying the receipt's "Acknowledged"
- * button. Safe to call repeatedly — re-setting an existing category overwrites
- * it, which is how the button follows a language change.
+ * Register (or relabel) the two categories carrying the receipt's buttons — the
+ * acknowledge-only set and the one that adds "Change category". Safe to call
+ * repeatedly — re-setting an existing category overwrites it, which is how the
+ * labels follow a language change.
  *
- * Best-effort: if it fails the receipt still posts, just without the button.
+ * Best-effort: if it fails the receipt still posts, just without its buttons.
  *
- * @param {string} [buttonTitle] - localized button label
+ * @param {{ actionLabel?: string, changeCategoryLabel?: string }} [labels]
  * @returns {Promise<void>}
  */
-export const ensureAddedAlertCategoryAsync = async (buttonTitle) => {
+export const ensureAddedAlertCategoriesAsync = async (labels = {}) => {
+  const acknowledgeAction = {
+    identifier: ACKNOWLEDGE_ACTION_ID,
+    buttonTitle: labels.actionLabel || 'Acknowledged',
+    // Never launch the app: acknowledging is done with the notification, not
+    // in the app. Android delivers the press as a broadcast instead.
+    options: { opensAppToForeground: false },
+  };
+  const changeCategoryAction = {
+    identifier: CHANGE_CATEGORY_ACTION_ID,
+    buttonTitle: labels.changeCategoryLabel || 'Change category',
+    // Picking a category is done in the app, so this one opens it.
+    options: { opensAppToForeground: true },
+  };
   try {
-    await Notifications.setNotificationCategoryAsync(ADDED_ALERT_CATEGORY_ID, [
-      {
-        identifier: ACKNOWLEDGE_ACTION_ID,
-        buttonTitle: buttonTitle || 'Acknowledged',
-        // Never launch the app: acknowledging is done with the notification, not
-        // in the app. Android delivers the press as a broadcast instead.
-        options: { opensAppToForeground: false },
-      },
+    await Promise.all([
+      Notifications.setNotificationCategoryAsync(
+        ADDED_ALERT_CATEGORY_ID,
+        [acknowledgeAction],
+      ),
+      Notifications.setNotificationCategoryAsync(
+        ADDED_ALERT_RECATEGORIZE_CATEGORY_ID,
+        [acknowledgeAction, changeCategoryAction],
+      ),
     ]);
   } catch (error) {
-    // Non-fatal — the receipt is still worth posting without its button.
+    // Non-fatal — the receipt is still worth posting without its buttons.
   }
 };
 
@@ -358,19 +398,29 @@ export const presentPendingOperationsAlert = async (copy, pendingIds) => {
  * addedAlertIdentifier). Carries the "Acknowledged" button that clears it without
  * opening the app.
  *
- * @param {{ title: string, body: string, channelName?: string, actionLabel?: string }} copy
+ * Carries "Change category" on top of "Acknowledged" when `categoryOperationId`
+ * names the one operation the receipt is about; the caller decides that (see
+ * runBackgroundBankCheck), because only it knows whether the booking has a
+ * category to change.
+ *
+ * @param {{ title: string, body: string, channelName?: string, actionLabel?: string,
+ *   changeCategoryLabel?: string }} copy
  * @param {Array<string|number>} [operationIds] - the operations this receipt
  *   describes; supplying them makes a duplicate report collapse instead of
  *   posting a second identical row.
+ * @param {string|number|null} [categoryOperationId] - the single operation whose
+ *   category the receipt's button edits, or null for the acknowledge-only set
  * @returns {Promise<void>}
  */
-export const presentAddedOperationsAlert = async (copy, operationIds) => {
-  await ensureAddedAlertCategoryAsync(copy?.actionLabel);
+export const presentAddedOperationsAlert = async (copy, operationIds, categoryOperationId = null) => {
+  await ensureAddedAlertCategoriesAsync(copy);
+  const recategorizable = categoryOperationId != null;
   return presentBankAlert(
     addedAlertIdentifier(operationIds),
     ROUTE_ADDED_OPERATIONS,
     copy,
-    ADDED_ALERT_CATEGORY_ID,
+    recategorizable ? ADDED_ALERT_RECATEGORIZE_CATEGORY_ID : ADDED_ALERT_CATEGORY_ID,
+    recategorizable ? { [OPERATION_ID_KEY]: String(categoryOperationId) } : null,
   );
 };
 
@@ -451,6 +501,29 @@ export const isRejectPendingResponse = (response) =>
  */
 export const isSelectPendingResponse = (response) =>
   response?.actionIdentifier === SELECT_PENDING_ACTION_ID;
+
+/**
+ * Whether a response is the receipt's "Change category" button. Checked before
+ * the route matchers like its siblings: it asks for one operation's form, not
+ * for the operations list the receipt's body tap opens.
+ *
+ * @param {object|null} response - a Notifications.NotificationResponse
+ * @returns {boolean}
+ */
+export const isChangeCategoryResponse = (response) =>
+  response?.actionIdentifier === CHANGE_CATEGORY_ACTION_ID;
+
+/**
+ * The operation id a response's notification names, as a string, or null when it
+ * carried none (see presentAddedOperationsAlert).
+ *
+ * @param {object|null} response - a Notifications.NotificationResponse
+ * @returns {string|null}
+ */
+export const responseOperationId = (response) => {
+  const id = response?.notification?.request?.content?.data?.[OPERATION_ID_KEY];
+  return id == null || id === '' ? null : String(id);
+};
 
 /**
  * The pending-queue row ids a response's notification is about, as strings.

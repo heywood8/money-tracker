@@ -59,4 +59,9 @@ export const EVENTS = {
   // Handled by SimpleTabs only (switch to the Operations tab): the operations
   // are already booked, so there is nothing to review — the list is the target.
   OPEN_ADDED_OPERATIONS: 'navigate:addedOperations',
+  // Emitted with { operationId } when the user presses that receipt's "Change
+  // category" button. Handled by SimpleTabs (switch to the Operations tab) and
+  // OperationsScreen (open that operation's form on its category picker): the
+  // booking is right, its auto-guessed category is what the user came to fix.
+  OPEN_OPERATION_CATEGORY: 'navigate:operationCategory',
 };

@@ -595,6 +595,7 @@
   "bank_notifications_bg_added_body_other": "已自动添加 {count} 笔交易",
   "bank_notifications_bg_added_to_account": "转入：{name}",
   "bank_notifications_bg_added_acknowledge": "已知晓",
+  "bank_notifications_bg_added_change_category": "更改分类",
   "bank_notifications_bg_reject": "拒绝",
   "bank_notifications_bg_select": "选择",
   "bank_notifications_channel_name": "银行交易",

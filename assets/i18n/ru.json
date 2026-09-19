@@ -598,6 +598,7 @@
   "bank_notifications_bg_added_body_other": "Автоматически добавлено операций: {count}",
   "bank_notifications_bg_added_to_account": "На счёт: {name}",
   "bank_notifications_bg_added_acknowledge": "Прочитано",
+  "bank_notifications_bg_added_change_category": "Изменить категорию",
   "bank_notifications_bg_reject": "Отклонить",
   "bank_notifications_bg_select": "Выбрать",
   "bank_notifications_channel_name": "Банковские операции",

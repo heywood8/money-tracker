@@ -409,10 +409,11 @@ live on `AccountsDB` (`getAccountByCardMask`, `setAccountCardMask`).
 - Tapped alerts reach the page through `useNotificationResponseRouter`
   (`app/hooks/`), mounted in `AppInitializer`. It queues a cold-start response
   until `SimpleTabs` is on screen (nothing is subscribed before then), re-reads
-  the last response on every return to the foreground and routes a **Select** or
-  body tap the listener did not deliver — once, keyed by press — and clears the
-  response natively once routed. **Reject** and **Acknowledged** are never re-run
-  from that re-check: they were performed headless when pressed.
+  the last response on every return to the foreground and routes a **Select**,
+  **Change category** or body tap the listener did not deliver — once, keyed by
+  press — and clears the response natively once routed. **Reject** and
+  **Acknowledged** are never re-run from that re-check: they were performed
+  headless when pressed.
 - **Known limitation:** the native service keeps only the **last 50**
   notifications and is pull-only (no JS events). For lossless capture under
   bursty/backgrounded conditions, extend the Kotlin
@@ -463,7 +464,7 @@ declares a `NotificationsService` subclass at intent-filter priority 0 — expo'
 own receiver sits at -1 and dispatch resolves through
 `queryBroadcastReceivers().firstOrNull()`, so the app-level one wins — whose
 builder overrides `icon` by reading the `route` value already carried in each
-alert's payload. Nothing else is replaced: tap routing, the action button,
+alert's payload. Nothing else is replaced: tap routing, the action buttons,
 dismissal and scheduling are inherited, and a route the override does not
 recognise falls back to the app-wide icon. The glyphs themselves are generated
 by `scripts/generate-notification-icon.js` (Material Design Icons path data,
@@ -518,6 +519,33 @@ notification action (category `bank-operations-added`, action `acknowledge`)
 declared with `opensAppToForeground: false`, so pressing it never launches the
 app. The review alert deliberately has no such button: its items still need the
 user.
+
+**The "Change category" button.** A booking made without asking still *guessed*
+its category from the merchant binding, and that guess is the part users most
+often want to correct — which, before this button, meant opening the app, finding
+the row in the list and tapping into it. The button (category
+`bank-operations-added-category`, action `change-category`,
+`opensAppToForeground: true`) carries the booked operation's id in the payload
+(`operationId`) and lands the user on that operation's form with the category
+picker already open.
+
+It names one row, so it is offered only on a receipt about a single booking —
+`recategorizableOperationId` in `backgroundBankTask.js` decides, and withholds it
+for a batch (the collapsed row does not say which operation the button would
+edit), for a transfer (no category to change — its counterpart is an account) and
+for an operation whose id the pipeline did not record. Those receipts keep the
+acknowledge-only set.
+
+The press routes as a deep link, not as an answered button: `deliver` emits
+`OPEN_OPERATION_CATEGORY` with the id, `SimpleTabs` switches to Operations, and
+`OperationsScreen` reads the row with `getOperationById` — the loaded list holds
+one window of dates, and a booking dated outside it is simply not there — then
+renders `OperationModal` with `openCategoryPicker`. The modal waits for the form
+to have loaded that operation before opening the picker: the picker is handed a
+snapshot of `filteredCategories`, which is keyed on the loaded type, so opening a
+frame early would show the previous operation's categories. A receipt that
+somehow carries no id falls back to `OPEN_ADDED_OPERATIONS` (the operations list)
+rather than swallowing the press.
 
 Pressing an action button does **not** clear the notification on its own —
 Android's auto-cancel only covers a tap on the body — so the dismissal is ours,

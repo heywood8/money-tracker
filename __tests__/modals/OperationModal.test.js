@@ -18,7 +18,7 @@
  */
 
 import React from 'react';
-import { render, fireEvent, waitFor } from '@testing-library/react-native';
+import { render, fireEvent, waitFor, within } from '@testing-library/react-native';
 import OperationModal from '../../app/modals/OperationModal';
 
 // Mock dependencies
@@ -1007,6 +1007,198 @@ describe('OperationModal', () => {
       );
 
       expect(getByText('add_operation')).toBeTruthy();
+    });
+  });
+
+  // The "Change category" button on the auto-added notification lands here: the
+  // host asks the form to come up on its category picker (see OperationsScreen).
+  describe('openCategoryPicker', () => {
+    const expense = {
+      id: 'op1',
+      type: 'expense',
+      amount: '50',
+      accountId: 'acc1',
+      categoryId: 'cat2',
+      date: '2024-01-15',
+    };
+
+    let openPicker;
+
+    const usePicker = (overrides = {}) => {
+      const useOperationPicker = require('../../app/hooks/useOperationPicker');
+      openPicker = jest.fn();
+      useOperationPicker.mockReturnValue({
+        pickerState: { visible: false, type: null, data: [] },
+        openPicker,
+        closePicker: jest.fn(),
+        ...overrides,
+      });
+    };
+
+    afterEach(() => {
+      // Restore the module default so the return value set here cannot leak.
+      const useOperationPicker = require('../../app/hooks/useOperationPicker');
+      useOperationPicker.mockImplementation(() => ({
+        pickerState: { visible: false, type: null, data: [] },
+        openPicker: jest.fn(),
+        closePicker: jest.fn(),
+      }));
+    });
+
+    it('opens the category picker with the type-filtered list', async () => {
+      usePicker();
+
+      await render(
+        <OperationModal
+          visible={true}
+          onClose={mockOnClose}
+          operation={expense}
+          isNew={false}
+          openCategoryPicker={true}
+        />,
+      );
+
+      await waitFor(() => expect(openPicker).toHaveBeenCalledWith(
+        'category',
+        makeDefaultFormValues().filteredCategories,
+      ));
+    });
+
+    it('opens it once, so closing the picker does not reopen it', async () => {
+      usePicker();
+
+      const { rerender } = await render(
+        <OperationModal
+          visible={true}
+          onClose={mockOnClose}
+          operation={expense}
+          isNew={false}
+          openCategoryPicker={true}
+        />,
+      );
+      await waitFor(() => expect(openPicker).toHaveBeenCalledTimes(1));
+
+      await rerender(
+        <OperationModal
+          visible={true}
+          onClose={mockOnClose}
+          operation={expense}
+          isNew={false}
+          openCategoryPicker={true}
+        />,
+      );
+
+      expect(openPicker).toHaveBeenCalledTimes(1);
+    });
+
+    it('surfaces the picker panel, not just the openPicker call', async () => {
+      // Driven through the real hook: the panel is mirrored off pickerState by
+      // an effect, so a call that never reaches it would leave the sheet bare.
+      const useOperationPicker = require('../../app/hooks/useOperationPicker');
+      useOperationPicker.mockImplementation(
+        jest.requireActual('../../app/hooks/useOperationPicker').default,
+      );
+
+      const { getByTestId } = await render(
+        <OperationModal
+          visible={true}
+          onClose={mockOnClose}
+          operation={expense}
+          isNew={false}
+          openCategoryPicker={true}
+        />,
+      );
+
+      await waitFor(() => expect(getByTestId('operation-picker-panel')).toBeTruthy());
+      // The category panel, not an account one: the panel is shared. Scoped to
+      // the panel — the form's own category row carries the same label.
+      expect(
+        within(getByTestId('operation-picker-panel')).getByText('select_category'),
+      ).toBeTruthy();
+    });
+
+    it('leaves the form alone when the host did not ask', async () => {
+      usePicker();
+
+      await render(
+        <OperationModal
+          visible={true}
+          onClose={mockOnClose}
+          operation={expense}
+          isNew={false}
+        />,
+      );
+
+      expect(openPicker).not.toHaveBeenCalled();
+    });
+
+    it('does not open it for a transfer, which has no category', async () => {
+      usePicker();
+      const useOperationForm = require('../../app/hooks/useOperationForm');
+      const base = makeDefaultFormValues();
+      useOperationForm.mockReturnValue({
+        ...base,
+        values: { ...base.values, type: 'transfer', toAccountId: 'acc2' },
+        filteredCategories: [],
+      });
+
+      await render(
+        <OperationModal
+          visible={true}
+          onClose={mockOnClose}
+          operation={{ ...expense, type: 'transfer', toAccountId: 'acc2' }}
+          isNew={false}
+          openCategoryPicker={true}
+        />,
+      );
+
+      expect(openPicker).not.toHaveBeenCalled();
+    });
+
+    it('does not open it for a read-only shadow operation', async () => {
+      usePicker();
+      const useOperationForm = require('../../app/hooks/useOperationForm');
+      useOperationForm.mockReturnValue({
+        ...makeDefaultFormValues(),
+        isShadowOperation: true,
+      });
+
+      await render(
+        <OperationModal
+          visible={true}
+          onClose={mockOnClose}
+          operation={expense}
+          isNew={false}
+          openCategoryPicker={true}
+        />,
+      );
+
+      expect(openPicker).not.toHaveBeenCalled();
+    });
+
+    it('waits for the form to load the operation before snapshotting the list', async () => {
+      // The picker is opened with a snapshot of filteredCategories, which is
+      // keyed on the loaded type — opening before the load would hand it the
+      // previous operation's categories.
+      usePicker();
+      const useOperationForm = require('../../app/hooks/useOperationForm');
+      const base = makeDefaultFormValues();
+      useOperationForm.mockReturnValue({
+        ...base,
+        values: { ...base.values, type: 'expense' },
+      });
+
+      await render(
+        <OperationModal
+          visible={true}
+          onClose={mockOnClose}
+          operation={{ ...expense, type: 'income' }}
+          isNew={false}
+          openCategoryPicker={true}
+        />,
+      );
+
+      expect(openPicker).not.toHaveBeenCalled();
     });
   });
 
