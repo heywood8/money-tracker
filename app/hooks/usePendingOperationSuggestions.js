@@ -120,6 +120,10 @@ export default function usePendingOperationSuggestions({
   // an older snapshot would write back over the queue as it now stands and hide
   // a suggestion until the next event.
   const reloadSeqRef = useRef(0);
+  // Whether any reload has completed yet, and how many items the last one
+  // published. Both exist for the log below rather than for behaviour.
+  const readOnceRef = useRef(false);
+  const lastPublishedCountRef = useRef(0);
 
   const reload = useCallback(async () => {
     const seq = reloadSeqRef.current + 1;
@@ -134,6 +138,17 @@ export default function usePendingOperationSuggestions({
       const queued = await getPendingNotifications();
       if (!Array.isArray(queued) || queued.length === 0) {
         if (!mountedRef.current || seq !== reloadSeqRef.current) return;
+        // Say so on the first read of a session and on each emptying — not on
+        // every operation change, which is how often this path runs. An early
+        // return that logged nothing at all is what left `[deck] mount reload`
+        // with no line after it meaning either "the queue was empty" or "the
+        // read threw before it got anywhere", and the 2026-09-19 export could
+        // not be read past that fork.
+        if (!readOnceRef.current || lastPublishedCountRef.current > 0) {
+          console.log('[deck] reload empty', { seq, ms: Date.now() - started });
+        }
+        readOnceRef.current = true;
+        lastPublishedCountRef.current = 0;
         setSuggestions((prev) => (prev.length === 0 ? prev : []));
         return;
       }
@@ -195,6 +210,8 @@ export default function usePendingOperationSuggestions({
         return;
       }
       console.log('[deck] reload publish', { seq, count: list.length, ids: list.map((item) => item.id) });
+      readOnceRef.current = true;
+      lastPublishedCountRef.current = list.length;
       setSuggestions(list);
       // Seed choices with any suggested account/category, the bound ATM target
       // for transfers, and the learned label.
@@ -317,9 +334,9 @@ export default function usePendingOperationSuggestions({
    * feature is disabled; already-seen notifications are skipped) and reload the
    * queue. Operations created by the run surface via its RELOAD_ALL emit.
    */
-  const refresh = useCallback(async () => {
+  const refresh = useCallback(async (reason = 'manual') => {
     const started = Date.now();
-    console.log('[deck] refresh start');
+    console.log('[deck] refresh start', { reason });
     let settled = false;
     const pass = processBankNotifications()
       .then((summary) => {
@@ -374,8 +391,10 @@ export default function usePendingOperationSuggestions({
   // run, so this joins the pass AppInitializer just started instead of racing it,
   // and the reload then sees whatever that pass queued.
   useOnForeground(useCallback(() => {
-    console.log('[deck] foreground refresh');
-    refresh();
+    // The reason rides on the one line the refresh already logs: a separate
+    // "foreground refresh" said nothing `refresh start` did not, and the log is
+    // a 500-entry ring buffer that a duplicate per app-open is measured against.
+    refresh('foreground');
   }, [refresh]));
 
   /**

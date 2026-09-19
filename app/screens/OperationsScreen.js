@@ -1,5 +1,5 @@
 import React, { useState, useMemo, useCallback, useEffect, useRef } from 'react';
-import { View, StyleSheet, FlatList, TouchableOpacity, TextInput, Pressable, Modal, Keyboard, BackHandler, AppState } from 'react-native';
+import { View, StyleSheet, FlatList, TouchableOpacity, TextInput, Pressable, Modal, Keyboard, BackHandler, AppState, Dimensions } from 'react-native';
 import Animated, { useSharedValue, useAnimatedStyle, withTiming, withSpring } from 'react-native-reanimated';
 import Icon from '@expo/vector-icons/MaterialCommunityIcons';
 import DateTimePicker from '@react-native-community/datetimepicker';
@@ -63,6 +63,19 @@ export const QUICK_ADD_UNCLIPPED = 1000;
 // How long after a deck arrives its landing is inspected — long enough for the
 // clip, the card entrance and the layout pass that measures them to settle.
 const DECK_SETTLE_MS = 600;
+
+// The diagnostic log is a 500-entry ring buffer (LogService's MAX_ENTRIES), and
+// the quick-add wrapper is the noisiest thing on this screen: a LayoutAnimation
+// walks it down a pixel per frame (450, 449, 448 …) and every step used to take
+// a line. The 2026-09-18 export spent 180 of its 500 entries on those frames and
+// had evicted the deck's arrival — the only part of the file anyone needed to
+// read — before it was ever uploaded. So a run of layout passes takes two lines
+// whatever distance it covers: the pass that starts it, and the value it settles
+// on once it has stopped moving. A move below the epsilon does not even start a
+// line of its own — measured against the last LOGGED height, so a frame-by-frame
+// walk cannot accumulate its way into one line per 8dp travelled.
+const LAYOUT_LOG_EPSILON = 8;
+const LAYOUT_SETTLE_LOG_MS = 250;
 
 // Map a QuickAdd validation failure to the form field that should flash red,
 // so single-field omissions get the same lightweight inline treatment the
@@ -235,7 +248,16 @@ const OperationsScreen = () => {
   // that a state write here would re-render the whole screen for nothing.
   const quickAddClipHeightRef = useRef(0);
   const handleQuickAddClipLayout = useCallback((event) => {
-    quickAddClipHeightRef.current = Math.round(event.nativeEvent.layout.height);
+    const measured = Math.round(event.nativeEvent.layout.height);
+    // A zero from an OPEN block is never the truth, for the same reason it is
+    // not on the wrapper below (see handleQuickAddLayout): the form is always
+    // laid out there, so a 0 is a transient pass — a card-leave LayoutAnimation
+    // reports several in a row. Keeping it poisoned this ref, which is how the
+    // 2026-09-18 log came to report `slide: 0` on a block that measured 444 a
+    // frame later, and left every collapse animating from the fallback height
+    // instead of from the height the eye can see.
+    if (measured === 0 && !quickAddCollapsedRef.current) return;
+    quickAddClipHeightRef.current = measured;
   }, []);
   // The frame a suggestion deck reserves over the form (0 without one). Kept in
   // a ref for the same reason as the clip height: applyQuickAddCollapse reads it
@@ -253,6 +275,7 @@ const OperationsScreen = () => {
   // The frame the deck container actually got. `clipHeight` says the block was
   // open; this says the cards inside it had somewhere to draw.
   const deckHostHeightRef = useRef(0);
+  const deckHostRef = useRef(null);
   const handleDeckHostLayout = useCallback((event) => {
     deckHostHeightRef.current = Math.round(event.nativeEvent.layout.height);
   }, []);
@@ -460,6 +483,29 @@ const OperationsScreen = () => {
   // a collapsed panel would hide the very thing that needs answering.
   const quickAddCollapsed = isSearchOpen
     || (!showQuickAddPanel && !quickAddExpanded && !hasSuggestions);
+  // Whether the DECK — rather than the form's own open/closed state — is what
+  // holds the panel open. While it does, the clip and the slide render from
+  // STATIC styles instead of the animated ones (see the JSX below).
+  //
+  // What five repairs failed on was not the shared value but the dependency on
+  // it. A change written while the Android activity is stopped has no frame to
+  // commit into, and a re-write of the value it already holds produces no diff
+  // for the shadow tree, so nothing reaches the mounting layer either: that is
+  // why `reassertQuickAddClip` logged a perfectly correct `collapsed: false` at
+  // 09:06:05 on 2026-09-18 and the user still had to open and close search
+  // (09:06:16 → 09:06:17) before the card appeared. Reanimated's own docs are
+  // explicit that an animated style overrides a static one in the same array
+  // whatever the order, so leaving it out is the only way to take the cards off
+  // it — and a style React renders cannot be lost that way: it arrives with the
+  // commit that rendered it.
+  //
+  // The trade, deliberately: closing search over a queued card now uncovers the
+  // deck in one frame instead of sliding it down on the shared exit curve with
+  // the pill and the list. Keeping that slide would mean handing the cards back
+  // to the animated value for its duration, which is the exact window this
+  // exists to close — and the deck already arrives instantly everywhere else, by
+  // the same reasoning as the motion effect's `mode = 'instant'` below.
+  const deckOwnsPanel = hasSuggestions && !isSearchOpen;
   // Mirrors for the layout handler and the diagnostic snapshot, which both run
   // outside a render and must read the block as it stands, not as it stood when
   // their callback was created.
@@ -488,8 +534,19 @@ const OperationsScreen = () => {
 
   const clearQuickAddDateRef = useRef(clearQuickAddDate);
   useEffect(() => { clearQuickAddDateRef.current = clearQuickAddDate; });
+  const loggedAppStateRef = useRef(null);
   useEffect(() => {
     const subscription = AppState.addEventListener('change', (nextState) => {
+      // The transition itself, so a deck that filled behind a stopped activity
+      // can be told from one that arrived in front of the user. That is the case
+      // every repair so far has been aimed at, and no export has ever carried
+      // the transition next to the arrival. Deduped: Android re-announces the
+      // state it is already in, and two lines per app switch is the whole budget
+      // this is worth.
+      if (loggedAppStateRef.current !== nextState) {
+        loggedAppStateRef.current = nextState;
+        console.log('[deck] appstate', { to: nextState, suggestions: suggestionsCountRef.current });
+      }
       if (nextState === 'background' || nextState === 'inactive') clearQuickAddDateRef.current();
     });
     // A stubbed AppState (unit environments) hands back nothing to remove.
@@ -504,6 +561,10 @@ const OperationsScreen = () => {
   // (deckCardHeight) until a real measurement lands.
   const [quickAddHeight, setQuickAddHeight] = useState(0);
   const loggedQuickAddHeightRef = useRef(null);
+  const quickAddHeightLogTimerRef = useRef(null);
+  useEffect(() => () => {
+    if (quickAddHeightLogTimerRef.current) clearTimeout(quickAddHeightLogTimerRef.current);
+  }, []);
   const handleQuickAddLayout = useCallback((event) => {
     const measured = Math.round(event.nativeEvent.layout.height);
     // A zero from an *open* block is never the truth: the form is always there,
@@ -524,9 +585,27 @@ const OperationsScreen = () => {
     }
     droppedZeroRef.current = false;
     quickAddHeightRef.current = measured;
-    if (loggedQuickAddHeightRef.current !== measured) {
+    // The pass that starts a run, then the value it settles on — not the 180
+    // frames between them (see LAYOUT_LOG_EPSILON). A pending settle timer is
+    // what says a run is still going: while one is armed nothing is logged at
+    // once, however far the run travels, so a 450 → 300 collapse cannot spend a
+    // line per 8dp of it.
+    const lastLogged = loggedQuickAddHeightRef.current;
+    const runInFlight = quickAddHeightLogTimerRef.current !== null;
+    if (!runInFlight
+      && (lastLogged === null || Math.abs(measured - lastLogged) >= LAYOUT_LOG_EPSILON)) {
       loggedQuickAddHeightRef.current = measured;
       console.log('[deck] quick-add measured', { height: measured });
+    }
+    if (measured !== loggedQuickAddHeightRef.current) {
+      if (quickAddHeightLogTimerRef.current) clearTimeout(quickAddHeightLogTimerRef.current);
+      quickAddHeightLogTimerRef.current = setTimeout(() => {
+        quickAddHeightLogTimerRef.current = null;
+        const settled = quickAddHeightRef.current;
+        if (settled === loggedQuickAddHeightRef.current) return;
+        loggedQuickAddHeightRef.current = settled;
+        console.log('[deck] quick-add settled', { height: settled });
+      }, LAYOUT_SETTLE_LOG_MS);
     }
     setQuickAddHeight((prev) => (prev === measured ? prev : measured));
   }, []);
@@ -578,10 +657,9 @@ const OperationsScreen = () => {
   const pullRefreshMountedRef = useRef(true);
   useEffect(() => () => { pullRefreshMountedRef.current = false; }, []);
   const handlePullRefresh = useCallback(async () => {
-    console.log('[deck] pull-to-refresh');
     setPullRefreshing(true);
     try {
-      await Promise.all([loadInitialOperations(undefined, false), refreshSuggestions()]);
+      await Promise.all([loadInitialOperations(undefined, false), refreshSuggestions('pull')]);
     } finally {
       if (pullRefreshMountedRef.current) setPullRefreshing(false);
     }
@@ -1413,12 +1491,20 @@ const OperationsScreen = () => {
   const quickAddFormComponent = useMemo(() => (
     <>
       <Animated.View
-        style={animatedQuickAddClipStyle}
+        testID="quick-add-clip"
+        // Static, not animated, while the deck owns the panel: the cards are the
+        // only way to answer the review queue, so their visibility may not
+        // depend on a shared value reaching the view (see `deckOwnsPanel`).
+        style={deckOwnsPanel ? styles.quickAddClipOpen : animatedQuickAddClipStyle}
         // A zero-height clip drops touches on Android, but not TalkBack: without
         // this the whole form stays reachable by screen reader while invisible.
         importantForAccessibility={quickAddCollapsed ? 'no-hide-descendants' : 'auto'}
       >
-        <Animated.View style={animatedQuickAddSlideStyle} onLayout={handleQuickAddClipLayout}>
+        <Animated.View
+          testID="quick-add-slide"
+          style={deckOwnsPanel ? null : animatedQuickAddSlideStyle}
+          onLayout={handleQuickAddClipLayout}
+        >
           {/* Deck container: the binding cards overlay the quick-add form
               (absolute, sized to the measured wrapper below), with top padding
               for the peeking edges of the cards behind the front one. The
@@ -1427,6 +1513,7 @@ const OperationsScreen = () => {
               pinned actions on Android). Collapses with the form when search
               opens (same clip). */}
           <View
+            ref={deckHostRef}
             onLayout={handleDeckHostLayout}
             style={{
               paddingTop: deckPeekAllowance(operationSuggestions.length),
@@ -1499,7 +1586,7 @@ const OperationsScreen = () => {
       </Animated.View>
       {filtersExpanded && filterPanelHeight > 0 && <View style={{ height: filterPanelHeight }} />}
     </>
-  ), [animatedQuickAddClipStyle, animatedQuickAddSlideStyle, handleQuickAddClipLayout, quickAddCollapsed, colors, t, quickAddValuesStore, setQuickAddValues, isMultiCurrencyTransfer, sourceAccount, destinationAccount, lastEditedField, setLastEditedField, setRateSource, visibleAccounts, filteredCategories, topCategoriesForType, getCategoryInfo, getAccountName, getAccountBalance, getCategoryName, openPicker, handleQuickAdd, handleAmountChange, handleExchangeRateChange, handleDestinationAmountChange, handleAutoAddWithCategory, topTransferAccountsForForm, handleAutoAddWithAccount, TYPES, rateSource, handleOperationCurrencyChange, foreignRateSource, foreignExchangeRate, filterPanelHeight, filtersExpanded, quickAddFlash, quickAddSaving, operationSuggestions, hasSuggestions, quickAddHeight, handleQuickAddLayout, handleDeckHostLayout, accounts, categories, suggestionSaveErrors, suggestionChoices, setSuggestionChoice, acceptSuggestion, dismissSuggestion]);
+  ), [animatedQuickAddClipStyle, animatedQuickAddSlideStyle, handleQuickAddClipLayout, quickAddCollapsed, deckOwnsPanel, colors, t, quickAddValuesStore, setQuickAddValues, isMultiCurrencyTransfer, sourceAccount, destinationAccount, lastEditedField, setLastEditedField, setRateSource, visibleAccounts, filteredCategories, topCategoriesForType, getCategoryInfo, getAccountName, getAccountBalance, getCategoryName, openPicker, handleQuickAdd, handleAmountChange, handleExchangeRateChange, handleDestinationAmountChange, handleAutoAddWithCategory, topTransferAccountsForForm, handleAutoAddWithAccount, TYPES, rateSource, handleOperationCurrencyChange, foreignRateSource, foreignExchangeRate, filterPanelHeight, filtersExpanded, quickAddFlash, quickAddSaving, operationSuggestions, hasSuggestions, quickAddHeight, handleQuickAddLayout, handleDeckHostLayout, accounts, categories, suggestionSaveErrors, suggestionChoices, setSuggestionChoice, acceptSuggestion, dismissSuggestion]);
 
   // Auto-scroll to top when filter panel closes, but only if the user is still
   // near the top (hasn't scrolled into past dates). The threshold is filterPanelHeight:
@@ -1607,7 +1694,11 @@ const OperationsScreen = () => {
     // plays no motion, so an open that never reached the screen is never retried.
     setQuickAddExpanded(true);
     reassertQuickAddClip('open-pending');
-    refreshSuggestions();
+    refreshSuggestions('open-pending');
+    // Past the clip, the scroll and the layout pass that follow this event: the
+    // geometry the cards actually ended up with on the screen the user is
+    // looking at while reporting that they cannot see them.
+    setTimeout(() => deckOnScreenRef.current?.('open-pending'), DECK_SETTLE_MS);
   }, [
     isSearchOpen, handleCloseSearch, scrollToTop, refreshSuggestions,
     showQuickAddPanel, quickAddExpanded, operationSuggestions.length,
@@ -1657,6 +1748,60 @@ const OperationsScreen = () => {
     translateY: Math.round(quickAddTranslateY.value),
     scrollOffset: Math.round(scrollOffsetRef.current),
   }), [quickAddMaxHeight, quickAddTranslateY]);
+  // The deck container's rect in WINDOW coordinates — the one line that tells
+  // the three ways a deck that IS in the tree stays invisible apart, which no
+  // export so far has been able to do:
+  //   height 0             the clip is shut on the native side whatever the
+  //                        shared value says, i.e. a commit that never landed;
+  //   y above the viewport the list is scrolled and the header holding the
+  //                        cards sits off the top of the screen;
+  //   a sane rect          the cards are laid out, sized and on screen, so what
+  //                        hid them is paint (the list's removeClippedSubviews)
+  //                        and neither the clip nor the scroll.
+  // measureInWindow reads the mounted view, not React's idea of it, which is
+  // exactly the gap every previous line in this file was blind to.
+  const deckOnScreen = useCallback((reason) => {
+    const node = deckHostRef.current;
+    if (!node || typeof node.measureInWindow !== 'function') return;
+    node.measureInWindow((x, y, width, height) => {
+      console.log('[deck] on screen', {
+        reason,
+        x: Math.round(x || 0),
+        y: Math.round(y || 0),
+        width: Math.round(width || 0),
+        height: Math.round(height || 0),
+        screen: Math.round(Dimensions.get('window').height),
+        ...deckSnapshot(),
+      });
+    });
+  }, [deckSnapshot]);
+  // Read by the deep-link handler, which is declared above this and would hit
+  // the temporal dead zone if it listed `deckOnScreen` as a dependency.
+  const deckOnScreenRef = useRef(null);
+  deckOnScreenRef.current = deckOnScreen;
+
+  // The deck's landing when the app comes back with cards already queued.
+  //
+  // A deck that filled behind a stopped activity had its arrival scroll dropped
+  // along with everything else that needed a frame, so the list can still be
+  // sitting where the user left it — with the header, and the cards in it, above
+  // the viewport. Unanimated: an animated scroll requested on the way back from
+  // the background is the kind of thing that gets dropped too.
+  useOnForeground(useCallback(() => {
+    if (suggestionsCountRef.current === 0) return;
+    // Search owns the screen and keeps the panel clipped, so the place the user
+    // had scrolled their results to is not the deck's to take. Closing search
+    // scrolls to the top on its own, which is where the deck lands anyway.
+    if (isSearchOpen) return;
+    if (scrollOffsetRef.current > 0) {
+      console.log('[deck] foreground scroll re-assert', {
+        offset: Math.round(scrollOffsetRef.current),
+      });
+      flatListRef.current?.scrollToOffset({ offset: 0, animated: false });
+    }
+    deckOnScreen('foreground');
+  }, [deckOnScreen, isSearchOpen]));
+
   useEffect(() => {
     console.log('[deck] suggestions changed', deckSnapshot());
     if (!hasSuggestions) return undefined;
@@ -1673,10 +1818,11 @@ const OperationsScreen = () => {
         lateBy,
         stale: lateBy > DECK_SETTLE_MS,
       });
+      deckOnScreen('arrival');
     }, DECK_SETTLE_MS);
     return () => clearTimeout(timer);
     // Logged on deck changes only; the snapshot reads live state when it prints.
-  }, [hasSuggestions, operationSuggestions.length, deckSnapshot]);
+  }, [hasSuggestions, operationSuggestions.length, deckSnapshot, deckOnScreen]);
 
   // Safety net for scrollToIndex failures. The list now provides getItemLayout,
   // so scrollToLocation resolves offsets directly and this should not fire in
@@ -1900,6 +2046,12 @@ const styles = StyleSheet.create({
     position: 'absolute',
     right: SPACING.lg,
     zIndex: Z_INDEX.popover,
+  },
+  quickAddClipOpen: {
+    // Deliberately no maxHeight: the deck reserves its own frame and must never
+    // be cut by a ceiling. `overflow` matches the animated clip so the peeking
+    // card edges paint the same on either style.
+    overflow: 'hidden',
   },
   scrollToTopButton: {
     alignItems: 'center',

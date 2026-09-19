@@ -654,4 +654,48 @@ describe('usePendingOperationSuggestions', () => {
       expect(result.current.suggestions).toEqual([EXPENSE]);
     });
   });
+
+  // The empty-queue path returned without logging anything, so a `[deck] mount
+  // reload` with no line after it meant either "the queue was empty" or "the
+  // read threw before it got anywhere" — and the 2026-09-19 export could not be
+  // read past that fork. It is also the path that runs on every operation
+  // change, so it says so once per emptying rather than once per reload.
+  describe('reload diagnostics', () => {
+    const emptyLines = (logs) =>
+      logs.mock.calls.filter((call) => call[0] === '[deck] reload empty');
+
+    it('reports the first read of a session that finds nothing queued', async () => {
+      PendingNotificationsDB.getPendingNotifications.mockResolvedValue([]);
+      const logs = jest.spyOn(console, 'log').mockImplementation(() => {});
+      try {
+        const { result } = await renderHook(() => usePendingOperationSuggestions());
+        await waitFor(() => expect(emptyLines(logs)).toHaveLength(1));
+
+        // Every reload after it finds the same nothing and stays quiet.
+        await act(async () => { await result.current.reload(); });
+        await act(async () => { await result.current.reload(); });
+        expect(emptyLines(logs)).toHaveLength(1);
+      } finally {
+        logs.mockRestore();
+      }
+    });
+
+    it('reports the queue emptying out from under a deck that was up', async () => {
+      const logs = jest.spyOn(console, 'log').mockImplementation(() => {});
+      try {
+        const { result } = await renderHook(() => usePendingOperationSuggestions());
+        await waitFor(() => expect(result.current.suggestions).toEqual([EXPENSE]));
+        logs.mockClear();
+
+        PendingNotificationsDB.getPendingNotifications.mockResolvedValue([]);
+        await act(async () => { await result.current.reload(); });
+        expect(emptyLines(logs)).toHaveLength(1);
+
+        await act(async () => { await result.current.reload(); });
+        expect(emptyLines(logs)).toHaveLength(1);
+      } finally {
+        logs.mockRestore();
+      }
+    });
+  });
 });
