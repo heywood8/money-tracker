@@ -121,13 +121,35 @@ jobs:
             adb shell am start -n com.heywood8.monkeep/.MainActivity
 
             # Create output directory
-            mkdir -p screenshots
+            mkdir -p screenshots maestro-out
 
-            # Run Maestro flow to navigate and take screenshots
-            maestro test .maestro/take-screenshots.yaml || true
+            # Run Maestro flow to navigate and take screenshots.
+            #
+            # --test-output-dir is load-bearing. `takeScreenshot` no longer writes
+            # its file relative to the working directory: Maestro saves it inside
+            # the flow's artifact bundle, under a `takeScreenshot/` folder, and
+            # refuses a path that climbs out of that directory. Without this the
+            # bundle lands somewhere under ~/.maestro and `screenshots/` stays
+            # empty — which is why every run since the Maestro upgrade has posted
+            # "No screenshots were captured".
+            maestro test --test-output-dir maestro-out .maestro/take-screenshots.yaml || true
 
-            # Capture Maestro debug artifacts on failure
-            cp -r ~/.maestro/tests/* screenshots/ 2>/dev/null || true
+            # Lift the frames out of the bundle, flattened, so the steps below
+            # (and the comment body) can keep addressing them by bare name.
+            # Scoped to the takeScreenshot folder: Maestro drops its own failure
+            # screenshots elsewhere in the bundle, and those are debug artifacts
+            # rather than frames of the app.
+            #
+            # One line on purpose — android-emulator-runner feeds this script to
+            # `sh -c` a line at a time, so a multi-line pipeline or loop would be
+            # split across invocations and die.
+            find maestro-out -type f -path '*takeScreenshot*' -name '*.png' -exec cp {} screenshots/ \; 2>/dev/null || true
+
+            # Capture Maestro debug artifacts too (a failed step's own screenshot
+            # and logs), so a broken flow can be diagnosed from the artifact.
+            mkdir -p screenshots/_debug
+            cp -r maestro-out/* screenshots/_debug/ 2>/dev/null || true
+            cp -r ~/.maestro/tests/* screenshots/_debug/ 2>/dev/null || true
 
             # List captured screenshots
             ls -la screenshots/ || echo "No screenshots directory found"
@@ -216,6 +238,8 @@ jobs:
             // Screens with light/dark variants
             const themedScreens = [
               { file: '01_operations', desc: 'Operations' },
+              { file: '11_operation_modal', desc: 'Operation Editor' },
+              { file: '12_category_picker', desc: 'Category Picker (subpanel)' },
               { file: '09_filter_modal', desc: 'Filter Modal' },
               { file: '05_transfer', desc: 'Multi-Currency Transfer' },
               { file: '02_graphs', desc: 'Graphs' },

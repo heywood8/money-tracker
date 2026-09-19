@@ -6,7 +6,7 @@ appId: com.heywood8.monkeep
     timeout: 30000
 
 # Screenshot 0: Language selection screen (only captured once, no dark/light variant)
-- takeScreenshot: screenshots/00_language_selection
+- takeScreenshot: 00_language_selection
 
 # Select English and continue
 - tapOn: "English"
@@ -36,7 +36,7 @@ appId: com.heywood8.monkeep
 # ============================================
 
 # Screenshot 1: Operations screen (default first tab)
-- takeScreenshot: screenshots/01_operations_light
+- takeScreenshot: 01_operations_light
 
 # Screenshot 1a: long-press action menu. The lifted clone must sit exactly on top of
 # the row it copies — this frame is the regression check for that (see
@@ -46,9 +46,41 @@ appId: com.heywood8.monkeep
     id: "operation-item-0"
 - waitForAnimationToEnd:
     timeout: 2000
-- takeScreenshot: screenshots/10_action_menu_light
+- takeScreenshot: 10_action_menu_light
 # Dismiss with the hardware back button: the overlay is not a native window, so this
 # also exercises the BackHandler the menu wires up in place of onRequestClose.
+- back
+- waitForAnimationToEnd:
+    timeout: 1000
+
+# Screenshot: the operation editor and its category picker. The picker used to
+# open a SECOND bottom sheet on top of this one; it is now a subpanel covering
+# the whole card, and these two frames are what shows that.
+#
+# Row 1, not row 0: the seed data's last operation is a transfer, and a transfer
+# has a destination-account row where the category button sits.
+- tapOn:
+    id: "operation-item-1"
+- waitForAnimationToEnd:
+    timeout: 2000
+- takeScreenshot: 11_operation_modal_light
+# Guarded anyway — if the seed order ever shifts, this skips instead of aborting
+# every screenshot after it.
+- runFlow:
+    when:
+      visible:
+        id: "category-input"
+    commands:
+      - tapOn:
+          id: "category-input"
+      - waitForAnimationToEnd:
+          timeout: 2000
+      - takeScreenshot: 12_category_picker_light
+      # Back closes the PANEL, not the sheet under it (onBackIntercept).
+      - back
+      - waitForAnimationToEnd:
+          timeout: 1000
+# Second back leaves the operation editor.
 - back
 - waitForAnimationToEnd:
     timeout: 1000
@@ -57,7 +89,7 @@ appId: com.heywood8.monkeep
 - tapOn: "Transfer"
 - waitForAnimationToEnd:
     timeout: 2000
-- takeScreenshot: screenshots/05_transfer_light
+- takeScreenshot: 05_transfer_light
 
 # Screenshot 1c: Multi-currency transfer (select different-currency account, enter amount)
 # "All accounts" only renders past 8 accounts (OperationFormFields), and the seed data
@@ -72,22 +104,29 @@ appId: com.heywood8.monkeep
     id: "calc-btn-2"
 - waitForAnimationToEnd:
     timeout: 2000
-- takeScreenshot: screenshots/06_multicurrency_transfer_light
+- takeScreenshot: 06_multicurrency_transfer_light
 # Switch back to expense type for the rest of the flow
 - tapOn: "Expense"
 - waitForAnimationToEnd:
     timeout: 2000
 
-# Screenshot: Filter modal
+# Screenshot: the filters panel. It is no longer a FAB over the list — it lives
+# behind the search pill, which expands into a field with a filter toggle beside
+# it (see SearchBar). `filter-fab` and `close-filter-modal` have not existed in
+# the app for a long time, and the flow aborted on them every run.
 - tapOn:
-    id: "filter-fab"
+    id: "search-input-container"
 - waitForAnimationToEnd:
     timeout: 2000
-- takeScreenshot: screenshots/09_filter_modal_light
-
-# Close filter modal
 - tapOn:
-    id: "close-filter-modal"
+    id: "filters-toggle-button"
+- waitForAnimationToEnd:
+    timeout: 2000
+- takeScreenshot: 09_filter_modal_light
+
+# Close the search bar (which closes the filters with it)
+- tapOn:
+    id: "close-search-button"
 - waitForAnimationToEnd:
     timeout: 1000
 
@@ -95,32 +134,32 @@ appId: com.heywood8.monkeep
 - tapOn: "Graphs"
 - waitForAnimationToEnd:
     timeout: 3000
-- takeScreenshot: screenshots/02_graphs_light
+- takeScreenshot: 02_graphs_light
 
 # Navigate to Accounts tab
 - tapOn: "Accounts"
 - waitForAnimationToEnd:
     timeout: 3000
-- takeScreenshot: screenshots/03_accounts_light
+- takeScreenshot: 03_accounts_light
 
 # Navigate to Categories tab
 - tapOn: "Categories"
 - waitForAnimationToEnd:
     timeout: 3000
-- takeScreenshot: screenshots/04_categories_light
+- takeScreenshot: 04_categories_light
 
 # Navigate to Planned tab
 - tapOn: "Planned"
 - waitForAnimationToEnd:
     timeout: 3000
-- takeScreenshot: screenshots/08_planned_light
+- takeScreenshot: 08_planned_light
 
 # Open Settings modal
 - tapOn:
     id: "settings-button"
 - waitForAnimationToEnd:
     timeout: 2000
-- takeScreenshot: screenshots/07_settings_light
+- takeScreenshot: 07_settings_light
 
 # Close Settings modal
 - tapOn:
@@ -144,18 +183,54 @@ appId: com.heywood8.monkeep
 - tapOn: "Operations"
 - waitForAnimationToEnd:
     timeout: 3000
-- takeScreenshot: screenshots/01_operations_dark
+- takeScreenshot: 01_operations_dark
 
-# Screenshot: Filter modal (dark)
+# Screenshot: the operation editor and its category picker. The picker used to
+# open a SECOND bottom sheet on top of this one; it is now a subpanel covering
+# the whole card, and these two frames are what shows that.
+#
+# Row 1, not row 0: the seed data's last operation is a transfer, and a transfer
+# has a destination-account row where the category button sits.
 - tapOn:
-    id: "filter-fab"
+    id: "operation-item-1"
 - waitForAnimationToEnd:
     timeout: 2000
-- takeScreenshot: screenshots/09_filter_modal_dark
+- takeScreenshot: 11_operation_modal_dark
+# Guarded anyway — if the seed order ever shifts, this skips instead of aborting
+# every screenshot after it.
+- runFlow:
+    when:
+      visible:
+        id: "category-input"
+    commands:
+      - tapOn:
+          id: "category-input"
+      - waitForAnimationToEnd:
+          timeout: 2000
+      - takeScreenshot: 12_category_picker_dark
+      # Back closes the PANEL, not the sheet under it (onBackIntercept).
+      - back
+      - waitForAnimationToEnd:
+          timeout: 1000
+# Second back leaves the operation editor.
+- back
+- waitForAnimationToEnd:
+    timeout: 1000
 
-# Close filter modal
+# Screenshot: the filters panel (dark). Same route as the light one above.
 - tapOn:
-    id: "close-filter-modal"
+    id: "search-input-container"
+- waitForAnimationToEnd:
+    timeout: 2000
+- tapOn:
+    id: "filters-toggle-button"
+- waitForAnimationToEnd:
+    timeout: 2000
+- takeScreenshot: 09_filter_modal_dark
+
+# Close the search bar (which closes the filters with it)
+- tapOn:
+    id: "close-search-button"
 - waitForAnimationToEnd:
     timeout: 1000
 
@@ -163,7 +238,7 @@ appId: com.heywood8.monkeep
 - tapOn: "Transfer"
 - waitForAnimationToEnd:
     timeout: 2000
-- takeScreenshot: screenshots/05_transfer_dark
+- takeScreenshot: 05_transfer_dark
 
 # Screenshot 6 dark: Multi-currency transfer
 - tapOn: "All accounts"
@@ -178,7 +253,7 @@ appId: com.heywood8.monkeep
     id: "calc-btn-2"
 - waitForAnimationToEnd:
     timeout: 2000
-- takeScreenshot: screenshots/06_multicurrency_transfer_dark
+- takeScreenshot: 06_multicurrency_transfer_dark
 - tapOn: "Expense"
 - waitForAnimationToEnd:
     timeout: 2000
@@ -187,13 +262,13 @@ appId: com.heywood8.monkeep
 - tapOn: "Graphs"
 - waitForAnimationToEnd:
     timeout: 3000
-- takeScreenshot: screenshots/02_graphs_dark
+- takeScreenshot: 02_graphs_dark
 
 # Navigate to Accounts tab
 - tapOn: "Accounts"
 - waitForAnimationToEnd:
     timeout: 3000
-- takeScreenshot: screenshots/03_accounts_dark
+- takeScreenshot: 03_accounts_dark
 
 # Navigate to Categories tab
 - tapOn: "Categories"
@@ -209,20 +284,20 @@ appId: com.heywood8.monkeep
     end: 50%, 70%
 - waitForAnimationToEnd:
     timeout: 2000
-- takeScreenshot: screenshots/04_categories_dark
+- takeScreenshot: 04_categories_dark
 
 # Navigate to Planned tab
 - tapOn: "Planned"
 - waitForAnimationToEnd:
     timeout: 3000
-- takeScreenshot: screenshots/08_planned_dark
+- takeScreenshot: 08_planned_dark
 
 # Open Settings modal
 - tapOn:
     id: "settings-button"
 - waitForAnimationToEnd:
     timeout: 2000
-- takeScreenshot: screenshots/07_settings_dark
+- takeScreenshot: 07_settings_dark
 
 # Close Settings modal
 - tapOn:
