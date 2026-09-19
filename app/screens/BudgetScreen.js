@@ -236,28 +236,23 @@ const BudgetScreen = () => {
     monthPickerVisible, handleOpenMonthPicker,
     handleOpenCurrencyPicker, handlePrevMonth, handleNextMonth, handleJumpToCurrentMonth]);
 
-  // The month's headline figure, and the shape of the month around it. It used
-  // to sit at the very bottom of the plan card in 14px muted text, below every
-  // row and the allocated/actual totals — the one number a person acts on,
-  // placed where they would reach it last. It then spent a while inside the
-  // header, which kept it on screen but made the two tabs' headers different
-  // heights for no reason a reader could see. Here it is the first thing in the
-  // body: still the first figure read, and it scrolls under the glass with
-  // everything else it belongs to.
+  // The shape of the month: what is spent, what the plan still has ahead of it,
+  // and what is not committed at all. It is the first thing in the body rather
+  // than in the header, so it scrolls under the glass with everything it
+  // belongs to and the two tabs' headers stay the same height.
   //
-  // The card draws the same figures the line "Allocated 1.94M · Actual 1.66M"
-  // used to state — see MonthSummaryCard for why they are a bar now.
+  // The card had a headline figure of its own — the remainder, over a pill
+  // holding the plan's fill. That remainder is the free entry of its own legend
+  // to the digit, so the card opened by printing its last column twice at four
+  // times the size. See MonthSummaryCard.
   const summaryCard = useMemo(() => (
     <MonthSummaryCard
       totals={planTotals}
       month={month}
-      // With a single account currency there is no header chip to pick one, and
-      // then the hero figure is the only place the screen names its unit at all.
-      showCurrencyCode={currencies.length <= 1}
       colors={colors}
       t={t}
     />
-  ), [planTotals, month, currencies.length, colors, t]);
+  ), [planTotals, month, colors, t]);
 
   const listHeader = useMemo(() => (
     <>

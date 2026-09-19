@@ -3,15 +3,8 @@ import { View, Text, StyleSheet } from 'react-native';
 import PropTypes from 'prop-types';
 import * as Currency from '../../services/currency';
 import { BORDER_RADIUS, FONT_SIZE, FONT_WEIGHT, SPACING } from '../../styles/designTokens';
-import { CARD_SURFACE, SECTION_LABEL } from '../../styles/componentStyles';
+import { CARD_SURFACE } from '../../styles/componentStyles';
 import { currentMonthKey, monthElapsedFraction } from '../../utils/monthUtils';
-
-/**
- * Stands in for the remainder until the plan section has computed and reported
- * one. The label alone would read as a value that failed to load, and reserving
- * the line keeps the block from jumping a row taller once the figure arrives.
- */
-const PENDING_PLACEHOLDER = '—';
 
 /** Height of the flow bar, and the pill radius it is drawn with. */
 const BAR_HEIGHT = 10;
@@ -67,8 +60,9 @@ const maxAmount = (a, b) => (Currency.compare(a, b) >= 0 ? a : b);
  *
  * With no income declared the income-relative pieces are dropped rather than
  * counted as overruns: a first-time user who has planned before recording a
- * salary would otherwise get a bar entirely in the alarm colours, which is the
- * same degenerate reading the remainder figure already guards against.
+ * salary would otherwise get a bar entirely in the alarm colours. That leaves a
+ * bar with no free zone and no overrun and nothing saying why, so the card says
+ * it in words instead — see the no-income line under the legend.
  */
 const computeFlow = (totals) => {
   const hasActual = totals.actual != null;
@@ -106,6 +100,12 @@ const computeFlow = (totals) => {
  * still to go, and how much is genuinely free is one glance rather than three
  * subtractions.
  *
+ * The card has no heading. It carried the remainder as a display figure, over a
+ * pill holding the plan's fill — and the remainder is, to the digit, the free
+ * zone the legend already names, so the card opened by printing its own last
+ * column twice at four times the size. Dropping it took 44dp off the top of the
+ * screen and left one home for the percent: the legend row it measures.
+ *
  * The pace mark is the one thing here that is not in the numbers at all. It sits
  * where an evenly-paced month would have spent to by today, so a bar that is
  * ahead of it and a bar that is behind it read differently even when they carry
@@ -116,7 +116,6 @@ const computeFlow = (totals) => {
 const MonthSummaryCard = ({
   totals = null,
   month,
-  showCurrencyCode = false,
   colors,
   t,
   testID = 'budget-summary-card',
@@ -152,6 +151,13 @@ const MonthSummaryCard = ({
     ].filter(segment => segment.value > 0);
   }, [flow, colors]);
 
+  // How full the plan is: the actual against what was allocated. Only where
+  // there is an actual to state it about and a plan to state it against.
+  const fillPercent = flow?.hasActual
+    ? Currency.formatFillPercent(totals.actual, totals.allocated)
+    : null;
+  const overPlan = fillPercent != null && Currency.compare(totals.actual, totals.allocated) > 0;
+
   // At most three: what is spent, what that leaves of the plan (or how far past
   // it the month already is), and what is free (or how far past the income the
   // plan itself is). The pairs are mutually exclusive by construction — a month
@@ -160,7 +166,10 @@ const MonthSummaryCard = ({
   const legend = useMemo(() => {
     if (!flow || flow.total <= 0) return [];
     const items = [];
-    if (flow.hasActual) {
+    // Gated on the segment, not on having an actual: with nothing allocated the
+    // whole actual is the overrun, and an entry reading "Spent 0" under a solid
+    // dot would key a colour that is nowhere on the bar.
+    if (flow.spent > 0) {
       items.push({
         key: 'spent',
         label: t('spent_amount'),
@@ -189,8 +198,8 @@ const MonthSummaryCard = ({
         key: 'committed',
         // Naming it as the plan is only true where the segment IS the plan:
         // nothing spent against it yet, and none of it past the income. Any
-        // other shape and it is a part of the plan, which is what "in plan"
-        // says and what the amount beside it means.
+        // other shape and it is the part of the plan still ahead of the month,
+        // which is what "still to spend" says and what the amount beside it means.
         label: flow.hasActual || flow.overCommitted > 0 ? t('budget_committed') : t('allocated'),
         amount: flow.hasActual ? Currency.subtract(ceiling, totals.actual) : ceiling,
         color: colors.primary,
@@ -220,62 +229,26 @@ const MonthSummaryCard = ({
         hollow: true,
       });
     }
+
+    // The card has no heading, so the plan's fill rides on a legend row instead
+    // of above one. Which row is not cosmetic: under the plan the percentage is
+    // the reading of what was spent, but past it the spent entry is capped at
+    // the allocation — "800 · 113%" would label the allocation as 113% of
+    // itself. The overrun is the entry that means "past the plan", so past the
+    // plan that is where the figure saying how far belongs.
+    if (fillPercent) {
+      const carrier = items.find(item => item.key === 'overspent')
+        || items.find(item => item.key === 'spent');
+      if (carrier) carrier.percent = fillPercent;
+    }
     return items;
-  }, [flow, totals, colors, t]);
-
-  // How full the plan is, in the same words every envelope row below uses. Only
-  // where there is an actual to state it about and a plan to state it against.
-  const fillPercent = flow?.hasActual ? Currency.formatFillPercent(totals.actual, totals.allocated) : null;
-  const overPlan = fillPercent != null && Currency.compare(totals.actual, totals.allocated) > 0;
-
-  const hasIncomeBasis = totals?.hasIncomeBasis !== false;
-  const negativeRemainder = totals != null && Currency.isNegative(totals.remainder);
+  }, [flow, totals, colors, t, fillPercent]);
 
   return (
     <View
       style={[styles.card, { backgroundColor: colors.surface, borderColor: colors.border }]}
       testID={testID}
     >
-      <View style={styles.heroRow}>
-        <View style={styles.heroFigure}>
-          <Text style={[styles.heroLabel, { color: colors.mutedText }]} numberOfLines={1}>
-            {hasIncomeBasis ? t('remainder') : t('add_income_for_remainder')}
-          </Text>
-          {hasIncomeBasis && (
-            <Text
-              style={[styles.heroValue, {
-                color: negativeRemainder ? colors.overspend : colors.text,
-              }]}
-              numberOfLines={1}
-              testID="budget-remainder"
-            >
-              {/* The code hangs off the figure only when the header has no
-                  currency control to carry it — with one up there, printing it
-                  here says "AMD" twice on one screen. */}
-              {totals
-                ? `${Currency.formatAmountTrimmed(totals.remainder, totals.currency)}${showCurrencyCode ? ` ${totals.currency}` : ''}`
-                : PENDING_PLACEHOLDER}
-            </Text>
-          )}
-        </View>
-
-        {fillPercent && (
-          <View
-            style={[styles.pill, {
-              backgroundColor: overPlan ? `${colors.overspend}1F` : colors.glassSurfaceStrong,
-            }]}
-            testID="budget-summary-percent"
-          >
-            <Text style={[styles.pillValue, { color: overPlan ? colors.overspend : colors.text }]}>
-              {fillPercent}
-            </Text>
-            <Text style={[styles.pillLabel, { color: colors.mutedText }]} numberOfLines={1}>
-              {t('budget_of_plan')}
-            </Text>
-          </View>
-        )}
-      </View>
-
       {/* The track is the free zone: only the filled segments are drawn, so the
           gaps between them and the tail after them are one continuous piece of
           bare track rather than a fifth view that has to be kept in step. */}
@@ -326,12 +299,38 @@ const MonthSummaryCard = ({
               <Text
                 style={[styles.legendAmount, { color: item.alert ? colors.overspend : colors.text }]}
                 numberOfLines={1}
+                testID={`budget-legend-amount-${item.key}`}
               >
                 {Currency.formatCompact(item.amount)}
+                {item.percent != null && (
+                  <Text
+                    style={[styles.legendPercent, {
+                      color: overPlan ? colors.overspend : colors.mutedText,
+                    }]}
+                    testID="budget-summary-percent"
+                  >
+                    {` · ${item.percent}`}
+                  </Text>
+                )}
               </Text>
             </View>
           ))}
         </View>
+      )}
+
+      {/* The prompt the removed heading used to carry, and the only place on
+          this screen it can be: MonthlyPlanSection states it as well, but only
+          in uncontrolled mode, and the Budgets tab always drives the month. Its
+          own line under the legend rather than above the bar — it explains a
+          bar that reads full when nothing is wrong, which is an answer to a
+          question the bar raises, not a heading over it. */}
+      {totals != null && totals.hasIncomeBasis === false && (
+        <Text
+          style={[styles.hint, { color: colors.mutedText }]}
+          testID="budget-summary-no-income"
+        >
+          {t('add_income_for_remainder')}
+        </Text>
       )}
     </View>
   );
@@ -352,7 +351,6 @@ MonthSummaryCard.propTypes = {
     hasIncomeBasis: PropTypes.bool,
   }),
   month: PropTypes.string.isRequired,
-  showCurrencyCode: PropTypes.bool,
   colors: PropTypes.object.isRequired,
   t: PropTypes.func.isRequired,
   testID: PropTypes.string,
@@ -363,7 +361,6 @@ export default MonthSummaryCard;
 const styles = StyleSheet.create({
   barWrapper: {
     justifyContent: 'center',
-    marginTop: SPACING.md,
     paddingVertical: PACE_OVERHANG,
   },
   card: {
@@ -390,21 +387,9 @@ const styles = StyleSheet.create({
   dotHollow: {
     borderWidth: 1.5,
   },
-  heroFigure: {
-    flexShrink: 1,
-  },
-  heroLabel: SECTION_LABEL,
-  heroRow: {
-    alignItems: 'center',
-    flexDirection: 'row',
-    justifyContent: 'space-between',
-  },
-  heroValue: {
-    fontSize: FONT_SIZE.xxl,
-    fontVariant: ['tabular-nums'],
-    fontWeight: FONT_WEIGHT.bold,
-    letterSpacing: -0.5,
-    marginTop: 2,
+  hint: {
+    fontSize: FONT_SIZE.sm,
+    marginTop: SPACING.sm,
   },
   legend: {
     flexDirection: 'row',
@@ -429,6 +414,10 @@ const styles = StyleSheet.create({
     flexShrink: 1,
     fontSize: FONT_SIZE.sm,
   },
+  legendPercent: {
+    fontSize: FONT_SIZE.sm,
+    fontWeight: FONT_WEIGHT.regular,
+  },
   overCommitted: {
     opacity: 0.55,
   },
@@ -441,21 +430,6 @@ const styles = StyleSheet.create({
     position: 'absolute',
     top: 0,
     width: 2,
-  },
-  pill: {
-    alignItems: 'center',
-    borderRadius: BORDER_RADIUS.md,
-    marginLeft: SPACING.sm,
-    paddingHorizontal: SPACING.sm,
-    paddingVertical: SPACING.xs,
-  },
-  pillLabel: {
-    fontSize: FONT_SIZE.xs,
-  },
-  pillValue: {
-    fontSize: FONT_SIZE.base,
-    fontVariant: ['tabular-nums'],
-    fontWeight: FONT_WEIGHT.bold,
   },
   segment: {
     height: '100%',
