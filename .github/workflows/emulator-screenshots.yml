@@ -197,10 +197,17 @@ jobs:
           git config user.name "github-actions[bot]"
           git config user.email "github-actions[bot]@users.noreply.github.com"
 
-          # Create or switch to the ci-screenshots orphan branch
+          # Create or switch to the ci-screenshots orphan branch.
+          #
+          # -f is load-bearing: `bun install` above rewrites bun.lock, which is
+          # tracked, so a plain checkout refuses to switch ("Your local changes
+          # to the following files would be overwritten by checkout: bun.lock")
+          # and the whole step exits 1 under `bash -e`. The screenshots are
+          # already copied to $BACKUP_DIR by this point and nothing else in the
+          # worktree is needed again, so discarding that edit is free.
           git fetch origin ci-screenshots 2>/dev/null || true
           if git rev-parse --verify origin/ci-screenshots >/dev/null 2>&1; then
-            git checkout ci-screenshots
+            git checkout -f ci-screenshots
           else
             git checkout --orphan ci-screenshots
             git rm -rf . 2>/dev/null || true
@@ -217,8 +224,9 @@ jobs:
           git commit -m "Update screenshots for PR #${PR_NUMBER}" || echo "No changes to commit"
           git push origin ci-screenshots
 
-          # Switch back to the PR branch and restore screenshots
-          git checkout - 2>/dev/null || true
+          # Switch back to the PR branch and restore screenshots (-f for the
+          # same reason: the lockfile is dirty again on the way back).
+          git checkout -f - 2>/dev/null || true
           mkdir -p screenshots
           cp "$BACKUP_DIR"/*.png screenshots/
 
