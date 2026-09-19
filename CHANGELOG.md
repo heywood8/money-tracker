@@ -1,5 +1,12 @@
 # Changelog
 
+## [0.291.1](https://github.com/heywood8/money-tracker/compare/penny-v0.291.0...penny-v0.291.1) (2026-09-19)
+
+
+### Bug Fixes
+
+* **operations:** take the review deck off the animated clip ([#1800](https://github.com/heywood8/money-tracker/issues/1800)) ([d23a7fd](https://github.com/heywood8/money-tracker/commit/d23a7fdd1f54af4bbaf7eb78e980cf567e8feb62))
+
 ## [0.291.0](https://github.com/heywood8/money-tracker/compare/penny-v0.290.0...penny-v0.291.0) (2026-09-18)
 
 
