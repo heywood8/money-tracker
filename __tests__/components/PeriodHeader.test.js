@@ -141,12 +141,16 @@ describe('PeriodHeader', () => {
   });
 
   describe('currency', () => {
-    // Nothing to choose between with one account currency, and a control that
-    // cannot change anything is furniture over the content.
-    it('is absent with a single account currency', async () => {
-      const { queryByTestId } = await setup({ currencies: ['USD'] });
+    // Nothing to choose between with one account currency, so the chip loses
+    // its chevron and its press target. The code itself stays: since the
+    // Budgets card lost the hero figure that used to print it, this header is
+    // the only thing on the screen naming the unit its figures are in.
+    it('states a single account currency as plain text, not a control', async () => {
+      const { getByTestId, queryByTestId } = await setup({ currencies: ['USD'] });
       expect(queryByTestId('scope-currency-chip')).toBeNull();
-      expect(queryByTestId('scope-divider')).toBeNull();
+      expect(queryByTestId('scope-currency-chevron')).toBeNull();
+      expect(getByTestId('scope-currency-label')).toHaveTextContent(/\$USD/);
+      expect(getByTestId('scope-divider')).toBeTruthy();
     });
 
     it('shows the code with its symbol and opens the host sheet', async () => {

@@ -22,7 +22,6 @@ const COLORS = {
   primary: '#4A90D9',
   overspend: '#FF6B6B',
   warning: '#F2A93B',
-  glassSurfaceStrong: 'rgba(120,120,120,0.12)',
 };
 
 const t = (key) => key;
@@ -54,42 +53,36 @@ describe('MonthSummaryCard', () => {
     );
   });
 
-  describe('The remainder figure', () => {
-    it('prints the remainder trimmed of an all-zero decimal part', async () => {
-      const { getByTestId } = await renderCard();
-      expect(getByTestId('budget-remainder')).toHaveTextContent(/^200$/);
+  // The remainder opened this card as a display figure over a pill holding the
+  // fill percentage. It is, to the digit, the free entry in the legend below, so
+  // the card printed its own last column twice — once at four times the size —
+  // and spent 44dp of screen height doing it.
+  describe('The heading that was removed', () => {
+    it('prints the remainder once, as the free entry', async () => {
+      const { getByTestId, queryByTestId } = await renderCard();
+      expect(queryByTestId('budget-remainder')).toBeNull();
+      expect(getByTestId('budget-legend-free')).toHaveTextContent(/budget_free200/);
     });
 
-    it('leaves the currency code off when the header carries one', async () => {
-      const { getByTestId } = await renderCard();
-      expect(getByTestId('budget-remainder')).not.toHaveTextContent('USD');
-    });
-
-    it('keeps the code on the figure when there is no chip to carry it', async () => {
-      const { getByTestId } = await renderCard(HEALTHY, { showCurrencyCode: true });
-      expect(getByTestId('budget-remainder')).toHaveTextContent('200 USD');
-    });
-
-    it('colours a negative remainder with the overspend colour', async () => {
-      const { getByTestId } = await renderCard({ ...HEALTHY, remainder: '-50.00' });
-      expect(StyleSheet.flatten(getByTestId('budget-remainder').props.style).color)
-        .toBe(COLORS.overspend);
-    });
-
-    // With nothing to allocate FROM, the remainder degenerates into "minus
-    // everything you planned" — a number in alarm red is worse than a prompt.
-    it('shows the add-income prompt instead of a figure with no income declared', async () => {
-      const { queryByTestId, getByText } = await renderCard({
+    // The heading carried the add-income prompt, and MonthlyPlanSection states
+    // it only in uncontrolled mode while the Budgets tab always drives the
+    // month — so without a line here it is reachable from nowhere. It earns one:
+    // with no income there is no free zone and no overrun, and the bar reads
+    // full when nothing is wrong.
+    it('says why the bar reads full when no income is declared', async () => {
+      const { getByTestId } = await renderCard({
         ...HEALTHY, hasIncomeBasis: false, expectedIncome: '0.00', remainder: '-800.00',
       });
-      expect(getByText('add_income_for_remainder')).toBeTruthy();
-      expect(queryByTestId('budget-remainder')).toBeNull();
+      expect(getByTestId('budget-summary-no-income'))
+        .toHaveTextContent('add_income_for_remainder');
+      // And it still draws the part of the month it does know about.
+      expect(getByTestId('budget-legend-spent')).toHaveTextContent(/spent_amount600/);
+      expect(getByTestId('budget-flow-spent')).toBeTruthy();
     });
 
-    it('reserves the line for the figure until the plan section has reported', async () => {
-      const { getByTestId, queryByTestId } = await renderCard(null);
-      expect(getByTestId('budget-remainder')).toHaveTextContent('—');
-      expect(queryByTestId('budget-summary-legend')).toBeNull();
+    it('drops that line once an income is declared', async () => {
+      const { queryByTestId } = await renderCard();
+      expect(queryByTestId('budget-summary-no-income')).toBeNull();
     });
   });
 
@@ -148,6 +141,8 @@ describe('MonthSummaryCard', () => {
       const { getByTestId, queryByTestId } = await renderCard(null);
       expect(getByTestId('budget-flow-bar')).toBeTruthy();
       expect(queryByTestId('budget-flow-spent')).toBeNull();
+      expect(queryByTestId('budget-summary-legend')).toBeNull();
+      expect(queryByTestId('budget-remainder')).toBeNull();
     });
   });
 
@@ -251,16 +246,48 @@ describe('MonthSummaryCard', () => {
   });
 
   describe('The fill percentage', () => {
-    it('states how much of the plan is spent', async () => {
+    // With no heading left to hang it from, it rides on the legend row it
+    // actually measures: the actual against the allocation is the spent entry.
+    it('states how much of the plan is spent, on the spent entry', async () => {
       const { getByTestId } = await renderCard();
-      expect(getByTestId('budget-summary-percent')).toHaveTextContent(/75%budget_of_plan/);
+      expect(getByTestId('budget-summary-percent')).toHaveTextContent(/75%/);
+      expect(getByTestId('budget-legend-spent')).toHaveTextContent(/spent_amount600.*75%/);
     });
 
-    it('turns to the overspend colour past the plan', async () => {
+    // A second voice on one line, not a second figure: the amount is the entry,
+    // the percentage qualifies it.
+    it('stays quieter than the amount it rides on', async () => {
+      const { getByTestId } = await renderCard();
+      expect(StyleSheet.flatten(getByTestId('budget-summary-percent').props.style).color)
+        .toBe(COLORS.mutedText);
+      expect(StyleSheet.flatten(getByTestId('budget-legend-amount-spent').props.style).color)
+        .toBe(COLORS.text);
+    });
+
+    // 800 spent of an 800 plan is 100% of it, not 113%: past the plan the spent
+    // entry is capped at the allocation, so the figure saying how far past goes
+    // on the entry that means "past".
+    it('moves to the overrun, in the overspend colour, once the plan is passed', async () => {
       const { getByTestId } = await renderCard({ ...HEALTHY, actual: '900.00' });
       const percent = getByTestId('budget-summary-percent');
       expect(percent).toHaveTextContent(/113%/);
-      expect(StyleSheet.flatten(percent.props.style).backgroundColor).toBe(`${COLORS.overspend}1F`);
+      expect(StyleSheet.flatten(percent.props.style).color).toBe(COLORS.overspend);
+      expect(getByTestId('budget-legend-overspent')).toHaveTextContent(/113%/);
+      expect(getByTestId('budget-legend-spent')).not.toHaveTextContent(/113%/);
+    });
+
+    // Every legend entry keys a segment of the bar. With nothing allocated the
+    // whole actual is the overrun, so a "Spent 0" entry under a solid dot would
+    // point at a colour the bar does not carry.
+    it('drops the spent entry when there is no allocation to have spent from', async () => {
+      const { getByTestId, queryByTestId } = await renderCard({
+        ...HEALTHY, allocated: '0.00', actual: '500.00', remainder: '1000.00',
+      });
+      expect(queryByTestId('budget-legend-spent')).toBeNull();
+      expect(queryByTestId('budget-flow-spent')).toBeNull();
+      expect(getByTestId('budget-legend-overspent')).toHaveTextContent(/budget_overspent500/);
+      // Nothing to be a percentage of, either.
+      expect(queryByTestId('budget-summary-percent')).toBeNull();
     });
 
     it('is withheld until there is an actual to state', async () => {
