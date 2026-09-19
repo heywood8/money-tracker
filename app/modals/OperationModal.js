@@ -741,6 +741,7 @@ export default function OperationModal({
                   disabled={isShadowOperation}
                   accessibilityRole="button"
                   accessibilityLabel={t('select_category')}
+                  testID="category-input"
                 >
                   <Icon name="tag" size={20} color={isShadowOperation ? colors.mutedText : colors.text} />
                   <Text
