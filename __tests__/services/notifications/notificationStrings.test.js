@@ -316,6 +316,24 @@ describe('notificationStrings.getAddedAlertCopy', () => {
 
     expect(copy.actionLabel).toBe(ruJson.bank_notifications_bg_added_acknowledge);
   });
+
+  it('carries the change-category button label in every shape', async () => {
+    // The copy layer always supplies it; whether the receipt shows the button is
+    // the presenter's call (only a single categorizable booking can).
+    const label = enJson.bank_notifications_bg_added_change_category;
+
+    expect((await getAddedAlertCopy(2)).changeCategoryLabel).toBe(label); // count-only
+    expect((await getAddedAlertCopy(1, [detail()])).changeCategoryLabel).toBe(label); // single
+    expect((await getAddedAlertCopy(2, [detail(), detail()])).changeCategoryLabel).toBe(label);
+  });
+
+  it('localizes the change-category button label', async () => {
+    PreferencesDB.getPreference.mockResolvedValue('ru');
+
+    const copy = await getAddedAlertCopy(1, [detail()]);
+
+    expect(copy.changeCategoryLabel).toBe(ruJson.bank_notifications_bg_added_change_category);
+  });
 });
 
 describe('notificationStrings.isSingleItemAlert', () => {

@@ -111,6 +111,7 @@ const buildLocationOverrides = (attachLocation, location) => {
 
 export default function OperationModal({
   visible = false, onClose = () => {}, operation = null, isNew = false, onDelete = null,
+  openCategoryPicker = false,
 }) {
   const { colors } = useThemeColors();
   const { t } = useLocalization();
@@ -186,6 +187,34 @@ export default function OperationModal({
     openPicker,
     closePicker,
   } = useOperationPicker();
+
+  // A host can ask for the form to come up on its category picker — the "Change
+  // category" button on the auto-added receipt does, because correcting the
+  // guessed category is the whole reason that press happened.
+  //
+  // It waits for the form to have loaded this operation: `filteredCategories` is
+  // keyed on `values.type`, and the picker is opened with a snapshot of the list,
+  // so opening it during the render that merely *scheduled* the load would hand
+  // it the previous operation's categories. Comparing the loaded type against the
+  // operation's own is what says the load has landed.
+  const autoOpenedCategoryRef = useRef(false);
+  useEffect(() => {
+    if (!visible) {
+      autoOpenedCategoryRef.current = false;
+      return;
+    }
+    if (!openCategoryPicker || autoOpenedCategoryRef.current) return;
+    if (isNew || !operation || isShadowOperation) return;
+    // A transfer has no category — its counterpart is an account — so there is
+    // nothing to open.
+    if (values.type === 'transfer') return;
+    if (values.type !== (operation.type || 'expense')) return;
+    autoOpenedCategoryRef.current = true;
+    openPicker('category', filteredCategories);
+  }, [
+    visible, openCategoryPicker, isNew, operation, isShadowOperation,
+    values.type, filteredCategories, openPicker,
+  ]);
 
   // State for split modal
   const [showSplitModal, setShowSplitModal] = useState(false);
@@ -847,5 +876,6 @@ OperationModal.propTypes = {
   }),
   isNew: PropTypes.bool,
   onDelete: PropTypes.func,
+  openCategoryPicker: PropTypes.bool,
 };
 

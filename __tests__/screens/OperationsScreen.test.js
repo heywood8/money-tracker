@@ -108,14 +108,23 @@ jest.mock('../../app/services/LastAccount', () => ({
 }));
 
 /* eslint-disable react/prop-types */
+// Hoisted so tests can tell a remounted form from one handed new props; jest
+// allows a `mock`-prefixed binding inside the factory below.
+const mockOperationModalMounts = [];
 jest.mock('../../app/modals/OperationModal', () => {
   const React = require('react');
   return function MockOperationModal(props) {
+    React.useEffect(() => {
+      // Mount only (empty deps): the array records each instance, not each render.
+      mockOperationModalMounts.push(props.operation ? props.operation.id : null);
+    }, []);
     return React.createElement('OperationModal', {
       testID: 'operation-modal',
       visible: props.visible,
       onClose: props.onClose,
       onDelete: props.onDelete,
+      openCategoryPicker: props.openCategoryPicker,
+      operationId: props.operation ? props.operation.id : null,
     });
   };
 });
@@ -313,6 +322,9 @@ jest.mock('../../app/services/OperationsDB', () => {
     __esModule: true,
     ...actual,
     getDistinctLabels: jest.fn(() => Promise.resolve([])),
+    // Only the "Change category" deep link reads a single row by id; it resolves
+    // to nothing unless a test says otherwise.
+    getOperationById: jest.fn(() => Promise.resolve(null)),
   };
 });
 
@@ -3094,6 +3106,142 @@ describe('OperationsScreen', () => {
       });
 
       expect(mockShowDialog).toHaveBeenCalled();
+    });
+  });
+
+  // The "operations added" receipt's "Change category" button routes here: the
+  // operation is already booked, so the screen opens its form straight onto the
+  // category picker rather than surfacing the review deck.
+  describe('Change-category deep link', () => {
+    const { act } = require('@testing-library/react-native');
+    const { appEvents, EVENTS } = require('../../app/services/eventEmitter');
+    const { getOperationById } = require('../../app/services/OperationsDB');
+
+    const booked = {
+      id: 'op-7',
+      type: 'expense',
+      amount: '1299',
+      accountId: 'acc1',
+      categoryId: 'cat2',
+      date: '2026-08-12',
+    };
+
+    beforeEach(() => {
+      jest.clearAllMocks();
+      mockOperationModalMounts.length = 0;
+      getOperationById.mockResolvedValue(booked);
+    });
+
+    it('opens the named operation with its category picker up', async () => {
+      const OperationsScreen = require('../../app/screens/OperationsScreen').default;
+
+      const { getByTestId } = await render(<OperationsScreen />);
+      expect(getByTestId('operation-modal').props.visible).toBe(false);
+
+      await act(async () => {
+        appEvents.emit(EVENTS.OPEN_OPERATION_CATEGORY, { operationId: 'op-7' });
+      });
+
+      // Read from the database, not the loaded window: a booking dated outside
+      // the dates currently on screen is simply not in the list.
+      expect(getOperationById).toHaveBeenCalledWith('op-7');
+      const modal = getByTestId('operation-modal');
+      expect(modal.props.visible).toBe(true);
+      expect(modal.props.operationId).toBe('op-7');
+      expect(modal.props.openCategoryPicker).toBe(true);
+    });
+
+    it('clears the picker request when the form closes', async () => {
+      const OperationsScreen = require('../../app/screens/OperationsScreen').default;
+
+      const { getByTestId } = await render(<OperationsScreen />);
+      await act(async () => {
+        appEvents.emit(EVENTS.OPEN_OPERATION_CATEGORY, { operationId: 'op-7' });
+      });
+      expect(getByTestId('operation-modal').props.openCategoryPicker).toBe(true);
+
+      await act(async () => {
+        getByTestId('operation-modal').props.onClose();
+      });
+
+      // The request belonged to that press; the next edit opens the plain form.
+      const modal = getByTestId('operation-modal');
+      expect(modal.props.visible).toBe(false);
+      expect(modal.props.openCategoryPicker).toBe(false);
+    });
+
+    it('stays put when the operation is gone', async () => {
+      const OperationsScreen = require('../../app/screens/OperationsScreen').default;
+      getOperationById.mockResolvedValue(null);
+
+      const { getByTestId } = await render(<OperationsScreen />);
+      await act(async () => {
+        appEvents.emit(EVENTS.OPEN_OPERATION_CATEGORY, { operationId: 'op-7' });
+      });
+
+      expect(getByTestId('operation-modal').props.visible).toBe(false);
+    });
+
+    it('survives a failed read', async () => {
+      const OperationsScreen = require('../../app/screens/OperationsScreen').default;
+      getOperationById.mockRejectedValue(new Error('db is busy'));
+
+      const { getByTestId } = await render(<OperationsScreen />);
+      await act(async () => {
+        appEvents.emit(EVENTS.OPEN_OPERATION_CATEGORY, { operationId: 'op-7' });
+      });
+
+      expect(getByTestId('operation-modal').props.visible).toBe(false);
+    });
+
+    it('ignores an event that names no operation', async () => {
+      const OperationsScreen = require('../../app/screens/OperationsScreen').default;
+
+      await render(<OperationsScreen />);
+      await act(async () => {
+        appEvents.emit(EVENTS.OPEN_OPERATION_CATEGORY, {});
+      });
+
+      expect(getOperationById).not.toHaveBeenCalled();
+    });
+
+    it('drops its subscription on unmount', async () => {
+      const OperationsScreen = require('../../app/screens/OperationsScreen').default;
+
+      const { unmount } = await render(<OperationsScreen />);
+      await unmount();
+      await act(async () => {
+        appEvents.emit(EVENTS.OPEN_OPERATION_CATEGORY, { operationId: 'op-7' });
+      });
+
+      expect(getOperationById).not.toHaveBeenCalled();
+    });
+
+    describe('Regression Tests', () => {
+      it('rebuilds the form when the press names another operation over an open one', async () => {
+        // The form loads its values once per open and then guards against
+        // re-running, so swapping only the prop would leave op-7's amount,
+        // account and date under op-8's id — and Save would write them onto it.
+        const OperationsScreen = require('../../app/screens/OperationsScreen').default;
+
+        const { getByTestId } = await render(<OperationsScreen />);
+        await act(async () => {
+          appEvents.emit(EVENTS.OPEN_OPERATION_CATEGORY, { operationId: 'op-7' });
+        });
+        expect(getByTestId('operation-modal').props.operationId).toBe('op-7');
+
+        getOperationById.mockResolvedValue({ ...booked, id: 'op-8', type: 'income' });
+        await act(async () => {
+          appEvents.emit(EVENTS.OPEN_OPERATION_CATEGORY, { operationId: 'op-8' });
+        });
+
+        const modal = getByTestId('operation-modal');
+        expect(modal.props.operationId).toBe('op-8');
+        expect(modal.props.visible).toBe(true);
+        expect(modal.props.openCategoryPicker).toBe(true);
+        // A fresh instance, not the previous form handed a new operation.
+        expect(mockOperationModalMounts).toEqual([null, 'op-7', 'op-8']);
+      });
     });
   });
 

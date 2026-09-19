@@ -595,6 +595,7 @@
   "bank_notifications_bg_added_body_other": "{count} Vorgänge automatisch hinzugefügt",
   "bank_notifications_bg_added_to_account": "Auf: {name}",
   "bank_notifications_bg_added_acknowledge": "Gelesen",
+  "bank_notifications_bg_added_change_category": "Kategorie ändern",
   "bank_notifications_bg_reject": "Ablehnen",
   "bank_notifications_bg_select": "Auswählen",
   "bank_notifications_channel_name": "Bankvorgänge",

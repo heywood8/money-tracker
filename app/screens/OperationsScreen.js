@@ -16,7 +16,7 @@ import { useTabFocused } from '../contexts/TabFocusContext';
 import { setLastAccessedAccount } from '../services/LastAccount';
 import { appEvents, EVENTS } from '../services/eventEmitter';
 import { formatDate as toDateString } from '../services/BalanceHistoryDB';
-import { getDistinctLabels } from '../services/OperationsDB';
+import { getDistinctLabels, getOperationById } from '../services/OperationsDB';
 import { parseLabels, serializeLabels, addLabel, hasLabel } from '../utils/labelUtils';
 import { buildRepeatedOperation } from '../utils/operationUtils';
 import { getDriveBackupStatusLabel } from '../utils/driveBackupStatus';
@@ -159,6 +159,10 @@ const OperationsScreen = () => {
   const [modalVisible, setModalVisible] = useState(false);
   const [editingOperation, setEditingOperation] = useState(null);
   const [isNew, setIsNew] = useState(false);
+  // Whether the operation form should come up with its category picker already
+  // open. Only the "Change category" notification button sets it (see
+  // handleOpenOperationCategory); every other way into the form opens the form.
+  const [openCategoryPicker, setOpenCategoryPicker] = useState(false);
   const [showScrollToTop, setShowScrollToTop] = useState(false);
   const [showDatePicker, setShowDatePicker] = useState(false);
   const [selectedDate, setSelectedDate] = useState(new Date());
@@ -807,6 +811,7 @@ const OperationsScreen = () => {
   const handleEditOperation = useCallback((operation) => {
     setEditingOperation(operation);
     setIsNew(false);
+    setOpenCategoryPicker(false);
     setModalVisible(true);
   }, []);
 
@@ -1431,6 +1436,10 @@ const OperationsScreen = () => {
   // Handlers for modal visibility
   const handleCloseOperationModal = useCallback(() => {
     setModalVisible(false);
+    // The picker request belongs to the press that opened this form, not to the
+    // form: leaving it set would greet the next edit with a picker nobody asked
+    // for.
+    setOpenCategoryPicker(false);
   }, []);
 
   // Search handlers
@@ -1708,6 +1717,38 @@ const OperationsScreen = () => {
   useEffect(
     () => appEvents.on(EVENTS.OPEN_PENDING_OPERATIONS, handleOpenPendingSuggestions),
     [handleOpenPendingSuggestions],
+  );
+
+  // The "operations added" receipt's "Change category" button lands here: the
+  // operation was booked automatically and its category was guessed, so the form
+  // opens straight onto the category picker.
+  //
+  // The row is read from the database rather than from the loaded list — the
+  // list holds one window of dates, and an operation booked for an older date
+  // (or on a screen the user has since scrolled away from) is simply not in it.
+  const handleOpenOperationCategory = useCallback(async (payload) => {
+    const operationId = payload?.operationId;
+    if (operationId == null) return;
+    try {
+      const operation = await getOperationById(operationId);
+      if (!operation) {
+        console.log('[notif-route] change category: operation is gone', { operationId });
+        return;
+      }
+      setEditingOperation(operation);
+      setIsNew(false);
+      setOpenCategoryPicker(true);
+      setModalVisible(true);
+    } catch (error) {
+      // A failed read is not worth a dialog: the user pressed a notification
+      // button, and the operations list they land on is still the right place.
+      console.warn('[notif-route] change category: failed to load the operation', error);
+    }
+  }, []);
+
+  useEffect(
+    () => appEvents.on(EVENTS.OPEN_OPERATION_CATEGORY, handleOpenOperationCategory),
+    [handleOpenOperationCategory],
   );
 
   // A deck that arrives on its own — the foreground resync, a pull-to-refresh, a
@@ -1996,12 +2037,20 @@ const OperationsScreen = () => {
         </Animated.View>
       )}
 
+      {/* Keyed on the operation so a form already on screen is rebuilt for a new
+          one rather than kept. useOperationForm loads its values once per open
+          and then guards against re-running, so swapping only the prop — which
+          the "Change category" deep link can do over an open form — would leave
+          the previous operation's amount, account and date sitting under the new
+          operation's id, and Save would write them onto it. */}
       <OperationModal
+        key={editingOperation ? String(editingOperation.id) : 'new'}
         visible={modalVisible}
         onClose={handleCloseOperationModal}
         operation={editingOperation}
         isNew={isNew}
         onDelete={handleDeleteOperation}
+        openCategoryPicker={openCategoryPicker}
       />
 
       {/* Date Picker for jumping to a specific date */}

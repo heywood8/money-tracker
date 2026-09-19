@@ -595,6 +595,7 @@
   "bank_notifications_bg_added_body_other": "거래 {count}건이 자동으로 추가되었습니다",
   "bank_notifications_bg_added_to_account": "입금 계좌: {name}",
   "bank_notifications_bg_added_acknowledge": "확인함",
+  "bank_notifications_bg_added_change_category": "카테고리 변경",
   "bank_notifications_bg_reject": "거부",
   "bank_notifications_bg_select": "선택",
   "bank_notifications_channel_name": "은행 거래",

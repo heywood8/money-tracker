@@ -595,6 +595,7 @@
   "bank_notifications_bg_added_body_other": "{count} opérations ajoutées automatiquement",
   "bank_notifications_bg_added_to_account": "Vers : {name}",
   "bank_notifications_bg_added_acknowledge": "Vu",
+  "bank_notifications_bg_added_change_category": "Changer de catégorie",
   "bank_notifications_bg_reject": "Rejeter",
   "bank_notifications_bg_select": "Choisir",
   "bank_notifications_channel_name": "Opérations bancaires",

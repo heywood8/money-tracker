@@ -379,6 +379,55 @@ describe('localNotifications', () => {
       );
       const [request] = Notifications.scheduleNotificationAsync.mock.calls[0];
       expect(request.content.categoryIdentifier).toBe(localNotifications.ADDED_ALERT_CATEGORY_ID);
+      // Nothing was named, so the receipt carries no operation to re-categorize.
+      expect(request.content.data).not.toHaveProperty(localNotifications.OPERATION_ID_KEY);
+    });
+
+    it('adds "Change category" when the receipt names one operation', async () => {
+      await localNotifications.presentAddedOperationsAlert(
+        { title: 'a', body: 'b', actionLabel: 'Прочитано', changeCategoryLabel: 'Изменить категорию' },
+        ['op-1'],
+        'op-1',
+      );
+
+      expect(Notifications.setNotificationCategoryAsync).toHaveBeenCalledWith(
+        localNotifications.ADDED_ALERT_RECATEGORIZE_CATEGORY_ID,
+        [
+          expect.objectContaining({ identifier: localNotifications.ACKNOWLEDGE_ACTION_ID }),
+          expect.objectContaining({
+            identifier: localNotifications.CHANGE_CATEGORY_ACTION_ID,
+            buttonTitle: 'Изменить категорию',
+            // Picking a category happens in the app, so this one opens it.
+            options: { opensAppToForeground: true },
+          }),
+        ],
+      );
+      const [request] = Notifications.scheduleNotificationAsync.mock.calls[0];
+      expect(request.content.categoryIdentifier).toBe(
+        localNotifications.ADDED_ALERT_RECATEGORIZE_CATEGORY_ID,
+      );
+      // The id the button needs to find the operation again.
+      expect(request.content.data[localNotifications.OPERATION_ID_KEY]).toBe('op-1');
+    });
+
+    it('carries a numeric operation id as a string', async () => {
+      // SQLite hands back integer ids; the payload round-trips through the OS,
+      // so the matcher reads strings and the id is normalized on the way out.
+      await localNotifications.presentAddedOperationsAlert({ title: 'a', body: 'b' }, [42], 42);
+
+      const [request] = Notifications.scheduleNotificationAsync.mock.calls[0];
+      expect(request.content.data[localNotifications.OPERATION_ID_KEY]).toBe('42');
+    });
+
+    it('keeps the acknowledge-only set when no operation is named', async () => {
+      await localNotifications.presentAddedOperationsAlert(
+        { title: 'a', body: 'b' },
+        ['op-1', 'op-2'],
+        null,
+      );
+
+      const [request] = Notifications.scheduleNotificationAsync.mock.calls[0];
+      expect(request.content.categoryIdentifier).toBe(localNotifications.ADDED_ALERT_CATEGORY_ID);
     });
 
     it('still posts when the category cannot be registered', async () => {
@@ -398,6 +447,36 @@ describe('localNotifications', () => {
       expect(request.content.categoryIdentifier).not.toBe(
         localNotifications.ADDED_ALERT_CATEGORY_ID,
       );
+    });
+  });
+
+  describe('isChangeCategoryResponse / responseOperationId', () => {
+    const response = (actionIdentifier, data = {}) => ({
+      actionIdentifier,
+      notification: { request: { identifier: 'penny-added-operations-1', content: { data } } },
+    });
+
+    it('matches only the change-category action', () => {
+      expect(localNotifications.isChangeCategoryResponse(response('change-category'))).toBe(true);
+      expect(localNotifications.isChangeCategoryResponse(response('acknowledge'))).toBe(false);
+      expect(localNotifications.isChangeCategoryResponse(null)).toBe(false);
+    });
+
+    it('reads the operation id the notification carries', () => {
+      expect(
+        localNotifications.responseOperationId(response('change-category', { operationId: 'op-1' })),
+      ).toBe('op-1');
+      expect(
+        localNotifications.responseOperationId(response('change-category', { operationId: 42 })),
+      ).toBe('42');
+    });
+
+    it('returns null when no operation is named', () => {
+      expect(localNotifications.responseOperationId(response('change-category'))).toBeNull();
+      expect(
+        localNotifications.responseOperationId(response('change-category', { operationId: '' })),
+      ).toBeNull();
+      expect(localNotifications.responseOperationId(null)).toBeNull();
     });
   });
 

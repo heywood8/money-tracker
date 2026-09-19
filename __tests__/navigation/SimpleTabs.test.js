@@ -1893,6 +1893,24 @@ describe('SimpleTabs deep link to the review deck', () => {
     });
   });
 
+  it('switches to Operations when the receipt\'s "Change category" button routes here', async () => {
+    // The form the press asks for is a modal over this tab; the tab underneath
+    // is what the user is returned to when they close it.
+    const { getByTestId } = await render(<SimpleTabs />);
+    await act(async () => { fireEvent.press(getByTestId('tab-settings')); });
+    await waitFor(() => {
+      expect(getByTestId('tab-settings').props.accessibilityState).toEqual({ selected: true });
+    });
+
+    await act(async () => {
+      appEvents.emit(EVENTS.OPEN_OPERATION_CATEGORY, { operationId: 'op-7' });
+    });
+
+    await waitFor(() => {
+      expect(getByTestId('tab-Operations').props.accessibilityState).toEqual({ selected: true });
+    });
+  });
+
   // The receipt deep link gets the same treatment as the review one: the guard
   // must not swallow it either.
   it('lands the "operations added" deep link while a transition is in flight', async () => {
