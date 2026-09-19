@@ -1,5 +1,12 @@
 # Changelog
 
+## [0.291.2](https://github.com/heywood8/money-tracker/compare/penny-v0.291.1...penny-v0.291.2) (2026-09-19)
+
+
+### Code Refactoring
+
+* **operations:** slide the category picker into the sheet ([#1802](https://github.com/heywood8/money-tracker/issues/1802)) ([66b672e](https://github.com/heywood8/money-tracker/commit/66b672e4b3d6e1dae87b0c653cd216cc0e54f16f))
+
 ## [0.291.1](https://github.com/heywood8/money-tracker/compare/penny-v0.291.0...penny-v0.291.1) (2026-09-19)
 
 
