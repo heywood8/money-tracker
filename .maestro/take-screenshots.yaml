@@ -53,12 +53,13 @@ appId: com.heywood8.monkeep
 - waitForAnimationToEnd:
     timeout: 1000
 
-# Screenshot: the operation editor and its category picker. The picker used to
-# open a SECOND bottom sheet on top of this one; it is now a subpanel covering
-# the whole card, and these two frames are what shows that.
-#
+# Screenshot: the operation editor and its category picker. The picker used to be
+# a SECOND bottom sheet stacked on this one, landing its rounded top edge in the
+# middle of the form; it is now a subpanel that covers the whole card. These two
+# frames are the regression check for that (see OperationModal's overlayPanel).
 # Row 1, not row 0: the seed data's last operation is a transfer, and a transfer
-# has a destination-account row where the category button sits.
+# has a destination-account row where the category button sits — row 0 opened the
+# editor but never the picker.
 - tapOn:
     id: "operation-item-1"
 - waitForAnimationToEnd:
@@ -76,7 +77,7 @@ appId: com.heywood8.monkeep
       - waitForAnimationToEnd:
           timeout: 2000
       - takeScreenshot: 12_category_picker_light
-      # Back closes the PANEL, not the sheet under it (onBackIntercept).
+      # Back closes the PANEL, not the sheet under it — this is onBackIntercept.
       - back
       - waitForAnimationToEnd:
           timeout: 1000
@@ -110,10 +111,7 @@ appId: com.heywood8.monkeep
 - waitForAnimationToEnd:
     timeout: 2000
 
-# Screenshot: the filters panel. It is no longer a FAB over the list — it lives
-# behind the search pill, which expands into a field with a filter toggle beside
-# it (see SearchBar). `filter-fab` and `close-filter-modal` have not existed in
-# the app for a long time, and the flow aborted on them every run.
+# Screenshot: Filter modal
 - tapOn:
     id: "search-input-container"
 - waitForAnimationToEnd:
@@ -124,7 +122,7 @@ appId: com.heywood8.monkeep
     timeout: 2000
 - takeScreenshot: 09_filter_modal_light
 
-# Close the search bar (which closes the filters with it)
+# Close filter modal
 - tapOn:
     id: "close-search-button"
 - waitForAnimationToEnd:
@@ -185,12 +183,13 @@ appId: com.heywood8.monkeep
     timeout: 3000
 - takeScreenshot: 01_operations_dark
 
-# Screenshot: the operation editor and its category picker. The picker used to
-# open a SECOND bottom sheet on top of this one; it is now a subpanel covering
-# the whole card, and these two frames are what shows that.
-#
+# Screenshot: the operation editor and its category picker. The picker used to be
+# a SECOND bottom sheet stacked on this one, landing its rounded top edge in the
+# middle of the form; it is now a subpanel that covers the whole card. These two
+# frames are the regression check for that (see OperationModal's overlayPanel).
 # Row 1, not row 0: the seed data's last operation is a transfer, and a transfer
-# has a destination-account row where the category button sits.
+# has a destination-account row where the category button sits — row 0 opened the
+# editor but never the picker.
 - tapOn:
     id: "operation-item-1"
 - waitForAnimationToEnd:
@@ -208,7 +207,7 @@ appId: com.heywood8.monkeep
       - waitForAnimationToEnd:
           timeout: 2000
       - takeScreenshot: 12_category_picker_dark
-      # Back closes the PANEL, not the sheet under it (onBackIntercept).
+      # Back closes the PANEL, not the sheet under it — this is onBackIntercept.
       - back
       - waitForAnimationToEnd:
           timeout: 1000
@@ -217,7 +216,7 @@ appId: com.heywood8.monkeep
 - waitForAnimationToEnd:
     timeout: 1000
 
-# Screenshot: the filters panel (dark). Same route as the light one above.
+# Screenshot: Filter modal (dark)
 - tapOn:
     id: "search-input-container"
 - waitForAnimationToEnd:
@@ -228,7 +227,7 @@ appId: com.heywood8.monkeep
     timeout: 2000
 - takeScreenshot: 09_filter_modal_dark
 
-# Close the search bar (which closes the filters with it)
+# Close filter modal
 - tapOn:
     id: "close-search-button"
 - waitForAnimationToEnd:
