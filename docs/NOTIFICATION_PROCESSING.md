@@ -398,14 +398,28 @@ live on `AccountsDB` (`getAccountByCardMask`, `setAccountCardMask`).
   *start*, so a row it then makes redundant (it auto-created the same
   transaction) would otherwise be shown as a card the next reconciling reload
   takes straight back off the screen.
+- The deck is rendered **outside** the quick-add clip, as a sibling of it with a
+  height of its own, and a queued card collapses the form rather than being laid
+  over it. That is not a layout preference: a container inside the clip is a
+  container the clip can shut, and once Reanimated has written a `maxHeight: 0`
+  into it behind a stopped activity nothing React renders can clear it —
+  `useAnimatedStyle` hands React an opaque object, so React never renders a
+  literal `maxHeight` and its diff has nothing to undo. Six repairs were made
+  inside that clip before the logs showed it (`clipHeight: 0` beside
+  `deckHostHeight: 444` at every arrival: a content view measuring nothing while
+  its own child measures the full card frame). Do not move the cards back in.
 - The deck does not wait for the quick-add panel to be measured. With the panel
-  setting off it sits collapsed behind the `+` button and may never have
-  reported a height, so the cards open at their floor frame
-  (`MIN_CARD_HEIGHT`), and `OperationsScreen` opens the clipped block instantly
-  and scrolls the list to the top the moment the queue becomes non-empty —
-  whether a tapped alert, the foreground resync or a pull-to-refresh filled it.
-  The `+` button stands down while cards are up, so a deck left clipped or
-  above the viewport would leave the user with neither.
+  setting off the form may never have reported a height, so the cards open at
+  their floor frame (`MIN_CARD_HEIGHT`), and `OperationsScreen` scrolls the list
+  to the top the moment the queue becomes non-empty — whether a tapped alert,
+  the foreground resync or a pull-to-refresh filled it. The `+` button stands
+  down while cards are up, so a deck above the viewport would leave the user
+  with neither.
+- `[deck] on screen` reports the deck container's rect via `measureInWindow`.
+  Read it together with `clipHeight`/`deckHostHeight` on the same line and never
+  alone: `measureInWindow` reports a layout frame and cannot see `overflow:
+  hidden`, so a clipped container reports a perfectly healthy rect while
+  painting nothing.
 - Tapped alerts reach the page through `useNotificationResponseRouter`
   (`app/hooks/`), mounted in `AppInitializer`. It queues a cold-start response
   until `SimpleTabs` is on screen (nothing is subscribed before then), re-reads

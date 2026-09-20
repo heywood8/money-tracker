@@ -259,14 +259,13 @@ const OperationsScreen = () => {
     // reports several in a row. Keeping it poisoned this ref, which is how the
     // 2026-09-18 log came to report `slide: 0` on a block that measured 444 a
     // frame later, and left every collapse animating from the fallback height
-    // instead of from the height the eye can see.
-    if (measured === 0 && !quickAddCollapsedRef.current) return;
+    // instead of from the height the eye can see. A deck now holds the block
+    // collapsed rather than open, so its card-leave zeros arrive on exactly that
+    // path — hence the second half of the test, matching the wrapper's guard.
+    if (measured === 0
+      && (!quickAddCollapsedRef.current || suggestionsCountRef.current > 0)) return;
     quickAddClipHeightRef.current = measured;
   }, []);
-  // The frame a suggestion deck reserves over the form (0 without one). Kept in
-  // a ref for the same reason as the clip height: applyQuickAddCollapse reads it
-  // when it opens the clip, and it must not re-create that callback.
-  const deckReserveRef = useRef(0);
 
   // Read by the layout handler below, which must not be re-created on every
   // collapse (its identity is a dep of the memoized header).
@@ -301,18 +300,16 @@ const OperationsScreen = () => {
     // the clip touches nothing: the list below sat still for 300ms and then
     // jumped as the last 20ms cut through the actual content. Starting at the
     // measured height makes every frame of the collapse a frame the eye can see.
-    // A deck over the form reserves its own frame, which the clip measurement can
-    // predate (the layout that grows the block for the cards has not run yet when
-    // the effect fires): open to at least that, or the cards would sit clipped
-    // until a release callback that an interrupted animation never delivers.
-    const measured = Math.max(quickAddClipHeightRef.current, deckReserveRef.current)
-      || QUICK_ADD_UNCLIPPED;
+    // The deck used to reserve a frame in here as well, so the clip had to open
+    // to at least that or the cards sat clipped inside it. They are no longer in
+    // the clip, so this is the form's own height and nothing else.
+    const measured = quickAddClipHeightRef.current || QUICK_ADD_UNCLIPPED;
     // The slide's travel: exactly the block's own height, so the content clears
     // the boundary as the boundary closes. Before the first layout there is no
     // height to travel — the clip alone hides it, and the first expansion then
     // reads as an uncover rather than as a slide from far above the screen.
     const slide = quickAddClipHeightRef.current || 0;
-    console.log('[deck] clip', { collapsed, mode, measured, slide, reserve: deckReserveRef.current });
+    console.log('[deck] clip', { collapsed, mode, measured, slide });
 
     if (mode === 'instant') {
       quickAddMaxHeight.value = collapsed ? 0 : QUICK_ADD_UNCLIPPED;
@@ -485,31 +482,39 @@ const OperationsScreen = () => {
   // notifications holds the panel open on its own — the cards are laid over the
   // form and clipped with it, and nothing else on this screen announces them, so
   // a collapsed panel would hide the very thing that needs answering.
+  //
+  // A deck now REPLACES the form rather than being laid over it: the cards are
+  // rendered outside this clip, so leaving the form open underneath them would
+  // stack two blocks down the page instead of one. The form comes back when the
+  // queue empties.
   const quickAddCollapsed = isSearchOpen
-    || (!showQuickAddPanel && !quickAddExpanded && !hasSuggestions);
-  // Whether the DECK — rather than the form's own open/closed state — is what
-  // holds the panel open. While it does, the clip and the slide render from
-  // STATIC styles instead of the animated ones (see the JSX below).
+    || hasSuggestions
+    || (!showQuickAddPanel && !quickAddExpanded);
+  // Whether the review deck is on screen. It is rendered OUTSIDE the quick-add
+  // clip (see the JSX below), which is the whole point of this flag.
   //
-  // What five repairs failed on was not the shared value but the dependency on
-  // it. A change written while the Android activity is stopped has no frame to
-  // commit into, and a re-write of the value it already holds produces no diff
-  // for the shadow tree, so nothing reaches the mounting layer either: that is
-  // why `reassertQuickAddClip` logged a perfectly correct `collapsed: false` at
-  // 09:06:05 on 2026-09-18 and the user still had to open and close search
-  // (09:06:16 → 09:06:17) before the card appeared. Reanimated's own docs are
-  // explicit that an animated style overrides a static one in the same array
-  // whatever the order, so leaving it out is the only way to take the cards off
-  // it — and a style React renders cannot be lost that way: it arrives with the
-  // commit that rendered it.
+  // Six repairs were made inside that clip, and the 2026-09-20 export finally
+  // says why every one of them was unreachable. At each arrival the log carries
+  // the same impossible pair: `clipHeight: 0` next to `deckHostHeight: 444` —
+  // the clip's content view measuring nothing while its own child measures the
+  // full card frame. That is a shut clip with its content overflowing it
+  // invisibly, and `measureInWindow` cannot see it, which is why the rect the
+  // previous round added reported a perfectly healthy 444 at y=46 on a screen
+  // showing no cards at all.
   //
-  // The trade, deliberately: closing search over a queued card now uncovers the
-  // deck in one frame instead of sliding it down on the shared exit curve with
-  // the pill and the list. Keeping that slide would mean handing the cards back
-  // to the animated value for its duration, which is the exact window this
-  // exists to close — and the deck already arrives instantly everywhere else, by
-  // the same reasoning as the motion effect's `mode = 'instant'` below.
-  const deckOwnsPanel = hasSuggestions && !isSearchOpen;
+  // Nothing React renders can reopen that clip. `useAnimatedStyle` hands React
+  // an opaque object, so React never renders a literal `maxHeight` — Reanimated
+  // writes that prop into the shadow tree itself. A static style with no
+  // `maxHeight` therefore diffs to no change at all, and the `maxHeight: 0`
+  // Reanimated left behind (written while the activity was stopped, with no
+  // frame to commit into) stays on the view. Only Reanimated can clear it, which
+  // is exactly what opening and closing search does, and why that stayed the
+  // only cure through six attempts.
+  //
+  // So the cards stop living in the clip. Their container is a plain View with
+  // its own height, a sibling of the clip rather than a child, and no shared
+  // value, ceiling, transform or overflow stands between them and the screen.
+  const deckUp = hasSuggestions && !isSearchOpen;
   // Mirrors for the layout handler and the diagnostic snapshot, which both run
   // outside a render and must read the block as it stands, not as it stood when
   // their callback was created.
@@ -577,8 +582,11 @@ const OperationsScreen = () => {
     // to the MIN_CARD_HEIGHT floor, so the next suggestion rendered a 260-high
     // card and jumped to the form's height a frame later. While the block is
     // collapsed 0 *is* the truth (nothing is laid out behind the + button), and
-    // the deck floors its frame for exactly that case.
-    if (measured === 0 && !quickAddCollapsedRef.current) {
+    // the deck floors its frame for exactly that case — except while a deck is
+    // UP, because a deck now collapses the form itself and the cards are sized
+    // from the height it last had. Reading that collapse as "the form is 0 tall"
+    // would shrink every card to the floor the moment it appeared.
+    if (measured === 0 && (!quickAddCollapsedRef.current || suggestionsCountRef.current > 0)) {
       // Once per run of them: a LayoutAnimation reports several zero passes in a
       // row, and this handler runs on every frame of one.
       if (!droppedZeroRef.current) {
@@ -613,14 +621,6 @@ const OperationsScreen = () => {
     }
     setQuickAddHeight((prev) => (prev === measured ? prev : measured));
   }, []);
-  // Declared before the motion effect below: effects run in order, and the clip
-  // reads this reserve when that effect opens it.
-  useEffect(() => {
-    deckReserveRef.current = hasSuggestions
-      ? deckPeekAllowance(operationSuggestions.length) + deckCardHeight(quickAddHeight)
-      : 0;
-  }, [hasSuggestions, operationSuggestions.length, quickAddHeight]);
-
   // Which input moved decides the motion, so the previous values are kept rather
   // than just the previous collapsed state.
   const quickAddMotionRef = useRef(null);
@@ -639,13 +639,11 @@ const OperationsScreen = () => {
     let mode = 'spring';
     if (!prev || prev.setting !== showQuickAddPanel) mode = 'instant';
     else if (prev.search !== isSearchOpen) mode = 'timing';
-    // Opened by a deck arriving from the review queue — the one remaining way a
-    // collapsed block opens with cards up, since the + button stands down while
-    // they are. The cards are the only way to answer the queue, so this open
-    // must land no matter what: instantly (the cards play their own entrance)
-    // rather than on the spring, whose settle callback is the only thing that
-    // would otherwise hand the ceiling back.
-    else if (hasSuggestions && !quickAddCollapsed) mode = 'instant';
+    // A deck arriving now CLOSES this block rather than opening it — the cards
+    // took the panel's place instead of being laid over the form inside it — so
+    // a queue landing is a plain collapse and the deck's own entrance is the
+    // only motion the arrival plays.
+    else if (hasSuggestions) mode = 'instant';
     applyQuickAddCollapse(quickAddCollapsed, mode);
   }, [quickAddCollapsed, isSearchOpen, showQuickAddPanel, hasSuggestions, applyQuickAddCollapse]);
 
@@ -1499,103 +1497,98 @@ const OperationsScreen = () => {
 
   const quickAddFormComponent = useMemo(() => (
     <>
+      {/* The review deck: a plain container, a SIBLING of the clip rather than a
+          child of it, with a height of its own. Nothing here is animated, has a
+          ceiling, or is clipped — because the clip is precisely what six repairs
+          could not reopen once Reanimated had written a `maxHeight: 0` into it
+          behind a stopped activity (see `deckUp`). The cards are absolutely
+          positioned inside, so the height is explicit rather than a minimum:
+          padding for the peeking edges above, the floored card frame below. */}
+      {deckUp && (
+        <View
+          ref={deckHostRef}
+          onLayout={handleDeckHostLayout}
+          style={{
+            paddingTop: deckPeekAllowance(operationSuggestions.length),
+            height: deckPeekAllowance(operationSuggestions.length)
+              + deckCardHeight(quickAddHeight),
+          }}
+        >
+          <NotificationBindingStack
+            suggestions={operationSuggestions}
+            choices={suggestionChoices}
+            saveErrors={suggestionSaveErrors}
+            quickAddHeight={quickAddHeight}
+            colors={colors}
+            t={t}
+            accounts={accounts}
+            categories={categories}
+            onChoiceChange={setSuggestionChoice}
+            onSave={acceptSuggestion}
+            onDismiss={dismissSuggestion}
+          />
+        </View>
+      )}
       <Animated.View
         testID="quick-add-clip"
-        // Static, not animated, while the deck owns the panel: the cards are the
-        // only way to answer the review queue, so their visibility may not
-        // depend on a shared value reaching the view (see `deckOwnsPanel`).
-        style={deckOwnsPanel ? styles.quickAddClipOpen : animatedQuickAddClipStyle}
+        style={animatedQuickAddClipStyle}
         // A zero-height clip drops touches on Android, but not TalkBack: without
         // this the whole form stays reachable by screen reader while invisible.
         importantForAccessibility={quickAddCollapsed ? 'no-hide-descendants' : 'auto'}
       >
         <Animated.View
           testID="quick-add-slide"
-          style={deckOwnsPanel ? null : animatedQuickAddSlideStyle}
+          style={animatedQuickAddSlideStyle}
           onLayout={handleQuickAddClipLayout}
         >
-          {/* Deck container: the binding cards overlay the quick-add form
-              (absolute, sized to the measured wrapper below), with top padding
-              for the peeking edges of the cards behind the front one. The
-              minHeight reserves room for the floored card frame so a card never
-              overhangs this container (an overhang would drop touches on the
-              pinned actions on Android). Collapses with the form when search
-              opens (same clip). */}
           <View
-            ref={deckHostRef}
-            onLayout={handleDeckHostLayout}
-            style={{
-              paddingTop: deckPeekAllowance(operationSuggestions.length),
-              minHeight: hasSuggestions
-                ? deckPeekAllowance(operationSuggestions.length) + deckCardHeight(quickAddHeight)
-                : undefined,
-            }}
+            testID="quick-add-measure"
+            onLayout={handleQuickAddLayout}
           >
-            <View
-              testID="quick-add-measure"
-              onLayout={handleQuickAddLayout}
-              importantForAccessibility={hasSuggestions ? 'no-hide-descendants' : 'auto'}
-            >
-              <QuickAddForm
-                colors={colors}
-                t={t}
-                valuesStore={quickAddValuesStore}
-                setQuickAddValues={setQuickAddValues}
-                accounts={visibleAccounts}
-                filteredCategories={filteredCategories}
-                topCategoriesForType={topCategoriesForType}
-                getCategoryInfo={getCategoryInfo}
-                getAccountName={getAccountName}
-                getAccountBalance={getAccountBalance}
-                getCategoryName={getCategoryName}
-                openPicker={openPicker}
-                handleQuickAdd={handleQuickAdd}
-                handleAmountChange={handleAmountChange}
-                handleExchangeRateChange={handleExchangeRateChange}
-                handleDestinationAmountChange={handleDestinationAmountChange}
-                onAutoAddWithCategory={handleAutoAddWithCategory}
-                topTransferAccounts={topTransferAccountsForForm}
-                onAutoAddWithAccount={handleAutoAddWithAccount}
-                TYPES={TYPES}
-                rateSource={rateSource}
-                onOperationCurrencyChange={handleOperationCurrencyChange}
-                foreignRateSource={foreignRateSource}
-                foreignExchangeRate={foreignExchangeRate}
-                flashError={quickAddFlash}
-                saving={quickAddSaving}
-              />
-              <QuickAddRateSync
-                valuesStore={quickAddValuesStore}
-                setValues={setQuickAddValues}
-                isMultiCurrencyTransfer={isMultiCurrencyTransfer}
-                sourceAccount={sourceAccount}
-                destinationAccount={destinationAccount}
-                lastEditedField={lastEditedField}
-                setLastEditedField={setLastEditedField}
-                setRateSource={setRateSource}
-              />
-            </View>
-            {hasSuggestions && (
-              <NotificationBindingStack
-                suggestions={operationSuggestions}
-                choices={suggestionChoices}
-                saveErrors={suggestionSaveErrors}
-                quickAddHeight={quickAddHeight}
-                colors={colors}
-                t={t}
-                accounts={accounts}
-                categories={categories}
-                onChoiceChange={setSuggestionChoice}
-                onSave={acceptSuggestion}
-                onDismiss={dismissSuggestion}
-              />
-            )}
+            <QuickAddForm
+              colors={colors}
+              t={t}
+              valuesStore={quickAddValuesStore}
+              setQuickAddValues={setQuickAddValues}
+              accounts={visibleAccounts}
+              filteredCategories={filteredCategories}
+              topCategoriesForType={topCategoriesForType}
+              getCategoryInfo={getCategoryInfo}
+              getAccountName={getAccountName}
+              getAccountBalance={getAccountBalance}
+              getCategoryName={getCategoryName}
+              openPicker={openPicker}
+              handleQuickAdd={handleQuickAdd}
+              handleAmountChange={handleAmountChange}
+              handleExchangeRateChange={handleExchangeRateChange}
+              handleDestinationAmountChange={handleDestinationAmountChange}
+              onAutoAddWithCategory={handleAutoAddWithCategory}
+              topTransferAccounts={topTransferAccountsForForm}
+              onAutoAddWithAccount={handleAutoAddWithAccount}
+              TYPES={TYPES}
+              rateSource={rateSource}
+              onOperationCurrencyChange={handleOperationCurrencyChange}
+              foreignRateSource={foreignRateSource}
+              foreignExchangeRate={foreignExchangeRate}
+              flashError={quickAddFlash}
+              saving={quickAddSaving}
+            />
+            <QuickAddRateSync
+              valuesStore={quickAddValuesStore}
+              setValues={setQuickAddValues}
+              isMultiCurrencyTransfer={isMultiCurrencyTransfer}
+              sourceAccount={sourceAccount}
+              destinationAccount={destinationAccount}
+              lastEditedField={lastEditedField}
+              setLastEditedField={setLastEditedField}
+              setRateSource={setRateSource}
+            />
           </View>
         </Animated.View>
       </Animated.View>
       {filtersExpanded && filterPanelHeight > 0 && <View style={{ height: filterPanelHeight }} />}
     </>
-  ), [animatedQuickAddClipStyle, animatedQuickAddSlideStyle, handleQuickAddClipLayout, quickAddCollapsed, deckOwnsPanel, colors, t, quickAddValuesStore, setQuickAddValues, isMultiCurrencyTransfer, sourceAccount, destinationAccount, lastEditedField, setLastEditedField, setRateSource, visibleAccounts, filteredCategories, topCategoriesForType, getCategoryInfo, getAccountName, getAccountBalance, getCategoryName, openPicker, handleQuickAdd, handleAmountChange, handleExchangeRateChange, handleDestinationAmountChange, handleAutoAddWithCategory, topTransferAccountsForForm, handleAutoAddWithAccount, TYPES, rateSource, handleOperationCurrencyChange, foreignRateSource, foreignExchangeRate, filterPanelHeight, filtersExpanded, quickAddFlash, quickAddSaving, operationSuggestions, hasSuggestions, quickAddHeight, handleQuickAddLayout, handleDeckHostLayout, accounts, categories, suggestionSaveErrors, suggestionChoices, setSuggestionChoice, acceptSuggestion, dismissSuggestion]);
+  ), [animatedQuickAddClipStyle, animatedQuickAddSlideStyle, handleQuickAddClipLayout, quickAddCollapsed, deckUp, colors, t, quickAddValuesStore, setQuickAddValues, isMultiCurrencyTransfer, sourceAccount, destinationAccount, lastEditedField, setLastEditedField, setRateSource, visibleAccounts, filteredCategories, topCategoriesForType, getCategoryInfo, getAccountName, getAccountBalance, getCategoryName, openPicker, handleQuickAdd, handleAmountChange, handleExchangeRateChange, handleDestinationAmountChange, handleAutoAddWithCategory, topTransferAccountsForForm, handleAutoAddWithAccount, TYPES, rateSource, handleOperationCurrencyChange, foreignRateSource, foreignExchangeRate, filterPanelHeight, filtersExpanded, quickAddFlash, quickAddSaving, operationSuggestions, hasSuggestions, quickAddHeight, handleQuickAddLayout, handleDeckHostLayout, accounts, categories, suggestionSaveErrors, suggestionChoices, setSuggestionChoice, acceptSuggestion, dismissSuggestion]);
 
   // Auto-scroll to top when filter panel closes, but only if the user is still
   // near the top (hasn't scrolled into past dates). The threshold is filterPanelHeight:
@@ -1696,12 +1689,13 @@ const OperationsScreen = () => {
     });
     if (isSearchOpen) handleCloseSearch();
     else scrollToTop();
-    // The deck is laid over the quick-add form, so a collapsed panel would swallow
-    // the very cards this event exists to show. No-op when the panel is pinned —
-    // and also when a deck already holds the block open, which is the ordinary
-    // case here and the reason for the line below: a state that does not change
-    // plays no motion, so an open that never reached the screen is never retried.
-    setQuickAddExpanded(true);
+    // Nothing to open: the cards are no longer laid over the quick-add form, so
+    // the form stays folded and the deck below renders on its own. Expanding it
+    // here used to be how the cards were uncovered; now it would only leave the
+    // form pinned open, with the + button reading "close", once the user has
+    // answered the queue. The clip is still re-committed for the form's own
+    // sake — a pinned panel opened behind a stopped activity has the same lost
+    // commit, and with a deck up this commits the collapse it should be in.
     reassertQuickAddClip('open-pending');
     refreshSuggestions('open-pending');
     // Past the clip, the scroll and the layout pass that follow this event: the
@@ -1789,18 +1783,20 @@ const OperationsScreen = () => {
     translateY: Math.round(quickAddTranslateY.value),
     scrollOffset: Math.round(scrollOffsetRef.current),
   }), [quickAddMaxHeight, quickAddTranslateY]);
-  // The deck container's rect in WINDOW coordinates — the one line that tells
-  // the three ways a deck that IS in the tree stays invisible apart, which no
-  // export so far has been able to do:
-  //   height 0             the clip is shut on the native side whatever the
-  //                        shared value says, i.e. a commit that never landed;
-  //   y above the viewport the list is scrolled and the header holding the
-  //                        cards sits off the top of the screen;
-  //   a sane rect          the cards are laid out, sized and on screen, so what
-  //                        hid them is paint (the list's removeClippedSubviews)
-  //                        and neither the clip nor the scroll.
-  // measureInWindow reads the mounted view, not React's idea of it, which is
-  // exactly the gap every previous line in this file was blind to.
+  // The deck container's rect in WINDOW coordinates.
+  //
+  // Read it WITH `clipHeight` and `deckHostHeight` from the same line, never on
+  // its own: measureInWindow reports a LAYOUT frame and cannot see `overflow:
+  // hidden`, so a container overflowing a shut clip reports a perfectly healthy
+  // rect while painting nothing. That is what the 2026-09-20 export showed —
+  // `x: 0, y: 46, height: 444` on a screen with no cards on it — and reading the
+  // rect alone cost a round. The pair that gave it away in the same lines was
+  // `clipHeight: 0` beside `deckHostHeight: 444`: a content view measuring
+  // nothing while its own child measures the full frame.
+  //
+  // The container is no longer inside the clip, so the rect now means what it
+  // says: a y above the viewport is the list scrolled past the header, and a
+  // sane rect with nothing on screen would leave only paint.
   const deckOnScreen = useCallback((reason) => {
     const node = deckHostRef.current;
     if (!node || typeof node.measureInWindow !== 'function') return;
@@ -2095,12 +2091,6 @@ const styles = StyleSheet.create({
     position: 'absolute',
     right: SPACING.lg,
     zIndex: Z_INDEX.popover,
-  },
-  quickAddClipOpen: {
-    // Deliberately no maxHeight: the deck reserves its own frame and must never
-    // be cut by a ceiling. `overflow` matches the animated clip so the peeking
-    // card edges paint the same on either style.
-    overflow: 'hidden',
   },
   scrollToTopButton: {
     alignItems: 'center',
