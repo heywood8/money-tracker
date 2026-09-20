@@ -135,7 +135,7 @@ jobs:
       # seconds rather than after another full build.
       - name: 📥 Reuse the AAB from run ${{ github.event.inputs.aab_run_id }}
         if: github.event.inputs.aab_run_id != ''
-        uses: actions/download-artifact@v7
+        uses: actions/download-artifact@v8
         with:
           name: penny-aab
           run-id: ${{ github.event.inputs.aab_run_id }}
