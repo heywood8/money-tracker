@@ -1,5 +1,12 @@
 # Changelog
 
+## [0.292.2](https://github.com/heywood8/money-tracker/compare/penny-v0.292.1...penny-v0.292.2) (2026-09-20)
+
+
+### Bug Fixes
+
+* **ci:** let the screenshot push switch branches with a dirty lockfile ([#1809](https://github.com/heywood8/money-tracker/issues/1809)) ([f958ecb](https://github.com/heywood8/money-tracker/commit/f958ecb084bd7a611e64a839ba0a2d9dcf95dbaa))
+
 ## [0.292.1](https://github.com/heywood8/money-tracker/compare/penny-v0.292.0...penny-v0.292.1) (2026-09-19)
 
 
