@@ -86,6 +86,27 @@ export const setBackgroundAlertsEnabled = async (enabled) => {
 };
 
 /**
+ * The one operation the receipt's "Change category" button may edit, or null.
+ *
+ * The button names a single row, so it is offered only for a run that booked
+ * exactly one operation — a receipt summarizing several does not say which one
+ * the button would open. A transfer is excluded because it has no category to
+ * change (its counterpart is an account), and so is an operation whose id the
+ * pipeline did not record, which is what the button needs to find it again.
+ *
+ * @param {number} created - how many operations the run auto-created
+ * @param {Array<Object>} createdItems - the records it kept for them
+ * @returns {string|null}
+ */
+export const recategorizableOperationId = (created, createdItems) => {
+  const items = Array.isArray(createdItems) ? createdItems.filter(Boolean) : [];
+  if (created !== 1 || items.length !== 1) return null;
+  const [item] = items;
+  if (item.type === 'transfer' || item.operationId == null) return null;
+  return String(item.operationId);
+};
+
+/**
  * The work performed on each background wakeup (exported for direct testing).
  *
  * Ingests any newly-captured bank notifications and reports the outcome, as long
@@ -142,14 +163,16 @@ export const runBackgroundBankCheck = async () => {
   // booked (amount, payee, account, category / cash account); an empty list
   // degrades to the plain count-only copy.
   if (reportAdded) {
-    const addedDetails = await collectAddedAlertDetails(summary.createdItems);
+    const createdItems = summary.createdItems || [];
+    const addedDetails = await collectAddedAlertDetails(createdItems);
     const addedCopy = await getAddedAlertCopy(summary.created, addedDetails);
     // Key the receipt on the operations it describes, so a second wakeup handed
     // this same run's summary lands on the notification already in the tray
     // instead of stacking an identical copy beside it.
     await presentAddedOperationsAlert(
       addedCopy,
-      (summary.createdItems || []).map((item) => item.operationId),
+      createdItems.map((item) => item.operationId),
+      recategorizableOperationId(summary.created, createdItems),
     );
     notifiedAdded = true;
   }

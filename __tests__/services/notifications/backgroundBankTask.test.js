@@ -325,6 +325,8 @@ describe('backgroundBankTask', () => {
         // Keyed on the operations, so a repeat report of this same booking
         // replaces the receipt rather than stacking a second one.
         ['op-1'],
+        // One categorizable booking, so the receipt may carry "Change category".
+        'op-1',
       );
       expect(result.notifiedAdded).toBe(true);
       // Nothing was queued, so the review alert stays silent.
@@ -457,6 +459,44 @@ describe('backgroundBankTask', () => {
       });
     });
 
+    it('offers "Change category" only for the booking the receipt names', async () => {
+      // Two bookings under one receipt: the button would not say which row it
+      // opens, so it is withheld and the receipt keeps its acknowledge-only set.
+      enableBothGates();
+      processMod.processBankNotifications.mockResolvedValue({
+        created: 2,
+        pending: 0,
+        skipped: 0,
+        createdItems: [createdItem, { ...createdItem, operationId: 'op-2' }],
+      });
+
+      await backgroundBankTask.runBackgroundBankCheck();
+
+      expect(localNotifications.presentAddedOperationsAlert).toHaveBeenCalledWith(
+        expect.any(Object),
+        ['op-1', 'op-2'],
+        null,
+      );
+    });
+
+    it('withholds "Change category" for a transfer, which has no category', async () => {
+      enableBothGates();
+      processMod.processBankNotifications.mockResolvedValue({
+        created: 1,
+        pending: 0,
+        skipped: 0,
+        createdItems: [{ ...createdItem, type: 'transfer', toAccountId: 'acc-2' }],
+      });
+
+      await backgroundBankTask.runBackgroundBankCheck();
+
+      expect(localNotifications.presentAddedOperationsAlert).toHaveBeenCalledWith(
+        expect.any(Object),
+        ['op-1'],
+        null,
+      );
+    });
+
     describe('Regression Tests', () => {
       it('reports a run it shares with another caller under one receipt id', async () => {
         // Two wakeups landing together are handed the same run's summary and both
@@ -489,6 +529,8 @@ describe('backgroundBankTask', () => {
         expect(localNotifications.presentAddedOperationsAlert).toHaveBeenCalledWith(
           expect.any(Object),
           [null],
+          // Without an id the button has nothing to open, so it is not offered.
+          null,
         );
         expect(result.notifiedAdded).toBe(true);
       });

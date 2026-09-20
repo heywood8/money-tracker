@@ -1,5 +1,40 @@
 # Changelog
 
+## [0.292.2](https://github.com/heywood8/money-tracker/compare/penny-v0.292.1...penny-v0.292.2) (2026-09-20)
+
+
+### Bug Fixes
+
+* **ci:** let the screenshot push switch branches with a dirty lockfile ([#1809](https://github.com/heywood8/money-tracker/issues/1809)) ([f958ecb](https://github.com/heywood8/money-tracker/commit/f958ecb084bd7a611e64a839ba0a2d9dcf95dbaa))
+
+## [0.292.1](https://github.com/heywood8/money-tracker/compare/penny-v0.292.0...penny-v0.292.1) (2026-09-19)
+
+
+### Code Refactoring
+
+* **budget:** drop the summary hero and reword its legend ([#1807](https://github.com/heywood8/money-tracker/issues/1807)) ([ba03010](https://github.com/heywood8/money-tracker/commit/ba03010edb1efae0027e1cdf5a42a9936cce71a3))
+
+## [0.292.0](https://github.com/heywood8/money-tracker/compare/penny-v0.291.2...penny-v0.292.0) (2026-09-19)
+
+
+### Features
+
+* **notifications:** add "change category" to the auto-added receipt ([#1803](https://github.com/heywood8/money-tracker/issues/1803)) ([67b04bb](https://github.com/heywood8/money-tracker/commit/67b04bb4cb2910fac546d97e9d3fe12d3bf52fe9))
+
+## [0.291.2](https://github.com/heywood8/money-tracker/compare/penny-v0.291.1...penny-v0.291.2) (2026-09-19)
+
+
+### Code Refactoring
+
+* **operations:** slide the category picker into the sheet ([#1802](https://github.com/heywood8/money-tracker/issues/1802)) ([66b672e](https://github.com/heywood8/money-tracker/commit/66b672e4b3d6e1dae87b0c653cd216cc0e54f16f))
+
+## [0.291.1](https://github.com/heywood8/money-tracker/compare/penny-v0.291.0...penny-v0.291.1) (2026-09-19)
+
+
+### Bug Fixes
+
+* **operations:** take the review deck off the animated clip ([#1800](https://github.com/heywood8/money-tracker/issues/1800)) ([d23a7fd](https://github.com/heywood8/money-tracker/commit/d23a7fdd1f54af4bbaf7eb78e980cf567e8feb62))
+
 ## [0.291.0](https://github.com/heywood8/money-tracker/compare/penny-v0.290.0...penny-v0.291.0) (2026-09-18)
 
 

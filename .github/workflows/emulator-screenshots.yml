@@ -121,13 +121,36 @@ jobs:
             adb shell am start -n com.heywood8.monkeep/.MainActivity
 
             # Create output directory
-            mkdir -p screenshots
+            mkdir -p screenshots maestro-out
 
-            # Run Maestro flow to navigate and take screenshots
-            maestro test .maestro/take-screenshots.yaml || true
+            # Run Maestro flow to navigate and take screenshots.
+            #
+            # --test-output-dir is load-bearing. `takeScreenshot` no longer writes
+            # its file relative to the working directory: Maestro saves it inside
+            # the flow's artifact bundle, under a `takeScreenshot/` folder, and
+            # refuses a path that climbs out of that directory. Without this the
+            # bundle lands under ~/.maestro and `screenshots/` stays empty — which
+            # is why every run since that Maestro change has posted "No
+            # screenshots were captured".
+            maestro test --test-output-dir maestro-out .maestro/take-screenshots.yaml || true
 
-            # Capture Maestro debug artifacts on failure
-            cp -r ~/.maestro/tests/* screenshots/ 2>/dev/null || true
+            # Lift the frames out of the bundle, flattened, so the steps below and
+            # the comment body can keep addressing them by bare name. Scoped to the
+            # takeScreenshot folder: Maestro drops its own failure screenshots
+            # elsewhere in the bundle, and those are debug artifacts rather than
+            # frames of the app.
+            #
+            # One line on purpose — android-emulator-runner feeds this script to
+            # `sh -c` a line at a time, so a multi-line pipeline or loop would be
+            # split across invocations and die.
+            find maestro-out -type f -path '*takeScreenshot*' -name '*.png' -exec cp {} screenshots/ \; 2>/dev/null || true
+
+            # Keep the debug output too (a failed step's own screenshot and logs),
+            # so a broken flow stays diagnosable from the artifact. Under a
+            # subdirectory, so it never reaches the `screenshots/*.png` glob below.
+            mkdir -p screenshots/_debug
+            cp -r maestro-out/* screenshots/_debug/ 2>/dev/null || true
+            cp -r ~/.maestro/tests/* screenshots/_debug/ 2>/dev/null || true
 
             # List captured screenshots
             ls -la screenshots/ || echo "No screenshots directory found"
@@ -174,10 +197,17 @@ jobs:
           git config user.name "github-actions[bot]"
           git config user.email "github-actions[bot]@users.noreply.github.com"
 
-          # Create or switch to the ci-screenshots orphan branch
+          # Create or switch to the ci-screenshots orphan branch.
+          #
+          # -f is load-bearing: `bun install` above rewrites bun.lock, which is
+          # tracked, so a plain checkout refuses to switch ("Your local changes
+          # to the following files would be overwritten by checkout: bun.lock")
+          # and the whole step exits 1 under `bash -e`. The screenshots are
+          # already copied to $BACKUP_DIR by this point and nothing else in the
+          # worktree is needed again, so discarding that edit is free.
           git fetch origin ci-screenshots 2>/dev/null || true
           if git rev-parse --verify origin/ci-screenshots >/dev/null 2>&1; then
-            git checkout ci-screenshots
+            git checkout -f ci-screenshots
           else
             git checkout --orphan ci-screenshots
             git rm -rf . 2>/dev/null || true
@@ -194,8 +224,9 @@ jobs:
           git commit -m "Update screenshots for PR #${PR_NUMBER}" || echo "No changes to commit"
           git push origin ci-screenshots
 
-          # Switch back to the PR branch and restore screenshots
-          git checkout - 2>/dev/null || true
+          # Switch back to the PR branch and restore screenshots (-f for the
+          # same reason: the lockfile is dirty again on the way back).
+          git checkout -f - 2>/dev/null || true
           mkdir -p screenshots
           cp "$BACKUP_DIR"/*.png screenshots/
 
@@ -216,12 +247,14 @@ jobs:
             // Screens with light/dark variants
             const themedScreens = [
               { file: '01_operations', desc: 'Operations' },
+              { file: '11_operation_modal', desc: 'Operation Editor' },
+              { file: '12_category_picker', desc: 'Category Picker (subpanel)' },
               { file: '09_filter_modal', desc: 'Filter Modal' },
               { file: '05_transfer', desc: 'Multi-Currency Transfer' },
               { file: '02_graphs', desc: 'Graphs' },
               { file: '03_accounts', desc: 'Accounts' },
               { file: '04_categories', desc: 'Categories' },
-              { file: '08_planned', desc: 'Planned Operations' },
+              { file: '08_budget', desc: 'Budget' },
               { file: '07_settings', desc: 'Settings' },
             ];
 

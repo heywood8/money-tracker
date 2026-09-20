@@ -5,10 +5,12 @@ import {
   dismissNotificationById,
   isAcknowledgeResponse,
   isAddedOperationsResponse,
+  isChangeCategoryResponse,
   isPendingOperationsResponse,
   isRejectPendingResponse,
   isSelectPendingResponse,
   responseNotificationId,
+  responseOperationId,
 } from '../services/notifications/localNotifications';
 import { handleRejectPendingResponse } from '../services/notifications/rejectPendingAction';
 import useOnForeground from './useOnForeground';
@@ -38,9 +40,10 @@ export const responseKey = (response) => [
 
 /**
  * The key a deep link is remembered under — a tap on the review alert's body or
- * its "Select" button, or a tap on the receipt — and null for anything else: the
- * answered buttons are never replayed by design, and an unrelated response is
- * never routed.
+ * its "Select" button, or a tap on the receipt (or its "Change category" button,
+ * which likewise opens the app) — and null for anything else: the answered
+ * buttons are never replayed by design, and an unrelated response is never
+ * routed.
  */
 const deepLinkKey = (response) => {
   if (isAcknowledgeResponse(response) || isRejectPendingResponse(response)) return null;
@@ -79,7 +82,9 @@ const clearLastResponse = () => {
  *
  * The sibling "operations added" notification routes to the same page but not to
  * the deck: those operations are already booked, so the user wants to see them in
- * the list, not a review surface.
+ * the list, not a review surface. Its "Change category" button goes one step
+ * further, naming the booked operation so the screen can open that operation's
+ * form straight onto its category picker.
  *
  * The alert's two buttons are handled here too: "Select" is the same deep link
  * as a tap on the body (plus the dismissal Android does not do for a button),
@@ -180,6 +185,24 @@ export default function useNotificationResponseRouter({ enabled = true } = {}) {
     if (isRejectPendingResponse(response)) {
       console.log('[notif-route] reject', { ...describe(response), fromColdStart });
       if (!fromColdStart) handleRejectPendingResponse(response).catch(() => {});
+      settle(response);
+      return;
+    }
+    // "Change category" is the receipt's one button that opens the app, and it
+    // asks for a specific operation rather than the list its body tap opens —
+    // so it is checked before the route matchers below, which only know the
+    // route the receipt carries. Android auto-cancels a body tap but not a
+    // button press, so the answered receipt is cleared here.
+    if (isChangeCategoryResponse(response)) {
+      const operationId = responseOperationId(response);
+      console.log('[notif-route] change category', {
+        ...describe(response), hasOperation: !!operationId, fromColdStart,
+      });
+      dismissNotificationById(responseNotificationId(response));
+      // Without an id there is no form to open; fall back to the receipt's own
+      // destination rather than swallowing the press.
+      if (operationId) appEvents.emit(EVENTS.OPEN_OPERATION_CATEGORY, { operationId });
+      else appEvents.emit(EVENTS.OPEN_ADDED_OPERATIONS);
       settle(response);
       return;
     }

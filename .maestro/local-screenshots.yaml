@@ -128,12 +128,16 @@ appId: com.heywood8.monkeep.dev
 
 # 09: Filter modal
 - tapOn:
-    id: "filter-fab"
+    id: "search-input-container"
+- waitForAnimationToEnd:
+    timeout: 250
+- tapOn:
+    id: "filters-toggle-button"
 - waitForAnimationToEnd:
     timeout: 250
 - takeScreenshot: local/screenshots/09_filter_modal_light
 - tapOn:
-    id: "close-filter-modal"
+    id: "close-search-button"
 - waitForAnimationToEnd:
     timeout: 250
 
@@ -411,12 +415,16 @@ appId: com.heywood8.monkeep.dev
     timeout: 250
 
 - tapOn:
-    id: "filter-fab"
+    id: "search-input-container"
+- waitForAnimationToEnd:
+    timeout: 250
+- tapOn:
+    id: "filters-toggle-button"
 - waitForAnimationToEnd:
     timeout: 250
 - takeScreenshot: local/screenshots/09_filter_modal_dark
 - tapOn:
-    id: "close-filter-modal"
+    id: "close-search-button"
 - waitForAnimationToEnd:
     timeout: 250
 

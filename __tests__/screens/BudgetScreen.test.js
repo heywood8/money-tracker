@@ -120,8 +120,11 @@ jest.mock('../../app/components/budgets/MonthlyPlanSection', () => {
       }, React.createElement(Text, {}, 'report')),
       React.createElement(Pressable, {
         testID: 'mock-report-no-income',
+        // A real plan, with no income declared against it: the case the card
+        // has to explain, not an empty month it can simply draw nothing for.
         onPress: () => props.onTotalsChange?.({
-          remainder: '0', hasIncomeBasis: false, currency: 'AMD',
+          remainder: '-800000', hasIncomeBasis: false, currency: 'AMD',
+          expectedIncome: '0', allocated: '800000', actual: '600000',
         }),
       }, React.createElement(Text, {}, 'report none')));
   });
@@ -215,14 +218,15 @@ describe('BudgetScreen', () => {
       expect(order).toEqual([...order].sort((a, b) => a - b));
     });
 
-    // The remainder is the month's figure, not part of the scope statement: it
-    // lives in the body and scrolls under the header, which is the same glass
-    // overlay the Graphs tab wears and must stay the same height on both.
-    it('keeps the remainder figure in the body, out of the header', async () => {
+    // The month's own figures are not part of the scope statement: they live in
+    // the body and scroll under the header, which is the same glass overlay the
+    // Graphs tab wears and must stay the same height on both.
+    it('keeps the summary card in the body, out of the header', async () => {
       const { getByTestId } = await render(<BudgetScreen />);
-      await waitFor(() => expect(getByTestId('budget-remainder')).toBeTruthy());
+      await waitFor(() => expect(getByTestId('budget-summary-card')).toBeTruthy());
 
-      expect(within(getByTestId('budget-month-header')).queryByTestId('budget-remainder')).toBeNull();
+      expect(within(getByTestId('budget-month-header')).queryByTestId('budget-summary-card'))
+        .toBeNull();
     });
 
     // The header floats over the list, so nothing but this padding keeps the
@@ -316,42 +320,10 @@ describe('BudgetScreen', () => {
     });
   });
 
-  describe('Header remainder', () => {
-    it('prints the remainder reported by the list', async () => {
-      const { getByTestId } = await render(<BudgetScreen />);
-      await waitFor(() => expect(getByTestId('mock-report-remainder')).toBeTruthy());
-      fireEvent.press(getByTestId('mock-report-remainder'));
-      // Trimmed of an all-zero decimal part, and with no currency code: the
-      // header names the unit and printing it again here would say "AMD"
-      // twice on one screen.
-      await waitFor(() => expect(getByTestId('budget-remainder')).toHaveTextContent('-85745'));
-      expect(getByTestId('budget-remainder')).not.toHaveTextContent('AMD');
-      expect(within(getByTestId('budget-month-currency-chip')).getByText('AMD')).toBeTruthy();
-    });
-
-    it('keeps the currency code on the hero when there is no chip to carry it', async () => {
-      // One account currency means no picker — and then the hero is the only
-      // place the screen names its unit at all.
-      setAccounts([{ id: 'a1', name: 'Ameria', currency: 'AMD' }]);
-      const { getByTestId, queryByTestId } = await render(<BudgetScreen />);
-      await waitFor(() => expect(getByTestId('mock-report-remainder')).toBeTruthy());
-      fireEvent.press(getByTestId('mock-report-remainder'));
-      await waitFor(() => expect(getByTestId('budget-remainder')).toHaveTextContent('-85745 AMD'));
-      expect(queryByTestId('budget-month-currency-chip')).toBeNull();
-    });
-
-    it('replaces a negative remainder with the overspend colour', async () => {
-      const { getByTestId } = await render(<BudgetScreen />);
-      await waitFor(() => expect(getByTestId('mock-report-remainder')).toBeTruthy());
-      fireEvent.press(getByTestId('mock-report-remainder'));
-      await waitFor(() => expect(getByTestId('budget-remainder')).toBeTruthy());
-      expect(StyleSheet.flatten(getByTestId('budget-remainder').props.style).color)
-        .toBe(COLORS.overspend);
-    });
-
-    // The line "Allocated 1.94M · Actual 1.66M" that used to sit under the
-    // figure is a bar now: the same three quantities, drawn against each other
-    // instead of listed. See MonthSummaryCard.
+  describe('Month summary card', () => {
+    // The line "Allocated 1.94M · Actual 1.66M" that used to sit under a
+    // remainder figure is a bar now: the same three quantities, drawn against
+    // each other instead of listed. See MonthSummaryCard.
     it('draws the month as a bar with a legend from the reported totals', async () => {
       const { getByTestId } = await render(<BudgetScreen />);
       await waitFor(() => expect(getByTestId('mock-report-remainder')).toBeTruthy());
@@ -364,14 +336,34 @@ describe('BudgetScreen', () => {
       expect(getByTestId('budget-summary-percent')).toHaveTextContent(/55%/);
     });
 
-    it('shows the add-income prompt instead of a figure when no income is declared', async () => {
-      const { getByTestId, queryByTestId, getByText } = await render(<BudgetScreen />);
+    // The card opened with the remainder as a display figure, which is the same
+    // number its own free entry carries. The screen states it once now, and the
+    // currency chip in the header is the only place naming the unit.
+    it('states the remainder once, in the legend rather than as a heading', async () => {
+      const { getByTestId, queryByTestId } = await render(<BudgetScreen />);
+      await waitFor(() => expect(getByTestId('mock-report-remainder')).toBeTruthy());
+      fireEvent.press(getByTestId('mock-report-remainder'));
+
+      await waitFor(() => expect(getByTestId('budget-flow-spent')).toBeTruthy());
+      expect(queryByTestId('budget-remainder')).toBeNull();
+      expect(within(getByTestId('budget-month-currency-chip')).getByText('AMD')).toBeTruthy();
+    });
+
+    // With no income the plan itself is the bar's full width, so it reads full
+    // while nothing is wrong. The card has no heading left to say why, and
+    // MonthlyPlanSection states it only in uncontrolled mode, so this screen is
+    // the one that has to reach the prompt.
+    it('explains the full bar when no income is declared', async () => {
+      const { getByTestId } = await render(<BudgetScreen />);
       await waitFor(() => expect(getByTestId('mock-report-no-income')).toBeTruthy());
       fireEvent.press(getByTestId('mock-report-no-income'));
-      // With nothing to allocate FROM, the remainder degenerates into "minus
-      // everything you planned" — a number in alarm red is worse than a prompt.
-      await waitFor(() => expect(getByText('add_income_for_remainder')).toBeTruthy());
-      expect(queryByTestId('budget-remainder')).toBeNull();
+
+      await waitFor(() => expect(getByTestId('budget-flow-spent')).toBeTruthy());
+      expect(getByTestId('budget-summary-no-income'))
+        .toHaveTextContent('add_income_for_remainder');
+      // 600K spent of an 800K plan, and no free zone to have a remainder in.
+      expect(getByTestId('budget-legend-spent')).toHaveTextContent(/600K/);
+      expect(getByTestId('budget-legend-committed')).toHaveTextContent(/200K/);
     });
   });
 

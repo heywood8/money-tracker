@@ -535,6 +535,18 @@ export default function SimpleTabs() {
     [openOperationsForNotification],
   );
 
+  // That receipt's "Change category" button lands on the same tab too.
+  // OperationsScreen listens for the same event and opens the named operation's
+  // form on its category picker; the modal covers whatever is behind it, but the
+  // tab underneath must still be the one the user is returned to on close.
+  React.useEffect(
+    () => appEvents.on(
+      EVENTS.OPEN_OPERATION_CATEGORY,
+      () => openOperationsForNotification('open-operation-category event'),
+    ),
+    [openOperationsForNotification],
+  );
+
   // Android hardware back button navigates to Operations from any other tab
   React.useEffect(() => {
     const subscription = BackHandler.addEventListener('hardwareBackPress', () => {

@@ -3,16 +3,18 @@ import PropTypes from 'prop-types';
 import {
   View,
   Text,
-  Modal,
   Pressable,
   StyleSheet,
-  FlatList,
   ScrollView,
+  Animated,
+  Easing,
+  Keyboard,
   Dimensions,
 } from 'react-native';
 import DateTimePicker from '@react-native-community/datetimepicker';
 import { Switch } from 'react-native-paper';
 import Icon from '@expo/vector-icons/MaterialCommunityIcons';
+import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { useThemeColors } from '../contexts/ThemeColorsContext';
 import { useLocalization } from '../contexts/LocalizationContext';
 import { useDialog } from '../contexts/DialogContext';
@@ -29,7 +31,10 @@ import { getDistinctLabels, getLabelsNearLocation } from '../services/Operations
 import useOperationLocation from '../hooks/useOperationLocation';
 import * as Currency from '../services/currency';
 import { formatDate } from '../services/BalanceHistoryDB';
-import { SPACING, BORDER_RADIUS, FONT_SIZE } from '../styles/designTokens';
+import FormInput from '../components/FormInput';
+import { SPACING, BORDER_RADIUS, FONT_SIZE, ICON_SIZE } from '../styles/designTokens';
+import { DURATION_ENTER, DURATION_EXIT } from '../utils/motion';
+import { motionDuration } from '../utils/reducedMotion';
 import currencies from '../../assets/currencies.json';
 import { hasOperation, evaluateExpression } from '../utils/calculatorUtils';
 import useOperationForm from '../hooks/useOperationForm';
@@ -38,6 +43,10 @@ import CategoryGridSelector from '../components/CategoryGridSelector';
 import AccountGridSelector from '../components/AccountGridSelector';
 import { modalSharedStyles } from '../styles/modalStyles';
 import useOperationPicker from '../hooks/useOperationPicker';
+
+// Options a picker needs before a search field earns its row. Matches the
+// budget line editor's threshold, so the two panels behave the same way.
+const SEARCH_THRESHOLD = 8;
 
 /**
  * OperationModal Component
@@ -111,10 +120,14 @@ const buildLocationOverrides = (attachLocation, location) => {
 
 export default function OperationModal({
   visible = false, onClose = () => {}, operation = null, isNew = false, onDelete = null,
+  openCategoryPicker = false,
 }) {
   const { colors } = useThemeColors();
   const { t } = useLocalization();
   const { showDialog } = useDialog();
+  // A subpanel covers the sheet edge to edge, including the strip ModalShell
+  // reserves for the system navigation bar — so it pads that back in itself.
+  const insets = useSafeAreaInsets();
   const { addOperation, splitOperation, updateOperation, validateOperation } = useOperationsActions();
   const { visibleAccounts: accounts } = useAccountsData();
   const { categories } = useCategories();
@@ -186,6 +199,117 @@ export default function OperationModal({
     openPicker,
     closePicker,
   } = useOperationPicker();
+
+  // The picker is a SUBPANEL over this sheet, not a modal of its own (see
+  // CLAUDE.md, "Modal Sub-Navigation"). A second bottom sheet stacked on the
+  // first landed its rounded top edge in the middle of the form, cut the fields
+  // under it in half and put a second "close" next to the sheet's own Cancel —
+  // three surfaces reading as one broken one. It now slides in from the right
+  // over the whole card, header and action row included.
+  //
+  // `panel` is a local mirror of the open picker rather than a read of
+  // `pickerState`: the hook clears type and data the instant it closes, and the
+  // panel still has an exit animation to play with something in it.
+  const [panel, setPanel] = useState(null);
+  const [pickerQuery, setPickerQuery] = useState('');
+  const mainAnim = useRef(new Animated.Value(0)).current;
+  const panelAnim = useRef(new Animated.Value(0)).current;
+  // Guards the close animation's completion against a picker reopened inside its
+  // 180ms window — the stale callback would otherwise unmount the new panel.
+  const panelTokenRef = useRef(0);
+  // Whether a panel is currently up, readable synchronously inside the effect so
+  // a closed picker does not start an exit animation it has nothing to play on —
+  // these modals stay mounted for the whole session.
+  const panelOpenRef = useRef(false);
+
+  useEffect(() => {
+    if (pickerState.visible) {
+      panelOpenRef.current = true;
+      panelTokenRef.current++;
+      Keyboard.dismiss();
+      setPickerQuery('');
+      setPanel({ type: pickerState.type, data: pickerState.data });
+      Animated.parallel([
+        Animated.timing(mainAnim, {
+          toValue: 1, duration: motionDuration(DURATION_EXIT), easing: Easing.in(Easing.quad), useNativeDriver: true,
+        }),
+        Animated.timing(panelAnim, {
+          toValue: 1, duration: motionDuration(DURATION_ENTER), easing: Easing.out(Easing.cubic), useNativeDriver: true,
+        }),
+      ]).start();
+      return;
+    }
+    if (!panelOpenRef.current) return;
+    panelOpenRef.current = false;
+    const token = ++panelTokenRef.current;
+    Animated.parallel([
+      Animated.timing(panelAnim, {
+        toValue: 0, duration: motionDuration(180), easing: Easing.in(Easing.quad), useNativeDriver: true,
+      }),
+      Animated.timing(mainAnim, {
+        toValue: 0, duration: motionDuration(240), easing: Easing.out(Easing.cubic), useNativeDriver: true,
+      }),
+    ]).start(() => {
+      if (panelTokenRef.current === token) setPanel(null);
+    });
+  }, [pickerState.visible, pickerState.type, pickerState.data, mainAnim, panelAnim]);
+
+  // Closing the sheet with a picker open must not leave the panel mid-animation
+  // for the next open — reset both to "no panel" outright.
+  //
+  // `closePicker()` is the load-bearing line: ModalShell's backdrop dismisses the
+  // sheet directly, without consulting `onBackIntercept`, so a tap there would
+  // otherwise leave the hook parked on {visible: true, type, data}. The mirror
+  // effect keys off exactly those three values, so the next openPicker with the
+  // same type and the same (stable) array would compare equal, never run, and
+  // the picker would simply stop opening for the rest of the session — these
+  // modals never unmount.
+  useEffect(() => {
+    if (visible) return;
+    panelOpenRef.current = false;
+    setPanel(null);
+    mainAnim.setValue(0);
+    panelAnim.setValue(0);
+    closePicker();
+  }, [visible, mainAnim, panelAnim, closePicker]);
+
+  // Android back closes the picker first; only a sheet with none open is
+  // dismissed (ModalShell plays its own exit for that). Keyed on the hook rather
+  // than on `panel`, which outlives it by the length of the exit animation — a
+  // back press in that window belongs to the sheet, not to a panel already gone.
+  const handleBackIntercept = useCallback(() => {
+    if (!pickerState.visible) return false;
+    closePicker();
+    return true;
+  }, [pickerState.visible, closePicker]);
+
+  // A host can ask for the form to come up on its category picker — the "Change
+  // category" button on the auto-added receipt does, because correcting the
+  // guessed category is the whole reason that press happened.
+  //
+  // It waits for the form to have loaded this operation: `filteredCategories` is
+  // keyed on `values.type`, and the picker is opened with a snapshot of the list,
+  // so opening it during the render that merely *scheduled* the load would hand
+  // it the previous operation's categories. Comparing the loaded type against the
+  // operation's own is what says the load has landed.
+  const autoOpenedCategoryRef = useRef(false);
+  useEffect(() => {
+    if (!visible) {
+      autoOpenedCategoryRef.current = false;
+      return;
+    }
+    if (!openCategoryPicker || autoOpenedCategoryRef.current) return;
+    if (isNew || !operation || isShadowOperation) return;
+    // A transfer has no category — its counterpart is an account — so there is
+    // nothing to open.
+    if (values.type === 'transfer') return;
+    if (values.type !== (operation.type || 'expense')) return;
+    autoOpenedCategoryRef.current = true;
+    openPicker('category', filteredCategories);
+  }, [
+    visible, openCategoryPicker, isNew, operation, isShadowOperation,
+    values.type, filteredCategories, openPicker,
+  ]);
 
   // State for split modal
   const [showSplitModal, setShowSplitModal] = useState(false);
@@ -363,9 +487,6 @@ export default function OperationModal({
     }
   }, [setValues]);
 
-  // Empty handler for preventing event propagation
-  const handleStopPropagation = useCallback(() => {}, []);
-
   // Handler for account selection in picker
   const handleAccountSelect = useCallback((accountId) => {
     setValues(v => ({ ...v, accountId }));
@@ -435,10 +556,13 @@ export default function OperationModal({
     }
   }, [values, setValues, closePicker, isNew, isForeignCurrencyOp, addOperation, onClose, hasOperation, evaluateExpression, attachLocation, location]);
 
+  // Reads the mirror, not `pickerState`: closePicker() nulls the hook's type
+  // immediately, so a tap landing during the panel's exit animation would fall
+  // through to the "to account" branch and write the id to the wrong field.
   const handleSelectPickedAccount = useCallback((accountId) => {
-    const select = pickerState.type === 'account' ? handleAccountSelect : handleToAccountSelect;
+    const select = panel?.type === 'account' ? handleAccountSelect : handleToAccountSelect;
     select(accountId);
-  }, [pickerState.type, handleAccountSelect, handleToAccountSelect]);
+  }, [panel, handleAccountSelect, handleToAccountSelect]);
 
   const TYPES = [
     { key: 'expense', label: t('expense'), icon: 'minus-circle' },
@@ -459,6 +583,96 @@ export default function OperationModal({
     </Pressable>
   ) : null;
 
+  const panelWidth = Dimensions.get('window').width;
+  const panelTranslateX = panelAnim.interpolate({ inputRange: [0, 1], outputRange: [panelWidth, 0] });
+  const mainTranslateX = mainAnim.interpolate({ inputRange: [0, 1], outputRange: [0, -40] });
+  const mainOpacity = mainAnim.interpolate({ inputRange: [0, 1], outputRange: [1, 0] });
+
+  const isCategoryPanel = panel?.type === 'category';
+  const isAccountPanel = panel?.type === 'account' || panel?.type === 'toAccount';
+  const panelTitle = isCategoryPanel
+    ? t('select_category')
+    : (panel?.type === 'toAccount' ? t('to_account') : t('select_account'));
+  // Categories are counted whole — the grid searches the entire tree, not the
+  // folder level it happens to be showing.
+  const panelOptionCount = panel ? panel.data.length : 0;
+
+  const pickerPanel = panel ? (
+    <Animated.View
+      testID="operation-picker-panel"
+      // The panel is still mounted for its ~180ms exit. A second tap inside that
+      // window is never intentional, and on a new operation the category grid
+      // auto-saves — so it would post the operation twice.
+      pointerEvents={pickerState.visible ? 'auto' : 'none'}
+      style={[
+        styles.panel,
+        { backgroundColor: colors.card, paddingBottom: insets.bottom + SPACING.md },
+        { opacity: panelAnim, transform: [{ translateX: panelTranslateX }] },
+      ]}
+    >
+      <View style={styles.panelHeader}>
+        <Pressable
+          onPress={closePicker}
+          style={styles.panelBack}
+          hitSlop={8}
+          accessibilityRole="button"
+          accessibilityLabel={t('back')}
+          testID="operation-picker-back"
+        >
+          <Icon name="arrow-left" size={ICON_SIZE.base} color={colors.text} />
+        </Pressable>
+        <Text style={[styles.panelTitle, { color: colors.text }]} numberOfLines={1}>
+          {panelTitle}
+        </Text>
+      </View>
+
+      {panelOptionCount >= SEARCH_THRESHOLD && (
+        <FormInput
+          value={pickerQuery}
+          onChangeText={setPickerQuery}
+          placeholder={t('search')}
+          leftIcon="magnify"
+          testID="operation-picker-search"
+        />
+      )}
+
+      <ScrollView
+        style={styles.panelListBody}
+        contentContainerStyle={styles.panelList}
+        keyboardShouldPersistTaps="handled"
+      >
+        {/* Categories nest, so the picker is the app's shared category grid
+            (CLAUDE.md, "Category selection") rather than a list of its own. */}
+        {isCategoryPanel && (
+          <CategoryGridSelector
+            categories={panel.data}
+            categoryType={values.type === 'income' ? 'income' : 'expense'}
+            selectedCategoryId={values.categoryId || null}
+            onSelect={handleCategorySelect}
+            colors={colors}
+            t={t}
+            query={pickerQuery}
+            onQueryChange={setPickerQuery}
+          />
+        )}
+        {/* Accounts group by currency in the shared account grid
+            (CLAUDE.md, "Account selection"). Gated on the two account types
+            rather than "not a category", so an unrecognised picker type shows
+            an empty panel instead of a grid of whatever it was opened with. */}
+        {isAccountPanel && (
+          <AccountGridSelector
+            accounts={panel.data}
+            selectedAccountId={panel.type === 'account' ? values.accountId : values.toAccountId}
+            onSelect={handleSelectPickedAccount}
+            colors={colors}
+            t={t}
+            query={pickerQuery}
+          />
+        )}
+      </ScrollView>
+    </Animated.View>
+  ) : null;
+
   return (
     <>
       <ModalShell
@@ -475,43 +689,103 @@ export default function OperationModal({
         extraActions={splitExtraActions}
         scrollRef={scrollViewRef}
         showBlurOverlay
+        overlayPanel={pickerPanel}
+        onBackIntercept={handleBackIntercept}
       >
-        {/* Shared Form Fields: type selector, amount, account(s), category, multi-currency */}
-        <OperationFormFields
-          colors={colors}
-          t={t}
-          values={values}
-          setValues={setValues}
-          accounts={accounts}
-          categories={filteredCategories}
-          getAccountName={getAccountName}
-          getAccountBalance={getAccountBalance}
-          getCategoryName={getCategoryName}
-          openPicker={openPicker}
-          onAmountChange={handleAmountChange}
-          TYPES={TYPES}
-          showTypeSelector={true}
-          showAccountBalance={true}
-          showFieldIcons={true}
-          hideCategoryPicker={!isNew}
-          hideTransferTargetPicker={true}
-          transferLayout="sideBySide"
-          compact={true}
-          disabled={isShadowOperation}
-          containerBackground={colors.card}
-          onExchangeRateChange={handleExchangeRateChange}
-          onDestinationAmountChange={handleDestinationAmountChange}
-          rateSource={rateSource}
-          onOperationCurrencyChange={handleOperationCurrencyChange}
-          foreignCurrencyEditable={true}
-        />
+        <Animated.View style={{ opacity: mainOpacity, transform: [{ translateX: mainTranslateX }] }}>
+          {/* Shared Form Fields: type selector, amount, account(s), category, multi-currency */}
+          <OperationFormFields
+            colors={colors}
+            t={t}
+            values={values}
+            setValues={setValues}
+            accounts={accounts}
+            categories={filteredCategories}
+            getAccountName={getAccountName}
+            getAccountBalance={getAccountBalance}
+            getCategoryName={getCategoryName}
+            openPicker={openPicker}
+            onAmountChange={handleAmountChange}
+            TYPES={TYPES}
+            showTypeSelector={true}
+            showAccountBalance={true}
+            showFieldIcons={true}
+            hideCategoryPicker
+            hideTransferTargetPicker={true}
+            transferLayout="sideBySide"
+            compact={true}
+            disabled={isShadowOperation}
+            containerBackground={colors.card}
+            onExchangeRateChange={handleExchangeRateChange}
+            onDestinationAmountChange={handleDestinationAmountChange}
+            rateSource={rateSource}
+            onOperationCurrencyChange={handleOperationCurrencyChange}
+            foreignCurrencyEditable={true}
+          />
 
-        {/* Category / To Account + Date row */}
-        <View style={styles.categoryDateRow}>
-          {values.type === 'transfer' ? (
+          {/* Category / To Account + Date row */}
+          <View style={styles.categoryDateRow}>
+            {values.type === 'transfer' ? (
+              <View style={styles.halfFieldWrapper}>
+                <Text style={[modalSharedStyles.fieldLabel, { color: colors.mutedText }]}>
+                  {(t('to_account') || 'To').toUpperCase()}
+                </Text>
+                <Pressable
+                  style={[
+                    styles.pickerButtonHalf,
+                    { backgroundColor: colors.inputBackground, borderColor: colors.inputBorder },
+                    isShadowOperation && styles.disabledInput,
+                  ]}
+                  onPress={() => !isShadowOperation && openPicker('toAccount', accounts.filter(acc => acc.id !== values.accountId))}
+                  disabled={isShadowOperation}
+                  accessibilityRole="button"
+                  accessibilityLabel={t('to_account')}
+                  testID="to-account-picker"
+                >
+                  <Icon name="swap-horizontal" size={20} color={isShadowOperation ? colors.mutedText : colors.text} />
+                  <Text
+                    style={[styles.pickerButtonText, { color: isShadowOperation ? colors.mutedText : colors.text }]}
+                    numberOfLines={1}
+                  >
+                    {values.toAccountId ? getAccountName(values.toAccountId) : t('to_account')}
+                  </Text>
+                </Pressable>
+              </View>
+            ) : (
+              <View style={styles.halfFieldWrapper}>
+                {/* The eyebrow NAMES the field; the imperative belongs on the
+                    button, which already reads "Select category" until one is
+                    picked. A label that keeps ordering you to select something
+                    you have already selected is the part that read wrong. */}
+                <Text style={[modalSharedStyles.fieldLabel, { color: colors.mutedText }]}>
+                  {(t('category') || 'Category').toUpperCase()}
+                </Text>
+                <Pressable
+                  style={[
+                    styles.pickerButtonHalf,
+                    { backgroundColor: colors.inputBackground, borderColor: colors.inputBorder },
+                    isShadowOperation && styles.disabledInput,
+                  ]}
+                  onPress={() => !isShadowOperation && openPicker('category', filteredCategories)}
+                  disabled={isShadowOperation}
+                  accessibilityRole="button"
+                  accessibilityLabel={t('select_category')}
+                  testID="category-input"
+                >
+                  <Icon name="tag" size={20} color={isShadowOperation ? colors.mutedText : colors.text} />
+                  <Text
+                    style={[styles.pickerButtonText, { color: isShadowOperation ? colors.mutedText : colors.text }]}
+                    numberOfLines={1}
+                  >
+                    {getCategoryName(values.categoryId)}
+                  </Text>
+                </Pressable>
+              </View>
+            )}
+
             <View style={styles.halfFieldWrapper}>
               <Text style={[modalSharedStyles.fieldLabel, { color: colors.mutedText }]}>
-                {(t('to_account') || 'To').toUpperCase()}
+                {(t('date') || 'Date').toUpperCase()}
               </Text>
               <Pressable
                 style={[
@@ -519,149 +793,98 @@ export default function OperationModal({
                   { backgroundColor: colors.inputBackground, borderColor: colors.inputBorder },
                   isShadowOperation && styles.disabledInput,
                 ]}
-                onPress={() => !isShadowOperation && openPicker('toAccount', accounts.filter(acc => acc.id !== values.accountId))}
+                onPress={handleOpenDatePicker}
                 disabled={isShadowOperation}
                 accessibilityRole="button"
-                accessibilityLabel={t('to_account')}
-                testID="to-account-picker"
+                accessibilityLabel={t('select_date')}
+                testID="date-input"
               >
-                <Icon name="swap-horizontal" size={20} color={isShadowOperation ? colors.mutedText : colors.text} />
-                <Text
-                  style={[styles.pickerButtonText, { color: isShadowOperation ? colors.mutedText : colors.text }]}
-                  numberOfLines={1}
-                >
-                  {values.toAccountId ? getAccountName(values.toAccountId) : t('to_account')}
+                <Icon name="calendar" size={20} color={isShadowOperation ? colors.mutedText : colors.text} />
+                <Text style={[styles.pickerButtonText, { color: isShadowOperation ? colors.mutedText : colors.text }]}>
+                  {formatDateForDisplay(values.date)}
                 </Text>
               </Pressable>
             </View>
-          ) : (
-            <View style={styles.halfFieldWrapper}>
-              <Text style={[modalSharedStyles.fieldLabel, { color: colors.mutedText }]}>
-                {(t('select_category') || 'Category').toUpperCase()}
-              </Text>
-              <Pressable
-                style={[
-                  styles.pickerButtonHalf,
-                  { backgroundColor: colors.inputBackground, borderColor: colors.inputBorder },
-                  isShadowOperation && styles.disabledInput,
-                ]}
-                onPress={() => !isShadowOperation && openPicker('category', filteredCategories)}
-                disabled={isShadowOperation}
-                accessibilityRole="button"
-                accessibilityLabel={t('select_category')}
-              >
-                <Icon name="tag" size={20} color={isShadowOperation ? colors.mutedText : colors.text} />
-                <Text
-                  style={[styles.pickerButtonText, { color: isShadowOperation ? colors.mutedText : colors.text }]}
-                  numberOfLines={1}
-                >
-                  {getCategoryName(values.categoryId)}
+          </View>
+
+          {/* Labels editor (stored in the description field) */}
+          <Text style={[modalSharedStyles.fieldLabel, { color: colors.mutedText }]}>
+            {(t('labels') || 'Labels').toUpperCase()}
+          </Text>
+          <LabelInput
+            ref={labelInputRef}
+            value={values.description || ''}
+            onChangeText={handleDescriptionChange}
+            suggestions={labelSuggestions}
+            placeholder={t('add_label_placeholder')}
+            editable={!isShadowOperation}
+            colors={colors}
+            t={t}
+            onFocus={handleDescriptionFocus}
+          />
+
+          {/* Location row (stored as latitude/longitude). Only when the feature is on. */}
+          {attachLocation && !isShadowOperation && (
+            <OperationLocationRow
+              status={locationStatus}
+              location={location}
+              onCapture={captureLocation}
+              onClear={clearLocation}
+              colors={colors}
+              t={t}
+            />
+          )}
+
+          {/* Exclude-from-average toggle. Only when editing an expense (the burndown
+              forecast / daily average is expense-based), never for shadow ops. */}
+          {!isNew && !isShadowOperation && values.type === 'expense' && (
+            <View style={styles.excludeAvgRow}>
+              <View style={styles.excludeAvgTextContainer}>
+                <Text style={[modalSharedStyles.fieldLabel, styles.excludeAvgLabel, { color: colors.mutedText }]}>
+                  {(t('exclude_from_average') || 'Exclude from spending average').toUpperCase()}
                 </Text>
-              </Pressable>
+                <Text style={[styles.excludeAvgHint, { color: colors.mutedText }]}>
+                  {t('exclude_from_average_hint') || "Won't affect the daily average or burndown forecast"}
+                </Text>
+              </View>
+              <Switch
+                value={!!values.excludeFromAvg}
+                onValueChange={handleToggleExcludeFromAvg}
+                trackColor={{ false: colors.border, true: colors.primary + '66' }}
+                thumbColor={values.excludeFromAvg ? colors.primary : colors.mutedText}
+                testID="exclude-from-avg-switch"
+              />
             </View>
           )}
 
-          <View style={styles.halfFieldWrapper}>
-            <Text style={[modalSharedStyles.fieldLabel, { color: colors.mutedText }]}>
-              {(t('select_date') || 'Date').toUpperCase()}
-            </Text>
-            <Pressable
-              style={[
-                styles.pickerButtonHalf,
-                { backgroundColor: colors.inputBackground, borderColor: colors.inputBorder },
-                isShadowOperation && styles.disabledInput,
-              ]}
-              onPress={handleOpenDatePicker}
-              disabled={isShadowOperation}
-              accessibilityRole="button"
-              accessibilityLabel={t('select_date')}
-              testID="date-input"
-            >
-              <Icon name="calendar" size={20} color={isShadowOperation ? colors.mutedText : colors.text} />
-              <Text style={[styles.pickerButtonText, { color: isShadowOperation ? colors.mutedText : colors.text }]}>
-                {formatDateForDisplay(values.date)}
-              </Text>
-            </Pressable>
-          </View>
-        </View>
-
-        {/* Labels editor (stored in the description field) */}
-        <Text style={[modalSharedStyles.fieldLabel, { color: colors.mutedText }]}>
-          {(t('labels') || 'Labels').toUpperCase()}
-        </Text>
-        <LabelInput
-          ref={labelInputRef}
-          value={values.description || ''}
-          onChangeText={handleDescriptionChange}
-          suggestions={labelSuggestions}
-          placeholder={t('add_label_placeholder')}
-          editable={!isShadowOperation}
-          colors={colors}
-          t={t}
-          onFocus={handleDescriptionFocus}
-        />
-
-        {/* Location row (stored as latitude/longitude). Only when the feature is on. */}
-        {attachLocation && !isShadowOperation && (
-          <OperationLocationRow
-            status={locationStatus}
-            location={location}
-            onCapture={captureLocation}
-            onClear={clearLocation}
-            colors={colors}
-            t={t}
-          />
-        )}
-
-        {/* Exclude-from-average toggle. Only when editing an expense (the burndown
-            forecast / daily average is expense-based), never for shadow ops. */}
-        {!isNew && !isShadowOperation && values.type === 'expense' && (
-          <View style={styles.excludeAvgRow}>
-            <View style={styles.excludeAvgTextContainer}>
-              <Text style={[modalSharedStyles.fieldLabel, styles.excludeAvgLabel, { color: colors.mutedText }]}>
-                {(t('exclude_from_average') || 'Exclude from spending average').toUpperCase()}
-              </Text>
-              <Text style={[styles.excludeAvgHint, { color: colors.mutedText }]}>
-                {t('exclude_from_average_hint') || "Won't affect the daily average or burndown forecast"}
-              </Text>
+          {/* Hide-from-charts toggle. Expenses and income both feed a donut and the
+              summary totals; a transfer feeds neither, so it has nothing to hide.
+              Shown for a balance adjustment too — it is the one control that is live
+              on an otherwise read-only form, and skewed charts are exactly what a
+              correction causes (it writes itself straight to the DB, see the
+              handler). */}
+          {!isNew && values.type !== 'transfer' && (
+            <View style={styles.excludeAvgRow}>
+              <View style={styles.excludeAvgTextContainer}>
+                <Text style={[modalSharedStyles.fieldLabel, styles.excludeAvgLabel, { color: colors.mutedText }]}>
+                  {(t('exclude_from_charts') || 'Hide from charts').toUpperCase()}
+                </Text>
+                <Text style={[styles.excludeAvgHint, { color: colors.mutedText }]}>
+                  {t('exclude_from_charts_hint') || "Won't appear in the donut or the spending trend"}
+                </Text>
+              </View>
+              <Switch
+                value={!!values.excludeFromCharts}
+                onValueChange={handleToggleExcludeFromCharts}
+                trackColor={{ false: colors.border, true: colors.primary + '66' }}
+                thumbColor={values.excludeFromCharts ? colors.primary : colors.mutedText}
+                testID="exclude-from-charts-switch"
+              />
             </View>
-            <Switch
-              value={!!values.excludeFromAvg}
-              onValueChange={handleToggleExcludeFromAvg}
-              trackColor={{ false: colors.border, true: colors.primary + '66' }}
-              thumbColor={values.excludeFromAvg ? colors.primary : colors.mutedText}
-              testID="exclude-from-avg-switch"
-            />
-          </View>
-        )}
+          )}
 
-        {/* Hide-from-charts toggle. Expenses and income both feed a donut and the
-            summary totals; a transfer feeds neither, so it has nothing to hide.
-            Shown for a balance adjustment too — it is the one control that is live
-            on an otherwise read-only form, and skewed charts are exactly what a
-            correction causes (it writes itself straight to the DB, see the
-            handler). */}
-        {!isNew && values.type !== 'transfer' && (
-          <View style={styles.excludeAvgRow}>
-            <View style={styles.excludeAvgTextContainer}>
-              <Text style={[modalSharedStyles.fieldLabel, styles.excludeAvgLabel, { color: colors.mutedText }]}>
-                {(t('exclude_from_charts') || 'Hide from charts').toUpperCase()}
-              </Text>
-              <Text style={[styles.excludeAvgHint, { color: colors.mutedText }]}>
-                {t('exclude_from_charts_hint') || "Won't appear in the donut or the spending trend"}
-              </Text>
-            </View>
-            <Switch
-              value={!!values.excludeFromCharts}
-              onValueChange={handleToggleExcludeFromCharts}
-              trackColor={{ false: colors.border, true: colors.primary + '66' }}
-              thumbColor={values.excludeFromCharts ? colors.primary : colors.mutedText}
-              testID="exclude-from-charts-switch"
-            />
-          </View>
-        )}
-
-        {errors.general && <Text style={[styles.error, { color: colors.destructive }]}>{errors.general}</Text>}
+          {errors.general && <Text style={[styles.error, { color: colors.destructive }]}>{errors.general}</Text>}
+        </Animated.View>
       </ModalShell>
 
       {/* Split Operation Modal */}
@@ -688,49 +911,6 @@ export default function OperationModal({
         />
       )}
 
-      {/* Unified Picker Modal */}
-      <Modal
-        visible={pickerState.visible && visible}
-        animationType="slide"
-        transparent
-        onRequestClose={closePicker}
-      >
-        <Pressable style={styles.pickerOverlay} onPress={closePicker}>
-          <Pressable style={[styles.pickerModalContent, { backgroundColor: colors.card }]} onPress={handleStopPropagation}>
-            {pickerState.type === 'category' ? (
-              // Categories nest, so the picker is the app's shared category grid
-              // (CLAUDE.md, "Category selection") rather than a list of its own.
-              <ScrollView contentContainerStyle={styles.gridContent} keyboardShouldPersistTaps="handled">
-                <CategoryGridSelector
-                  categories={pickerState.data}
-                  categoryType={values.type === 'income' ? 'income' : 'expense'}
-                  selectedCategoryId={values.categoryId || null}
-                  onSelect={handleCategorySelect}
-                  colors={colors}
-                  t={t}
-                />
-              </ScrollView>
-            ) : (
-              // Accounts group by currency in the shared account grid
-              // (CLAUDE.md, "Account selection").
-              <ScrollView contentContainerStyle={styles.gridContent} keyboardShouldPersistTaps="handled">
-                <AccountGridSelector
-                  accounts={pickerState.type === 'account' || pickerState.type === 'toAccount' ? pickerState.data : []}
-                  selectedAccountId={pickerState.type === 'account' ? values.accountId : values.toAccountId}
-                  onSelect={handleSelectPickedAccount}
-                  colors={colors}
-                  t={t}
-                />
-              </ScrollView>
-            )}
-            {(pickerState.type !== 'category' || !isNew) && (
-              <Pressable style={styles.closeButton} onPress={closePicker}>
-                <Text style={[styles.closeButtonText, { color: colors.primary }]}>{t('close')}</Text>
-              </Pressable>
-            )}
-          </Pressable>
-        </Pressable>
-      </Modal>
     </>
   );
 }
@@ -740,20 +920,6 @@ const styles = StyleSheet.create({
     flexDirection: 'row',
     gap: SPACING.sm,
     marginBottom: SPACING.md,
-  },
-  closeButton: {
-    alignItems: 'center',
-    alignSelf: 'center',
-    borderRadius: BORDER_RADIUS.md,
-    justifyContent: 'center',
-    marginTop: SPACING.lg,
-    minHeight: 48,
-    paddingHorizontal: SPACING.xxl,
-    paddingVertical: SPACING.md,
-  },
-  closeButtonText: {
-    fontSize: FONT_SIZE.base,
-    fontWeight: '600',
   },
   disabledInput: {
     opacity: 0.6,
@@ -778,11 +944,36 @@ const styles = StyleSheet.create({
   excludeAvgTextContainer: {
     flex: 1,
   },
-  gridContent: {
-    padding: SPACING.sm,
-  },
   halfFieldWrapper: {
     flex: 1,
+  },
+  panel: {
+    flex: 1,
+    paddingHorizontal: SPACING.lg,
+    paddingTop: SPACING.md,
+  },
+  panelBack: {
+    marginRight: SPACING.xs,
+    padding: SPACING.xs,
+  },
+  panelHeader: {
+    alignItems: 'center',
+    flexDirection: 'row',
+    marginBottom: SPACING.md,
+  },
+  panelList: {
+    paddingBottom: SPACING.lg,
+  },
+  // Bounds the grid to what is left of the panel. Without it the ScrollView
+  // sizes to its content inside a fixed-height column and the overflow is
+  // simply clipped — categories past the fold that cannot be scrolled to.
+  panelListBody: {
+    flex: 1,
+  },
+  panelTitle: {
+    flexShrink: 1,
+    fontSize: FONT_SIZE.lg,
+    fontWeight: '700',
   },
   pickerButtonHalf: {
     alignItems: 'center',
@@ -797,18 +988,6 @@ const styles = StyleSheet.create({
   },
   pickerButtonText: {
     fontSize: 13,
-  },
-  pickerModalContent: {
-    borderTopLeftRadius: BORDER_RADIUS.lg,
-    borderTopRightRadius: BORDER_RADIUS.lg,
-    maxHeight: '70%',
-    padding: SPACING.md,
-    width: '100%',
-  },
-  pickerOverlay: {
-    alignItems: 'center',
-    flex: 1,
-    justifyContent: 'flex-end',
   },
   splitButtonContainer: {
     alignItems: 'center',
@@ -847,5 +1026,6 @@ OperationModal.propTypes = {
   }),
   isNew: PropTypes.bool,
   onDelete: PropTypes.func,
+  openCategoryPicker: PropTypes.bool,
 };
 

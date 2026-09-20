@@ -243,12 +243,16 @@ const landedIn = (language, detail) => {
  * With no details it degrades to a plain count.
  *
  * `actionLabel` is the receipt's "Acknowledged" button, which clears the
- * notification without opening the app.
+ * notification without opening the app; `changeCategoryLabel` is the button that
+ * opens the booked operation's form on its category picker. Whether the receipt
+ * actually shows the second one is the presenter's call (see
+ * presentAddedOperationsAlert) — only a receipt about a single categorizable
+ * booking can name the operation it would edit.
  *
  * @param {number} count - how many operations this run auto-created
  * @param {Array<Object>} [details] - described items (see collectAddedAlertDetails)
  * @returns {Promise<{ title: string, body: string, channelName: string,
- *   actionLabel: string }>}
+ *   actionLabel: string, changeCategoryLabel: string }>}
  */
 export const getAddedAlertCopy = async (count, details = []) => {
   const language = await resolveLanguage();
@@ -258,7 +262,10 @@ export const getAddedAlertCopy = async (count, details = []) => {
     : 'bank_notifications_bg_added_body_other';
   const countLine = translate(language, bodyKey).replace('{count}', String(safeCount));
   const channelName = translate(language, 'bank_notifications_channel_name');
-  const actionLabel = translate(language, 'bank_notifications_bg_added_acknowledge');
+  const actions = {
+    actionLabel: translate(language, 'bank_notifications_bg_added_acknowledge'),
+    changeCategoryLabel: translate(language, 'bank_notifications_bg_added_change_category'),
+  };
   const items = Array.isArray(details) ? details.filter(Boolean) : [];
 
   if (items.length === 0) {
@@ -266,7 +273,7 @@ export const getAddedAlertCopy = async (count, details = []) => {
       title: translate(language, 'bank_notifications_bg_added_title'),
       body: countLine,
       channelName,
-      actionLabel,
+      ...actions,
     };
   }
 
@@ -276,7 +283,7 @@ export const getAddedAlertCopy = async (count, details = []) => {
       title: headlineFor(language, detail),
       body: [countLine, recognizedFor(language, detail)].filter(Boolean).join('\n'),
       channelName,
-      actionLabel,
+      ...actions,
     };
   }
 
@@ -296,6 +303,6 @@ export const getAddedAlertCopy = async (count, details = []) => {
     title: countLine,
     body: lines.join('\n'),
     channelName,
-    actionLabel,
+    ...actions,
   };
 };

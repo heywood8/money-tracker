@@ -260,11 +260,12 @@ const PeriodHeader = memo(({
               />
             </Pressable>
 
-            {/* Mounted only when there is more than one account currency to
-                pick between: with a single one there is nothing to choose, and
-                the period should not be parted from a label nobody can act on.
-                The Budgets hero prints the code itself in that case. */}
-            {currencies.length > 1 && (
+            {/* A control only when there is more than one account currency to
+                pick between. With a single one the code still shows, as plain
+                text rather than a chip — the Budgets card used to print it on
+                its hero figure, and that hero is gone, so the header is now the
+                only thing on either screen that names the unit at all. */}
+            {currencies.length > 1 ? (
               <>
                 <View
                   style={[styles.divider, { backgroundColor: colors.border }]}
@@ -293,6 +294,23 @@ const PeriodHeader = memo(({
                     testID={`${testIDPrefix}-currency-chevron`}
                   />
                 </Pressable>
+              </>
+            ) : (
+              <>
+                <View
+                  style={[styles.divider, { backgroundColor: colors.border }]}
+                  testID={`${testIDPrefix}-divider`}
+                />
+                <View style={styles.currencyButton} testID={`${testIDPrefix}-currency-label`}>
+                  {!!displaySymbol && (
+                    <Text style={[styles.currencyText, { color: currencyColor }]}>
+                      {displaySymbol}
+                    </Text>
+                  )}
+                  <Text style={[styles.currencyText, { color: currencyColor }]}>
+                    {selectedCurrency}
+                  </Text>
+                </View>
               </>
             )}
           </View>

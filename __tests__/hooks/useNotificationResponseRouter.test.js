@@ -83,6 +83,86 @@ describe('useNotificationResponseRouter', () => {
     await unmount();
   });
 
+  it('opens the booked operation on "Change category"', async () => {
+    let listener;
+    Notifications.addNotificationResponseReceivedListener.mockImplementation((cb) => {
+      listener = cb;
+      return { remove: jest.fn() };
+    });
+
+    const { unmount } = await renderHook(() => useNotificationResponseRouter());
+    listener({
+      actionIdentifier: 'change-category',
+      notification: {
+        request: {
+          identifier: 'penny-added-operations-1',
+          content: { data: { route: 'addedOperations', operationId: 'op-7' } },
+        },
+      },
+    });
+
+    // The press asks for one operation's form, not the list the receipt's body
+    // tap opens.
+    expect(emitSpy).toHaveBeenCalledWith(
+      EVENTS.OPEN_OPERATION_CATEGORY,
+      { operationId: 'op-7' },
+    );
+    expect(emitSpy).not.toHaveBeenCalledWith(EVENTS.OPEN_ADDED_OPERATIONS);
+    // Android auto-cancels a body tap but not a button press.
+    expect(Notifications.dismissNotificationAsync).toHaveBeenCalledWith('penny-added-operations-1');
+    await unmount();
+  });
+
+  it('falls back to the operations list when the receipt names no operation', async () => {
+    let listener;
+    Notifications.addNotificationResponseReceivedListener.mockImplementation((cb) => {
+      listener = cb;
+      return { remove: jest.fn() };
+    });
+
+    const { unmount } = await renderHook(() => useNotificationResponseRouter());
+    listener({
+      actionIdentifier: 'change-category',
+      notification: {
+        request: {
+          identifier: 'penny-added-operations-1',
+          content: { data: { route: 'addedOperations' } },
+        },
+      },
+    });
+
+    // There is no form to open, but the press still asked for the app — landing
+    // on the list beats swallowing it.
+    expect(emitSpy).toHaveBeenCalledWith(EVENTS.OPEN_ADDED_OPERATIONS);
+    expect(emitSpy).not.toHaveBeenCalledWith(
+      EVENTS.OPEN_OPERATION_CATEGORY,
+      expect.anything(),
+    );
+    await unmount();
+  });
+
+  it('delivers "Change category" pressed from a cold start', async () => {
+    // Unlike "Reject", this press is what launched the app, so the cold-start
+    // replay is the only way it arrives.
+    Notifications.getLastNotificationResponseAsync.mockResolvedValue({
+      actionIdentifier: 'change-category',
+      notification: {
+        request: {
+          identifier: 'penny-added-operations-1',
+          content: { data: { route: 'addedOperations', operationId: 'op-7' } },
+        },
+      },
+    });
+
+    const { unmount } = await renderHook(() => useNotificationResponseRouter());
+
+    await waitFor(() => expect(emitSpy).toHaveBeenCalledWith(
+      EVENTS.OPEN_OPERATION_CATEGORY,
+      { operationId: 'op-7' },
+    ));
+    await unmount();
+  });
+
   it('clears the notification and navigates nowhere on "Acknowledged"', async () => {
     let listener;
     Notifications.addNotificationResponseReceivedListener.mockImplementation((cb) => {
