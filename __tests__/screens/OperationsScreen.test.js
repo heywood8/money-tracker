@@ -3415,9 +3415,11 @@ describe('OperationsScreen', () => {
     // right in the failure — a re-write of it commits nothing, which is exactly
     // how the deck stayed invisible over correct state.
 
-    it('re-commits the clip when a deck that arrived in the background comes back', async () => {
+    it('re-commits a pinned-open clip when the app comes back', async () => {
       const OperationsScreen = require('../../app/screens/OperationsScreen').default;
-      mockSuggestionsHook({ suggestions: [{ id: 'p1', type: 'expense', amount: '10' }] });
+      mockSuggestionsHook();
+      const { useDisplaySettings } = require('../../app/contexts/DisplaySettingsContext');
+      useDisplaySettings.mockReturnValue({ attachLocation: false, showQuickAddPanel: true });
       const restoreSearch = withSearchClosed();
       const tracker = trackSharedValues();
       const handlers = [];
@@ -3440,12 +3442,14 @@ describe('OperationsScreen', () => {
         AppState.addEventListener.mockRestore();
         tracker.restore();
         restoreSearch();
+        require('../../app/contexts/DisplaySettingsContext').useDisplaySettings
+          .mockReturnValue({ attachLocation: false });
       }
     });
 
-    it('re-commits the clip on the deep link, whose state change a deck swallows', async () => {
+    it('re-commits the clip on the deep link', async () => {
       const OperationsScreen = require('../../app/screens/OperationsScreen').default;
-      mockSuggestionsHook({ suggestions: [{ id: 'p1', type: 'expense', amount: '10' }] });
+      mockSuggestionsHook();
       const restoreSearch = withSearchClosed();
       const tracker = trackSharedValues();
 
@@ -3459,7 +3463,50 @@ describe('OperationsScreen', () => {
         });
 
         expect(clip.commits).toBeGreaterThan(before);
-        expect(clip.value).toBe(QUICK_ADD_UNCLIPPED);
+      } finally {
+        tracker.restore();
+        restoreSearch();
+      }
+    });
+
+    // The invariant the whole change exists to hold. A container inside the clip
+    // is a container the clip can shut, and once Reanimated has written a
+    // `maxHeight: 0` into it behind a stopped activity nothing React renders can
+    // reopen it — `useAnimatedStyle` hands React an opaque object, so React never
+    // renders a literal `maxHeight` and its diff has nothing to clear.
+    it('renders the deck outside the quick-add clip, never inside it', async () => {
+      const { within } = require('@testing-library/react-native');
+      const OperationsScreen = require('../../app/screens/OperationsScreen').default;
+      mockSuggestionsHook({ suggestions: [{ id: 'p1', type: 'expense', amount: '10' }] });
+      const restoreSearch = withSearchClosed();
+
+      try {
+        const { getByTestId } = await render(<OperationsScreen />);
+        const options = { includeHiddenElements: true };
+
+        // Present...
+        expect(getByTestId('notification-binding-stack', options)).toBeTruthy();
+        // ...and not under the clip, nor under the slide inside it.
+        expect(
+          within(getByTestId('quick-add-clip', options))
+            .queryByTestId('notification-binding-stack', options),
+        ).toBeNull();
+      } finally {
+        restoreSearch();
+      }
+    });
+
+    it('collapses the quick-add block while a deck is up', async () => {
+      const OperationsScreen = require('../../app/screens/OperationsScreen').default;
+      mockSuggestionsHook({ suggestions: [{ id: 'p1', type: 'expense', amount: '10' }] });
+      const restoreSearch = withSearchClosed();
+      const tracker = trackSharedValues();
+
+      try {
+        await render(<OperationsScreen />);
+        // The cards took the panel's place rather than being laid over the form
+        // inside it, so the form folds away instead of sitting under them.
+        expect(tracker.clip().value).toBe(0);
       } finally {
         tracker.restore();
         restoreSearch();
@@ -3506,75 +3553,47 @@ describe('OperationsScreen', () => {
     // repair above, doing exactly what it was written to do — and the user still
     // had to open and close search at 09:06:16 before the card appeared.
     //
-    // Re-committing the value cannot fix it: a shared value reaches a view
-    // through a diff of the props its animated style derives, and re-writing the
-    // value it already holds yields no diff, so nothing reaches the mounting
-    // layer. The tests above assert the commit against a mock that counts
-    // `modify()` as one — which is how a green suite sat on top of a live bug for
-    // five attempts. They stay (the re-assert is still right for the form), but
-    // the deck no longer depends on any of it: while a deck owns the panel, the
-    // clip and the slide render from STATIC styles, and React commits those with
-    // the render that produced them.
-    const withAnimatedStyleSentinel = () => {
-      const reanimated = require('react-native-reanimated');
-      const previous = reanimated.useAnimatedStyle.getMockImplementation();
-      reanimated.useAnimatedStyle.mockImplementation(() => ({ animated: true }));
-      return () => reanimated.useAnimatedStyle.mockImplementation(previous);
-    };
-
-    const styleOf = (element) => {
-      const { style } = element.props;
-      return Array.isArray(style)
-        ? Object.assign({}, ...style.filter(Boolean))
-        : (style || {});
-    };
-
-    const panelStyles = (getByTestId) => ({
-      clip: styleOf(getByTestId('quick-add-clip', { includeHiddenElements: true })),
-      slide: styleOf(getByTestId('quick-add-slide', { includeHiddenElements: true })),
-    });
-
-    it('renders the panel from a static style while a deck owns it', async () => {
+    // Re-committing the value cannot fix it, and neither can rendering a static
+    // style over it: `useAnimatedStyle` hands React an opaque object, so React
+    // never renders a literal `maxHeight` and its diff has nothing to clear. The
+    // tests above assert the commit against a mock that counts `modify()` as one,
+    // which is how a green suite sat on top of a live bug for six attempts. They
+    // stay, because the re-assert is still right for the form's own pinned-open
+    // state — but the deck is no longer in the clip at all, and the tests below
+    // are the ones that hold that.
+    // The cards inside the stack are absolutely positioned, so their container
+    // contributes no height of its own: without an explicit one it lays out at
+    // zero and paints nothing, which is the same invisible-deck symptom by
+    // another route. It used to borrow its height from the form it covered.
+    it('gives the deck container a height of its own', async () => {
       const OperationsScreen = require('../../app/screens/OperationsScreen').default;
       mockSuggestionsHook({ suggestions: [{ id: 'p1', type: 'expense', amount: '10' }] });
       const restoreSearch = withSearchClosed();
-      const restoreStyle = withAnimatedStyleSentinel();
 
       try {
         const { getByTestId } = await render(<OperationsScreen />);
-        const { clip, slide } = panelStyles(getByTestId);
+        const options = { includeHiddenElements: true };
+        // Measure the form so the deck sizes to it rather than to its floor.
+        await act(async () => {
+          fireEvent(getByTestId('quick-add-measure', options), 'layout', {
+            nativeEvent: { layout: { height: 437 } },
+          });
+        });
 
-        // Nothing the shared value drives, and no ceiling to be cut by.
-        expect(clip.animated).toBeUndefined();
-        expect(clip.maxHeight).toBeUndefined();
-        expect(slide.animated).toBeUndefined();
-        expect(slide.transform).toBeUndefined();
+        const stack = getByTestId('notification-binding-stack', options);
+        const container = stack.parent;
+        const style = Array.isArray(container.props.style)
+          ? Object.assign({}, ...container.props.style.filter(Boolean))
+          : container.props.style;
+        const { deckPeekAllowance: peek, deckCardHeight: cardHeight } =
+          require('../../app/components/operations/NotificationBindingStack');
+        expect(style.height).toBe(peek(1) + cardHeight(437));
       } finally {
-        restoreStyle();
         restoreSearch();
       }
     });
 
-    it('hands the panel back to the animated style once the deck empties', async () => {
-      const OperationsScreen = require('../../app/screens/OperationsScreen').default;
-      mockSuggestionsHook({ suggestions: [] });
-      const restoreSearch = withSearchClosed();
-      const restoreStyle = withAnimatedStyleSentinel();
-
-      try {
-        const { getByTestId } = await render(<OperationsScreen />);
-        const { clip, slide } = panelStyles(getByTestId);
-
-        // The form's own open/close is still animated — only the deck is not.
-        expect(clip.animated).toBe(true);
-        expect(slide.animated).toBe(true);
-      } finally {
-        restoreStyle();
-        restoreSearch();
-      }
-    });
-
-    it('leaves search in charge of the clip even with a deck queued', async () => {
+    it('takes the deck off the screen while search is open', async () => {
       const OperationsScreen = require('../../app/screens/OperationsScreen').default;
       const { useSearch } = require('../../app/contexts/SearchContext');
       useSearch.mockReturnValue({
@@ -3587,17 +3606,13 @@ describe('OperationsScreen', () => {
         registerSearchHandler: jest.fn(),
       });
       mockSuggestionsHook({ suggestions: [{ id: 'p1', type: 'expense', amount: '10' }] });
-      const restoreStyle = withAnimatedStyleSentinel();
 
       try {
-        const { getByTestId } = await render(<OperationsScreen />);
-        const { clip } = panelStyles(getByTestId);
-
-        // Search collapses the panel on the shared curves it shares with the
-        // pill and the list, so the animated style has to be the one in place.
-        expect(clip.animated).toBe(true);
+        const { queryByTestId } = await render(<OperationsScreen />);
+        // Search takes the whole screen; the cards come back when it closes.
+        expect(queryByTestId('notification-binding-stack', { includeHiddenElements: true }))
+          .toBeNull();
       } finally {
-        restoreStyle();
         useSearch.mockReturnValue({ registerSearchHandler: jest.fn(), openSearch: jest.fn() });
       }
     });
@@ -3789,7 +3804,11 @@ describe('OperationsScreen', () => {
     it('ignores a transient zero on the clip height while the block is open', async () => {
       const OperationsScreen = require('../../app/screens/OperationsScreen').default;
       const { useSearch } = require('../../app/contexts/SearchContext');
-      mockSuggestionsHook({ suggestions: [{ id: 'p1', type: 'expense', amount: '10' }] });
+      const { useDisplaySettings } = require('../../app/contexts/DisplaySettingsContext');
+      // The form's own block, pinned open: a deck would collapse it, and a
+      // collapsed block's zero is the truth rather than a transient pass.
+      useDisplaySettings.mockReturnValue({ attachLocation: false, showQuickAddPanel: true });
+      mockSuggestionsHook();
       const restoreSearch = withSearchClosed();
       const logs = jest.spyOn(console, 'log').mockImplementation(() => {});
 
@@ -3823,6 +3842,7 @@ describe('OperationsScreen', () => {
         logs.mockRestore();
         restoreSearch();
         useSearch.mockReturnValue({ registerSearchHandler: jest.fn(), openSearch: jest.fn() });
+        useDisplaySettings.mockReturnValue({ attachLocation: false });
       }
     });
   });
