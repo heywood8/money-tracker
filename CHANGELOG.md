@@ -1,5 +1,12 @@
 # Changelog
 
+## [0.292.3](https://github.com/heywood8/money-tracker/compare/penny-v0.292.2...penny-v0.292.3) (2026-09-21)
+
+
+### Bug Fixes
+
+* **operations:** render the review deck outside the quick-add clip ([#1811](https://github.com/heywood8/money-tracker/issues/1811)) ([daa49a1](https://github.com/heywood8/money-tracker/commit/daa49a149c50ac8cfc558559e3ceab6313b731fa))
+
 ## [0.292.2](https://github.com/heywood8/money-tracker/compare/penny-v0.292.1...penny-v0.292.2) (2026-09-20)
 
 
