@@ -1,5 +1,12 @@
 # Changelog
 
+## [0.292.5](https://github.com/heywood8/money-tracker/compare/penny-v0.292.4...penny-v0.292.5) (2026-09-22)
+
+
+### Miscellaneous Chores
+
+* **deps:** bump @shopify/react-native-skia from 2.11.2 to 2.12.0 ([#1815](https://github.com/heywood8/money-tracker/issues/1815)) ([e7d681f](https://github.com/heywood8/money-tracker/commit/e7d681f630a47be2f056605d4e8b4b2dfa3314f0))
+
 ## [0.292.4](https://github.com/heywood8/money-tracker/compare/penny-v0.292.3...penny-v0.292.4) (2026-09-21)
 
 
