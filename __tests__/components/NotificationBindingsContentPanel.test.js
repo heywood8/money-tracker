@@ -37,6 +37,8 @@ jest.mock('../../app/contexts/CategoriesContext', () => ({
     categories: [
       { id: 'c1', name: 'Food', categoryType: 'expense', parentId: null },
       { id: 'c2', name: 'Salary', categoryType: 'income', parentId: null },
+      { id: 'f1', name: 'Shopping', type: 'folder', categoryType: 'expense', parentId: null },
+      { id: 'c3', name: 'Books', type: 'entry', categoryType: 'expense', parentId: 'f1' },
     ],
   }),
 }));
@@ -133,6 +135,38 @@ describe('NotificationBindingsContentPanel', () => {
     fireEvent.press(getAllByLabelText('notification_bindings_remove')[0]);
     fireEvent.press(await waitFor(() => getByLabelText('delete')));
     await waitFor(() => expect(NotificationRulesDB.clearMerchantRuleCategory).toHaveBeenCalledWith('r1'));
+  });
+
+  describe('Category picker', () => {
+    beforeEach(() => {
+      mockAccounts = [CASH_ACCOUNT];
+      NotificationRulesDB.getAllMerchantRules.mockResolvedValue([CATEGORY_RULE]);
+      pipeline.resolveAtmTargetAccount.mockResolvedValue(null);
+    });
+
+    it('shows the category tile grid only after the field is tapped', async () => {
+      const { getByTestId, queryByTestId } = await render(<NotificationBindingsContentPanel />);
+      const field = await waitFor(() => getByTestId('binding-category-field-r1'));
+      expect(queryByTestId('binding-category-option-r1-c1')).toBeNull();
+      await fireEvent.press(field);
+      expect(getByTestId('binding-category-option-r1-c1')).toBeTruthy();
+      // Root level of the tree: the folder is a tile, its child is not shown yet,
+      // and income categories are filtered out.
+      expect(getByTestId('binding-category-option-r1-f1')).toBeTruthy();
+      expect(queryByTestId('binding-category-option-r1-c3')).toBeNull();
+      expect(queryByTestId('binding-category-option-r1-c2')).toBeNull();
+    });
+
+    it('drills into a folder and re-points the binding to the nested category', async () => {
+      const { getByTestId, queryByTestId } = await render(<NotificationBindingsContentPanel />);
+      await fireEvent.press(await waitFor(() => getByTestId('binding-category-field-r1')));
+      await fireEvent.press(getByTestId('binding-category-option-r1-f1'));
+      await fireEvent.press(getByTestId('binding-category-option-r1-c3'));
+      await waitFor(() => expect(NotificationRulesDB.upsertMerchantRule)
+        .toHaveBeenCalledWith('COFFEE HOUSE', 'c3', 'am.bank'));
+      // Picking collapses the grid.
+      expect(queryByTestId('binding-category-option-r1-c1')).toBeNull();
+    });
   });
 
   it('removes a name binding via clearMerchantRuleLabel', async () => {
