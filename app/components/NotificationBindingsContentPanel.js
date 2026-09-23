@@ -9,6 +9,7 @@ import { useAccountsData } from '../contexts/AccountsDataContext';
 import { useAccountsActions } from '../contexts/AccountsActionsContext';
 import { useCategories } from '../contexts/CategoriesContext';
 import SimplePicker from './SimplePicker';
+import CategoryGridSelector from './CategoryGridSelector';
 import FormInput from './FormInput';
 import { getCategoryDisplayName } from '../utils/categoryUtils';
 import { parseCardMasks, cardMaskLast4 } from '../utils/cardMask';
@@ -86,9 +87,13 @@ export default function NotificationBindingsContentPanel({ active = true, bottom
     [accounts],
   );
 
-  const categoryItems = useMemo(
-    () => categories.map((c) => ({ label: getCategoryDisplayName(c.id, categories, t), value: c.id })),
-    [categories, t],
+  // The category binding whose tile grid is unfolded (a rule id), or null. Only
+  // one grid is open at a time so the list stays scannable.
+  const [expandedCategoryRuleId, setExpandedCategoryRuleId] = useState(null);
+
+  const categoriesById = useMemo(
+    () => new Map(categories.map((c) => [c.id, c])),
+    [categories],
   );
 
   const reload = useCallback(async () => {
@@ -204,6 +209,7 @@ export default function NotificationBindingsContentPanel({ active = true, bottom
   );
 
   const handleChangeCategory = useCallback(async (rule, categoryId) => {
+    setExpandedCategoryRuleId(null);
     if (!categoryId || categoryId === rule.categoryId) return;
     await upsertMerchantRule(rule.merchant, categoryId, rule.packageName);
     await reload();
@@ -380,6 +386,62 @@ export default function NotificationBindingsContentPanel({ active = true, bottom
       </View>
     </View>
   );
+
+  // A category binding row. Categories are a tree, so the picker is the shared
+  // tile grid with folder drill-down, unfolded inline under the field rather than
+  // a flat list in a bottom sheet.
+  const renderCategoryRow = (rule) => {
+    const rowKey = `cat-${rule.id}`;
+    const expanded = expandedCategoryRuleId === rule.id;
+    const categoryType = categoriesById.get(rule.categoryId)?.categoryType === 'income' ? 'income' : 'expense';
+    return (
+      <View
+        key={rowKey}
+        style={[styles.card, { backgroundColor: colors.surface, borderColor: colors.border }]}
+      >
+        <View style={styles.cardTitleRow}>
+          <View style={styles.cardTitleText}>
+            <Ionicons name="storefront-outline" size={16} color={colors.mutedText} />
+            <Text style={[styles.bindingKey, { color: colors.text }]} numberOfLines={1}>
+              {rule.merchant}
+            </Text>
+          </View>
+          {renderRemoveControl(
+            rowKey,
+            () => handleRemoveCategory(rule),
+            t('notification_bindings_remove') || 'Remove binding',
+          )}
+        </View>
+        <TouchableOpacity
+          onPress={() => setExpandedCategoryRuleId(expanded ? null : rule.id)}
+          style={[styles.pickerWrap, styles.categoryField, { borderColor: colors.border, backgroundColor: colors.background }]}
+          accessibilityRole="button"
+          accessibilityState={{ expanded }}
+          accessibilityLabel={t('category') || 'Category'}
+          testID={`binding-category-field-${rule.id}`}
+        >
+          <Ionicons name="pricetag-outline" size={16} color={colors.mutedText} />
+          <Text style={[styles.categoryFieldText, { color: colors.text }]} numberOfLines={1}>
+            {getCategoryDisplayName(rule.categoryId, categories, t)}
+          </Text>
+          <Ionicons name={expanded ? 'chevron-up' : 'chevron-down'} size={16} color={colors.mutedText} />
+        </TouchableOpacity>
+        {expanded && (
+          <View style={styles.categoryGrid}>
+            <CategoryGridSelector
+              categories={categories}
+              categoryType={categoryType}
+              selectedCategoryId={rule.categoryId}
+              onSelect={(categoryId) => handleChangeCategory(rule, categoryId)}
+              colors={colors}
+              t={t}
+              testIDPrefix={`binding-category-option-${rule.id}`}
+            />
+          </View>
+        )}
+      </View>
+    );
+  };
 
   return (
     <ScrollView
@@ -562,22 +624,7 @@ export default function NotificationBindingsContentPanel({ active = true, bottom
             </Text>
           )}
 
-          {visibleCategories.map((rule) => renderPickerRow(
-            `cat-${rule.id}`,
-            'storefront-outline',
-            rule.merchant,
-            {
-              value: rule.categoryId,
-              onValueChange: (v) => handleChangeCategory(rule, v),
-              items: categoryItems,
-              leftIcon: 'shape-outline',
-            },
-            renderRemoveControl(
-              `cat-${rule.id}`,
-              () => handleRemoveCategory(rule),
-              t('notification_bindings_remove') || 'Remove binding',
-            ),
-          ))}
+          {visibleCategories.map(renderCategoryRow)}
         </>
       )}
 
@@ -685,6 +732,21 @@ const styles = StyleSheet.create({
     flexDirection: 'row',
     gap: SPACING.xs,
     marginRight: SPACING.sm,
+  },
+  categoryField: {
+    alignItems: 'center',
+    flexDirection: 'row',
+    gap: SPACING.sm,
+    height: 44,
+    paddingHorizontal: SPACING.md,
+  },
+  categoryFieldText: {
+    flex: 1,
+    fontSize: FONT_SIZE.md,
+    fontWeight: '500',
+  },
+  categoryGrid: {
+    marginTop: SPACING.sm,
   },
   centered: {
     alignItems: 'center',
