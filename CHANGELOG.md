@@ -1,5 +1,12 @@
 # Changelog
 
+## [0.292.6](https://github.com/heywood8/money-tracker/compare/penny-v0.292.5...penny-v0.292.6) (2026-09-23)
+
+
+### Bug Fixes
+
+* **notifications:** use category tile grid in bindings panel ([#1819](https://github.com/heywood8/money-tracker/issues/1819)) ([14ca185](https://github.com/heywood8/money-tracker/commit/14ca185ffb239d98abb56843a90c44dd663bdfd9))
+
 ## [0.292.5](https://github.com/heywood8/money-tracker/compare/penny-v0.292.4...penny-v0.292.5) (2026-09-22)
 
 
