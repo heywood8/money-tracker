@@ -1,5 +1,12 @@
 # Changelog
 
+## [0.292.13](https://github.com/heywood8/money-tracker/compare/penny-v0.292.12...penny-v0.292.13) (2026-09-24)
+
+
+### Bug Fixes
+
+* **search:** ignore a cancelled date picker in filters and jump-to-date ([#1834](https://github.com/heywood8/money-tracker/issues/1834)) ([2496941](https://github.com/heywood8/money-tracker/commit/24969412bfc5f16d51081c192bbbe6e2e0631d1a))
+
 ## [0.292.12](https://github.com/heywood8/money-tracker/compare/penny-v0.292.11...penny-v0.292.12) (2026-09-24)
 
 
