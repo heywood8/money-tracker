@@ -1,5 +1,12 @@
 # Changelog
 
+## [0.292.7](https://github.com/heywood8/money-tracker/compare/penny-v0.292.6...penny-v0.292.7) (2026-09-24)
+
+
+### Bug Fixes
+
+* **backup:** stop sheets and csv restores from silently losing data ([#1821](https://github.com/heywood8/money-tracker/issues/1821)) ([a420316](https://github.com/heywood8/money-tracker/commit/a420316e2918a535ed015b9ec22abc3efb038cd2))
+
 ## [0.292.6](https://github.com/heywood8/money-tracker/compare/penny-v0.292.5...penny-v0.292.6) (2026-09-23)
 
 
