@@ -1,5 +1,12 @@
 # Changelog
 
+## [0.292.10](https://github.com/heywood8/money-tracker/compare/penny-v0.292.9...penny-v0.292.10) (2026-09-24)
+
+
+### Bug Fixes
+
+* **backup:** keep notification templates when restoring an older .db ([#1827](https://github.com/heywood8/money-tracker/issues/1827)) ([9fa7f43](https://github.com/heywood8/money-tracker/commit/9fa7f4365b3e1d7d4aa5448a39ffcd340a7d2e6b))
+
 ## [0.292.9](https://github.com/heywood8/money-tracker/compare/penny-v0.292.8...penny-v0.292.9) (2026-09-24)
 
 
