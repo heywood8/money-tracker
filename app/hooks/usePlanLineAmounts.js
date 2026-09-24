@@ -15,11 +15,10 @@ const EMPTY_SET = new Set();
  * silently: the amount was AMD, the progress bar beneath it was RUB, and neither
  * said which.
  *
- * `calculatePlanStatus` already converts the same way, but only for a month that
- * HAS a plan row; recurring lines render for plan-less months too, and the
- * screen's own live totals recompute before the async status lands. This hook is
- * the one source of converted target amounts for both cases, so a row, the
- * totals and the summary strip can never disagree.
+ * `calculatePlanStatus` already converts the same way, but its status is async
+ * and the screen's own live totals recompute before it lands. This hook is the
+ * one source of converted target amounts for the rows and those totals, so a
+ * row, the totals and the summary strip can never disagree.
  *
  * Rates come from the shared offline-first lookup ({@link fetchRatesToTarget}),
  * the same one the status path uses — identical inputs give identical figures.

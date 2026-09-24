@@ -163,8 +163,10 @@ const MonthlyPlanSection = forwardRef(function MonthlyPlanSection({
   // the code stays — it would otherwise appear nowhere at all.
   const currencySuffix = controlledMonth ? '' : ` ${planCurrency}`;
 
-  // Plan-vs-actual status for the shown month (may be null while computing).
-  const storedPlanStatus = (planId && planStatuses && planStatuses.get(planId)) || null;
+  // Plan-vs-actual status for the shown month (may be null while computing),
+  // keyed by month: a month with no plan has one too when recurring lines apply
+  // to it (BudgetPlansDB.calculatePlanStatusesForMonth).
+  const storedPlanStatus = (planStatuses && planStatuses.get(month)) || null;
   // A status computed in another currency is not this section's status. The
   // context recomputes them whenever the display currency changes, but that is
   // async: for a render or two after the chip is switched the map still holds the
