@@ -1,5 +1,12 @@
 # Changelog
 
+## [0.292.8](https://github.com/heywood8/money-tracker/compare/penny-v0.292.7...penny-v0.292.8) (2026-09-24)
+
+
+### Bug Fixes
+
+* **operations:** stop foreign-currency edits and re-adjusts moving balances ([#1823](https://github.com/heywood8/money-tracker/issues/1823)) ([622748f](https://github.com/heywood8/money-tracker/commit/622748fe4cab67995204ecd96cc1bb6e80fcb238))
+
 ## [0.292.7](https://github.com/heywood8/money-tracker/compare/penny-v0.292.6...penny-v0.292.7) (2026-09-24)
 
 
