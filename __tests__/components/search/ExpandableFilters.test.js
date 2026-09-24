@@ -2,6 +2,20 @@ import React from 'react';
 import { render, fireEvent } from '@testing-library/react-native';
 import ExpandableFilters from '../../../app/components/search/ExpandableFilters';
 
+// The global mock renders a bare host element and drops its props; this one
+// hands the change handler back so the date pickers can be driven.
+let pickerProps = null;
+jest.mock('@react-native-community/datetimepicker', () => {
+  const ReactLib = require('react');
+  return {
+    __esModule: true,
+    default: (props) => {
+      pickerProps = props;
+      return ReactLib.createElement('DateTimePicker');
+    },
+  };
+});
+
 describe('ExpandableFilters', () => {
   const mockColors = {
     background: '#FFFFFF',
@@ -39,6 +53,45 @@ describe('ExpandableFilters', () => {
 
   beforeEach(() => {
     jest.clearAllMocks();
+    pickerProps = null;
+  });
+
+  // On Android a cancelled picker still calls onChange, passing the date it
+  // opened on: today, for a filter with no date yet. Pressing Cancel on "From"
+  // used to set the filter to today and hide the whole history.
+  describe('date range pickers', () => {
+    it('leaves the filter alone when the From picker is cancelled', async () => {
+      const onFilterChange = jest.fn();
+      const { getByText } = await render(<ExpandableFilters {...defaultProps} onFilterChange={onFilterChange} />);
+      await fireEvent.press(getByText('from_date'));
+      expect(pickerProps).not.toBeNull();
+
+      pickerProps.onChange({ type: 'dismissed' }, new Date());
+
+      expect(onFilterChange).not.toHaveBeenCalled();
+    });
+
+    it('leaves the filter alone when the To picker is cancelled', async () => {
+      const onFilterChange = jest.fn();
+      const { getByText } = await render(<ExpandableFilters {...defaultProps} onFilterChange={onFilterChange} />);
+      await fireEvent.press(getByText('to_date'));
+
+      pickerProps.onChange({ type: 'dismissed' }, new Date());
+
+      expect(onFilterChange).not.toHaveBeenCalled();
+    });
+
+    it('sets the date the user confirms', async () => {
+      const onFilterChange = jest.fn();
+      const { getByText } = await render(<ExpandableFilters {...defaultProps} onFilterChange={onFilterChange} />);
+      await fireEvent.press(getByText('from_date'));
+
+      pickerProps.onChange({ type: 'set' }, new Date(2026, 2, 5));
+
+      expect(onFilterChange).toHaveBeenCalledWith({
+        dateRange: { startDate: '2026-03-05', endDate: null },
+      });
+    });
   });
 
   it('does not render when isExpanded is false', async () => {
