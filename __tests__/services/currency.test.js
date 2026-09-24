@@ -714,7 +714,9 @@ describe('Currency Service', () => {
 
   describe('invertRate', () => {
     it('inverts a rate with decimal precision (default 6 places)', () => {
-      expect(Currency.invertRate('418.5')).toBe('0.002389');
+      // A small inverse keeps 8 significant digits, not just 6 decimals
+      // (0.002389 held four, and an amount recomputed from it drifted).
+      expect(Currency.invertRate('418.5')).toBe('0.0023894863');
       expect(Currency.invertRate('0.92')).toBe('1.086957');
       expect(Currency.invertRate('2')).toBe('0.500000');
     });
@@ -739,6 +741,19 @@ describe('Currency Service', () => {
       const once = Currency.invertRate('418.5', 10);
       const twice = Currency.invertRate(once, 4);
       expect(twice).toBe('418.5000');
+    });
+
+    // USD on a VND account: the stored account→foreign rate is 1/25445. At a
+    // flat 6 decimals that was 0.000039, and re-saving 100 USD recomputed the
+    // deduction as 100 / 0.000039 = 2,564,103 VND instead of 2,544,500.
+    it('keeps 8 significant digits for a very small inverse', () => {
+      expect(Currency.invertRate('25445')).toBe('0.000039300452');
+      const displayRate = Currency.invertRate(Currency.invertRate('25445'));
+      expect(Math.round(100 * parseFloat(displayRate))).toBe(2544500);
+    });
+
+    it('keeps exactly the decimals asked for when given', () => {
+      expect(Currency.invertRate('25445', 6)).toBe('0.000039');
     });
   });
 

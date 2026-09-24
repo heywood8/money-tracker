@@ -1,6 +1,6 @@
 import { renderHook, act, waitFor } from '@testing-library/react-native';
 import { Keyboard } from 'react-native';
-import useOperationForm from '../../app/hooks/useOperationForm';
+import useOperationForm, { isRateStoredForeignToAccount } from '../../app/hooks/useOperationForm';
 import * as BalanceHistoryDB from '../../app/services/BalanceHistoryDB';
 import * as LastAccount from '../../app/services/LastAccount';
 import * as Currency from '../../app/services/currency';
@@ -40,6 +40,7 @@ jest.mock('../../app/services/currency', () => ({
   subtract: jest.fn((a, b) => String(parseFloat(a) - parseFloat(b))),
   fetchLiveExchangeRate: jest.fn().mockResolvedValue({ rate: null, source: 'none' }),
   getDecimalPlaces: jest.fn(() => 2),
+  invertRate: jest.requireActual('../../app/services/currency').invertRate,
 }));
 
 jest.mock('../../app/utils/categoryUtils', () => ({
@@ -1705,6 +1706,75 @@ describe('useOperationForm', () => {
       await waitFor(() => {
         expect(result.current.values.destinationAmount).toBe('291.60');
       });
+    });
+
+    // Quick add used to store the rate it fetched (foreign→account) without
+    // inverting it. Read the old way, 244 USD / 263.52 EUR at 0.925926 showed a
+    // rate of 1.08 and the save recomputed the deduction as 263.52 × 1.08.
+    describe('rows quick add saved with the rate the wrong way round', () => {
+      const legacyQuickAddExpense = {
+        ...foreignCurrencyExpense,
+        exchangeRate: '0.925926', // EUR→USD: 263.52 × 0.925926 ≈ 244
+      };
+
+      it('shows the stored rate as is instead of inverting it', async () => {
+        const props = { ...defaultProps, operation: legacyQuickAddExpense, isNew: false };
+        const { result } = await renderHook(() => useOperationForm(props));
+
+        await waitFor(() => {
+          expect(result.current.values.amount).toBe('263.52');
+          expect(result.current.values.destinationAmount).toBe('244');
+          expect(result.current.values.exchangeRate).toBe('0.925926');
+        });
+      });
+
+      it('saves the deduction unchanged and writes the rate back account→foreign', async () => {
+        Currency.convertAmount.mockReturnValue('244');
+        mockUpdateOperation.mockResolvedValue();
+
+        const props = { ...defaultProps, operation: legacyQuickAddExpense, isNew: false };
+        const { result } = await renderHook(() => useOperationForm(props));
+
+        await waitFor(() => {
+          expect(result.current.values.exchangeRate).toBe('0.925926');
+        });
+
+        await act(async () => {
+          await result.current.handleSave();
+        });
+
+        expect(Currency.convertAmount).toHaveBeenCalledWith('263.52', 'EUR', 'USD', '0.925926');
+        expect(mockUpdateOperation).toHaveBeenCalledWith(
+          'op-fx',
+          expect.objectContaining({
+            amount: '244',
+            destinationAmount: '263.52',
+            exchangeRate: '1.080000',
+          }),
+        );
+      });
+    });
+  });
+
+  describe('isRateStoredForeignToAccount', () => {
+    it('is false for a row stored account→foreign', () => {
+      // 244 USD × 1.08 = 263.52 EUR
+      expect(isRateStoredForeignToAccount({ amount: '244', destinationAmount: '263.52', exchangeRate: '1.08' })).toBe(false);
+      // 244 AMD × 0.122951 ≈ 30 TRY
+      expect(isRateStoredForeignToAccount({ amount: '244', destinationAmount: '30', exchangeRate: '0.122951' })).toBe(false);
+    });
+
+    it('is true for a row stored foreign→account by the old quick add', () => {
+      // 30 TRY × 11.76 ≈ 353 AMD (account amount rounded to 0 decimals)
+      expect(isRateStoredForeignToAccount({ amount: '353', destinationAmount: '30', exchangeRate: '11.76' })).toBe(true);
+      expect(isRateStoredForeignToAccount({ amount: '244', destinationAmount: '263.52', exchangeRate: '0.925926' })).toBe(true);
+    });
+
+    it('is false when an amount or the rate is missing or not positive', () => {
+      expect(isRateStoredForeignToAccount({ amount: '244', destinationAmount: null, exchangeRate: '1.08' })).toBe(false);
+      expect(isRateStoredForeignToAccount({ amount: '0', destinationAmount: '30', exchangeRate: '11.76' })).toBe(false);
+      expect(isRateStoredForeignToAccount({ amount: '353', destinationAmount: '30', exchangeRate: '' })).toBe(false);
+      expect(isRateStoredForeignToAccount(null)).toBe(false);
     });
   });
 });

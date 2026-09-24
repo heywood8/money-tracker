@@ -704,18 +704,25 @@ export const reverseConvert = (destinationAmount, fromCurrency, toCurrency, cust
  * account→foreign rate without float error.
  *
  * @param {string|number} rate - rate to invert
- * @param {number} decimals - decimal places to keep (default 6, matching the
- *   precision used elsewhere for stored exchange rates)
+ * @param {number} [decimals] - exact decimal places to keep. When omitted, 6
+ *   (matching the precision used elsewhere for stored exchange rates), widened
+ *   to 8 significant digits for a result below 0.1: 1/25445 at a flat 6
+ *   decimals is 0.000039, two digits, and an amount recomputed from that rate
+ *   moves by about 0.8%.
  * @returns {string|null} the inverted rate as a string, or null when the input
  *   is not a positive, finite number
  */
-export const invertRate = (rate, decimals = 6) => {
+export const invertRate = (rate, decimals) => {
   try {
     const rateDecimal = toDecimal(rate);
     if (!rateDecimal.isFinite() || rateDecimal.lessThanOrEqualTo(0)) {
       return null;
     }
-    return new Decimal(1).dividedBy(rateDecimal).toFixed(decimals);
+    const inverse = new Decimal(1).dividedBy(rateDecimal);
+    if (decimals !== undefined) return inverse.toFixed(decimals);
+    // `e` is the base-10 exponent: -5 for 0.0000393. A result of 0.1 or more
+    // already has 6 significant digits at 6 decimals, and keeps that format.
+    return inverse.toFixed(inverse.e < -1 ? 8 - inverse.e - 1 : 6);
   } catch (error) {
     return null;
   }

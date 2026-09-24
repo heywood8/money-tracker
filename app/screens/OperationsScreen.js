@@ -1039,7 +1039,12 @@ const OperationsScreen = () => {
     let finalAmount = formValues.amount;
 
     if (hasOperation(finalAmount)) {
-      const evaluated = evaluateExpression(finalAmount, Currency.getDecimalPlaces(sourceAccount?.currency));
+      // A non-transfer amount is typed in the operation currency when a foreign
+      // one is picked: evaluate with THAT currency's decimals, as the modal does,
+      // or "12.50+3.25" USD on a RUB account (0 decimals) is booked as $16.
+      const amountCurrency = (formValues.type !== 'transfer' && formValues.operationCurrency)
+        || sourceAccount?.currency;
+      const evaluated = evaluateExpression(finalAmount, Currency.getDecimalPlaces(amountCurrency));
       if (evaluated !== null) {
         finalAmount = evaluated;
       }
@@ -1148,11 +1153,22 @@ const OperationsScreen = () => {
           return;
         }
 
+        // The fetched rate is foreign→home, but the column holds account→foreign
+        // (amount × rate = destinationAmount), as the edit form and the
+        // bank-notification importer write it. Stored uninverted, re-opening the
+        // operation read 30 TRY at 11.76 as 30 × 0.085 = 3 AMD and saving rewrote
+        // the account deduction to that.
+        const accountToForeignRate = Currency.invertRate(rateToUse);
+        if (!accountToForeignRate) {
+          showDialog(t('error'), t('exchange_rate_unavailable'), [{ text: t('ok') }]);
+          return;
+        }
+
         // Store home-currency amount as the account deduction; foreign amount as destinationAmount
         operationData.amount = Currency.formatAmount(homeAmount, homeCurrency);
         operationData.sourceCurrency = foreignCurrency;
         operationData.destinationCurrency = homeCurrency;
-        operationData.exchangeRate = rateToUse;
+        operationData.exchangeRate = accountToForeignRate;
         operationData.destinationAmount = foreignAmount;
       } else if (effectiveSourceAccount) {
         // Format amount for same-currency operations

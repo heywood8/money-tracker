@@ -505,7 +505,11 @@ export default function OperationModal({
     let finalAmount = values.amount;
 
     if (hasOperation(values.amount)) {
-      const evaluated = evaluateExpression(values.amount, Currency.getDecimalPlaces(sourceAccount?.currency));
+      // A foreign-currency amount is typed in the operation currency, so it keeps
+      // that currency's decimals (a USD amount on a JPY account keeps its cents),
+      // matching what handleSave evaluates with.
+      const amountCurrency = (isForeignCurrencyOp && values.operationCurrency) || sourceAccount?.currency;
+      const evaluated = evaluateExpression(values.amount, Currency.getDecimalPlaces(amountCurrency));
       if (evaluated !== null) {
         finalAmount = evaluated;
       }
