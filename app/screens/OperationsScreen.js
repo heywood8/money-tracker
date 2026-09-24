@@ -997,6 +997,9 @@ const OperationsScreen = () => {
 
   const handleDatePickerChange = useCallback(async (event, date) => {
     setShowDatePicker(false);
+    // A cancelled picker still calls onChange on Android, with the date it opened
+    // on; jumping there would scroll or reload the list the user just declined.
+    if (event?.type === 'dismissed') return;
     if (date) {
       const dateString = toDateString(date);
 

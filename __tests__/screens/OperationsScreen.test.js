@@ -2085,6 +2085,54 @@ describe('OperationsScreen', () => {
       // but we can verify the handler was callable
       expect(operationsList.props.onDateSeparatorPress).toBeDefined();
     });
+
+    // On Android a cancelled picker still calls onChange, with the date it
+    // opened on. The screen jumped there anyway, reloading or scrolling the list
+    // the user had just declined to move.
+    it('does nothing when the jump-to-date picker is cancelled, and jumps on a confirmed pick', async () => {
+      const OperationsScreen = require('../../app/screens/OperationsScreen').default;
+      // The global mock drops its props. The screen reads the module's default
+      // export at render time, so swap in one that hands the handler back.
+      const pickerModule = require('@react-native-community/datetimepicker');
+      const originalPicker = pickerModule.default;
+      let pickerProps = null;
+      pickerModule.default = (props) => { pickerProps = props; return null; };
+      const { useOperationsData } = require('../../app/contexts/OperationsDataContext');
+      const { useOperationsActions } = require('../../app/contexts/OperationsActionsContext');
+      const jumpToDate = jest.fn(() => Promise.resolve());
+
+      useOperationsData.mockReturnValue({
+        operations: [], loading: false, loadingMore: false, hasMoreOperations: false,
+        activeFilters: {}, filtersActive: false,
+      });
+      useOperationsActions.mockReturnValue({
+        deleteOperation: jest.fn(), addOperation: jest.fn(), validateOperation: jest.fn(() => null),
+        loadMoreOperations: jest.fn(), jumpToDate, updateFilters: jest.fn(), clearFilters: jest.fn(),
+        getActiveFilterCount: jest.fn(() => 0),
+      });
+
+      try {
+        const { getByTestId } = await render(<OperationsScreen />);
+
+        await act(async () => {
+          getByTestId('operations-list').props.onDateSeparatorPress('2024-01-15');
+        });
+        await act(async () => {
+          await pickerProps.onChange({ type: 'dismissed' }, new Date(2024, 0, 15));
+        });
+        expect(jumpToDate).not.toHaveBeenCalled();
+
+        await act(async () => {
+          getByTestId('operations-list').props.onDateSeparatorPress('2024-01-15');
+        });
+        await act(async () => {
+          await pickerProps.onChange({ type: 'set' }, new Date(2024, 0, 10));
+        });
+        expect(jumpToDate).toHaveBeenCalledWith('2024-01-10');
+      } finally {
+        pickerModule.default = originalPicker;
+      }
+    });
   });
 
   describe('Amount Change Handlers', () => {

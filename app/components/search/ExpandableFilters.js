@@ -96,8 +96,13 @@ const ExpandableFilters = ({
     onFilterChange({ accountIds: newAccountIds });
   };
 
+  // On Android a cancelled picker still calls onChange, with the date it opened
+  // on as the "selected" one: today, for a filter with no date yet. Taken at
+  // face value, pressing Cancel on "From" set the filter to today and hid the
+  // whole history. Only a confirmed pick changes the filter.
   const handleStartDateChange = (event, selectedDate) => {
     setShowStartDatePicker(false);
+    if (event?.type === 'dismissed') return;
     if (selectedDate) {
       const dateStr = formatDate(selectedDate);
       onFilterChange({
@@ -108,6 +113,7 @@ const ExpandableFilters = ({
 
   const handleEndDateChange = (event, selectedDate) => {
     setShowEndDatePicker(false);
+    if (event?.type === 'dismissed') return;
     if (selectedDate) {
       const dateStr = formatDate(selectedDate);
       onFilterChange({
