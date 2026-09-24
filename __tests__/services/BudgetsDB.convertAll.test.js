@@ -350,5 +350,23 @@ describe('BudgetsDB convert-all spending', () => {
       expect(sql).toContain('o.account_id IN (?)');
       expect(sql).toContain('GROUP BY a.currency');
     });
+
+    // Lowering card X's balance on the Accounts screen books an expense into a
+    // hidden shadow category. A line tracking "everything on card X" counted
+    // that correction as money spent.
+    it('leaves balance adjustments (shadow categories) out, in both toggle states', async () => {
+      stubRates({});
+      queryFirst.mockResolvedValue({ total: 0 });
+      queryAll.mockResolvedValue([]);
+
+      await BudgetsDB.calculateSpendingForFilters({ ...range, accountIds: [3] });
+      await BudgetsDB.calculateSpendingForFilters({ ...range, accountIds: [3], convertAll: true });
+
+      for (const [sql, params] of [queryFirst.mock.calls[0], queryAll.mock.calls[0]]) {
+        expect(sql).toContain('LEFT JOIN categories c ON o.category_id = c.id');
+        expect(sql).toContain('(c.is_shadow IS NULL OR c.is_shadow = 0)');
+        expect(params[0]).toBe(3);
+      }
+    });
   });
 });

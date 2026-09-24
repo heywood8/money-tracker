@@ -47,6 +47,7 @@ const PlanLineRow = memo(function PlanLineRow({
   icon,
   status = null,
   planCurrency,
+  inheritedCurrency = null,
   displayAmount = null,
   converting = false,
   colors,
@@ -65,7 +66,9 @@ const PlanLineRow = memo(function PlanLineRow({
   // copies, and two nodes under one testID is a query that can no longer name
   // either of them.
   const testIDPrefix = lifted ? 'plan-line-lifted' : 'plan-line';
-  const lineCurrency = line.currency || planCurrency;
+  // A one-off line with no currency of its own is in the plan's STORED
+  // currency, which the screen's (`planCurrency`) need not be.
+  const lineCurrency = line.currency || inheritedCurrency || planCurrency;
   const isBroken = line.isBroken || status?.broken;
   // The screen shows exactly one currency, so a row prints a bare number in it —
   // no per-row code to read, and never the stored figure of a line that keeps its
@@ -302,6 +305,7 @@ PlanLineRow.propTypes = {
   icon: PropTypes.string.isRequired,
   status: PropTypes.object,
   planCurrency: PropTypes.string.isRequired,
+  inheritedCurrency: PropTypes.string,
   displayAmount: PropTypes.oneOfType([PropTypes.string, PropTypes.number]),
   converting: PropTypes.bool,
   colors: PropTypes.object.isRequired,

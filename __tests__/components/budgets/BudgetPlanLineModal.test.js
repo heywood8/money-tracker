@@ -670,6 +670,63 @@ describe('BudgetPlanLineModal', () => {
       }));
     });
 
+    // The screen can read a plan in a currency other than the one it is stored
+    // in (a RUB plan shown in USD). null means the STORED currency, so a line
+    // entered in the screen's USD must say so, or 100 USD is saved as 100 RUB.
+    describe('plan stored in a currency other than the screen\'s', () => {
+      const rubPlanProps = () => ({
+        ...baseProps(),
+        currency: 'USD',
+        inheritedCurrency: 'RUB',
+        accounts: [...ACCOUNTS, { id: 2, name: 'Card', currency: 'RUB' }],
+      });
+
+      it('saves a line entered in the screen currency with that currency, not null', async () => {
+        const props = rubPlanProps();
+        const { getByTestId } = await render(<BudgetPlanLineModal {...props} />);
+        await waitFor(() => expect(getByTestId('plan-line-currency-USD')).toBeTruthy());
+        await fireEvent.press(getByTestId('plan-target-picker'));
+        await fireEvent.press(getByTestId('plan-target-option-cat-cat1'));
+        await fireEvent.changeText(getByTestId('plan-line-amount'), '100');
+        await fireEvent.press(getByTestId('plan-line-save'));
+        expect(props.onSaveLine).toHaveBeenCalledWith(expect.objectContaining({ isRecurring: false, currency: 'USD' }));
+      });
+
+      // "Gift 100 USD" on the RUB plan, edited while the screen shows USD. The
+      // chip matched the screen, so it used to be saved as null; the DB then
+      // converted 100 USD into ~9000 RUB and the status read that as 9000 USD.
+      it('keeps a USD line on a RUB plan in USD when only its label changes', async () => {
+        const props = {
+          ...rubPlanProps(),
+          line: {
+            id: 'l1', planId: 'p1', amount: '100', label: 'Gift', comment: null, kind: 'expense',
+            categoryId: 'cat1', categoryIds: ['cat1'], toAccountId: null, isRecurring: false, currency: 'USD',
+          },
+        };
+        const { getByTestId } = await render(<BudgetPlanLineModal {...props} />);
+        await waitFor(() => expect(getByTestId('plan-line-amount')).toBeTruthy());
+        await fireEvent.changeText(getByTestId('plan-line-label'), 'Birthday gift');
+        await fireEvent.press(getByTestId('plan-line-save'));
+        expect(props.onSaveLine).toHaveBeenCalledWith(expect.objectContaining({ currency: 'USD', label: 'Birthday gift' }));
+      });
+
+      it('keeps a currency-less line in the plan currency (null) when only its label changes', async () => {
+        const props = {
+          ...rubPlanProps(),
+          line: {
+            id: 'l1', planId: 'p1', amount: '100', label: 'Gift', comment: null, kind: 'expense',
+            categoryId: 'cat1', categoryIds: ['cat1'], toAccountId: null, isRecurring: false, currency: null,
+          },
+        };
+        const { getByTestId } = await render(<BudgetPlanLineModal {...props} />);
+        await waitFor(() => expect(getByTestId('plan-line-amount')).toBeTruthy());
+        // The chip shows what the line is in: the plan's RUB, not the screen's USD.
+        await fireEvent.changeText(getByTestId('plan-line-label'), 'Birthday gift');
+        await fireEvent.press(getByTestId('plan-line-save'));
+        expect(props.onSaveLine).toHaveBeenCalledWith(expect.objectContaining({ currency: null, label: 'Birthday gift' }));
+      });
+    });
+
     it('a one-off line left on the plan currency still saves currency: null (inherit)', async () => {
       const props = { ...baseProps(), accounts: [...ACCOUNTS, { id: 2, name: 'Foreign', currency: 'EUR' }] };
       const { getByTestId } = await render(<BudgetPlanLineModal {...props} />);

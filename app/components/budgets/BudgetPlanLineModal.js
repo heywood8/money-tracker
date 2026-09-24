@@ -282,6 +282,7 @@ export default function BudgetPlanLineModal({
   line = null,
   initialKind = 'expense',
   currency = 'USD',
+  inheritedCurrency = null,
   month = null,
   expenseCategories = [],
   incomeCategories = [],
@@ -355,13 +356,19 @@ export default function BudgetPlanLineModal({
   // what it did before it had a picker — so only a chip that differs from the
   // plan's currency is written out. A recurring line has no plan to inherit
   // from and always carries its own.
-  const oneOffCurrency = lineCurrency && lineCurrency !== currency ? lineCurrency : null;
+  //
+  // "The plan's" is the currency the plan is STORED in (`inheritedCurrency`),
+  // which is what the DB reads null as. The screen's chip (`currency`) can
+  // differ: a RUB plan read in USD used to save a USD line as null, and the DB
+  // then took its 100 for 100 RUB.
+  const planOwnCurrency = inheritedCurrency || currency;
+  const oneOffCurrency = lineCurrency && lineCurrency !== planOwnCurrency ? lineCurrency : null;
   const effectiveCurrency = isRecurring ? lineCurrency : oneOffCurrency;
   // What the amount is actually denominated in. A one-off line on the plan's own
   // currency stores null, so the field is labelled with the plan's rather than
   // left bare. (May still be '' if the plan has no currency yet — no accounts
   // exist.)
-  const displayCurrency = effectiveCurrency || currency;
+  const displayCurrency = effectiveCurrency || planOwnCurrency;
 
   // Currency options: every currency in use across the user's accounts, the
   // plan's own currency (always offered, even if no account currently uses it),
@@ -370,9 +377,10 @@ export default function BudgetPlanLineModal({
   const currencyOptions = useMemo(() => {
     const set = new Set(accounts.map(a => a.currency));
     set.add(currency);
+    if (inheritedCurrency) set.add(inheritedCurrency);
     if (line?.currency) set.add(line.currency);
     return [...set];
-  }, [accounts, currency, line]);
+  }, [accounts, currency, inheritedCurrency, line]);
   // One option is not a choice: the single chip would be the plan's own currency,
   // permanently selected, saying nothing the amount's own label does not already.
   const showCurrencyChips = currencyOptions.length > 1;
@@ -401,7 +409,8 @@ export default function BudgetPlanLineModal({
       setTrackedLabelsText(serializeLabels(line.trackedLabels ?? []));
       setToAccountId(line.toAccountId ?? null);
       setIsRecurring(!!line.isRecurring);
-      setLineCurrency(line.currency || currency);
+      // A stored null is the plan's own currency, not whatever the screen shows.
+      setLineCurrency(line.currency || inheritedCurrency || currency);
       setGroupId(line.groupId ?? null);
     } else {
       setKind(initialKind);
@@ -417,7 +426,7 @@ export default function BudgetPlanLineModal({
       setGroupId(null);
     }
     setNewGroupName('');
-  }, [visible, line, initialKind, currency]);
+  }, [visible, line, initialKind, currency, inheritedCurrency]);
 
   // Label suggestions for an income line's filter — the labels already in use on
   // real operations, so the filter is picked from what exists rather than typed
@@ -1270,6 +1279,9 @@ BudgetPlanLineModal.propTypes = {
   }),
   initialKind: PropTypes.oneOf(KINDS),
   currency: PropTypes.string,
+  // The currency the plan is stored in, which a one-off line's null currency
+  // means. May differ from `currency`, the one the screen reads in.
+  inheritedCurrency: PropTypes.string,
   // The month the sheet was opened over (YYYY-MM) — where a recurring budget
   // starts applying from.
   month: PropTypes.string,
