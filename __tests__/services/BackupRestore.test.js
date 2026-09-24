@@ -986,6 +986,10 @@ test_key,test_value`;
       const csvContent = `# Money Tracker Backup
 # Version: 1
 
+[ACCOUNTS]
+
+[CATEGORIES]
+
 [OPERATIONS]
 id,description
 op-1,"Food, drinks, etc"`;
@@ -1012,6 +1016,10 @@ op-1,"Food, drinks, etc"`;
       const csvContent = `# Money Tracker Backup
 # Version: 1
 
+[ACCOUNTS]
+
+[CATEGORIES]
+
 [OPERATIONS]
 id,description
 op-1,"Mom's ""special"" food"`;
@@ -1037,6 +1045,10 @@ op-1,"Mom's ""special"" food"`;
     it('parses CSV with multiline quoted values (regression #590)', async () => {
       const csvContent = `# Money Tracker Backup
 # Version: 1
+
+[ACCOUNTS]
+
+[CATEGORIES]
 
 [OPERATIONS]
 id,description
@@ -1074,6 +1086,8 @@ op-2,normal`;
 id,name,balance
 acc-1,Cash,100
 acc-2,Savings
+
+[CATEGORIES]
 
 [OPERATIONS]
 id,type,amount,account_id,category_id,description
@@ -1145,6 +1159,137 @@ op-2,income,20,acc-1,cat-1`;
 
       expect(backup.data.accounts).toEqual([]);
       expect(backup.data.categories).toEqual([]);
+    });
+
+    it('refuses a CSV that is not a Penny backup, before touching the database', async () => {
+      // A bank statement picked by mistake: no section marker at all. Every
+      // section used to default to [], pass validation, and restore as an empty
+      // database reported as a success.
+      const csvContent = 'Date,Amount,Description\n2024-01-01,10.00,Coffee\n2024-01-02,25.50,Groceries\n';
+
+      mockDocumentPicker.getDocumentAsync.mockResolvedValue({
+        canceled: false,
+        assets: [{ uri: 'file:///mock/statement.csv', name: 'statement.csv' }],
+      });
+      mockFileSystem.readAsStringAsync.mockResolvedValue(csvContent);
+
+      await expect(BackupRestore.importBackup()).rejects.toThrow('not a complete Penny CSV backup');
+      expect(mockDb.executeTransaction).not.toHaveBeenCalled();
+    });
+
+    it('refuses a backup cut short before its operations section', async () => {
+      // A partial download or sync: the file ends inside [CATEGORIES]. Restoring
+      // it would clear every operation and put nothing back.
+      const csvContent = `# Money Tracker Backup
+# Version: 1
+
+[ACCOUNTS]
+id,name,balance,currency
+acc-1,Cash,100,USD
+
+[CATEGORIES]
+id,name,type,category_type
+cat-1,Food,fol`;
+
+      mockDocumentPicker.getDocumentAsync.mockResolvedValue({
+        canceled: false,
+        assets: [{ uri: 'file:///mock/backup.csv', name: 'backup.csv' }],
+      });
+      mockFileSystem.readAsStringAsync.mockResolvedValue(csvContent);
+
+      await expect(BackupRestore.importBackup()).rejects.toThrow('not a complete Penny CSV backup');
+      expect(mockDb.executeTransaction).not.toHaveBeenCalled();
+    });
+
+    it('restores a backup whose line endings were converted to CRLF', async () => {
+      const csvContent = [
+        '# Money Tracker Backup',
+        '# Version: 1',
+        '',
+        '[ACCOUNTS]',
+        'id,name,balance,currency',
+        'acc-1,Cash,100,USD',
+        '',
+        '[CATEGORIES]',
+        'id,name,type,category_type',
+        'cat-1,Food,folder,expense',
+        '',
+        '[OPERATIONS]',
+        'id,type,amount,account_id,category_id,description',
+        'op-1,expense,10,acc-1,cat-1,"two\r\nlines"',
+        '',
+      ].join('\r\n');
+
+      mockDocumentPicker.getDocumentAsync.mockResolvedValue({
+        canceled: false,
+        assets: [{ uri: 'file:///mock/backup.csv', name: 'backup.csv' }],
+      });
+      mockFileSystem.readAsStringAsync.mockResolvedValue(csvContent);
+      mockDb.executeTransaction.mockImplementation(async (callback) => {
+        await callback({
+          runAsync: jest.fn().mockResolvedValue({ lastInsertRowId: 1 }),
+          getAllAsync: jest.fn().mockResolvedValue([]),
+        });
+      });
+
+      const backup = await BackupRestore.importBackup();
+
+      expect(backup.data.accounts).toHaveLength(1);
+      expect(backup.data.categories).toHaveLength(1);
+      expect(backup.data.operations).toHaveLength(1);
+      // The markers accept CRLF; the cell keeps the line break it was written with.
+      expect(backup.data.operations[0].description).toBe('two\r\nlines');
+    });
+
+    it('restores a blank metadata value as an empty string instead of failing on NOT NULL', async () => {
+      // backup_last_skipped is written as '' after every accepted daily backup,
+      // and CSV reads a blank cell back as null. app_metadata.value is NOT NULL,
+      // so passing that null through aborted the whole restore.
+      const csvContent = `# Money Tracker Backup
+# Version: 1
+
+[ACCOUNTS]
+id,name,balance,currency
+acc-1,Cash,100,USD
+
+[CATEGORIES]
+id,name,type,category_type
+cat-1,Food,folder,expense
+
+[OPERATIONS]
+id,type,amount,account_id,category_id
+
+[APP_METADATA]
+key,value,updated_at
+backup_last_skipped,,2024-01-01T00:00:00.000Z
+language,en,
+`;
+
+      mockDocumentPicker.getDocumentAsync.mockResolvedValue({
+        canceled: false,
+        assets: [{ uri: 'file:///mock/backup.csv', name: 'backup.csv' }],
+      });
+      mockFileSystem.readAsStringAsync.mockResolvedValue(csvContent);
+      const runAsync = jest.fn().mockResolvedValue({ lastInsertRowId: 1 });
+      mockDb.executeTransaction.mockImplementation(async (callback) => {
+        await callback({ runAsync, getAllAsync: jest.fn().mockResolvedValue([]) });
+      });
+
+      await BackupRestore.importBackup();
+
+      const metadataInserts = runAsync.mock.calls
+        .filter(([sql]) => sql.startsWith('INSERT OR REPLACE INTO app_metadata'))
+        .map(([, params]) => params);
+      const byKey = Object.fromEntries(metadataInserts.map(params => [params[0], params]));
+
+      expect(byKey.backup_last_skipped).toEqual(['backup_last_skipped', '', '2024-01-01T00:00:00.000Z']);
+      expect(byKey.language[1]).toBe('en');
+      expect(typeof byKey.language[2]).toBe('string');
+      expect(byKey.language[2]).not.toBe('');
+      metadataInserts.forEach(params => {
+        expect(params[1]).not.toBeNull();
+        expect(params[2]).not.toBeNull();
+      });
     });
   });
 

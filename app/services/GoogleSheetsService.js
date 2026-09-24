@@ -305,6 +305,29 @@ const parseSheet = (valueRange) => {
 };
 
 /**
+ * Tab title a valueRange's `range` names.
+ *
+ * The API echoes each range back in canonical A1 form, and that form quotes a
+ * title containing a space: a request for `Balance History` comes back as
+ * `'Balance History'!A1:D40`. Matching the raw string against `Balance History!`
+ * therefore missed every multi-word tab, which imported as empty and let the
+ * restore clear those tables with nothing to put back.
+ *
+ * @param {string} range - e.g. `Accounts!A1:G3` or `'Budget Plans'!A1:D2`
+ * @returns {string} the unquoted tab title
+ */
+export const sheetTitleOfRange = (range) => {
+  const text = String(range || '');
+  const bang = text.lastIndexOf('!');
+  const title = bang === -1 ? text : text.slice(0, bang);
+  if (title.length >= 2 && title.startsWith('\'') && title.endsWith('\'')) {
+    // Inside quotes, a literal apostrophe is doubled.
+    return title.slice(1, -1).replace(/''/g, '\'');
+  }
+  return title;
+};
+
+/**
  * Import all app data from the saved Google Sheets spreadsheet.
  * Fetches all 8 sheets in one batchGet call, resolves foreign keys
  * (ID-first, name fallback), and returns a backup object compatible
@@ -368,11 +391,18 @@ export const importFromSheets = async (accessToken, onProgress) => {
   // ── Step 2: parse ──────────────────────────────────────────────────
   report('parse', 'in_progress');
 
-  // Find a sheet's valueRange by matching the tab name prefix
-  const findSheet = (name) => {
-    const vr = valueRanges.find(r => r.range?.startsWith(`${name}!`));
-    return parseSheet(vr);
-  };
+  // Find a sheet's valueRange by its tab title (quoted or not in the response)
+  const findValueRange = (name) => valueRanges.find(r => r.range && sheetTitleOfRange(r.range) === name);
+  const findSheet = (name) => parseSheet(findValueRange(name));
+
+  // An export writes a header row into every tab, even for an empty table. When
+  // not one core tab has it, the spreadsheet holds no Penny data at all: most
+  // likely an export cleared the tabs and then failed to write them. Importing
+  // it would clear every table on restore, so refuse it.
+  const hasHeaderRow = (name) => (findValueRange(name)?.values?.length ?? 0) > 0;
+  if (!['Accounts', 'Categories', 'Operations'].some(hasHeaderRow)) {
+    throw new Error('fetch_sheets_failed');
+  }
 
   const accountRows = findSheet('Accounts');
   const categoryRows = findSheet('Categories');
@@ -609,14 +639,29 @@ export const importFromSheets = async (accessToken, onProgress) => {
   // resolved, so a line never comes back from a round trip tracking nothing.
   const budget_plan_line_categories = [];
   const splitList = (value) => String(value || '').split(';').map(part => part.trim()).filter(Boolean);
+  // IDs first; a name counts only when it names something the IDs did not
+  // already cover. An export fills both columns, and names are not unique (the
+  // default set alone has nine "Other"s), so resolving the echoed name could
+  // land on a different category of that name and link it as an extra target.
+  // A name typed in by hand beside the IDs still gets through.
+  const resolveIdsThenNames = (ids, names, idMap, nameById) => {
+    const resolved = splitList(ids).map(token => idMap.get(token) ?? null).filter(Boolean);
+    const coveredNames = new Set(resolved.map(id => nameById.get(id)).filter(Boolean));
+    for (const name of splitList(names)) {
+      if (coveredNames.has(name)) continue;
+      const id = idMap.get(name) ?? null;
+      if (id) resolved.push(id);
+    }
+    return resolved;
+  };
+  const categoryNameById = new Map(categoryRows.map(c => [String(c.id), c.name]));
+  const accountNameById = new Map(accountRows.map(a => [String(a.id), a.name]));
   for (let i = 0; i < budgetPlanLineRows.length; i++) {
     const row = budgetPlanLineRows[i];
     const line = budget_plan_lines[i];
     if (!line.id) continue;
     // Both columns go through categoryIdMap, which is keyed by ID *and* by name.
-    const listed = [...splitList(row.category_ids), ...splitList(row.categories)]
-      .map(token => categoryIdMap.get(token) ?? null)
-      .filter(Boolean);
+    const listed = resolveIdsThenNames(row.category_ids, row.categories, categoryIdMap, categoryNameById);
     const resolved = listed.length > 0 ? listed : (line.category_id ? [line.category_id] : []);
     const seen = new Set();
     for (const categoryId of resolved) {
@@ -640,9 +685,7 @@ export const importFromSheets = async (accessToken, onProgress) => {
     const row = budgetPlanLineRows[i];
     const line = budget_plan_lines[i];
     if (!line.id) continue;
-    const listed = [...splitList(row.spending_account_ids), ...splitList(row.spending_accounts)]
-      .map(token => accountIdMap.get(token) ?? null)
-      .filter(Boolean);
+    const listed = resolveIdsThenNames(row.spending_account_ids, row.spending_accounts, accountIdMap, accountNameById);
     const seen = new Set();
     for (const accountId of listed) {
       if (seen.has(accountId)) continue;
