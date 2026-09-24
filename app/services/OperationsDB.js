@@ -1757,7 +1757,8 @@ export const getAvailableMonths = async () => {
 
 /**
  * Get operations for a specific week offset from today
- * Week 0 is the current week (last 7 days including today)
+ * Week 0 is the current week: the last 7 days including today, plus anything
+ * dated after today (the list's first page, so future-dated operations show)
  * Week 1 is days 8-14 ago, week 2 is days 15-21 ago, etc.
  * @param {number} weekOffset - Number of weeks before current week (0 = current week)
  * @returns {Promise<Array>}
@@ -1780,12 +1781,22 @@ export const getOperationsByWeekOffset = async (weekOffset) => {
     const startDateStr = formatLocalDate(startDate);
     const endDateStr = formatLocalDate(endDate);
 
-    console.debug(`Loading week ${weekOffset}: ${startDateStr} to ${endDateStr}`);
+    // The current week (0) has no upper bound. An operation dated ahead (rent
+    // booked for next Monday) belongs at the top of the list; capped at today it
+    // showed until the next reload and then vanished for good, while the
+    // balance already counted it, which is how it got entered a second time.
+    const isCurrentWeek = weekOffset === 0;
+    console.debug(`Loading week ${weekOffset}: ${startDateStr} to ${isCurrentWeek ? 'any later date' : endDateStr}`);
 
-    const operations = await queryAll(
-      'SELECT * FROM operations WHERE date >= ? AND date <= ? ORDER BY date DESC, created_at DESC',
-      [startDateStr, endDateStr],
-    );
+    const operations = isCurrentWeek
+      ? await queryAll(
+        'SELECT * FROM operations WHERE date >= ? ORDER BY date DESC, created_at DESC',
+        [startDateStr],
+      )
+      : await queryAll(
+        'SELECT * FROM operations WHERE date >= ? AND date <= ? ORDER BY date DESC, created_at DESC',
+        [startDateStr, endDateStr],
+      );
 
     console.debug(`Week ${weekOffset} loaded: ${operations?.length || 0} operations`);
 

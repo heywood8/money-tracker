@@ -1013,7 +1013,7 @@ const OperationsScreen = () => {
           viewPosition: 0, // Position at the top of the viewport
         });
       } else {
-        // Date is not in current list - load from that date to today
+        // Date is not in current list - load everything from that date on
         // Set the target date for scrolling after load completes
         scrollScheduledRef.current = false;
         setScrollToDateString(dateString);

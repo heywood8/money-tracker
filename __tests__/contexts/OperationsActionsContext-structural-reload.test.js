@@ -110,6 +110,27 @@ describe('OperationsActionsContext - structural filter reload detection', () => 
     { wrapper },
   );
 
+  // Jumping to a date used to load that date through today only, and then mark
+  // "nothing newer": an operation dated ahead could never be paged back in.
+  describe('jumpToDate keeps future-dated operations', () => {
+    it('loads from the picked date with no upper bound', async () => {
+      const futureRent = { id: 9, type: 'expense', amount: '500', date: '2999-01-01', accountId: 'a1' };
+      const pastCoffee = { id: 1, type: 'expense', amount: '3', date: '2025-03-10', accountId: 'a1' };
+      OperationsDB.getOperationsByDateRange.mockResolvedValueOnce([futureRent, pastCoffee]);
+      const { result } = await setupHook();
+      await waitFor(() => expect(OperationsDB.getOperationsByWeekOffset).toHaveBeenCalledTimes(1));
+
+      await act(async () => {
+        await result.current.actions.jumpToDate('2025-03-01');
+      });
+
+      const [from, to] = OperationsDB.getOperationsByDateRange.mock.calls[0];
+      expect(from).toBe('2025-03-01');
+      expect(to >= '2999-01-01').toBe(true);
+      expect(result.current.data.operations.map(op => op.id)).toContain(9);
+    });
+  });
+
   describe('text search triggers all-dates DB query', () => {
     beforeEach(() => {
       OperationsDB.getFilteredOperationsAllDates.mockResolvedValue([]);
