@@ -1,5 +1,13 @@
 # Changelog
 
+## [0.292.11](https://github.com/heywood8/money-tracker/compare/penny-v0.292.10...penny-v0.292.11) (2026-09-24)
+
+
+### Bug Fixes
+
+* **budgets:** read one-off lines in the plan currency, skip adjustments ([#1829](https://github.com/heywood8/money-tracker/issues/1829)) ([52a1030](https://github.com/heywood8/money-tracker/commit/52a1030f7a43c8089c09a15bd601b976805cc90b))
+* **operations:** keep future-dated operations in the list after a reload ([#1830](https://github.com/heywood8/money-tracker/issues/1830)) ([bd3e7b5](https://github.com/heywood8/money-tracker/commit/bd3e7b58bad713e680c81fdd1e88189ddc4e8e53))
+
 ## [0.292.10](https://github.com/heywood8/money-tracker/compare/penny-v0.292.9...penny-v0.292.10) (2026-09-24)
 
 
