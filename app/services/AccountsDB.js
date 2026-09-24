@@ -667,8 +667,19 @@ export const adjustAccountBalance = async (accountId, newBalance, description = 
       // Add target balance to history
       adjustmentHistory.push(Currency.formatAmount(targetBalanceStr));
 
-      // Calculate total cumulative adjustment from original balance (precise)
-      const totalDeltaStr = Currency.subtract(targetBalanceStr, originalBalanceStr);
+      // The day's adjustment after this change: whatever it already moved, plus
+      // the step from the CURRENT balance to the target. Measuring from the
+      // original balance instead ignored every operation booked between two
+      // same-day adjustments: 1000 → adjust to 900 → spend 50 → set 800 landed
+      // on 750. With nothing booked in between the two readings agree.
+      let totalDeltaStr = Currency.subtract(targetBalanceStr, currentBalanceStr);
+      if (existingOperation) {
+        const existingAmountStr = existingOperation.amount || '0';
+        const existingSignedStr = existingOperation.type === 'expense'
+          ? Currency.subtract('0', existingAmountStr)
+          : existingAmountStr;
+        totalDeltaStr = Currency.add(existingSignedStr, totalDeltaStr);
+      }
       const absoluteDeltaStr = Currency.abs(totalDeltaStr);
 
       // Determine operation type based on cumulative delta

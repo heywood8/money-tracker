@@ -354,6 +354,8 @@ jest.mock('../../app/services/currency', () => ({
   getExchangeRate: jest.fn(() => null),
   convertAmount: jest.fn(() => null),
   fetchLiveExchangeRate: jest.fn().mockResolvedValue({ rate: null, source: 'none' }),
+  getDecimalPlaces: jest.requireActual('../../app/services/currency').getDecimalPlaces,
+  invertRate: jest.requireActual('../../app/services/currency').invertRate,
 }));
 
 jest.mock('../../app/components/Calculator', () => {
@@ -367,6 +369,7 @@ jest.mock('../../assets/currencies.json', () => ({
   USD: { symbol: '$', decimal_digits: 2 },
   EUR: { symbol: '€', decimal_digits: 2 },
   RUB: { symbol: '₽', decimal_digits: 2 },
+  JPY: { symbol: '¥', decimal_digits: 0 },
 }), { virtual: true });
 
 describe('OperationsScreen', () => {
@@ -1704,6 +1707,129 @@ describe('OperationsScreen', () => {
       const arg = mockAddOperation.mock.calls[0][0];
       expect(arg).not.toHaveProperty('latitude');
       expect(arg).not.toHaveProperty('longitude');
+    });
+  });
+
+  describe('Quick-add in a foreign currency', () => {
+    const { act } = require('@testing-library/react-native');
+    const useMultiCurrencyTransfer = require('../../app/hooks/useMultiCurrencyTransfer');
+
+    // Every hook these tests point at their own account and values, the quick
+    // add source account (useMultiCurrencyTransfer) included. Put back whatever
+    // the file had set up, so no later describe inherits a JPY account.
+    const overriddenHooks = () => [
+      useMultiCurrencyTransfer,
+      require('../../app/hooks/useOperationPicker'),
+      require('../../app/hooks/useQuickAddForm'),
+      require('../../app/contexts/AccountsDataContext').useAccountsData,
+      require('../../app/contexts/OperationsDataContext').useOperationsData,
+      require('../../app/contexts/OperationsActionsContext').useOperationsActions,
+    ];
+    let previousImpls;
+    beforeEach(() => {
+      previousImpls = overriddenHooks().map(hook => hook.getMockImplementation());
+    });
+    afterEach(() => {
+      overriddenHooks().forEach((hook, i) => hook.mockImplementation(previousImpls[i]));
+    });
+
+    const renderAndQuickAdd = async ({ account, values }) => {
+      useMultiCurrencyTransfer.mockReturnValue({
+        sourceAccount: account,
+        destinationAccount: null,
+        isMultiCurrencyTransfer: false,
+        lastEditedField: null,
+        setLastEditedField: jest.fn(),
+        rateSource: 'offline',
+        setRateSource: jest.fn(),
+      });
+      const OperationsScreen = require('../../app/screens/OperationsScreen').default;
+      const { useOperationsData } = require('../../app/contexts/OperationsDataContext');
+      const { useOperationsActions } = require('../../app/contexts/OperationsActionsContext');
+      const { useAccountsData } = require('../../app/contexts/AccountsDataContext');
+      const useQuickAddForm = require('../../app/hooks/useQuickAddForm');
+      const useOperationPicker = require('../../app/hooks/useOperationPicker');
+
+      useOperationPicker.mockReturnValue({
+        pickerState: { visible: true, type: 'category', data: [] },
+        categoryNavigation: { currentFolderId: null, breadcrumb: [] },
+        openPicker: jest.fn(),
+        closePicker: jest.fn(),
+        navigateIntoFolder: jest.fn(),
+        navigateBack: jest.fn(),
+      });
+
+      const mockAddOperation = jest.fn(() => Promise.resolve({ id: 'new-op' }));
+      useQuickAddForm.mockReturnValue({
+        quickAddValues: values,
+        quickAddValuesStore: makeMockQuickAddStore(values),
+        setQuickAddValues: jest.fn(),
+        getAccountName: jest.fn(() => 'Card'),
+        getAccountBalance: jest.fn(() => '1000'),
+        getCategoryInfo: jest.fn(() => ({ name: 'Food', icon: 'food' })),
+        getCategoryName: jest.fn(() => 'Food'),
+        filteredCategories: [],
+        resetForm: jest.fn(),
+        clearDate: jest.fn(),
+      });
+      useAccountsData.mockReturnValue({ accounts: [account], visibleAccounts: [account], loading: false });
+      useOperationsData.mockReturnValue({
+        operations: [], loading: false, loadingMore: false, hasMoreOperations: false,
+      });
+      useOperationsActions.mockReturnValue({
+        deleteOperation: jest.fn(),
+        addOperation: mockAddOperation,
+        validateOperation: jest.fn(() => null),
+        loadMoreOperations: jest.fn(),
+        jumpToDate: jest.fn(),
+      });
+
+      const { getByTestId } = await render(<OperationsScreen />);
+      await act(async () => {
+        await getByTestId('picker-modal').props.onAutoAddWithCategory('cat-1');
+      });
+      return mockAddOperation;
+    };
+
+    // The fetched rate is foreign→account (EUR→USD 1.08). Every other writer
+    // stores account→foreign, which the edit form inverts on load, so an
+    // uninverted rate here turned a later re-save of 30 EUR into 30 × 0.93.
+    it('stores the rate account→foreign, like every other writer', async () => {
+      const Currency = require('../../app/services/currency');
+      Currency.fetchLiveExchangeRate.mockResolvedValueOnce({ rate: '1.08', source: 'live' });
+      Currency.convertAmount.mockReturnValueOnce('32.40');
+
+      const mockAddOperation = await renderAndQuickAdd({
+        account: { id: 'acc-1', currency: 'USD' },
+        values: { type: 'expense', amount: '30', accountId: 'acc-1', categoryId: 'cat-1', operationCurrency: 'EUR' },
+      });
+
+      expect(Currency.fetchLiveExchangeRate).toHaveBeenCalledWith('EUR', 'USD');
+      expect(mockAddOperation).toHaveBeenCalledWith(expect.objectContaining({
+        amount: '32.40',               // account currency (USD)
+        destinationAmount: '30',       // foreign currency (EUR)
+        sourceCurrency: 'EUR',
+        destinationCurrency: 'USD',
+        exchangeRate: '0.925926',      // USD→EUR = 1 / 1.08
+      }));
+    });
+
+    // The amount is typed in the operation currency, so a pending expression
+    // is evaluated with its decimals: USD cents survive on a JPY account.
+    it('evaluates a pending expression with the operation currency decimals', async () => {
+      const Currency = require('../../app/services/currency');
+      const calculatorUtils = require('../../app/utils/calculatorUtils');
+      calculatorUtils.hasOperation.mockReturnValueOnce(true);
+      calculatorUtils.evaluateExpression.mockReturnValueOnce('15.75');
+      Currency.fetchLiveExchangeRate.mockResolvedValueOnce({ rate: '150', source: 'live' });
+      Currency.convertAmount.mockReturnValueOnce('2363');
+
+      await renderAndQuickAdd({
+        account: { id: 'acc-1', currency: 'JPY' },
+        values: { type: 'expense', amount: '12.50+3.25', accountId: 'acc-1', categoryId: 'cat-1', operationCurrency: 'USD' },
+      });
+
+      expect(calculatorUtils.evaluateExpression).toHaveBeenCalledWith('12.50+3.25', 2);
     });
   });
 

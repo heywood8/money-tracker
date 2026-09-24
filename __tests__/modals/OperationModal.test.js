@@ -193,6 +193,7 @@ jest.mock('../../app/services/LastAccount', () => ({
 
 jest.mock('../../app/services/currency', () => ({
   formatAmount: (amount, currency) => `${amount} ${currency}`,
+  getDecimalPlaces: jest.requireActual('../../app/services/currency').getDecimalPlaces,
 }));
 
 jest.mock('../../app/services/BalanceHistoryDB', () => ({
@@ -820,6 +821,45 @@ describe('OperationModal', () => {
 
       await waitFor(() => expect(getByTestId('category-grid-breadcrumb')).toBeTruthy());
       expect(getByTestId('category-grid-breadcrumb')).toHaveTextContent('Food');
+    });
+
+    // The amount of a foreign-currency operation is typed in that currency, so
+    // picking a category must evaluate a pending expression with its decimals:
+    // "12.50+3.25" USD on a JPY account (0 decimals) used to become 16.
+    it('evaluates a pending foreign-currency expression with that currency decimals on category pick', async () => {
+      const useOperationPicker = require('../../app/hooks/useOperationPicker');
+      useOperationPicker.mockReturnValue({
+        pickerState: {
+          visible: true,
+          type: 'category',
+          data: [{ id: 'cat1', name: 'Food', type: 'entry', categoryType: 'expense', icon: 'food' }],
+        },
+        openPicker: jest.fn(),
+        closePicker: jest.fn(),
+      });
+      const useOperationForm = require('../../app/hooks/useOperationForm');
+      useOperationForm.mockImplementation(() => {
+        const defaults = makeDefaultFormValues();
+        return {
+          ...defaults,
+          values: { ...defaults.values, amount: '12.50+3.25', operationCurrency: 'USD' },
+          sourceAccount: { id: 'acc1', name: 'Wallet', currency: 'JPY' },
+          isForeignCurrencyOp: true,
+        };
+      });
+      const calculatorUtils = require('../../app/utils/calculatorUtils');
+      calculatorUtils.hasOperation.mockImplementation((value) => value === '12.50+3.25');
+
+      try {
+        const { getByText } = await render(
+          <OperationModal visible={true} onClose={mockOnClose} isNew={true} />,
+        );
+        await fireEvent.press(getByText('Food'));
+
+        expect(calculatorUtils.evaluateExpression).toHaveBeenCalledWith('12.50+3.25', 2);
+      } finally {
+        calculatorUtils.hasOperation.mockImplementation(() => false);
+      }
     });
 
     it('renders the account picker as a subpanel with a back affordance', async () => {

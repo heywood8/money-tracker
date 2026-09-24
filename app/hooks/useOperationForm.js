@@ -15,6 +15,31 @@ const getCurrencySymbol = (currencyCode) => {
 };
 
 /**
+ * Whether a foreign-currency expense/income row holds its rate the wrong way
+ * round: foreign→account instead of account→foreign.
+ *
+ * The column is account→foreign, so `amount × rate ≈ destinationAmount`. Quick
+ * add stored the foreign→account rate it fetched, uninverted, until that was
+ * fixed, so such a row satisfies `destinationAmount × rate ≈ amount` instead.
+ * The row's own two amounts say which it is. Relative error is compared because
+ * the two residuals are in different currencies; near a rate of 1 both fit and
+ * either reading costs next to nothing.
+ *
+ * @param {{ amount: string|number, destinationAmount: string|number, exchangeRate: string|number }} operation
+ *   amount in the account currency, destinationAmount in the foreign one
+ * @returns {boolean}
+ */
+export const isRateStoredForeignToAccount = (operation) => {
+  const accountAmount = parseFloat(String(operation?.amount ?? ''));
+  const foreignAmount = parseFloat(String(operation?.destinationAmount ?? ''));
+  const rate = parseFloat(String(operation?.exchangeRate ?? ''));
+  if (!(accountAmount > 0) || !(foreignAmount > 0) || !(rate > 0)) return false;
+  const accountToForeignError = Math.abs((accountAmount * rate) / foreignAmount - 1);
+  const foreignToAccountError = Math.abs((foreignAmount * rate) / accountAmount - 1);
+  return foreignToAccountError < accountToForeignError;
+};
+
+/**
  * Custom hook for managing operation modal form state and logic
  * Handles form initialization, validation, save/delete operations, and shadow category checks
  */
@@ -289,9 +314,15 @@ const useOperationForm = ({
           && operation.sourceCurrency !== acct.currency;
 
         const storedRate = parseFloat(String(operation.exchangeRate || '0'));
-        const loadExchangeRate = isForeignOp && storedRate > 0
-          ? String((1 / storedRate).toFixed(6))
-          : String(operation.exchangeRate || '');
+        let loadExchangeRate = String(operation.exchangeRate || '');
+        if (isForeignOp && storedRate > 0) {
+          // A row quick-add saved before its rate was inverted already holds
+          // the foreign→account rate: show it as is, and the save below writes
+          // it back the right way round.
+          loadExchangeRate = isRateStoredForeignToAccount(operation)
+            ? String(operation.exchangeRate)
+            : Currency.invertRate(storedRate);
+        }
         const loadAmount = isForeignOp
           ? String(operation.destinationAmount || '')
           : String(operation.amount || '');
@@ -481,7 +512,7 @@ const useOperationForm = ({
         const formAccountAmount = data.destinationAmount;
         data.amount = formAccountAmount;        // account currency — formatted below
         data.destinationAmount = formForeignAmount;  // foreign currency
-        data.exchangeRate = String((1 / displayRate).toFixed(6));
+        data.exchangeRate = Currency.invertRate(displayRate);
       }
     }
 

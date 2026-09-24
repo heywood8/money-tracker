@@ -1197,6 +1197,75 @@ describe('AccountsDB', () => {
 
       expect(mockDb.runAsync).not.toHaveBeenCalled();
     });
+
+    describe('operations booked between two same-day adjustments', () => {
+      // Balance 1000, adjusted to 900 (an expense adjustment of 100), then a
+      // real expense of 50 is booked: the account reads 850 when the user sets
+      // it again. The second adjustment used to be measured from the original
+      // 1000 and ignored the 50.
+      const setup = () => {
+        const mockDb = {
+          getFirstAsync: jest.fn()
+            .mockResolvedValueOnce({ balance: '850.00' })
+            .mockResolvedValueOnce({
+              id: 'existing-op',
+              amount: '100.00',
+              type: 'expense',
+              original_balance: '1000.00',
+              description: '1000.00 → 900.00',
+              category_type: 'expense',
+            }),
+          getAllAsync: jest.fn().mockResolvedValue([
+            { id: 'shadow-expense', category_type: 'expense', is_shadow: 1 },
+            { id: 'shadow-income', category_type: 'income', is_shadow: 1 },
+          ]),
+          runAsync: jest.fn().mockResolvedValue(undefined),
+        };
+        jest.spyOn(db, 'executeTransaction').mockImplementation(async (callback) => {
+          await callback(mockDb);
+        });
+        return mockDb;
+      };
+      const storedBalance = (mockDb) => {
+        const call = mockDb.runAsync.mock.calls.find(c => String(c[0]).startsWith('UPDATE accounts SET balance'));
+        return parseFloat(call[1][0]);
+      };
+      const operationUpdate = (mockDb) => mockDb.runAsync.mock.calls
+        .find(c => String(c[0]).startsWith('UPDATE operations SET'));
+
+      it('lands on the target balance, not the target minus what was booked since', async () => {
+        const mockDb = setup();
+
+        await AccountsDB.adjustAccountBalance('acc-1', '800.00');
+
+        expect(storedBalance(mockDb)).toBe(800);
+        const [, params] = operationUpdate(mockDb);
+        expect(params[0]).toBe('expense');
+        expect(parseFloat(params[1])).toBe(150);
+      });
+
+      it('keeps a residual adjustment when set back to the original balance', async () => {
+        const mockDb = setup();
+
+        await AccountsDB.adjustAccountBalance('acc-1', '1000.00');
+
+        expect(storedBalance(mockDb)).toBe(1000);
+        expect(mockDb.runAsync).not.toHaveBeenCalledWith('DELETE FROM operations WHERE id = ?', ['existing-op']);
+        const [, params] = operationUpdate(mockDb);
+        expect(params[0]).toBe('income');
+        expect(parseFloat(params[1])).toBe(50);
+      });
+
+      it('deletes the adjustment once the booked operation explains the whole difference', async () => {
+        const mockDb = setup();
+
+        // 1000 - 50 = 950: without the adjustment the account would read exactly this.
+        await AccountsDB.adjustAccountBalance('acc-1', '950.00');
+
+        expect(mockDb.runAsync).toHaveBeenCalledWith('DELETE FROM operations WHERE id = ?', ['existing-op']);
+        expect(storedBalance(mockDb)).toBe(950);
+      });
+    });
   });
 
   // Regression tests for data integrity
