@@ -441,6 +441,10 @@ describe('parseBankNotification', () => {
       expect(amountFor('1,234 USD')).toBe('1234');
     });
 
+    it('keeps a 3-decimal currency fraction (12.500 KWD -> 12.500)', () => {
+      expect(amountFor('12.500 KWD')).toBe('12.500');
+    });
+
     it('does not corrupt comma-decimal amounts by 100x', () => {
       // Regression: previously "42,50" became "4250".
       expect(amountFor('42,50 EUR')).not.toBe('4250');

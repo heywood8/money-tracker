@@ -253,6 +253,10 @@ describe('Tinkoff notification parser', () => {
       expect(amountFor('1.234,56 ₽, счет RUB')).toBe('1234.56');
     });
 
+    it('reads a lone dot group as thousands (1.500 ₽ -> 1500)', () => {
+      expect(amountFor('1.500 ₽, счет RUB')).toBe('1500');
+    });
+
     it('does not corrupt a comma decimal by 100x', () => {
       expect(amountFor('42,50 ₽, счет RUB')).not.toBe('4250');
     });

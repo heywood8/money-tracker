@@ -13,6 +13,8 @@
  * validated against a real calendar rather than trusted.
  */
 
+import currencies from '../../../assets/currencies.json';
+
 /**
  * Whitespace variants a notification can carry that are *not* U+0020: no-break
  * space, narrow/thin no-break space, figure space, word joiner, BOM. Banks use
@@ -65,6 +67,24 @@ export const DATE_VALUE_PATTERN = String.raw`\d{1,4}[.\-/]\d{1,2}[.\-/]\d{1,4}`;
 /** A clock time. */
 export const TIME_VALUE_PATTERN = String.raw`\d{1,2}:\d{2}`;
 
+/** A lone separator with a 3-digit tail that could be thousands: "1.500", "12,345". */
+const LONE_GROUP_RE = /^[1-9]\d{0,2}[.,]\d{3}$/;
+
+/**
+ * Whether a 3-digit tail after a lone separator has to be thousands grouping
+ * rather than a fraction. It does for a currency known to carry at most 2
+ * decimal places, which is every one in assets/currencies.json. A code outside
+ * that list (KWD, BHD, a crypto ticker) may carry 3, so there it stays a fraction.
+ *
+ * @param {string|null|undefined} currency - ISO code, when the caller knows it
+ * @returns {boolean}
+ */
+const threeDigitTailIsGroup = (currency) => {
+  if (!currency) return true;
+  const digits = currencies[String(currency).toUpperCase()]?.decimal_digits;
+  return digits !== undefined && digits <= 2;
+};
+
 /**
  * Normalize a localized amount string to a plain decimal string.
  *
@@ -75,16 +95,19 @@ export const TIME_VALUE_PATTERN = String.raw`\d{1,2}:\d{2}`;
  * - "1 000,50" (space thousands)              -> "1000.50"
  *
  * When both separators are present, the one that appears last is the decimal
- * separator and the other is grouping. When only one separator is present it is
- * treated as a decimal point only if it is not a 3-digit group (so "1,234" and
- * "1.234" are read as thousands, while "12,50" is read as a decimal). The result
- * is a string so it feeds straight into the decimal currency layer without ever
- * becoming a lossy float.
+ * separator and the other is grouping. A repeated separator is grouping. A lone
+ * one is grouping only where it can be: a 1-3 digit lead that does not start
+ * with 0, then exactly 3 digits, in a currency that can't carry 3 decimals. So
+ * "1,234 EUR" and "1.234 EUR" are thousands, while "12,50", "0.500", "1234.567"
+ * and "1.500 KWD" are decimals. The result is a string so it feeds straight
+ * into the decimal currency layer without ever becoming a lossy float.
  *
  * @param {string} raw - e.g. "3,900.00"
+ * @param {string} [currency] - ISO code of the amount, when known. Only decides
+ *   what a lone "1.500" means; without it that reads as thousands.
  * @returns {string|null} e.g. "3900.00", or null when no digits are present
  */
-export const normalizeAmountString = (raw) => {
+export const normalizeAmountString = (raw, currency) => {
   if (!raw) return null;
   // Strip everything that is not a digit or a separator — this also removes the
   // spaces used as thousands grouping and any currency symbol glued to the value.
@@ -93,6 +116,7 @@ export const normalizeAmountString = (raw) => {
 
   const lastDot = s.lastIndexOf('.');
   const lastComma = s.lastIndexOf(',');
+  const loneGroup = LONE_GROUP_RE.test(s) && threeDigitTailIsGroup(currency);
 
   if (lastDot !== -1 && lastComma !== -1) {
     if (lastComma > lastDot) {
@@ -104,17 +128,16 @@ export const normalizeAmountString = (raw) => {
     }
   } else if (lastComma !== -1) {
     const parts = s.split(',');
-    if (parts.length === 2 && parts[1].length !== 3) {
-      s = s.replace(',', '.'); // single comma, not a 3-digit group -> decimal
+    if (parts.length === 2 && !loneGroup) {
+      s = s.replace(',', '.'); // single comma that can't be grouping -> decimal
     } else {
       s = s.replace(/,/g, ''); // grouping
     }
   } else if (lastDot !== -1) {
-    const parts = s.split('.');
-    if (parts.length > 2) {
-      s = s.replace(/\./g, ''); // multiple dots -> grouping
+    if (s.split('.').length > 2 || loneGroup) {
+      s = s.replace(/\./g, ''); // grouping: "1.250.000", or a lone "1.500"
     }
-    // single dot -> keep as the decimal point
+    // otherwise a single dot stays the decimal point
   }
 
   return s;

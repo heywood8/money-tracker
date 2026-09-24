@@ -188,7 +188,7 @@ export const parse = (notification) => {
   for (const segment of segments) {
     const match = segment.match(AMOUNT_CURRENCY_RE);
     if (match) {
-      amount = normalizeAmountString(match[1]);
+      amount = normalizeAmountString(match[1], match[2]);
       currency = match[2];
       break;
     }

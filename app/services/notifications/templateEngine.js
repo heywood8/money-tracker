@@ -460,8 +460,6 @@ export const matchTemplate = (template, notification) => {
   if (!fields.amount) return null;
   const amountMatch = extractField(normalized, fields.amount);
   if (!amountMatch) return null;
-  const amount = normalizeAmountString(amountMatch.value);
-  if (!isBookableAmount(amount)) return null;
 
   // 2. Currency — extracted when marked, otherwise the template's fixed choice.
   //    Falling back matters for apps that write only "1 000" with the currency
@@ -473,6 +471,10 @@ export const matchTemplate = (template, notification) => {
   }
   if (!currency) currency = template.currency || null;
   if (!currency) return null;
+
+  // Read after the currency: it decides whether "1.500" is thousands or 1.5.
+  const amount = normalizeAmountString(amountMatch.value, currency);
+  if (!isBookableAmount(amount)) return null;
 
   // 3. Payee, card, date and time are all optional — the pipeline already knows
   //    how to fill in a missing date (the notification's post time) and how to

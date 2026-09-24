@@ -155,7 +155,8 @@ const locateIn = (text, descriptor, claimed) => {
   let amountRange = null;
   if (descriptor.amount) {
     amountRange = scan(text, AMOUNT_SCAN)
-      .find((candidate) => normalizeAmountString(candidate.value) === descriptor.amount) || null;
+      .find((candidate) => normalizeAmountString(candidate.value, descriptor.currency) === descriptor.amount)
+      || null;
     add('amount', amountRange);
   }
 
