@@ -1372,6 +1372,80 @@ language,en,
     });
   });
 
+  // #1695 made restoreBackup keep the live merchant rules and parse templates
+  // when a backup does not carry them. A .db file made before those tables
+  // existed was migrated before it was read, which created them empty, so the
+  // import handed over two empty lists and restoreBackup cleared the user's
+  // bindings and templates to match. (importBackupSQLite itself loads its
+  // modules with dynamic import(), which this Jest setup cannot run, so the
+  // extraction step is tested through readCarriedNotificationData.)
+  describe('SQLite (.db) import of notification data', () => {
+    const olderFileTables = new Set(['accounts', 'categories', 'operations', 'budgets', 'app_metadata']);
+    const newerFileTables = new Set([...olderFileTables, 'notification_merchant_rules', 'notification_templates']);
+    const RULE = { id: 'r1', merchant: 'SHOP', package_name: 'am.bank', category_id: null };
+    const TEMPLATE = { id: 't1', name: 'Bank', package_name: 'am.bank', fields: '{}', triggers: '[]' };
+
+    const importFile = () => ({
+      getAllAsync: jest.fn(async (sql) => {
+        if (sql.includes('notification_merchant_rules')) return [RULE];
+        if (sql.includes('notification_templates')) return [TEMPLATE];
+        return [];
+      }),
+    });
+
+    const restoreAndCapture = async (data) => {
+      const runAsync = jest.fn().mockResolvedValue({ lastInsertRowId: 1 });
+      mockDb.executeTransaction.mockImplementation(async (callback) => {
+        await callback({ runAsync, getAllAsync: jest.fn().mockResolvedValue([]) });
+      });
+      await BackupRestore.restoreBackup({
+        version: 1,
+        timestamp: '2024-01-01T00:00:00.000Z',
+        data: { accounts: [], categories: [], operations: [], ...data },
+      });
+      return runAsync.mock.calls.map(([sql]) => sql);
+    };
+
+    it('leaves out the tables a file made before them did not carry', async () => {
+      const file = importFile();
+      const warn = jest.spyOn(console, 'warn').mockImplementation(() => {});
+
+      const data = await BackupRestore.readCarriedNotificationData(file, olderFileTables);
+
+      expect(data).toEqual({});
+      // Not even read: after migration they exist, empty, and read as [].
+      expect(file.getAllAsync).not.toHaveBeenCalled();
+      warn.mockRestore();
+    });
+
+    it('reads the rules and templates a newer file carries', async () => {
+      const data = await BackupRestore.readCarriedNotificationData(importFile(), newerFileTables);
+
+      expect(data).toEqual({ notification_merchant_rules: [RULE], notification_templates: [TEMPLATE] });
+    });
+
+    it('keeps the live rules and templates when restoring an older file', async () => {
+      const warn = jest.spyOn(console, 'warn').mockImplementation(() => {});
+      const data = await BackupRestore.readCarriedNotificationData(importFile(), olderFileTables);
+      warn.mockRestore();
+
+      const statements = await restoreAndCapture(data);
+
+      expect(statements).not.toContain('DELETE FROM notification_merchant_rules');
+      expect(statements).not.toContain('DELETE FROM notification_templates');
+    });
+
+    it('replaces the live rules and templates with the ones a newer file carries', async () => {
+      const data = await BackupRestore.readCarriedNotificationData(importFile(), newerFileTables);
+
+      const statements = await restoreAndCapture(data);
+
+      expect(statements).toContain('DELETE FROM notification_merchant_rules');
+      expect(statements).toContain('DELETE FROM notification_templates');
+      expect(statements.some(sql => sql.startsWith('INSERT OR IGNORE INTO notification_templates'))).toBe(true);
+    });
+  });
+
   describe('Regression — soft-delete and adjustment metadata survive restore', () => {
     const makeMockDbInstance = () => {
       let insertCount = 0;

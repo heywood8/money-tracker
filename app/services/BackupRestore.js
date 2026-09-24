@@ -1885,6 +1885,40 @@ const importBackupCSV = async (fileUri, cancelToken) => {
 
 
 /**
+ * The merchant rules (migration 0010) and parse templates (0025) an imported
+ * .db file carries, keyed as backup data.
+ *
+ * `tablesInFile` must be read before the file is migrated: migrating creates
+ * every missing table empty, and a file made before these tables existed then
+ * looked like one that carried them with no rows. restoreBackup clears a table
+ * whose key is present, so the user's live bindings and templates were wiped.
+ * A table the file did not carry is left out of the result entirely, which is
+ * what tells restoreBackup to keep the live rows (#1695).
+ *
+ * @param {{ getAllAsync: Function }} sourceDb - the opened import file
+ * @param {Set<string>} tablesInFile - table names the file held before migration
+ * @returns {Promise<{ notification_merchant_rules?: Array, notification_templates?: Array }>}
+ */
+export const readCarriedNotificationData = async (sourceDb, tablesInFile) => {
+  const data = {};
+  if (tablesInFile.has('notification_merchant_rules')) {
+    data.notification_merchant_rules = (await sourceDb.getAllAsync(
+      'SELECT * FROM notification_merchant_rules ORDER BY created_at ASC',
+    )) || [];
+  } else {
+    console.warn('No notification_merchant_rules table in imported database (older format): keeping the live rules');
+  }
+  if (tablesInFile.has('notification_templates')) {
+    data.notification_templates = (await sourceDb.getAllAsync(
+      'SELECT * FROM notification_templates ORDER BY priority ASC, created_at ASC',
+    )) || [];
+  } else {
+    console.warn('No notification_templates table in imported database (older format): keeping the live templates');
+  }
+  return data;
+};
+
+/**
  * Import backup from SQLite database file
  * @param {string} fileUri - File URI
  * @param {{ cancelled: boolean }} [cancelToken]
@@ -1939,6 +1973,16 @@ const importBackupSQLite = async (fileUri, cancelToken) => {
       console.log('No migrations table found - database will be migrated from scratch');
     }
 
+    // Which tables the file itself carries, read BEFORE migrating it. Migrating
+    // creates every missing table empty, so afterwards a backup made before the
+    // notification tables existed (0010 merchant rules, 0025 templates) looked
+    // like one that carried them with no rows, and restoreBackup cleared the
+    // user's live merchant bindings and parse templates to match (#1695).
+    const tablesInFile = new Set(
+      ((await tempDb.getAllAsync("SELECT name FROM sqlite_master WHERE type = 'table'")) || [])
+        .map(row => row.name),
+    );
+
     // A migration that aborts throws, and the import must stop right there: the
     // newer tables would be missing, every optional-table read below would log
     // "older backup format" and yield [], and restoreBackup would then wipe the
@@ -1973,24 +2017,7 @@ const importBackupSQLite = async (fileUri, cancelToken) => {
       console.warn('No planned_operations table in imported database (older format)');
     }
 
-    // Merchant rules table may not exist in older backups. Without this extraction
-    // restoreBackup clears the live table and re-inserts nothing, wiping learned rules.
-    let merchantRules = [];
-    try {
-      merchantRules = await tempDb.getAllAsync('SELECT * FROM notification_merchant_rules ORDER BY created_at ASC');
-    } catch (e) {
-      console.warn('No notification_merchant_rules table in imported database (older format)');
-    }
-
-    // Parse templates may not exist in pre-0025 backups. Same reasoning as the
-    // merchant rules above: without this extraction restoreBackup clears the live
-    // table and re-inserts nothing, wiping every template the user built.
-    let notificationTemplates = [];
-    try {
-      notificationTemplates = await tempDb.getAllAsync('SELECT * FROM notification_templates ORDER BY priority ASC, created_at ASC');
-    } catch (e) {
-      console.warn('No notification_templates table in imported database (older format)');
-    }
+    const notificationData = await readCarriedNotificationData(tempDb, tablesInFile);
 
     // Budgets v2 tables may not exist in pre-0018 backups.
     let budgetPlans = [];
@@ -2061,8 +2088,7 @@ const importBackupSQLite = async (fileUri, cancelToken) => {
         app_metadata: appMetadata || [],
         balance_history: balanceHistory || [],
         planned_operations: plannedOperations || [],
-        notification_merchant_rules: merchantRules || [],
-        notification_templates: notificationTemplates || [],
+        ...notificationData,
         budget_plans: budgetPlans || [],
         budget_plan_lines: budgetPlanLines || [],
         budget_plan_line_categories: budgetPlanLineCategories || [],
