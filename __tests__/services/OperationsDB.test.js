@@ -1690,7 +1690,7 @@ describe('OperationsDB Service', () => {
       ];
       queryAll.mockResolvedValue(mockOps);
 
-      const result = await OperationsDB.getOperationsByWeekOffset(0);
+      const result = await OperationsDB.getOperationsByWeekOffset(1);
 
       expect(queryAll).toHaveBeenCalledWith(
         expect.stringContaining('WHERE date >= ? AND date <= ?'),
@@ -1698,6 +1698,26 @@ describe('OperationsDB Service', () => {
       );
       expect(result).toHaveLength(1);
       expect(result[0].accountId).toBe('acc1');
+    });
+
+    // An operation dated ahead (rent for next Monday) used to be cut off by a
+    // `date <= today` bound on the first page: it showed until the next reload,
+    // then disappeared although the balance already counted it.
+    it('loads the current week with no upper bound, so future-dated operations stay listed', async () => {
+      queryAll.mockResolvedValue([
+        { id: 2, type: 'expense', date: '2999-01-01', account_id: 'acc1' },
+        { id: 1, type: 'expense', date: '2025-12-05', account_id: 'acc1' },
+      ]);
+
+      const result = await OperationsDB.getOperationsByWeekOffset(0);
+
+      const [sql, params] = queryAll.mock.calls[0];
+      expect(sql).toContain('WHERE date >= ?');
+      expect(sql).not.toContain('date <= ?');
+      // Newest first, so a future-dated operation heads the list.
+      expect(sql).toContain('ORDER BY date DESC');
+      expect(params).toHaveLength(1);
+      expect(result.map(op => op.id)).toEqual([2, 1]);
     });
 
     it('gets next oldest operation before date', async () => {

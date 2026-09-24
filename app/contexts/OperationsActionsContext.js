@@ -9,6 +9,10 @@ import { setJsonPreference, PREF_KEYS } from '../services/PreferencesDB';
 import { useOperationsData } from './OperationsDataContext';
 import { formatDate as formatLocalDate } from '../services/BalanceHistoryDB';
 
+// Upper bound for a date range that should reach every operation from its start
+// on, future-dated ones included (dates are YYYY-MM-DD strings).
+const LATEST_DATE = '9999-12-31';
+
 /**
  * OperationsActionsContext provides stable action functions for operations.
  * Split from OperationsContext to reduce unnecessary re-renders.
@@ -651,23 +655,24 @@ export const OperationsActionsProvider = ({ children }) => {
     await updateFilters(emptyFilters);
   }, [updateFilters]);
 
-  // Jump to a specific date (loads all operations from selected date to today)
+  // Jump to a specific date (loads every operation from the selected date on,
+  // future-dated ones included — see getOperationsByWeekOffset)
   const jumpToDate = useCallback(async (date) => {
     try {
       _setLoading(true);
       const currentFilters = activeFiltersRef.current;
       const isFiltered = _hasActiveFilters(currentFilters);
 
-      // Calculate today's date in YYYY-MM-DD format using the LOCAL calendar day.
-      // toISOString would yield yesterday's date for UTC+ timezones, silently
-      // excluding today's operations from the loaded range (and hasNewerOperations
-      // is set false below, so they could never be paged back in).
+      // Today's date on the LOCAL calendar day (toISOString would give yesterday
+      // in UTC+ timezones), used as the newest date when nothing matched.
       const todayStr = formatLocalDate(new Date());
 
-      // Load all operations from the selected date to today
+      // Load all operations from the selected date on. Capping the range at
+      // today left out anything dated ahead, and hasNewerOperations is set false
+      // below, so it could never be paged back in.
       const operationsData = isFiltered
-        ? await OperationsDB.getFilteredOperationsByDateRange(date, todayStr, currentFilters)
-        : await OperationsDB.getOperationsByDateRange(date, todayStr);
+        ? await OperationsDB.getFilteredOperationsByDateRange(date, LATEST_DATE, currentFilters)
+        : await OperationsDB.getOperationsByDateRange(date, LATEST_DATE);
 
       _setOperations(operationsData);
 
@@ -678,12 +683,14 @@ export const OperationsActionsProvider = ({ children }) => {
         _setNewestLoadedDate(newestOp.date);
         _setOldestLoadedDate(oldestOp.date);
 
-        // No newer operations since we loaded up to today
+        // No newer operations: everything from the date on is loaded
         _setHasNewerOperations(false);
       } else {
-        _setNewestLoadedDate(todayStr);
+        // Never older than the jump target itself, or a jump to a future date
+        // with nothing on it would leave newest < oldest.
+        _setNewestLoadedDate(date > todayStr ? date : todayStr);
         _setOldestLoadedDate(date);
-        // No newer operations since we loaded up to today
+        // No newer operations: nothing exists from the date on
         _setHasNewerOperations(false);
       }
 
