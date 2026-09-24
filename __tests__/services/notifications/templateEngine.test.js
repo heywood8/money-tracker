@@ -308,6 +308,16 @@ describe('matchTemplate', () => {
     expect(matchTemplate(tpl, nbsp)).toMatchObject({ amount: '1000', currency: 'RUB' });
   });
 
+  it('reads a lone dot group as thousands, not as a fraction', () => {
+    // Regression: "1.500 EUR" was booked as 1.500, a thousandth of the charge.
+    const text = 'Zahlung 1.500 EUR';
+    const tpl = build({ text }, { amount: { from: 1 }, currency: { from: 2 } });
+    expect(matchTemplate(tpl, { text })).toMatchObject({ amount: '1500', currency: 'EUR' });
+    expect(matchTemplate(tpl, { text: 'Zahlung 12.50 EUR' })).toMatchObject({ amount: '12.50' });
+    // A currency that may carry 3 decimals keeps the fraction.
+    expect(matchTemplate(tpl, { text: 'Zahlung 1.500 KWD' })).toMatchObject({ amount: '1.500', currency: 'KWD' });
+  });
+
   it('respects the template date order for an ambiguous date', () => {
     const text = 'PAY 100 USD 05.06.2026';
     const tpl = build({ text }, { amount: { from: 1 }, currency: { from: 2 }, date: { from: 3 } });

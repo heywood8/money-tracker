@@ -48,6 +48,15 @@ describe('notificationHighlights', () => {
       expect(highlighted(AMERIA.text, ranges).amount).toBe('3,900.00');
     });
 
+    it('finds an amount whose reading depends on its currency', () => {
+      // "1.500" is 1.5 in KWD but 1500 in AMD; the lookup has to read it the way
+      // the parser did, or the amount the parser found is never highlighted.
+      const kwd = { ...AMERIA, text: 'PURCHASE | 1.500 KWD | 4083***7027, | SHOP, KW | 28.06.2026 10:15' };
+      const descriptor = parseBankNotification(kwd);
+      expect(descriptor.amount).toBe('1.500');
+      expect(highlighted(kwd.text, notificationHighlights(kwd, descriptor).text).amount).toBe('1.500');
+    });
+
     it('points at every field the parser read', () => {
       expect(highlighted(AMERIA.text, ranges)).toMatchObject({
         kind: 'PURCHASE',

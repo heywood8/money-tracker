@@ -171,8 +171,6 @@ export const parse = (notification) => {
   // 3. Amount + currency — required; without it there's nothing to record.
   const amountMatch = primary.match(AMOUNT_CURRENCY_RE);
   if (!amountMatch) return null;
-  const amount = normalizeAmountString(amountMatch[1]);
-  if (!amount) return null;
 
   // 4. Currency — prefer the explicit account ISO code ("счет RUB"), since with
   //    no card mask the account is matched by currency; fall back to the amount's
@@ -182,6 +180,10 @@ export const parse = (notification) => {
     ? accountCurrencyMatch[1].toUpperCase()
     : currencyCodeFromToken(amountMatch[2]);
   if (!currency) return null;
+
+  // Read after the currency: it decides whether "1.500" is thousands or 1.5.
+  const amount = normalizeAmountString(amountMatch[1], currency);
+  if (!amount) return null;
 
   // 5. Card mask — optional; usually absent in this format.
   const cardSegment = primary.match(CARD_MASK_RE);
