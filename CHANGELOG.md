@@ -1,5 +1,12 @@
 # Changelog
 
+## [0.292.9](https://github.com/heywood8/money-tracker/compare/penny-v0.292.8...penny-v0.292.9) (2026-09-24)
+
+
+### Bug Fixes
+
+* **notifications:** keep window signatures and skip deleted atm target ([#1824](https://github.com/heywood8/money-tracker/issues/1824)) ([bd516e6](https://github.com/heywood8/money-tracker/commit/bd516e69d0a6e5c65b2feeff0533713e958af248))
+
 ## [0.292.8](https://github.com/heywood8/money-tracker/compare/penny-v0.292.7...penny-v0.292.8) (2026-09-24)
 
 
