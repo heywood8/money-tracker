@@ -11,7 +11,7 @@
 import uuid from 'react-native-uuid';
 import { executeQuery, queryAll, queryFirst, executeTransaction } from './db';
 import * as Currency from './currency';
-import { calculateSpendingForFilters, expandCategoryIds, deriveSpendingStatus } from './BudgetsDB';
+import { calculateSpendingForFilters, expandCategoryIds, deriveSpendingStatus, NOT_SHADOW_SQL } from './BudgetsDB';
 import { formatDate as formatLocalDate } from './BalanceHistoryDB';
 import { normalizeLabel, matchesAnyLabel } from '../utils/labelUtils';
 import { sumMoneySql } from './sqlMoney';
@@ -1959,7 +1959,8 @@ export const calculateIncomeForFilters = async ({
     // whole income as this one line's actual.
     if (expandedIds.length === 0 && filterLabels.length === 0) return '0';
 
-    const conditions = ["o.type = 'income'", 'o.date >= ?', 'o.date <= ?'];
+    // Balance adjustments (shadow categories) are corrections, not income.
+    const conditions = ["o.type = 'income'", 'o.date >= ?', 'o.date <= ?', NOT_SHADOW_SQL];
     const params = [startDate, endDate];
     if (expandedIds.length > 0) {
       conditions.push(`o.category_id IN (${expandedIds.map(() => '?').join(',')})`);
@@ -1979,6 +1980,7 @@ export const calculateIncomeForFilters = async ({
       `SELECT o.amount AS amount, o.description AS description, a.currency AS currency
        FROM operations o
        JOIN accounts a ON o.account_id = a.id
+       LEFT JOIN categories c ON o.category_id = c.id
        WHERE ${conditions.join(' AND ')}`,
       params,
     );
@@ -2140,9 +2142,11 @@ export const calculateActualIncome = async (month, displayCurrency, convertAll) 
         `SELECT a.currency as currency, ${sumMoneySql()} as total
          FROM operations o
          JOIN accounts a ON o.account_id = a.id
+         LEFT JOIN categories c ON o.category_id = c.id
          WHERE o.type = 'income'
            AND o.date >= ?
            AND o.date <= ?
+           AND ${NOT_SHADOW_SQL}
          GROUP BY a.currency`,
         [startDate, endDate],
       );
@@ -2162,10 +2166,12 @@ export const calculateActualIncome = async (month, displayCurrency, convertAll) 
       `SELECT ${sumMoneySql()} as total
        FROM operations o
        JOIN accounts a ON o.account_id = a.id
+       LEFT JOIN categories c ON o.category_id = c.id
        WHERE o.type = 'income'
          AND a.currency = ?
          AND o.date >= ?
-         AND o.date <= ?`,
+         AND o.date <= ?
+         AND ${NOT_SHADOW_SQL}`,
       [displayCurrency, startDate, endDate],
     );
     return result && result.total != null ? String(result.total) : '0';
@@ -2225,10 +2231,12 @@ const collectPlanSourceCurrencies = async (lines, startDate, endDate, convertAll
         `SELECT DISTINCT a.currency as currency
          FROM operations o
          JOIN accounts a ON o.account_id = a.id
+         LEFT JOIN categories c ON o.category_id = c.id
          WHERE o.category_id IN (${placeholders})
            AND o.type = 'expense'
            AND o.date >= ?
-           AND o.date <= ?`,
+           AND o.date <= ?
+           AND ${NOT_SHADOW_SQL}`,
         [...categoryIds, startDate, endDate],
       );
       for (const row of rows || []) currencies.add(row.currency);
@@ -2248,10 +2256,14 @@ const collectPlanSourceCurrencies = async (lines, startDate, endDate, convertAll
       }
       conditions.push(`o.account_id IN (${filtered.accountIds.map(() => '?').join(',')})`);
       params.push(...filtered.accountIds);
+      // Same filter calculateSpendingForFilters applies: a balance adjustment is
+      // not spending, so its currency cannot feed this line's actual.
+      conditions.push(NOT_SHADOW_SQL);
       const rows = await queryAll(
         `SELECT DISTINCT a.currency as currency
          FROM operations o
          JOIN accounts a ON o.account_id = a.id
+         LEFT JOIN categories c ON o.category_id = c.id
          WHERE ${conditions.join(' AND ')}
            AND o.type = 'expense'
            AND o.date >= ?
@@ -2261,13 +2273,18 @@ const collectPlanSourceCurrencies = async (lines, startDate, endDate, convertAll
       for (const row of rows || []) currencies.add(row.currency);
     }
 
+    // Matches calculateActualIncome, which leaves balance adjustments out: a
+    // currency only an adjustment arrived in never fed the total, so it must
+    // not be reported as dropped from it either.
     const incomeRows = await queryAll(
       `SELECT DISTINCT a.currency as currency
        FROM operations o
        JOIN accounts a ON o.account_id = a.id
+       LEFT JOIN categories c ON o.category_id = c.id
        WHERE o.type = 'income'
          AND o.date >= ?
-         AND o.date <= ?`,
+         AND o.date <= ?
+         AND ${NOT_SHADOW_SQL}`,
       [startDate, endDate],
     );
     for (const row of incomeRows || []) currencies.add(row.currency);
@@ -2309,10 +2326,19 @@ export const calculatePlanStatus = async (planId, displayCurrency = null, conver
       throw new Error(`Budget plan ${planId} not found`);
     }
     const target = displayCurrency || plan.currency;
+    // What a one-off line with no currency of its own (null) is denominated in:
+    // the plan's STORED currency, the same reading updateLine and the editor
+    // use. Falling back to the display currency instead read "Laptop 1500" on a
+    // RUB plan as 1500 of whatever the screen showed, 90 times too much in USD.
+    const inheritedCurrency = plan.currency || target;
+    const hasStoredExpectedIncome = !Currency.isZero(String(plan.expectedIncome ?? '0'));
     const [oneOffLines, recurringLines, allGroups] = await Promise.all([
       getPlanLines(planId), getRecurringLinesForMonth(plan.month), getLineGroups(),
     ]);
     const lines = [...recurringLines, ...oneOffLines];
+    // The stored expected income is the basis only for a plan with no income
+    // lines; only then does its currency need a rate.
+    const usesStoredExpectedIncome = hasStoredExpectedIncome && !lines.some(line => line.kind === 'income');
     const { startDate, endDate } = getMonthDateRange(plan.month);
 
     const groupsById = new Map(allGroups.map(g => [g.id, g]));
@@ -2348,8 +2374,10 @@ export const calculatePlanStatus = async (planId, displayCurrency = null, conver
     // lookup rather than adding a round trip per group.
     const distinctLineCurrencies = [...new Set(
       [
-        ...lines.map(line => line.currency || target),
+        ...lines.map(line => line.currency || inheritedCurrency),
         ...allGroups.map(group => group.currency || target),
+        // The stored expected-income fallback below, only when it will be read.
+        ...(usesStoredExpectedIncome ? [inheritedCurrency] : []),
       ].filter(c => c !== target),
     )];
     const lineRateByCurrency = distinctLineCurrencies.length > 0
@@ -2359,7 +2387,7 @@ export const calculatePlanStatus = async (planId, displayCurrency = null, conver
     for (const line of lines) {
       // One-off lines have no currency of their own (null) — they inherit the
       // plan's currency, matching pre-recurring behavior exactly.
-      const lineCurrency = line.currency || target;
+      const lineCurrency = line.currency || inheritedCurrency;
       let amount = line.amount;
       if (lineCurrency !== target) {
         const converted = convertWithRateMap(amount, lineCurrency, target, lineRateByCurrency);
@@ -2539,9 +2567,16 @@ export const calculatePlanStatus = async (planId, displayCurrency = null, conver
     }
 
     const actualIncome = await calculateActualIncome(plan.month, target, convertAll);
-    const expectedIncome = hasIncomeLine
-      ? expectedFromLines
-      : Currency.add(plan.expectedIncome ?? '0', '0', target);
+    // The stored expected_income is in the plan's own currency, like a one-off
+    // line; a missing rate flags that currency rather than mislabelling it.
+    let expectedIncome = expectedFromLines;
+    if (!hasIncomeLine && hasStoredExpectedIncome) {
+      const storedExpected = convertWithRateMap(
+        String(plan.expectedIncome ?? '0'), inheritedCurrency, target, lineRateByCurrency,
+      );
+      if (storedExpected === null) transferCurrencies.add(inheritedCurrency);
+      expectedIncome = Currency.add(storedExpected ?? '0', '0', target);
+    }
     const plannedRemainder = Currency.subtract(expectedIncome, allocated, target);
     const actualRemainder = Currency.subtract(actualIncome, totalActual, target);
 

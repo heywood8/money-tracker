@@ -283,6 +283,37 @@ describe('BudgetPlansDB plan-vs-actual', () => {
       queryFirst.mockResolvedValue({ total: null });
       expect(await BudgetPlansDB.calculateActualIncome('2026-07', 'USD', false)).toBe('0');
     });
+
+    // Raising an account's balance on the Accounts screen books an income into
+    // a hidden shadow category. It is a correction, not income: it used to lift
+    // the Budgets income header and the actual remainder by the full amount.
+    it('leaves balance adjustments (shadow categories) out, in both toggle states', async () => {
+      queryAll.mockResolvedValue([]);
+      queryFirst.mockResolvedValue({ total: 0 });
+
+      await BudgetPlansDB.calculateActualIncome('2026-07', 'USD', true);
+      await BudgetPlansDB.calculateActualIncome('2026-07', 'USD', false);
+
+      for (const [sql] of [queryAll.mock.calls[0], queryFirst.mock.calls[0]]) {
+        expect(sql).toContain('LEFT JOIN categories c ON o.category_id = c.id');
+        expect(sql).toContain('(c.is_shadow IS NULL OR c.is_shadow = 0)');
+      }
+    });
+  });
+
+  describe('calculateIncomeForFilters', () => {
+    it('leaves balance adjustments (shadow categories) out of a line\'s income', async () => {
+      CategoriesDB.getAllDescendants.mockResolvedValue([]);
+      queryAll.mockResolvedValue([]);
+
+      await BudgetPlansDB.calculateIncomeForFilters({
+        categoryIds: ['cat-salary'], currency: 'USD', startDate: '2026-07-01', endDate: '2026-07-31',
+      });
+
+      const incomeQuery = queryAll.mock.calls.map(([sql]) => sql).find(sql => sql.includes("o.type = 'income'"));
+      expect(incomeQuery).toContain('LEFT JOIN categories c ON o.category_id = c.id');
+      expect(incomeQuery).toContain('(c.is_shadow IS NULL OR c.is_shadow = 0)');
+    });
   });
 
   describe('calculatePlanStatus', () => {
@@ -530,6 +561,52 @@ describe('BudgetPlansDB plan-vs-actual', () => {
         await BudgetPlansDB.calculatePlanStatus('p1', 'USD', false);
 
         expect(fetchRatesToTarget).not.toHaveBeenCalled();
+      });
+
+      // A one-off line with no currency of its own is in the plan's STORED
+      // currency (USD here), which is how updateLine reads it too. Reading it in
+      // the display currency instead showed a 100 USD line as 100 AMD, and the
+      // stored expected income the same way.
+      it('reads a currency-less one-off line and the stored expected income in the plan currency', async () => {
+        setupDb({ lines: [lineRow('l1', '100', 'cat1', null, 0)] });
+        calculateSpendingForFilters.mockResolvedValue('0');
+        stubRates({ USD: '400' });
+
+        const status = await BudgetPlansDB.calculatePlanStatus('p1', 'AMD', false);
+
+        expect(fetchRatesToTarget).toHaveBeenCalledWith(['USD'], 'AMD');
+        const line = status.lines.find(l => l.lineId === 'l1');
+        expect(parseFloat(line.amount)).toBe(40000); // 100 USD * 400
+        expect(parseFloat(status.totals.allocated)).toBe(40000);
+        // No income lines: the plan's expected_income (1000 USD) is the basis.
+        expect(parseFloat(status.totals.expectedIncome)).toBe(400000);
+      });
+
+      it('does not flag the plan currency for a stored expected income of zero', async () => {
+        setupDb({ lines: [] });
+        queryFirst.mockImplementation(async (sql) => {
+          if (sql.includes('FROM budget_plans WHERE id')) return { ...PLAN_ROW, expected_income: '0' };
+          if (sql.includes("o.type = 'income'")) return { total: 0 };
+          return null;
+        });
+        stubRates({});
+        getUnconvertibleCurrencies.mockImplementation(async (currencies) => [...currencies]);
+
+        const status = await BudgetPlansDB.calculatePlanStatus('p1', 'AMD', false);
+
+        expect(status.unconvertible).not.toContain('USD');
+        expect(fetchRatesToTarget).not.toHaveBeenCalled();
+      });
+
+      it('flags the plan currency when the display currency has no rate for it', async () => {
+        setupDb({ lines: [lineRow('l1', '100', 'cat1', null, 0)] });
+        stubRates({});
+        getUnconvertibleCurrencies.mockImplementation(async (currencies) => [...currencies]);
+
+        const status = await BudgetPlansDB.calculatePlanStatus('p1', 'AMD', false);
+
+        expect(status.lines.find(l => l.lineId === 'l1').status).toBe('unconvertible');
+        expect(status.unconvertible).toContain('USD');
       });
     });
   });

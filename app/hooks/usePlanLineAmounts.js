@@ -26,6 +26,9 @@ const EMPTY_SET = new Set();
  *
  * @param {Array<{id: string, amount: string, currency: ?string}>} lines
  * @param {string} targetCurrency - The currency the screen is showing
+ * @param {?string} [inheritedCurrency] - What a line with no currency of its
+ *   own (a one-off line, null) is denominated in: the plan's STORED currency,
+ *   which need not be the one the screen shows. Defaults to `targetCurrency`.
  * @returns {{
  *   amountById: Map<string, string>,
  *   unconvertibleIds: Set<string>,
@@ -35,14 +38,14 @@ const EMPTY_SET = new Set();
  *   present in `unconvertibleIds` instead, so callers must decide explicitly
  *   what to do rather than silently printing a mislabeled number.
  */
-export default function usePlanLineAmounts(lines, targetCurrency) {
+export default function usePlanLineAmounts(lines, targetCurrency, inheritedCurrency = null) {
   // Lines in the target currency need no rate at all, so they are resolved
   // synchronously on first render — the common case never flashes an empty map.
   const local = useMemo(() => {
     const amountById = new Map();
     const foreign = [];
     for (const line of lines) {
-      const lineCurrency = line.currency || targetCurrency;
+      const lineCurrency = line.currency || inheritedCurrency || targetCurrency;
       if (lineCurrency === targetCurrency) {
         amountById.set(line.id, String(line.amount ?? '0'));
       } else {
@@ -50,7 +53,7 @@ export default function usePlanLineAmounts(lines, targetCurrency) {
       }
     }
     return { amountById, foreign };
-  }, [lines, targetCurrency]);
+  }, [lines, targetCurrency, inheritedCurrency]);
 
   const [converted, setConverted] = useState(null);
 

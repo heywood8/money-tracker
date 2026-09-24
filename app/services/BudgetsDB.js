@@ -33,6 +33,14 @@ const mapBudgetFields = (dbBudget) => {
  * @param {Object} budget - Budget object to validate
  * @returns {string|null} Error message or null if valid
  */
+/**
+ * SQL predicate leaving out balance adjustments, which live in the hidden shadow
+ * categories: correcting an account's balance is neither income nor spending,
+ * and Graphs and the forecast already exclude them (OperationsDB). The query
+ * must `LEFT JOIN categories c ON o.category_id = c.id`.
+ */
+export const NOT_SHADOW_SQL = '(c.is_shadow IS NULL OR c.is_shadow = 0)';
+
 export const validateBudget = (budget) => {
   if (!budget.categoryId) {
     return 'Category is required';
@@ -678,6 +686,10 @@ export const calculateSpendingForFilters = async ({
       conditions.push(`o.account_id IN (${filterAccountIds.map(() => '?').join(',')})`);
       filterParams.push(...filterAccountIds);
     }
+    // Balance adjustments (the hidden shadow categories) are corrections, not
+    // spending: a line tracking "everything on card X" counted a downward
+    // correction of card X's balance as money spent.
+    conditions.push(NOT_SHADOW_SQL);
     const filterClause = conditions.join(' AND ');
 
     if (convertAll) {
@@ -685,6 +697,7 @@ export const calculateSpendingForFilters = async ({
         `SELECT a.currency as currency, ${sumMoneySql()} as total
          FROM operations o
          JOIN accounts a ON o.account_id = a.id
+         LEFT JOIN categories c ON o.category_id = c.id
          WHERE ${filterClause}
            AND o.type = 'expense'
            AND o.date >= ?
@@ -709,6 +722,7 @@ export const calculateSpendingForFilters = async ({
       SELECT ${sumMoneySql()} as total
       FROM operations o
       JOIN accounts a ON o.account_id = a.id
+      LEFT JOIN categories c ON o.category_id = c.id
       WHERE ${filterClause}
         AND o.type = 'expense'
         AND a.currency = ?

@@ -32,6 +32,8 @@ const SINGLE_ROW = { length: 1 };
 // conversion map — see the `amountSources` memo. Groups and lines have separate
 // ID spaces, so the prefix is what keeps a group from ever shadowing a line.
 const groupAmountKey = (groupId) => `group:${groupId}`;
+// amountById key for the plan's stored expected income (see amountSources).
+const EXPECTED_INCOME_KEY = 'plan:expected-income';
 
 /**
  * MonthlyPlanSection — the unified Budgets list: one month-scoped envelope view
@@ -140,6 +142,11 @@ const MonthlyPlanSection = forwardRef(function MonthlyPlanSection({
   const prevPlanExists = useMemo(() => plans.some(p => p.month === prevMonth), [plans, prevMonth]);
 
   const planId = plan?.id ?? null;
+  // What a one-off line's null currency means (the plan's STORED currency), and
+  // the stored expected income in it. Primitives, so a refreshed plan object
+  // alone does not rebuild the conversion inputs.
+  const planStoredCurrency = plan?.currency || null;
+  const planExpectedIncome = plan?.expectedIncome || null;
   // The currency the section READS in, which is the one the host's chip names —
   // not the one the plan happens to be stored in. Those are different things: a
   // plan created back when the only account was in RUB stays a RUB row forever,
@@ -319,12 +326,21 @@ const MonthlyPlanSection = forwardRef(function MonthlyPlanSection({
   // units. The array keeps `lines`' identity when no group overrides exist, so
   // the common case adds no work and no extra render.
   const amountSources = useMemo(() => {
-    const overrides = groups
+    const extras = groups
       .filter(g => !g.isDerived && g.amount != null)
-      .map(g => ({ id: groupAmountKey(g.id), amount: g.amount, currency: g.currency }));
-    return overrides.length > 0 ? [...lines, ...overrides] : lines;
-  }, [lines, groups]);
-  const { amountById, converting } = usePlanLineAmounts(amountSources, planCurrency);
+      // A group belongs to no plan: one without a currency is read in the
+      // screen's, as calculatePlanStatus reads it, never in the plan's.
+      .map(g => ({ id: groupAmountKey(g.id), amount: g.amount, currency: g.currency || planCurrency }));
+    // The stored expected income (the fallback below) is in the plan's own
+    // currency, exactly like a one-off line.
+    if (planExpectedIncome) {
+      extras.push({ id: EXPECTED_INCOME_KEY, amount: planExpectedIncome, currency: planStoredCurrency });
+    }
+    return extras.length > 0 ? [...lines, ...extras] : lines;
+  }, [lines, groups, planCurrency, planExpectedIncome, planStoredCurrency]);
+  // A one-off line stores currency: null for "the plan's", and the plan's is the
+  // STORED one, not the chip's: a RUB plan read in USD still has RUB lines.
+  const { amountById, converting } = usePlanLineAmounts(amountSources, planCurrency, planStoredCurrency);
 
   // Live totals: allocated = Σ allocation amounts, expected = Σ income lines,
   // remainder = expected − allocated. Same precise decimal math as
@@ -372,12 +388,15 @@ const MonthlyPlanSection = forwardRef(function MonthlyPlanSection({
     }
     // Fallback for a plan whose expected income was never bridged into lines
     // (migration 0020 only skips that when income templates already exist).
-    if (!hasIncomeLine && plan?.expectedIncome) {
-      income = Currency.add(plan.expectedIncome, '0', planCurrency);
+    // Until it is converted (or when no rate exists) it counts as no basis at
+    // all, which hasIncomeBasis below reports, rather than as zero income.
+    if (!hasIncomeLine && planExpectedIncome) {
+      const expected = amountById.get(EXPECTED_INCOME_KEY);
+      if (expected != null) income = Currency.add(expected, '0', planCurrency);
     }
     const remainder = Currency.subtract(income, allocated, planCurrency);
     return { income, allocated, remainder };
-  }, [plan, lines, groups, amountById, planCurrency]);
+  }, [planExpectedIncome, lines, groups, amountById, planCurrency]);
 
   // Once the plan status has resolved (and is not stale — see freshPlanStatus
   // above), prefer its totals: those are computed with correct cross-currency
@@ -890,6 +909,7 @@ const MonthlyPlanSection = forwardRef(function MonthlyPlanSection({
       icon={lineIcon(line)}
       status={lineStatusById.get(line.id) || null}
       planCurrency={planCurrency}
+      inheritedCurrency={plan?.currency || null}
       displayAmount={amountById.get(line.id) ?? null}
       converting={converting}
       colors={colors}
@@ -1237,6 +1257,7 @@ const MonthlyPlanSection = forwardRef(function MonthlyPlanSection({
           line={modal.line}
           initialKind={modal.kind}
           currency={planCurrency}
+          inheritedCurrency={plan?.currency || null}
           month={month}
           expenseCategories={expenseCategories}
           incomeCategories={incomeCategories}

@@ -927,9 +927,15 @@ describe('MonthlyPlanSection', () => {
       });
       await waitFor(() => expect(getByTestId('plan-line-l1')).toBeTruthy());
 
-      expect(onTotalsChange).toHaveBeenLastCalledWith(
-        expect.objectContaining({ allocated: '300', actual: null }),
-      );
+      // The line has no currency of its own, so it is in the plan's stored RUB:
+      // the local estimate is its AMD conversion (it used to be read as 300 AMD).
+      const { fetchRatesToTarget, convertWithRateMap } = jest.requireActual('../../../app/services/OperationsDB');
+      const rates = await fetchRatesToTarget(['RUB'], 'AMD');
+      const expectedAllocated = convertWithRateMap('300', 'RUB', 'AMD', rates);
+      expect(expectedAllocated).not.toBeNull();
+      await waitFor(() => expect(onTotalsChange).toHaveBeenLastCalledWith(
+        expect.objectContaining({ allocated: expectedAllocated, actual: null }),
+      ));
       expect(onTotalsChange).not.toHaveBeenLastCalledWith(
         expect.objectContaining({ allocated: '99999.00' }),
       );
@@ -960,6 +966,30 @@ describe('MonthlyPlanSection', () => {
       expect(onTotalsChange).toHaveBeenLastCalledWith(
         expect.objectContaining({ allocated: '410.00', actual: '250.00' }),
       );
+    });
+
+    // With no RUB rate the row falls back to its stored figure, labelled with
+    // the unit it is really in: the plan's RUB, not the screen's AMD.
+    it('labels an unconvertible currency-less line with the plan currency', async () => {
+      planInRub({
+        planStatuses: new Map([['p1', {
+          planId: 'p1', month: THIS_MONTH, currency: 'AMD', convertAll: false,
+          lines: [{
+            lineId: 'l1', broken: false, amount: '300', actual: '0', remaining: '300',
+            percentage: 0, isExceeded: false, status: 'unconvertible',
+          }],
+          totals: {
+            expectedIncome: '0', actualIncome: '0', allocated: '0',
+            totalActual: '0', plannedRemainder: '0', actualRemainder: '0',
+          },
+          unconvertible: ['RUB'],
+        }]]),
+      });
+      const { getByTestId } = await renderSection(undefined, { currency: 'AMD', month: THIS_MONTH });
+      await waitFor(() => expect(getByTestId('plan-line-l1')).toBeTruthy());
+
+      expect(getByTestId('plan-line-l1')).toHaveTextContent(/300(\.00)? RUB/);
+      expect(getByTestId('plan-line-l1')).not.toHaveTextContent(/300(\.00)? AMD/);
     });
   });
 
