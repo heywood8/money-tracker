@@ -1426,13 +1426,18 @@ export const restoreBackup = async (backup, cancelToken) => {
           status: 'in_progress',
           data: backup.data.app_metadata.length,
         });
+        const metadataRestoredAt = new Date().toISOString();
         for (const meta of backup.data.app_metadata) {
-          if (meta.key !== 'db_version') {
-            await db.runAsync(
-              'INSERT OR REPLACE INTO app_metadata (key, value, updated_at) VALUES (?, ?, ?)',
-              [meta.key, meta.value, meta.updated_at],
-            );
-          }
+          if (!meta.key || meta.key === 'db_version') continue;
+          // Both columns are NOT NULL with no default, and CSV cannot tell an
+          // empty string from a missing value: parseCSV reads every blank cell as
+          // null. A preference legitimately stored as '' (backup_last_skipped is,
+          // after every accepted daily backup) would otherwise abort the whole
+          // restore with "NOT NULL constraint failed: app_metadata.value".
+          await db.runAsync(
+            'INSERT OR REPLACE INTO app_metadata (key, value, updated_at) VALUES (?, ?, ?)',
+            [meta.key, meta.value ?? '', meta.updated_at ?? metadataRestoredAt],
+          );
         }
         console.log(`Restored ${backup.data.app_metadata.length} metadata entries`);
         appEvents.emit(IMPORT_PROGRESS_EVENT, {
@@ -1806,22 +1811,38 @@ const importBackupCSV = async (fileUri, cancelToken) => {
 
   // Split by section markers. The six [BUDGET_PLAN*] markers don't collide:
   // each marker + newline (`[BUDGET_PLANS]\n`, `[BUDGET_PLAN_LINES]\n`) is not a
-  // substring of any of the others.
-  const accountsMatch = fileContent.match(/\[ACCOUNTS\]\n([\s\S]*?)(?=\n\[[A-Z_]+\]\n|$)/);
-  const categoriesMatch = fileContent.match(/\[CATEGORIES\]\n([\s\S]*?)(?=\n\[[A-Z_]+\]\n|$)/);
-  const operationsMatch = fileContent.match(/\[OPERATIONS\]\n([\s\S]*?)(?=\n\[[A-Z_]+\]\n|$)/);
-  const budgetsMatch = fileContent.match(/\[BUDGETS\]\n([\s\S]*?)(?=\n\[[A-Z_]+\]\n|$)/);
-  const metadataMatch = fileContent.match(/\[APP_METADATA\]\n([\s\S]*?)(?=\n\[[A-Z_]+\]\n|$)/);
-  const balanceHistoryMatch = fileContent.match(/\[BALANCE_HISTORY\]\n([\s\S]*?)(?=\n\[[A-Z_]+\]\n|$)/);
-  const plannedOpsMatch = fileContent.match(/\[PLANNED_OPERATIONS\]\n([\s\S]*?)(?=\n\[[A-Z_]+\]\n|$)/);
-  const budgetPlansMatch = fileContent.match(/\[BUDGET_PLANS\]\n([\s\S]*?)(?=\n\[[A-Z_]+\]\n|$)/);
-  const budgetPlanLinesMatch = fileContent.match(/\[BUDGET_PLAN_LINES\]\n([\s\S]*?)(?=\n\[[A-Z_]+\]\n|$)/);
-  const budgetPlanLineCategoriesMatch = fileContent.match(/\[BUDGET_PLAN_LINE_CATEGORIES\]\n([\s\S]*?)(?=\n\[[A-Z_]+\]\n|$)/);
-  const budgetPlanLineGroupsMatch = fileContent.match(/\[BUDGET_PLAN_LINE_GROUPS\]\n([\s\S]*?)(?=\n\[[A-Z_]+\]\n|$)/);
-  const budgetPlanLineAccountsMatch = fileContent.match(/\[BUDGET_PLAN_LINE_ACCOUNTS\]\n([\s\S]*?)(?=\n\[[A-Z_]+\]\n|$)/);
-  const budgetPlanLineLabelsMatch = fileContent.match(/\[BUDGET_PLAN_LINE_LABELS\]\n([\s\S]*?)(?=\n\[[A-Z_]+\]\n|$)/);
-  const merchantRulesMatch = fileContent.match(/\[NOTIFICATION_MERCHANT_RULES\]\n([\s\S]*?)(?=\n\[[A-Z_]+\]\n|$)/);
-  const notificationTemplatesMatch = fileContent.match(/\[NOTIFICATION_TEMPLATES\]\n([\s\S]*?)(?=\n\[[A-Z_]+\]\n|$)/);
+  // substring of any of the others. Line breaks may be '\r\n': a backup that
+  // passed through a Windows editor or a mail client matched no marker written
+  // against '\n' alone, and restored as an empty database. Only the markers
+  // accept it; the cells are left as written, and parseCSV splits rows on either.
+  const matchSection = (marker) => fileContent.match(
+    new RegExp(`\\[${marker}\\]\\r?\\n([\\s\\S]*?)(?=\\r?\\n\\[[A-Z_]+\\]\\r?\\n|$)`),
+  );
+  const accountsMatch = matchSection('ACCOUNTS');
+  const categoriesMatch = matchSection('CATEGORIES');
+  const operationsMatch = matchSection('OPERATIONS');
+  const budgetsMatch = matchSection('BUDGETS');
+  const metadataMatch = matchSection('APP_METADATA');
+  const balanceHistoryMatch = matchSection('BALANCE_HISTORY');
+  const plannedOpsMatch = matchSection('PLANNED_OPERATIONS');
+  const budgetPlansMatch = matchSection('BUDGET_PLANS');
+  const budgetPlanLinesMatch = matchSection('BUDGET_PLAN_LINES');
+  const budgetPlanLineCategoriesMatch = matchSection('BUDGET_PLAN_LINE_CATEGORIES');
+  const budgetPlanLineGroupsMatch = matchSection('BUDGET_PLAN_LINE_GROUPS');
+  const budgetPlanLineAccountsMatch = matchSection('BUDGET_PLAN_LINE_ACCOUNTS');
+  const budgetPlanLineLabelsMatch = matchSection('BUDGET_PLAN_LINE_LABELS');
+  const merchantRulesMatch = matchSection('NOTIFICATION_MERCHANT_RULES');
+  const notificationTemplatesMatch = matchSection('NOTIFICATION_TEMPLATES');
+
+  // Every section defaults to [], which validateBackup accepts, and restoreBackup
+  // clears each table before refilling it. So a CSV that is not a Penny backup at
+  // all (a bank statement, a spreadsheet export), or one cut short before its
+  // operations, would wipe what it lacks and report success. The writer emits
+  // all three core markers even for an empty table, so a file missing any of
+  // them is refused before anything is touched.
+  if (!accountsMatch || !categoriesMatch || !operationsMatch) {
+    throw new Error('Invalid backup format: not a complete Penny CSV backup (accounts, categories or operations section missing)');
+  }
 
   if (accountsMatch) sections.accounts = parseCSV(accountsMatch[1]);
   if (categoriesMatch) sections.categories = parseCSV(categoriesMatch[1]);

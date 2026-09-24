@@ -6,6 +6,7 @@ import {
   buildSheetsData,
   exportToSheets,
   importFromSheets,
+  sheetTitleOfRange,
 } from '../../app/services/GoogleSheetsService';
 
 jest.mock('../../app/services/PreferencesDB', () => ({
@@ -1026,6 +1027,184 @@ describe('GoogleSheetsService', () => {
       const backup = await importFromSheets('token');
       expect(backup.data.budget_plans).toEqual([]);
       expect(backup.data.budget_plan_lines).toEqual([]);
+    });
+
+    // The real API echoes a multi-word tab title quoted: a request for
+    // `Balance History` comes back as `'Balance History'!A1:D2`. Every mock
+    // above uses the unquoted form, which is how these four tabs imported as
+    // empty in production and the restore cleared their tables.
+    it('reads multi-word tabs from the quoted ranges the API actually returns', async () => {
+      getPreference.mockResolvedValue('sheet-id-123');
+      mockFetch.mockResolvedValue({
+        ok: true,
+        json: async () => ({
+          valueRanges: [
+            { range: 'Accounts!A1:D2', values: [['id', 'name', 'balance', 'currency'], ['1', 'Savings', '0', 'USD']] },
+            { range: 'Operations!A1:I1', values: [['id', 'date', 'type', 'amount', 'currency', 'category', 'account', 'to_account', 'description']] },
+            { range: 'Categories!A1:H2', values: [['id', 'name', 'type', 'category_type', 'icon', 'parent_id', 'color', 'is_shadow'], ['cat-1', 'Food', 'entry', 'expense', 'food', '', '', '0']] },
+            { range: 'Budgets!A1:A1', values: [['id']] },
+            { range: '\'Balance History\'!A1:D2', values: [['account', 'date', 'balance', 'account_id'], ['Savings', '2026-07-01', '120.00', '1']] },
+            { range: '\'Budget Plans\'!A1:D2', values: [['id', 'month', 'currency', 'expected_income'], ['plan-1', '2026-07', 'USD', '3000.00']] },
+            {
+              range: '\'Budget Plan Lines\'!A1:N2',
+              values: [
+                ['id', 'plan_id', 'label', 'amount', 'comment', 'category', 'account', 'category_id', 'to_account_id', 'sort_order', 'is_recurring', 'currency', 'group', 'group_id'],
+                ['line-1', 'plan-1', 'Groceries', '400', '', 'Food', '', 'cat-1', '', '0', '0', '', 'Living', 'grp-1'],
+              ],
+            },
+            { range: '\'Budget Line Groups\'!A1:E2', values: [['id', 'label', 'amount', 'currency', 'sort_order'], ['grp-1', 'Living', '', '', '0']] },
+          ],
+        }),
+      });
+
+      const backup = await importFromSheets('token');
+
+      expect(backup.data.balance_history).toEqual([
+        expect.objectContaining({ account_id: '1', date: '2026-07-01', balance: '120.00' }),
+      ]);
+      expect(backup.data.budget_plans).toEqual([
+        expect.objectContaining({ id: 'plan-1', month: '2026-07' }),
+      ]);
+      expect(backup.data.budget_plan_lines).toEqual([
+        expect.objectContaining({ id: 'line-1', plan_id: 'plan-1', category_id: 'cat-1', group_id: 'grp-1' }),
+      ]);
+      expect(backup.data.budget_plan_line_groups).toEqual([
+        expect.objectContaining({ id: 'grp-1', label: 'Living' }),
+      ]);
+    });
+
+    // An export writes both the ID and the name column, and category names are
+    // not unique. Merging the two columns let "Other" resolve to a different
+    // "Other" and link it to the line as a second, unintended target.
+    it('reads the ID column alone when it is filled, so duplicate names cannot add targets', async () => {
+      getPreference.mockResolvedValue('sheet-id-123');
+      mockFetch.mockResolvedValue({
+        ok: true,
+        json: async () => ({
+          valueRanges: [
+            {
+              range: 'Accounts!A1:D3',
+              values: [
+                ['id', 'name', 'balance', 'currency'],
+                ['1', 'Card', '0', 'USD'],
+                ['2', 'Card', '0', 'EUR'],
+              ],
+            },
+            {
+              range: 'Categories!A1:H3',
+              values: [
+                ['id', 'name', 'type', 'category_type', 'icon', 'parent_id', 'color', 'is_shadow'],
+                ['expense-food-other', 'Other', 'entry', 'expense', 'dots', '', '', '0'],
+                ['expense-house-other', 'Other', 'entry', 'expense', 'dots', '', '', '0'],
+              ],
+            },
+            { range: '\'Budget Plans\'!A1:D2', values: [['id', 'month', 'currency', 'expected_income'], ['plan-1', '2026-07', 'USD', '0']] },
+            {
+              range: '\'Budget Plan Lines\'!A1:U2',
+              values: [
+                ['id', 'plan_id', 'label', 'amount', 'comment', 'category', 'account', 'category_id', 'to_account_id', 'sort_order', 'is_recurring', 'currency', 'kind', 'execution_account', 'account_id', 'last_executed_month', 'categories', 'category_ids', 'include_children', 'spending_accounts', 'spending_account_ids'],
+                ['line-1', 'plan-1', '', '50', '', 'Other', '', 'expense-food-other', '', '0', '0', '', '', '', '', '', 'Other', 'expense-food-other', '1', 'Card', '1'],
+              ],
+            },
+          ],
+        }),
+      });
+
+      const backup = await importFromSheets('token');
+
+      expect(backup.data.budget_plan_line_categories).toEqual([
+        { line_id: 'line-1', category_id: 'expense-food-other' },
+      ]);
+      expect(backup.data.budget_plan_line_accounts).toEqual([
+        { line_id: 'line-1', account_id: '1' },
+      ]);
+    });
+
+    it('still adds a name typed beside the IDs by hand', async () => {
+      getPreference.mockResolvedValue('sheet-id-123');
+      mockFetch.mockResolvedValue({
+        ok: true,
+        json: async () => ({
+          valueRanges: [
+            {
+              range: 'Accounts!A1:D3',
+              values: [
+                ['id', 'name', 'balance', 'currency'],
+                ['1', 'Card', '0', 'USD'],
+                ['2', 'Wallet', '0', 'USD'],
+              ],
+            },
+            {
+              range: 'Categories!A1:H3',
+              values: [
+                ['id', 'name', 'type', 'category_type', 'icon', 'parent_id', 'color', 'is_shadow'],
+                ['cat-1', 'Food', 'entry', 'expense', 'food', '', '', '0'],
+                ['cat-2', 'Cafes', 'entry', 'expense', 'cup', '', '', '0'],
+              ],
+            },
+            { range: '\'Budget Plans\'!A1:D2', values: [['id', 'month', 'currency', 'expected_income'], ['plan-1', '2026-07', 'USD', '0']] },
+            {
+              range: '\'Budget Plan Lines\'!A1:U2',
+              values: [
+                ['id', 'plan_id', 'label', 'amount', 'comment', 'category', 'account', 'category_id', 'to_account_id', 'sort_order', 'is_recurring', 'currency', 'kind', 'execution_account', 'account_id', 'last_executed_month', 'categories', 'category_ids', 'include_children', 'spending_accounts', 'spending_account_ids'],
+                // Exported with Food / Card, then "Cafes" and "Wallet" typed into
+                // the readable columns without touching the IDs.
+                ['line-1', 'plan-1', '', '50', '', 'Food', '', 'cat-1', '', '0', '0', '', '', '', '', '', 'Food;Cafes', 'cat-1', '1', 'Card;Wallet', '1'],
+              ],
+            },
+          ],
+        }),
+      });
+
+      const backup = await importFromSheets('token');
+
+      expect(backup.data.budget_plan_line_categories).toEqual([
+        { line_id: 'line-1', category_id: 'cat-1' },
+        { line_id: 'line-1', category_id: 'cat-2' },
+      ]);
+      expect(backup.data.budget_plan_line_accounts).toEqual([
+        { line_id: 'line-1', account_id: '1' },
+        { line_id: 'line-1', account_id: '2' },
+      ]);
+    });
+
+    it('refuses a spreadsheet whose tabs exist but hold nothing, not even a header', async () => {
+      // What an export leaves behind when it clears the tabs and then fails to
+      // write them. Importing it would clear every table on restore.
+      getPreference.mockResolvedValue('sheet-id-123');
+      mockFetch.mockResolvedValue({
+        ok: true,
+        json: async () => ({
+          valueRanges: [
+            { range: 'Accounts!A1:Z1000' },
+            { range: 'Operations!A1:Z1000' },
+            { range: 'Categories!A1:Z1000' },
+            { range: 'Budgets!A1:Z1000' },
+            { range: '\'Balance History\'!A1:Z1000' },
+          ],
+        }),
+      });
+
+      await expect(importFromSheets('token')).rejects.toThrow('fetch_sheets_failed');
+    });
+  });
+
+  describe('sheetTitleOfRange', () => {
+    it('returns an unquoted title as is', () => {
+      expect(sheetTitleOfRange('Accounts!A1:G3')).toBe('Accounts');
+    });
+
+    it('strips the quotes the API puts around a title with a space', () => {
+      expect(sheetTitleOfRange('\'Budget Plan Lines\'!A1:U40')).toBe('Budget Plan Lines');
+    });
+
+    it('undoubles an apostrophe inside a quoted title', () => {
+      expect(sheetTitleOfRange('\'Bob\'\'s tab\'!A1')).toBe('Bob\'s tab');
+    });
+
+    it('treats a bare title with no cell reference as the title', () => {
+      expect(sheetTitleOfRange('Budgets')).toBe('Budgets');
+      expect(sheetTitleOfRange(undefined)).toBe('');
     });
   });
 
