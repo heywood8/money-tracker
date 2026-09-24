@@ -84,8 +84,8 @@ const resolvePendingLocation = async (pending) => {
 };
 
 // Cap on remembered signatures. The native side keeps a rolling window of 50
-// notifications, so twice that is comfortable headroom (the newest 100
-// signatures always cover the newest 50 notifications) while bounding storage.
+// notifications, and saveSignatures always keeps the signature of every one of
+// them; the rest of the room holds the newest older ones.
 const MAX_SIGNATURES = 100;
 
 /**
@@ -135,9 +135,20 @@ const loadSignatures = async () => {
   return Array.isArray(sigs) ? sigs : [];
 };
 
-const saveSignatures = async (sigs) => {
-  // Keep only the most recent MAX_SIGNATURES entries.
-  const trimmed = sigs.slice(-MAX_SIGNATURES);
+const saveSignatures = async (sigs, currentWindow = []) => {
+  // A blind tail trim did not keep the newest 50 notifications covered: the
+  // native window replaces an updated notification in place, but each update of
+  // an ongoing one (music, navigation, a download) arrives with a new post time
+  // and so a new signature, and a hundred of those pushed out the signature of a
+  // bank notification still sitting in the window. It was then processed again:
+  // booked a second time if its operation had been deleted or edited, or queued
+  // as a second review card. Keep every signature of the current window, then
+  // fill the remaining room with the newest others.
+  const inWindow = new Set(currentWindow);
+  const current = sigs.filter(sig => inWindow.has(sig));
+  const older = sigs.filter(sig => !inWindow.has(sig));
+  const room = Math.max(0, MAX_SIGNATURES - current.length);
+  const trimmed = [...older.slice(Math.max(0, older.length - room)), ...current];
   await PreferencesDB.setJsonPreference(
     PreferencesDB.PREF_KEYS.BANK_NOTIFICATIONS_PROCESSED_SIGS,
     trimmed,
@@ -279,7 +290,10 @@ export const resolveAtmTargetAccount = async () => {
   if (id == null) return null;
   try {
     const account = await AccountsDB.getAccountById(id);
-    return account || null;
+    // Deleting an account only soft-deletes it, and getAccountById still returns
+    // the row: without this a withdrawal was transferred into a deleted cash
+    // account and vanished from every visible balance.
+    return account && !account.deletedAt ? account : null;
   } catch (error) {
     return null;
   }
@@ -758,8 +772,9 @@ const runProcess = async () => {
     (a, b) => (a.postTime || 0) - (b.postTime || 0),
   );
 
-  for (const notification of ordered) {
-    const signature = notificationSignature(notification);
+  const windowSignatures = ordered.map(notificationSignature);
+  for (const [index, notification] of ordered.entries()) {
+    const signature = windowSignatures[index];
     if (seen.has(signature)) {
       continue;
     }
@@ -819,7 +834,7 @@ const runProcess = async () => {
   trace.mark('book');
 
   if (newlySeen.length > 0) {
-    await saveSignatures([...seen]);
+    await saveSignatures([...seen], windowSignatures);
   }
 
   // Refresh on any change so a pending badge updates too, not just on creates.

@@ -734,6 +734,28 @@ describe('processBankNotifications', () => {
       expect(account).toBeNull();
     });
 
+    // Deleting an account only soft-deletes it, and getAccountById still
+    // returns the row: withdrawals were transferred into the deleted account.
+    it('returns null when the bound cash account was deleted', async () => {
+      PreferencesDB.getNumberPreference.mockResolvedValue(9);
+      AccountsDB.getAccountById.mockResolvedValue({ id: 9, currency: 'AMD', deletedAt: '2026-07-01T10:00:00.000Z' });
+      const account = await pipeline.resolveAtmTargetAccount();
+      expect(account).toBeNull();
+    });
+
+    it('queues a withdrawal instead of transferring it into a deleted cash account', async () => {
+      NotificationAccess.getRecentNotifications.mockResolvedValue([ATM_CASH]);
+      AccountsDB.getAccountByCardMask.mockResolvedValue({ id: 7, currency: 'AMD' });
+      PreferencesDB.getJsonPreference.mockImplementation((key) => prefs([], [PKG])(key));
+      PreferencesDB.getNumberPreference.mockResolvedValue(9);
+      AccountsDB.getAccountById.mockResolvedValue({ id: 9, currency: 'AMD', deletedAt: '2026-07-01T10:00:00.000Z' });
+
+      const summary = await pipeline.processBankNotifications();
+
+      expect(summary).toMatchObject({ created: 0, pending: 1 });
+      expect(OperationsDB.createOperation).not.toHaveBeenCalled();
+    });
+
     it('persists the chosen cash account', async () => {
       await pipeline.setAtmTargetAccount(9);
       expect(PreferencesDB.setPreference).toHaveBeenCalledWith(
@@ -1530,6 +1552,58 @@ describe('processBankNotifications', () => {
       expect(summary).toMatchObject({ created: 0, pending: 0, skipped: 0 });
       expect(PendingNotificationsDB.deletePendingNotification).toHaveBeenCalledWith('p1');
       expect(emitSpy).toHaveBeenCalledWith(EVENTS.RELOAD_ALL);
+    });
+  });
+
+  // Each update of an ongoing notification (music, navigation) arrives with a
+  // new post time and so a new signature. A blind trim to the newest 100 pushed
+  // out the signature of a bank notification still in the native window, and
+  // the next pass processed it again.
+  describe('seen-signature window', () => {
+    let store;
+    beforeEach(() => {
+      PendingNotificationsDB.getPendingNotifications.mockResolvedValue([]);
+    });
+    const useStore = (initial) => {
+      store = { [PREF_KEYS.BANK_NOTIFICATIONS_PACKAGES]: [PKG], ...initial };
+      PreferencesDB.getJsonPreference.mockImplementation(async (key, fallback) => (key in store ? store[key] : fallback));
+      PreferencesDB.setJsonPreference.mockImplementation(async (key, value) => { store[key] = value; });
+    };
+    const musicUpdates = (count, from = 0) => Array.from({ length: count }, (_, i) => ({
+      ...NON_TRANSACTION, postTime: NON_TRANSACTION.postTime + 10 + from + i,
+    }));
+
+    it('keeps the signature of every notification still in the window', async () => {
+      const olderSigs = Array.from({ length: 100 }, (_, i) => `${1000 + i}:1`);
+      const bankSig = pipeline.notificationSignature(PURCHASE);
+      useStore({ [PREF_KEYS.BANK_NOTIFICATIONS_PROCESSED_SIGS]: [bankSig, ...olderSigs] });
+      const updates = musicUpdates(5);
+      NotificationAccess.getRecentNotifications.mockResolvedValue([PURCHASE, ...updates]);
+
+      await pipeline.processBankNotifications();
+
+      const saved = store[PREF_KEYS.BANK_NOTIFICATIONS_PROCESSED_SIGS];
+      expect(saved).toContain(bankSig);
+      expect(saved).toHaveLength(100);
+      updates.forEach(n => expect(saved).toContain(pipeline.notificationSignature(n)));
+    });
+
+    it('does not process a bank notification again while music keeps updating', async () => {
+      // The purchase is booked once, then 120 passes each see one new update of
+      // a music notification replacing the previous one in the native window.
+      useStore({});
+      AccountsDB.getAccountByCardMask.mockResolvedValue({ id: 7, currency: 'AMD' });
+      NotificationRulesDB.getMerchantRule.mockResolvedValue({ categoryId: 'cat-food', labelOverride: 'Groceries' });
+      OperationsDB.getOperationsByAccountTypeAndDate.mockResolvedValue([]); // e.g. the user deleted it
+      NotificationAccess.getRecentNotifications.mockResolvedValue([PURCHASE]);
+      await pipeline.processBankNotifications();
+
+      for (let pass = 0; pass < 120; pass += 1) {
+        NotificationAccess.getRecentNotifications.mockResolvedValue([PURCHASE, ...musicUpdates(1, pass)]);
+        await pipeline.processBankNotifications();
+      }
+
+      expect(OperationsDB.createOperation).toHaveBeenCalledTimes(1);
     });
   });
 });
