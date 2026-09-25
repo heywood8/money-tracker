@@ -446,6 +446,20 @@ describe('OperationsDB Service', () => {
       );
     });
 
+    // A timestamped date fell out of every string date compare and stalled the
+    // operations list's load-more (#773): only the calendar day is stored.
+    it('stores only the calendar day of a timestamped date', async () => {
+      mockDb.getFirstAsync.mockResolvedValue({ balance: '1000' });
+
+      await OperationsDB.createOperation({
+        type: 'expense', amount: '100', accountId: 'acc1', categoryId: 'cat1', date: '2025-12-05T09:30:00.000Z',
+      });
+
+      const insert = mockDb.runAsync.mock.calls.find(([sql]) => sql.includes('INSERT INTO operations'));
+      expect(insert[1]).toContain('2025-12-05');
+      expect(insert[1]).not.toContain('2025-12-05T09:30:00.000Z');
+    });
+
     it('creates income operation and updates account balance', async () => {
       const operation = {
         type: 'income',
@@ -1752,6 +1766,20 @@ describe('OperationsDB Service', () => {
         expect.any(Array),
       );
       expect(result).toHaveLength(2);
+    });
+
+    // The anchor comes from the oldest loaded row. A timestamped one built
+    // `new Date('…ZT00:00:00')` — Invalid Date, a NaN window, zero rows, and a
+    // load-more that never advanced again.
+    it('builds a valid week window from a timestamped anchor', async () => {
+      queryAll.mockResolvedValue([]);
+
+      await OperationsDB.getOperationsByWeekFromDate('2025-12-05T09:00:00.000Z');
+
+      expect(queryAll).toHaveBeenLastCalledWith(
+        expect.stringContaining('WHERE date >= ? AND date <= ?'),
+        ['2025-11-29', '2025-12-05'],
+      );
     });
   });
 

@@ -9,6 +9,7 @@ import { queryAll, executeQuery, executeTransaction, getDatabase } from './db';
 import { appEvents } from './eventEmitter';
 import { acceptBaseline, countRows } from './backupBaseline';
 import * as BudgetPlansDB from './BudgetPlansDB';
+import { toOperationDate, todayLocalDate } from '../utils/dateUtils';
 
 const BACKUP_VERSION = 1;
 
@@ -1038,7 +1039,9 @@ export const restoreBackup = async (backup, cancelToken) => {
             mappedAccountId,
             resolveCategoryReference(operation.category_id, 'operation'),
             mappedToAccountId,
-            operation.date || new Date().toISOString(),
+            // A calendar day, as every other writer stores it: a file's timestamp
+            // (or the old full-ISO fallback) broke every string date compare.
+            toOperationDate(operation.date) || todayLocalDate(),
             operation.created_at || new Date().toISOString(),
             operation.description || null,
             operation.exchange_rate || null,

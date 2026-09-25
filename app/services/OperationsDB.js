@@ -16,7 +16,7 @@ import * as Currency from './currency';
 import { formatDate, updateTodayBalance } from './BalanceHistoryDB';
 import * as AccountsDB from './AccountsDB';
 import { sumMoneySql } from './sqlMoney';
-import { formatLocalDate } from '../utils/dateUtils';
+import { formatLocalDate, toOperationDate, parseLocalDay } from '../utils/dateUtils';
 import getDefaultOperations from '../defaults/defaultOperations';
 
 // Operation types currently supported. Used as the upper bound for the
@@ -555,7 +555,7 @@ export const createOperationInTx = async (db, operation) => {
     account_id: extractId(operation.accountId),
     category_id: extractId(operation.categoryId),
     to_account_id: extractId(operation.toAccountId),
-    date: operation.date,
+    date: toOperationDate(operation.date),
     created_at: now,
     description: operation.description || null,
     exchange_rate: operation.exchangeRate || null,
@@ -688,7 +688,7 @@ export const updateOperation = async (id, updates) => {
       }
       if (updates.date !== undefined) {
         fields.push('date = ?');
-        values.push(updates.date);
+        values.push(toOperationDate(updates.date));
       }
       if (updates.description !== undefined) {
         fields.push('description = ?');
@@ -846,7 +846,7 @@ export const splitOperation = async (id, updates, newOperationData) => {
       if (updates.accountId !== undefined) { fields.push('account_id = ?'); vals.push(extractId(updates.accountId)); }
       if (updates.categoryId !== undefined) { fields.push('category_id = ?'); vals.push(extractId(updates.categoryId)); }
       if (updates.toAccountId !== undefined) { fields.push('to_account_id = ?'); vals.push(extractId(updates.toAccountId)); }
-      if (updates.date !== undefined) { fields.push('date = ?'); vals.push(updates.date); }
+      if (updates.date !== undefined) { fields.push('date = ?'); vals.push(toOperationDate(updates.date)); }
       if (updates.description !== undefined) { fields.push('description = ?'); vals.push(updates.description || null); }
       if (updates.exchangeRate !== undefined) { fields.push('exchange_rate = ?'); vals.push(updates.exchangeRate || null); }
       if (updates.destinationAmount !== undefined) { fields.push('destination_amount = ?'); vals.push(updates.destinationAmount || null); }
@@ -873,7 +873,7 @@ export const splitOperation = async (id, updates, newOperationData) => {
         account_id: extractId(newOperationData.accountId),
         category_id: extractId(newOperationData.categoryId),
         to_account_id: extractId(newOperationData.toAccountId) || null,
-        date: newOperationData.date,
+        date: toOperationDate(newOperationData.date),
         created_at: now,
         description: newOperationData.description || null,
         exchange_rate: newOperationData.exchangeRate || null,
@@ -1833,7 +1833,7 @@ export const getNextOldestOperation = async (beforeDate) => {
 export const getOperationsByWeekFromDate = async (endDate) => {
   try {
     // Parse the end date
-    const end = new Date(endDate + 'T00:00:00');
+    const end = parseLocalDay(endDate);
 
     // Calculate start date (6 days before end date)
     const start = new Date(end);
@@ -1874,7 +1874,7 @@ export const getOperationsByWeekFromDate = async (endDate) => {
 export const getFilteredOperationsByWeekFromDate = async (endDate, filters = {}) => {
   try {
     // Calculate week bounds (6 days before endDate)
-    const end = new Date(endDate + 'T00:00:00');
+    const end = parseLocalDay(endDate);
     const start = new Date(end);
     start.setDate(start.getDate() - 6);
 
@@ -1972,7 +1972,7 @@ export const getNextNewestOperation = async (afterDate) => {
 export const getOperationsByWeekToDate = async (startDate) => {
   try {
     // Parse the start date
-    const start = new Date(startDate + 'T00:00:00');
+    const start = parseLocalDay(startDate);
 
     // Calculate end date (6 days after start date)
     const end = new Date(start);
@@ -2036,7 +2036,7 @@ export const getNextNewestFilteredOperation = async (afterDate, filters = {}) =>
 export const getFilteredOperationsByWeekToDate = async (startDate, filters = {}) => {
   try {
     // Parse the start date
-    const start = new Date(startDate + 'T00:00:00');
+    const start = parseLocalDay(startDate);
 
     // Calculate end date (6 days after start date)
     const end = new Date(start);

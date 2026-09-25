@@ -14,7 +14,40 @@
  * the issue is then pinned explicitly by faking the offset.
  */
 
-import { formatLocalDate, todayLocalDate, localDateOf } from '../../app/utils/dateUtils';
+import { formatLocalDate, todayLocalDate, localDateOf, toOperationDate, parseLocalDay } from '../../app/utils/dateUtils';
+
+// Imports copied timestamped dates into operations.date, which broke every
+// string date compare and stalled the operations list (#773).
+describe('toOperationDate', () => {
+  it('keeps only the calendar day of a timestamp', () => {
+    expect(toOperationDate('2026-08-18T09:00:00.000Z')).toBe('2026-08-18');
+    expect(toOperationDate('2026-08-18 14:22:00')).toBe('2026-08-18');
+    expect(toOperationDate(' 2026-08-18 ')).toBe('2026-08-18');
+  });
+
+  it('leaves a plain day unchanged', () => {
+    expect(toOperationDate('2026-08-18')).toBe('2026-08-18');
+  });
+
+  it('turns a Date into its local day', () => {
+    expect(toOperationDate(new Date(2026, 7, 18, 23, 30))).toBe('2026-08-18');
+  });
+
+  it('returns anything else unchanged for validation to handle', () => {
+    expect(toOperationDate('18.08.2026')).toBe('18.08.2026');
+    expect(toOperationDate('')).toBe('');
+    expect(toOperationDate(null)).toBeNull();
+    expect(toOperationDate(undefined)).toBeUndefined();
+  });
+});
+
+describe('parseLocalDay', () => {
+  it('gives local midnight of the day, with or without a time tail', () => {
+    const expected = new Date(2026, 7, 18).getTime();
+    expect(parseLocalDay('2026-08-18').getTime()).toBe(expected);
+    expect(parseLocalDay('2026-08-18T09:00:00.000Z').getTime()).toBe(expected);
+  });
+});
 
 /** The local calendar day of a Date, spelled out independently of the helper. */
 const localDayOf = (d) =>
