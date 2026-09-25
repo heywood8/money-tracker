@@ -1429,6 +1429,10 @@ export const restoreBackup = async (backup, cancelToken) => {
         const metadataRestoredAt = new Date().toISOString();
         for (const meta of backup.data.app_metadata) {
           if (!meta.key || meta.key === 'db_version') continue;
+          // Operation ids are reassigned on restore, so the registry of
+          // operations the notification pipeline booked (keyed by id) would
+          // point at unrelated rows. It starts empty instead.
+          if (meta.key === 'bank_notifications_booked_ops') continue;
           // Both columns are NOT NULL with no default, and CSV cannot tell an
           // empty string from a missing value: parseCSV reads every blank cell as
           // null. A preference legitimately stored as '' (backup_last_skipped is,

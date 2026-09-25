@@ -31,7 +31,7 @@ import { parseBankNotification, kindRequiresCategory } from './parseBankNotifica
 import { ensureCustomTemplatesLoaded } from './customTemplates';
 import { resolveNotification } from './resolveNotification';
 import { learnAccountBinding } from './accountBindings';
-import { findMatchingOperation, reconcilePendingNotifications } from './duplicateOperations';
+import { findMatchingOperation, reconcilePendingNotifications, rememberBookedOperation } from './duplicateOperations';
 import { dismissPendingOperationsAlert } from './localNotifications';
 import { startTrace, traceAsync } from '../perfTrace';
 import { localDateOf, todayLocalDate } from '../../utils/dateUtils';
@@ -374,6 +374,8 @@ const findExistingOperation = async (descriptor, resolution, date, options) => {
       currency: descriptor.currency,
       date,
       accountId: resolution.accountId,
+      merchant: descriptor.merchant || null,
+      labelOverride: resolution.labelOverride || null,
     },
     {
       currency: resolution.accountCurrency,
@@ -502,6 +504,9 @@ const bookExpenseOrQueue = async (descriptor, resolution, date, allowedPackages,
     // Claim the new operation so a later duplicate notification in this run pairs
     // with a different existing operation rather than re-matching this one.
     if (options.claimedOpIds && created && created.id != null) options.claimedOpIds.add(created.id);
+    // ...and remember whose it is, so a later notification for a different payee
+    // (or a queued card for one) is never absorbed by it.
+    await rememberBookedOperation(created && created.id, [label, descriptor.merchant]);
     summary.created += 1;
     recordCreated(summary, {
       operationId: created && created.id != null ? created.id : null,
@@ -628,6 +633,7 @@ const bookTransferOrQueue = async (descriptor, resolution, date, allowedPackages
       ...operationLocationFields(location),
     });
     if (options.claimedOpIds && created && created.id != null) options.claimedOpIds.add(created.id);
+    await rememberBookedOperation(created && created.id, [descriptor.merchant]);
     summary.created += 1;
     recordCreated(summary, {
       operationId: created && created.id != null ? created.id : null,
@@ -951,6 +957,7 @@ export const resolvePendingNotification = async (pendingId, choices = {}) => {
     description: label ? serializeLabels([label]) : null,
     ...operationLocationFields(location),
   });
+  await rememberBookedOperation(operation && operation.id, [label, pending.merchant]);
 
   // Persist an override change only when the user actually changed it in the
   // review UI: a new/edited name is learned, a blanked field clears the override.
@@ -1121,6 +1128,7 @@ const resolvePendingTransfer = async (pending, choices = {}) => {
     description: label ? serializeLabels([label]) : null,
     ...operationLocationFields(location),
   });
+  await rememberBookedOperation(operation && operation.id, [label, pending.merchant]);
 
   // Learn the card -> source-account binding (default on when a card is present).
   if (choices.learnCardMask !== false && pending.cardMask && accountId != null) {

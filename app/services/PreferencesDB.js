@@ -45,6 +45,10 @@ export const PREF_KEYS = {
   // Bank-notification processing
   BANK_NOTIFICATIONS_ENABLED: 'bank_notifications_enabled',
   BANK_NOTIFICATIONS_PROCESSED_SIGS: 'bank_notifications_processed_sigs',
+  // JSON [{ id, payees, at }]: operations the pipeline itself booked from a
+  // notification, with the payee each was booked for. Duplicate detection only
+  // lets such an operation absorb a notification for the same payee.
+  BANK_NOTIFICATIONS_BOOKED_OPS: 'bank_notifications_booked_ops',
   BANK_NOTIFICATIONS_PACKAGES: 'bank_notifications_packages',
   // Opt-in: run the ingestion pipeline periodically in the background and post a
   // system notification when new transactions land in the review queue.
