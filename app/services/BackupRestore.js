@@ -448,6 +448,21 @@ const asFlag = (value, fallback = 0) => {
 const asNullable = (value) => (value === '' || value == null ? null : value);
 
 /**
+ * A stored JSON array (an app_metadata value), or [] when absent or unreadable.
+ * @param {string|null|undefined} value
+ * @returns {Array}
+ */
+const parseJsonArray = (value) => {
+  if (typeof value !== 'string' || !value) return [];
+  try {
+    const parsed = JSON.parse(value);
+    return Array.isArray(parsed) ? parsed : [];
+  } catch {
+    return [];
+  }
+};
+
+/**
  * Read a numeric backup column, tolerating the strings a CSV round trip yields.
  * @param {*} value - Raw column value
  * @param {number} [fallback=0] - Result for an absent, blank or unreadable value
@@ -725,6 +740,17 @@ export const restoreBackup = async (backup, cancelToken) => {
       const preservedTemplateCategories = Array.isArray(backup.data.notification_templates)
         ? null
         : await readPreserved('SELECT id, category_id FROM notification_templates');
+      // The review queue is transient and never in a backup, but it is not
+      // disposable: `DELETE FROM accounts` below cascades away every queued item
+      // with a resolved account (nearly all of them), and the processed-signature
+      // list says those notifications were handled, so they are never queued
+      // again — transactions the user was asked to review, gone. Kept with the
+      // signatures this device has already handled (merged back below).
+      const preservedPending = await readPreserved('SELECT * FROM pending_notifications');
+      const liveProcessedSigs = await readPreserved(
+        "SELECT value FROM app_metadata WHERE key = 'bank_notifications_processed_sigs'",
+      );
+      await db.runAsync('DELETE FROM pending_notifications').catch(() => {});
 
       // Clear existing data (in reverse order due to foreign keys)
       // Merchant rules and parse templates are cleared ONLY when the backup
@@ -1662,6 +1688,52 @@ export const restoreBackup = async (backup, cancelToken) => {
           keptTemplateCategories += 1;
         }
         console.log(`Preserved the category of ${keptTemplateCategories} notification templates`);
+      }
+
+      // The review queue, re-pointed at the restored data: an account or a
+      // category the restored set no longer has is left for the user to pick at
+      // review rather than dropping the item.
+      if (preservedPending.length > 0) {
+        let keptPending = 0;
+        for (const item of preservedPending) {
+          if (!item.id) continue;
+          const account = item.account_id != null
+            ? await db.getFirstAsync('SELECT id FROM accounts WHERE id = ? AND deleted_at IS NULL', [item.account_id])
+            : null;
+          await db.runAsync(
+            `INSERT OR IGNORE INTO pending_notifications
+              (id, kind, type, amount, currency, card_mask, merchant, country, date, time, account_id, category_id, package_name, raw, latitude, longitude, force_added, created_at)
+             VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
+            [
+              item.id, item.kind, item.type, item.amount, item.currency, item.card_mask ?? null,
+              item.merchant ?? null, item.country ?? null, item.date ?? null, item.time ?? null,
+              account ? account.id : null,
+              item.category_id ? resolveCategoryReference(item.category_id, 'preserved review item') : null,
+              item.package_name ?? null, item.raw ?? null, item.latitude ?? null, item.longitude ?? null,
+              item.force_added ? 1 : 0, item.created_at || new Date().toISOString(),
+            ],
+          ).catch((e) => { console.warn('Skipping preserved review item:', e.message); });
+          keptPending += 1;
+        }
+        console.log(`Preserved ${keptPending} queued bank notifications`);
+      }
+
+      // Notifications this device already handled stay handled: the restored
+      // list only knows what the backup's device had seen, so the preserved
+      // queue items (and anything booked here) would otherwise be processed
+      // again and queued a second time.
+      const liveSigs = parseJsonArray(liveProcessedSigs[0]?.value);
+      if (liveSigs.length > 0) {
+        const restoredRow = await db.getFirstAsync(
+          "SELECT value FROM app_metadata WHERE key = 'bank_notifications_processed_sigs'",
+        );
+        const restoredSigs = parseJsonArray(restoredRow?.value);
+        const known = new Set(restoredSigs);
+        const merged = [...restoredSigs, ...liveSigs.filter(sig => !known.has(sig))];
+        await db.runAsync(
+          'INSERT OR REPLACE INTO app_metadata (key, value, updated_at) VALUES (?, ?, ?)',
+          ['bank_notifications_processed_sigs', JSON.stringify(merged), new Date().toISOString()],
+        );
       }
 
       appEvents.emit(IMPORT_PROGRESS_EVENT, { stepId: 'upgrades', status: 'completed' });
