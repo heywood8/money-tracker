@@ -2320,11 +2320,35 @@ const collectPlanSourceCurrencies = async (lines, startDate, endDate, convertAll
  * }
  */
 export const calculatePlanStatus = async (planId, displayCurrency = null, convertAll = false) => {
+  const plan = await getPlanById(planId);
+  if (!plan) {
+    const error = new Error(`Budget plan ${planId} not found`);
+    console.error('Failed to calculate plan status:', error);
+    throw error;
+  }
+  return calculateStatusForPlan(plan, displayCurrency, convertAll);
+};
+
+/**
+ * A month with no plan row, standing in for one so its recurring lines can be
+ * walked like any plan's. It has no one-off lines, no stored currency (every
+ * figure is read in the display currency) and no stored expected income.
+ * @param {string} month - YYYY-MM
+ * @returns {Object}
+ */
+const planlessMonth = (month) => ({ id: null, month, currency: null, expectedIncome: null });
+
+/**
+ * {@link calculatePlanStatus} for a plan row already in hand, or for a
+ * {@link planlessMonth}.
+ * @param {Object} plan - a mapped plan row, or a planlessMonth
+ * @param {?string} [displayCurrency]
+ * @param {boolean} [convertAll=false]
+ * @returns {Promise<Object|null>} as calculatePlanStatus, with `planId` null for
+ *   a planless month; null when a planless month has no line to report on
+ */
+const calculateStatusForPlan = async (plan, displayCurrency = null, convertAll = false) => {
   try {
-    const plan = await getPlanById(planId);
-    if (!plan) {
-      throw new Error(`Budget plan ${planId} not found`);
-    }
     const target = displayCurrency || plan.currency;
     // What a one-off line with no currency of its own (null) is denominated in:
     // the plan's STORED currency, the same reading updateLine and the editor
@@ -2333,9 +2357,10 @@ export const calculatePlanStatus = async (planId, displayCurrency = null, conver
     const inheritedCurrency = plan.currency || target;
     const hasStoredExpectedIncome = !Currency.isZero(String(plan.expectedIncome ?? '0'));
     const [oneOffLines, recurringLines, allGroups] = await Promise.all([
-      getPlanLines(planId), getRecurringLinesForMonth(plan.month), getLineGroups(),
+      plan.id != null ? getPlanLines(plan.id) : [], getRecurringLinesForMonth(plan.month), getLineGroups(),
     ]);
     const lines = [...recurringLines, ...oneOffLines];
+    if (plan.id == null && lines.length === 0) return null;
     // The stored expected income is the basis only for a plan with no income
     // lines; only then does its currency need a rate.
     const usesStoredExpectedIncome = hasStoredExpectedIncome && !lines.some(line => line.kind === 'income');
@@ -2604,27 +2629,41 @@ export const calculatePlanStatus = async (planId, displayCurrency = null, conver
 };
 
 /**
- * Compute the plan-vs-actual status for ONE month, keyed by plan ID so it drops
- * into the same map the screen reads.
+ * Compute the plan-vs-actual status for ONE month, keyed by that month. Not by
+ * the plan's ID: a month can have no plan, and can gain one while on screen, and
+ * a key that changed with it would hide the month's figures until the recompute
+ * landed.
  *
  * The Budgets screen shows a single month, but its statuses were recomputed for
  * every plan the user has ever had — one plan per month of history, each a full
  * per-line walk — on every operation change. Months other than the one on screen
  * are recomputed when the user navigates to them.
  *
+ * A month with no plan row still gets a status when recurring lines apply to it:
+ * the screen renders those lines for it (see {@link getLinesForMonth}), and
+ * adding one never creates a plan, so a person who budgets only with recurring
+ * lines (every v1 user after the migration) has no plan in any month. Without
+ * this their lines never showed a single actual. Such a status is read in
+ * `displayCurrency`, since there is no stored one to fall back on.
+ *
  * @param {string} month - YYYY-MM.
  * @param {boolean} [convertAll=false]
  * @param {?string} [displayCurrency=null] - see calculateAllPlanStatuses.
- * @returns {Promise<Map<string, Object>>} Empty when the month has no plan.
+ * @returns {Promise<Map<string, Object>>} `month` -> status. Empty when the month
+ *   has neither a plan nor a recurring line, or has no plan and no display currency.
  */
 export const calculatePlanStatusesForMonth = async (month, convertAll = false, displayCurrency = null) => {
   const statusMap = new Map();
   if (!month) return statusMap;
   try {
     const plan = await getPlanByMonth(month);
-    if (!plan) return statusMap;
-    const status = await calculatePlanStatus(plan.id, displayCurrency || plan.currency, convertAll);
-    statusMap.set(plan.id, status);
+    let status = null;
+    if (plan) {
+      status = await calculateStatusForPlan(plan, displayCurrency || plan.currency, convertAll);
+    } else if (displayCurrency) {
+      status = await calculateStatusForPlan(planlessMonth(month), displayCurrency, convertAll);
+    }
+    if (status) statusMap.set(month, status);
     return statusMap;
   } catch (error) {
     console.error(`Failed to calculate status for month ${month}:`, error);
@@ -2638,7 +2677,8 @@ export const calculatePlanStatusesForMonth = async (month, convertAll = false, d
  * calculateAllBudgetStatuses).
  *
  * Kept for callers that genuinely need every month. The Budgets screen does not
- * — see {@link calculatePlanStatusesForMonth}.
+ * — see {@link calculatePlanStatusesForMonth}. Only months with a plan row are
+ * covered: a planless month's recurring lines are reported by that one alone.
  * @param {boolean} [convertAll=false]
  * @param {?string} [displayCurrency=null] - Currency to express every status in.
  *   Null (the default) keeps each plan in its own stored currency. The Budgets

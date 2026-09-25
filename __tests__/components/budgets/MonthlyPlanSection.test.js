@@ -374,6 +374,81 @@ describe('MonthlyPlanSection', () => {
     });
   });
 
+  describe('A month with no plan row', () => {
+    // A recurring line needs no plan, and adding one creates none, so a person
+    // who budgets only with recurring lines has no plan in any month.
+    const RECURRING = {
+      id: 'rent', planId: null, amount: '200', label: 'Rent', comment: null,
+      kind: 'expense', categoryId: 'cat1', categoryIds: ['cat1'], toAccountId: null,
+      sortOrder: 0, isBroken: false, isRecurring: true, currency: 'USD',
+    };
+    const status = (currency = 'USD') => ({
+      planId: null,
+      month: THIS_MONTH,
+      currency,
+      convertAll: false,
+      lines: [{
+        lineId: 'rent', broken: false, amount: '200', actual: '50', remaining: '150',
+        percentage: 25, isExceeded: false, status: 'safe',
+      }],
+      totals: {
+        expectedIncome: '0', actualIncome: '0', allocated: '200',
+        totalActual: '50', plannedRemainder: '-200', actualRemainder: '-50',
+      },
+      unconvertible: [],
+    });
+
+    it("shows a recurring line's spending from the status keyed by the month", async () => {
+      setPlans({
+        plans: [],
+        lines: [RECURRING],
+        planStatuses: new Map([[THIS_MONTH, status()]]),
+      });
+      const { getByTestId } = await renderSection();
+      await waitFor(() => expect(getByTestId('plan-line-rent')).toBeTruthy());
+
+      expect(getByTestId('plan-line-pair-rent')).toHaveTextContent('50 / 200');
+      expect(getByTestId('plan-line-primary-rent')).toHaveTextContent('25%');
+    });
+
+    it('keeps the figures up when the month gains a plan', async () => {
+      // Creating the plan must not move the status out from under the screen:
+      // the figures stay until the recompute replaces them.
+      setPlans({ plans: [], lines: [RECURRING], planStatuses: new Map([[THIS_MONTH, status()]]) });
+      const { getByTestId, rerender } = await renderSection();
+      await waitFor(() => expect(getByTestId('plan-line-pair-rent')).toHaveTextContent('50 / 200'));
+
+      mockPlans = { ...mockPlans, plans: [{ id: 'p-new', month: THIS_MONTH, currency: 'USD', expectedIncome: null }] };
+      rerender(
+        <OverlayHostProvider>
+          <View>
+            <MonthlyPlanSection
+              currency="USD"
+              expenseCategories={EXPENSE_CATEGORIES}
+              incomeCategories={INCOME_CATEGORIES}
+              accounts={ACCOUNTS}
+            />
+          </View>
+          <OverlayOutlet />
+        </OverlayHostProvider>,
+      );
+
+      expect(getByTestId('plan-line-pair-rent')).toHaveTextContent('50 / 200');
+    });
+
+    it("does not read another month's status", async () => {
+      setPlans({
+        plans: [],
+        lines: [RECURRING],
+        planStatuses: new Map([[PREV_MONTH, { ...status(), month: PREV_MONTH }]]),
+      });
+      const { getByTestId, queryByTestId } = await renderSection();
+      await waitFor(() => expect(getByTestId('plan-line-rent')).toBeTruthy());
+
+      expect(queryByTestId('plan-line-pair-rent')).toBeNull();
+    });
+  });
+
   describe('Income lines tracked by label (migration 0028)', () => {
     const incomeLine = (id, amount, overrides = {}) => ({
       id, planId: 'p1', amount, label: null, comment: null, categoryId: null,
@@ -384,7 +459,7 @@ describe('MonthlyPlanSection', () => {
     const setIncomePlan = (lines, lineStatuses) => setPlans({
       plans: [{ id: 'p1', month: THIS_MONTH, currency: 'USD', expectedIncome: null }],
       lines,
-      planStatuses: new Map([['p1', {
+      planStatuses: new Map([[THIS_MONTH, {
         planId: 'p1',
         month: THIS_MONTH,
         currency: 'USD',
@@ -496,7 +571,7 @@ describe('MonthlyPlanSection', () => {
     const setPlanWithStatus = (status = STATUS, lines = LINES) => setPlans({
       plans: [{ id: 'p1', month: THIS_MONTH, currency: 'USD', expectedIncome: '1000' }],
       lines,
-      planStatuses: new Map([['p1', status]]),
+      planStatuses: new Map([[THIS_MONTH, status]]),
     });
 
     it('renders per-line progress with actuals and status details', async () => {
@@ -857,7 +932,7 @@ describe('MonthlyPlanSection', () => {
           { id: 'l1', planId: 'p1', amount: '300', label: 'Groceries', comment: null, categoryId: 'cat1', toAccountId: null, sortOrder: 0, isBroken: false },
           { id: 'l-eur', planId: null, amount: '100', label: 'Rent', comment: null, categoryId: 'cat2', toAccountId: null, sortOrder: 0, isBroken: false, isRecurring: true, currency: 'EUR' },
         ],
-        planStatuses: new Map([['p1', {
+        planStatuses: new Map([[THIS_MONTH, {
           planId: 'p1', month: THIS_MONTH, currency: 'USD', convertAll: false,
           lines: [],
           totals: {
@@ -909,7 +984,7 @@ describe('MonthlyPlanSection', () => {
       // bug the conversion exists to prevent — so the section falls back to its
       // own same-currency estimate (300) and hides the actual column entirely.
       planInRub({
-        planStatuses: new Map([['p1', {
+        planStatuses: new Map([[THIS_MONTH, {
           planId: 'p1', month: THIS_MONTH, currency: 'RUB', convertAll: false,
           lines: [],
           totals: {
@@ -947,7 +1022,7 @@ describe('MonthlyPlanSection', () => {
 
     it('uses a status once it arrives in the chip currency', async () => {
       planInRub({
-        planStatuses: new Map([['p1', {
+        planStatuses: new Map([[THIS_MONTH, {
           planId: 'p1', month: THIS_MONTH, currency: 'AMD', convertAll: false,
           lines: [],
           totals: {
@@ -972,7 +1047,7 @@ describe('MonthlyPlanSection', () => {
     // the unit it is really in: the plan's RUB, not the screen's AMD.
     it('labels an unconvertible currency-less line with the plan currency', async () => {
       planInRub({
-        planStatuses: new Map([['p1', {
+        planStatuses: new Map([[THIS_MONTH, {
           planId: 'p1', month: THIS_MONTH, currency: 'AMD', convertAll: false,
           lines: [{
             lineId: 'l1', broken: false, amount: '300', actual: '0', remaining: '300',
@@ -1012,7 +1087,7 @@ describe('MonthlyPlanSection', () => {
       setPlans({
         plans: [{ id: 'p1', month: THIS_MONTH, currency: 'USD', expectedIncome: '1000' }],
         lines: [],
-        planStatuses: new Map([['p1', staleStatus]]),
+        planStatuses: new Map([[THIS_MONTH, staleStatus]]),
       });
       // refreshPlanStatuses is a no-op jest.fn() in this test (setPlans's
       // default) — planStatus never actually changes, so the ONLY way the
@@ -1056,7 +1131,7 @@ describe('MonthlyPlanSection', () => {
         lines: [
           { id: 'l1', planId: 'p1', amount: '300', label: 'Groceries', comment: null, categoryId: 'cat1', toAccountId: null, sortOrder: 0, isBroken: false },
         ],
-        planStatuses: new Map([['p1', staleStatus]]),
+        planStatuses: new Map([[THIS_MONTH, staleStatus]]),
       });
       mockPlans.getLinesForMonth = jest.fn()
         .mockResolvedValueOnce([
@@ -1221,7 +1296,7 @@ describe('MonthlyPlanSection', () => {
       isBroken: false, isRecurring: true, currency: 'USD',
       hasTemplate: true, lastExecutedMonth: THIS_MONTH,
     };
-    const statusFor = (actual, amount, isExceeded) => new Map([['p1', {
+    const statusFor = (actual, amount, isExceeded) => new Map([[THIS_MONTH, {
       planId: 'p1', month: THIS_MONTH, currency: 'USD', convertAll: false,
       lines: [{
         lineId: 'l-done', broken: false, amount, actual,
@@ -1282,7 +1357,7 @@ describe('MonthlyPlanSection', () => {
         id, planId: 'p1', amount, label: 'Food', comment: null, kind: 'expense',
         categoryId: 'cat1', toAccountId: null, sortOrder: 0, isBroken: false,
       }],
-      planStatuses: new Map([['p1', {
+      planStatuses: new Map([[THIS_MONTH, {
         planId: 'p1', month: THIS_MONTH, currency: 'USD', convertAll: false,
         lines: [{
           lineId: id, broken: false, amount, actual,
@@ -1404,7 +1479,7 @@ describe('MonthlyPlanSection', () => {
           categoryId: 'cat1', toAccountId: null, sortOrder: 0, isBroken: false,
           isRecurring: true, currency: 'JPY',
         }],
-        planStatuses: new Map([['p1', {
+        planStatuses: new Map([[THIS_MONTH, {
           planId: 'p1', month: THIS_MONTH, currency: 'USD', convertAll: false,
           lines: [{
             lineId: 'l-jpy', broken: false, amount: '10000', actual: '0', remaining: '10000',
@@ -1532,7 +1607,7 @@ describe('MonthlyPlanSection', () => {
         lines: [
           { id: 'i1', planId: 'p1', amount: '220', label: 'Salary', comment: null, kind: 'income', categoryId: null, toAccountId: null, sortOrder: 0, isBroken: false, isRecurring: false, currency: null },
         ],
-        planStatuses: new Map([['p1', {
+        planStatuses: new Map([[THIS_MONTH, {
           planId: 'p1', month: THIS_MONTH, currency: 'USD', convertAll: false,
           lines: [{ lineId: 'i1', broken: false, amount: '220', actual: '0', remaining: '220', percentage: 0, isExceeded: false, status: 'income' }],
           totals: {

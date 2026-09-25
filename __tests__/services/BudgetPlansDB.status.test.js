@@ -341,9 +341,11 @@ describe('BudgetPlansDB plan-vs-actual', () => {
     // distinct-currency collection, account currency lookup.
     const setupDb = ({
       lines = [], recurringLines = [], incomeTotal = 0, incomeRows = [], expenseCurrencies = [], accountCurrency = 'USD',
+      planForMonth = null,
     }) => {
       queryFirst.mockImplementation(async (sql) => {
         if (sql.includes('FROM budget_plans WHERE id')) return PLAN_ROW;
+        if (sql.includes('FROM budget_plans WHERE month')) return planForMonth;
         if (sql.includes('SELECT currency FROM accounts')) return { currency: accountCurrency };
         if (sql.includes("o.type = 'income'")) return { total: incomeTotal };
         return null;
@@ -607,6 +609,70 @@ describe('BudgetPlansDB plan-vs-actual', () => {
 
         expect(status.lines.find(l => l.lineId === 'l1').status).toBe('unconvertible');
         expect(status.unconvertible).toContain('USD');
+      });
+    });
+
+    describe('calculatePlanStatusesForMonth', () => {
+      it('keys a month with a plan by the month', async () => {
+        setupDb({ lines: [lineRow('l1', '100', 'cat1', null, 0)], planForMonth: PLAN_ROW });
+        calculateSpendingForFilters.mockResolvedValue('30');
+
+        const statuses = await BudgetPlansDB.calculatePlanStatusesForMonth('2026-07', false, 'USD');
+
+        expect([...statuses.keys()]).toEqual(['2026-07']);
+        expect(statuses.get('2026-07')).toMatchObject({ planId: 'p1', month: '2026-07' });
+        expect(statuses.get('2026-07').lines[0]).toMatchObject({ lineId: 'l1', actual: '30' });
+      });
+
+      it("computes a planless month's recurring lines instead of returning nothing", async () => {
+        // Regression: a recurring line needs no plan and adding one creates none,
+        // so a person budgeting only with recurring lines saw 0 spent on every
+        // line of every month.
+        setupDb({
+          lines: [lineRow('stray', '999', 'cat9', null, 0)],
+          recurringLines: [recurringLineRow('rent', '200', 'USD', 'cat1', null, 0)],
+          incomeTotal: 500,
+        });
+        calculateSpendingForFilters.mockResolvedValue('50');
+
+        const statuses = await BudgetPlansDB.calculatePlanStatusesForMonth('2026-07', false, 'USD');
+
+        const status = statuses.get('2026-07');
+        expect(status).toMatchObject({ planId: null, month: '2026-07', currency: 'USD' });
+        // Only the recurring line: a planless month has no one-off lines to read.
+        expect(status.lines).toEqual([expect.objectContaining({ lineId: 'rent', actual: '50', percentage: 25 })]);
+        expect(parseFloat(status.totals.allocated)).toBe(200);
+        expect(parseFloat(status.totals.totalActual)).toBe(50);
+        expect(parseFloat(status.totals.actualIncome)).toBe(500);
+        // With no stored expected income, only income lines would set one.
+        expect(parseFloat(status.totals.expectedIncome)).toBe(0);
+        expect(calculateSpendingForFilters).toHaveBeenCalledWith(expect.objectContaining({
+          categoryIds: ['cat1'], currency: 'USD', startDate: '2026-07-01', endDate: '2026-07-31',
+        }));
+        // The recurring lines are read once per refresh, not once to check and again to walk.
+        expect(queryAll.mock.calls.filter(([sql]) => sql.includes('is_recurring = 1'))).toHaveLength(1);
+      });
+
+      it('converts a planless recurring line into the display currency', async () => {
+        setupDb({ recurringLines: [recurringLineRow('rent', '100', 'EUR', 'cat1', null, 0)] });
+        stubRates({ EUR: '1.1' });
+
+        const statuses = await BudgetPlansDB.calculatePlanStatusesForMonth('2026-07', false, 'USD');
+
+        const line = statuses.get('2026-07').lines[0];
+        expect(parseFloat(line.amount)).toBeCloseTo(110);
+      });
+
+      it('returns nothing for a planless month without recurring lines', async () => {
+        setupDb({});
+        const statuses = await BudgetPlansDB.calculatePlanStatusesForMonth('2026-07', false, 'USD');
+        expect(statuses.size).toBe(0);
+      });
+
+      it('returns nothing for a planless month with no display currency to read it in', async () => {
+        setupDb({ recurringLines: [recurringLineRow('rent', '200', 'USD', 'cat1', null, 0)] });
+        const statuses = await BudgetPlansDB.calculatePlanStatusesForMonth('2026-07', false, null);
+        expect(statuses.size).toBe(0);
       });
     });
   });
