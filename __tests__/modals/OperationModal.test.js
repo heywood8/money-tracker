@@ -194,6 +194,7 @@ jest.mock('../../app/services/LastAccount', () => ({
 jest.mock('../../app/services/currency', () => ({
   formatAmount: (amount, currency) => `${amount} ${currency}`,
   getDecimalPlaces: jest.requireActual('../../app/services/currency').getDecimalPlaces,
+  isPositiveAmount: jest.requireActual('../../app/services/currency').isPositiveAmount,
 }));
 
 jest.mock('../../app/services/BalanceHistoryDB', () => ({

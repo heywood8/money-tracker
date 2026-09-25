@@ -394,7 +394,9 @@ const useOperationForm = ({
       newErrors.type = t('operation_type_required');
     }
 
-    if (!vals.amount || isNaN(parseFloat(vals.amount)) || parseFloat(vals.amount) <= 0) {
+    // A plain positive number only: `parseFloat` read "100+" as 100, and the
+    // unevaluable expression was then saved as 0.00.
+    if (!Currency.isPositiveAmount(vals.amount)) {
       newErrors.amount = t('valid_amount_required');
     }
 
@@ -664,15 +666,21 @@ const useOperationForm = ({
       return { success: false, error: 'Cannot split new operations' };
     }
 
-    const numSplitAmount = parseFloat(splitAmount);
-    const numOriginalAmount = parseFloat(values.amount);
+    const currency = sourceAccount?.currency;
 
-    // Validate split amount (parseFloat is acceptable here: validation only, not arithmetic)
-    if (isNaN(numSplitAmount) || numSplitAmount <= 0) {
+    // The form amount may still hold an unevaluated calculator entry ("100+5").
+    // Resolve it the way Save does; subtracting from the raw string coerced it to
+    // 0 and wrote a negative remainder ("-3.00") next to the split row.
+    let originalAmount = values.amount;
+    if (hasOperation(originalAmount)) {
+      originalAmount = evaluateExpression(originalAmount, Currency.getDecimalPlaces(currency));
+    }
+
+    if (!Currency.isPositiveAmount(originalAmount) || !Currency.isPositiveAmount(splitAmount)) {
       return { success: false, error: t('valid_amount_required') };
     }
 
-    if (numSplitAmount >= numOriginalAmount) {
+    if (Currency.compare(splitAmount, originalAmount) >= 0) {
       return { success: false, error: t('split_amount_error') };
     }
 
@@ -680,12 +688,16 @@ const useOperationForm = ({
       // Format both amounts to the account currency's decimal precision before persisting.
       // splitAmount is a raw calculator string; the remainder must also be formatted so
       // both DB rows are stored with correct decimal places (same as the non-split save path).
-      const currency = sourceAccount?.currency;
       const formattedSplit = Currency.formatAmount(splitAmount, currency);
       const formattedNew = Currency.formatAmount(
-        Currency.subtract(values.amount, formattedSplit),
+        Currency.subtract(originalAmount, formattedSplit),
         currency,
       );
+      // Rounding to the currency can leave nothing behind (99.996 split off
+      // 100.00): never write a zero or negative remainder.
+      if (!Currency.isPositive(formattedNew) || !Currency.isPositive(formattedSplit)) {
+        return { success: false, error: t('split_amount_error') };
+      }
 
       formModifiedRef.current = true;
 
@@ -710,7 +722,7 @@ const useOperationForm = ({
       console.error('[useOperationForm] Failed to split operation:', error);
       return { success: false, error: t('error') };
     }
-  }, [operation, isNew, values, splitOperation, t, setValues]);
+  }, [operation, isNew, values, splitOperation, t, setValues, sourceAccount]);
 
   return {
     // State

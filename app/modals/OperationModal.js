@@ -380,8 +380,16 @@ export default function OperationModal({
   // fields (foreign amount in `amount`), and handleSplit persists form values
   // verbatim — splitting one would write the foreign nominal as the account
   // amount, corrupting the row and the account balance.
+  // The amount the split works from: a pending calculator entry is resolved the
+  // way handleSplit resolves it, so the button and the split sheet's own check
+  // agree with what will be written ("100+" has no value to split).
+  const splitBaseAmount = useMemo(() => (
+    hasOperation(values.amount)
+      ? evaluateExpression(values.amount, Currency.getDecimalPlaces(sourceAccount?.currency))
+      : values.amount
+  ), [values.amount, sourceAccount]);
   const canSplit = !isNew && !isShadowOperation && values.type !== 'transfer'
-    && !isForeignCurrencyOp && parseFloat(values.amount) > 0;
+    && !isForeignCurrencyOp && Currency.isPositiveAmount(splitBaseAmount);
 
   // Handle split confirmation
   const handleSplitConfirm = useCallback(async (splitAmount, categoryId) => {
@@ -525,18 +533,16 @@ export default function OperationModal({
     // would record the foreign nominal (e.g. 30 TRY) as the account-currency
     // amount. The user completes those with the Save button instead.
     if (isNew && !isForeignCurrencyOp) {
-      // Check if amount is valid and auto-save
-      const hasValidAmount = finalAmount &&
-        !isNaN(parseFloat(finalAmount)) &&
-        parseFloat(finalAmount) > 0;
-
-      if (hasValidAmount) {
-        // Build operation data directly with evaluated amount. Attach coordinates
-        // via the shared helper so this quick-add path applies the same R1.5 rule
-        // as the full save path.
+      // Auto-save only a plain positive amount. `parseFloat` let an unevaluable
+      // entry ("10+") through, and it was written to the amount column verbatim.
+      if (Currency.isPositiveAmount(finalAmount)) {
+        // Build operation data directly with evaluated amount, rounded to the
+        // account currency like the Save path. Attach coordinates via the shared
+        // helper so this quick-add path applies the same R1.5 rule as the full
+        // save path.
         const operationData = {
           type: values.type,
-          amount: finalAmount, // Use the evaluated amount directly
+          amount: sourceAccount ? Currency.formatAmount(finalAmount, sourceAccount.currency) : finalAmount,
           accountId: values.accountId,
           categoryId,
           date: values.date,
@@ -558,7 +564,7 @@ export default function OperationModal({
         }
       }
     }
-  }, [values, setValues, closePicker, isNew, isForeignCurrencyOp, addOperation, onClose, hasOperation, evaluateExpression, attachLocation, location]);
+  }, [values, setValues, closePicker, isNew, isForeignCurrencyOp, sourceAccount, addOperation, onClose, hasOperation, evaluateExpression, attachLocation, location]);
 
   // Reads the mirror, not `pickerState`: closePicker() nulls the hook's type
   // immediately, so a tap landing during the panel's exit animation would fall
@@ -896,7 +902,7 @@ export default function OperationModal({
         visible={showSplitModal}
         onClose={() => setShowSplitModal(false)}
         onConfirm={handleSplitConfirm}
-        originalAmount={values.amount}
+        originalAmount={splitBaseAmount ?? values.amount}
         operationType={values.type}
         categories={categories}
         colors={colors}

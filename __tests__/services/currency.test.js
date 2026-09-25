@@ -499,6 +499,28 @@ describe('Currency Service', () => {
     });
   });
 
+  // Form validation: `parseFloat` read "100+" as 100 and let a half-typed
+  // calculator entry through, which the save path then wrote as 0.00.
+  describe('isPositiveAmount', () => {
+    it('accepts plain positive numbers, with or without a trailing or leading dot', () => {
+      ['100', '100.50', '0.01', '100.', '.5', ' 42 ', 7].forEach(value => {
+        expect(Currency.isPositiveAmount(value)).toBe(true);
+      });
+    });
+
+    it('rejects expressions, signs, exponents and commas', () => {
+      ['100+', '10+5', '5×2', '-10', '+10', '1e5', '1,5', 'abc', '.', ''].forEach(value => {
+        expect(Currency.isPositiveAmount(value)).toBe(false);
+      });
+    });
+
+    it('rejects zero and missing values', () => {
+      ['0', '0.00', '.0', 0, null, undefined].forEach(value => {
+        expect(Currency.isPositiveAmount(value)).toBe(false);
+      });
+    });
+  });
+
   describe('isPositive', () => {
     it('identifies positive amounts', async () => {
       expect(Currency.isPositive('10.50')).toBe(true);
