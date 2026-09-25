@@ -67,7 +67,26 @@ describe('GoogleSheetsService', () => {
       expect(token).toBe('new-token');
     });
 
-    it('throws when signIn is cancelled', async () => {
+    // The installed library (v16) resolves a dismissed picker with
+    // { type: 'cancelled' }. Ignored, the flow reached getTokens() and reported a
+    // failure for the user's own cancel, or reused a stale session's token.
+    it('throws sign_in_cancelled when signIn resolves as cancelled, without reading tokens', async () => {
+      GoogleSignin.hasPlayServices.mockResolvedValue(true);
+      GoogleSignin.signIn.mockResolvedValue({ type: 'cancelled', data: null });
+
+      await expect(signIn()).rejects.toThrow('sign_in_cancelled');
+      expect(GoogleSignin.getTokens).not.toHaveBeenCalled();
+    });
+
+    it('throws auth_failed when getTokens fails after a successful sign-in', async () => {
+      GoogleSignin.hasPlayServices.mockResolvedValue(true);
+      GoogleSignin.signIn.mockResolvedValue({ type: 'success', data: { user: { email: 'u@g.com' } } });
+      GoogleSignin.getTokens.mockRejectedValue(Object.assign(new Error('no user'), { code: 'getTokens' }));
+
+      await expect(signIn()).rejects.toThrow('auth_failed');
+    });
+
+    it('throws when signIn is cancelled (older library versions reject)', async () => {
       GoogleSignin.hasPlayServices.mockResolvedValue(true);
       const cancelError = new Error('cancelled');
       cancelError.code = statusCodes.SIGN_IN_CANCELLED;

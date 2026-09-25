@@ -39,16 +39,30 @@ export const getValidAccessToken = async () => {
  * @returns {Promise<string>} Access token
  */
 export const signIn = async () => {
+  let response;
   try {
     await GoogleSignin.hasPlayServices({ showPlayServicesUpdateDialog: true });
-    await GoogleSignin.signIn();
-    const { accessToken } = await GoogleSignin.getTokens();
-    return accessToken;
+    response = await GoogleSignin.signIn();
   } catch (error) {
     console.error('[GoogleSignIn] signIn error:', JSON.stringify(error), 'code:', error?.code, 'message:', error?.message);
+    // Older versions of the library rejected a dismissed picker.
     if (error?.code === statusCodes.SIGN_IN_CANCELLED) {
       throw new Error('sign_in_cancelled');
     }
+    throw new Error('auth_failed');
+  }
+  // Since v13 a dismissed picker RESOLVES with { type: 'cancelled' } instead of
+  // rejecting. Ignored, the flow went on to getTokens(): with nobody signed in
+  // that failed and the user saw "sign-in failed" for their own cancel; with a
+  // stale session it quietly carried on with the old (possibly revoked) token.
+  if (response?.type === 'cancelled') {
+    throw new Error('sign_in_cancelled');
+  }
+  try {
+    const { accessToken } = await GoogleSignin.getTokens();
+    return accessToken;
+  } catch (error) {
+    console.error('[GoogleSignIn] getTokens error:', error?.code, error?.message);
     throw new Error('auth_failed');
   }
 };
