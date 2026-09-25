@@ -463,15 +463,29 @@ const useOperationForm = ({
           }
         }
       } else if (data.amount && data.exchangeRate) {
-        // Recompute synchronously so a save before the async useEffect resolves
-        // never stores a destinationAmount that is inconsistent with amount × rate.
-        const recomputed = Currency.convertAmount(
-          data.amount,
-          sourceAccount.currency,
-          destinationAccount.currency,
-          data.exchangeRate,
-        );
-        if (recomputed) data.destinationAmount = recomputed;
+        // An edit that left the money alone (a label, the date) keeps the
+        // destination amount as stored. The stored rate is a 6-decimal rounding
+        // of what the user typed, so re-deriving the amount from it drifted: a
+        // 1,000,000 AMD → 2,564.10 USD transfer re-saved as 2,564.00 and the
+        // USD account silently lost 0.10.
+        const moneyUntouched = !isNew && operation && lastEditedField == null
+          && data.destinationAmount
+          && Currency.isValid(String(data.amount))
+          && Currency.compare(data.amount, String(operation.amount ?? '')) === 0
+          && String(data.exchangeRate) === String(operation.exchangeRate ?? '')
+          && String(data.accountId) === String(operation.accountId)
+          && String(data.toAccountId) === String(operation.toAccountId);
+        if (!moneyUntouched) {
+          // Recompute synchronously so a save before the async useEffect resolves
+          // never stores a destinationAmount that is inconsistent with amount × rate.
+          const recomputed = Currency.convertAmount(
+            data.amount,
+            sourceAccount.currency,
+            destinationAccount.currency,
+            data.exchangeRate,
+          );
+          if (recomputed) data.destinationAmount = recomputed;
+        }
       }
     } else if (isForeignCurrencyOp && sourceAccount && values.operationCurrency) {
       data.sourceCurrency = values.operationCurrency;
