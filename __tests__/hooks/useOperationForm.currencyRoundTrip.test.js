@@ -44,6 +44,37 @@ const makeProps = (overrides = {}) => ({
 });
 
 describe('useOperationForm — saving multi-currency operations', () => {
+  // Switching a foreign-currency expense back to the account currency cleared
+  // its rate and destination amount but left source/destination currency on the
+  // row, which the next open read as a foreign operation with an empty amount.
+  describe('foreign-currency expense switched back to the account currency', () => {
+    const foreignExpense = {
+      id: 'op-fx', type: 'expense', amount: '244.00', destinationAmount: '263.52', exchangeRate: '1.08',
+      sourceCurrency: 'EUR', destinationCurrency: 'USD', accountId: 'acc-usd', categoryId: 'cat-1',
+      date: '2024-01-15', description: '',
+    };
+
+    it('clears the currency pair along with the rate', async () => {
+      const props = makeProps({ operation: foreignExpense, isNew: false });
+      const { result } = await renderHook(() => useOperationForm(props));
+      await waitFor(() => expect(result.current.values.operationCurrency).toBe('EUR'));
+
+      await act(async () => {
+        result.current.setValues(v => ({ ...v, operationCurrency: 'USD', amount: '250' }));
+      });
+      await waitFor(() => expect(result.current.isForeignCurrencyOp).toBe(false));
+      await waitFor(() => expect(result.current.values.exchangeRate).toBe(''));
+      await act(async () => {
+        await result.current.handleSave();
+      });
+
+      const payload = props.updateOperation.mock.calls[0][1];
+      expect(payload.amount).toBe('250.00');
+      expect(payload.sourceCurrency).toBeNull();
+      expect(payload.destinationCurrency).toBeNull();
+    });
+  });
+
   // The rate is stored rounded to 6 decimals, so re-deriving the destination
   // from it on a save that changed no money moved the destination balance.
   describe('cross-currency transfer', () => {

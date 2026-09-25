@@ -530,6 +530,14 @@ const useOperationForm = ({
         data.destinationAmount = formForeignAmount;  // foreign currency
         data.exchangeRate = Currency.invertRate(displayRate);
       }
+    } else if (sourceAccount && (data.type !== 'transfer' || destinationAccount)) {
+      // A plain operation in the account's own currency carries no currency
+      // pair. Left out, an edit that switched a foreign-currency expense back to
+      // the account currency kept its old source/destination currencies next to
+      // a cleared rate and amount, and the next open read the row as a foreign
+      // operation with an empty amount that could not be saved.
+      data.sourceCurrency = null;
+      data.destinationCurrency = null;
     }
 
     // Ensure amount is preserved when editing
