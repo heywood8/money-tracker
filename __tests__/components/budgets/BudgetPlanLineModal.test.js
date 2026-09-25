@@ -682,6 +682,20 @@ describe('BudgetPlanLineModal', () => {
         }));
       });
 
+      // The same digits retyped under the new chip are meant in that currency:
+      // the flag follows typing, not the value.
+      it('marks an amount retyped with the same digits as priced in the new currency', async () => {
+        const props = editProps();
+        const { getByTestId } = await render(<BudgetPlanLineModal {...props} />);
+        await waitFor(() => expect(getByTestId('plan-line-currency-USD')).toBeTruthy());
+        await fireEvent.press(getByTestId('plan-line-currency-USD'));
+        await fireEvent.changeText(getByTestId('plan-line-amount'), '250');
+        await fireEvent.press(getByTestId('plan-line-save'));
+        expect(props.onSaveLine).toHaveBeenCalledWith(expect.objectContaining({
+          amount: '250', currency: 'USD', amountInNewCurrency: true,
+        }));
+      });
+
       it('leaves an untouched amount to be converted', async () => {
         const props = editProps();
         const { getByTestId } = await render(<BudgetPlanLineModal {...props} />);
