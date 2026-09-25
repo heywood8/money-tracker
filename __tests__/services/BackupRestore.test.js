@@ -1390,26 +1390,32 @@ language,en,
   // away every queued item with a resolved account, and the processed
   // signatures kept them from ever being queued again.
   describe('restore keeps the bank-notification review queue', () => {
+    // The live row joined with its account, as the preservation read returns it.
     const queued = {
       id: 'p1', kind: 'PURCHASE', type: 'expense', amount: '1000', currency: 'AMD', card_mask: '4083***7027',
-      merchant: 'NEW BAKERY', country: 'AM', date: '2026-06-28', time: '09:10', account_id: 1,
+      merchant: 'NEW BAKERY', country: 'AM', date: '2026-06-28', time: '09:10', account_id: 2,
       category_id: 'gone-category', package_name: 'am.bank', raw: 'PURCHASE | 1,000.00 AMD',
       latitude: null, longitude: null, force_added: 0, created_at: '2026-06-28T05:10:00.000Z',
+      account_name: 'Card', account_currency: 'AMD',
     };
 
     const restoreCapturing = async ({ liveAccountExists, liveSigs, restoredSigs }) => {
-      const runAsync = jest.fn().mockResolvedValue({ lastInsertRowId: 1 });
+      const runAsync = jest.fn().mockResolvedValue({ lastInsertRowId: 1, changes: 1 });
       const tx = {
         runAsync,
         getAllAsync: jest.fn(async (sql) => {
-          if (sql === 'SELECT * FROM pending_notifications') return [queued];
+          if (sql.includes('FROM pending_notifications p')) return [queued];
           if (sql.includes("key = 'bank_notifications_processed_sigs'")) {
             return liveSigs ? [{ value: JSON.stringify(liveSigs) }] : [];
           }
           return [];
         }),
-        getFirstAsync: jest.fn(async (sql) => {
-          if (sql.startsWith('SELECT id FROM accounts WHERE id = ?')) return liveAccountExists ? { id: 1 } : null;
+        getFirstAsync: jest.fn(async (sql, params) => {
+          // Ids are reassigned by the restore: the account is found by name and
+          // currency, under whatever id it now has.
+          if (sql.startsWith('SELECT id FROM accounts WHERE name = ?')) {
+            return liveAccountExists && params[0] === 'Card' && params[1] === 'AMD' ? { id: 5 } : null;
+          }
           if (sql.includes("key = 'bank_notifications_processed_sigs'")) {
             return restoredSigs ? { value: JSON.stringify(restoredSigs) } : null;
           }
@@ -1426,11 +1432,11 @@ language,en,
       return runAsync.mock.calls;
     };
 
-    it('puts queued items back, keeping an account that still exists', async () => {
+    it('puts queued items back on the same account under its new id', async () => {
       const calls = await restoreCapturing({ liveAccountExists: true });
       const insert = calls.find(([sql]) => sql.includes('INSERT OR IGNORE INTO pending_notifications'));
       expect(insert[1][0]).toBe('p1');
-      expect(insert[1][10]).toBe(1);        // account_id kept
+      expect(insert[1][10]).toBe(5);        // the restored account, not the stale id 2
       expect(insert[1][11]).toBeNull();     // category the restored set lacks, left for review
     });
 

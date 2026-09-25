@@ -746,7 +746,11 @@ export const restoreBackup = async (backup, cancelToken) => {
       // list says those notifications were handled, so they are never queued
       // again — transactions the user was asked to review, gone. Kept with the
       // signatures this device has already handled (merged back below).
-      const preservedPending = await readPreserved('SELECT * FROM pending_notifications');
+      const preservedPending = await readPreserved(
+        `SELECT p.*, a.name AS account_name, a.currency AS account_currency
+           FROM pending_notifications p
+           LEFT JOIN accounts a ON a.id = p.account_id AND a.deleted_at IS NULL`,
+      );
       const liveProcessedSigs = await readPreserved(
         "SELECT value FROM app_metadata WHERE key = 'bank_notifications_processed_sigs'",
       );
@@ -1697,10 +1701,16 @@ export const restoreBackup = async (backup, cancelToken) => {
         let keptPending = 0;
         for (const item of preservedPending) {
           if (!item.id) continue;
-          const account = item.account_id != null
-            ? await db.getFirstAsync('SELECT id FROM accounts WHERE id = ? AND deleted_at IS NULL', [item.account_id])
+          // Ids are reassigned by a restore, so the live account is found again
+          // by what identifies it to the user: its name and currency. No such
+          // account in the restored set leaves the item for the user to place.
+          const account = item.account_name
+            ? await db.getFirstAsync(
+              'SELECT id FROM accounts WHERE name = ? AND currency = ? AND deleted_at IS NULL ORDER BY id LIMIT 1',
+              [item.account_name, item.account_currency],
+            )
             : null;
-          await db.runAsync(
+          const inserted = await db.runAsync(
             `INSERT OR IGNORE INTO pending_notifications
               (id, kind, type, amount, currency, card_mask, merchant, country, date, time, account_id, category_id, package_name, raw, latitude, longitude, force_added, created_at)
              VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
@@ -1712,8 +1722,8 @@ export const restoreBackup = async (backup, cancelToken) => {
               item.package_name ?? null, item.raw ?? null, item.latitude ?? null, item.longitude ?? null,
               item.force_added ? 1 : 0, item.created_at || new Date().toISOString(),
             ],
-          ).catch((e) => { console.warn('Skipping preserved review item:', e.message); });
-          keptPending += 1;
+          ).catch((e) => { console.warn('Skipping preserved review item:', e.message); return null; });
+          if (inserted && inserted.changes !== 0) keptPending += 1;
         }
         console.log(`Preserved ${keptPending} queued bank notifications`);
       }
