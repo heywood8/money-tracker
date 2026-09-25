@@ -115,6 +115,7 @@
   "category_type_required": "카테고리 유형(지출/수입)은 필수입니다",
   "icon_required": "아이콘은 필수입니다",
   "cannot_change_to_entry_with_children": "하위 카테고리가 있는 동안 항목 유형으로 변경할 수 없습니다",
+  "cannot_change_category_type_in_use": "하위 카테고리나 거래가 있는 카테고리의 유형은 변경할 수 없습니다",
   "amount_must_be_greater_than_zero": "금액은 0보다 커야 합니다",
   "period_type_required": "기간 유형은 필수입니다",
   "start_date_required": "시작 날짜는 필수입니다",

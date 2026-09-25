@@ -115,6 +115,7 @@
   "category_type_required": "Il tipo di categoria (uscita/entrata) è obbligatorio",
   "icon_required": "L'icona è obbligatoria",
   "cannot_change_to_entry_with_children": "Impossibile cambiare al tipo voce mentre la categoria ha sottocategorie",
+  "cannot_change_category_type_in_use": "Impossibile cambiare il tipo di una categoria che ha sottocategorie o operazioni",
   "amount_must_be_greater_than_zero": "L'importo deve essere maggiore di zero",
   "period_type_required": "Il tipo di periodo è obbligatorio",
   "start_date_required": "La data di inizio è obbligatoria",

@@ -115,6 +115,7 @@
   "category_type_required": "Kategorietyp (Ausgabe/Einnahme) erforderlich",
   "icon_required": "Symbol erforderlich",
   "cannot_change_to_entry_with_children": "Kann nicht zu Eintragstyp geändert werden, solange die Kategorie Unterkategorien hat",
+  "cannot_change_category_type_in_use": "Der Typ einer Kategorie mit Unterkategorien oder Buchungen kann nicht geändert werden",
   "amount_must_be_greater_than_zero": "Betrag muss größer als Null sein",
   "period_type_required": "Zeitraumtyp erforderlich",
   "start_date_required": "Startdatum erforderlich",

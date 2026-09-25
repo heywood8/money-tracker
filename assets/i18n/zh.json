@@ -115,6 +115,7 @@
   "category_type_required": "需要类别类型（支出/收入）",
   "icon_required": "需要图标",
   "cannot_change_to_entry_with_children": "类别有子类别时无法更改为条目类型",
+  "cannot_change_category_type_in_use": "无法更改含有子类别或交易的类别的类型",
   "amount_must_be_greater_than_zero": "金额必须大于零",
   "period_type_required": "需要期间类型",
   "start_date_required": "需要开始日期",

@@ -115,6 +115,7 @@
   "category_type_required": "Tipo de categoría (gasto/ingreso) requerido",
   "icon_required": "Icono requerido",
   "cannot_change_to_entry_with_children": "No se puede cambiar a tipo de entrada mientras la categoría tiene subcategorías",
+  "cannot_change_category_type_in_use": "No se puede cambiar el tipo de una categoría que tiene subcategorías u operaciones",
   "amount_must_be_greater_than_zero": "La cantidad debe ser mayor que cero",
   "period_type_required": "Tipo de periodo requerido",
   "start_date_required": "Fecha de inicio requerida",

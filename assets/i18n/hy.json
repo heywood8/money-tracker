@@ -115,6 +115,7 @@
   "category_type_required": "Կատեգորիայի տեսակը (ծախս/եկամուտ) պարտադիր է",
   "icon_required": "Պատկերակը պարտադիր է",
   "cannot_change_to_entry_with_children": "Հնարավոր չէ փոխել գրառման տեսակի, երբ կատեգորիան ունի ենթակատեգորիաներ",
+  "cannot_change_category_type_in_use": "Հնարավոր չէ փոխել ենթակատեգորիաներ կամ գործարքներ ունեցող կատեգորիայի տեսակը",
   "amount_must_be_greater_than_zero": "Գումարը պետք է լինի զրոյից մեծ",
   "period_type_required": "Ժամանակահատվածի տեսակը պարտադիր է",
   "start_date_required": "Սկսելու ամսաթիվը պարտադիր է",

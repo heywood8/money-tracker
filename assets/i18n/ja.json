@@ -115,6 +115,7 @@
   "category_type_required": "カテゴリータイプ（支出/収入）は必須です",
   "icon_required": "アイコンは必須です",
   "cannot_change_to_entry_with_children": "サブカテゴリーがある場合、エントリータイプに変更できません",
+  "cannot_change_category_type_in_use": "サブカテゴリや取引があるカテゴリの種類は変更できません",
   "amount_must_be_greater_than_zero": "金額はゼロより大きい必要があります",
   "period_type_required": "期間タイプは必須です",
   "start_date_required": "開始日は必須です",

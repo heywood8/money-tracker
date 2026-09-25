@@ -115,6 +115,7 @@
   "category_type_required": "Необходимо указать тип категории (расход/доход)",
   "icon_required": "Необходимо выбрать иконку",
   "cannot_change_to_entry_with_children": "Невозможно изменить тип на запись, пока категория имеет подкатегории",
+  "cannot_change_category_type_in_use": "Нельзя изменить тип категории, у которой есть подкатегории или операции",
   "amount_must_be_greater_than_zero": "Сумма должна быть больше нуля",
   "period_type_required": "Необходимо выбрать тип периода",
   "start_date_required": "Необходимо указать дату начала",

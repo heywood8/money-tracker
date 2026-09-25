@@ -115,6 +115,7 @@
   "category_type_required": "Type de catégorie (dépense/revenu) requis",
   "icon_required": "Icône requise",
   "cannot_change_to_entry_with_children": "Impossible de changer en type d'entrée tant que la catégorie a des sous-catégories",
+  "cannot_change_category_type_in_use": "Impossible de modifier le type d'une catégorie qui a des sous-catégories ou des opérations",
   "amount_must_be_greater_than_zero": "Le montant doit être supérieur à zéro",
   "period_type_required": "Type de période requis",
   "start_date_required": "Date de début requise",

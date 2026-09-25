@@ -25,6 +25,7 @@ import LoadingView from '../components/LoadingView';
 import { useLocalization } from '../contexts/LocalizationContext';
 import { useDialog } from '../contexts/DialogContext';
 import { useCategories } from '../contexts/CategoriesContext';
+import { countCategoryUsage } from '../services/CategoriesDB';
 import IconPicker from '../components/IconPicker';
 import { makeModalStyles, modalSharedStyles } from '../styles/modalStyles';
 
@@ -241,6 +242,26 @@ const CategoriesScreen = ({ onBackStateChange }) => {
     if (!formEditingCategory?.id) return false;
     return categories.some(cat => cat.parentId === formEditingCategory.id);
   }, [formEditingCategory, categories]);
+
+  // Operations booked to the category being edited. Its expense/income type is
+  // locked while it has any (or any subcategory): switching only this row left
+  // the children unreachable in every picker and the operations of the other
+  // type. Unknown (null) until counted, and treated as in use meanwhile.
+  const [editingUsageCount, setEditingUsageCount] = useState(null);
+  useEffect(() => {
+    const id = formEditingCategory?.id;
+    if (!id) {
+      setEditingUsageCount(null);
+      return undefined;
+    }
+    let cancelled = false;
+    setEditingUsageCount(null);
+    countCategoryUsage(id)
+      .then(count => { if (!cancelled) setEditingUsageCount(count); })
+      .catch(() => { if (!cancelled) setEditingUsageCount(null); });
+    return () => { cancelled = true; };
+  }, [formEditingCategory]);
+  const categoryTypeLocked = !formIsNew && (hasChildren || editingUsageCount !== 0);
 
   const CATEGORY_TYPES = useMemo(() => [
     { key: 'expense', label: t('expense') },
@@ -590,21 +611,39 @@ const CategoriesScreen = ({ onBackStateChange }) => {
                 <FlatList
                   data={CATEGORY_TYPES}
                   keyExtractor={item => item.key}
-                  renderItem={({ item }) => (
-                    <Pressable
-                      onPress={() => {
-                        setFormValues(v => ({ ...v, category_type: item.key, parentId: null }));
-                        handleClosePicker();
-                      }}
-                      style={({ pressed }) => [
-                        styles.pickerOption,
-                        { borderColor: colors.border },
-                        pressed && { backgroundColor: colors.selected },
-                      ]}
-                    >
-                      <Text style={themed.pickerItemText}>{item.label}</Text>
-                    </Pressable>
-                  )}
+                  renderItem={({ item }) => {
+                    const originalType = formEditingCategory
+                      ? (formEditingCategory.category_type || formEditingCategory.categoryType)
+                      : null;
+                    const isDisabled = categoryTypeLocked && item.key !== originalType;
+                    return (
+                      <Pressable
+                        testID={`category-type-option-${item.key}`}
+                        onPress={() => {
+                          if (isDisabled) {
+                            showDialog(
+                              t('error'),
+                              t('cannot_change_category_type_in_use') || 'Cannot change the type of a category that has subcategories or operations',
+                              [{ text: t('ok') }],
+                            );
+                            return;
+                          }
+                          setFormValues(v => ({ ...v, category_type: item.key, parentId: null }));
+                          handleClosePicker();
+                        }}
+                        style={({ pressed }) => [
+                          styles.pickerOption,
+                          { borderColor: colors.border },
+                          pressed && !isDisabled && { backgroundColor: colors.selected },
+                          isDisabled && styles.disabledOption,
+                        ]}
+                      >
+                        <Text style={[themed.pickerItemText, isDisabled && { color: colors.mutedText }]}>
+                          {item.label}{isDisabled && ' ⚠️'}
+                        </Text>
+                      </Pressable>
+                    );
+                  }}
                 />
               )}
 

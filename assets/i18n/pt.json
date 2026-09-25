@@ -115,6 +115,7 @@
   "category_type_required": "Tipo de categoria (gasto/receita) é obrigatório",
   "icon_required": "Ícone é obrigatório",
   "cannot_change_to_entry_with_children": "Não é possível alterar para tipo de entrada enquanto a categoria tem subcategorias",
+  "cannot_change_category_type_in_use": "Não é possível alterar o tipo de uma categoria que tem subcategorias ou operações",
   "amount_must_be_greater_than_zero": "O valor deve ser maior que zero",
   "period_type_required": "Tipo de período é obrigatório",
   "start_date_required": "Data de início é obrigatória",
