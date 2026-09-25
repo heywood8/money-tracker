@@ -167,13 +167,20 @@ describe('services/sentry', () => {
     // description, a merchant or an account name.
     it('scrubs money and free-text fields of a logged object, whatever their size', () => {
       const { mod } = loadWith({ dsn: DSN });
-      const line = 'adjust: {"accountId":7,"newBalance":"950","description":"Rent to John Smith","amount":12,"name":"Main card","merchant":"YANDEX.GO"}';
+      const line = 'adjust: {"accountId":7,"newBalance":"950","description":"Rent to John Smith","amount":12,"accountName":"Main card","card_mask":"4083***7027","merchant":"YANDEX.GO"}';
       const out = mod.redactText(line);
-      expect(out).not.toMatch(/950|John|Main card|YANDEX/);
+      expect(out).not.toMatch(/950|John|Main card|4083|YANDEX/);
       expect(out).toContain('"newBalance":"[redacted]"');
       expect(out).toContain('"description":"[redacted]"');
       expect(out).toContain('"amount":"[redacted]"');
       expect(out).toContain('"accountId":7');
+    });
+
+    // Matching by whole word keeps the fields a crash report is read by.
+    it('keeps diagnostic keys whose names merely contain a sensitive word', () => {
+      const { mod } = loadWith({ dsn: DSN });
+      const line = '{"packageName":"com.idamob.tinkoff","name":"TypeError","context":"restore","tableName":"operations","withdrawalCount":3}';
+      expect(mod.redactText(line)).toBe(line);
     });
 
     it('scrubs email / PII addresses', () => {
