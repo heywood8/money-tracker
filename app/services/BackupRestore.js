@@ -1919,6 +1919,29 @@ export const readCarriedNotificationData = async (sourceDb, tablesInFile) => {
 };
 
 /**
+ * Refuse a `.db` file that is not a Penny database.
+ *
+ * Migrating a file creates every table it lacks, empty — that is the
+ * fresh-install path. So any SQLite file (another app's database, a browser
+ * `.sqlite`, an empty file) came out of migration as an empty Penny schema,
+ * restoreBackup cleared every live table to match it, and the import reported
+ * success over a wiped database. The CSV and Sheets importers already refuse a
+ * source missing its core sections; this is the same guard for `.db`, and it
+ * must run on the table list read BEFORE migrating.
+ *
+ * @param {Set<string>} tablesInFile - table names the file held before migration
+ * @throws {Error} when accounts, categories or operations is missing
+ */
+export const assertPennyDatabaseTables = (tablesInFile) => {
+  const missing = ['accounts', 'categories', 'operations'].filter(name => !tablesInFile.has(name));
+  if (missing.length > 0) {
+    throw new Error(
+      `Invalid backup format: not a Penny database (missing table${missing.length > 1 ? 's' : ''}: ${missing.join(', ')})`,
+    );
+  }
+};
+
+/**
  * Import backup from SQLite database file
  * @param {string} fileUri - File URI
  * @param {{ cancelled: boolean }} [cancelToken]
@@ -1982,6 +2005,7 @@ const importBackupSQLite = async (fileUri, cancelToken) => {
       ((await tempDb.getAllAsync("SELECT name FROM sqlite_master WHERE type = 'table'")) || [])
         .map(row => row.name),
     );
+    assertPennyDatabaseTables(tablesInFile);
 
     // A migration that aborts throws, and the import must stop right there: the
     // newer tables would be missing, every optional-table read below would log

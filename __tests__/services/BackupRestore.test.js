@@ -1379,6 +1379,25 @@ language,en,
   // bindings and templates to match. (importBackupSQLite itself loads its
   // modules with dynamic import(), which this Jest setup cannot run, so the
   // extraction step is tested through readCarriedNotificationData.)
+  // Migrating a file creates every table it lacks, so any SQLite file came out
+  // as an empty Penny schema and the restore wiped the live database while
+  // reporting success. The table list is checked before migrating.
+  describe('SQLite (.db) import of a non-Penny file', () => {
+    it('refuses a file without the core tables', () => {
+      expect(() => BackupRestore.assertPennyDatabaseTables(new Set()))
+        .toThrow('not a Penny database (missing tables: accounts, categories, operations)');
+      expect(() => BackupRestore.assertPennyDatabaseTables(new Set(['moz_places', 'accounts'])))
+        .toThrow('missing tables: categories, operations');
+      expect(() => BackupRestore.assertPennyDatabaseTables(new Set(['accounts', 'categories'])))
+        .toThrow('missing table: operations');
+    });
+
+    it('accepts the oldest Penny schema', () => {
+      const oldest = new Set(['accounts', 'app_metadata', 'budgets', 'categories', 'operations']);
+      expect(() => BackupRestore.assertPennyDatabaseTables(oldest)).not.toThrow();
+    });
+  });
+
   describe('SQLite (.db) import of notification data', () => {
     const olderFileTables = new Set(['accounts', 'categories', 'operations', 'budgets', 'app_metadata']);
     const newerFileTables = new Set([...olderFileTables, 'notification_merchant_rules', 'notification_templates']);
