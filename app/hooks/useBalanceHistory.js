@@ -35,10 +35,11 @@ const OPENING_RECONCILE_TOLERANCE = 1;
  * whole path, the end and the opening included.
  *
  * The walk only means anything if the day's operations are the ones that day's
- * snapshot was written from, and they are not always: a snapshot is only ever
- * written under *today's* date, so an operation back-dated into the day (entered
- * or edited later) is in the delta list but not in the balance it is subtracted
- * from. Undoing it would invent a balance the account never held — and one that
+ * snapshot was written from, and they are not always: snapshots written before
+ * back-dated changes were carried into past rows (and hand-edited calendar
+ * values) can miss an operation back-dated into the day, which is then in the
+ * delta list but not in the balance it is subtracted from. Undoing it would
+ * invent a balance the account never held — and one that
  * is higher than the close by construction, so it would become the day-zero point
  * and drag the whole y-axis with it. `openingBalance` — the last snapshot before
  * the day — is the check: when the walk does not land back on it, the operations

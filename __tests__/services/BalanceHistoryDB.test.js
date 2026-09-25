@@ -20,7 +20,57 @@ jest.mock('../../app/services/AccountsDB', () => ({
 jest.mock('../../app/services/currency', () => ({
   add: jest.fn((a, b) => String(parseFloat(a) + parseFloat(b))),
   subtract: jest.fn((a, b) => String(parseFloat(a) - parseFloat(b))),
+  isZero: jest.fn((a) => parseFloat(a) === 0),
 }));
+
+/** The local day `offset` days from today, as the snapshots store it. */
+const dayFromToday = (offset) => {
+  const d = new Date();
+  d.setDate(d.getDate() + offset);
+  return BalanceHistoryDB.formatDate(d);
+};
+
+/**
+ * A transaction handle over in-memory accounts, operations and snapshots: just
+ * the statements applyPastBalanceChanges and calculateBalanceOnDate issue.
+ */
+const makeHistoryDb = ({ accounts, operations = [], history }) => {
+  let nextId = history.reduce((max, row) => Math.max(max, row.id), 0) + 1;
+  return {
+    history,
+    getAllAsync: jest.fn(async (sql, params) => {
+      if (sql.includes('FROM accounts_balance_history')) {
+        const [accountId, from, to] = params;
+        return history.filter(r => r.account_id === accountId && r.date >= from && r.date < to);
+      }
+      if (sql.includes('FROM accounts WHERE id')) {
+        return accounts.filter(a => String(a.id) === String(params[0]));
+      }
+      if (sql.includes('FROM operations')) {
+        const [accountId, , after] = params;
+        return operations.filter(o => (String(o.account_id) === String(accountId)
+          || String(o.to_account_id) === String(accountId)) && o.date > after);
+      }
+      return [];
+    }),
+    getFirstAsync: jest.fn(async (sql, params) => {
+      if (sql.includes('FROM accounts WHERE id')) {
+        return accounts.find(a => String(a.id) === String(params[0])) || null;
+      }
+      if (sql.includes('FROM accounts_balance_history')) {
+        return history.find(r => r.account_id === params[0] && r.date === params[1]) || null;
+      }
+      return null;
+    }),
+    runAsync: jest.fn(async (sql, params) => {
+      if (sql.startsWith('UPDATE accounts_balance_history')) {
+        history.find(r => r.id === params[1]).balance = params[0];
+      } else if (sql.includes('INSERT OR IGNORE INTO accounts_balance_history')) {
+        history.push({ id: nextId++, account_id: params[0], date: params[1], balance: params[2] });
+      }
+    }),
+  };
+};
 
 describe('BalanceHistoryDB', () => {
   beforeEach(() => {
@@ -46,6 +96,75 @@ describe('BalanceHistoryDB', () => {
     it('handles end of year dates', async () => {
       const date = new Date(2024, 11, 31); // December 31, 2024
       expect(BalanceHistoryDB.formatDate(date)).toBe('2024-12-31');
+    });
+  });
+
+  // Snapshots were only written under today's date, so an operation booked for
+  // an earlier day never reached the rows the chart draws that day from.
+  describe('applyPastBalanceChanges', () => {
+    it('moves every snapshot from the operation day to yesterday, and leaves earlier ones and today alone', async () => {
+      const db = makeHistoryDb({
+        accounts: [{ id: 1, balance: '800' }],
+        history: [
+          { id: 1, account_id: 1, date: dayFromToday(-10), balance: '1000' },
+          { id: 2, account_id: 1, date: dayFromToday(-5), balance: '1000' },
+          { id: 3, account_id: 1, date: dayFromToday(-1), balance: '1000' },
+          { id: 4, account_id: 1, date: dayFromToday(0), balance: '800' },
+        ],
+      });
+
+      await BalanceHistoryDB.applyPastBalanceChanges(db, [{ accountId: 1, date: dayFromToday(-5), delta: '-200' }]);
+
+      expect(db.history.map(r => r.balance)).toEqual(['1000', '800', '800', '800']);
+    });
+
+    it('adds a snapshot on the operation day when it has none, read from the ledger', async () => {
+      const db = makeHistoryDb({
+        accounts: [{ id: 1, balance: '800' }],
+        history: [
+          { id: 1, account_id: 1, date: dayFromToday(-10), balance: '1000' },
+          { id: 2, account_id: 1, date: dayFromToday(0), balance: '800' },
+        ],
+      });
+
+      await BalanceHistoryDB.applyPastBalanceChanges(db, [{ accountId: 1, date: dayFromToday(-3), delta: '-200' }]);
+
+      expect(db.history).toContainEqual(expect.objectContaining({ account_id: 1, date: dayFromToday(-3), balance: '800' }));
+    });
+
+    it('shifts only the days between an operation\'s old and new date when just its date moves', async () => {
+      const db = makeHistoryDb({
+        accounts: [{ id: 1, balance: '800' }],
+        history: [
+          { id: 1, account_id: 1, date: dayFromToday(-8), balance: '800' },
+          { id: 2, account_id: 1, date: dayFromToday(-4), balance: '800' },
+          { id: 3, account_id: 1, date: dayFromToday(-1), balance: '800' },
+        ],
+      });
+
+      // The expense (-200) moved from 8 days ago to 2 days ago.
+      await BalanceHistoryDB.applyPastBalanceChanges(db, [
+        { accountId: 1, date: dayFromToday(-8), delta: '200' },
+        { accountId: 1, date: dayFromToday(-2), delta: '-200' },
+      ]);
+
+      expect(db.history.find(r => r.id === 1).balance).toBe('1000');
+      expect(db.history.find(r => r.id === 2).balance).toBe('1000');
+      expect(db.history.find(r => r.id === 3).balance).toBe('800');
+    });
+
+    it('does nothing for today, a future day, a zero delta or a deleted account', async () => {
+      const db = makeHistoryDb({ accounts: [], history: [{ id: 1, account_id: 1, date: dayFromToday(-1), balance: '5' }] });
+
+      await BalanceHistoryDB.applyPastBalanceChanges(db, [
+        { accountId: 1, date: dayFromToday(0), delta: '-1' },
+        { accountId: 1, date: dayFromToday(3), delta: '-1' },
+        { accountId: 1, date: dayFromToday(-2), delta: '0' },
+        { accountId: 2, date: dayFromToday(-2), delta: '-1' },
+      ]);
+
+      expect(db.history).toHaveLength(1);
+      expect(db.history[0].balance).toBe('5');
     });
   });
 

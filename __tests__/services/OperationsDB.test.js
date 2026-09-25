@@ -12,6 +12,14 @@ jest.mock('../../app/services/db');
 jest.mock('../../app/services/currency');
 jest.mock('../../app/services/AccountsDB');
 jest.mock('../../app/defaults/defaultOperations');
+// The past-snapshot backfill has its own tests (BalanceHistoryDB.test.js); here
+// only the movements OperationsDB hands it are checked, so the DB call counts
+// these tests pin stay about the operation itself.
+jest.mock('../../app/services/BalanceHistoryDB', () => ({
+  ...jest.requireActual('../../app/services/BalanceHistoryDB'),
+  applyPastBalanceChanges: jest.fn(() => Promise.resolve()),
+}));
+import { applyPastBalanceChanges } from '../../app/services/BalanceHistoryDB';
 
 import * as AccountsDB from '../../app/services/AccountsDB';
 import getDefaultOperations from '../../app/defaults/defaultOperations';
@@ -446,6 +454,18 @@ describe('OperationsDB Service', () => {
       );
     });
 
+    it('hands a back-dated operation to the balance-history backfill', async () => {
+      mockDb.getFirstAsync.mockResolvedValue({ balance: '1000' });
+
+      await OperationsDB.createOperation({
+        type: 'expense', amount: '100', accountId: 'acc1', categoryId: 'cat1', date: '2025-12-05',
+      });
+
+      expect(applyPastBalanceChanges).toHaveBeenCalledWith(mockDb, [
+        { accountId: 'acc1', date: '2025-12-05', delta: '-100' },
+      ]);
+    });
+
     // A timestamped date fell out of every string date compare and stalled the
     // operations list's load-more (#773): only the calendar day is stored.
     it('stores only the calendar day of a timestamped date', async () => {
@@ -653,6 +673,25 @@ describe('OperationsDB Service', () => {
 
       // Should recalculate balance: reverse old (-(-100) = +100) + apply new (-200) = -100 net
       expect(Currency.add).toHaveBeenCalled();
+    });
+
+    // Past snapshots follow the edit: the old version leaves the days from its
+    // date on and the new one joins from its own, even when only the date moved.
+    it('hands the old and new versions to the balance-history backfill, each with its own date', async () => {
+      const oldOperation = {
+        id: 1, type: 'expense', amount: '100', account_id: 'acc1', category_id: 'cat1', date: '2025-12-05',
+      };
+      const updatedOperation = { ...oldOperation, date: '2025-12-12' };
+      mockDb.getFirstAsync
+        .mockResolvedValueOnce(oldOperation)
+        .mockResolvedValueOnce(updatedOperation);
+
+      await OperationsDB.updateOperation(1, { date: '2025-12-12' });
+
+      expect(applyPastBalanceChanges).toHaveBeenCalledWith(mockDb, [
+        { accountId: 'acc1', date: '2025-12-05', delta: '100' },
+        { accountId: 'acc1', date: '2025-12-12', delta: '-100' },
+      ]);
     });
 
     it('persists exclude_from_avg when the flag is toggled on', async () => {
@@ -995,6 +1034,11 @@ describe('OperationsDB Service', () => {
 
       // Should reverse balance change (expense was -100, so reverse is +100)
       expect(Currency.add).toHaveBeenCalledWith('900', '100');
+
+      // ...in the snapshots from the operation's own day on as well.
+      expect(applyPastBalanceChanges).toHaveBeenCalledWith(mockDb, [
+        { accountId: 'acc1', date: '2025-12-05', delta: '100' },
+      ]);
     });
 
     it('reverses transfer balance changes on delete', async () => {

@@ -13,7 +13,7 @@ const searchNormExpr = (columnExpr) =>
   isSearchNormAvailable() ? `SEARCH_NORM(${columnExpr})` : buildSearchNormSql(columnExpr);
 const normalizeSearchQuery = (text) => normalizeSearchText(text);
 import * as Currency from './currency';
-import { formatDate, updateTodayBalance } from './BalanceHistoryDB';
+import { formatDate, updateTodayBalance, applyPastBalanceChanges } from './BalanceHistoryDB';
 import * as AccountsDB from './AccountsDB';
 import { sumMoneySql } from './sqlMoney';
 import { formatLocalDate, toOperationDate, parseLocalDay } from '../utils/dateUtils';
@@ -463,6 +463,21 @@ export const getOperationsByType = async (type) => {
 };
 
 /**
+ * One operation's balance changes as dated movements for
+ * BalanceHistoryDB.applyPastBalanceChanges, optionally reversed.
+ *
+ * @param {Map<string, string>} changes - calculateBalanceChanges() result
+ * @param {string} date - the operation's date
+ * @param {boolean} [reverse]
+ * @returns {Array<{ accountId: *, date: string, delta: string }>}
+ */
+const datedMovements = (changes, date, reverse = false) => [...changes.entries()].map(([accountId, delta]) => ({
+  accountId,
+  date,
+  delta: reverse ? Currency.subtract('0', delta) : delta,
+}));
+
+/**
  * Calculate balance changes for an operation
  * Handles multi-currency transfers by using destination_amount when available.
  * When destination_amount is null on a transfer, queries account currencies to
@@ -608,6 +623,9 @@ export const createOperationInTx = async (db, operation) => {
 
     await updateTodayBalance(accountId, newBalance, db);
   }
+
+  // A back-dated operation also moves every snapshot from its day on.
+  await applyPastBalanceChanges(db, datedMovements(balanceChanges, operationData.date));
 
   return operationData;
 };
@@ -797,6 +815,14 @@ export const updateOperation = async (id, updates) => {
         // Update today's balance history
         await updateTodayBalance(accountId, newBalance, db);
       }
+
+      // Past snapshots: the old version leaves the days from its date on, the
+      // new one joins them from its own (a date-only edit shifts the days in
+      // between, though the balance itself is unchanged).
+      await applyPastBalanceChanges(db, [
+        ...datedMovements(oldChanges, oldOperation.date, true),
+        ...datedMovements(newChanges, newOperation.date),
+      ]);
     });
   } catch (error) {
     console.error('Failed to update operation:', error);
@@ -925,9 +951,12 @@ export const splitOperation = async (id, updates, newOperationData) => {
         }
       };
 
-      applyChanges(await calculateBalanceChanges(oldOperation, db), true);
-      applyChanges(await calculateBalanceChanges(updatedOperation, db), false);
-      applyChanges(await calculateBalanceChanges(createdOperation, db), false);
+      const oldSplitChanges = await calculateBalanceChanges(oldOperation, db);
+      const updatedSplitChanges = await calculateBalanceChanges(updatedOperation, db);
+      const createdSplitChanges = await calculateBalanceChanges(createdOperation, db);
+      applyChanges(oldSplitChanges, true);
+      applyChanges(updatedSplitChanges, false);
+      applyChanges(createdSplitChanges, false);
 
       // Step 5: update account balances and balance history
       const updateTime = new Date().toISOString();
@@ -952,6 +981,12 @@ export const splitOperation = async (id, updates, newOperationData) => {
 
         await updateTodayBalance(accountId, newBalance, db);
       }
+
+      await applyPastBalanceChanges(db, [
+        ...datedMovements(oldSplitChanges, oldOperation.date, true),
+        ...datedMovements(updatedSplitChanges, updatedOperation.date),
+        ...datedMovements(createdSplitChanges, createdOperation.date),
+      ]);
     });
 
     return createdOperation;
@@ -1016,6 +1051,8 @@ export const deleteOperation = async (id) => {
         // Update today's balance history
         await updateTodayBalance(accountId, newBalance, db);
       }
+
+      await applyPastBalanceChanges(db, datedMovements(balanceChanges, operation.date, true));
     });
   } catch (error) {
     console.error('Failed to delete operation:', error);
@@ -1442,11 +1479,11 @@ const getBalanceMovementsSince = async (sinceDate, currencyByAccountId) => {
  * booked after the date rather than from the balance-history snapshots the
  * Graphs chart reads, and that is deliberate:
  *
- * - Snapshots are only ever written under *today's* date
- *   (`BalanceHistoryDB.updateTodayBalance`), so a back-dated or retroactively
- *   edited operation never reaches the historical rows it belongs to. Walking
- *   the ledger reflects the corrections; the snapshots preserve whatever the app
- *   believed at the time.
+ * - Snapshots can disagree with the ledger. Back-dated changes are now carried
+ *   into the past rows (`BalanceHistoryDB.applyPastBalanceChanges`), but rows
+ *   written before that, hand-edited calendar values and restored histories keep
+ *   whatever the app believed at the time. Walking the ledger reflects every
+ *   correction.
  * - An account with no snapshot on or before the date contributes nothing to a
  *   snapshot-based reading, which turns "I added an account" into a jump in net
  *   worth. Here a newly added account simply has no operations to reverse, so it
