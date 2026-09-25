@@ -59,6 +59,20 @@ describe('resolveNotification', () => {
       expect(await resolver.resolveAccountId(descriptor)).toBe(1);
     });
 
+    // "Покупка на 10 $, счет RUB": the charge is in USD, the account in RUB.
+    // The account is found by the account's currency, not the charge's.
+    it('finds a card-less account by the account currency hint, not the charge currency', async () => {
+      AccountsDB.getAllAccounts.mockResolvedValue([
+        { id: 1, currency: 'RUB', hidden: 0 },
+        { id: 2, currency: 'USD', hidden: 0 },
+      ]);
+      const foreign = {
+        ...cardless, amount: '10', currency: 'USD', accountCurrencyHint: 'RUB',
+      };
+      expect(await resolver.resolveAccountId(foreign)).toBe(1);
+      expect(resolveAccountBinding).toHaveBeenCalledWith('com.idamob.tinkoff.android', 'RUB');
+    });
+
     it('does not guess when multiple accounts share the currency', async () => {
       AccountsDB.getAllAccounts.mockResolvedValue([
         { id: 1, currency: 'AMD', hidden: 0 },

@@ -23,6 +23,29 @@ const TINKOFF_PAYMENT = {
 };
 
 describe('Tinkoff notification parser', () => {
+  // The "счет RUB" code used to replace the charge's own currency, so a
+  // purchase in dollars was booked as that many rubles.
+  describe('a charge in a currency other than the account\'s', () => {
+    const parse = (text) => parseBankNotification({
+      title: 'Amazon', text, packageName: 'com.idamob.tinkoff.android', postTime: 1782000900000,
+    });
+
+    it('keeps the charge currency and names the account currency separately', () => {
+      const result = parse('Покупка на 10 $, счет RUB. Доступно 39 000 ₽');
+      expect(result).toEqual(expect.objectContaining({ amount: '10', currency: 'USD', accountCurrencyHint: 'RUB' }));
+    });
+
+    it('reads an ISO code after the amount the same way', () => {
+      const result = parse('Покупка на 15,50 EUR, счет RUB');
+      expect(result).toEqual(expect.objectContaining({ amount: '15.50', currency: 'EUR', accountCurrencyHint: 'RUB' }));
+    });
+
+    it('carries no hint when the charge is in the account currency', () => {
+      const result = parse('Покупка на 549,90 ₽, счет RUB');
+      expect(result).toEqual(expect.objectContaining({ amount: '549.90', currency: 'RUB', accountCurrencyHint: null }));
+    });
+  });
+
   describe('canonical Платеж (payment) template', () => {
     let result;
     beforeEach(() => {
