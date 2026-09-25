@@ -1,5 +1,12 @@
 # Changelog
 
+## [0.292.14](https://github.com/heywood8/money-tracker/compare/penny-v0.292.13...penny-v0.292.14) (2026-09-25)
+
+
+### Bug Fixes
+
+* **budgets:** show recurring line spending in months with no plan ([#1837](https://github.com/heywood8/money-tracker/issues/1837)) ([b64abd0](https://github.com/heywood8/money-tracker/commit/b64abd00e6ec263ae607eeafe985ad519124f9fd))
+
 ## [0.292.13](https://github.com/heywood8/money-tracker/compare/penny-v0.292.12...penny-v0.292.13) (2026-09-24)
 
 
