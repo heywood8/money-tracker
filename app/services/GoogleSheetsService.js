@@ -835,6 +835,13 @@ const getSheetIdsByTitle = async (accessToken, spreadsheetId) => {
       await signOut();
       throw new Error('refresh_failed');
     }
+    // Deleted (404), or owned by a Google account this one cannot open (403
+    // PERMISSION_DENIED — a backup restored on a device signed in to another
+    // account carries the old spreadsheet id).
+    if (response.status === 404
+      || (response.status === 403 && data.error?.status === 'PERMISSION_DENIED')) {
+      throw new Error('spreadsheet_not_found');
+    }
     throw new Error(data.error?.message || 'get_sheet_ids_failed');
   }
   const data = await response.json();
@@ -964,9 +971,27 @@ export const exportToSheets = async (accessToken, backup, onProgress) => {
 
   report('connect', 'in_progress');
   let spreadsheetId = await getPreference(PREF_KEYS.GOOGLE_SHEETS_SPREADSHEET_ID);
+  // One metadata read up front, before anything names a range: a spreadsheet
+  // from an older build lacks the newest tabs, and naming an absent one in a
+  // batchClear range fails the entire call. The same read supplies the sheet IDs
+  // the filters need at the end, and tells whether the stored spreadsheet can
+  // still be opened at all.
+  let sheetIdByTitle = null;
+  if (spreadsheetId) {
+    try {
+      sheetIdByTitle = await getSheetIdsByTitle(accessToken, spreadsheetId);
+    } catch (error) {
+      if (error.message !== 'spreadsheet_not_found') throw error;
+      // The stored spreadsheet was deleted, or belongs to another Google
+      // account. It used to stay stored, so every export failed the same way
+      // with no way to recover; a new one is created in its place instead.
+      spreadsheetId = null;
+    }
+  }
   if (!spreadsheetId) {
     spreadsheetId = await createSpreadsheet(accessToken);
     await setPreference(PREF_KEYS.GOOGLE_SHEETS_SPREADSHEET_ID, spreadsheetId);
+    sheetIdByTitle = await getSheetIdsByTitle(accessToken, spreadsheetId);
   }
   report('connect', 'completed');
 
@@ -974,12 +999,6 @@ export const exportToSheets = async (accessToken, backup, onProgress) => {
   const sheetNames = sheets.map(s => s.range.split('!')[0]);
 
   report('clear', 'in_progress');
-  // One metadata read up front, before anything names a range: a spreadsheet
-  // from an older build lacks the newest tabs, and naming an absent one in a
-  // batchClear range fails the entire call. The same read supplies the sheet IDs
-  // the filters need at the end, so this costs no extra request in the common
-  // case — it just moved from after the write to before the clear.
-  const sheetIdByTitle = await getSheetIdsByTitle(accessToken, spreadsheetId);
   const missing = sheetNames.filter(name => !sheetIdByTitle.has(name));
   if (missing.length > 0) {
     const added = await addSheets(accessToken, spreadsheetId, missing);

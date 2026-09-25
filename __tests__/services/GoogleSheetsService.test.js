@@ -355,6 +355,45 @@ describe('GoogleSheetsService', () => {
       expect(setPreference).toHaveBeenCalledWith('google_sheets_spreadsheet_id', 'new-sheet-id');
     });
 
+    // The stored id used to be the only route to a spreadsheet: once it was
+    // deleted from Drive, or the backup was restored under another Google
+    // account, every export failed the same way with no way out.
+    describe('a stored spreadsheet that can no longer be opened', () => {
+      const exportsIntoNewSpreadsheet = async (failedMetadataResponse) => {
+        getPreference.mockResolvedValue('gone-sheet-id');
+        setPreference.mockResolvedValue(undefined);
+        mockFetch.mockResolvedValueOnce(failedMetadataResponse); // stored spreadsheet
+        mockFetch.mockResolvedValueOnce({ ok: true, json: async () => ({ spreadsheetId: 'fresh-sheet-id' }) }); // create
+        mockFetch.mockResolvedValueOnce({ ok: true, json: async () => mockMetadata }); // its metadata
+        mockFetch.mockResolvedValueOnce({ ok: true, json: async () => ({}) }); // clearSheets
+        mockFetch.mockResolvedValueOnce({ ok: true, json: async () => ({}) }); // writeSheets
+        mockFetch.mockResolvedValueOnce({ ok: true, json: async () => ({}) }); // applyFilters
+
+        const url = await exportToSheets('access-token', mockBackup);
+
+        expect(url).toBe('https://docs.google.com/spreadsheets/d/fresh-sheet-id');
+        expect(setPreference).toHaveBeenCalledWith('google_sheets_spreadsheet_id', 'fresh-sheet-id');
+      };
+
+      it('creates a new one when the stored one was deleted', async () => {
+        await exportsIntoNewSpreadsheet({ ok: false, status: 404, json: async () => ({ error: { status: 'NOT_FOUND' } }) });
+      });
+
+      it('creates a new one when the stored one belongs to another account', async () => {
+        await exportsIntoNewSpreadsheet({
+          ok: false, status: 403, json: async () => ({ error: { status: 'PERMISSION_DENIED', message: 'The caller does not have permission' } }),
+        });
+      });
+
+      it('still fails on other errors instead of abandoning the spreadsheet', async () => {
+        getPreference.mockResolvedValue('existing-sheet-id');
+        mockFetch.mockResolvedValueOnce({ ok: false, status: 500, json: async () => ({ error: { message: 'Backend error' } }) });
+
+        await expect(exportToSheets('access-token', mockBackup)).rejects.toThrow('Backend error');
+        expect(setPreference).not.toHaveBeenCalled();
+      });
+    });
+
     it('updates existing spreadsheet without creating a new one on re-export', async () => {
       getPreference.mockResolvedValue('existing-sheet-id');
       mockFetch.mockResolvedValueOnce({ ok: true, json: async () => mockMetadata }); // getSheetIdsByTitle
