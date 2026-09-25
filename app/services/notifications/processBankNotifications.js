@@ -31,7 +31,7 @@ import { parseBankNotification, kindRequiresCategory } from './parseBankNotifica
 import { ensureCustomTemplatesLoaded } from './customTemplates';
 import { resolveNotification } from './resolveNotification';
 import { learnAccountBinding } from './accountBindings';
-import { findMatchingOperation, reconcilePendingNotifications, rememberBookedOperation } from './duplicateOperations';
+import { findMatchingOperation, reconcilePendingNotifications, rememberBookedOperation, loadBookedPayees } from './duplicateOperations';
 import { dismissPendingOperationsAlert } from './localNotifications';
 import { startTrace, traceAsync } from '../perfTrace';
 import { localDateOf, todayLocalDate } from '../../utils/dateUtils';
@@ -362,7 +362,10 @@ const isAllowedSource = (packageName, allowed) =>
  * @param {Object} descriptor - parsed notification
  * @param {Object} resolution - resolveNotification() result
  * @param {string} date - resolved ISO date
- * @param {{ checkDuplicate?: boolean, claimedOpIds?: Set }} options
+ * `options.bookedPayees` is the booked-operations registry read once per run
+ * (see duplicateOperations.loadBookedPayees); omitted, it is read per call.
+ *
+ * @param {{ checkDuplicate?: boolean, claimedOpIds?: Set, bookedPayees?: Map }} options
  * @returns {Promise<Object|null>}
  */
 const findExistingOperation = async (descriptor, resolution, date, options) => {
@@ -383,6 +386,7 @@ const findExistingOperation = async (descriptor, resolution, date, options) => {
       autoTxnRoundingMode: resolution.accountRoundingMode,
     },
     options.claimedOpIds || null,
+    options.bookedPayees,
   );
 };
 
@@ -771,7 +775,10 @@ const runProcess = async () => {
   // freshly auto-created), so a second identical charge in the same batch pairs
   // with a different operation instead of being absorbed by the first.
   const claimedOpIds = new Set();
-  const bookOptions = { claimedOpIds };
+  // The registry is read once for the whole window. An operation booked
+  // earlier in this same run is excluded by `claimedOpIds`, so the map not
+  // knowing it yet cannot make it absorb a later notification.
+  const bookOptions = { claimedOpIds, bookedPayees: await loadBookedPayees() };
 
   // Oldest first so operations are created in chronological order.
   const ordered = [...notifications].sort(
