@@ -71,18 +71,43 @@ export const TIME_VALUE_PATTERN = String.raw`\d{1,2}:\d{2}`;
 const LONE_GROUP_RE = /^[1-9]\d{0,2}[.,]\d{3}$/;
 
 /**
+ * ISO 4217 codes whose minor unit is at most 2 digits: every active code except
+ * the 3-decimal BHD, IQD, JOD, KWD, LYD, OMR, TND (and the 4-decimal CLF, UYW).
+ * Generated from `Intl.supportedValuesOf('currency')`.
+ */
+const ISO_AT_MOST_TWO_DECIMALS = new Set(`
+  AED AFN ALL AMD ANG AOA ARS AUD AWG AZN BAM BBD BDT BGN BIF BMD
+  BND BOB BRL BSD BTN BWP BYN BZD CAD CDF CHF CLP CNY COP CRC CUC
+  CUP CVE CZK DJF DKK DOP DZD EGP ERN ETB EUR FJD FKP GBP GEL GHS
+  GIP GMD GNF GTQ GYD HKD HNL HRK HTG HUF IDR ILS INR IRR ISK JMD
+  JPY KES KGS KHR KMF KPW KRW KYD KZT LAK LBP LKR LRD LSL MAD MDL
+  MGA MKD MMK MNT MOP MRU MUR MVR MWK MXN MYR MZN NAD NGN NIO NOK
+  NPR NZD PAB PEN PGK PHP PKR PLN PYG QAR RON RSD RUB RWF SAR SBD
+  SCR SDG SEK SGD SHP SLE SLL SOS SRD SSP STN SVC SYP SZL THB TJS
+  TMT TOP TRY TTD TWD TZS UAH UGX USD UYU UZS VES VND VUV WST XAF
+  XCD XCG XDR XOF XPF XSU YER ZAR ZMW ZWG ZWL
+`.trim().split(/\s+/));
+
+/**
  * Whether a 3-digit tail after a lone separator has to be thousands grouping
  * rather than a fraction. It does for a currency known to carry at most 2
- * decimal places, which is every one in assets/currencies.json. A code outside
- * that list (KWD, BHD, a crypto ticker) may carry 3, so there it stays a fraction.
+ * decimal places: every one in assets/currencies.json, and every other ISO code
+ * but the 3-decimal ones. A 3-decimal ISO currency (KWD, BHD) or a code outside
+ * ISO 4217 (a crypto ticker) may carry 3, so there it stays a fraction.
+ *
+ * Only the app's own table used to count, so a template in a currency the app
+ * has no accounts in (KZT, UAH, PLN — ₸ and ₴ map to those codes) read
+ * "1,500" as 1.5.
  *
  * @param {string|null|undefined} currency - ISO code, when the caller knows it
  * @returns {boolean}
  */
 const threeDigitTailIsGroup = (currency) => {
   if (!currency) return true;
-  const digits = currencies[String(currency).toUpperCase()]?.decimal_digits;
-  return digits !== undefined && digits <= 2;
+  const code = String(currency).toUpperCase();
+  const digits = currencies[code]?.decimal_digits;
+  if (digits !== undefined) return digits <= 2;
+  return ISO_AT_MOST_TWO_DECIMALS.has(code);
 };
 
 /**
