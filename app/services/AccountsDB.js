@@ -406,6 +406,10 @@ export const deleteAccount = async (id, transferToAccountId = null) => {
           );
         }
 
+        // The destination's past snapshots take on the combined balance, read
+        // from the ledger as it still is (before the rows below move).
+        await BalanceHistoryDB.mergeBalanceHistoryInto(db, id, transferToAccountId);
+
         // The two accounts become one, so transfers between them are internal:
         // re-pointed, each became a transfer to the account itself, which nets
         // to zero, and which the editor refuses to save ("accounts must be

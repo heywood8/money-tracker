@@ -39,6 +39,10 @@ const makeHistoryDb = ({ accounts, operations = [], history }) => {
   return {
     history,
     getAllAsync: jest.fn(async (sql, params) => {
+      if (sql.startsWith('SELECT date FROM accounts_balance_history')) {
+        const [accountId, before] = params;
+        return history.filter(r => r.account_id === accountId && r.date < before);
+      }
       if (sql.includes('FROM accounts_balance_history')) {
         const [accountId, from, to] = params;
         return history.filter(r => r.account_id === accountId && r.date >= from && r.date < to);
@@ -63,11 +67,26 @@ const makeHistoryDb = ({ accounts, operations = [], history }) => {
       return null;
     }),
     runAsync: jest.fn(async (sql, params) => {
+      if (sql.startsWith('UPDATE accounts_balance_history SET balance = ? WHERE account_id = ?')) {
+        const row = history.find(r => r.account_id === params[1] && r.date === params[2]);
+        if (row) row.balance = params[0];
+        return { changes: row ? 1 : 0 };
+      }
       if (sql.startsWith('UPDATE accounts_balance_history')) {
         history.find(r => r.id === params[1]).balance = params[0];
-      } else if (sql.includes('INSERT OR IGNORE INTO accounts_balance_history')) {
-        history.push({ id: nextId++, account_id: params[0], date: params[1], balance: params[2] });
+        return { changes: 1 };
       }
+      if (sql.includes('INTO accounts_balance_history')) {
+        history.push({ id: nextId++, account_id: params[0], date: params[1], balance: params[2] });
+        return { changes: 1 };
+      }
+      if (sql.startsWith('DELETE FROM accounts_balance_history WHERE account_id = ?')) {
+        for (let i = history.length - 1; i >= 0; i -= 1) {
+          if (history[i].account_id === params[0]) history.splice(i, 1);
+        }
+        return { changes: 1 };
+      }
+      return { changes: 0 };
     }),
   };
 };
@@ -153,6 +172,23 @@ describe('BalanceHistoryDB', () => {
       expect(db.history.find(r => r.id === 3).balance).toBe('800');
     });
 
+    // A label or category edit reverses and re-applies the same amount on the
+    // same day: nothing to rewrite.
+    it('leaves snapshots untouched when the movements on a day net to zero', async () => {
+      const db = makeHistoryDb({
+        accounts: [{ id: 1, balance: '800' }],
+        history: [{ id: 1, account_id: 1, date: dayFromToday(-5), balance: '1000' }],
+      });
+
+      await BalanceHistoryDB.applyPastBalanceChanges(db, [
+        { accountId: 1, date: dayFromToday(-7), delta: '200' },
+        { accountId: 1, date: dayFromToday(-7), delta: '-200' },
+      ]);
+
+      expect(db.runAsync).not.toHaveBeenCalled();
+      expect(db.history).toHaveLength(1);
+    });
+
     it('does nothing for today, a future day, a zero delta or a deleted account', async () => {
       const db = makeHistoryDb({ accounts: [], history: [{ id: 1, account_id: 1, date: dayFromToday(-1), balance: '5' }] });
 
@@ -165,6 +201,51 @@ describe('BalanceHistoryDB', () => {
 
       expect(db.history).toHaveLength(1);
       expect(db.history[0].balance).toBe('5');
+    });
+  });
+
+  // Delete-with-transfer merges two accounts; the destination's past snapshots
+  // must read the combined balance, or the chart shows a cliff on merge day.
+  describe('mergeBalanceHistoryInto', () => {
+    it('sums both accounts\' balances on every day either had a snapshot, and drops the source rows', async () => {
+      // A: 500 now, a 100 expense 3 days ago (so 600 before it).
+      // B: 1000 now, a 300 income 6 days ago (so 700 before it).
+      const db = makeHistoryDb({
+        accounts: [{ id: 1, balance: '500' }, { id: 2, balance: '1000' }],
+        operations: [
+          { type: 'expense', amount: '100', account_id: 1, to_account_id: null, date: dayFromToday(-3) },
+          { type: 'income', amount: '300', account_id: 2, to_account_id: null, date: dayFromToday(-6) },
+        ],
+        history: [
+          { id: 1, account_id: 1, date: dayFromToday(-8), balance: '600' },
+          { id: 2, account_id: 1, date: dayFromToday(-3), balance: '500' },
+          { id: 3, account_id: 2, date: dayFromToday(-6), balance: '1000' },
+          { id: 4, account_id: 2, date: dayFromToday(0), balance: '1000' },
+        ],
+      });
+
+      await BalanceHistoryDB.mergeBalanceHistoryInto(db, 1, 2);
+
+      const byDay = Object.fromEntries(db.history.filter(r => r.account_id === 2).map(r => [r.date, r.balance]));
+      expect(byDay[dayFromToday(-8)]).toBe('1300'); // 600 + 700
+      expect(byDay[dayFromToday(-6)]).toBe('1600'); // 600 + 1000
+      expect(byDay[dayFromToday(-3)]).toBe('1500'); // 500 + 1000
+      expect(byDay[dayFromToday(0)]).toBe('1000');  // today is left to updateTodayBalance
+      expect(db.history.some(r => r.account_id === 1)).toBe(false);
+    });
+
+    it('lets a transfer between the two accounts cancel out in the sum', async () => {
+      const db = makeHistoryDb({
+        accounts: [{ id: 1, balance: '400' }, { id: 2, balance: '1100' }],
+        operations: [
+          { type: 'transfer', amount: '100', account_id: 1, to_account_id: 2, destination_amount: null, date: dayFromToday(-2) },
+        ],
+        history: [{ id: 1, account_id: 2, date: dayFromToday(-5), balance: '1000' }],
+      });
+
+      await BalanceHistoryDB.mergeBalanceHistoryInto(db, 1, 2);
+
+      expect(db.history.find(r => r.account_id === 2 && r.date === dayFromToday(-5)).balance).toBe('1500');
     });
   });
 

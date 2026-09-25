@@ -462,6 +462,9 @@ export const getOperationsByType = async (type) => {
   }
 };
 
+// The columns that decide what an operation does to balances.
+const MONEY_FIELDS = ['type', 'amount', 'account_id', 'to_account_id', 'destination_amount', 'exchange_rate'];
+
 /**
  * One operation's balance changes as dated movements for
  * BalanceHistoryDB.applyPastBalanceChanges, optionally reversed.
@@ -471,9 +474,6 @@ export const getOperationsByType = async (type) => {
  * @param {boolean} [reverse]
  * @returns {Array<{ accountId: *, date: string, delta: string }>}
  */
-// The columns that decide what an operation does to balances.
-const MONEY_FIELDS = ['type', 'amount', 'account_id', 'to_account_id', 'destination_amount', 'exchange_rate'];
-
 const datedMovements = (changes, date, reverse = false) => [...changes.entries()].map(([accountId, delta]) => ({
   accountId,
   date,
@@ -836,11 +836,14 @@ export const updateOperation = async (id, updates) => {
 
       // Past snapshots: the old version leaves the days from its date on, the
       // new one joins them from its own (a date-only edit shifts the days in
-      // between, though the balance itself is unchanged).
-      await applyPastBalanceChanges(db, [
-        ...datedMovements(oldChanges, oldOperation.date, true),
-        ...datedMovements(newChanges, newOperation.date),
-      ]);
+      // between, though the balance itself is unchanged). An edit that touched
+      // neither money nor date leaves them alone.
+      if (!moneyUnchanged || oldOperation.date !== newOperation.date) {
+        await applyPastBalanceChanges(db, [
+          ...datedMovements(oldChanges, oldOperation.date, true),
+          ...datedMovements(newChanges, newOperation.date),
+        ]);
+      }
     });
   } catch (error) {
     console.error('Failed to update operation:', error);

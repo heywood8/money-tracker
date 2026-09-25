@@ -694,6 +694,19 @@ describe('OperationsDB Service', () => {
       ]);
     });
 
+    it('leaves past snapshots alone for an edit that changes neither money nor date', async () => {
+      const oldOperation = {
+        id: 1, type: 'expense', amount: '100', account_id: 'acc1', category_id: 'cat1', date: '2025-12-05',
+      };
+      mockDb.getFirstAsync
+        .mockResolvedValueOnce(oldOperation)
+        .mockResolvedValueOnce({ ...oldOperation, category_id: 'cat2' });
+
+      await OperationsDB.updateOperation(1, { categoryId: 'cat2' });
+
+      expect(applyPastBalanceChanges).not.toHaveBeenCalled();
+    });
+
     it('persists exclude_from_avg when the flag is toggled on', async () => {
       const oldOperation = {
         id: 1,

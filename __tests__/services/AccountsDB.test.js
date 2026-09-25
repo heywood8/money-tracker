@@ -797,10 +797,9 @@ describe('AccountsDB', () => {
           .mockResolvedValueOnce({ count: 3 }) // operation count
           .mockResolvedValueOnce({ id: 'to-delete', currency: 'USD' }) // fromAccount
           .mockResolvedValueOnce({ id: 'transfer-to', currency: 'USD' }), // toAccount
-        getAllAsync: jest.fn().mockResolvedValue([
-          { id: 'to-delete', balance: '500' },
-          { id: 'transfer-to', balance: '1000' },
-        ]),
+        getAllAsync: jest.fn(async (sql) => (sql.includes('FROM accounts WHERE id IN')
+          ? [{ id: 'to-delete', balance: '500' }, { id: 'transfer-to', balance: '1000' }]
+          : [])),
         runAsync: jest.fn().mockResolvedValue({ changes: 1 }),
       };
       jest.spyOn(db, 'executeTransaction').mockImplementation(async (callback) => {
@@ -833,7 +832,9 @@ describe('AccountsDB', () => {
           .mockResolvedValueOnce({ count: 3 })
           .mockResolvedValueOnce({ id: 'a', currency: 'USD' })
           .mockResolvedValueOnce({ id: 'b', currency: 'USD' }),
-        getAllAsync: jest.fn().mockResolvedValue([{ id: 'a', balance: '0' }, { id: 'b', balance: '0' }]),
+        getAllAsync: jest.fn(async (sql) => (sql.includes('FROM accounts WHERE id IN')
+          ? [{ id: 'a', balance: '0' }, { id: 'b', balance: '0' }]
+          : [])),
         runAsync: jest.fn().mockResolvedValue({ changes: 1 }),
       };
       jest.spyOn(db, 'executeTransaction').mockImplementation(async (callback) => callback(mockTxDb));
@@ -856,7 +857,9 @@ describe('AccountsDB', () => {
           .mockResolvedValueOnce({ count: 3 })
           .mockResolvedValueOnce({ id: 'a', currency: 'USD' })
           .mockResolvedValueOnce({ id: 'b', currency: 'USD' }),
-        getAllAsync: jest.fn().mockResolvedValue([{ id: 'a', balance: '500.25' }, { id: 'b', balance: '1000' }]),
+        getAllAsync: jest.fn(async (sql) => (sql.includes('FROM accounts WHERE id IN')
+          ? [{ id: 'a', balance: '500.25' }, { id: 'b', balance: '1000' }]
+          : [])),
         runAsync: jest.fn().mockResolvedValue({ changes: 1 }),
       };
       jest.spyOn(db, 'executeTransaction').mockImplementation(async (callback) => callback(mockTxDb));
@@ -868,6 +871,31 @@ describe('AccountsDB', () => {
         ['1500.25', expect.any(String), 'b'],
       );
       expect(mockTxDb.runAsync).toHaveBeenCalledWith('UPDATE accounts SET balance = ? WHERE id = ?', ['0', 'a']);
+    });
+
+    // The destination's past snapshots must read the combined balance too, or
+    // its chart shows a cliff on merge day (see BalanceHistoryDB tests for the
+    // arithmetic; here only the hand-off, before the rows move).
+    it('folds the deleted account\'s balance history into the destination before moving its operations', async () => {
+      const BalanceHistoryDB = require('../../app/services/BalanceHistoryDB');
+      const mergeSpy = jest.spyOn(BalanceHistoryDB, 'mergeBalanceHistoryInto').mockResolvedValue();
+      const mockTxDb = {
+        getFirstAsync: jest.fn()
+          .mockResolvedValueOnce({ count: 3 })
+          .mockResolvedValueOnce({ id: 'a', currency: 'USD' })
+          .mockResolvedValueOnce({ id: 'b', currency: 'USD' }),
+        getAllAsync: jest.fn(async () => []),
+        runAsync: jest.fn(async () => {
+          expect(mergeSpy).toHaveBeenCalledWith(mockTxDb, 'a', 'b');
+          return { changes: 1 };
+        }),
+      };
+      jest.spyOn(db, 'executeTransaction').mockImplementation(async (callback) => callback(mockTxDb));
+
+      await AccountsDB.deleteAccount('a', 'b');
+
+      expect(mergeSpy).toHaveBeenCalledTimes(1);
+      mergeSpy.mockRestore();
     });
 
     it('moves budget and review-queue references to the destination', async () => {
