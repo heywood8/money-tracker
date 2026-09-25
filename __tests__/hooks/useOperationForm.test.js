@@ -155,6 +155,33 @@ describe('useOperationForm', () => {
       });
     });
 
+    // The hook may be handed every account (archived ones are still on their
+    // old operations, and the form must resolve them); a new operation must
+    // still default to one the picker offers.
+    it('never defaults a new operation to an archived account', async () => {
+      LastAccount.getLastAccessedAccount.mockResolvedValue(null);
+      const archived = { id: 'acc-0', name: 'Old', currency: 'USD', balance: '0', hidden: 1 };
+      const props = { ...defaultProps, accounts: [archived, ...mockAccounts] };
+
+      const { result } = await renderHook(() => useOperationForm(props));
+
+      await waitFor(() => {
+        expect(result.current.values.accountId).toBe('acc-1');
+      });
+    });
+
+    it('ignores a last-accessed account that has since been archived', async () => {
+      LastAccount.getLastAccessedAccount.mockResolvedValue('acc-0');
+      const archived = { id: 'acc-0', name: 'Old', currency: 'USD', balance: '0', hidden: 1 };
+      const props = { ...defaultProps, accounts: [archived, ...mockAccounts] };
+
+      const { result } = await renderHook(() => useOperationForm(props));
+
+      await waitFor(() => {
+        expect(result.current.values.accountId).toBe('acc-1');
+      });
+    });
+
     it('should not initialize values when modal is not visible', async () => {
       const props = { ...defaultProps, visible: false };
       const { result } = await renderHook(() => useOperationForm(props));

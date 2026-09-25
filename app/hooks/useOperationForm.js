@@ -347,15 +347,19 @@ const useOperationForm = ({
           });
         }
       } else if (isNew) {
+        // A new operation defaults to an account the picker offers: `accounts`
+        // may include archived ones (they are still on their old operations),
+        // and defaulting to one would book onto an account the user cannot see.
+        const candidates = currentAccounts.filter(acc => !acc.hidden);
         let defaultAccountId = '';
-        if (currentAccounts.length === 1) {
-          defaultAccountId = currentAccounts[0].id;
-        } else if (currentAccounts.length > 1) {
+        if (candidates.length === 1) {
+          defaultAccountId = candidates[0].id;
+        } else if (candidates.length > 1) {
           const lastId = await getLastAccessedAccount();
-          if (lastId && currentAccounts.some(acc => acc.id === lastId)) {
+          if (lastId && candidates.some(acc => acc.id === lastId)) {
             defaultAccountId = lastId;
           } else {
-            defaultAccountId = currentAccounts.slice().sort((a, b) => (a.id < b.id ? -1 : 1))[0].id;
+            defaultAccountId = candidates.slice().sort((a, b) => (a.id < b.id ? -1 : 1))[0].id;
           }
         }
         if (!cancelled) {
