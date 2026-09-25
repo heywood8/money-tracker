@@ -695,10 +695,19 @@ export default function BudgetPlanLineModal({
       // An income line is never grouped — groups aggregate allocations, and the
       // group row is not offered for one (see the picker below).
       groupId: kind === 'income' ? null : groupId,
+      // Editing only. The field is labelled with the selected chip's currency,
+      // so a figure the user typed is already in it: BudgetPlansDB must not
+      // convert it out of the line's old currency on a chip change too (250 EUR
+      // → pick USD, type 275 was stored as 302.50 USD). An untouched amount is
+      // still the old currency's figure and is converted, as before.
+      ...(line ? {
+        amountInNewCurrency: line.amount == null || !Currency.isValid(String(line.amount))
+          || Currency.compare(amount, String(line.amount)) !== 0,
+      } : {}),
     });
   }, [saving, kind, amount, amountIsParseable, amountIsPositive, label, comment, categoryIds,
     sourceAccountIds, trackedLabelsText, toAccountId,
-    isRecurring, effectiveCurrency, groupId, onSaveLine, t]);
+    isRecurring, effectiveCurrency, groupId, onSaveLine, t, line]);
 
   const handleDelete = useCallback(() => {
     if (!isEditingLine) return;

@@ -553,6 +553,36 @@ describe('BudgetPlansDB', () => {
         expect(params).toEqual(expect.arrayContaining(['USD', '275', 'l1']));
       });
 
+      // The editor labels the amount with the chip being picked, so a figure the
+      // user retyped is already in the new currency. Converting it again from the
+      // old one stored a retyped 275 USD on a 250 EUR line as 302.50 USD.
+      it('stores an amount the caller priced in the new currency as given', async () => {
+        queryFirst.mockResolvedValueOnce({
+          id: 'l1', plan_id: null, is_recurring: 1, currency: 'EUR', amount: '250',
+        });
+        stubRates('EUR', 'USD', '1.1');
+
+        await BudgetPlansDB.updateLine('l1', { currency: 'USD', amount: '275', amountInNewCurrency: true });
+
+        expect(fetchRatesToTarget).not.toHaveBeenCalled();
+        const [, params] = executeQuery.mock.calls[0];
+        expect(params).toEqual(expect.arrayContaining(['USD', '275', 'l1']));
+      });
+
+      it('stores a priced amount as given on a scope change to recurring too', async () => {
+        queryFirst.mockResolvedValueOnce({
+          id: 'l1', plan_id: 'p1', is_recurring: 0, currency: null, amount: '10000',
+        });
+
+        await BudgetPlansDB.updateLine('l1', {
+          isRecurring: true, currency: 'USD', amount: '120', amountInNewCurrency: true,
+        });
+
+        expect(fetchRatesToTarget).not.toHaveBeenCalled();
+        const [, params] = executeQuery.mock.calls[0];
+        expect(params).toEqual(expect.arrayContaining(['USD', '120', 'l1']));
+      });
+
       it('converts using the row\'s stored amount when the caller does not pass amount at all', async () => {
         // The previously-missed sibling path in miniature: a currency-only
         // update with no `amount` key present in `updates` at all — still must
