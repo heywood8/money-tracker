@@ -325,6 +325,47 @@ describe('CategoriesContext', () => {
       expect(result.current.categories[0].icon).toBe('beer');
     });
 
+    // The Categories screen submits its form with snake_case `category_type`,
+    // while every picker filters on `categoryType`. The new category must be in
+    // state in the loaded shape, or it is missing from pickers until a reload.
+    it('stores a category submitted with category_type in the loaded shape', async () => {
+      CategoriesDB.getAllCategories.mockResolvedValue([
+        { id: 'cat1', name: 'Food', type: 'folder', categoryType: 'expense', parentId: null },
+      ]);
+      const { result } = await renderHook(() => useCategories(), { wrapper });
+      await waitFor(() => expect(result.current.loading).toBe(false));
+
+      await act(async () => {
+        await result.current.addCategory({ name: 'Vet', type: 'entry', parentId: 'cat1', icon: 'dog', category_type: 'expense' });
+      });
+
+      const added = result.current.categories.find(c => c.name === 'Vet');
+      expect(added.categoryType).toBe('expense');
+      expect(added.parentId).toBe('cat1');
+      expect(added.category_type).toBeUndefined();
+      expect(added.isShadow).toBe(false);
+      expect(added.createdAt).toEqual(expect.any(String));
+    });
+
+    // The edit form spreads the loaded category (stale categoryType) and sets
+    // the chosen category_type: the edit must win in state as it does in the DB.
+    it('applies a type change submitted as category_type over the stale categoryType', async () => {
+      CategoriesDB.getAllCategories.mockResolvedValue([
+        { id: 'cat1', name: 'Bonus', type: 'entry', categoryType: 'expense', parentId: null },
+      ]);
+      const { result } = await renderHook(() => useCategories(), { wrapper });
+      await waitFor(() => expect(result.current.loading).toBe(false));
+
+      await act(async () => {
+        await result.current.updateCategory('cat1', {
+          id: 'cat1', name: 'Bonus', type: 'entry', categoryType: 'expense', category_type: 'income', parentId: null,
+        });
+      });
+
+      expect(result.current.categories[0].categoryType).toBe('income');
+      expect(result.current.categories[0].category_type).toBeUndefined();
+    });
+
     it('deletes a category', async () => {
       const existingCategories = [
         { id: 'cat1', name: 'Food', type: 'folder', categoryType: 'expense' },
