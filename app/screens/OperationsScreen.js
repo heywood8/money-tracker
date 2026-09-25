@@ -1121,9 +1121,14 @@ const OperationsScreen = () => {
         operationData.destinationAmount = Currency.formatAmount(operationData.destinationAmount, effectiveDestAccount.currency);
       }
     } else {
-      // Check if this is a foreign currency expense/income
+      // Check if this is a foreign currency expense/income. A transfer is never
+      // one: the currency chip is hidden for transfers, but a foreign currency
+      // picked in Expense mode survives the switch to Transfer, and without this
+      // guard a same-currency transfer was booked as a conversion (100 AMD typed,
+      // 39,000 AMD debited as "100 USD").
       const opCurrency = operationData.operationCurrency;
-      const isForeignCurrencyOp = opCurrency
+      const isForeignCurrencyOp = operationData.type !== 'transfer'
+        && opCurrency
         && effectiveSourceAccount
         && opCurrency !== effectiveSourceAccount.currency;
 

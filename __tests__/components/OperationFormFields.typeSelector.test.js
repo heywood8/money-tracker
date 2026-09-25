@@ -1,5 +1,5 @@
 import React from 'react';
-import { render } from '@testing-library/react-native';
+import { render, fireEvent } from '@testing-library/react-native';
 import OperationFormFields from '../../app/components/operations/OperationFormFields';
 import { FONT_SIZE } from '../../app/styles/designTokens';
 
@@ -145,6 +145,31 @@ describe('OperationFormFields type selector labels', () => {
       TYPES.forEach(({ label }) => {
         expect(labelStyle(getByText, label).fontSize).toBeGreaterThanOrEqual(FONT_SIZE.sm);
       });
+    });
+  });
+
+  // A foreign currency picked for an expense used to ride along into a
+  // transfer, which has no currency chip, and quick-add then booked a
+  // same-currency transfer as a conversion.
+  describe('Switching to Transfer', () => {
+    const pressAndApply = async (label, values) => {
+      const setValues = jest.fn();
+      const { getByText } = await renderFields({ setValues, values: { ...defaultProps.values, ...values } });
+      fireEvent.press(getByText(label));
+      const updater = setValues.mock.calls[0][0];
+      return updater({ ...defaultProps.values, ...values });
+    };
+
+    it('resets a foreign operation currency to the account currency', async () => {
+      const next = await pressAndApply('Transfer', { operationCurrency: 'EUR' });
+      expect(next.type).toBe('transfer');
+      expect(next.operationCurrency).toBe('USD');
+    });
+
+    it('keeps the operation currency when switching between expense and income', async () => {
+      const next = await pressAndApply('Income', { operationCurrency: 'EUR' });
+      expect(next.type).toBe('income');
+      expect(next.operationCurrency).toBe('EUR');
     });
   });
 });

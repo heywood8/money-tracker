@@ -594,14 +594,23 @@ const OperationFormFields = memo(({
         (v.type === 'expense' && typeKey === 'income') ||
         (v.type === 'income' && typeKey === 'expense');
       const shouldClearCategory = typeKey === 'transfer' || switchingBetweenExpenseIncome;
-      return {
+      const next = {
         ...v,
         type: typeKey,
         categoryId: shouldClearCategory ? '' : v.categoryId,
         toAccountId: '',
       };
+      // A transfer moves money in its accounts' own currencies and has no
+      // currency chip, so a foreign currency picked for an expense must not ride
+      // along into it (a stale one turned a same-currency transfer into a
+      // conversion at save time).
+      if (typeKey === 'transfer' && sourceAccount?.currency && v.operationCurrency
+        && v.operationCurrency !== sourceAccount.currency) {
+        next.operationCurrency = sourceAccount.currency;
+      }
+      return next;
     });
-  }, [setValues]);
+  }, [setValues, sourceAccount]);
 
   // `null` means "today, resolved when the operation is saved" — see
   // QuickAddDateChip.
