@@ -129,7 +129,12 @@ export default function OperationModal({
   // reserves for the system navigation bar — so it pads that back in itself.
   const insets = useSafeAreaInsets();
   const { addOperation, splitOperation, updateOperation, validateOperation } = useOperationsActions();
-  const { visibleAccounts: accounts } = useAccountsData();
+  // Pickers offer the visible accounts; the operation's own accounts are looked
+  // up among all of them. An archived account is still on its operations, and
+  // not finding it made a cross-currency transfer look like a same-currency one:
+  // the form cleared its rate, and saving any edit failed in the DB.
+  const { accounts: allAccountsFromContext, visibleAccounts: accounts } = useAccountsData();
+  const allAccounts = allAccountsFromContext || accounts;
   const { categories } = useCategories();
   // Read defensively: this context has no default value, so a missing provider
   // (e.g. in unit tests) yields undefined rather than throwing on destructure.
@@ -181,7 +186,7 @@ export default function OperationModal({
     visible,
     operation,
     isNew,
-    accounts,
+    accounts: allAccounts,
     categories,
     t,
     addOperation,
@@ -710,6 +715,7 @@ export default function OperationModal({
             values={values}
             setValues={setValues}
             accounts={accounts}
+            allAccounts={allAccounts}
             categories={filteredCategories}
             getAccountName={getAccountName}
             getAccountBalance={getAccountBalance}

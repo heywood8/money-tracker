@@ -1038,6 +1038,26 @@ describe('OperationModal', () => {
       expect(getByText('add_operation')).toBeTruthy();
     });
 
+    // An archived account is still on its operations. Resolved among the
+    // visible accounts only, a transfer from one looked same-currency: the form
+    // cleared its rate and every save failed in the DB.
+    it('resolves the operation\'s accounts among all accounts, archived included', async () => {
+      const visible = { id: 'acc1', name: 'Checking', currency: 'USD', balance: '1000' };
+      const archived = { id: 'acc9', name: 'Old AMD', currency: 'AMD', balance: '0', hidden: 1 };
+      jest.spyOn(require('../../app/contexts/AccountsDataContext'), 'useAccountsData').mockReturnValue({
+        accounts: [visible, archived],
+        visibleAccounts: [visible],
+      });
+      const useOperationForm = require('../../app/hooks/useOperationForm');
+
+      await render(<OperationModal visible={true} onClose={mockOnClose} isNew={false} operation={{ id: 'op1', type: 'transfer' }} />);
+
+      expect(useOperationForm).toHaveBeenLastCalledWith(expect.objectContaining({ accounts: [visible, archived] }));
+      const OperationFormFields = require('../../app/components/operations/OperationFormFields');
+      expect(OperationFormFields._lastProps.accounts).toEqual([visible]);
+      expect(OperationFormFields._lastProps.allAccounts).toEqual([visible, archived]);
+    });
+
     it('handles empty categories list', async () => {
       jest.spyOn(require('../../app/contexts/CategoriesContext'), 'useCategories').mockReturnValue({
         categories: [],

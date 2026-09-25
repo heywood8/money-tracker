@@ -471,6 +471,9 @@ export const getOperationsByType = async (type) => {
  * @param {boolean} [reverse]
  * @returns {Array<{ accountId: *, date: string, delta: string }>}
  */
+// The columns that decide what an operation does to balances.
+const MONEY_FIELDS = ['type', 'amount', 'account_id', 'to_account_id', 'destination_amount', 'exchange_rate'];
+
 const datedMovements = (changes, date, reverse = false) => [...changes.entries()].map(([accountId, delta]) => ({
   accountId,
   date,
@@ -482,11 +485,21 @@ const datedMovements = (changes, date, reverse = false) => [...changes.entries()
  * Handles multi-currency transfers by using destination_amount when available.
  * When destination_amount is null on a transfer, queries account currencies to
  * detect cross-currency transfers and recomputes the amount via exchange_rate.
+ * `booked` is for an operation that is already on the books and is being
+ * reversed (delete, the old side of an edit). A transfer with neither
+ * destination_amount nor exchange_rate was credited its own amount when it was
+ * booked — its accounts then shared a currency — and that is exactly what must
+ * come back off, whatever the accounts' currencies are now. Only a transfer
+ * being booked needs a rate to cross currencies; demanding one on reversal made
+ * such a transfer impossible to delete or edit once either account's currency
+ * had changed (or when an import left the columns empty).
+ *
  * @param {Object} operation
  * @param {Object} db - Transaction-scoped database instance
+ * @param {{ booked?: boolean }} [options]
  * @returns {Promise<Map<string, string>>} Map of accountId → string delta (Decimal-safe)
  */
-const calculateBalanceChanges = async (operation, db) => {
+const calculateBalanceChanges = async (operation, db, { booked = false } = {}) => {
   const balanceChanges = new Map();
   const amount = String(operation.amount || '0');
 
@@ -515,7 +528,9 @@ const calculateBalanceChanges = async (operation, db) => {
         const fromCurrency = fromAcc?.currency;
         const toCurrency = toAcc?.currency;
 
-        if (fromCurrency && toCurrency && fromCurrency !== toCurrency) {
+        const crossesCurrencies = fromCurrency && toCurrency && fromCurrency !== toCurrency;
+        // A booked transfer with no rate was credited its own amount (see above).
+        if (crossesCurrencies && !(booked && !operation.exchange_rate)) {
           if (!operation.exchange_rate) {
             throw new Error(
               `Multi-currency transfer ${operation.id} is missing destination_amount and exchange_rate`,
@@ -765,13 +780,16 @@ export const updateOperation = async (id, updates) => {
       const balanceChanges = new Map();
 
       // Reverse old operation
-      const oldChanges = await calculateBalanceChanges(oldOperation, db);
+      const oldChanges = await calculateBalanceChanges(oldOperation, db, { booked: true });
       for (const [accountId, delta] of oldChanges.entries()) {
         balanceChanges.set(accountId, Currency.subtract(balanceChanges.get(accountId) || '0', delta));
       }
 
       // Apply new operation — track which accounts the new operation requires
-      const newChanges = await calculateBalanceChanges(newOperation, db);
+      // An edit that leaves every money field alone (a label, a category, the
+      // date) re-applies exactly what it reversed, so it is read the same way.
+      const moneyUnchanged = MONEY_FIELDS.every(field => String(oldOperation[field] ?? '') === String(newOperation[field] ?? ''));
+      const newChanges = await calculateBalanceChanges(newOperation, db, { booked: moneyUnchanged });
       const newOperationAccountIds = new Set(newChanges.keys());
       for (const [accountId, delta] of newChanges.entries()) {
         balanceChanges.set(accountId, Currency.add(balanceChanges.get(accountId) || '0', delta));
@@ -951,7 +969,7 @@ export const splitOperation = async (id, updates, newOperationData) => {
         }
       };
 
-      const oldSplitChanges = await calculateBalanceChanges(oldOperation, db);
+      const oldSplitChanges = await calculateBalanceChanges(oldOperation, db, { booked: true });
       const updatedSplitChanges = await calculateBalanceChanges(updatedOperation, db);
       const createdSplitChanges = await calculateBalanceChanges(createdOperation, db);
       applyChanges(oldSplitChanges, true);
@@ -1018,7 +1036,7 @@ export const deleteOperation = async (id) => {
       await db.runAsync('DELETE FROM operations WHERE id = ?', [id]);
 
       // Reverse balance changes
-      const balanceChanges = await calculateBalanceChanges(operation, db);
+      const balanceChanges = await calculateBalanceChanges(operation, db, { booked: true });
       const reverseChanges = new Map();
       for (const [accountId, delta] of balanceChanges.entries()) {
         reverseChanges.set(accountId, Currency.subtract('0', delta));

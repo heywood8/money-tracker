@@ -2051,6 +2051,53 @@ describe('OperationsDB Service', () => {
       );
     });
 
+    // A transfer booked between two same-currency accounts stores neither
+    // destination_amount nor exchange_rate. Once one account's currency changed,
+    // reversing it demanded a rate, so it could be neither deleted nor edited.
+    describe('a booked transfer whose accounts no longer share a currency', () => {
+      const booked = {
+        id: 7, type: 'transfer', amount: '100', account_id: 'acc-usd', to_account_id: 'acc-eur',
+        destination_amount: null, exchange_rate: null, date: '2025-12-05', description: null,
+      };
+      // Every lookup the transaction makes, keyed on the SQL it issues.
+      const stubLookups = (operationAfterUpdate = booked) => {
+        mockDb.getFirstAsync.mockImplementation(async (sql, params) => {
+          if (sql.startsWith('SELECT * FROM operations WHERE id')) {
+            stubLookups.reads = (stubLookups.reads || 0) + 1;
+            return stubLookups.reads === 1 ? booked : operationAfterUpdate;
+          }
+          if (sql === 'SELECT currency FROM accounts WHERE id = ?') {
+            return { currency: params[0] === 'acc-usd' ? 'USD' : 'EUR' };
+          }
+          if (sql === 'SELECT balance FROM accounts WHERE id = ?') return { balance: '1000' };
+          return null;
+        });
+      };
+      beforeEach(() => { stubLookups.reads = 0; });
+
+      it('deletes it, reversing the amount it was credited', async () => {
+        stubLookups();
+
+        await OperationsDB.deleteOperation(7);
+
+        expect(Currency.add).toHaveBeenCalledWith('1000', '100');   // source gets it back
+        expect(Currency.add).toHaveBeenCalledWith('1000', '-100');  // destination gives it back
+      });
+
+      it('saves an edit that leaves the money alone', async () => {
+        stubLookups({ ...booked, description: 'Rent' });
+
+        await expect(OperationsDB.updateOperation(7, { description: 'Rent' })).resolves.not.toThrow();
+      });
+
+      it('still refuses an edit that re-books it across currencies without a rate', async () => {
+        stubLookups({ ...booked, amount: '150' });
+
+        await expect(OperationsDB.updateOperation(7, { amount: '150' }))
+          .rejects.toThrow('missing destination_amount and exchange_rate');
+      });
+    });
+
     it('falls back to source amount for same-currency transfers missing destination_amount', async () => {
       const operation = {
         type: 'transfer',

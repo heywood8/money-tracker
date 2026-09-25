@@ -269,6 +269,7 @@ const OperationFormFields = memo(({
   values,
   setValues,
   accounts,
+  allAccounts,
   categories,
   topCategoriesForType,
   getCategoryInfo,
@@ -530,14 +531,17 @@ const OperationFormFields = memo(({
     disabled ? styles.disabledInput : null
   , [disabled]);
 
-  // Get source and destination accounts for multi-currency detection
+  // Get source and destination accounts for multi-currency detection. Looked up
+  // among every account (an archived one is still on its operations); the
+  // pickers keep offering `accounts`.
+  const lookupAccounts = allAccounts || accounts;
   const sourceAccount = useMemo(() => {
-    return accounts.find(acc => acc.id === values.accountId);
-  }, [accounts, values.accountId]);
+    return lookupAccounts.find(acc => acc.id === values.accountId);
+  }, [lookupAccounts, values.accountId]);
 
   const destinationAccount = useMemo(() => {
-    return accounts.find(acc => acc.id === values.toAccountId);
-  }, [accounts, values.toAccountId]);
+    return lookupAccounts.find(acc => acc.id === values.toAccountId);
+  }, [lookupAccounts, values.toAccountId]);
 
   // MultiCurrencyFields received two object literals built inline on every
   // render, so it could never bail out. Declared AFTER sourceAccount on purpose:
@@ -1213,6 +1217,9 @@ OperationFormFields.propTypes = {
   }).isRequired,
   setValues: PropTypes.func.isRequired,
   accounts: PropTypes.array.isRequired,
+  // Every account, archived included, for looking up the operation's own
+  // accounts; `accounts` is what the pickers offer. Defaults to `accounts`.
+  allAccounts: PropTypes.array,
   categories: PropTypes.array.isRequired,
   topCategoriesForType: PropTypes.array,
   getCategoryInfo: PropTypes.func,
