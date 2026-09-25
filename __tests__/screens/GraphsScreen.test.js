@@ -83,6 +83,21 @@ describe('GraphsScreen', () => {
     jest.clearAllMocks();
   });
 
+  // The Balance card's account picker printed every balance while "Hide
+  // balances" was on.
+  describe('accountPickerItem', () => {
+    const { accountPickerItem } = require('../../app/screens/GraphsScreen');
+    const account = { id: 7, name: 'Card', balance: '1234.5', currency: 'USD' };
+
+    it('shows the balance when balances are visible', () => {
+      expect(accountPickerItem(account, false)).toEqual({ label: 'Card', value: 7, subLabel: '$1234.50' });
+    });
+
+    it('names the currency instead of the balance when balances are hidden', () => {
+      expect(accountPickerItem(account, true)).toEqual({ label: 'Card', value: 7, subLabel: 'USD' });
+    });
+  });
+
   describe('Component Structure', () => {
     it('renders without crashing', async () => {
       const GraphsScreen = require('../../app/screens/GraphsScreen').default;

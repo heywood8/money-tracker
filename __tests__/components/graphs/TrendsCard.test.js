@@ -409,6 +409,26 @@ describe('TrendsCard', () => {
 
       useDisplaySettings.mockReturnValue({ hideBalances: false });
     });
+
+    // The totals were blanked but the chart's spoken label still read the
+    // selected month's total aloud.
+    it('keeps the amount out of the chart accessibility label when hideBalances is true', async () => {
+      const { useDisplaySettings } = require('../../../app/contexts/DisplaySettingsContext');
+      useDisplaySettings.mockReturnValue({ hideBalances: true });
+      try {
+        const { getByTestId } = await render(<TrendsCard {...defaultProps} />);
+        const chart = getByTestId('trend-chart');
+        expect(chart.props.accessibilityLabel).not.toMatch(/\d/);
+      } finally {
+        useDisplaySettings.mockReturnValue({ hideBalances: false });
+      }
+    });
+
+    it('reads the amount in the chart accessibility label when balances are shown', async () => {
+      const { getByTestId } = await render(<TrendsCard {...defaultProps} />);
+      const chart = getByTestId('trend-chart');
+      expect(chart.props.accessibilityLabel).toMatch(/\d/);
+    });
   });
 
   describe('Header layout', () => {

@@ -28,6 +28,7 @@ import { appEvents, EVENTS } from '../services/eventEmitter';
 import { parseCardMasks, serializeCardMasks, cardMaskLast4 } from '../utils/cardMask';
 import currencies from '../../assets/currencies.json';
 import { CARD_SURFACE } from '../styles/componentStyles';
+import { authenticateWithBiometrics, BiometricResult } from '../services/BiometricService';
 
 // Alias for use as a prop default: a `currencies = currencies` destructuring
 // default would shadow the import and throw (TDZ), so default to this instead.
@@ -538,8 +539,26 @@ export default function AccountsScreen({ onBackStateChange, tabKey = 'Accounts' 
   const { accounts, displayedAccounts, hiddenAccounts, showHiddenAccounts, loading, error } = useAccountsData();
   const { toggleShowHiddenAccounts, addAccount, updateAccount, deleteAccount, reorderAccounts, validateAccount, getOperationCount } = useAccountsActions();
   const { t, language } = useLocalization();
+  const { hideBalances } = useDisplaySettings();
 
   const balanceInputRef = useRef(null);
+
+  // With "Hide balances" on, the list masks every balance and turning the mask
+  // off asks for biometrics — but a plain tap on a row opened the edit form with
+  // the exact balance in its text field. The field stays masked until the same
+  // authentication the Privacy panel uses passes, per form opening.
+  const [balanceRevealed, setBalanceRevealed] = useState(false);
+  const balanceMasked = hideBalances && editingId !== null && editingId !== 'new' && !balanceRevealed;
+  const revealBalance = useCallback(async () => {
+    const result = await authenticateWithBiometrics(t('biometric_prompt') || 'Authenticate to show balances');
+    // Same policy as the Privacy toggle: no biometrics on the device means the
+    // mask is a convenience, not a lock.
+    if (result === BiometricResult.SUCCESS
+      || result === BiometricResult.NOT_AVAILABLE
+      || result === BiometricResult.NOT_ENROLLED) {
+      setBalanceRevealed(true);
+    }
+  }, [t]);
 
   const SCREEN_WIDTH = Dimensions.get('window').width;
 
@@ -556,6 +575,7 @@ export default function AccountsScreen({ onBackStateChange, tabKey = 'Accounts' 
   const openFormPanel = useCallback((id, values) => {
     setCurrencyPanelVisible(false);
     currencySlideAnim.setValue(Dimensions.get('window').width);
+    setBalanceRevealed(false);
     setEditingId(id);
     setEditValues(values);
     setNewCardMask('');
@@ -578,6 +598,7 @@ export default function AccountsScreen({ onBackStateChange, tabKey = 'Accounts' 
       setEditValues({});
       setErrors({});
       setCurrencyPanelVisible(false);
+      setBalanceRevealed(false);
     });
   }, [formPanelAnim]);
 
@@ -1132,22 +1153,42 @@ export default function AccountsScreen({ onBackStateChange, tabKey = 'Accounts' 
             <Text style={[modalSharedStyles.fieldLabel, { color: colors.mutedText }]}>
               {(t('balance') || 'Balance').toUpperCase()}
             </Text>
-            <PaperTextInput
-              ref={balanceInputRef}
-              mode="outlined"
-              theme={paperInputTheme}
-              value={editValues.balance}
-              onChangeText={handleBalanceChange}
-              error={!!errors.balance}
-              keyboardType="numeric"
-              returnKeyType="done"
-              placeholder={(() => {
-                const dec = currencies[editValues.currency]?.decimal_digits ?? 2;
-                return dec === 0 ? '0' : `0.${'0'.repeat(dec)}`;
-              })()}
-              onSubmitEditing={Keyboard.dismiss}
-              style={modalSharedStyles.textInput}
-            />
+            {balanceMasked ? (
+              <TouchableRipple
+                testID="account-balance-masked"
+                onPress={revealBalance}
+                accessibilityRole="button"
+                accessibilityLabel={t('biometric_prompt') || 'Authenticate to show balances'}
+                style={[modalSharedStyles.pickerRow, { backgroundColor: colors.surface, borderColor: colors.border }]}
+              >
+                <View style={modalSharedStyles.pickerRowInner}>
+                  <Text style={[modalSharedStyles.pickerRowValue, { color: colors.text }]}>••••••</Text>
+                  <View style={styles.revealHint}>
+                    <Text variant="bodySmall" style={{ color: colors.mutedText }}>
+                      {t('tap_to_show_balance') || 'Tap to show balance'}
+                    </Text>
+                    <Icon name="eye-outline" size={20} color={colors.mutedText} />
+                  </View>
+                </View>
+              </TouchableRipple>
+            ) : (
+              <PaperTextInput
+                ref={balanceInputRef}
+                mode="outlined"
+                theme={paperInputTheme}
+                value={editValues.balance}
+                onChangeText={handleBalanceChange}
+                error={!!errors.balance}
+                keyboardType="numeric"
+                returnKeyType="done"
+                placeholder={(() => {
+                  const dec = currencies[editValues.currency]?.decimal_digits ?? 2;
+                  return dec === 0 ? '0' : `0.${'0'.repeat(dec)}`;
+                })()}
+                onSubmitEditing={Keyboard.dismiss}
+                style={modalSharedStyles.textInput}
+              />
+            )}
             {errors.balance && <Text variant="bodySmall" style={[styles.error, { color: colors.destructive }]}>{errors.balance}</Text>}
 
             {/* Currency selector */}
@@ -1793,6 +1834,11 @@ const styles = StyleSheet.create({
   },
   pickerOptionText: {
     fontSize: FONT_SIZE.base,
+  },
+  revealHint: {
+    alignItems: 'center',
+    flexDirection: 'row',
+    gap: SPACING.xs,
   },
   roundingOption: {
     alignItems: 'center',

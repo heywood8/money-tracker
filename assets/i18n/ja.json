@@ -544,6 +544,7 @@
   "keep_filters_active": "フィルターを維持しますか？",
   "keep_filters": "フィルターを維持",
   "biometric_prompt": "残高を表示するために認証",
+  "tap_to_show_balance": "タップして残高を表示",
   "biometric_unavailable": "このデバイスでは生体認証が利用できません",
   "biometric_not_enrolled": "生体情報が登録されていません。デバイスの設定で生体認証を設定してください。",
   "biometric_failed": "認証に失敗しました",

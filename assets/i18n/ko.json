@@ -544,6 +544,7 @@
   "keep_filters_active": "필터를 유지하시겠습니까?",
   "keep_filters": "필터 유지",
   "biometric_prompt": "잔액을 표시하려면 인증하세요",
+  "tap_to_show_balance": "탭하여 잔액 표시",
   "biometric_unavailable": "이 기기에서는 생체 인증을 사용할 수 없습니다",
   "biometric_not_enrolled": "등록된 생체 인증이 없습니다. 기기 설정에서 생체 인증을 설정해 주세요.",
   "biometric_failed": "인증에 실패했습니다",

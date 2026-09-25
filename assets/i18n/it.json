@@ -544,6 +544,7 @@
   "keep_filters_active": "Mantenere i filtri attivi?",
   "keep_filters": "Mantieni Filtri",
   "biometric_prompt": "Autenticati per mostrare i saldi",
+  "tap_to_show_balance": "Tocca per mostrare il saldo",
   "biometric_unavailable": "Autenticazione biometrica non disponibile su questo dispositivo",
   "biometric_not_enrolled": "Nessuna biometria registrata. Configura la biometria nelle impostazioni del dispositivo.",
   "biometric_failed": "Autenticazione fallita",
