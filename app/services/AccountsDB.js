@@ -406,6 +406,18 @@ export const deleteAccount = async (id, transferToAccountId = null) => {
           );
         }
 
+        // The two accounts become one, so transfers between them are internal:
+        // re-pointed, each became a transfer to the account itself, which nets
+        // to zero, and which the editor refuses to save ("accounts must be
+        // different"). Their two sides cancel in the merged balance below, so
+        // they are removed rather than kept as self-transfers.
+        await db.runAsync(
+          `DELETE FROM operations WHERE type = 'transfer' AND (
+             (account_id = ? AND to_account_id = ?)
+             OR (account_id = ? AND to_account_id = ?)
+             OR (account_id = ? AND to_account_id = ?))`,
+          [id, transferToAccountId, transferToAccountId, id, id, id],
+        );
         await db.runAsync(
           'UPDATE operations SET account_id = ? WHERE account_id = ?',
           [transferToAccountId, id],
@@ -414,6 +426,47 @@ export const deleteAccount = async (id, transferToAccountId = null) => {
           'UPDATE operations SET to_account_id = ? WHERE to_account_id = ?',
           [transferToAccountId, id],
         );
+
+        // Operations carry their effect with them: a balance is its starting
+        // value plus every operation on it, so the destination takes the whole
+        // balance of the account its operations came from. Moving the rows alone
+        // left the destination's ledger disagreeing with its balance, and every
+        // figure walked from the ledger (net-worth change, balance history) off
+        // by the moved amount.
+        const balances = await db.getAllAsync(
+          'SELECT id, balance FROM accounts WHERE id IN (?, ?)',
+          [id, transferToAccountId],
+        );
+        const balanceOf = (accountId) => (balances || []).find(row => String(row.id) === String(accountId))?.balance ?? '0';
+        const mergedBalance = Currency.add(balanceOf(transferToAccountId), balanceOf(id));
+        const now = new Date().toISOString();
+        await db.runAsync(
+          'UPDATE accounts SET balance = ?, updated_at = ? WHERE id = ?',
+          [mergedBalance, now, transferToAccountId],
+        );
+        await db.runAsync('UPDATE accounts SET balance = ? WHERE id = ?', ['0', id]);
+        await BalanceHistoryDB.updateTodayBalance(transferToAccountId, mergedBalance, db);
+      }
+
+      // References the soft delete would otherwise leave pointing at a dead
+      // account: the FK cascades only fire on a real DELETE. With a destination
+      // they move to it (its operations did); without one they are dropped the
+      // way the cascades would, so a budget line tracking only this account is
+      // flagged broken instead of silently reading zero.
+      if (transferToAccountId) {
+        await db.runAsync(
+          'INSERT OR IGNORE INTO budget_plan_line_accounts (line_id, account_id) SELECT line_id, ? FROM budget_plan_line_accounts WHERE account_id = ?',
+          [transferToAccountId, id],
+        );
+        await db.runAsync('DELETE FROM budget_plan_line_accounts WHERE account_id = ?', [id]);
+        await db.runAsync('UPDATE budget_plan_lines SET to_account_id = ? WHERE to_account_id = ?', [transferToAccountId, id]);
+        await db.runAsync('UPDATE budget_plan_lines SET account_id = ? WHERE account_id = ?', [transferToAccountId, id]);
+        await db.runAsync('UPDATE pending_notifications SET account_id = ? WHERE account_id = ?', [transferToAccountId, id]);
+      } else {
+        await db.runAsync('DELETE FROM budget_plan_line_accounts WHERE account_id = ?', [id]);
+        await db.runAsync('UPDATE budget_plan_lines SET to_account_id = NULL WHERE to_account_id = ?', [id]);
+        await db.runAsync('UPDATE budget_plan_lines SET account_id = NULL WHERE account_id = ?', [id]);
+        await db.runAsync('UPDATE pending_notifications SET account_id = NULL WHERE account_id = ?', [id]);
       }
 
       await db.runAsync(

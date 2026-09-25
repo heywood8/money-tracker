@@ -411,7 +411,7 @@
   "no_same_currency_account": "Dieses Konto enthält Transaktionen, aber es gibt keine anderen Konten mit derselben Währung. Bitte erstellen Sie zuerst ein anderes Konto mit derselben Währung oder löschen Sie die Transaktionen.",
   "account_not_found": "Konto nicht gefunden. Bitte versuchen Sie es erneut.",
   "confirm_delete_and_transfer": "Löschen bestätigen",
-  "confirm_delete_and_transfer_message": "Dies wird das Konto dauerhaft löschen und alle Transaktionen unwiderruflich auf das ausgewählte Konto verschieben.\n\nDiese Aktion kann nicht rückgängig gemacht werden.",
+  "confirm_delete_and_transfer_message": "Dies wird das Konto dauerhaft löschen und alle seine Transaktionen sowie seinen Kontostand auf das ausgewählte Konto verschieben. Überweisungen zwischen den beiden Konten werden entfernt.\n\nDiese Aktion kann nicht rückgängig gemacht werden.",
   "create_adjustment_operation": "Anpassungsvorgang erstellen",
   "create_adjustment_operation_hint": "Automatisch einen Schattenvorgang erstellen, um Saldo-Anpassungen zu verfolgen",
   "archived_account": "Archiviertes Konto",

@@ -415,7 +415,7 @@
   "no_same_currency_account": "この口座には取引がありますが、同じ通貨の他の口座がありません。まず同じ通貨の別の口座を作成するか、取引を削除してください。",
   "account_not_found": "口座が見つかりません。再試行してください。",
   "confirm_delete_and_transfer": "削除の確認",
-  "confirm_delete_and_transfer_message": "口座が完全に削除され、すべての取引が選択した口座に不可逆的に移動されます。\n\nこの操作は取り消せません。",
+  "confirm_delete_and_transfer_message": "口座が完全に削除され、そのすべての取引と残高が選択した口座に移動されます。2つの口座間の振替は削除されます。\n\nこの操作は取り消せません。",
   "create_adjustment_operation": "調整取引を作成",
   "create_adjustment_operation_hint": "残高調整を追跡するためのシャドウ取引を自動作成",
   "archived_account": "アーカイブ済みの口座",

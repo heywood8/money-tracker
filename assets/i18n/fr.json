@@ -415,7 +415,7 @@
   "no_same_currency_account": "Ce compte a des transactions mais il n'y a pas d'autres comptes avec la même devise. Veuillez d'abord créer un autre compte avec la même devise, ou supprimer les transactions.",
   "account_not_found": "Compte introuvable. Veuillez réessayer.",
   "confirm_delete_and_transfer": "Confirmer la suppression",
-  "confirm_delete_and_transfer_message": "Cela supprimera définitivement le compte et déplacera de manière irréversible toutes les transactions vers le compte sélectionné.\n\nCette action ne peut pas être annulée.",
+  "confirm_delete_and_transfer_message": "Cela supprimera définitivement le compte et déplacera toutes ses transactions ainsi que son solde vers le compte sélectionné. Les virements entre les deux comptes sont supprimés.\n\nCette action ne peut pas être annulée.",
   "create_adjustment_operation": "Créer une opération d'ajustement",
   "create_adjustment_operation_hint": "Créer automatiquement une opération fantôme pour suivre les ajustements de solde",
   "archived_account": "Compte archivé",

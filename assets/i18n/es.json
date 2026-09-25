@@ -411,7 +411,7 @@
   "no_same_currency_account": "Esta cuenta tiene transacciones pero no hay otras cuentas con la misma moneda. Por favor, cree otra cuenta con la misma moneda primero, o elimine las transacciones.",
   "account_not_found": "Cuenta no encontrada. Por favor, inténtelo de nuevo.",
   "confirm_delete_and_transfer": "Confirmar eliminación",
-  "confirm_delete_and_transfer_message": "Esto eliminará permanentemente la cuenta y moverá irreversiblemente todas las transacciones a la cuenta seleccionada.\n\nEsta acción no se puede deshacer.",
+  "confirm_delete_and_transfer_message": "Esto eliminará permanentemente la cuenta y moverá todas sus transacciones y su saldo a la cuenta seleccionada. Las transferencias entre ambas cuentas se eliminan.\n\nEsta acción no se puede deshacer.",
   "create_adjustment_operation": "Crear operación de ajuste",
   "create_adjustment_operation_hint": "Crear automáticamente una operación sombra para rastrear ajustes de saldo",
   "archived_account": "Cuenta archivada",

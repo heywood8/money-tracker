@@ -418,7 +418,7 @@
   "no_same_currency_account": "This account has transactions but there are no other accounts with the same currency. Please create another account with the same currency first, or delete the transactions.",
   "account_not_found": "Account not found. Please try again.",
   "confirm_delete_and_transfer": "Confirm Deletion",
-  "confirm_delete_and_transfer_message": "This will permanently delete the account and irreversibly move all transactions to the selected account.\n\nThis action cannot be undone.",
+  "confirm_delete_and_transfer_message": "This will permanently delete the account and move all its transactions and its balance to the selected account. Transfers between the two accounts are removed.\n\nThis action cannot be undone.",
   "create_adjustment_operation": "Create adjustment operation",
   "create_adjustment_operation_hint": "Automatically create a shadow operation to track balance adjustments",
   "archived_account": "Archived account",

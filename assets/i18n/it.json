@@ -415,7 +415,7 @@
   "no_same_currency_account": "Questo conto ha transazioni ma non ci sono altri conti con la stessa valuta. Crea prima un altro conto con la stessa valuta o elimina le transazioni.",
   "account_not_found": "Conto non trovato. Riprova.",
   "confirm_delete_and_transfer": "Conferma eliminazione",
-  "confirm_delete_and_transfer_message": "Questo eliminerà definitivamente il conto e sposterà in modo irreversibile tutte le transazioni al conto selezionato.\n\nQuesta azione non può essere annullata.",
+  "confirm_delete_and_transfer_message": "Questo eliminerà definitivamente il conto e sposterà tutte le sue transazioni e il suo saldo al conto selezionato. I trasferimenti tra i due conti vengono rimossi.\n\nQuesta azione non può essere annullata.",
   "create_adjustment_operation": "Crea operazione di rettifica",
   "create_adjustment_operation_hint": "Crea automaticamente un'operazione fantasma per tracciare le rettifiche del saldo",
   "archived_account": "Conto archiviato",
