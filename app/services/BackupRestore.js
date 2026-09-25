@@ -813,7 +813,7 @@ export const restoreBackup = async (backup, cancelToken) => {
       for (const account of backup.data.accounts) {
         // Validate required fields
         if (!account.name) {
-          console.warn('Skipping account with missing name:', account);
+          console.warn('Skipping account with missing name, id:', account?.id);
           continue;
         }
 
@@ -900,7 +900,7 @@ export const restoreBackup = async (backup, cancelToken) => {
       for (const category of sortCategoriesParentsFirst(backup.data.categories)) {
         // Validate required fields
         if (!category || !category.id || !category.name) {
-          console.warn('Skipping category with missing id or name:', category);
+          console.warn('Skipping category with missing id or name, id:', category?.id);
           continue;
         }
 
@@ -1040,7 +1040,7 @@ export const restoreBackup = async (backup, cancelToken) => {
         
         // Validate that account_id is not null/undefined
         if (mappedAccountId == null) {
-          console.warn('Skipping operation with null account_id:', operation);
+          console.warn('Skipping operation with null account_id, id:', operation?.id);
           skippedOperations++;
           continue;
         }
@@ -1159,7 +1159,7 @@ export const restoreBackup = async (backup, cancelToken) => {
         for (const budget of backup.data.budgets) {
           // Validate required fields
           if (!budget.id || !budget.category_id || !budget.amount || !budget.currency) {
-            console.warn('Skipping budget with missing required fields:', budget);
+            console.warn('Skipping budget with missing required fields, id:', budget?.id);
             continue;
           }
           // `budgets.category_id` is the one category FK that is NOT NULL, so a
@@ -1229,7 +1229,7 @@ export const restoreBackup = async (backup, cancelToken) => {
         const restoredGroupIds = new Set();
         for (const group of groups) {
           if (!group.id || !group.label) {
-            console.warn('Skipping budget line group with missing required fields:', group);
+            console.warn('Skipping budget line group with missing required fields, id:', group?.id);
             continue;
           }
           // A CSV round trip turns a null amount into '', which must restore as a
@@ -1258,7 +1258,7 @@ export const restoreBackup = async (backup, cancelToken) => {
         let restoredPlans = 0;
         for (const plan of plans) {
           if (!plan.id || !plan.month || !plan.currency) {
-            console.warn('Skipping budget plan with missing required fields:', plan);
+            console.warn('Skipping budget plan with missing required fields, id:', plan?.id);
             continue;
           }
           await db.runAsync(
@@ -1288,13 +1288,13 @@ export const restoreBackup = async (backup, cancelToken) => {
           // amount is a NOT NULL text column; treat null/empty as invalid and
           // skip (mirrors how budgets skip rows with missing required fields).
           if (!line.id || line.amount == null || line.amount === '') {
-            console.warn('Skipping budget plan line with missing required fields:', line);
+            console.warn('Skipping budget plan line with missing required fields, id:', line?.id);
             continue;
           }
           const isRecurring = Number(line.is_recurring) === 1;
           if (!isRecurring) {
             if (!line.plan_id) {
-              console.warn('Skipping budget plan line with missing required fields:', line);
+              console.warn('Skipping budget plan line with missing required fields, id:', line?.id);
               continue;
             }
             if (!restoredPlanIds.has(line.plan_id)) {
@@ -1579,7 +1579,7 @@ export const restoreBackup = async (backup, cancelToken) => {
         let restoredRules = 0;
         for (const rule of backup.data.notification_merchant_rules) {
           if (!rule.id || !rule.merchant) {
-            console.warn('Skipping merchant rule with missing id or merchant:', rule);
+            console.warn('Skipping merchant rule with missing id or merchant, id:', rule?.id);
             continue;
           }
           // INSERT OR IGNORE: a rule whose category was not restored is skipped

@@ -27,6 +27,11 @@ const isDev = typeof __DEV__ !== 'undefined' && __DEV__;
  * not.
  */
 const REDACTION_PATTERNS = [
+  // Values of money and free-text fields in a logged object (LogService
+  // serializes objects as JSON). A short amount ("newBalance":"950") slipped
+  // past the digit rules below, and no rule covered a description, a
+  // merchant or an account name at all.
+  /"([A-Za-z_]*(?:amount|balance|description|name|merchant|label|raw|text|title|comment|note|mask|latitude|longitude)[A-Za-z_]*)"\s*:\s*("(?:[^"\\]|\\.)*"|-?[\d.,]+)/gi,
   // Emails / address-like tokens.
   /[a-zA-Z0-9._%+-]+@[a-zA-Z0-9.-]+\.[a-zA-Z]{2,}/g,
   // Decimal amounts: 1234.56, 1,234.56, -12.5
@@ -39,9 +44,10 @@ const REDACTION_PATTERNS = [
 export function redactText(text) {
   if (typeof text !== 'string') return text;
   let out = text;
-  for (const re of REDACTION_PATTERNS) {
-    out = out.replace(re, '[redacted]');
-  }
+  REDACTION_PATTERNS.forEach((re, index) => {
+    // The first pattern keeps the key so the line still says what was there.
+    out = out.replace(re, index === 0 ? '"$1":"[redacted]"' : '[redacted]');
+  });
   return out;
 }
 

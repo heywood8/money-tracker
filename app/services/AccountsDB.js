@@ -649,7 +649,9 @@ export const reorderAccounts = async (orderedAccounts) => {
  */
 export const adjustAccountBalance = async (accountId, newBalance, description = '') => {
   try {
-    console.log('adjustAccountBalance called:', { accountId, newBalance, description });
+    // The balance and description are the user's financial data: every log line
+    // is mirrored to Sentry, so only the id is logged.
+    console.log('adjustAccountBalance called for account', accountId);
 
     // Import necessary modules within the function to avoid circular dependencies
     const OperationsDB = require('./OperationsDB');

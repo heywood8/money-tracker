@@ -162,6 +162,20 @@ describe('services/sentry', () => {
       expect(mod.redactText('cents=123456')).toBe('cents=[redacted]');
     });
 
+    // LogService serializes a logged object as JSON. A short balance
+    // ("newBalance":"950") passed the digit rules, and nothing covered a
+    // description, a merchant or an account name.
+    it('scrubs money and free-text fields of a logged object, whatever their size', () => {
+      const { mod } = loadWith({ dsn: DSN });
+      const line = 'adjust: {"accountId":7,"newBalance":"950","description":"Rent to John Smith","amount":12,"name":"Main card","merchant":"YANDEX.GO"}';
+      const out = mod.redactText(line);
+      expect(out).not.toMatch(/950|John|Main card|YANDEX/);
+      expect(out).toContain('"newBalance":"[redacted]"');
+      expect(out).toContain('"description":"[redacted]"');
+      expect(out).toContain('"amount":"[redacted]"');
+      expect(out).toContain('"accountId":7');
+    });
+
     it('scrubs email / PII addresses', () => {
       const { mod } = loadWith({ dsn: DSN });
       expect(mod.redactText('user jane.doe@example.com failed')).toBe(
