@@ -1,5 +1,12 @@
 # Changelog
 
+## [0.292.16](https://github.com/heywood8/money-tracker/compare/penny-v0.292.15...penny-v0.292.16) (2026-09-26)
+
+
+### Bug Fixes
+
+* **operations:** size notification cards to their content ([#1841](https://github.com/heywood8/money-tracker/issues/1841)) ([ff49941](https://github.com/heywood8/money-tracker/commit/ff4994180af42ddc6e25bc94cdea728708ccfaf7))
+
 ## [0.292.15](https://github.com/heywood8/money-tracker/compare/penny-v0.292.14...penny-v0.292.15) (2026-09-26)
 
 
