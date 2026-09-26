@@ -12,6 +12,8 @@ import NotificationBindingStack, {
   MAX_DECK,
   MIN_CARD_HEIGHT,
   PEEK_OFFSET,
+  deckCardMaxHeight,
+  deckCardMinHeight,
   deckPeekAllowance,
 } from '../../../app/components/operations/NotificationBindingStack';
 import { kindRequiresCategory } from '../../../app/services/notifications/parseBankNotification';
@@ -100,6 +102,27 @@ describe('deckPeekAllowance', () => {
   });
 });
 
+describe('deckCardMinHeight', () => {
+  it('keeps a card at least as tall as the measured quick-add form', async () => {
+    expect(deckCardMinHeight(437)).toBe(437);
+  });
+
+  it('floors an unmeasured or implausibly small form', async () => {
+    expect(deckCardMinHeight(0)).toBe(MIN_CARD_HEIGHT);
+    expect(deckCardMinHeight(12)).toBe(MIN_CARD_HEIGHT);
+  });
+});
+
+describe('deckCardMaxHeight', () => {
+  it('lets a card grow to a share of the window', async () => {
+    expect(deckCardMaxHeight(1000, MIN_CARD_HEIGHT)).toBe(600);
+  });
+
+  it('never caps a card below its own floor', async () => {
+    expect(deckCardMaxHeight(300, 437)).toBe(437);
+  });
+});
+
 describe('NotificationBindingStack', () => {
   beforeEach(() => {
     jest.clearAllMocks();
@@ -111,15 +134,13 @@ describe('NotificationBindingStack', () => {
     expect(toJSON()).toBeNull();
   });
 
-  it('opens at the floor frame before the quick-add panel has been measured', async () => {
+  it('opens at the floor before the quick-add panel has been measured', async () => {
     // A panel collapsed behind the + button has no reason to have reported a
     // height yet, and a queue filled in the background must still reach the
     // screen: the cards do not wait for a measurement.
     const { getByTestId } = await renderStack({ quickAddHeight: 0 });
-    const card = getByTestId('notification-binding-card');
-    expect(card.props.style).toEqual(
-      expect.arrayContaining([expect.objectContaining({ height: MIN_CARD_HEIGHT })]),
-    );
+    const card = StyleSheet.flatten(getByTestId('notification-binding-card').props.style);
+    expect(card.minHeight).toBe(MIN_CARD_HEIGHT);
   });
 
   it('shows the oldest suggestion as the only interactive card (FIFO)', async () => {
@@ -138,12 +159,11 @@ describe('NotificationBindingStack', () => {
     expect(getByText('dismiss')).toBeTruthy();
   });
 
-  it('pins the card frame to the measured quick-add height', async () => {
+  it('never lets the card get shorter than the measured quick-add height', async () => {
     const { getByTestId } = await renderStack({ quickAddHeight: 411 });
-    const card = getByTestId('notification-binding-card');
-    expect(card.props.style).toEqual(
-      expect.arrayContaining([expect.objectContaining({ height: 411 })]),
-    );
+    const card = StyleSheet.flatten(getByTestId('notification-binding-card').props.style);
+    expect(card.minHeight).toBe(411);
+    expect(card.maxHeight).toBeGreaterThanOrEqual(411);
   });
 
   it('renders the full expense binding form: label input, account picker, category grid', async () => {
@@ -261,6 +281,66 @@ describe('NotificationBindingStack', () => {
   });
 
   describe('Regression Tests', () => {
+    // The card frame used to be pinned to the quick-add form's height. With the
+    // form never measured (the app opened onto a pending notification, or the
+    // quick-add panel is hidden) that fell to the 260dp floor, shorter than the
+    // card's own content, and the category chips were cut off at the bottom.
+    it('sizes the card to its content instead of pinning a height', async () => {
+      const { getByTestId } = await renderStack({ quickAddHeight: 0 });
+      const card = StyleSheet.flatten(getByTestId('notification-binding-card').props.style);
+
+      expect(card.height).toBeUndefined();
+      expect(card.minHeight).toBe(MIN_CARD_HEIGHT);
+      expect(card.maxHeight).toBeGreaterThanOrEqual(MIN_CARD_HEIGHT);
+    });
+
+    // `flex: 1` is a zero flex basis: the body would only ever get the space the
+    // minHeight left over, clipping whatever content went past it.
+    it('lets the card body grow from its content rather than a zero basis', async () => {
+      const { getByTestId } = await renderStack({ quickAddHeight: 0 });
+      const body = StyleSheet.flatten(getByTestId('binding-card-body').props.style);
+
+      expect(body.flex).toBeUndefined();
+      expect(body.flexBasis).toBeUndefined();
+      expect(body.flexGrow).toBe(1);
+      expect(body.flexShrink).toBe(1);
+    });
+
+    // An absolutely positioned front card contributes no height, which is what
+    // forced the host to pin one. In flow, the card's content sizes the deck.
+    it('lays the front card out in flow so it gives the deck its height', async () => {
+      const { getByTestId, toJSON } = await renderStack({
+        suggestions: makeSuggestions(3),
+        choices: { p1: { accountId: 1, categoryId: 'c1' } },
+      });
+      const front = StyleSheet.flatten(getByTestId('notification-binding-front').props.style);
+      const root = StyleSheet.flatten(toJSON().props.style);
+
+      expect(front.position).toBeUndefined();
+      expect(front.height).toBeUndefined();
+      expect(root.position).toBeUndefined();
+      expect(root.height).toBeUndefined();
+      expect(root.paddingTop).toBe(deckPeekAllowance(3));
+    });
+
+    // Behind cards follow the front card's height by being anchored to both
+    // edges: each layer sits one peek higher than the one in front of it.
+    it('anchors the cards behind to the front card instead of a fixed height', async () => {
+      const { getAllByTestId } = await renderStack({
+        suggestions: makeSuggestions(3),
+        choices: { p1: { accountId: 1, categoryId: 'c1' } },
+      });
+      // Rendered deepest first.
+      const peeks = getAllByTestId('notification-binding-peek', { includeHiddenElements: true })
+        .map((peek) => StyleSheet.flatten(peek.props.style));
+
+      expect(peeks.map((p) => p.height)).toEqual([undefined, undefined]);
+      expect(peeks.map((p) => [p.top, p.bottom])).toEqual([
+        [0, 2 * PEEK_OFFSET],
+        [PEEK_OFFSET, PEEK_OFFSET],
+      ]);
+    });
+
     // An income notification arrives with nothing bound, so the selected-category
     // row is absent — and that row used to be the only thing spacing the category
     // grid off the account picker, leaving income chips flush against it.

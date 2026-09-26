@@ -36,8 +36,10 @@ const formatSuggestionDate = (isoDate) => {
  * category grid (expense/income) or a target-account picker (ATM transfers),
  * with Dismiss/Save actions pinned to the card's bottom edge.
  *
- * The card's height is pinned to the measured quick-add panel height so the deck
- * reads as cards laid over the form; the body scrolls inside that fixed frame.
+ * The card sizes to its content between two bounds: `minHeight` (the quick-add
+ * form's height, so the list does not jump when the form comes back) and
+ * `maxHeight` (a share of the screen). Only past `maxHeight` does the body
+ * scroll, and the actions stay pinned below it either way.
  */
 const NotificationBindingCard = ({
   item,
@@ -47,7 +49,8 @@ const NotificationBindingCard = ({
   accounts,
   categories,
   saveError = false,
-  height,
+  minHeight,
+  maxHeight,
   onChoiceChange,
   onSave,
   onDismiss,
@@ -81,11 +84,11 @@ const NotificationBindingCard = ({
     backgroundColor: colors.surface,
     borderColor: colors.border,
     borderLeftColor: colors.primary,
-    // Pinned to the height the deck measured for the quick-add panel (already
-    // floored by the stack), so the card never overhangs its overlay container —
-    // an overhanging bottom would put the pinned actions outside the parent's
-    // bounds, where Android doesn't deliver touches.
-    height,
+    // Bounds, not a height. A frame pinned to the quick-add height clipped the
+    // category chips whenever that form had not been measured yet (the deck
+    // then fell back to its 260dp floor, shorter than this card's content).
+    minHeight,
+    maxHeight,
   };
 
   // A screen reader hears each card's identical buttons ("Dismiss"/"Save")
@@ -95,6 +98,7 @@ const NotificationBindingCard = ({
   return (
     <View testID="notification-binding-card" style={[styles.card, frameStyle]}>
       <ScrollView
+        testID="binding-card-body"
         style={styles.body}
         nestedScrollEnabled
         keyboardShouldPersistTaps="handled"
@@ -256,7 +260,8 @@ NotificationBindingCard.propTypes = {
   accounts: PropTypes.array.isRequired,
   categories: PropTypes.array.isRequired,
   saveError: PropTypes.bool,
-  height: PropTypes.number.isRequired,
+  minHeight: PropTypes.number.isRequired,
+  maxHeight: PropTypes.number.isRequired,
   onChoiceChange: PropTypes.func.isRequired,
   onSave: PropTypes.func.isRequired,
   onDismiss: PropTypes.func.isRequired,
@@ -290,7 +295,13 @@ const styles = StyleSheet.create({
     alignItems: 'flex-end',
   },
   body: {
-    flex: 1,
+    // Never `flex: 1`: that sets a zero basis, so the body would only ever get
+    // the card's minHeight and the content past it would be cut off again. These
+    // two match ScrollView's own defaults and are spelled out so the contract
+    // (start from the content's height, fill up to minHeight, shrink under
+    // maxHeight) does not hinge on React Native internals.
+    flexGrow: 1,
+    flexShrink: 1,
     paddingHorizontal: SPACING.md,
     paddingTop: SPACING.md,
   },

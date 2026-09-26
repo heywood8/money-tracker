@@ -27,7 +27,7 @@ import OperationsList from '../components/operations/OperationsList';
 import OperationActionMenu from '../components/operations/OperationActionMenu';
 import QuickAddForm from '../components/operations/QuickAddForm';
 import QuickAddRateSync from '../components/operations/QuickAddRateSync';
-import NotificationBindingStack, { deckPeekAllowance, deckCardHeight } from '../components/operations/NotificationBindingStack';
+import NotificationBindingStack from '../components/operations/NotificationBindingStack';
 import PickerModal from '../components/operations/PickerModal';
 import UndoSnackbar, { UNDO_DURATION_MS } from '../components/operations/UndoSnackbar';
 import { SUGGESTION_TIMEOUT_MS } from '../components/operations/DescriptionSuggestionRow';
@@ -511,9 +511,10 @@ const OperationsScreen = () => {
   // is exactly what opening and closing search does, and why that stayed the
   // only cure through six attempts.
   //
-  // So the cards stop living in the clip. Their container is a plain View with
-  // its own height, a sibling of the clip rather than a child, and no shared
-  // value, ceiling, transform or overflow stands between them and the screen.
+  // So the cards stop living in the clip. Their container is a plain View, a
+  // sibling of the clip rather than a child, sized by the front card's content,
+  // and no shared value, ceiling, transform or overflow stands between them and
+  // the screen.
   const deckUp = hasSuggestions && !isSearchOpen;
   // Mirrors for the layout handler and the diagnostic snapshot, which both run
   // outside a render and must read the block as it stands, not as it stood when
@@ -562,12 +563,12 @@ const OperationsScreen = () => {
     return () => subscription?.remove?.();
   }, []);
 
-  // Measured height of the quick-add wrapper — the binding cards pin their frame
-  // to it so the deck reads as cards stacked over the form. Rounded, and only
-  // committed on a real change, so onLayout can't ping-pong re-renders. The deck
-  // does not wait for it: a panel collapsed behind the + button has no reason to
-  // have been measured yet, so the cards fall back to their floor height
-  // (deckCardHeight) until a real measurement lands.
+  // Measured height of the quick-add wrapper — the binding cards never get
+  // shorter than it, so the list does not jump when the deck gives way to the
+  // form. Rounded, and only committed on a real change, so onLayout can't
+  // ping-pong re-renders. The deck does not wait for it: a panel collapsed behind
+  // the + button has no reason to have been measured yet, and the cards size to
+  // their own content regardless (deckCardMinHeight is only their floor).
   const [quickAddHeight, setQuickAddHeight] = useState(0);
   const loggedQuickAddHeightRef = useRef(null);
   const quickAddHeightLogTimerRef = useRef(null);
@@ -578,14 +579,14 @@ const OperationsScreen = () => {
     const measured = Math.round(event.nativeEvent.layout.height);
     // A zero from an *open* block is never the truth: the form is always there,
     // so 0 means a transient pass — the card-leave LayoutAnimation reports one
-    // every time a suggestion is accepted. Keeping it dropped the deck's frame
-    // to the MIN_CARD_HEIGHT floor, so the next suggestion rendered a 260-high
-    // card and jumped to the form's height a frame later. While the block is
+    // every time a suggestion is accepted. Keeping it dropped the cards' minimum
+    // to the MIN_CARD_HEIGHT floor, so a card shorter than the form shrank for a
+    // frame and jumped back once the form measured again. While the block is
     // collapsed 0 *is* the truth (nothing is laid out behind the + button), and
-    // the deck floors its frame for exactly that case — except while a deck is
-    // UP, because a deck now collapses the form itself and the cards are sized
-    // from the height it last had. Reading that collapse as "the form is 0 tall"
-    // would shrink every card to the floor the moment it appeared.
+    // the deck floors its minimum for exactly that case — except while a deck is
+    // UP, because a deck now collapses the form itself and the cards take their
+    // minimum from the height it last had. Reading that collapse as "the form is
+    // 0 tall" would drop every card's minimum to the floor the moment it appeared.
     if (measured === 0 && (!quickAddCollapsedRef.current || suggestionsCountRef.current > 0)) {
       // Once per run of them: a LayoutAnimation reports several zero passes in a
       // row, and this handler runs on every frame of one.
@@ -1522,21 +1523,18 @@ const OperationsScreen = () => {
   const quickAddFormComponent = useMemo(() => (
     <>
       {/* The review deck: a plain container, a SIBLING of the clip rather than a
-          child of it, with a height of its own. Nothing here is animated, has a
-          ceiling, or is clipped — because the clip is precisely what six repairs
-          could not reopen once Reanimated had written a `maxHeight: 0` into it
-          behind a stopped activity (see `deckUp`). The cards are absolutely
-          positioned inside, so the height is explicit rather than a minimum:
-          padding for the peeking edges above, the floored card frame below. */}
+          child of it. Nothing here is animated, has a ceiling, or is clipped —
+          because the clip is precisely what six repairs could not reopen once
+          Reanimated had written a `maxHeight: 0` into it behind a stopped
+          activity (see `deckUp`). It sets no height either: the deck lays its
+          front card out in normal flow and pads its own top for the peeking
+          edges, so the container takes its height from the card's content. A
+          height pinned here from the form clipped the card whenever the form
+          had not been measured yet. */}
       {deckUp && (
         <View
           ref={deckHostRef}
           onLayout={handleDeckHostLayout}
-          style={{
-            paddingTop: deckPeekAllowance(operationSuggestions.length),
-            height: deckPeekAllowance(operationSuggestions.length)
-              + deckCardHeight(quickAddHeight),
-          }}
         >
           <NotificationBindingStack
             suggestions={operationSuggestions}
