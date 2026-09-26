@@ -1,6 +1,6 @@
 import React, { useRef, useEffect, memo } from 'react';
 import PropTypes from 'prop-types';
-import { View, Text, StyleSheet, Animated, Easing } from 'react-native';
+import { View, Text, StyleSheet, Animated, Easing, useWindowDimensions } from 'react-native';
 import NotificationBindingCard from './NotificationBindingCard';
 import { SPACING, BORDER_RADIUS } from '../../styles/designTokens';
 import { motionDuration } from '../../utils/reducedMotion';
@@ -15,25 +15,36 @@ export const PEEK_OFFSET = 10;
 // scale transform (which would shift the top edge and need translate compensation).
 const EDGE_INSET = 8;
 // Floor for the card frame when the measured quick-add panel is implausibly small
-// (a transient near-zero layout pass) — the form needs at least this to be usable.
-// It is also the frame the deck opens with before the panel has reported any
-// height at all: a queue that fills while the panel sits collapsed behind the
-// + button must still put its cards on screen, and an unmeasured panel is the
-// normal state there, not a transient.
+// (a transient near-zero layout pass). It is also the floor the deck opens with
+// before the panel has reported any height at all: a queue that fills while the
+// panel sits collapsed behind the + button must still put its cards on screen,
+// and an unmeasured panel is the normal state there, not a transient.
 export const MIN_CARD_HEIGHT = 260;
+// Share of the window a card may grow to before its body scrolls instead, so
+// Save stays on screen when "All categories" opens a long grid. Kept well under
+// the viewport: the search pill above the list and the floating tab bar below
+// it take roughly a fifth of the window between them.
+const MAX_CARD_WINDOW_SHARE = 0.6;
 
 /**
- * The card frame height for a measured quick-add panel height, floored so the
- * cards stay usable if a transient layout pass reports a tiny value. Exported so
- * the host can reserve a matching container minHeight and the cards never overhang
- * their overlay (where Android would drop touches on the pinned actions).
+ * The shortest a card may be: the measured quick-add panel height, so the
+ * list below does not jump when the queue drains and the form comes back,
+ * floored so a transient near-zero layout pass cannot shrink it. A floor only:
+ * the card grows past it to fit its content. Pinning the frame to this value
+ * clipped the category chips whenever the panel had not been measured yet.
  */
-export const deckCardHeight = (quickAddHeight) => Math.max(quickAddHeight, MIN_CARD_HEIGHT);
+export const deckCardMinHeight = (quickAddHeight) => Math.max(quickAddHeight, MIN_CARD_HEIGHT);
 
 /**
- * Vertical headroom the deck needs above the quick-add panel so the cards
- * behind the front one have room to peek. The host screen adds this as padding
- * above the quick-add wrapper; exported so both share one source of truth.
+ * The tallest a card may grow before its body scrolls: a share of the window,
+ * never below the card's own floor.
+ */
+export const deckCardMaxHeight = (windowHeight, minHeight) =>
+  Math.max(minHeight, Math.round(windowHeight * MAX_CARD_WINDOW_SHARE));
+
+/**
+ * Vertical headroom the deck needs above the front card so the cards behind it
+ * have room to peek. The deck pads its own top by this much.
  */
 export const deckPeekAllowance = (count) =>
   Math.max(0, Math.min(count, MAX_DECK) - 1) * PEEK_OFFSET;
@@ -87,14 +98,14 @@ DeckSlot.propTypes = {
 };
 
 /**
- * FIFO deck of notification binding cards laid over the quick-add panel.
+ * FIFO deck of notification binding cards, shown in place of the quick-add panel.
  *
- * The oldest pending notification is the front, interactive card, sized and
- * positioned to cover the quick-add form exactly; up to three older siblings
- * peek above it as receding deck layers. Anything beyond MAX_DECK is summed in
- * a "+N" badge over the deepest visible edge. The host renders this inside a
- * relatively-positioned container that also holds the quick-add form and adds
- * deckPeekAllowance() of top padding for the peeking edges.
+ * The oldest pending notification is the front, interactive card, laid out in
+ * normal flow so its content decides the deck's height (never shorter than the
+ * quick-add form it stands in for); up to three older siblings peek above it as
+ * receding deck layers, anchored to its edges. Anything beyond MAX_DECK is summed
+ * in a "+N" badge over the deepest visible edge. The deck pads its own top by
+ * deckPeekAllowance() for the peeking edges, so the host needs no height for it.
  */
 const NotificationBindingStack = memo(function NotificationBindingStack({
   suggestions = [],
@@ -110,15 +121,19 @@ const NotificationBindingStack = memo(function NotificationBindingStack({
   onDismiss,
 }) {
   const count = suggestions ? suggestions.length : 0;
-  const cardHeight = deckCardHeight(quickAddHeight);
+  const { height: windowHeight } = useWindowDimensions();
+  const minCardHeight = deckCardMinHeight(quickAddHeight);
+  const maxCardHeight = deckCardMaxHeight(windowHeight, minCardHeight);
   // Before the early return, as hooks must be: the line that says the cards
-  // reached the tree, and with what frame.
+  // reached the tree, and with what bounds.
   useEffect(() => {
-    if (count > 0) console.log('[deck] stack rendered', { count, cardHeight, quickAddHeight });
-  }, [count, cardHeight, quickAddHeight]);
+    if (count > 0) {
+      console.log('[deck] stack rendered', { count, minCardHeight, maxCardHeight, quickAddHeight });
+    }
+  }, [count, minCardHeight, maxCardHeight, quickAddHeight]);
 
   // An unmeasured panel (quickAddHeight 0) is not a reason to hold the cards
-  // back — deckCardHeight floors the frame, and the host reserves the same room.
+  // back — the front card sizes to its own content either way.
   if (count === 0) return null;
 
   const visible = suggestions.slice(0, MAX_DECK);
@@ -126,34 +141,37 @@ const NotificationBindingStack = memo(function NotificationBindingStack({
   const peekDepth = visible.length - 1;
 
   return (
-    <View style={styles.overlay} pointerEvents="box-none">
+    <View
+      style={{ paddingTop: deckPeekAllowance(count) }}
+      pointerEvents="box-none"
+    >
       {/* Deepest card first: later siblings draw on top, so the front card wins
           without zIndex juggling. */}
       {visible
         .map((item, depth) => ({ item, depth }))
         .reverse()
         .map(({ item, depth }) => {
-          const slotStyle = {
-            position: 'absolute',
-            top: (peekDepth - depth) * PEEK_OFFSET,
-            left: SPACING.sm + depth * EDGE_INSET,
-            right: SPACING.sm + depth * EDGE_INSET,
-          };
+          const inset = SPACING.sm + depth * EDGE_INSET;
           if (depth > 0) {
             // Only the top PEEK_OFFSET strip of a behind card is ever visible —
             // render just its chrome, invisible to touch and screen readers.
+            // Anchored top AND bottom rather than given a height, so it tracks
+            // the front card as that card grows to fit its content: each layer
+            // sits `depth` peeks higher than the front card, bottom edge included.
             return (
               <DeckSlot
                 key={item.id}
                 testID="notification-binding-peek"
                 style={[
                   styles.peekCard,
-                  slotStyle,
                   {
+                    top: (peekDepth - depth) * PEEK_OFFSET,
+                    bottom: depth * PEEK_OFFSET,
+                    left: inset,
+                    right: inset,
                     backgroundColor: colors.surface,
                     borderColor: colors.border,
                     borderLeftColor: colors.primary,
-                    height: cardHeight,
                   },
                 ]}
                 pointerEvents="none"
@@ -161,8 +179,14 @@ const NotificationBindingStack = memo(function NotificationBindingStack({
               />
             );
           }
+          // The front card stays in normal flow: it is what gives the deck (and
+          // the host container) its height.
           return (
-            <DeckSlot key={item.id} style={slotStyle}>
+            <DeckSlot
+              key={item.id}
+              testID="notification-binding-front"
+              style={{ marginHorizontal: inset }}
+            >
               <NotificationBindingCard
                 item={item}
                 choice={choices[item.id] || {}}
@@ -171,7 +195,8 @@ const NotificationBindingStack = memo(function NotificationBindingStack({
                 accounts={accounts}
                 categories={categories}
                 saveError={!!saveErrors[item.id]}
-                height={cardHeight}
+                minHeight={minCardHeight}
+                maxHeight={maxCardHeight}
                 onChoiceChange={(patch) => onChoiceChange(item.id, patch)}
                 onSave={() => onSave(item)}
                 onDismiss={() => onDismiss(item)}
@@ -223,17 +248,11 @@ const styles = StyleSheet.create({
     ...BADGE_TEXT,
     color: '#ffffff',
   },
-  overlay: {
-    bottom: 0,
-    left: 0,
-    position: 'absolute',
-    right: 0,
-    top: 0,
-  },
   peekCard: {
     borderLeftWidth: 3,
     borderRadius: BORDER_RADIUS.md,
     borderWidth: StyleSheet.hairlineWidth,
+    position: 'absolute',
   },
 });
 
