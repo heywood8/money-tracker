@@ -1,5 +1,12 @@
 # Changelog
 
+## [0.292.15](https://github.com/heywood8/money-tracker/compare/penny-v0.292.14...penny-v0.292.15) (2026-09-26)
+
+
+### Bug Fixes
+
+* address the 20 highest-impact audit findings ([#1839](https://github.com/heywood8/money-tracker/issues/1839)) ([bd6fba7](https://github.com/heywood8/money-tracker/commit/bd6fba700e992a3ebfb899a6a4e36bff2acd8f68))
+
 ## [0.292.14](https://github.com/heywood8/money-tracker/compare/penny-v0.292.13...penny-v0.292.14) (2026-09-25)
 
 
