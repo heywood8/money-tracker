@@ -570,6 +570,10 @@ describe('BackupRestore', () => {
         },
       });
 
+      // The review queue is read and cleared first (it is put back once the
+      // new accounts and categories are in), before anything that cascades
+      // into it.
+      expect(deleteCalls.shift()).toContain('pending_notifications');
       expect(deleteCalls[0]).toContain('notification_merchant_rules');
       // Parse templates (migration 0025) reference categories (ON DELETE SET
       // NULL), so they clear before the categories they point at.
@@ -1379,6 +1383,93 @@ language,en,
   // bindings and templates to match. (importBackupSQLite itself loads its
   // modules with dynamic import(), which this Jest setup cannot run, so the
   // extraction step is tested through readCarriedNotificationData.)
+  // Migrating a file creates every table it lacks, so any SQLite file came out
+  // as an empty Penny schema and the restore wiped the live database while
+  // reporting success. The table list is checked before migrating.
+  // The review queue is never in a backup, but DELETE FROM accounts cascaded
+  // away every queued item with a resolved account, and the processed
+  // signatures kept them from ever being queued again.
+  describe('restore keeps the bank-notification review queue', () => {
+    // The live row joined with its account, as the preservation read returns it.
+    const queued = {
+      id: 'p1', kind: 'PURCHASE', type: 'expense', amount: '1000', currency: 'AMD', card_mask: '4083***7027',
+      merchant: 'NEW BAKERY', country: 'AM', date: '2026-06-28', time: '09:10', account_id: 2,
+      category_id: 'gone-category', package_name: 'am.bank', raw: 'PURCHASE | 1,000.00 AMD',
+      latitude: null, longitude: null, force_added: 0, created_at: '2026-06-28T05:10:00.000Z',
+      account_name: 'Card', account_currency: 'AMD',
+    };
+
+    const restoreCapturing = async ({ liveAccountExists, liveSigs, restoredSigs }) => {
+      const runAsync = jest.fn().mockResolvedValue({ lastInsertRowId: 1, changes: 1 });
+      const tx = {
+        runAsync,
+        getAllAsync: jest.fn(async (sql) => {
+          if (sql.includes('FROM pending_notifications p')) return [queued];
+          if (sql.includes("key = 'bank_notifications_processed_sigs'")) {
+            return liveSigs ? [{ value: JSON.stringify(liveSigs) }] : [];
+          }
+          return [];
+        }),
+        getFirstAsync: jest.fn(async (sql, params) => {
+          // Ids are reassigned by the restore: the account is found by name and
+          // currency, under whatever id it now has.
+          if (sql.startsWith('SELECT id FROM accounts WHERE name = ?')) {
+            return liveAccountExists && params[0] === 'Card' && params[1] === 'AMD' ? { id: 5 } : null;
+          }
+          if (sql.includes("key = 'bank_notifications_processed_sigs'")) {
+            return restoredSigs ? { value: JSON.stringify(restoredSigs) } : null;
+          }
+          return null;
+        }),
+      };
+      mockDb.executeTransaction.mockImplementation(async (callback) => callback(tx));
+      await BackupRestore.restoreBackup({
+        version: 1,
+        timestamp: '2024-01-01T00:00:00.000Z',
+        platform: 'native',
+        data: { accounts: [], categories: [], operations: [], app_metadata: [] },
+      });
+      return runAsync.mock.calls;
+    };
+
+    it('puts queued items back on the same account under its new id', async () => {
+      const calls = await restoreCapturing({ liveAccountExists: true });
+      const insert = calls.find(([sql]) => sql.includes('INSERT OR IGNORE INTO pending_notifications'));
+      expect(insert[1][0]).toBe('p1');
+      expect(insert[1][10]).toBe(5);        // the restored account, not the stale id 2
+      expect(insert[1][11]).toBeNull();     // category the restored set lacks, left for review
+    });
+
+    it('leaves the account to pick when the restored data has no such account', async () => {
+      const calls = await restoreCapturing({ liveAccountExists: false });
+      const insert = calls.find(([sql]) => sql.includes('INSERT OR IGNORE INTO pending_notifications'));
+      expect(insert[1][10]).toBeNull();
+    });
+
+    it('keeps the notifications this device already handled marked as handled', async () => {
+      const calls = await restoreCapturing({ liveAccountExists: true, liveSigs: ['a', 'b'], restoredSigs: ['x', 'a'] });
+      const write = calls.find(([sql, params]) => sql.startsWith('INSERT OR REPLACE INTO app_metadata')
+        && params[0] === 'bank_notifications_processed_sigs');
+      expect(JSON.parse(write[1][1])).toEqual(['x', 'a', 'b']);
+    });
+  });
+
+  describe('SQLite (.db) import of a non-Penny file', () => {
+    it('refuses a file without the core tables', () => {
+      expect(() => BackupRestore.assertPennyDatabaseTables(new Set()))
+        .toThrow('not a Penny database (missing tables: accounts, categories, operations)');
+      expect(() => BackupRestore.assertPennyDatabaseTables(new Set(['moz_places', 'accounts'])))
+        .toThrow('missing tables: categories, operations');
+      expect(() => BackupRestore.assertPennyDatabaseTables(new Set(['accounts', 'categories'])))
+        .toThrow('missing table: operations');
+    });
+
+    it('accepts the oldest Penny schema', () => {
+      const oldest = new Set(['accounts', 'app_metadata', 'budgets', 'categories', 'operations']);
+      expect(() => BackupRestore.assertPennyDatabaseTables(oldest)).not.toThrow();
+    });
+  });
+
   describe('SQLite (.db) import of notification data', () => {
     const olderFileTables = new Set(['accounts', 'categories', 'operations', 'budgets', 'app_metadata']);
     const newerFileTables = new Set([...olderFileTables, 'notification_merchant_rules', 'notification_templates']);

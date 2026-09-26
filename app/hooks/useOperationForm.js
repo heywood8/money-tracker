@@ -347,15 +347,19 @@ const useOperationForm = ({
           });
         }
       } else if (isNew) {
+        // A new operation defaults to an account the picker offers: `accounts`
+        // may include archived ones (they are still on their old operations),
+        // and defaulting to one would book onto an account the user cannot see.
+        const candidates = currentAccounts.filter(acc => !acc.hidden);
         let defaultAccountId = '';
-        if (currentAccounts.length === 1) {
-          defaultAccountId = currentAccounts[0].id;
-        } else if (currentAccounts.length > 1) {
+        if (candidates.length === 1) {
+          defaultAccountId = candidates[0].id;
+        } else if (candidates.length > 1) {
           const lastId = await getLastAccessedAccount();
-          if (lastId && currentAccounts.some(acc => acc.id === lastId)) {
+          if (lastId && candidates.some(acc => acc.id === lastId)) {
             defaultAccountId = lastId;
           } else {
-            defaultAccountId = currentAccounts.slice().sort((a, b) => (a.id < b.id ? -1 : 1))[0].id;
+            defaultAccountId = candidates.slice().sort((a, b) => (a.id < b.id ? -1 : 1))[0].id;
           }
         }
         if (!cancelled) {
@@ -394,7 +398,9 @@ const useOperationForm = ({
       newErrors.type = t('operation_type_required');
     }
 
-    if (!vals.amount || isNaN(parseFloat(vals.amount)) || parseFloat(vals.amount) <= 0) {
+    // A plain positive number only: `parseFloat` read "100+" as 100, and the
+    // unevaluable expression was then saved as 0.00.
+    if (!Currency.isPositiveAmount(vals.amount)) {
       newErrors.amount = t('valid_amount_required');
     }
 
@@ -461,15 +467,29 @@ const useOperationForm = ({
           }
         }
       } else if (data.amount && data.exchangeRate) {
-        // Recompute synchronously so a save before the async useEffect resolves
-        // never stores a destinationAmount that is inconsistent with amount × rate.
-        const recomputed = Currency.convertAmount(
-          data.amount,
-          sourceAccount.currency,
-          destinationAccount.currency,
-          data.exchangeRate,
-        );
-        if (recomputed) data.destinationAmount = recomputed;
+        // An edit that left the money alone (a label, the date) keeps the
+        // destination amount as stored. The stored rate is a 6-decimal rounding
+        // of what the user typed, so re-deriving the amount from it drifted: a
+        // 1,000,000 AMD → 2,564.10 USD transfer re-saved as 2,564.00 and the
+        // USD account silently lost 0.10.
+        const moneyUntouched = !isNew && operation && lastEditedField == null
+          && data.destinationAmount
+          && Currency.isValid(String(data.amount))
+          && Currency.compare(data.amount, String(operation.amount ?? '')) === 0
+          && String(data.exchangeRate) === String(operation.exchangeRate ?? '')
+          && String(data.accountId) === String(operation.accountId)
+          && String(data.toAccountId) === String(operation.toAccountId);
+        if (!moneyUntouched) {
+          // Recompute synchronously so a save before the async useEffect resolves
+          // never stores a destinationAmount that is inconsistent with amount × rate.
+          const recomputed = Currency.convertAmount(
+            data.amount,
+            sourceAccount.currency,
+            destinationAccount.currency,
+            data.exchangeRate,
+          );
+          if (recomputed) data.destinationAmount = recomputed;
+        }
       }
     } else if (isForeignCurrencyOp && sourceAccount && values.operationCurrency) {
       data.sourceCurrency = values.operationCurrency;
@@ -514,6 +534,14 @@ const useOperationForm = ({
         data.destinationAmount = formForeignAmount;  // foreign currency
         data.exchangeRate = Currency.invertRate(displayRate);
       }
+    } else if (sourceAccount && (data.type !== 'transfer' || destinationAccount)) {
+      // A plain operation in the account's own currency carries no currency
+      // pair. Left out, an edit that switched a foreign-currency expense back to
+      // the account currency kept its old source/destination currencies next to
+      // a cleared rate and amount, and the next open read the row as a foreign
+      // operation with an empty amount that could not be saved.
+      data.sourceCurrency = null;
+      data.destinationCurrency = null;
     }
 
     // Ensure amount is preserved when editing
@@ -664,15 +692,21 @@ const useOperationForm = ({
       return { success: false, error: 'Cannot split new operations' };
     }
 
-    const numSplitAmount = parseFloat(splitAmount);
-    const numOriginalAmount = parseFloat(values.amount);
+    const currency = sourceAccount?.currency;
 
-    // Validate split amount (parseFloat is acceptable here: validation only, not arithmetic)
-    if (isNaN(numSplitAmount) || numSplitAmount <= 0) {
+    // The form amount may still hold an unevaluated calculator entry ("100+5").
+    // Resolve it the way Save does; subtracting from the raw string coerced it to
+    // 0 and wrote a negative remainder ("-3.00") next to the split row.
+    let originalAmount = values.amount;
+    if (hasOperation(originalAmount)) {
+      originalAmount = evaluateExpression(originalAmount, Currency.getDecimalPlaces(currency));
+    }
+
+    if (!Currency.isPositiveAmount(originalAmount) || !Currency.isPositiveAmount(splitAmount)) {
       return { success: false, error: t('valid_amount_required') };
     }
 
-    if (numSplitAmount >= numOriginalAmount) {
+    if (Currency.compare(splitAmount, originalAmount) >= 0) {
       return { success: false, error: t('split_amount_error') };
     }
 
@@ -680,12 +714,16 @@ const useOperationForm = ({
       // Format both amounts to the account currency's decimal precision before persisting.
       // splitAmount is a raw calculator string; the remainder must also be formatted so
       // both DB rows are stored with correct decimal places (same as the non-split save path).
-      const currency = sourceAccount?.currency;
       const formattedSplit = Currency.formatAmount(splitAmount, currency);
       const formattedNew = Currency.formatAmount(
-        Currency.subtract(values.amount, formattedSplit),
+        Currency.subtract(originalAmount, formattedSplit),
         currency,
       );
+      // Rounding to the currency can leave nothing behind (99.996 split off
+      // 100.00): never write a zero or negative remainder.
+      if (!Currency.isPositive(formattedNew) || !Currency.isPositive(formattedSplit)) {
+        return { success: false, error: t('split_amount_error') };
+      }
 
       formModifiedRef.current = true;
 
@@ -710,7 +748,7 @@ const useOperationForm = ({
       console.error('[useOperationForm] Failed to split operation:', error);
       return { success: false, error: t('error') };
     }
-  }, [operation, isNew, values, splitOperation, t, setValues]);
+  }, [operation, isNew, values, splitOperation, t, setValues, sourceAccount]);
 
   return {
     // State

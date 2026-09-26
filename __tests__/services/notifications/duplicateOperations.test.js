@@ -8,14 +8,22 @@ import {
   operationMatchesNotification,
   findMatchingOperation,
   reconcilePendingNotifications,
+  rememberBookedOperation,
+  loadBookedPayees,
 } from '../../../app/services/notifications/duplicateOperations';
 import * as OperationsDB from '../../../app/services/OperationsDB';
 import * as AccountsDB from '../../../app/services/AccountsDB';
 import * as PendingNotificationsDB from '../../../app/services/PendingNotificationsDB';
+import * as PreferencesDB from '../../../app/services/PreferencesDB';
 
 jest.mock('../../../app/services/OperationsDB');
 jest.mock('../../../app/services/AccountsDB');
 jest.mock('../../../app/services/PendingNotificationsDB');
+jest.mock('../../../app/services/PreferencesDB', () => ({
+  PREF_KEYS: { BANK_NOTIFICATIONS_BOOKED_OPS: 'booked' },
+  getJsonPreference: jest.fn(async (key, fallback) => fallback),
+  setJsonPreference: jest.fn(async () => {}),
+}));
 
 const AMD = { id: 9, currency: 'AMD', autoTxnRounding: null, autoTxnRoundingMode: null };
 const AMD_ROUND_100 = { id: 9, currency: 'AMD', autoTxnRounding: 100, autoTxnRoundingMode: 'nearest' };
@@ -105,6 +113,64 @@ describe('operationMatchesNotification', () => {
     const transferItem = item({ type: 'transfer' });
     const transferOp = op({ type: 'transfer' });
     expect(operationMatchesNotification(transferOp, transferItem, AMD)).toBe(true);
+  });
+});
+
+// An operation the pipeline booked from one notification must not absorb a
+// same-amount notification for another payee (two same-price purchases a day).
+describe('operationMatchesNotification with booked operations', () => {
+  const booked = new Map([['1', ['yandex go', 'yandex.go']]]);
+
+  it('does not match a notification for a different payee', () => {
+    expect(operationMatchesNotification(op(), item({ merchant: 'NEW BAKERY' }), AMD, booked)).toBe(false);
+  });
+
+  it('matches a notification for the same payee, by raw merchant or learned label', () => {
+    expect(operationMatchesNotification(op(), item({ merchant: 'YANDEX.GO' }), AMD, booked)).toBe(true);
+    expect(operationMatchesNotification(op(), item({ merchant: 'YANDEX GO' }), AMD, booked)).toBe(true);
+    expect(operationMatchesNotification(op(), item({ merchant: 'YNDX*TAXI', labelOverride: 'Yandex Go' }), AMD, booked)).toBe(true);
+  });
+
+  it('matches when the notification names no payee', () => {
+    expect(operationMatchesNotification(op(), item(), AMD, booked)).toBe(true);
+  });
+
+  it('matches a hand-entered operation whatever the payee', () => {
+    expect(operationMatchesNotification(op({ id: 2 }), item({ merchant: 'NEW BAKERY' }), AMD, booked)).toBe(true);
+  });
+});
+
+describe('booked-operations registry', () => {
+  beforeEach(() => {
+    jest.clearAllMocks();
+  });
+
+  it('records the payees case-folded, replacing an entry for the same id', async () => {
+    PreferencesDB.getJsonPreference.mockResolvedValueOnce([{ id: 7, payees: ['old'], at: Date.now() }]);
+    await rememberBookedOperation(7, ['Yandex Go', 'YANDEX.GO', null]);
+    const [key, value] = PreferencesDB.setJsonPreference.mock.calls[0];
+    expect(key).toBe('booked');
+    expect(value).toEqual([expect.objectContaining({ id: 7, payees: ['yandex go', 'yandex.go'] })]);
+  });
+
+  it('drops expired entries', async () => {
+    const old = Date.now() - 60 * 24 * 60 * 60 * 1000;
+    PreferencesDB.getJsonPreference.mockResolvedValueOnce([{ id: 1, payees: ['a'], at: old }]);
+    await rememberBookedOperation(2, ['Shop']);
+    expect(PreferencesDB.setJsonPreference.mock.calls[0][1].map(e => e.id)).toEqual([2]);
+  });
+
+  it('records nothing for an operation without a payee', async () => {
+    await rememberBookedOperation(3, [null, '']);
+    await rememberBookedOperation(null, ['Shop']);
+    expect(PreferencesDB.setJsonPreference).not.toHaveBeenCalled();
+  });
+
+  it('reads the registry keyed by string id, and survives a read failure', async () => {
+    PreferencesDB.getJsonPreference.mockResolvedValueOnce([{ id: 4, payees: ['shop'], at: 1 }]);
+    expect((await loadBookedPayees()).get('4')).toEqual(['shop']);
+    PreferencesDB.getJsonPreference.mockRejectedValueOnce(new Error('db'));
+    expect((await loadBookedPayees()).size).toBe(0);
   });
 });
 

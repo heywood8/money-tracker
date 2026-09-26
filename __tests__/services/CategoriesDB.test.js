@@ -494,6 +494,47 @@ describe('CategoriesDB', () => {
       expect(params).toContain('income');
     });
 
+    // Switching expense <-> income changed only this row: its subcategories
+    // dropped out of every picker and its operations kept the old type.
+    describe('expense/income type change', () => {
+      const stubCounts = ({ current = 'expense', children = 0, operations = 0 }) => {
+        mockDb.queryFirst.mockImplementation(async (sql) => {
+          if (sql.includes('SELECT category_type FROM categories')) return { category_type: current };
+          if (sql.includes('FROM categories WHERE parent_id')) return { count: children };
+          if (sql.includes('FROM operations WHERE category_id')) return { count: operations };
+          return null;
+        });
+      };
+
+      it('refuses when the category has subcategories', async () => {
+        stubCounts({ children: 2 });
+        await expect(CategoriesDB.updateCategory('cat-1', { category_type: 'income' }))
+          .rejects.toMatchObject({ code: 'CATEGORY_TYPE_IN_USE' });
+        expect(mockDb.executeQuery).not.toHaveBeenCalled();
+      });
+
+      it('refuses when operations use the category', async () => {
+        stubCounts({ operations: 5 });
+        await expect(CategoriesDB.updateCategory('cat-1', { categoryType: 'income' }))
+          .rejects.toMatchObject({ code: 'CATEGORY_TYPE_IN_USE' });
+        expect(mockDb.executeQuery).not.toHaveBeenCalled();
+      });
+
+      it('allows it for an unused category', async () => {
+        stubCounts({});
+        mockDb.executeQuery.mockResolvedValue();
+        await CategoriesDB.updateCategory('cat-1', { category_type: 'income' });
+        expect(mockDb.executeQuery.mock.calls[0][1]).toContain('income');
+      });
+
+      it('does not check usage when the type stays the same', async () => {
+        stubCounts({ current: 'income', children: 3, operations: 9 });
+        mockDb.executeQuery.mockResolvedValue();
+        await CategoriesDB.updateCategory('cat-1', { name: 'Salary', category_type: 'income' });
+        expect(mockDb.executeQuery).toHaveBeenCalled();
+      });
+    });
+
     it('updates parentId to null', async () => {
       mockDb.executeQuery.mockResolvedValue();
 

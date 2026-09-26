@@ -93,6 +93,10 @@ jest.mock('../../app/contexts/CategoriesContext', () => ({
   })),
 }));
 
+jest.mock('../../app/services/CategoriesDB', () => ({
+  countCategoryUsage: jest.fn(() => Promise.resolve(0)),
+}));
+
 jest.mock('../../app/contexts/BudgetsContext', () => ({
   useBudgets: jest.fn(() => ({
     hasActiveBudget: jest.fn(() => false),
@@ -478,6 +482,51 @@ describe('CategoriesScreen', () => {
 
       expect(updateCategory).toHaveBeenCalled();
       expect(getByText('save')).toBeTruthy();
+    });
+  });
+
+  // Switching a category between expense and income changed only that row:
+  // its subcategories fell out of every picker and its operations kept their
+  // type. The switch is locked while the category is in use.
+  describe('expense/income switch on a category in use', () => {
+    const leaf = { id: 'c1', name: 'Groceries', type: 'entry', category_type: 'expense' };
+
+    const openTypePicker = async (usage) => {
+      const { countCategoryUsage } = require('../../app/services/CategoriesDB');
+      countCategoryUsage.mockResolvedValue(usage);
+      const showDialog = jest.fn();
+      const { useDialog } = require('../../app/contexts/DialogContext');
+      useDialog.mockReturnValue({ showDialog });
+      const CategoriesScreen = require('../../app/screens/CategoriesScreen').default;
+      const { useCategories } = require('../../app/contexts/CategoriesContext');
+      useCategories.mockReturnValue({
+        categories: [leaf],
+        loading: false,
+        getChildren: jest.fn(() => []),
+        addCategory: jest.fn(),
+        updateCategory: jest.fn(),
+        deleteCategory: jest.fn(),
+        validateCategory: jest.fn(() => null),
+      });
+      const screen = await render(<CategoriesScreen />);
+      fireEvent.press(screen.getByLabelText('Groceries category'));
+      await waitFor(() => screen.getByText('save'));
+      await waitFor(() => expect(countCategoryUsage).toHaveBeenCalledWith('c1'));
+      fireEvent.press(screen.getByText('expense'));
+      await waitFor(() => screen.getByTestId('category-type-option-income'));
+      return { ...screen, showDialog };
+    };
+
+    it('refuses the other type while operations use the category', async () => {
+      const { getByTestId, showDialog } = await openTypePicker(4);
+      fireEvent.press(getByTestId('category-type-option-income'));
+      expect(showDialog).toHaveBeenCalledWith('error', 'cannot_change_category_type_in_use', expect.any(Array));
+    });
+
+    it('allows the other type for an unused category', async () => {
+      const { getByTestId, showDialog } = await openTypePicker(0);
+      fireEvent.press(getByTestId('category-type-option-income'));
+      expect(showDialog).not.toHaveBeenCalled();
     });
   });
 

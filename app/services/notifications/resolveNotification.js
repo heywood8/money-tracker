@@ -31,18 +31,23 @@ import { resolveAccountBinding } from './accountBindings';
 export const resolveAccount = async (descriptor) => {
   if (!descriptor) return null;
 
+  // A parser that names the account's currency separately from the charge's
+  // ("Покупка на 10 $, счет RUB") has the account found by the former: the
+  // charge currency says nothing about which account paid.
+  const accountCurrency = descriptor.accountCurrencyHint || descriptor.currency;
+
   if (descriptor.cardMask) {
     const account = await AccountsDB.getAccountByCardMask(descriptor.cardMask);
     if (account) return account;
   } else {
-    const bound = await resolveAccountBinding(descriptor.packageName, descriptor.currency);
+    const bound = await resolveAccountBinding(descriptor.packageName, accountCurrency);
     if (bound) return bound;
   }
 
-  if (descriptor.currency) {
+  if (accountCurrency) {
     const all = await AccountsDB.getAllAccounts();
     const matches = (all || []).filter(
-      (a) => a.currency === descriptor.currency && !a.hidden,
+      (a) => a.currency === accountCurrency && !a.hidden,
     );
     if (matches.length === 1) return matches[0];
   }

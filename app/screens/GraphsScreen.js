@@ -7,6 +7,7 @@ import { useThemeColors } from '../contexts/ThemeColorsContext';
 import { useLocalization } from '../contexts/LocalizationContext';
 import { useAccountsData } from '../contexts/AccountsDataContext';
 import { useCategories } from '../contexts/CategoriesContext';
+import { useDisplaySettings } from '../contexts/DisplaySettingsContext';
 import { BORDER_RADIUS, FONT_SIZE, SPACING, TAB_BAR_CLEARANCE, TOP_CONTENT_SPACING } from '../styles/designTokens';
 import { getUnconvertibleCurrencies } from '../services/OperationsDB';
 import { formatAmount } from '../services/currency';
@@ -50,6 +51,26 @@ const PANEL_CLOSE_DURATION = 220;
 // read as a second pager on the axis the tab strip already swipes along.
 const PERIOD_SHIFT = 20;
 const PERIOD_TRANSITION_DURATION = 280;
+
+/**
+ * One row of the Balance card's account picker.
+ *
+ * "Hide balances" masks every balance elsewhere, so with it on the row names
+ * the account's currency instead of printing its balance.
+ *
+ * @param {{ id: *, name: string, balance: string, currency: string }} account
+ * @param {boolean} hideBalances
+ * @returns {{ label: string, value: *, subLabel: string }}
+ */
+export const accountPickerItem = (account, hideBalances) => {
+  const currencyInfo = currenciesJson[account.currency];
+  const symbol = currencyInfo ? currencyInfo.symbol : account.currency;
+  return {
+    label: account.name,
+    value: account.id,
+    subLabel: hideBalances ? account.currency : `${symbol}${formatAmount(account.balance, account.currency)}`,
+  };
+};
 
 const GraphsScreen = () => {
   const { colors } = useThemeColors();
@@ -308,18 +329,11 @@ const GraphsScreen = () => {
   const handleCloseCurrencyPicker = useCallback(() => setCurrencySheetVisible(false), []);
   const handleToggleConvert = useCallback(() => setConvertAllCurrencies(v => !v), []);
 
+  const { hideBalances } = useDisplaySettings();
   const accountItems = useMemo(() => {
     const items = accounts
       .filter(acc => !acc.hidden)
-      .map(acc => {
-        const currencyInfo = currenciesJson[acc.currency];
-        const symbol = currencyInfo ? currencyInfo.symbol : acc.currency;
-        return {
-          label: acc.name,
-          value: acc.id,
-          subLabel: `${symbol}${formatAmount(acc.balance, acc.currency)}`,
-        };
-      });
+      .map(acc => accountPickerItem(acc, hideBalances));
     // First in the list, above the individual accounts: everything at once, as a
     // single line in the display currency.
     if (netWorthAvailable) {
@@ -330,7 +344,7 @@ const GraphsScreen = () => {
       });
     }
     return items;
-  }, [accounts, netWorthAvailable, selectedCurrency, t]);
+  }, [accounts, netWorthAvailable, selectedCurrency, t, hideBalances]);
 
   // Human-readable name of the selected period. It is both the header's title
   // and the scope named by surfaces further down (the heatmap header), so there

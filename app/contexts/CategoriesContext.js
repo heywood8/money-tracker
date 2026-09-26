@@ -11,6 +11,28 @@ import { useDialog } from './DialogContext';
 
 const CategoriesContext = createContext();
 
+/**
+ * Bring a category into the shape the DB layer loads (`mapCategoryFields`):
+ * camelCase `categoryType` / `parentId`, no snake_case twins.
+ *
+ * The Categories screen edits a form that carries `category_type`, while every
+ * picker filters on `categoryType`. Put into state as-is, a new category had no
+ * `categoryType` and never showed up in an operation picker until a reload, and
+ * an edited one kept its old `categoryType` next to the new `category_type`.
+ * When both are present the snake_case one is the edit (it wins in the DB too).
+ *
+ * @param {Object} category
+ * @returns {Object}
+ */
+const toStateCategory = (category) => {
+  const { category_type: snakeType, parent_id: snakeParentId, ...rest } = category;
+  return {
+    ...rest,
+    categoryType: snakeType || rest.categoryType || 'expense',
+    parentId: rest.parentId !== undefined ? rest.parentId : (snakeParentId ?? null),
+  };
+};
+
 export const useCategories = () => {
   const context = useContext(CategoriesContext);
   if (!context) {
@@ -136,9 +158,14 @@ export const CategoriesProvider = ({ children }) => {
       };
 
       await CategoriesDB.createCategory(newCategory);
-      setCategories(cats => [...cats, newCategory]);
+      const stored = toStateCategory({
+        createdAt: new Date().toISOString(),
+        isShadow: false,
+        ...newCategory,
+      });
+      setCategories(cats => [...cats, stored]);
       setSaveError(null);
-      return newCategory;
+      return stored;
     } catch (error) {
       console.error('Failed to add category:', error);
       setSaveError(error.message);
@@ -155,7 +182,7 @@ export const CategoriesProvider = ({ children }) => {
     try {
       await CategoriesDB.updateCategory(id, updates);
       setCategories(cats =>
-        cats.map(cat => (cat.id === id ? { ...cat, ...updates } : cat)),
+        cats.map(cat => (cat.id === id ? toStateCategory({ ...cat, ...updates }) : cat)),
       );
       setSaveError(null);
     } catch (error) {

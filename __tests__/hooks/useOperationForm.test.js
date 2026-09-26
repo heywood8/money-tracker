@@ -41,6 +41,9 @@ jest.mock('../../app/services/currency', () => ({
   fetchLiveExchangeRate: jest.fn().mockResolvedValue({ rate: null, source: 'none' }),
   getDecimalPlaces: jest.fn(() => 2),
   invertRate: jest.requireActual('../../app/services/currency').invertRate,
+  isPositiveAmount: jest.requireActual('../../app/services/currency').isPositiveAmount,
+  isPositive: jest.requireActual('../../app/services/currency').isPositive,
+  compare: jest.requireActual('../../app/services/currency').compare,
 }));
 
 jest.mock('../../app/utils/categoryUtils', () => ({
@@ -149,6 +152,33 @@ describe('useOperationForm', () => {
 
       await waitFor(() => {
         expect(result.current.values.accountId).toBe('acc-2');
+      });
+    });
+
+    // The hook may be handed every account (archived ones are still on their
+    // old operations, and the form must resolve them); a new operation must
+    // still default to one the picker offers.
+    it('never defaults a new operation to an archived account', async () => {
+      LastAccount.getLastAccessedAccount.mockResolvedValue(null);
+      const archived = { id: 'acc-0', name: 'Old', currency: 'USD', balance: '0', hidden: 1 };
+      const props = { ...defaultProps, accounts: [archived, ...mockAccounts] };
+
+      const { result } = await renderHook(() => useOperationForm(props));
+
+      await waitFor(() => {
+        expect(result.current.values.accountId).toBe('acc-1');
+      });
+    });
+
+    it('ignores a last-accessed account that has since been archived', async () => {
+      LastAccount.getLastAccessedAccount.mockResolvedValue('acc-0');
+      const archived = { id: 'acc-0', name: 'Old', currency: 'USD', balance: '0', hidden: 1 };
+      const props = { ...defaultProps, accounts: [archived, ...mockAccounts] };
+
+      const { result } = await renderHook(() => useOperationForm(props));
+
+      await waitFor(() => {
+        expect(result.current.values.accountId).toBe('acc-1');
       });
     });
 
@@ -584,6 +614,28 @@ describe('useOperationForm', () => {
       expect(mockAddOperation).toHaveBeenCalledWith(
         expect.objectContaining({ amount: '15' }),
       );
+    });
+
+    // parseFloat('100+') is 100, so an entry with a trailing operator passed
+    // validation and the unparseable string was then formatted to 0.00: the
+    // edited expense was saved as zero and the account credited back.
+    it('refuses an amount that is an unevaluable expression', async () => {
+      const existing = {
+        id: 'op-1', type: 'expense', amount: '100.00', accountId: 'acc-1',
+        categoryId: 'cat-1', date: '2024-01-15',
+      };
+      const { result } = await renderHook(() => useOperationForm({ ...defaultProps, operation: existing, isNew: false }));
+      await waitFor(() => expect(result.current.values.amount).toBe('100.00'));
+
+      await act(async () => {
+        result.current.setValues(prev => ({ ...prev, amount: '100+' }));
+      });
+      await act(async () => {
+        await result.current.handleSave();
+      });
+
+      expect(mockUpdateOperation).not.toHaveBeenCalled();
+      expect(result.current.errors.amount).toBe('valid_amount_required');
     });
 
     it('should add new operation with correct data', async () => {
@@ -1127,6 +1179,45 @@ describe('useOperationForm', () => {
       let splitResult;
       await act(async () => {
         splitResult = await result.current.handleSplit('0', 'cat-2');
+      });
+
+      expect(splitResult.success).toBe(false);
+      expect(mockSplitOperation).not.toHaveBeenCalled();
+    });
+
+    // The form amount can still hold a calculator entry when Split is tapped.
+    // Subtracting from the raw string coerced it to 0 and wrote a negative
+    // remainder next to the split row.
+    it('evaluates a pending expression before splitting', async () => {
+      const props = { ...defaultProps, operation: existingOperation, isNew: false };
+      const { result } = await renderHook(() => useOperationForm(props));
+      await waitFor(() => expect(result.current.values.amount).toBe('100.00'));
+
+      await act(async () => {
+        result.current.setValues(prev => ({ ...prev, amount: '10+5' }));
+      });
+      let splitResult;
+      await act(async () => {
+        splitResult = await result.current.handleSplit('3', 'cat-2');
+      });
+
+      expect(splitResult.success).toBe(true);
+      const [, updates, newOperation] = mockSplitOperation.mock.calls[0];
+      expect(updates.amount).toBe('12');
+      expect(newOperation.amount).toBe('3');
+    });
+
+    it('refuses to split an unevaluable expression', async () => {
+      const props = { ...defaultProps, operation: existingOperation, isNew: false };
+      const { result } = await renderHook(() => useOperationForm(props));
+      await waitFor(() => expect(result.current.values.amount).toBe('100.00'));
+
+      await act(async () => {
+        result.current.setValues(prev => ({ ...prev, amount: '100+' }));
+      });
+      let splitResult;
+      await act(async () => {
+        splitResult = await result.current.handleSplit('3', 'cat-2');
       });
 
       expect(splitResult.success).toBe(false);

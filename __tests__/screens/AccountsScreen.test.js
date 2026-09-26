@@ -120,6 +120,13 @@ jest.mock('../../app/contexts/DisplaySettingsContext', () => ({
   })),
 }));
 
+jest.mock('../../app/services/BiometricService', () => ({
+  BiometricResult: {
+    SUCCESS: 'success', FAILED: 'failed', CANCELLED: 'cancelled', NOT_AVAILABLE: 'not_available', NOT_ENROLLED: 'not_enrolled',
+  },
+  authenticateWithBiometrics: jest.fn(() => Promise.resolve('success')),
+}));
+
 // Default-account preference helpers used by the star indicator + edit-form toggle.
 jest.mock('../../app/services/PreferencesDB', () => ({
   getDefaultAccountId: jest.fn(() => Promise.resolve(null)),
@@ -1049,6 +1056,59 @@ describe('AccountsScreen', () => {
 
   // Issue #1700: saveEdit fired the context action without awaiting or catching it,
   // so a rejected write closed the panel and discarded everything the user typed.
+  // "Hide balances" masks the list and asks for biometrics to unmask it; the
+  // edit form, one tap away, printed the exact balance in its text field.
+  describe('Hide balances in the edit form', () => {
+    const { fireEvent, act, waitFor } = require('@testing-library/react-native');
+    const account = { id: 'acc-1', name: 'Cash', balance: '12345.67', currency: 'USD', order: 0 };
+
+    const openEditWithHiddenBalances = async () => {
+      const AccountsScreen = require('../../app/screens/AccountsScreen').default;
+      const { useAccountsData } = require('../../app/contexts/AccountsDataContext');
+      const { useDisplaySettings } = require('../../app/contexts/DisplaySettingsContext');
+      useDisplaySettings.mockReturnValue({ hideBalances: true });
+      useAccountsData.mockReturnValue(createAccountsDataMock({ accounts: [account], displayedAccounts: [account] }));
+      const screen = await render(<AccountsScreen />);
+      await fireEvent.press(screen.getByLabelText('edit_account'));
+      await waitFor(() => expect(screen.getByText('edit_account')).toBeTruthy());
+      return screen;
+    };
+
+    afterEach(() => {
+      const { useDisplaySettings } = require('../../app/contexts/DisplaySettingsContext');
+      useDisplaySettings.mockReturnValue({ hideBalances: false });
+    });
+
+    it('masks the balance field until authentication passes', async () => {
+      const { authenticateWithBiometrics } = require('../../app/services/BiometricService');
+      authenticateWithBiometrics.mockResolvedValueOnce('success');
+      const { getByTestId, queryByDisplayValue, findByDisplayValue } = await openEditWithHiddenBalances();
+
+      expect(getByTestId('account-balance-masked')).toBeTruthy();
+      expect(queryByDisplayValue('12345.67')).toBeNull();
+
+      await act(async () => {
+        fireEvent.press(getByTestId('account-balance-masked'));
+      });
+
+      expect(authenticateWithBiometrics).toHaveBeenCalled();
+      expect(await findByDisplayValue('12345.67')).toBeTruthy();
+    });
+
+    it('stays masked when authentication fails', async () => {
+      const { authenticateWithBiometrics } = require('../../app/services/BiometricService');
+      authenticateWithBiometrics.mockResolvedValueOnce('failed');
+      const { getByTestId, queryByDisplayValue } = await openEditWithHiddenBalances();
+
+      await act(async () => {
+        fireEvent.press(getByTestId('account-balance-masked'));
+      });
+
+      expect(getByTestId('account-balance-masked')).toBeTruthy();
+      expect(queryByDisplayValue('12345.67')).toBeNull();
+    });
+  });
+
   describe('failed saves keep the form open (issue #1700)', () => {
     const { fireEvent, waitFor } = require('@testing-library/react-native');
 

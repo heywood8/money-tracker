@@ -797,6 +797,9 @@ describe('AccountsDB', () => {
           .mockResolvedValueOnce({ count: 3 }) // operation count
           .mockResolvedValueOnce({ id: 'to-delete', currency: 'USD' }) // fromAccount
           .mockResolvedValueOnce({ id: 'transfer-to', currency: 'USD' }), // toAccount
+        getAllAsync: jest.fn(async (sql) => (sql.includes('FROM accounts WHERE id IN')
+          ? [{ id: 'to-delete', balance: '500' }, { id: 'transfer-to', balance: '1000' }]
+          : [])),
         runAsync: jest.fn().mockResolvedValue({ changes: 1 }),
       };
       jest.spyOn(db, 'executeTransaction').mockImplementation(async (callback) => {
@@ -818,6 +821,120 @@ describe('AccountsDB', () => {
         'UPDATE accounts SET deleted_at = ?, updated_at = ? WHERE id = ?',
         expect.arrayContaining(['to-delete']),
       );
+    });
+
+    // Re-pointed, a transfer between the two accounts became a transfer to the
+    // destination itself, which the editor refuses to save. The two sides
+    // cancel once the accounts are one, so they are removed.
+    it('removes transfers between the deleted and the destination account', async () => {
+      const mockTxDb = {
+        getFirstAsync: jest.fn()
+          .mockResolvedValueOnce({ count: 3 })
+          .mockResolvedValueOnce({ id: 'a', currency: 'USD' })
+          .mockResolvedValueOnce({ id: 'b', currency: 'USD' }),
+        getAllAsync: jest.fn(async (sql) => (sql.includes('FROM accounts WHERE id IN')
+          ? [{ id: 'a', balance: '0' }, { id: 'b', balance: '0' }]
+          : [])),
+        runAsync: jest.fn().mockResolvedValue({ changes: 1 }),
+      };
+      jest.spyOn(db, 'executeTransaction').mockImplementation(async (callback) => callback(mockTxDb));
+
+      await AccountsDB.deleteAccount('a', 'b');
+
+      const calls = mockTxDb.runAsync.mock.calls;
+      const deleteIndex = calls.findIndex(([sql]) => sql.includes("DELETE FROM operations WHERE type = 'transfer'"));
+      const repointIndex = calls.findIndex(([sql]) => sql === 'UPDATE operations SET account_id = ? WHERE account_id = ?');
+      expect(deleteIndex).toBeGreaterThanOrEqual(0);
+      expect(deleteIndex).toBeLessThan(repointIndex);
+      expect(calls[deleteIndex][1]).toEqual(['a', 'b', 'b', 'a', 'a', 'a']);
+    });
+
+    // Operations carry their effect: moving them without the balance left the
+    // destination's ledger and balance disagreeing by the moved amount.
+    it('moves the deleted account\'s balance to the destination', async () => {
+      const mockTxDb = {
+        getFirstAsync: jest.fn()
+          .mockResolvedValueOnce({ count: 3 })
+          .mockResolvedValueOnce({ id: 'a', currency: 'USD' })
+          .mockResolvedValueOnce({ id: 'b', currency: 'USD' }),
+        getAllAsync: jest.fn(async (sql) => (sql.includes('FROM accounts WHERE id IN')
+          ? [{ id: 'a', balance: '500.25' }, { id: 'b', balance: '1000' }]
+          : [])),
+        runAsync: jest.fn().mockResolvedValue({ changes: 1 }),
+      };
+      jest.spyOn(db, 'executeTransaction').mockImplementation(async (callback) => callback(mockTxDb));
+
+      await AccountsDB.deleteAccount('a', 'b');
+
+      expect(mockTxDb.runAsync).toHaveBeenCalledWith(
+        'UPDATE accounts SET balance = ?, updated_at = ? WHERE id = ?',
+        ['1500.25', expect.any(String), 'b'],
+      );
+      expect(mockTxDb.runAsync).toHaveBeenCalledWith('UPDATE accounts SET balance = ? WHERE id = ?', ['0', 'a']);
+    });
+
+    // The destination's past snapshots must read the combined balance too, or
+    // its chart shows a cliff on merge day (see BalanceHistoryDB tests for the
+    // arithmetic; here only the hand-off, before the rows move).
+    it('folds the deleted account\'s balance history into the destination before moving its operations', async () => {
+      const BalanceHistoryDB = require('../../app/services/BalanceHistoryDB');
+      const mergeSpy = jest.spyOn(BalanceHistoryDB, 'mergeBalanceHistoryInto').mockResolvedValue();
+      const mockTxDb = {
+        getFirstAsync: jest.fn()
+          .mockResolvedValueOnce({ count: 3 })
+          .mockResolvedValueOnce({ id: 'a', currency: 'USD' })
+          .mockResolvedValueOnce({ id: 'b', currency: 'USD' }),
+        getAllAsync: jest.fn(async () => []),
+        runAsync: jest.fn(async () => {
+          expect(mergeSpy).toHaveBeenCalledWith(mockTxDb, 'a', 'b');
+          return { changes: 1 };
+        }),
+      };
+      jest.spyOn(db, 'executeTransaction').mockImplementation(async (callback) => callback(mockTxDb));
+
+      await AccountsDB.deleteAccount('a', 'b');
+
+      expect(mergeSpy).toHaveBeenCalledTimes(1);
+      mergeSpy.mockRestore();
+    });
+
+    it('moves budget and review-queue references to the destination', async () => {
+      const mockTxDb = {
+        getFirstAsync: jest.fn()
+          .mockResolvedValueOnce({ count: 1 })
+          .mockResolvedValueOnce({ id: 'a', currency: 'USD' })
+          .mockResolvedValueOnce({ id: 'b', currency: 'USD' }),
+        getAllAsync: jest.fn().mockResolvedValue([]),
+        runAsync: jest.fn().mockResolvedValue({ changes: 1 }),
+      };
+      jest.spyOn(db, 'executeTransaction').mockImplementation(async (callback) => callback(mockTxDb));
+
+      await AccountsDB.deleteAccount('a', 'b');
+
+      const sqls = mockTxDb.runAsync.mock.calls.map(([sql, params]) => [sql, params]);
+      expect(sqls).toContainEqual([expect.stringContaining('INSERT OR IGNORE INTO budget_plan_line_accounts'), ['b', 'a']]);
+      expect(sqls).toContainEqual(['UPDATE budget_plan_lines SET to_account_id = ? WHERE to_account_id = ?', ['b', 'a']]);
+      expect(sqls).toContainEqual(['UPDATE pending_notifications SET account_id = ? WHERE account_id = ?', ['b', 'a']]);
+    });
+  });
+
+  // A soft delete does not fire the FK cascades, so a budget line tracking only
+  // the deleted account kept pointing at it and read zero instead of being
+  // flagged broken.
+  describe('deleteAccount without operations', () => {
+    it('drops the references the cascades would have', async () => {
+      const mockTxDb = {
+        getFirstAsync: jest.fn().mockResolvedValue({ count: 0 }),
+        runAsync: jest.fn().mockResolvedValue(undefined),
+      };
+      jest.spyOn(db, 'executeTransaction').mockImplementation(async (callback) => callback(mockTxDb));
+
+      await AccountsDB.deleteAccount('a');
+
+      const sqls = mockTxDb.runAsync.mock.calls.map(([sql]) => sql);
+      expect(sqls).toContain('DELETE FROM budget_plan_line_accounts WHERE account_id = ?');
+      expect(sqls).toContain('UPDATE budget_plan_lines SET to_account_id = NULL WHERE to_account_id = ?');
+      expect(sqls).toContain('UPDATE pending_notifications SET account_id = NULL WHERE account_id = ?');
     });
   });
 

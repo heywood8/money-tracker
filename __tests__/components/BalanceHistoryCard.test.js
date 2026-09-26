@@ -2132,6 +2132,40 @@ describe('BalanceHistoryCard', () => {
       expect(getByTestId('calendar-toggle-btn')).toBeTruthy();
     });
 
+    // The calendar prints every day's balance and pre-fills the edit field with
+    // it, so "Hide balances" withholds it like the axis and legend.
+    it('does not offer the calendar while balances are hidden', async () => {
+      const { useDisplaySettings } = require('../../app/contexts/DisplaySettingsContext');
+      useDisplaySettings.mockReturnValue({ hideBalances: true });
+      try {
+        const { queryByTestId } = await render(
+          <BalanceHistoryCard
+            colors={mockColors}
+            t={mockT}
+            selectedAccount="acc1"
+            onAccountChange={jest.fn()}
+            accountItems={mockAccountItems}
+            loadingBalanceHistory={false}
+            balanceHistoryData={mockBalanceHistoryData}
+            selectedYear={2024}
+            selectedMonth={0}
+            accounts={mockAccounts}
+            balanceHistoryTableData={[{ date: '2024-01-01', balance: '1000' }]}
+            editingBalanceValue=""
+            onEditingBalanceValueChange={jest.fn()}
+            onEditBalance={jest.fn()}
+            onCancelEdit={jest.fn()}
+            onSaveBalance={jest.fn()}
+            onDeleteBalance={jest.fn()}
+            onShowCalendar={jest.fn()}
+          />,
+        );
+        expect(queryByTestId('calendar-toggle-btn')).toBeNull();
+      } finally {
+        useDisplaySettings.mockReturnValue({ hideBalances: false });
+      }
+    });
+
     it('does not render the calendar toggle button when there is no balance data', async () => {
       const { queryByTestId } = await render(
         <BalanceHistoryCard

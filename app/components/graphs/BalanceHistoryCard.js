@@ -1032,7 +1032,11 @@ const BalanceHistoryCard = ({
   // behind a given day to edit — the calendar (an editing grid) is not offered
   // for it, exactly as the year view doesn't offer it either.
   const isNetWorth = isNetWorthSelection(selectedAccount);
-  const calendarVisible = showCalendar && !isYearView && !isNetWorth;
+  // The calendar prints every day's balance in full and pre-fills the edit field
+  // with it, so it is not offered while "Hide balances" is on — the chart's axis
+  // and legend are already blanked for the same reason.
+  const calendarOffered = !isYearView && !isNetWorth && !hideBalances;
+  const calendarVisible = showCalendar && calendarOffered;
   // Each period reads its own remembered mode; the fallback still guards a value
   // that period no longer offers, so a stale 'yearAvg' can never leave the year
   // view with nothing drawn.
@@ -1246,7 +1250,7 @@ const BalanceHistoryCard = ({
           )}
           {/* Calendar / Chart toggle. The calendar is a month grid, so the year
               view has nothing to switch to. */}
-          {!isYearView && !isNetWorth && balanceHistoryData.actual && balanceHistoryData.actual.length > 0 && (
+          {calendarOffered && balanceHistoryData.actual && balanceHistoryData.actual.length > 0 && (
             <TouchableOpacity
               testID="calendar-toggle-btn"
               style={[styles.calendarToggleBtn, { backgroundColor: colors.surface }]}

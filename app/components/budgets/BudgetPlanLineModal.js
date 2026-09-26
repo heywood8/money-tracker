@@ -336,6 +336,11 @@ export default function BudgetPlanLineModal({
   const labelInputRef = useRef(null);
   const [isRecurring, setIsRecurring] = useState(false);
   const [lineCurrency, setLineCurrency] = useState(currency);
+  // Whether the amount field was typed into since the editor opened. The field
+  // is labelled with the selected currency chip, so a typed figure is in that
+  // currency whatever digits it holds — comparing values could not tell "250
+  // retyped as USD" from an untouched 250 EUR.
+  const [amountDirty, setAmountDirty] = useState(false);
   // The envelope this line belongs to (migration 0022), or null for a line that
   // stands on its own — which is what every line is until it is put in one.
   const [groupId, setGroupId] = useState(null);
@@ -398,6 +403,7 @@ export default function BudgetPlanLineModal({
   useEffect(() => {
     if (!visible) return;
     setError(null);
+    setAmountDirty(false);
     if (line) {
       setKind(line.kind || 'expense');
       setAmount(line.amount != null ? String(line.amount) : '');
@@ -636,6 +642,7 @@ export default function BudgetPlanLineModal({
   // this handler that only Currency.isValid can then reject.
   const handleAmountChange = useCallback((text) => {
     setAmount(text.replace(/,/g, '.'));
+    setAmountDirty(true);
     setError(null);
   }, []);
 
@@ -695,10 +702,16 @@ export default function BudgetPlanLineModal({
       // An income line is never grouped — groups aggregate allocations, and the
       // group row is not offered for one (see the picker below).
       groupId: kind === 'income' ? null : groupId,
+      // Editing only. The field is labelled with the selected chip's currency,
+      // so a figure the user typed is already in it: BudgetPlansDB must not
+      // convert it out of the line's old currency on a chip change too (250 EUR
+      // → pick USD, type 275 was stored as 302.50 USD). An untouched amount is
+      // still the old currency's figure and is converted, as before.
+      ...(line ? { amountInNewCurrency: amountDirty } : {}),
     });
   }, [saving, kind, amount, amountIsParseable, amountIsPositive, label, comment, categoryIds,
     sourceAccountIds, trackedLabelsText, toAccountId,
-    isRecurring, effectiveCurrency, groupId, onSaveLine, t]);
+    isRecurring, effectiveCurrency, groupId, onSaveLine, t, line, amountDirty]);
 
   const handleDelete = useCallback(() => {
     if (!isEditingLine) return;

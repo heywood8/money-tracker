@@ -1246,16 +1246,26 @@ export const updateLine = async (id, updates, options = {}) => {
       }
     }
 
+    // An amount the caller already expresses in the line's NEW currency (the
+    // editor's field is labelled with the chip being picked) is stored as given.
+    // Converting it again from the old currency priced a retyped "275 USD" on a
+    // 250 EUR line as 302.50 USD.
+    const amountAlreadyInNewCurrency = updates.amountInNewCurrency === true && amount !== undefined;
+
     if (changesCurrency) {
-      const fromCurrency = await currentLineCurrency(row);
+      // Only a conversion needs to know what the amount is in now.
+      const fromCurrency = amountAlreadyInNewCurrency ? null : await currentLineCurrency(row);
       const rawAmount = amount !== undefined ? amount : row.amount;
+      const convertLineAmountUnlessPriced = (raw, from, to) => (
+        amountAlreadyInNewCurrency ? Promise.resolve(String(raw)) : convertLineAmount(raw, from, to)
+      );
 
       if (updates.isRecurring !== undefined) {
         if (updates.isRecurring) {
           if (!updates.currency) {
             throw new Error('Currency is required for a recurring allocation');
           }
-          amount = await convertLineAmount(rawAmount, fromCurrency, updates.currency);
+          amount = await convertLineAmountUnlessPriced(rawAmount, fromCurrency, updates.currency);
           fields.push('is_recurring = ?', 'plan_id = ?', 'currency = ?');
           values.push(1, null, updates.currency);
         } else {
@@ -1267,7 +1277,7 @@ export const updateLine = async (id, updates, options = {}) => {
           // the currency the user priced it in. Without one it inherits the
           // target plan's currency (the pre-0020 behaviour).
           const toCurrency = updates.currency || await getPlanCurrencyOrThrow(updates.planId);
-          amount = await convertLineAmount(rawAmount, fromCurrency, toCurrency);
+          amount = await convertLineAmountUnlessPriced(rawAmount, fromCurrency, toCurrency);
           fields.push('is_recurring = ?', 'plan_id = ?', 'currency = ?');
           values.push(0, updates.planId, updates.currency ?? null);
         }
@@ -1281,7 +1291,7 @@ export const updateLine = async (id, updates, options = {}) => {
           throw new Error('Currency is required for a recurring allocation');
         }
         const toCurrency = updates.currency || await getPlanCurrencyOrThrow(row.plan_id);
-        amount = await convertLineAmount(rawAmount, fromCurrency, toCurrency);
+        amount = await convertLineAmountUnlessPriced(rawAmount, fromCurrency, toCurrency);
         fields.push('currency = ?');
         values.push(updates.currency ?? null);
       }

@@ -35,10 +35,41 @@ const REDACTION_PATTERNS = [
   /\b\d{4,}\b/g,
 ];
 
+/**
+ * Keys of a logged object whose values are the user's money or free text.
+ * LogService serializes objects as JSON, and a short amount ("newBalance":"950")
+ * slipped past the digit rules above while nothing covered a description or a
+ * merchant at all. Matched by whole word (split on `_` and camelCase), so
+ * `destinationAmount` and `card_mask` are scrubbed while `packageName`,
+ * `context` and a serialized error's `name` keep telling what happened.
+ */
+const SENSITIVE_KEY_WORDS = new Set([
+  'amount', 'balance', 'description', 'merchant', 'label', 'labels', 'raw', 'text',
+  'title', 'comment', 'note', 'mask', 'latitude', 'longitude',
+]);
+// A name is the user's when it names one of these (accountName, category_name).
+const NAMED_THING_WORDS = new Set(['account', 'category', 'merchant', 'label', 'user']);
+const KEY_VALUE_RE = /"([A-Za-z0-9_]+)"\s*:\s*("(?:[^"\\]|\\.)*"|-?\d[\d.,]*)/g;
+
+const keyWords = (key) => key
+  .replace(/([a-z0-9])([A-Z])/g, '$1 $2')
+  .toLowerCase()
+  .split(/[\s_]+/)
+  .filter(Boolean);
+
+const isSensitiveKey = (key) => {
+  const words = keyWords(key);
+  if (words.some(word => SENSITIVE_KEY_WORDS.has(word))) return true;
+  return words.includes('name') && words.some(word => NAMED_THING_WORDS.has(word));
+};
+
 /** Scrub financial / PII patterns from a string. Returns input unchanged if not a string. */
 export function redactText(text) {
   if (typeof text !== 'string') return text;
-  let out = text;
+  // Keyed values first, keeping the key so the line still says what was there.
+  let out = text.replace(KEY_VALUE_RE, (match, key) => (
+    isSensitiveKey(key) ? `"${key}":"[redacted]"` : match
+  ));
   for (const re of REDACTION_PATTERNS) {
     out = out.replace(re, '[redacted]');
   }

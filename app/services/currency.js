@@ -467,6 +467,27 @@ export const isPositive = (amount) => {
 };
 
 /**
+ * Whether a user-entered amount is a plain, positive number.
+ *
+ * Form validation used `parseFloat`, which reads the leading number of any
+ * string: "100+" (a calculator entry with a trailing operator) passed as 100,
+ * and the save path then formatted the unparseable string to "0.00" — an
+ * edited 100 expense was saved as 0. This accepts only digits with at most one
+ * decimal point ("100", "100.", ".5", "100.50"), so an unevaluated expression,
+ * a sign, an exponent or a comma is never mistaken for an amount. Silent: it
+ * is a validator, not a parser, so it does not log the "coerced to 0" warning.
+ *
+ * @param {string|number|null|undefined} amount
+ * @returns {boolean}
+ */
+export const isPositiveAmount = (amount) => {
+  if (amount === null || amount === undefined) return false;
+  const s = String(amount).trim();
+  if (!/^\d*\.?\d*$/.test(s) || !/\d/.test(s)) return false;
+  return new Decimal(s).greaterThan(0);
+};
+
+/**
  * Check if amount is negative
  * @param {string|number} amount
  * @returns {boolean}

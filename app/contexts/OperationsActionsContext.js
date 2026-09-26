@@ -2,6 +2,7 @@
 import React, { createContext, useContext, useCallback, useMemo, useEffect, useRef } from 'react';
 import PropTypes from 'prop-types';
 import * as OperationsDB from '../services/OperationsDB';
+import * as Currency from '../services/currency';
 import { useAccountsActions } from './AccountsActionsContext';
 import { appEvents, EVENTS } from '../services/eventEmitter';
 import { useDialog } from './DialogContext';
@@ -717,7 +718,7 @@ export const OperationsActionsProvider = ({ children }) => {
     if (!operation.type) {
       return t('operation_type_required') || 'Operation type is required';
     }
-    if (!operation.amount || isNaN(parseFloat(operation.amount)) || parseFloat(operation.amount) <= 0) {
+    if (!Currency.isPositiveAmount(operation.amount)) {
       return t('valid_amount_required') || 'Valid amount is required';
     }
     if (!operation.accountId) {

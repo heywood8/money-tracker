@@ -15,6 +15,7 @@ jest.mock('../../app/services/db', () => ({
 jest.mock('../../app/services/BalanceHistoryDB', () => ({
   formatDate: jest.fn(() => '2026-01-01'),
   updateTodayBalance: jest.fn(),
+  applyPastBalanceChanges: jest.fn(),
 }));
 jest.mock('../../app/services/AccountsDB', () => ({
   getAllAccounts: jest.fn(),

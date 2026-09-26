@@ -1831,6 +1831,59 @@ describe('OperationsScreen', () => {
 
       expect(calculatorUtils.evaluateExpression).toHaveBeenCalledWith('12.50+3.25', 2);
     });
+
+    // A foreign currency picked in Expense mode survives the switch to Transfer
+    // (the chip is hidden there). The transfer between two AMD accounts must be
+    // booked in AMD, not converted as if "100" were USD.
+    it('never treats a same-currency transfer as a foreign-currency operation', async () => {
+      const Currency = require('../../app/services/currency');
+      const { useOperationsActions } = require('../../app/contexts/OperationsActionsContext');
+      const { useAccountsData } = require('../../app/contexts/AccountsDataContext');
+      const { useOperationsData } = require('../../app/contexts/OperationsDataContext');
+      const useQuickAddForm = require('../../app/hooks/useQuickAddForm');
+      const useOperationPicker = require('../../app/hooks/useOperationPicker');
+      const OperationsScreen = require('../../app/screens/OperationsScreen').default;
+
+      const src = { id: 'acc-1', name: 'Card', currency: 'AMD' };
+      const dst = { id: 'acc-2', name: 'Cash', currency: 'AMD' };
+      const values = {
+        type: 'transfer', amount: '100', accountId: 'acc-1', toAccountId: 'acc-2', categoryId: '',
+        operationCurrency: 'USD', exchangeRate: '', destinationAmount: '', description: '',
+      };
+      useMultiCurrencyTransfer.mockReturnValue({
+        sourceAccount: src, destinationAccount: dst, isMultiCurrencyTransfer: false,
+        lastEditedField: null, setLastEditedField: jest.fn(), rateSource: 'offline', setRateSource: jest.fn(),
+      });
+      useOperationPicker.mockReturnValue({
+        pickerState: { visible: false, type: null, data: [] }, openPicker: jest.fn(), closePicker: jest.fn(),
+      });
+      const mockAddOperation = jest.fn(() => Promise.resolve({ id: 'new-op' }));
+      useQuickAddForm.mockReturnValue({
+        quickAddValues: values, quickAddValuesStore: makeMockQuickAddStore(values), setQuickAddValues: jest.fn(),
+        getAccountName: jest.fn(() => 'Card'), getAccountBalance: jest.fn(() => '1000'),
+        getCategoryInfo: jest.fn(() => ({ name: 'Food', icon: 'food' })), getCategoryName: jest.fn(() => 'Food'),
+        filteredCategories: [], resetForm: jest.fn(), clearDate: jest.fn(),
+      });
+      useAccountsData.mockReturnValue({ accounts: [src, dst], visibleAccounts: [src, dst], loading: false });
+      useOperationsData.mockReturnValue({ operations: [], loading: false, loadingMore: false, hasMoreOperations: false });
+      useOperationsActions.mockReturnValue({
+        deleteOperation: jest.fn(), addOperation: mockAddOperation, validateOperation: jest.fn(() => null),
+        loadMoreOperations: jest.fn(), jumpToDate: jest.fn(),
+      });
+      Currency.fetchLiveExchangeRate.mockResolvedValueOnce({ rate: '390', source: 'live' });
+      Currency.convertAmount.mockReturnValueOnce('39000');
+
+      const { getByTestId } = await render(<OperationsScreen />);
+      await act(async () => {
+        await getByTestId('quick-add-form').props.handleQuickAdd();
+      });
+
+      expect(Currency.fetchLiveExchangeRate).not.toHaveBeenCalled();
+      const payload = mockAddOperation.mock.calls[0][0];
+      expect(payload).toEqual(expect.objectContaining({ type: 'transfer', amount: '100', toAccountId: 'acc-2' }));
+      expect(payload.sourceCurrency).toBeUndefined();
+      expect(payload.destinationAmount).toBe('');
+    });
   });
 
   describe('Scroll Handlers', () => {

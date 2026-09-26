@@ -177,6 +177,7 @@ const TrendBarChart = ({
   width,
   selectedIndex,
   onBarPress,
+  hideBalances = false,
 }) => {
   const count = data.length;
   const hasVs = vsData != null && vsData.length === count;
@@ -479,15 +480,20 @@ const TrendBarChart = ({
 
   return (
     <View
+      testID="trend-chart"
       style={[styles.chartWrap, { width }]}
       accessible
       accessibilityRole="adjustable"
-      accessibilityLabel={`${selectedMonthLabel} ${formatYTick(data[selectedIndex]?.total ?? 0)}`}
+      // "Hide balances" blanks the totals above the chart; the axis ticks and
+      // the spoken label must not read them back.
+      accessibilityLabel={hideBalances
+        ? selectedMonthLabel
+        : `${selectedMonthLabel} ${formatYTick(data[selectedIndex]?.total ?? 0)}`}
       accessibilityActions={ACCESSIBILITY_ACTIONS}
       onAccessibilityAction={handleAccessibilityAction}
     >
       <View style={styles.chartRow}>
-        <TrendAxisColumn domain={domain} axisFont={axisFont} colors={colors} />
+        <TrendAxisColumn domain={domain} axisFont={axisFont} colors={colors} hideBalances={hideBalances} />
 
         <GestureDetector gesture={containerGesture}>
           <ScrollView
@@ -569,7 +575,9 @@ const ALL_SERIES_ICON = { income: 'arrow-bottom-left', expense: 'arrow-top-right
  * re-lays out its whole plot when it renders. Tapping a bar used to re-lay out
  * this one too.
  */
-const TrendAxisColumn = React.memo(function TrendAxisColumn({ domain, axisFont, colors }) {
+const hiddenTick = () => '';
+
+const TrendAxisColumn = React.memo(function TrendAxisColumn({ domain, axisFont, colors, hideBalances = false }) {
   return (
     <View style={styles.axisColumn} pointerEvents="none" testID="trend-chart-axis">
       <CartesianChart
@@ -591,7 +599,7 @@ const TrendAxisColumn = React.memo(function TrendAxisColumn({ domain, axisFont, 
           lineWidth: 0,
           labelColor: colors.mutedText,
           tickCount: 5,
-          formatYLabel: formatYTick,
+          formatYLabel: hideBalances ? hiddenTick : formatYTick,
         }]}
         frame={{ lineWidth: 0 }}
       >
@@ -605,6 +613,7 @@ TrendAxisColumn.propTypes = {
   domain: PropTypes.object.isRequired,
   axisFont: PropTypes.object,
   colors: PropTypes.object.isRequired,
+  hideBalances: PropTypes.bool,
 };
 
 const TrendsCard = ({
@@ -973,6 +982,7 @@ const TrendsCard = ({
           width={screenWidth - 64}
           selectedIndex={effectiveBarIndex}
           onBarPress={setSelectedBarIndex}
+          hideBalances={hideBalances}
         />
       )}
     </View>
@@ -993,6 +1003,7 @@ TrendBarChart.propTypes = {
   selectedIndex: PropTypes.number,
   vsData: PropTypes.arrayOf(PropTypes.shape({ total: PropTypes.number, month: PropTypes.number })),
   width: PropTypes.number.isRequired,
+  hideBalances: PropTypes.bool,
 };
 
 TrendsCard.propTypes = {

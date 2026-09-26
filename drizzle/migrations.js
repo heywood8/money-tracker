@@ -32,6 +32,7 @@ import m0027 from './0027_pending_notification_force_added.js';
 import m0028 from './0028_plan_line_labels.js';
 import m0029 from './0029_dismissed_notifications.js';
 import m0030 from './0030_operations_transfer_indexes.js';
+import { normalizeOperationDates } from './dataRepairs.js';
 
 export default {
   journal,
@@ -72,12 +73,16 @@ export default {
     m0003: m0003PostMigration,
     m0019: m0019PostMigration,
     m0020: m0020PostMigration,
+    // A data repair, not a schema change: keyed to 0030, which every current
+    // install has, so it runs once (see drizzle/dataRepairs.js).
+    normalizeOperationDates,
   },
   // Explicit tag mapping for post-migration handlers to avoid fragile substring matching
   postMigrationTags: {
     m0003: '0003_slow_grandmaster',
     m0019: '0019_recurring_plan_lines',
     m0020: '0020_plan_line_templates',
+    normalizeOperationDates: '0030_operations_transfer_indexes',
   },
 };
   

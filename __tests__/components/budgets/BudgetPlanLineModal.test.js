@@ -656,6 +656,69 @@ describe('BudgetPlanLineModal', () => {
       expect(props.onSaveLine).toHaveBeenCalledWith(expect.objectContaining({ currency: null }));
     });
 
+    // The amount field is labelled with the chip being picked. A figure retyped
+    // with the chip is already in the new currency and must not be converted
+    // again; an untouched one is still the old currency's and is.
+    describe('editing an existing line\'s currency', () => {
+      const eurLine = {
+        id: 'l1', kind: 'expense', amount: '250', label: 'Rent', categoryIds: ['cat1'],
+        isRecurring: true, currency: 'EUR',
+      };
+      const editProps = () => ({
+        ...baseProps(),
+        line: eurLine,
+        accounts: [...ACCOUNTS, { id: 2, name: 'Euro', currency: 'EUR' }],
+      });
+
+      it('marks a retyped amount as priced in the new currency', async () => {
+        const props = editProps();
+        const { getByTestId } = await render(<BudgetPlanLineModal {...props} />);
+        await waitFor(() => expect(getByTestId('plan-line-currency-USD')).toBeTruthy());
+        await fireEvent.press(getByTestId('plan-line-currency-USD'));
+        await fireEvent.changeText(getByTestId('plan-line-amount'), '275');
+        await fireEvent.press(getByTestId('plan-line-save'));
+        expect(props.onSaveLine).toHaveBeenCalledWith(expect.objectContaining({
+          amount: '275', currency: 'USD', amountInNewCurrency: true,
+        }));
+      });
+
+      // The same digits retyped under the new chip are meant in that currency:
+      // the flag follows typing, not the value.
+      it('marks an amount retyped with the same digits as priced in the new currency', async () => {
+        const props = editProps();
+        const { getByTestId } = await render(<BudgetPlanLineModal {...props} />);
+        await waitFor(() => expect(getByTestId('plan-line-currency-USD')).toBeTruthy());
+        await fireEvent.press(getByTestId('plan-line-currency-USD'));
+        await fireEvent.changeText(getByTestId('plan-line-amount'), '250');
+        await fireEvent.press(getByTestId('plan-line-save'));
+        expect(props.onSaveLine).toHaveBeenCalledWith(expect.objectContaining({
+          amount: '250', currency: 'USD', amountInNewCurrency: true,
+        }));
+      });
+
+      it('leaves an untouched amount to be converted', async () => {
+        const props = editProps();
+        const { getByTestId } = await render(<BudgetPlanLineModal {...props} />);
+        await waitFor(() => expect(getByTestId('plan-line-currency-USD')).toBeTruthy());
+        await fireEvent.press(getByTestId('plan-line-currency-USD'));
+        await fireEvent.press(getByTestId('plan-line-save'));
+        expect(props.onSaveLine).toHaveBeenCalledWith(expect.objectContaining({
+          amount: '250', currency: 'USD', amountInNewCurrency: false,
+        }));
+      });
+
+      it('sends no pricing flag for a new line', async () => {
+        const props = baseProps();
+        const { getByTestId } = await render(<BudgetPlanLineModal {...props} />);
+        await fireEvent.press(getByTestId('plan-target-picker'));
+        await fireEvent.press(getByTestId('plan-target-option-cat-cat1'));
+        await fireEvent.press(getByTestId('plan-target-done'));
+        await fireEvent.changeText(getByTestId('plan-line-amount'), '150');
+        await fireEvent.press(getByTestId('plan-line-save'));
+        expect(props.onSaveLine.mock.calls[0][0]).not.toHaveProperty('amountInNewCurrency');
+      });
+    });
+
     it('a one-off line on a currency other than the plan\'s saves that currency', async () => {
       const props = { ...baseProps(), accounts: [...ACCOUNTS, { id: 2, name: 'Foreign', currency: 'EUR' }] };
       const { getByTestId } = await render(<BudgetPlanLineModal {...props} />);

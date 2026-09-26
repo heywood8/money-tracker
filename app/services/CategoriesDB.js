@@ -262,8 +262,24 @@ export const updateCategory = async (id, updates) => {
       values.push(updates.type);
     }
     if (updates.category_type !== undefined || updates.categoryType !== undefined) {
+      const nextType = updates.category_type || updates.categoryType;
+      // Only this row changes type. Its subcategories kept the old one and
+      // dropped out of every picker (an expense child under an income parent is
+      // neither at the expense root nor inside the income folder), and its
+      // operations kept their type, so opening one cleared its category. A
+      // category in use keeps its type; a new one of the other type is the way.
+      const current = await queryFirst('SELECT category_type FROM categories WHERE id = ?', [id]);
+      if (current && current.category_type !== nextType) {
+        const children = await queryFirst('SELECT COUNT(*) AS count FROM categories WHERE parent_id = ?', [id]);
+        const used = await queryFirst('SELECT COUNT(*) AS count FROM operations WHERE category_id = ?', [id]);
+        if ((children?.count || 0) > 0 || (used?.count || 0) > 0) {
+          const error = new Error('Cannot change the type of a category that has subcategories or operations');
+          error.code = 'CATEGORY_TYPE_IN_USE';
+          throw error;
+        }
+      }
       fields.push('category_type = ?');
-      values.push(updates.category_type || updates.categoryType);
+      values.push(nextType);
     }
     if (updates.parentId !== undefined) {
       // Guard against parent cycles: re-parenting onto itself or one of its own

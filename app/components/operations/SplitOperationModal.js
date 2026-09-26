@@ -20,6 +20,7 @@ import { motionDuration } from '../../utils/reducedMotion';
 import ModalBlurOverlay from '../ModalBlurOverlay';
 import CategoryGridSelector from '../CategoryGridSelector';
 import useKeyboardOffset from '../../hooks/useKeyboardOffset';
+import * as Currency from '../../services/currency';
 import { BUTTON, BUTTON_TEXT, MODAL_TITLE } from '../../styles/componentStyles';
 
 const SCREEN_WIDTH = Dimensions.get('window').width;
@@ -75,15 +76,14 @@ export default function SplitOperationModal({
   }, [selectedCategoryId, categories, t]);
 
   // Validate split amount
+  // A plain positive number, below the original. `parseFloat` read "5-" as 5,
+  // and the split then formatted the unparseable string to a 0.00 row.
   const validateSplitAmount = useCallback((amount) => {
-    const numAmount = parseFloat(amount);
-    const numOriginal = parseFloat(originalAmount);
-
-    if (isNaN(numAmount) || numAmount <= 0) {
+    if (!Currency.isPositiveAmount(amount)) {
       return t('valid_amount_required');
     }
 
-    if (numAmount >= numOriginal) {
+    if (!Currency.isPositiveAmount(originalAmount) || Currency.compare(amount, originalAmount) >= 0) {
       return t('split_amount_error');
     }
 

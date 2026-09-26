@@ -12,6 +12,14 @@ jest.mock('../../app/services/db');
 jest.mock('../../app/services/currency');
 jest.mock('../../app/services/AccountsDB');
 jest.mock('../../app/defaults/defaultOperations');
+// The past-snapshot backfill has its own tests (BalanceHistoryDB.test.js); here
+// only the movements OperationsDB hands it are checked, so the DB call counts
+// these tests pin stay about the operation itself.
+jest.mock('../../app/services/BalanceHistoryDB', () => ({
+  ...jest.requireActual('../../app/services/BalanceHistoryDB'),
+  applyPastBalanceChanges: jest.fn(() => Promise.resolve()),
+}));
+import { applyPastBalanceChanges } from '../../app/services/BalanceHistoryDB';
 
 import * as AccountsDB from '../../app/services/AccountsDB';
 import getDefaultOperations from '../../app/defaults/defaultOperations';
@@ -446,6 +454,32 @@ describe('OperationsDB Service', () => {
       );
     });
 
+    it('hands a back-dated operation to the balance-history backfill', async () => {
+      mockDb.getFirstAsync.mockResolvedValue({ balance: '1000' });
+
+      await OperationsDB.createOperation({
+        type: 'expense', amount: '100', accountId: 'acc1', categoryId: 'cat1', date: '2025-12-05',
+      });
+
+      expect(applyPastBalanceChanges).toHaveBeenCalledWith(mockDb, [
+        { accountId: 'acc1', date: '2025-12-05', delta: '-100' },
+      ]);
+    });
+
+    // A timestamped date fell out of every string date compare and stalled the
+    // operations list's load-more (#773): only the calendar day is stored.
+    it('stores only the calendar day of a timestamped date', async () => {
+      mockDb.getFirstAsync.mockResolvedValue({ balance: '1000' });
+
+      await OperationsDB.createOperation({
+        type: 'expense', amount: '100', accountId: 'acc1', categoryId: 'cat1', date: '2025-12-05T09:30:00.000Z',
+      });
+
+      const insert = mockDb.runAsync.mock.calls.find(([sql]) => sql.includes('INSERT INTO operations'));
+      expect(insert[1]).toContain('2025-12-05');
+      expect(insert[1]).not.toContain('2025-12-05T09:30:00.000Z');
+    });
+
     it('creates income operation and updates account balance', async () => {
       const operation = {
         type: 'income',
@@ -639,6 +673,38 @@ describe('OperationsDB Service', () => {
 
       // Should recalculate balance: reverse old (-(-100) = +100) + apply new (-200) = -100 net
       expect(Currency.add).toHaveBeenCalled();
+    });
+
+    // Past snapshots follow the edit: the old version leaves the days from its
+    // date on and the new one joins from its own, even when only the date moved.
+    it('hands the old and new versions to the balance-history backfill, each with its own date', async () => {
+      const oldOperation = {
+        id: 1, type: 'expense', amount: '100', account_id: 'acc1', category_id: 'cat1', date: '2025-12-05',
+      };
+      const updatedOperation = { ...oldOperation, date: '2025-12-12' };
+      mockDb.getFirstAsync
+        .mockResolvedValueOnce(oldOperation)
+        .mockResolvedValueOnce(updatedOperation);
+
+      await OperationsDB.updateOperation(1, { date: '2025-12-12' });
+
+      expect(applyPastBalanceChanges).toHaveBeenCalledWith(mockDb, [
+        { accountId: 'acc1', date: '2025-12-05', delta: '100' },
+        { accountId: 'acc1', date: '2025-12-12', delta: '-100' },
+      ]);
+    });
+
+    it('leaves past snapshots alone for an edit that changes neither money nor date', async () => {
+      const oldOperation = {
+        id: 1, type: 'expense', amount: '100', account_id: 'acc1', category_id: 'cat1', date: '2025-12-05',
+      };
+      mockDb.getFirstAsync
+        .mockResolvedValueOnce(oldOperation)
+        .mockResolvedValueOnce({ ...oldOperation, category_id: 'cat2' });
+
+      await OperationsDB.updateOperation(1, { categoryId: 'cat2' });
+
+      expect(applyPastBalanceChanges).not.toHaveBeenCalled();
     });
 
     it('persists exclude_from_avg when the flag is toggled on', async () => {
@@ -981,6 +1047,11 @@ describe('OperationsDB Service', () => {
 
       // Should reverse balance change (expense was -100, so reverse is +100)
       expect(Currency.add).toHaveBeenCalledWith('900', '100');
+
+      // ...in the snapshots from the operation's own day on as well.
+      expect(applyPastBalanceChanges).toHaveBeenCalledWith(mockDb, [
+        { accountId: 'acc1', date: '2025-12-05', delta: '100' },
+      ]);
     });
 
     it('reverses transfer balance changes on delete', async () => {
@@ -1753,6 +1824,20 @@ describe('OperationsDB Service', () => {
       );
       expect(result).toHaveLength(2);
     });
+
+    // The anchor comes from the oldest loaded row. A timestamped one built
+    // `new Date('…ZT00:00:00')` — Invalid Date, a NaN window, zero rows, and a
+    // load-more that never advanced again.
+    it('builds a valid week window from a timestamped anchor', async () => {
+      queryAll.mockResolvedValue([]);
+
+      await OperationsDB.getOperationsByWeekFromDate('2025-12-05T09:00:00.000Z');
+
+      expect(queryAll).toHaveBeenLastCalledWith(
+        expect.stringContaining('WHERE date >= ? AND date <= ?'),
+        ['2025-11-29', '2025-12-05'],
+      );
+    });
   });
 
   describe('Field Mapping', () => {
@@ -1977,6 +2062,53 @@ describe('OperationsDB Service', () => {
       await expect(OperationsDB.createOperation(operation)).rejects.toThrow(
         'missing destination_amount and exchange_rate',
       );
+    });
+
+    // A transfer booked between two same-currency accounts stores neither
+    // destination_amount nor exchange_rate. Once one account's currency changed,
+    // reversing it demanded a rate, so it could be neither deleted nor edited.
+    describe('a booked transfer whose accounts no longer share a currency', () => {
+      const booked = {
+        id: 7, type: 'transfer', amount: '100', account_id: 'acc-usd', to_account_id: 'acc-eur',
+        destination_amount: null, exchange_rate: null, date: '2025-12-05', description: null,
+      };
+      // Every lookup the transaction makes, keyed on the SQL it issues.
+      const stubLookups = (operationAfterUpdate = booked) => {
+        mockDb.getFirstAsync.mockImplementation(async (sql, params) => {
+          if (sql.startsWith('SELECT * FROM operations WHERE id')) {
+            stubLookups.reads = (stubLookups.reads || 0) + 1;
+            return stubLookups.reads === 1 ? booked : operationAfterUpdate;
+          }
+          if (sql === 'SELECT currency FROM accounts WHERE id = ?') {
+            return { currency: params[0] === 'acc-usd' ? 'USD' : 'EUR' };
+          }
+          if (sql === 'SELECT balance FROM accounts WHERE id = ?') return { balance: '1000' };
+          return null;
+        });
+      };
+      beforeEach(() => { stubLookups.reads = 0; });
+
+      it('deletes it, reversing the amount it was credited', async () => {
+        stubLookups();
+
+        await OperationsDB.deleteOperation(7);
+
+        expect(Currency.add).toHaveBeenCalledWith('1000', '100');   // source gets it back
+        expect(Currency.add).toHaveBeenCalledWith('1000', '-100');  // destination gives it back
+      });
+
+      it('saves an edit that leaves the money alone', async () => {
+        stubLookups({ ...booked, description: 'Rent' });
+
+        await expect(OperationsDB.updateOperation(7, { description: 'Rent' })).resolves.not.toThrow();
+      });
+
+      it('still refuses an edit that re-books it across currencies without a rate', async () => {
+        stubLookups({ ...booked, amount: '150' });
+
+        await expect(OperationsDB.updateOperation(7, { amount: '150' }))
+          .rejects.toThrow('missing destination_amount and exchange_rate');
+      });
     });
 
     it('falls back to source amount for same-currency transfers missing destination_amount', async () => {

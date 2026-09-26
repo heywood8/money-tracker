@@ -13,10 +13,10 @@ const searchNormExpr = (columnExpr) =>
   isSearchNormAvailable() ? `SEARCH_NORM(${columnExpr})` : buildSearchNormSql(columnExpr);
 const normalizeSearchQuery = (text) => normalizeSearchText(text);
 import * as Currency from './currency';
-import { formatDate, updateTodayBalance } from './BalanceHistoryDB';
+import { formatDate, updateTodayBalance, applyPastBalanceChanges } from './BalanceHistoryDB';
 import * as AccountsDB from './AccountsDB';
 import { sumMoneySql } from './sqlMoney';
-import { formatLocalDate } from '../utils/dateUtils';
+import { formatLocalDate, toOperationDate, parseLocalDay } from '../utils/dateUtils';
 import getDefaultOperations from '../defaults/defaultOperations';
 
 // Operation types currently supported. Used as the upper bound for the
@@ -462,16 +462,44 @@ export const getOperationsByType = async (type) => {
   }
 };
 
+// The columns that decide what an operation does to balances.
+const MONEY_FIELDS = ['type', 'amount', 'account_id', 'to_account_id', 'destination_amount', 'exchange_rate'];
+
+/**
+ * One operation's balance changes as dated movements for
+ * BalanceHistoryDB.applyPastBalanceChanges, optionally reversed.
+ *
+ * @param {Map<string, string>} changes - calculateBalanceChanges() result
+ * @param {string} date - the operation's date
+ * @param {boolean} [reverse]
+ * @returns {Array<{ accountId: *, date: string, delta: string }>}
+ */
+const datedMovements = (changes, date, reverse = false) => [...changes.entries()].map(([accountId, delta]) => ({
+  accountId,
+  date,
+  delta: reverse ? Currency.subtract('0', delta) : delta,
+}));
+
 /**
  * Calculate balance changes for an operation
  * Handles multi-currency transfers by using destination_amount when available.
  * When destination_amount is null on a transfer, queries account currencies to
  * detect cross-currency transfers and recomputes the amount via exchange_rate.
+ * `booked` is for an operation that is already on the books and is being
+ * reversed (delete, the old side of an edit). A transfer with neither
+ * destination_amount nor exchange_rate was credited its own amount when it was
+ * booked — its accounts then shared a currency — and that is exactly what must
+ * come back off, whatever the accounts' currencies are now. Only a transfer
+ * being booked needs a rate to cross currencies; demanding one on reversal made
+ * such a transfer impossible to delete or edit once either account's currency
+ * had changed (or when an import left the columns empty).
+ *
  * @param {Object} operation
  * @param {Object} db - Transaction-scoped database instance
+ * @param {{ booked?: boolean }} [options]
  * @returns {Promise<Map<string, string>>} Map of accountId → string delta (Decimal-safe)
  */
-const calculateBalanceChanges = async (operation, db) => {
+const calculateBalanceChanges = async (operation, db, { booked = false } = {}) => {
   const balanceChanges = new Map();
   const amount = String(operation.amount || '0');
 
@@ -500,7 +528,9 @@ const calculateBalanceChanges = async (operation, db) => {
         const fromCurrency = fromAcc?.currency;
         const toCurrency = toAcc?.currency;
 
-        if (fromCurrency && toCurrency && fromCurrency !== toCurrency) {
+        const crossesCurrencies = fromCurrency && toCurrency && fromCurrency !== toCurrency;
+        // A booked transfer with no rate was credited its own amount (see above).
+        if (crossesCurrencies && !(booked && !operation.exchange_rate)) {
           if (!operation.exchange_rate) {
             throw new Error(
               `Multi-currency transfer ${operation.id} is missing destination_amount and exchange_rate`,
@@ -555,7 +585,7 @@ export const createOperationInTx = async (db, operation) => {
     account_id: extractId(operation.accountId),
     category_id: extractId(operation.categoryId),
     to_account_id: extractId(operation.toAccountId),
-    date: operation.date,
+    date: toOperationDate(operation.date),
     created_at: now,
     description: operation.description || null,
     exchange_rate: operation.exchangeRate || null,
@@ -608,6 +638,9 @@ export const createOperationInTx = async (db, operation) => {
 
     await updateTodayBalance(accountId, newBalance, db);
   }
+
+  // A back-dated operation also moves every snapshot from its day on.
+  await applyPastBalanceChanges(db, datedMovements(balanceChanges, operationData.date));
 
   return operationData;
 };
@@ -688,7 +721,7 @@ export const updateOperation = async (id, updates) => {
       }
       if (updates.date !== undefined) {
         fields.push('date = ?');
-        values.push(updates.date);
+        values.push(toOperationDate(updates.date));
       }
       if (updates.description !== undefined) {
         fields.push('description = ?');
@@ -747,13 +780,16 @@ export const updateOperation = async (id, updates) => {
       const balanceChanges = new Map();
 
       // Reverse old operation
-      const oldChanges = await calculateBalanceChanges(oldOperation, db);
+      const oldChanges = await calculateBalanceChanges(oldOperation, db, { booked: true });
       for (const [accountId, delta] of oldChanges.entries()) {
         balanceChanges.set(accountId, Currency.subtract(balanceChanges.get(accountId) || '0', delta));
       }
 
       // Apply new operation — track which accounts the new operation requires
-      const newChanges = await calculateBalanceChanges(newOperation, db);
+      // An edit that leaves every money field alone (a label, a category, the
+      // date) re-applies exactly what it reversed, so it is read the same way.
+      const moneyUnchanged = MONEY_FIELDS.every(field => String(oldOperation[field] ?? '') === String(newOperation[field] ?? ''));
+      const newChanges = await calculateBalanceChanges(newOperation, db, { booked: moneyUnchanged });
       const newOperationAccountIds = new Set(newChanges.keys());
       for (const [accountId, delta] of newChanges.entries()) {
         balanceChanges.set(accountId, Currency.add(balanceChanges.get(accountId) || '0', delta));
@@ -796,6 +832,17 @@ export const updateOperation = async (id, updates) => {
 
         // Update today's balance history
         await updateTodayBalance(accountId, newBalance, db);
+      }
+
+      // Past snapshots: the old version leaves the days from its date on, the
+      // new one joins them from its own (a date-only edit shifts the days in
+      // between, though the balance itself is unchanged). An edit that touched
+      // neither money nor date leaves them alone.
+      if (!moneyUnchanged || oldOperation.date !== newOperation.date) {
+        await applyPastBalanceChanges(db, [
+          ...datedMovements(oldChanges, oldOperation.date, true),
+          ...datedMovements(newChanges, newOperation.date),
+        ]);
       }
     });
   } catch (error) {
@@ -846,7 +893,7 @@ export const splitOperation = async (id, updates, newOperationData) => {
       if (updates.accountId !== undefined) { fields.push('account_id = ?'); vals.push(extractId(updates.accountId)); }
       if (updates.categoryId !== undefined) { fields.push('category_id = ?'); vals.push(extractId(updates.categoryId)); }
       if (updates.toAccountId !== undefined) { fields.push('to_account_id = ?'); vals.push(extractId(updates.toAccountId)); }
-      if (updates.date !== undefined) { fields.push('date = ?'); vals.push(updates.date); }
+      if (updates.date !== undefined) { fields.push('date = ?'); vals.push(toOperationDate(updates.date)); }
       if (updates.description !== undefined) { fields.push('description = ?'); vals.push(updates.description || null); }
       if (updates.exchangeRate !== undefined) { fields.push('exchange_rate = ?'); vals.push(updates.exchangeRate || null); }
       if (updates.destinationAmount !== undefined) { fields.push('destination_amount = ?'); vals.push(updates.destinationAmount || null); }
@@ -873,7 +920,7 @@ export const splitOperation = async (id, updates, newOperationData) => {
         account_id: extractId(newOperationData.accountId),
         category_id: extractId(newOperationData.categoryId),
         to_account_id: extractId(newOperationData.toAccountId) || null,
-        date: newOperationData.date,
+        date: toOperationDate(newOperationData.date),
         created_at: now,
         description: newOperationData.description || null,
         exchange_rate: newOperationData.exchangeRate || null,
@@ -925,9 +972,12 @@ export const splitOperation = async (id, updates, newOperationData) => {
         }
       };
 
-      applyChanges(await calculateBalanceChanges(oldOperation, db), true);
-      applyChanges(await calculateBalanceChanges(updatedOperation, db), false);
-      applyChanges(await calculateBalanceChanges(createdOperation, db), false);
+      const oldSplitChanges = await calculateBalanceChanges(oldOperation, db, { booked: true });
+      const updatedSplitChanges = await calculateBalanceChanges(updatedOperation, db);
+      const createdSplitChanges = await calculateBalanceChanges(createdOperation, db);
+      applyChanges(oldSplitChanges, true);
+      applyChanges(updatedSplitChanges, false);
+      applyChanges(createdSplitChanges, false);
 
       // Step 5: update account balances and balance history
       const updateTime = new Date().toISOString();
@@ -952,6 +1002,12 @@ export const splitOperation = async (id, updates, newOperationData) => {
 
         await updateTodayBalance(accountId, newBalance, db);
       }
+
+      await applyPastBalanceChanges(db, [
+        ...datedMovements(oldSplitChanges, oldOperation.date, true),
+        ...datedMovements(updatedSplitChanges, updatedOperation.date),
+        ...datedMovements(createdSplitChanges, createdOperation.date),
+      ]);
     });
 
     return createdOperation;
@@ -983,7 +1039,7 @@ export const deleteOperation = async (id) => {
       await db.runAsync('DELETE FROM operations WHERE id = ?', [id]);
 
       // Reverse balance changes
-      const balanceChanges = await calculateBalanceChanges(operation, db);
+      const balanceChanges = await calculateBalanceChanges(operation, db, { booked: true });
       const reverseChanges = new Map();
       for (const [accountId, delta] of balanceChanges.entries()) {
         reverseChanges.set(accountId, Currency.subtract('0', delta));
@@ -1016,6 +1072,8 @@ export const deleteOperation = async (id) => {
         // Update today's balance history
         await updateTodayBalance(accountId, newBalance, db);
       }
+
+      await applyPastBalanceChanges(db, datedMovements(balanceChanges, operation.date, true));
     });
   } catch (error) {
     console.error('Failed to delete operation:', error);
@@ -1442,11 +1500,11 @@ const getBalanceMovementsSince = async (sinceDate, currencyByAccountId) => {
  * booked after the date rather than from the balance-history snapshots the
  * Graphs chart reads, and that is deliberate:
  *
- * - Snapshots are only ever written under *today's* date
- *   (`BalanceHistoryDB.updateTodayBalance`), so a back-dated or retroactively
- *   edited operation never reaches the historical rows it belongs to. Walking
- *   the ledger reflects the corrections; the snapshots preserve whatever the app
- *   believed at the time.
+ * - Snapshots can disagree with the ledger. Back-dated changes are now carried
+ *   into the past rows (`BalanceHistoryDB.applyPastBalanceChanges`), but rows
+ *   written before that, hand-edited calendar values and restored histories keep
+ *   whatever the app believed at the time. Walking the ledger reflects every
+ *   correction.
  * - An account with no snapshot on or before the date contributes nothing to a
  *   snapshot-based reading, which turns "I added an account" into a jump in net
  *   worth. Here a newly added account simply has no operations to reverse, so it
@@ -1833,7 +1891,7 @@ export const getNextOldestOperation = async (beforeDate) => {
 export const getOperationsByWeekFromDate = async (endDate) => {
   try {
     // Parse the end date
-    const end = new Date(endDate + 'T00:00:00');
+    const end = parseLocalDay(endDate);
 
     // Calculate start date (6 days before end date)
     const start = new Date(end);
@@ -1874,7 +1932,7 @@ export const getOperationsByWeekFromDate = async (endDate) => {
 export const getFilteredOperationsByWeekFromDate = async (endDate, filters = {}) => {
   try {
     // Calculate week bounds (6 days before endDate)
-    const end = new Date(endDate + 'T00:00:00');
+    const end = parseLocalDay(endDate);
     const start = new Date(end);
     start.setDate(start.getDate() - 6);
 
@@ -1972,7 +2030,7 @@ export const getNextNewestOperation = async (afterDate) => {
 export const getOperationsByWeekToDate = async (startDate) => {
   try {
     // Parse the start date
-    const start = new Date(startDate + 'T00:00:00');
+    const start = parseLocalDay(startDate);
 
     // Calculate end date (6 days after start date)
     const end = new Date(start);
@@ -2036,7 +2094,7 @@ export const getNextNewestFilteredOperation = async (afterDate, filters = {}) =>
 export const getFilteredOperationsByWeekToDate = async (startDate, filters = {}) => {
   try {
     // Parse the start date
-    const start = new Date(startDate + 'T00:00:00');
+    const start = parseLocalDay(startDate);
 
     // Calculate end date (6 days after start date)
     const end = new Date(start);

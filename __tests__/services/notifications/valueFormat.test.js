@@ -80,6 +80,25 @@ describe('normalizeAmountString', () => {
       expect(normalizeAmountString(raw, currency)).toBe(expected);
     });
 
+    // Regression from bdf4665: only the app's own currency table counted, so a
+    // template in a currency the app has no account in (₸ → KZT, ₴ → UAH) read
+    // "1,500" as 1.5. Every ISO currency but the 3-decimal ones has <= 2.
+    it.each([
+      ['1,500', 'KZT', '1500'],
+      ['1,500', 'UAH', '1500'],
+      ['2.300', 'PLN', '2300'],
+      ['12.345', 'AED', '12345'],
+      ['1.500', 'kzt', '1500'],
+    ])('reads %s %s as thousands: an ISO currency outside the app\'s list', (raw, currency, expected) => {
+      expect(normalizeAmountString(raw, currency)).toBe(expected);
+    });
+
+    it('still keeps a fraction for the other 3-decimal ISO currencies', () => {
+      ['JOD', 'OMR', 'TND', 'IQD', 'LYD'].forEach(currency => {
+        expect(normalizeAmountString('1.500', currency)).toBe('1.500');
+      });
+    });
+
     it('leaves repeated and mixed separators alone', () => {
       expect(normalizeAmountString('1.250.000', 'KWD')).toBe('1250000');
       expect(normalizeAmountString('1,250.500', 'KWD')).toBe('1250.500');

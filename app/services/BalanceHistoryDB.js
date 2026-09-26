@@ -21,6 +21,33 @@ import { formatLocalDate as formatDate } from '../utils/dateUtils';
 export { formatDate };
 
 /**
+ * Undo one operation's effect on an account's balance (walking the ledger
+ * backwards). Ids are compared as strings: the column is an integer, but a
+ * caller may hold the id as a string, and a strict compare then reversed
+ * nothing at all. A transfer to the account itself is undone on both sides.
+ *
+ * @param {string} balance - balance after the operation
+ * @param {Object} op - operation row (snake_case columns)
+ * @param {number|string} accountId
+ * @returns {string} balance before the operation
+ */
+const reverseOperation = (balance, op, accountId) => {
+  const target = String(accountId);
+  const isSource = String(op.account_id) === target;
+  const isDestination = op.to_account_id != null && String(op.to_account_id) === target;
+  let result = balance;
+  if (op.type === 'expense' && isSource) {
+    result = Currency.add(result, op.amount);
+  } else if (op.type === 'income' && isSource) {
+    result = Currency.subtract(result, op.amount);
+  } else if (op.type === 'transfer') {
+    if (isSource) result = Currency.add(result, op.amount);
+    if (isDestination) result = Currency.subtract(result, op.destination_amount || op.amount);
+  }
+  return result;
+};
+
+/**
  * Calculate account balance at end of specific date
  * Works backwards from current balance by reversing operations
  *
@@ -71,24 +98,9 @@ const calculateBalanceOnDate = async (accountId, targetDate, db = null) => {
       );
     }
 
-    // Reverse each operation to get balance on target date
+    // Reverse each operation to get balance on target date.
     for (const op of operations) {
-      if (op.type === 'expense' && op.account_id === accountId) {
-        // Expense was deducted, add it back
-        currentBalance = Currency.add(currentBalance, op.amount);
-      } else if (op.type === 'income' && op.account_id === accountId) {
-        // Income was added, subtract it back
-        currentBalance = Currency.subtract(currentBalance, op.amount);
-      } else if (op.type === 'transfer') {
-        if (op.account_id === accountId) {
-          // Was debit (money out), add back
-          currentBalance = Currency.add(currentBalance, op.amount);
-        } else if (op.to_account_id === accountId) {
-          // Was credit (money in), subtract back
-          const creditAmount = op.destination_amount || op.amount;
-          currentBalance = Currency.subtract(currentBalance, creditAmount);
-        }
-      }
+      currentBalance = reverseOperation(currentBalance, op, accountId);
     }
 
     return currentBalance;
@@ -510,4 +522,173 @@ export const updateTodayBalance = async (accountId, balance, db = null) => {
     }
     // Swallow when called standalone — history is supplementary data
   }
+};
+
+/**
+ * Carry balance changes into the past snapshots they belong to.
+ *
+ * Snapshots were only ever written under today's date, so an operation entered
+ * or edited for an earlier day never reached the rows the chart draws that day
+ * from: rent booked on the 25th for the 3rd showed its drop on the 25th, and
+ * the "previous month" and yearly comparison lines kept the wrong month for
+ * good. Each movement is one operation's effect on one account, dated with the
+ * operation. Every snapshot of that account from the operation's day up to
+ * yesterday moves by the delta (today's row is written by updateTodayBalance
+ * from the live balance), and the operation's day gets a snapshot of its own
+ * when it has none, so the change shows on the day it happened.
+ *
+ * Per operation rather than per net account change: moving an operation from
+ * the 3rd to the 10th leaves the balance alone but shifts the days in between.
+ *
+ * Must run inside the caller's transaction, after the account balances have
+ * been updated (the new day's snapshot is read back from the ledger).
+ *
+ * @param {Object} db - Transaction-scoped database instance
+ * @param {Array<{ accountId: number|string, date: string, delta: string }>} movements
+ * @returns {Promise<void>}
+ */
+export const applyPastBalanceChanges = async (db, movements) => {
+  const today = formatDate(new Date());
+
+  // Net the movements per (account, day) first: an edit that reverses and
+  // re-applies the same amount on the same day (a label or category change)
+  // must not rewrite every snapshot twice, and nets to nothing at all.
+  const netByAccountDay = new Map(); // "accountId|day" -> { accountId, day, delta }
+  for (const { accountId, date, delta } of movements || []) {
+    if (accountId == null || !date || delta == null) continue;
+    const day = String(date).slice(0, 10);
+    if (!/^\d{4}-\d{2}-\d{2}$/.test(day) || day >= today) continue;
+    const numericAccountId = Number(accountId);
+    const key = `${numericAccountId}|${day}`;
+    const current = netByAccountDay.get(key);
+    netByAccountDay.set(key, {
+      accountId: numericAccountId,
+      day,
+      delta: current ? Currency.add(current.delta, delta) : String(delta),
+    });
+  }
+
+  const daysToAnchor = new Map(); // "accountId|day" -> { accountId, day }
+  for (const [key, { accountId: numericAccountId, day, delta }] of netByAccountDay) {
+    if (Currency.isZero(delta)) continue;
+
+    const rows = await db.getAllAsync(
+      `SELECT id, balance FROM accounts_balance_history
+        WHERE account_id = ? AND date(date) >= date(?) AND date(date) < date(?)`,
+      [numericAccountId, day, today],
+    );
+    for (const row of rows || []) {
+      await db.runAsync(
+        'UPDATE accounts_balance_history SET balance = ? WHERE id = ?',
+        [Currency.add(row.balance, delta), row.id],
+      );
+    }
+    daysToAnchor.set(key, { accountId: numericAccountId, day });
+  }
+
+  const now = new Date().toISOString();
+  for (const { accountId, day } of daysToAnchor.values()) {
+    // An operation's old account may be gone (the history rows went with it).
+    const account = await db.getFirstAsync('SELECT id FROM accounts WHERE id = ?', [accountId]);
+    if (!account) continue;
+    const existing = await db.getFirstAsync(
+      'SELECT id FROM accounts_balance_history WHERE account_id = ? AND date(date) = date(?) LIMIT 1',
+      [accountId, day],
+    );
+    if (existing) continue;
+    const balance = await calculateBalanceOnDate(accountId, day, db);
+    await db.runAsync(
+      'INSERT OR IGNORE INTO accounts_balance_history (account_id, date, balance, created_at) VALUES (?, ?, ?, ?)',
+      [accountId, day, balance, now],
+    );
+  }
+};
+
+/**
+ * End-of-day balances of one account on each of `daysAscending`, from one
+ * ledger walk: the current balance with every later operation undone.
+ *
+ * @param {Object} db - Transaction-scoped database instance
+ * @param {number} accountId
+ * @param {string[]} daysAscending - `YYYY-MM-DD`, ascending, at least one
+ * @returns {Promise<Map<string, string>>} day -> balance
+ */
+const balanceSeriesOnDays = async (db, accountId, daysAscending) => {
+  const account = await db.getFirstAsync('SELECT balance FROM accounts WHERE id = ?', [accountId]);
+  let running = account ? String(account.balance) : '0';
+  const operations = (await db.getAllAsync(
+    `SELECT type, amount, account_id, to_account_id, destination_amount, date FROM operations
+      WHERE (account_id = ? OR to_account_id = ?) AND date(date) > date(?)
+      ORDER BY date DESC, created_at DESC`,
+    [accountId, accountId, daysAscending[0]],
+  )) || [];
+  const series = new Map();
+  let next = 0;
+  for (const day of [...daysAscending].reverse()) {
+    while (next < operations.length && String(operations[next].date).slice(0, 10) > day) {
+      running = reverseOperation(running, operations[next], accountId);
+      next += 1;
+    }
+    series.set(day, running);
+  }
+  return series;
+};
+
+/**
+ * Fold one account's balance history into another's, for the account merge
+ * that delete-with-transfer performs.
+ *
+ * The destination takes the deleted account's operations and balance, so its
+ * past snapshots must read the two accounts' combined balance as well —
+ * otherwise the chart showed a cliff on the day of the merge, and every past
+ * day's snapshot disagreed with the ledger the app now walks for that day.
+ * Each day either account had a snapshot for gets the sum of both balances on
+ * that day (transfers between the two cancel out in the sum); the deleted
+ * account's rows are removed. Today's row is left to updateTodayBalance.
+ *
+ * Runs BEFORE the operations are moved, so both series come from the ledger as
+ * it was.
+ *
+ * @param {Object} db - Transaction-scoped database instance
+ * @param {number|string} fromAccountId - the account being deleted
+ * @param {number|string} toAccountId - the account taking it over
+ * @returns {Promise<void>}
+ */
+export const mergeBalanceHistoryInto = async (db, fromAccountId, toAccountId) => {
+  const from = Number(fromAccountId);
+  const to = Number(toAccountId);
+  const today = formatDate(new Date());
+  const days = new Set();
+  for (const accountId of [from, to]) {
+    const rows = await db.getAllAsync(
+      'SELECT date FROM accounts_balance_history WHERE account_id = ? AND date(date) < date(?)',
+      [accountId, today],
+    );
+    for (const row of rows || []) {
+      const day = String(row.date).slice(0, 10);
+      if (/^\d{4}-\d{2}-\d{2}$/.test(day)) days.add(day);
+    }
+  }
+
+  if (days.size > 0) {
+    const daysAscending = [...days].sort();
+    const fromSeries = await balanceSeriesOnDays(db, from, daysAscending);
+    const toSeries = await balanceSeriesOnDays(db, to, daysAscending);
+    const now = new Date().toISOString();
+    for (const day of daysAscending) {
+      const merged = Currency.add(toSeries.get(day), fromSeries.get(day));
+      const updated = await db.runAsync(
+        'UPDATE accounts_balance_history SET balance = ? WHERE account_id = ? AND date(date) = date(?)',
+        [merged, to, day],
+      );
+      if (!updated || updated.changes === 0) {
+        await db.runAsync(
+          'INSERT INTO accounts_balance_history (account_id, date, balance, created_at) VALUES (?, ?, ?, ?)',
+          [to, day, merged, now],
+        );
+      }
+    }
+  }
+
+  await db.runAsync('DELETE FROM accounts_balance_history WHERE account_id = ?', [from]);
 };

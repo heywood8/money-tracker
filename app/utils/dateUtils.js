@@ -25,6 +25,45 @@ export const formatLocalDate = (date) => {
 };
 
 /**
+ * An operation's calendar day as stored: `YYYY-MM-DD`, nothing after it.
+ *
+ * `operations.date` is a plain calendar day everywhere the app writes it, but a
+ * CSV/JSON/Sheets import copied whatever the file carried, and a missing date
+ * fell back to a full ISO timestamp (#773). A timestamped row broke every query
+ * that compares the column as a string: "2026-08-31T10:00" is neither
+ * <= "2026-08-31" nor >= "2026-09-01", so it fell out of every month's totals,
+ * and the operations list built its next week window from it with
+ * `new Date(date + 'T00:00:00')` — Invalid Date, zero rows, and a load-more that
+ * never advanced past it again.
+ *
+ * A value that starts with a calendar day keeps just the day (what SQLite's
+ * `date()` reads from it too); a Date becomes its local day; anything else is
+ * returned unchanged for validation to deal with.
+ *
+ * @param {string|Date|null|undefined} value
+ * @returns {string|Date|null|undefined}
+ */
+export const toOperationDate = (value) => {
+  if (value instanceof Date) {
+    return Number.isNaN(value.getTime()) ? value : formatLocalDate(value);
+  }
+  if (typeof value === 'string') {
+    const trimmed = value.trim();
+    return /^\d{4}-\d{2}-\d{2}(?:[T\s].*)?$/.test(trimmed) ? trimmed.slice(0, 10) : value;
+  }
+  return value;
+};
+
+/**
+ * Local midnight of a stored calendar day. Tolerates a timestamp tail, which
+ * `new Date(day + 'T00:00:00')` turned into an Invalid Date.
+ *
+ * @param {string} day - `YYYY-MM-DD`, optionally followed by a time
+ * @returns {Date}
+ */
+export const parseLocalDay = (day) => new Date(`${String(day).slice(0, 10)}T00:00:00`);
+
+/**
  * Today's local calendar day, as `YYYY-MM-DD`.
  * @returns {string}
  */

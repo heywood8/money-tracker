@@ -9,6 +9,7 @@ import { queryAll, executeQuery, executeTransaction, getDatabase } from './db';
 import { appEvents } from './eventEmitter';
 import { acceptBaseline, countRows } from './backupBaseline';
 import * as BudgetPlansDB from './BudgetPlansDB';
+import { toOperationDate, todayLocalDate } from '../utils/dateUtils';
 
 const BACKUP_VERSION = 1;
 
@@ -447,6 +448,21 @@ const asFlag = (value, fallback = 0) => {
 const asNullable = (value) => (value === '' || value == null ? null : value);
 
 /**
+ * A stored JSON array (an app_metadata value), or [] when absent or unreadable.
+ * @param {string|null|undefined} value
+ * @returns {Array}
+ */
+const parseJsonArray = (value) => {
+  if (typeof value !== 'string' || !value) return [];
+  try {
+    const parsed = JSON.parse(value);
+    return Array.isArray(parsed) ? parsed : [];
+  } catch {
+    return [];
+  }
+};
+
+/**
  * Read a numeric backup column, tolerating the strings a CSV round trip yields.
  * @param {*} value - Raw column value
  * @param {number} [fallback=0] - Result for an absent, blank or unreadable value
@@ -724,6 +740,21 @@ export const restoreBackup = async (backup, cancelToken) => {
       const preservedTemplateCategories = Array.isArray(backup.data.notification_templates)
         ? null
         : await readPreserved('SELECT id, category_id FROM notification_templates');
+      // The review queue is transient and never in a backup, but it is not
+      // disposable: `DELETE FROM accounts` below cascades away every queued item
+      // with a resolved account (nearly all of them), and the processed-signature
+      // list says those notifications were handled, so they are never queued
+      // again — transactions the user was asked to review, gone. Kept with the
+      // signatures this device has already handled (merged back below).
+      const preservedPending = await readPreserved(
+        `SELECT p.*, a.name AS account_name, a.currency AS account_currency
+           FROM pending_notifications p
+           LEFT JOIN accounts a ON a.id = p.account_id AND a.deleted_at IS NULL`,
+      );
+      const liveProcessedSigs = await readPreserved(
+        "SELECT value FROM app_metadata WHERE key = 'bank_notifications_processed_sigs'",
+      );
+      await db.runAsync('DELETE FROM pending_notifications').catch(() => {});
 
       // Clear existing data (in reverse order due to foreign keys)
       // Merchant rules and parse templates are cleared ONLY when the backup
@@ -786,7 +817,7 @@ export const restoreBackup = async (backup, cancelToken) => {
       for (const account of backup.data.accounts) {
         // Validate required fields
         if (!account.name) {
-          console.warn('Skipping account with missing name:', account);
+          console.warn('Skipping account with missing name, id:', account?.id);
           continue;
         }
 
@@ -873,7 +904,7 @@ export const restoreBackup = async (backup, cancelToken) => {
       for (const category of sortCategoriesParentsFirst(backup.data.categories)) {
         // Validate required fields
         if (!category || !category.id || !category.name) {
-          console.warn('Skipping category with missing id or name:', category);
+          console.warn('Skipping category with missing id or name, id:', category?.id);
           continue;
         }
 
@@ -1013,7 +1044,7 @@ export const restoreBackup = async (backup, cancelToken) => {
         
         // Validate that account_id is not null/undefined
         if (mappedAccountId == null) {
-          console.warn('Skipping operation with null account_id:', operation);
+          console.warn('Skipping operation with null account_id, id:', operation?.id);
           skippedOperations++;
           continue;
         }
@@ -1038,7 +1069,9 @@ export const restoreBackup = async (backup, cancelToken) => {
             mappedAccountId,
             resolveCategoryReference(operation.category_id, 'operation'),
             mappedToAccountId,
-            operation.date || new Date().toISOString(),
+            // A calendar day, as every other writer stores it: a file's timestamp
+            // (or the old full-ISO fallback) broke every string date compare.
+            toOperationDate(operation.date) || todayLocalDate(),
             operation.created_at || new Date().toISOString(),
             operation.description || null,
             operation.exchange_rate || null,
@@ -1130,7 +1163,7 @@ export const restoreBackup = async (backup, cancelToken) => {
         for (const budget of backup.data.budgets) {
           // Validate required fields
           if (!budget.id || !budget.category_id || !budget.amount || !budget.currency) {
-            console.warn('Skipping budget with missing required fields:', budget);
+            console.warn('Skipping budget with missing required fields, id:', budget?.id);
             continue;
           }
           // `budgets.category_id` is the one category FK that is NOT NULL, so a
@@ -1200,7 +1233,7 @@ export const restoreBackup = async (backup, cancelToken) => {
         const restoredGroupIds = new Set();
         for (const group of groups) {
           if (!group.id || !group.label) {
-            console.warn('Skipping budget line group with missing required fields:', group);
+            console.warn('Skipping budget line group with missing required fields, id:', group?.id);
             continue;
           }
           // A CSV round trip turns a null amount into '', which must restore as a
@@ -1229,7 +1262,7 @@ export const restoreBackup = async (backup, cancelToken) => {
         let restoredPlans = 0;
         for (const plan of plans) {
           if (!plan.id || !plan.month || !plan.currency) {
-            console.warn('Skipping budget plan with missing required fields:', plan);
+            console.warn('Skipping budget plan with missing required fields, id:', plan?.id);
             continue;
           }
           await db.runAsync(
@@ -1259,13 +1292,13 @@ export const restoreBackup = async (backup, cancelToken) => {
           // amount is a NOT NULL text column; treat null/empty as invalid and
           // skip (mirrors how budgets skip rows with missing required fields).
           if (!line.id || line.amount == null || line.amount === '') {
-            console.warn('Skipping budget plan line with missing required fields:', line);
+            console.warn('Skipping budget plan line with missing required fields, id:', line?.id);
             continue;
           }
           const isRecurring = Number(line.is_recurring) === 1;
           if (!isRecurring) {
             if (!line.plan_id) {
-              console.warn('Skipping budget plan line with missing required fields:', line);
+              console.warn('Skipping budget plan line with missing required fields, id:', line?.id);
               continue;
             }
             if (!restoredPlanIds.has(line.plan_id)) {
@@ -1429,6 +1462,10 @@ export const restoreBackup = async (backup, cancelToken) => {
         const metadataRestoredAt = new Date().toISOString();
         for (const meta of backup.data.app_metadata) {
           if (!meta.key || meta.key === 'db_version') continue;
+          // Operation ids are reassigned on restore, so the registry of
+          // operations the notification pipeline booked (keyed by id) would
+          // point at unrelated rows. It starts empty instead.
+          if (meta.key === 'bank_notifications_booked_ops') continue;
           // Both columns are NOT NULL with no default, and CSV cannot tell an
           // empty string from a missing value: parseCSV reads every blank cell as
           // null. A preference legitimately stored as '' (backup_last_skipped is,
@@ -1546,7 +1583,7 @@ export const restoreBackup = async (backup, cancelToken) => {
         let restoredRules = 0;
         for (const rule of backup.data.notification_merchant_rules) {
           if (!rule.id || !rule.merchant) {
-            console.warn('Skipping merchant rule with missing id or merchant:', rule);
+            console.warn('Skipping merchant rule with missing id or merchant, id:', rule?.id);
             continue;
           }
           // INSERT OR IGNORE: a rule whose category was not restored is skipped
@@ -1655,6 +1692,58 @@ export const restoreBackup = async (backup, cancelToken) => {
           keptTemplateCategories += 1;
         }
         console.log(`Preserved the category of ${keptTemplateCategories} notification templates`);
+      }
+
+      // The review queue, re-pointed at the restored data: an account or a
+      // category the restored set no longer has is left for the user to pick at
+      // review rather than dropping the item.
+      if (preservedPending.length > 0) {
+        let keptPending = 0;
+        for (const item of preservedPending) {
+          if (!item.id) continue;
+          // Ids are reassigned by a restore, so the live account is found again
+          // by what identifies it to the user: its name and currency. No such
+          // account in the restored set leaves the item for the user to place.
+          const account = item.account_name
+            ? await db.getFirstAsync(
+              'SELECT id FROM accounts WHERE name = ? AND currency = ? AND deleted_at IS NULL ORDER BY id LIMIT 1',
+              [item.account_name, item.account_currency],
+            )
+            : null;
+          const inserted = await db.runAsync(
+            `INSERT OR IGNORE INTO pending_notifications
+              (id, kind, type, amount, currency, card_mask, merchant, country, date, time, account_id, category_id, package_name, raw, latitude, longitude, force_added, created_at)
+             VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
+            [
+              item.id, item.kind, item.type, item.amount, item.currency, item.card_mask ?? null,
+              item.merchant ?? null, item.country ?? null, item.date ?? null, item.time ?? null,
+              account ? account.id : null,
+              item.category_id ? resolveCategoryReference(item.category_id, 'preserved review item') : null,
+              item.package_name ?? null, item.raw ?? null, item.latitude ?? null, item.longitude ?? null,
+              item.force_added ? 1 : 0, item.created_at || new Date().toISOString(),
+            ],
+          ).catch((e) => { console.warn('Skipping preserved review item:', e.message); return null; });
+          if (inserted && inserted.changes !== 0) keptPending += 1;
+        }
+        console.log(`Preserved ${keptPending} queued bank notifications`);
+      }
+
+      // Notifications this device already handled stay handled: the restored
+      // list only knows what the backup's device had seen, so the preserved
+      // queue items (and anything booked here) would otherwise be processed
+      // again and queued a second time.
+      const liveSigs = parseJsonArray(liveProcessedSigs[0]?.value);
+      if (liveSigs.length > 0) {
+        const restoredRow = await db.getFirstAsync(
+          "SELECT value FROM app_metadata WHERE key = 'bank_notifications_processed_sigs'",
+        );
+        const restoredSigs = parseJsonArray(restoredRow?.value);
+        const known = new Set(restoredSigs);
+        const merged = [...restoredSigs, ...liveSigs.filter(sig => !known.has(sig))];
+        await db.runAsync(
+          'INSERT OR REPLACE INTO app_metadata (key, value, updated_at) VALUES (?, ?, ?)',
+          ['bank_notifications_processed_sigs', JSON.stringify(merged), new Date().toISOString()],
+        );
       }
 
       appEvents.emit(IMPORT_PROGRESS_EVENT, { stepId: 'upgrades', status: 'completed' });
@@ -1919,6 +2008,29 @@ export const readCarriedNotificationData = async (sourceDb, tablesInFile) => {
 };
 
 /**
+ * Refuse a `.db` file that is not a Penny database.
+ *
+ * Migrating a file creates every table it lacks, empty — that is the
+ * fresh-install path. So any SQLite file (another app's database, a browser
+ * `.sqlite`, an empty file) came out of migration as an empty Penny schema,
+ * restoreBackup cleared every live table to match it, and the import reported
+ * success over a wiped database. The CSV and Sheets importers already refuse a
+ * source missing its core sections; this is the same guard for `.db`, and it
+ * must run on the table list read BEFORE migrating.
+ *
+ * @param {Set<string>} tablesInFile - table names the file held before migration
+ * @throws {Error} when accounts, categories or operations is missing
+ */
+export const assertPennyDatabaseTables = (tablesInFile) => {
+  const missing = ['accounts', 'categories', 'operations'].filter(name => !tablesInFile.has(name));
+  if (missing.length > 0) {
+    throw new Error(
+      `Invalid backup format: not a Penny database (missing table${missing.length > 1 ? 's' : ''}: ${missing.join(', ')})`,
+    );
+  }
+};
+
+/**
  * Import backup from SQLite database file
  * @param {string} fileUri - File URI
  * @param {{ cancelled: boolean }} [cancelToken]
@@ -1982,6 +2094,7 @@ const importBackupSQLite = async (fileUri, cancelToken) => {
       ((await tempDb.getAllAsync("SELECT name FROM sqlite_master WHERE type = 'table'")) || [])
         .map(row => row.name),
     );
+    assertPennyDatabaseTables(tablesInFile);
 
     // A migration that aborts throws, and the import must stop right there: the
     // newer tables would be missing, every optional-table read below would log

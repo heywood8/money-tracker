@@ -172,13 +172,20 @@ export const parse = (notification) => {
   const amountMatch = primary.match(AMOUNT_CURRENCY_RE);
   if (!amountMatch) return null;
 
-  // 4. Currency — prefer the explicit account ISO code ("счет RUB"), since with
-  //    no card mask the account is matched by currency; fall back to the amount's
-  //    symbol/code.
+  // 4. Currency. The charge is in the amount's own currency ("10 $"); the
+  //    "счет RUB" code names the account it hit, which is how a card-less
+  //    notification finds its account. The account code used to replace the
+  //    charge currency outright, so "Покупка на 10 $, счет RUB" was booked as
+  //    10 rubles. Now the charge keeps its currency (and is converted like any
+  //    foreign charge) and the account code travels as `accountCurrencyHint`.
+  //    A lower-case three-letter word is not a currency code.
   const accountCurrencyMatch = primary.match(ACCOUNT_CURRENCY_RE);
-  const currency = accountCurrencyMatch
-    ? accountCurrencyMatch[1].toUpperCase()
-    : currencyCodeFromToken(amountMatch[2]);
+  const accountCurrency = accountCurrencyMatch ? accountCurrencyMatch[1].toUpperCase() : null;
+  const amountToken = amountMatch[2];
+  const chargeCurrency = /^[A-Za-z]{3}$/.test(amountToken) && amountToken !== amountToken.toUpperCase()
+    ? null
+    : currencyCodeFromToken(amountToken);
+  const currency = chargeCurrency || accountCurrency;
   if (!currency) return null;
 
   // Read after the currency: it decides whether "1.500" is thousands or 1.5.
@@ -200,6 +207,8 @@ export const parse = (notification) => {
     type,
     amount,
     currency,
+    // Only when it differs: the account's currency, for account resolution.
+    accountCurrencyHint: accountCurrency && accountCurrency !== currency ? accountCurrency : null,
     cardMask,
     merchant,
     country: null,
