@@ -5,7 +5,7 @@
  */
 
 import React from 'react';
-import { Animated, AppState } from 'react-native';
+import { Animated, AppState, StyleSheet } from 'react-native';
 import { render, waitFor, act, fireEvent } from '@testing-library/react-native';
 import { SUGGESTION_TIMEOUT_MS } from '../../app/components/operations/DescriptionSuggestionRow';
 import { UNDO_DURATION_MS } from '../../app/components/operations/UndoSnackbar';
@@ -3788,11 +3788,13 @@ describe('OperationsScreen', () => {
     // stay, because the re-assert is still right for the form's own pinned-open
     // state — but the deck is no longer in the clip at all, and the tests below
     // are the ones that hold that.
-    // The cards inside the stack are absolutely positioned, so their container
-    // contributes no height of its own: without an explicit one it lays out at
-    // zero and paints nothing, which is the same invisible-deck symptom by
-    // another route. It used to borrow its height from the form it covered.
-    it('gives the deck container a height of its own', async () => {
+    // The deck lays its front card out in flow and pads its own top, so the
+    // container takes its height from the card's content. It used to pin one
+    // from the form (peek padding + the floored form height), which fell to the
+    // 260dp floor whenever the form had not been measured and clipped the
+    // card's category chips. The deck's own tests cover the in-flow layout
+    // that makes this safe.
+    it('leaves the deck container to size itself from the cards', async () => {
       const OperationsScreen = require('../../app/screens/OperationsScreen').default;
       mockSuggestionsHook({ suggestions: [{ id: 'p1', type: 'expense', amount: '10' }] });
       const restoreSearch = withSearchClosed();
@@ -3809,12 +3811,12 @@ describe('OperationsScreen', () => {
 
         const stack = getByTestId('notification-binding-stack', options);
         const container = stack.parent;
-        const style = Array.isArray(container.props.style)
-          ? Object.assign({}, ...container.props.style.filter(Boolean))
-          : container.props.style;
-        const { deckPeekAllowance: peek, deckCardHeight: cardHeight } =
-          require('../../app/components/operations/NotificationBindingStack');
-        expect(style.height).toBe(peek(1) + cardHeight(437));
+        const style = StyleSheet.flatten(container.props.style) || {};
+        expect(style.height).toBeUndefined();
+        expect(style.minHeight).toBeUndefined();
+        expect(style.paddingTop).toBeUndefined();
+        // The measured form still reaches the deck, as the cards' floor.
+        expect(stack.props.quickAddHeight).toBe(437);
       } finally {
         restoreSearch();
       }
