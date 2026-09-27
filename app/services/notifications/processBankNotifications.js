@@ -448,7 +448,9 @@ const bookExpenseOrQueue = async (descriptor, resolution, date, allowedPackages,
   // A learned display-name (label) binding is required too, alongside the account
   // and category: without one the item is routed to the review queue so the user
   // can set/confirm the name there, instead of silently booking the raw merchant
-  // string. Bank merchant names arrive truncated to varying lengths (e.g.
+  // string. (Saving a new source from review with the name left blank confirms the
+  // suggested, tidied name and binds it — see resolvePendingNotification.) Bank
+  // merchant names arrive truncated to varying lengths (e.g.
   // "YEREVAN CITY HANRAPETUTYU" vs "…TYUN"), so a name bound to one spelling
   // wouldn't match another; gating the silent create on a resolved name means such
   // a purchase surfaces for review rather than being booked with a name that
@@ -880,8 +882,14 @@ const runProcess = async () => {
  * with the user's chosen account/category, learn the bindings for next time,
  * then remove the pending row.
  *
+ * A source bound for the first time with its name left blank also gets a name
+ * binding: the suggested (tidied) shop name the review field showed.
+ *
  * @param {string} pendingId
- * @param {Object} choices - { accountId, categoryId, learnCardMask?, learnMerchant? }
+ * @param {Object} choices - { accountId, categoryId, labelOverride?,
+ *   learnCardMask?, learnMerchant?, learnAccountBinding?, learnSource? }.
+ *   `labelOverride` omitted keeps any learned name; a string (blank included) is
+ *   authoritative, and a blank one clears a learned name.
  * @returns {Promise<Object|null>} the created operation, or null if not found
  */
 export const resolvePendingNotification = async (pendingId, choices = {}) => {
@@ -1016,6 +1024,12 @@ export const resolvePendingNotification = async (pendingId, choices = {}) => {
   // Learn the merchant -> category rule (default on when both are present).
   // Never learn a rule for kinds that must always be categorized manually
   // (C2C): a transfer to a friend has no stable category to remember.
+  //
+  // A source bound for the first time also learns the name the operation was
+  // booked under. With the field left blank that is the suggested name shown as
+  // its placeholder (the tidied shop name), so saving blank confirms it the same
+  // way typing it would. An existing rule keeps its name (or its lack of one: the
+  // user may have removed it) — `labelIfNew` only applies when the rule is created.
   if (
     choices.learnMerchant !== false &&
     pending.merchant &&
@@ -1027,6 +1041,7 @@ export const resolvePendingNotification = async (pendingId, choices = {}) => {
         pending.merchant,
         categoryId,
         pending.packageName,
+        { labelIfNew: label },
       );
     } catch (error) {
       console.error('[resolvePendingNotification] Failed to learn merchant rule:', error);

@@ -103,9 +103,11 @@ export const getLabelForMerchant = async (merchant, packageName = null) => {
  * @param {string} key - already-normalized merchant key (non-empty)
  * @param {string|null} packageName
  * @param {Object} columns - DB column -> value to set (e.g. { category_id } or { label_override })
+ * @param {Object} [insertOnlyColumns] - DB column -> value written only when a new
+ *   row is inserted; an existing row keeps whatever it already holds
  * @returns {Promise<Object>} the stored rule
  */
-const upsertRuleRow = async (key, packageName, columns) => {
+const upsertRuleRow = async (key, packageName, columns, insertOnlyColumns = {}) => {
   const now = new Date().toISOString();
   let existing = await queryFirst(
     packageName
@@ -142,6 +144,7 @@ const upsertRuleRow = async (key, packageName, columns) => {
     package_name: packageName || null,
     category_id: null,
     label_override: null,
+    ...insertOnlyColumns,
     ...columns,
     created_at: now,
     updated_at: now,
@@ -159,16 +162,30 @@ const upsertRuleRow = async (key, packageName, columns) => {
  * Upserts on the (merchant, packageName) pair. A null/empty categoryId is
  * ignored — there is nothing to learn without a category.
  *
+ * `labelIfNew` names a source bound for the first time: it becomes the label
+ * override only when this call inserts the rule. An existing rule's label is never
+ * touched, so a name set a moment earlier (a typed override, or one a sibling
+ * review card just saved) always wins. Deciding inside the same write keeps the
+ * name and the category from landing half-saved.
+ *
  * @param {string} merchant
  * @param {string} categoryId
  * @param {string|null} packageName
+ * @param {{ labelIfNew?: string|null }} [options]
  * @returns {Promise<Object|null>} the stored rule, or null if nothing was learned
  */
-export const upsertMerchantRule = async (merchant, categoryId, packageName = null) => {
+export const upsertMerchantRule = async (merchant, categoryId, packageName = null, { labelIfNew = null } = {}) => {
   const key = normalizeMerchant(merchant);
   if (!key || !categoryId) return null;
+  // Same sanitation as upsertMerchantLabel; '' -> no label on the new row.
+  const label = sanitizeLabel(labelIfNew);
   try {
-    return await upsertRuleRow(key, packageName, { category_id: categoryId });
+    return await upsertRuleRow(
+      key,
+      packageName,
+      { category_id: categoryId },
+      label ? { label_override: label } : {},
+    );
   } catch (error) {
     console.error('Failed to upsert merchant rule:', error);
     throw error;

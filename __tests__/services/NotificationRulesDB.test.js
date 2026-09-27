@@ -112,6 +112,66 @@ describe('NotificationRulesDB', () => {
       );
       expect(rule.categoryId).toBe('cat-new');
     });
+
+    describe('labelIfNew (name for a source bound for the first time)', () => {
+      it('stores the label on a newly inserted rule, in the same write', async () => {
+        mockDb.queryFirst.mockResolvedValue(null);
+        const rule = await NotificationRulesDB.upsertMerchantRule(
+          'GURMAN', 'cat-food', 'am.bank', { labelIfNew: 'Gurman' },
+        );
+        expect(mockDb.executeQuery).toHaveBeenCalledTimes(1);
+        const [sql, params] = mockDb.executeQuery.mock.calls[0];
+        expect(sql).toContain('INSERT INTO notification_merchant_rules');
+        // (id, merchant, package_name, category_id, label_override, ...)
+        expect(params.slice(1, 5)).toEqual(['GURMAN', 'am.bank', 'cat-food', 'Gurman']);
+        expect(rule.labelOverride).toBe('Gurman');
+      });
+
+      it('leaves an existing rule\'s label alone, set or not', async () => {
+        // A category-only rule may be one whose name the user removed; a named
+        // one may have just been typed on a sibling card. Neither is overwritten.
+        mockDb.queryFirst.mockResolvedValue({
+          id: 'r1', merchant: 'GURMAN', package_name: 'am.bank', category_id: 'cat-old', label_override: null,
+        });
+        const rule = await NotificationRulesDB.upsertMerchantRule(
+          'GURMAN', 'cat-food', 'am.bank', { labelIfNew: 'Gurman' },
+        );
+        const [sql, params] = mockDb.executeQuery.mock.calls[0];
+        expect(sql).toMatch(/^UPDATE notification_merchant_rules SET category_id = \?, updated_at = \? WHERE id = \?$/);
+        expect(params).not.toContain('Gurman');
+        expect(rule.labelOverride).toBeNull();
+      });
+
+      it('treats the unscoped fallback row as existing', async () => {
+        // No row for this package, but an unscoped one for the merchant: the
+        // category lands on that row (as reads resolve it), so it is not new.
+        mockDb.queryFirst
+          .mockResolvedValueOnce(null)
+          .mockResolvedValueOnce({
+            id: 'r0', merchant: 'GURMAN', package_name: null, category_id: 'cat-old', label_override: 'Gurman Cafe',
+          });
+        await NotificationRulesDB.upsertMerchantRule('GURMAN', 'cat-food', 'am.bank', { labelIfNew: 'Gurman' });
+        const [sql, params] = mockDb.executeQuery.mock.calls[0];
+        expect(sql).toContain('UPDATE notification_merchant_rules SET category_id = ?');
+        expect(params).toEqual(['cat-food', expect.any(String), 'r0']);
+      });
+
+      it('sanitizes the label and stores none when it is blank', async () => {
+        mockDb.queryFirst.mockResolvedValue(null);
+        await NotificationRulesDB.upsertMerchantRule('A B', 'cat-1', null, { labelIfNew: '  A | B  ' });
+        expect(mockDb.executeQuery.mock.calls[0][1][4]).toBe('A B');
+
+        mockDb.executeQuery.mockClear();
+        await NotificationRulesDB.upsertMerchantRule('SHOP', 'cat-1', null, { labelIfNew: '   ' });
+        expect(mockDb.executeQuery.mock.calls[0][1][4]).toBeNull();
+      });
+
+      it('stores no label without the option', async () => {
+        mockDb.queryFirst.mockResolvedValue(null);
+        await NotificationRulesDB.upsertMerchantRule('SHOP', 'cat-1');
+        expect(mockDb.executeQuery.mock.calls[0][1][4]).toBeNull();
+      });
+    });
   });
 
   describe('getLabelForMerchant', () => {
