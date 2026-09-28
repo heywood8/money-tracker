@@ -1,5 +1,12 @@
 # Changelog
 
+## [0.292.17](https://github.com/heywood8/money-tracker/compare/penny-v0.292.16...penny-v0.292.17) (2026-09-28)
+
+
+### Bug Fixes
+
+* **notifications:** bind suggested name when first save leaves it blank ([#1843](https://github.com/heywood8/money-tracker/issues/1843)) ([286d8c2](https://github.com/heywood8/money-tracker/commit/286d8c24c85ce4b474e92646f05895f57137ce39))
+
 ## [0.292.16](https://github.com/heywood8/money-tracker/compare/penny-v0.292.15...penny-v0.292.16) (2026-09-26)
 
 
