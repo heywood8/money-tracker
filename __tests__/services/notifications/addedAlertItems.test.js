@@ -10,12 +10,16 @@ import {
 } from '../../../app/services/notifications/addedAlertItems';
 import { getAllAccounts } from '../../../app/services/AccountsDB';
 import { getAllCategories } from '../../../app/services/CategoriesDB';
+import { isHideBalancesEnabled } from '../../../app/services/PreferencesDB';
 
 jest.mock('../../../app/services/AccountsDB', () => ({
   getAllAccounts: jest.fn(),
 }));
 jest.mock('../../../app/services/CategoriesDB', () => ({
   getAllCategories: jest.fn(),
+}));
+jest.mock('../../../app/services/PreferencesDB', () => ({
+  isHideBalancesEnabled: jest.fn(),
 }));
 
 const created = (overrides = {}) => ({
@@ -33,9 +37,10 @@ describe('addedAlertItems.collectAddedAlertDetails', () => {
   beforeEach(() => {
     jest.clearAllMocks();
     getAllAccounts.mockResolvedValue([
-      { id: 5, name: 'Main card', currency: 'AMD' },
-      { id: 9, name: 'Cash', currency: 'AMD' },
+      { id: 5, name: 'Main card', currency: 'AMD', balance: '48800.00' },
+      { id: 9, name: 'Cash', currency: 'AMD', balance: '20000.00' },
     ]);
+    isHideBalancesEnabled.mockResolvedValue(false);
     getAllCategories.mockResolvedValue([
       { id: 'cat-groceries', name: 'Groceries', nameKey: null },
       { id: 'cat-food', name: null, nameKey: 'category_food' },
@@ -52,9 +57,38 @@ describe('addedAlertItems.collectAddedAlertDetails', () => {
       merchant: 'Sas',
       date: '2026-07-20',
       accountName: 'Main card',
+      accountBalance: '48800.00',
+      accountCurrency: 'AMD',
       categoryName: 'Groceries',
       targetAccountName: null,
     });
+  });
+
+  it('withholds the balance when the user hides balances', async () => {
+    isHideBalancesEnabled.mockResolvedValue(true);
+
+    const [detail] = await collectAddedAlertDetails([created()]);
+
+    expect(detail.accountBalance).toBeNull();
+    // The account itself is still named — only the figure is private.
+    expect(detail.accountName).toBe('Main card');
+  });
+
+  it('withholds the balance if the hide-balances check itself throws', async () => {
+    isHideBalancesEnabled.mockRejectedValue(new Error('unexpected'));
+
+    const [detail] = await collectAddedAlertDetails([created()]);
+
+    expect(detail.accountBalance).toBeNull();
+    expect(detail.accountName).toBe('Main card');
+  });
+
+  it('carries the balance of the account the transfer left, not the one it reached', async () => {
+    const [detail] = await collectAddedAlertDetails([
+      created({ type: 'transfer', categoryId: null, toAccountId: 9 }),
+    ]);
+
+    expect(detail.accountBalance).toBe('48800.00');
   });
 
   it('carries a built-in category through as a translation key', async () => {
@@ -109,7 +143,12 @@ describe('addedAlertItems.collectAddedAlertDetails', () => {
     const [detail] = await collectAddedAlertDetails([created()]);
 
     // The amount and payee — the part that matters — survive an unnamed account.
-    expect(detail).toMatchObject({ amount: '1299.00', merchant: 'Sas', accountName: null });
+    expect(detail).toMatchObject({
+      amount: '1299.00',
+      merchant: 'Sas',
+      accountName: null,
+      accountBalance: null,
+    });
   });
 
   it('never throws: an unexpected failure degrades to []', async () => {

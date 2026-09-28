@@ -10,10 +10,17 @@
  * Everything here is best-effort: a failed read degrades to unnamed rows — or an
  * empty list, which the copy layer renders as its plain count-only text — rather
  * than losing the alert.
+ *
+ * The account's balance rides along so the receipt can say what is left, but only
+ * while the user has not asked for balances to be hidden: a tray row is readable
+ * from the lock screen, which is the last place a hidden figure should surface.
+ * Withholding it here, rather than in the copy layer, means no later rendering
+ * change can print a balance the setting was meant to keep out of sight.
  */
 
 import { getAllAccounts } from '../AccountsDB';
 import { getAllCategories } from '../CategoriesDB';
+import { isHideBalancesEnabled } from '../PreferencesDB';
 
 /** How many booked operations the alert body describes before "+N more". */
 export const MAX_ADDED_ALERT_DETAILS = 3;
@@ -25,9 +32,12 @@ export const MAX_ADDED_ALERT_DETAILS = 3;
  * @param {number} [limit] - maximum number of described items
  * @returns {Promise<Array<{
  *   type: string, amount: string, currency: string, merchant: string|null,
- *   date: string|null, accountName: string|null, categoryName: string|null,
+ *   date: string|null, accountName: string|null, accountBalance: string|null,
+ *   accountCurrency: string|null, categoryName: string|null,
  *   categoryNameKey: string|null, targetAccountName: string|null,
- * }>>} described items, or [] when nothing could be described
+ * }>>} described items, or [] when nothing could be described. `accountBalance`
+ *   is the account's current balance (after this run's bookings), null when
+ *   balances are hidden or the account is unknown.
  */
 export const collectAddedAlertDetails = async (items, limit = MAX_ADDED_ALERT_DETAILS) => {
   try {
@@ -37,9 +47,11 @@ export const collectAddedAlertDetails = async (items, limit = MAX_ADDED_ALERT_DE
     // A transfer names its target account instead of a category, so categories
     // are only worth loading when a non-transfer is present.
     const needsCategories = shown.some((item) => item.type !== 'transfer');
-    const [accounts, categories] = await Promise.all([
+    const [accounts, categories, hideBalances] = await Promise.all([
       getAllAccounts().catch(() => []),
       needsCategories ? getAllCategories().catch(() => []) : Promise.resolve([]),
+      // A failed read counts as hidden (see isHideBalancesEnabled).
+      isHideBalancesEnabled().catch(() => true),
     ]);
 
     const accountsById = new Map((accounts || []).map((a) => [a.id, a]));
@@ -58,6 +70,10 @@ export const collectAddedAlertDetails = async (items, limit = MAX_ADDED_ALERT_DE
         merchant: item.merchant || null,
         date: item.date || null,
         accountName: account ? account.name || null : null,
+        accountBalance: account && !hideBalances && account.balance != null
+          ? String(account.balance)
+          : null,
+        accountCurrency: account ? account.currency || null : null,
         categoryName: category ? category.name || null : null,
         // Built-in categories carry a translation key instead of a literal name.
         categoryNameKey: category ? category.nameKey || null : null,

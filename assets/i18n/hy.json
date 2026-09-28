@@ -596,6 +596,7 @@
   "bank_notifications_bg_added_body_one": "Ավելացվել է ավտոմատ",
   "bank_notifications_bg_added_body_other": "Ավտոմատ ավելացվել է {count} գործարք",
   "bank_notifications_bg_added_to_account": "Դեպի՝ {name}",
+  "bank_notifications_bg_added_account_balance": "{account} · մնացորդ {balance}",
   "bank_notifications_bg_added_acknowledge": "Ընթերցված",
   "bank_notifications_bg_added_change_category": "Փոխել կատեգորիան",
   "bank_notifications_bg_reject": "Մերժել",

@@ -599,6 +599,7 @@
   "bank_notifications_bg_added_body_one": "Added automatically",
   "bank_notifications_bg_added_body_other": "{count} operations added automatically",
   "bank_notifications_bg_added_to_account": "To: {name}",
+  "bank_notifications_bg_added_account_balance": "{account} · balance {balance}",
   "bank_notifications_bg_added_acknowledge": "Acknowledged",
   "bank_notifications_bg_added_change_category": "Change category",
   "bank_notifications_bg_reject": "Reject",

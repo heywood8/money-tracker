@@ -599,6 +599,7 @@
   "bank_notifications_bg_added_body_one": "Добавлено автоматически",
   "bank_notifications_bg_added_body_other": "Автоматически добавлено операций: {count}",
   "bank_notifications_bg_added_to_account": "На счёт: {name}",
+  "bank_notifications_bg_added_account_balance": "{account} · остаток {balance}",
   "bank_notifications_bg_added_acknowledge": "Прочитано",
   "bank_notifications_bg_added_change_category": "Изменить категорию",
   "bank_notifications_bg_reject": "Отклонить",

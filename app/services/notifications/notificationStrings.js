@@ -216,6 +216,59 @@ export const getPendingAlertCopy = async (count, details = []) => {
   };
 };
 
+/**
+ * Fill `{name}` placeholders in one pass, so a value that happens to contain a
+ * placeholder (an account called "{balance}") or a `$&` sequence is inserted as
+ * written instead of being expanded again.
+ */
+const fillTemplate = (template, values) =>
+  template.replace(/\{(\w+)\}/g, (match, key) => (
+    Object.prototype.hasOwnProperty.call(values, key) ? values[key] : match
+  ));
+
+/**
+ * The third part of a single receipt's title: the bare category name for an
+ * expense or income ("Groceries"), "To: Cash" for a transfer. Null when neither
+ * resolved, which leaves the title at amount · payee.
+ *
+ * Also null when the category just repeats the payee (a merchant labelled
+ * "Pharmacy" filed under "Pharmacy"): the title is a single line, and a second
+ * copy of the same word would only push the rest of it out of view.
+ */
+const destinationFor = (language, detail) => {
+  if (detail.type === 'transfer') {
+    return detail.targetAccountName
+      ? fillTemplate(translate(language, 'bank_notifications_bg_added_to_account'), {
+        name: detail.targetAccountName,
+      })
+      : null;
+  }
+  const categoryName = categoryNameOf(language, detail);
+  if (!categoryName) return null;
+  const sameAsPayee = detail.merchant
+    && detail.merchant.trim().toLowerCase()
+      === categoryName.trim().toLowerCase();
+  return sameAsPayee ? null : categoryName;
+};
+
+/**
+ * "Main card · balance 48 800 AMD" — the account an operation was booked on and
+ * what it holds now. Just the account name when the balance was withheld (the
+ * user hides balances) or is unknown; null without an account.
+ */
+const accountLineFor = (language, detail) => {
+  if (!detail.accountName) return null;
+  if (detail.accountBalance == null || !detail.accountCurrency) return detail.accountName;
+  const amount = Currency.formatMoney(detail.accountBalance, detail.accountCurrency, {
+    language,
+    symbol: false,
+  });
+  return fillTemplate(translate(language, 'bank_notifications_bg_added_account_balance'), {
+    account: detail.accountName,
+    balance: `${amount} ${detail.accountCurrency}`,
+  });
+};
+
 /** Where an auto-created operation landed: its category, or a transfer's target. */
 const landedIn = (language, detail) => {
   if (detail.type === 'transfer' && detail.targetAccountName) {
@@ -236,11 +289,17 @@ const landedIn = (language, detail) => {
  * Build the localized title/body/channel-name for the "operations added" alert —
  * the receipt for operations a background run booked without asking.
  *
- * Mirrors getPendingAlertCopy's shape so the two alerts read alike: a single
- * operation puts the amount + payee in the title and says it was added, with what
- * was recognized underneath; several get one line each ("amount · payee — where it
- * landed"), plus a "+N more" line when the batch is longer than the described one.
- * With no details it degrades to a plain count.
+ * A single operation fits the whole booking into the title — amount · payee ·
+ * category (or "To: Cash" for a transfer) — and puts the account and its balance
+ * on the line under it, which is all the collapsed row shows. It deliberately
+ * does not say "added automatically": every receipt is about an automatic
+ * booking, and a booking that needs the user says so in the review alert
+ * instead. The date is left out too, to keep that line for the balance; it is
+ * one tap away in the operation itself.
+ *
+ * Several get one line each ("amount · payee — where it landed"), plus a "+N more"
+ * line when the batch is longer than the described one. With no details it
+ * degrades to a plain count.
  *
  * `actionLabel` is the receipt's "Acknowledged" button, which clears the
  * notification without opening the app; `changeCategoryLabel` is the button that
@@ -280,8 +339,10 @@ export const getAddedAlertCopy = async (count, details = []) => {
   if (items.length === 1 && safeCount === 1) {
     const detail = items[0];
     return {
-      title: headlineFor(language, detail),
-      body: [countLine, recognizedFor(language, detail)].filter(Boolean).join('\n'),
+      title: [headlineFor(language, detail), destinationFor(language, detail)]
+        .filter(Boolean)
+        .join(' · '),
+      body: accountLineFor(language, detail) || '',
       channelName,
       ...actions,
     };

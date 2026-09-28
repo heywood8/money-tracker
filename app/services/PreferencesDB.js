@@ -97,6 +97,30 @@ export const getPreference = async (key, defaultValue = null) => {
 };
 
 /**
+ * Whether the user has asked for balances to be hidden.
+ *
+ * For code that prints a balance *outside* the app (a tray notification is
+ * readable from the lock screen). It reads the row itself instead of going
+ * through getPreference, whose error path returns the default: here a failed
+ * read has to count as "hidden", because leaving a figure out costs nothing and
+ * printing one the user hid does. An unset row is the setting's default, off.
+ *
+ * @returns {Promise<boolean>}
+ */
+export const isHideBalancesEnabled = async () => {
+  try {
+    const result = await queryFirst(
+      'SELECT value FROM app_metadata WHERE key = ?',
+      [PREF_KEYS.HIDE_BALANCES],
+    );
+    return result?.value === 'true';
+  } catch (error) {
+    console.error('[PreferencesDB] Error reading hide balances, treating as hidden:', error);
+    return true;
+  }
+};
+
+/**
  * Set a preference value in the database
  * @param {string} key - Preference key
  * @param {string} value - Preference value
