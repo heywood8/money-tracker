@@ -126,7 +126,7 @@ const TransferAccountPickerModal = memo(({ visible = false, onClose = () => {}, 
           {`${t('transfer_operations_message') || 'This account has transactions. Select an account to transfer them to:'}`}
         </Text>
         <Text variant="bodySmall" style={[styles.centeredBodySmall, { color: colors.mutedText }]}>
-          {`${operationCount} ${operationCount === 1 ? 'transaction' : 'transactions'}`}
+          {t('operations_count').replace('{count}', String(operationCount))}
         </Text>
         {/* Same shared account grid as every other account picker. The candidates
             are already narrowed to the deleted account's currency, so its currency

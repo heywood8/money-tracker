@@ -755,5 +755,10 @@
   "no_backup_yet": "Автоматических копий ещё нет",
   "backup_skipped_row_count": "Пропущено: данных стало меньше, чем в прошлой копии",
   "accept_new_baseline": "Принять новый объём",
-  "backup_accept_failed": "Не удалось создать копию. Попробуйте ещё раз."
+  "backup_accept_failed": "Не удалось создать копию. Попробуйте ещё раз.",
+  "account": "Счёт",
+  "name": "Название",
+  "type": "Тип",
+  "remove": "Убрать",
+  "operations_count": "Операций: {count}"
 }

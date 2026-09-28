@@ -755,5 +755,10 @@
   "no_backup_yet": "Aún no hay copias automáticas",
   "backup_skipped_row_count": "Omitida: los datos se redujeron desde la última copia",
   "accept_new_baseline": "Aceptar el nuevo tamaño",
-  "backup_accept_failed": "No se pudo crear la copia. Inténtalo de nuevo."
+  "backup_accept_failed": "No se pudo crear la copia. Inténtalo de nuevo.",
+  "account": "Cuenta",
+  "name": "Nombre",
+  "type": "Tipo",
+  "remove": "Quitar",
+  "operations_count": "Operaciones: {count}"
 }

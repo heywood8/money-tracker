@@ -755,5 +755,10 @@
   "no_backup_yet": "Noch kein automatisches Backup",
   "backup_skipped_row_count": "Übersprungen: die Daten sind seit dem letzten Backup geschrumpft",
   "accept_new_baseline": "Neuen Referenzwert übernehmen",
-  "backup_accept_failed": "Backup konnte nicht geschrieben werden. Bitte erneut versuchen."
+  "backup_accept_failed": "Backup konnte nicht geschrieben werden. Bitte erneut versuchen.",
+  "account": "Konto",
+  "name": "Name",
+  "type": "Typ",
+  "remove": "Entfernen",
+  "operations_count": "Vorgänge: {count}"
 }

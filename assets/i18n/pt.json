@@ -755,5 +755,10 @@
   "no_backup_yet": "Ainda não há backup automático",
   "backup_skipped_row_count": "Ignorado: os dados diminuíram desde o último backup",
   "accept_new_baseline": "Aceitar o novo tamanho",
-  "backup_accept_failed": "Não foi possível gravar o backup. Tente novamente."
+  "backup_accept_failed": "Não foi possível gravar o backup. Tente novamente.",
+  "account": "Conta",
+  "name": "Nome",
+  "type": "Tipo",
+  "remove": "Remover",
+  "operations_count": "Operações: {count}"
 }
