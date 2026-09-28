@@ -584,7 +584,7 @@
   "bank_notifications_background_alerts_hint": "Проверять в фоне и уведомлять, когда появятся операции для обработки",
   "bank_notifications_bg_notification_title": "Операции для обработки",
   "bank_notifications_bg_notification_body_one": "1 операция ожидает добавления",
-  "bank_notifications_bg_notification_body_other": "{count} операций ожидают добавления",
+  "bank_notifications_bg_notification_body_other": "Ожидают добавления: {count}",
   "bank_notifications_bg_unknown_merchant": "Без названия",
   "bank_notifications_bg_detected_account": "Счёт: {name}",
   "bank_notifications_bg_detected_category": "Категория: {name}",
