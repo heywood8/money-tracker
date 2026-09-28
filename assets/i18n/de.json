@@ -596,6 +596,7 @@
   "bank_notifications_bg_added_body_one": "Automatisch hinzugefügt",
   "bank_notifications_bg_added_body_other": "{count} Vorgänge automatisch hinzugefügt",
   "bank_notifications_bg_added_to_account": "Auf: {name}",
+  "bank_notifications_bg_added_account_balance": "{account} · Saldo {balance}",
   "bank_notifications_bg_added_acknowledge": "Gelesen",
   "bank_notifications_bg_added_change_category": "Kategorie ändern",
   "bank_notifications_bg_reject": "Ablehnen",

@@ -16,6 +16,7 @@ import {
   getAllPreferences,
   getDefaultAccountId,
   setDefaultAccountId,
+  isHideBalancesEnabled,
 } from '../../app/services/PreferencesDB';
 import { queryFirst, executeQuery, queryAll } from '../../app/services/db';
 
@@ -565,6 +566,36 @@ describe('PreferencesDB', () => {
         'DELETE FROM app_metadata WHERE key = ?',
         ['default_account_id'],
       );
+    });
+  });
+
+  describe('isHideBalancesEnabled', () => {
+    it('is true when the stored flag is on', async () => {
+      queryFirst.mockResolvedValue({ value: 'true' });
+
+      await expect(isHideBalancesEnabled()).resolves.toBe(true);
+      expect(queryFirst).toHaveBeenCalledWith(
+        expect.stringContaining('SELECT value FROM app_metadata'),
+        [PREF_KEYS.HIDE_BALANCES],
+      );
+    });
+
+    it('is false when the stored flag is off', async () => {
+      queryFirst.mockResolvedValue({ value: 'false' });
+
+      await expect(isHideBalancesEnabled()).resolves.toBe(false);
+    });
+
+    it('is false when the setting was never touched (its default)', async () => {
+      queryFirst.mockResolvedValue(null);
+
+      await expect(isHideBalancesEnabled()).resolves.toBe(false);
+    });
+
+    it('is true when the read fails, unlike getPreference which falls back to its default', async () => {
+      queryFirst.mockRejectedValue(new Error('Database error'));
+
+      await expect(isHideBalancesEnabled()).resolves.toBe(true);
     });
   });
 });

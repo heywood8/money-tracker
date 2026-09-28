@@ -200,6 +200,8 @@ describe('notificationStrings.getAddedAlertCopy', () => {
     merchant: 'Sas',
     date: '2026-07-20',
     accountName: 'Main card',
+    accountBalance: '48800.00',
+    accountCurrency: 'AMD',
     categoryName: 'Groceries',
     categoryNameKey: null,
     targetAccountName: null,
@@ -228,14 +230,51 @@ describe('notificationStrings.getAddedAlertCopy', () => {
     );
   });
 
-  it('puts the amount and payee of a single operation in the title', async () => {
+  it('fits amount, payee and category into the title of a single operation', async () => {
     const copy = await getAddedAlertCopy(1, [detail()]);
-    const [added, recognized] = copy.body.split('\n');
 
-    expect(copy.title).toBe('1299 AMD · Sas');
-    expect(added).toBe(enJson.bank_notifications_bg_added_body_one);
-    expect(recognized).toContain('Account: Main card');
-    expect(recognized).toContain('Category: Groceries');
+    expect(copy.title).toBe('1299 AMD · Sas · Groceries');
+  });
+
+  it('puts the account and its balance on the only body line', async () => {
+    const copy = await getAddedAlertCopy(1, [detail()]);
+
+    expect(copy.body).toBe('Main card · balance 48,800 AMD');
+  });
+
+  it('drops the "added automatically" line and the date from a single receipt', async () => {
+    const copy = await getAddedAlertCopy(1, [detail()]);
+
+    expect(copy.body).not.toContain(enJson.bank_notifications_bg_added_body_one);
+    expect(`${copy.title}\n${copy.body}`).not.toContain('Jul 20');
+    expect(copy.body.split('\n')).toHaveLength(1);
+  });
+
+  it('keeps the minor units of a balance in a currency that has them', async () => {
+    const copy = await getAddedAlertCopy(1, [
+      detail({ accountBalance: '-1234.5', accountCurrency: 'USD' }),
+    ]);
+
+    expect(copy.body).toBe('Main card · balance -1,234.50 USD');
+  });
+
+  it('shows just the account when the balance was withheld', async () => {
+    const copy = await getAddedAlertCopy(1, [detail({ accountBalance: null })]);
+
+    expect(copy.body).toBe('Main card');
+  });
+
+  it('leaves the body empty when the account could not be named', async () => {
+    const copy = await getAddedAlertCopy(1, [detail({ accountName: null })]);
+
+    expect(copy.title).toBe('1299 AMD · Sas · Groceries');
+    expect(copy.body).toBe('');
+  });
+
+  it('inserts an account name as written, even one that looks like a placeholder', async () => {
+    const copy = await getAddedAlertCopy(1, [detail({ accountName: '{balance} $& card' })]);
+
+    expect(copy.body).toBe('{balance} $& card · balance 48,800 AMD');
   });
 
   it('names the cash account a transfer landed in', async () => {
@@ -243,20 +282,42 @@ describe('notificationStrings.getAddedAlertCopy', () => {
       detail({ type: 'transfer', categoryName: null, targetAccountName: 'Cash', merchant: 'Atm 401' }),
     ]);
 
-    expect(copy.body).toContain('To: Cash');
-    expect(copy.body).not.toContain('Category:');
+    expect(copy.title).toBe('1299 AMD · Atm 401 · To: Cash');
+    expect(copy.body).toBe('Main card · balance 48,800 AMD');
+  });
+
+  it('inserts a transfer target as written, even one with replacement patterns', async () => {
+    const copy = await getAddedAlertCopy(1, [
+      detail({ type: 'transfer', categoryName: null, targetAccountName: "Cash $& $' wallet", merchant: 'Atm 401' }),
+    ]);
+
+    expect(copy.title).toBe("1299 AMD · Atm 401 · To: Cash $& $' wallet");
+  });
+
+  it('does not repeat a category that only echoes the payee', async () => {
+    const copy = await getAddedAlertCopy(1, [
+      detail({ merchant: 'Pharmacy', categoryName: 'pharmacy ' }),
+    ]);
+
+    expect(copy.title).toBe('1299 AMD · Pharmacy');
+  });
+
+  it('keeps the title at amount · payee when nothing resolved where it landed', async () => {
+    const copy = await getAddedAlertCopy(1, [detail({ categoryName: null })]);
+
+    expect(copy.title).toBe('1299 AMD · Sas');
   });
 
   it('translates a built-in category name key', async () => {
     const copy = await getAddedAlertCopy(1, [detail({ categoryName: null, categoryNameKey: 'food' })]);
 
-    expect(copy.body).toContain(`Category: ${enJson.food}`);
+    expect(copy.title).toBe(`1299 AMD · Sas · ${enJson.food}`);
   });
 
   it('names an unknown payee', async () => {
     const copy = await getAddedAlertCopy(1, [detail({ merchant: null })]);
 
-    expect(copy.title).toBe(`1299 AMD · ${enJson.bank_notifications_bg_unknown_merchant}`);
+    expect(copy.title).toBe(`1299 AMD · ${enJson.bank_notifications_bg_unknown_merchant} · Groceries`);
   });
 
   it('gives each operation a line with where it landed when several were booked', async () => {
@@ -295,10 +356,12 @@ describe('notificationStrings.getAddedAlertCopy', () => {
   it('localizes the receipt', async () => {
     PreferencesDB.getPreference.mockResolvedValue('ru');
 
-    const copy = await getAddedAlertCopy(1, [detail()]);
+    const copy = await getAddedAlertCopy(1, [detail({ categoryName: null, categoryNameKey: 'food' })]);
 
-    expect(copy.body).toContain(ruJson.bank_notifications_bg_added_body_one);
-    expect(copy.body).toContain('Счёт: Main card');
+    expect(copy.title).toBe(`1299 AMD · Sas · ${ruJson.food}`);
+    // Russian groups thousands with a (narrow) no-break space.
+    expect(copy.body).toMatch(/^Main card · остаток 48\s800 AMD$/);
+    expect(copy.body).not.toContain(ruJson.bank_notifications_bg_added_body_one);
   });
 
   it('carries the acknowledge button label in every shape', async () => {

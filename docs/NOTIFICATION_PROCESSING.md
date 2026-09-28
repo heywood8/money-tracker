@@ -462,8 +462,18 @@ queues posts both):
 
 | Alert | Posted when | Copy |
 | ----- | ----------- | ---- |
-| **Operations added** | the run auto-created operations (`summary.created > 0`) **and the app is not on screen** | amount · payee, plus the account and the category / cash account it landed in |
+| **Operations added** | the run auto-created operations (`summary.created > 0`) **and the app is not on screen** | one operation: title `amount · payee · category` (`To: <cash account>` for a transfer), body `account · balance <current balance>`; several: one `amount · payee — where it landed` line each |
 | **Transactions to review** | the run queued new items (`summary.pending > 0`) | amount · payee, what resolved, and the field still missing |
+
+The single-operation receipt is built for the collapsed row, which shows only
+the title and the first body line. So the category shares the title with the
+amount and payee, and the one body line is the account and what it holds now.
+It carries no "added automatically" line and no date: every receipt is an
+automatic booking from moments ago, so neither says anything, and a booking that
+needs the user is announced by the review alert instead. The balance is left out
+(the line shows just the account) while **Hide balances** is on, since a tray
+row is readable from the lock screen; `addedAlertItems.js` withholds it before
+the copy layer ever sees it.
 
 Both are posted only from the background task: in the foreground the user is
 already looking at the app, where `RELOAD_ALL` refreshes the lists instead.
