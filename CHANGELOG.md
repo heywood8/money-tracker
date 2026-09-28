@@ -1,5 +1,12 @@
 # Changelog
 
+## [0.293.1](https://github.com/heywood8/money-tracker/compare/penny-v0.293.0...penny-v0.293.1) (2026-09-28)
+
+
+### Bug Fixes
+
+* follow-ups to the top-20 bug sweep ([#1847](https://github.com/heywood8/money-tracker/issues/1847)) ([bf80120](https://github.com/heywood8/money-tracker/commit/bf801209c60beb0a6174dd85625670d0f7852f8a))
+
 ## [0.293.0](https://github.com/heywood8/money-tracker/compare/penny-v0.292.17...penny-v0.293.0) (2026-09-28)
 
 
