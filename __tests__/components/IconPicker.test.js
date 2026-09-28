@@ -462,3 +462,22 @@ describe('IconPicker', () => {
     });
   });
 });
+
+// The picker offered "motorcycle", which is not in the icon set, so a category
+// saved with it drew the missing-glyph box. Every offered name, and every icon
+// a default category ships with, must be a real glyph.
+describe('icon names', () => {
+  // The real glyph map: the setup file stubs the icon component, not this file.
+  const glyphs = require('@expo/vector-icons/build/vendor/react-native-vector-icons/glyphmaps/MaterialCommunityIcons.json');
+
+  it('offers only glyphs MaterialCommunityIcons has', () => {
+    expect(COMMON_ICONS.filter(name => !(name in glyphs))).toEqual([]);
+  });
+
+  it('ships default categories with glyphs MaterialCommunityIcons has', () => {
+    const defaults = JSON.stringify(require('../../app/defaults/defaultCategories.json'));
+    const icons = [...defaults.matchAll(/"icon":"([^"]+)"/g)].map(match => match[1]);
+    expect(icons.length).toBeGreaterThan(0);
+    expect(icons.filter(name => !(name in glyphs))).toEqual([]);
+  });
+});

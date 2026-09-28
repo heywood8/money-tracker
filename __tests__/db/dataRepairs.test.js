@@ -1,7 +1,7 @@
 /**
  * One-off repair of operations.date values that carry a timestamp (#773).
  */
-import { normalizeOperationDates } from '../../drizzle/dataRepairs';
+import { normalizeOperationDates, renameMissingIcons } from '../../drizzle/dataRepairs';
 
 describe('normalizeOperationDates', () => {
   it('trims timestamped dates to their day and records completion', async () => {
@@ -30,6 +30,26 @@ describe('normalizeOperationDates', () => {
     const migrations = jest.requireActual('../../drizzle/migrations').default;
     expect(migrations.postMigrationHandlers.normalizeOperationDates).toBe(normalizeOperationDates);
     const tag = migrations.postMigrationTags.normalizeOperationDates;
+    expect(migrations.journal.entries.some(entry => entry.tag === tag)).toBe(true);
+  });
+});
+
+// The icon picker offered "motorcycle", which MaterialCommunityIcons does not
+// have; categories saved with it rendered the missing-glyph box everywhere.
+describe('renameMissingIcons', () => {
+  it('moves categories to the glyph that exists and records completion', async () => {
+    const db = { runAsync: jest.fn(async () => ({ changes: 1 })) };
+
+    await renameMissingIcons(db);
+
+    expect(db.runAsync.mock.calls[0][0]).toBe("UPDATE categories SET icon = 'motorbike' WHERE icon = 'motorcycle'");
+    expect(db.runAsync.mock.calls[1][0]).toContain('post_migration_renameMissingIcons_completed');
+  });
+
+  it('is registered with a migration every install has', () => {
+    const migrations = jest.requireActual('../../drizzle/migrations').default;
+    expect(migrations.postMigrationHandlers.renameMissingIcons).toBe(renameMissingIcons);
+    const tag = migrations.postMigrationTags.renameMissingIcons;
     expect(migrations.journal.entries.some(entry => entry.tag === tag)).toBe(true);
   });
 });
