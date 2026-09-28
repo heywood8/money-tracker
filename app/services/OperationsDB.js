@@ -17,7 +17,7 @@ const normalizeSearchQuery = (text) => normalizeSearchText(text);
 // "a_b" would match rows the in-memory pass then drops, leaving short or empty
 // pages while real matches wait further down. Escape them (and the escape
 // character itself) so the query matches literally; every LIKE that takes the
-// escaped value must carry LIKE_ESCAPE.
+// escaped value must carry LIKE_ESCAPE (a test fails on one that does not).
 const escapeLikePattern = (text) => text.replace(/[\\%_]/g, '\\$&');
 const LIKE_ESCAPE = "ESCAPE '\\'";
 import * as Currency from './currency';
