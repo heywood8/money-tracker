@@ -17,7 +17,7 @@ import { setLastAccessedAccount } from '../services/LastAccount';
 import { appEvents, EVENTS } from '../services/eventEmitter';
 import { formatDate as toDateString } from '../services/BalanceHistoryDB';
 import { getDistinctLabels, getOperationById } from '../services/OperationsDB';
-import { parseLabels, serializeLabels, addLabel, hasLabel } from '../utils/labelUtils';
+import { parseLabels, serializeLabels, addLabel, hasLabel, normalizeMerchantLabel } from '../utils/labelUtils';
 import { buildRepeatedOperation } from '../utils/operationUtils';
 import { getDriveBackupStatusLabel } from '../utils/driveBackupStatus';
 import OperationModal from '../modals/OperationModal';
@@ -438,7 +438,9 @@ const OperationsScreen = () => {
     }
     amount = Currency.formatAmount(amount, accountCurrency ?? 2);
     const trimmedLabel = typeof choice.labelOverride === 'string' ? choice.labelOverride.trim() : '';
-    const label = trimmedLabel || item.merchant || '';
+    // With no name typed, show the tidied shop name ("GURMAN" -> "Gurman") the
+    // resolver books for an unnamed merchant, not the raw ALL-CAPS string.
+    const label = trimmedLabel || normalizeMerchantLabel(item.merchant) || '';
     const isTransfer = item.type === 'transfer';
     const opId = `_pending_notif_${item.id}`;
     addOptimisticOperation({

@@ -877,7 +877,9 @@ describe('processBankNotifications', () => {
         expect.objectContaining({ accountId: 7, categoryId: 'cat-food', amount: '3900.00', date: '2026-06-28' }),
       );
       expect(AccountsDB.addAccountCardMask).toHaveBeenCalledWith(7, '4083***7027');
-      expect(NotificationRulesDB.upsertMerchantRule).toHaveBeenCalledWith('NAREK MEHRABYAN', 'cat-food', PKG);
+      expect(NotificationRulesDB.upsertMerchantRule).toHaveBeenCalledWith(
+        'NAREK MEHRABYAN', 'cat-food', PKG, { labelIfNew: 'Narek Mehrabyan' },
+      );
       expect(PreferencesDB.setJsonPreference).toHaveBeenCalledWith(
         'bank_notifications_packages', [PKG],
       );
@@ -1130,6 +1132,86 @@ describe('processBankNotifications', () => {
       expect(NotificationRulesDB.upsertMerchantLabel).not.toHaveBeenCalled();
     });
 
+    // A source saved for the first time with the name left blank is bound under
+    // the suggested name the field showed as its placeholder. The DB applies
+    // labelIfNew only when it creates the rule (see NotificationRulesDB tests), so
+    // the resolver hands over the booked label and the DB decides "new".
+    describe('name binding for a source saved with a blank name', () => {
+      it('offers the tidied suggested name when the name field was never touched', async () => {
+        // The operations-page deck omits labelOverride for an untouched field.
+        PendingNotificationsDB.getPendingNotificationById.mockResolvedValue(pending);
+
+        await pipeline.resolvePendingNotification('p1', { accountId: 7, categoryId: 'cat-food' });
+
+        expect(NotificationRulesDB.upsertMerchantRule).toHaveBeenCalledWith(
+          'NAREK MEHRABYAN', 'cat-food', PKG, { labelIfNew: 'Narek Mehrabyan' },
+        );
+        // No separate label write: the name rides on the category write.
+        expect(NotificationRulesDB.upsertMerchantLabel).not.toHaveBeenCalled();
+      });
+
+      it('offers the tidied suggested name when the name field is sent blank', async () => {
+        // The settings review panel always sends the field, blank included.
+        PendingNotificationsDB.getPendingNotificationById.mockResolvedValue(pending);
+
+        await pipeline.resolvePendingNotification('p1', {
+          accountId: 7, categoryId: 'cat-food', labelOverride: '   ',
+        });
+
+        expect(NotificationRulesDB.upsertMerchantRule).toHaveBeenCalledWith(
+          'NAREK MEHRABYAN', 'cat-food', PKG, { labelIfNew: 'Narek Mehrabyan' },
+        );
+        expect(NotificationRulesDB.upsertMerchantLabel).not.toHaveBeenCalled();
+      });
+
+      it('offers a mixed-case shop name as-is', async () => {
+        PendingNotificationsDB.getPendingNotificationById.mockResolvedValue({
+          ...pending, merchant: 'McDonald\'s',
+        });
+
+        await pipeline.resolvePendingNotification('p1', { accountId: 7, categoryId: 'cat-food' });
+
+        expect(NotificationRulesDB.upsertMerchantRule).toHaveBeenCalledWith(
+          'McDonald\'s', 'cat-food', PKG, { labelIfNew: 'McDonald\'s' },
+        );
+      });
+
+      it('writes a typed name before the category, so it wins over the suggestion', async () => {
+        PendingNotificationsDB.getPendingNotificationById.mockResolvedValue(pending);
+
+        await pipeline.resolvePendingNotification('p1', {
+          accountId: 7, categoryId: 'cat-food', labelOverride: 'Narek',
+        });
+
+        expect(NotificationRulesDB.upsertMerchantLabel).toHaveBeenCalledWith('NAREK MEHRABYAN', 'Narek', PKG);
+        expect(NotificationRulesDB.upsertMerchantRule).toHaveBeenCalledWith(
+          'NAREK MEHRABYAN', 'cat-food', PKG, { labelIfNew: 'Narek' },
+        );
+        expect(NotificationRulesDB.upsertMerchantLabel.mock.invocationCallOrder[0])
+          .toBeLessThan(NotificationRulesDB.upsertMerchantRule.mock.invocationCallOrder[0]);
+      });
+
+      it('does not bind a name when merchant learning is opted out', async () => {
+        PendingNotificationsDB.getPendingNotificationById.mockResolvedValue(pending);
+
+        await pipeline.resolvePendingNotification('p1', {
+          accountId: 7, categoryId: 'cat-food', learnMerchant: false,
+        });
+
+        expect(NotificationRulesDB.upsertMerchantRule).not.toHaveBeenCalled();
+        expect(NotificationRulesDB.upsertMerchantLabel).not.toHaveBeenCalled();
+      });
+
+      it('does not bind a name when no category is chosen', async () => {
+        PendingNotificationsDB.getPendingNotificationById.mockResolvedValue(pending);
+
+        await pipeline.resolvePendingNotification('p1', { accountId: 7, categoryId: null });
+
+        expect(NotificationRulesDB.upsertMerchantRule).not.toHaveBeenCalled();
+        expect(NotificationRulesDB.upsertMerchantLabel).not.toHaveBeenCalled();
+      });
+    });
+
     it('does not learn a merchant rule for a C2C transfer, even with a category', async () => {
       PendingNotificationsDB.getPendingNotificationById.mockResolvedValue({
         ...pending, kind: 'C2C', merchant: 'N. DORVANYAN',
@@ -1141,8 +1223,9 @@ describe('processBankNotifications', () => {
         expect.objectContaining({ accountId: 7, categoryId: 'cat-loan' }),
       );
       expect(AccountsDB.addAccountCardMask).toHaveBeenCalledWith(7, '4083***7027');
-      // ...but the friend -> category rule is never remembered.
+      // ...but the friend -> category rule is never remembered, nor a name for it.
       expect(NotificationRulesDB.upsertMerchantRule).not.toHaveBeenCalled();
+      expect(NotificationRulesDB.upsertMerchantLabel).not.toHaveBeenCalled();
     });
 
     it('does not learn a merchant rule for a DEBIT ACCOUNT debit, even with a category', async () => {

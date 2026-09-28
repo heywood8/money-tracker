@@ -4754,4 +4754,54 @@ describe('OperationsScreen', () => {
       expect(getByTestId('search-input-container')).toBeTruthy();
     });
   });
+
+  // The placeholder row laid down the moment a notification suggestion is
+  // accepted. With no name typed, the resolver books the tidied shop name, so
+  // the placeholder must show that too rather than the raw ALL-CAPS string.
+  describe('Accepted suggestion placeholder label', () => {
+    const acceptWith = async (choice) => {
+      const OperationsScreen = require('../../app/screens/OperationsScreen').default;
+      const usePendingOperationSuggestions = require('../../app/hooks/usePendingOperationSuggestions').default;
+      const { useOperationsActions } = require('../../app/contexts/OperationsActionsContext');
+      const { useAccountsData } = require('../../app/contexts/AccountsDataContext');
+      const addOptimisticOperation = jest.fn();
+      useOperationsActions.mockReturnValue({
+        loadMoreOperations: jest.fn(),
+        loadInitialOperations: jest.fn(() => Promise.resolve()),
+        addOperation: jest.fn(),
+        updateOperation: jest.fn(),
+        deleteOperation: jest.fn(),
+        addOptimisticOperation,
+      });
+      useAccountsData.mockReturnValue({
+        accounts: [{ id: 'acc-1', currency: 'USD' }],
+        visibleAccounts: [{ id: 'acc-1', currency: 'USD' }],
+        loading: false,
+      });
+
+      await render(<OperationsScreen />);
+      const { onOptimisticAdd } = usePendingOperationSuggestions.mock.calls.at(-1)[0];
+      await act(async () => {
+        onOptimisticAdd(
+          { id: 's-1', type: 'expense', amount: '10', currency: 'USD', merchant: 'GURMAN', date: '2026-06-28' },
+          { accountId: 'acc-1', categoryId: 'cat-1', ...choice },
+        );
+      });
+      return addOptimisticOperation;
+    };
+
+    it('shows the tidied shop name when no name was typed', async () => {
+      const addOptimisticOperation = await acceptWith({ labelOverride: '' });
+      expect(addOptimisticOperation).toHaveBeenCalledWith(
+        expect.objectContaining({ description: 'Gurman' }),
+      );
+    });
+
+    it('shows the typed name when one was entered', async () => {
+      const addOptimisticOperation = await acceptWith({ labelOverride: 'Gurman Bistro' });
+      expect(addOptimisticOperation).toHaveBeenCalledWith(
+        expect.objectContaining({ description: 'Gurman Bistro' }),
+      );
+    });
+  });
 });

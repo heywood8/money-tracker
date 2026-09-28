@@ -242,7 +242,10 @@ These were chosen up front and drive the architecture:
    is asked which account it belongs to; the answer is written back to that field.
 3. **Merchant binding — learn from first categorization.** When the user
    categorizes a merchant's first transaction, Penny remembers `merchant →
-   category` and auto-applies it next time. Self-improving, zero setup.
+   category` and auto-applies it next time. Self-improving, zero setup. If the
+   name field is left blank on that first save, the suggested name it showed (the
+   shop name tidied from ALL CAPS, `GURMAN` → `Gurman`) is bound as the merchant's
+   name too, so the next transaction can auto-create instead of asking again.
 
 ## Architecture
 
@@ -380,6 +383,9 @@ live on `AccountsDB` (`getAccountByCardMask`, `setAccountCardMask`).
   `RELOAD_ALL` when operations are created. No-op when disabled.
 - `resolvePendingNotification(id, choices)` — creates the operation from a
   reviewed item and learns the card → account and merchant → category bindings.
+  A merchant rule created by this save also takes the booked name (typed, or the
+  tidied suggestion when the field was blank); an existing rule's name is left
+  as it is.
 - Triggered on app open and on every foreground transition via an `AppState`
   listener in `app/screens/AppInitializer.js`, and — when background alerts are
   on — from the periodic background task (below).
