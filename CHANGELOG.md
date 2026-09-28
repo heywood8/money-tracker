@@ -1,5 +1,12 @@
 # Changelog
 
+## [0.293.0](https://github.com/heywood8/money-tracker/compare/penny-v0.292.17...penny-v0.293.0) (2026-09-28)
+
+
+### Features
+
+* **notifications:** show category and account balance on auto-added receipt ([#1845](https://github.com/heywood8/money-tracker/issues/1845)) ([80aaa7c](https://github.com/heywood8/money-tracker/commit/80aaa7ce497fb951eca84afc0465e3d357adc7ac))
+
 ## [0.292.17](https://github.com/heywood8/money-tracker/compare/penny-v0.292.16...penny-v0.292.17) (2026-09-28)
 
 
