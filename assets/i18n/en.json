@@ -756,5 +756,9 @@
   "no_backup_yet": "No automatic backup yet",
   "backup_skipped_row_count": "Skipped: the data shrank since the last backup",
   "accept_new_baseline": "Accept new baseline",
-  "backup_accept_failed": "Could not write a backup. Try again."
+  "backup_accept_failed": "Could not write a backup. Try again.",
+  "account": "Account",
+  "notification_template_name": "Name",
+  "remove": "Remove",
+  "operations_count": "Transactions: {count}"
 }

@@ -41,3 +41,33 @@ export const normalizeOperationDates = async (db) => {
     console.error('Failed to normalize operation dates:', error);
   }
 };
+
+/**
+ * Point categories at the icon the picker offers under the name the icon set
+ * actually has.
+ *
+ * The picker offered "motorcycle", which is not a MaterialCommunityIcons glyph
+ * ("motorbike" is), so every category saved with it rendered the missing-glyph
+ * box in the picker, the category grid and every operation row. The picker now
+ * offers "motorbike"; this moves categories saved with the old name.
+ *
+ * Idempotent: a second run finds nothing to rename. One-shot: once its flag is
+ * set it never runs again, so a later icon rename needs a handler of its own.
+ * Backups restored afterwards are mapped by resolveCategoryIcon
+ * (app/utils/categoryUtils.js) on insert instead.
+ *
+ * @param {Object} db - expo-sqlite database
+ * @returns {Promise<void>}
+ */
+export const renameMotorcycleIcon = async (db) => {
+  try {
+    await db.runAsync("UPDATE categories SET icon = 'motorbike' WHERE icon = 'motorcycle'");
+    await db.runAsync(
+      "INSERT OR REPLACE INTO app_metadata (key, value, updated_at) VALUES ('post_migration_renameMotorcycleIcon_completed', 'true', ?)",
+      [new Date().toISOString()],
+    );
+  } catch (error) {
+    // Not fatal: the flag stays unset and the repair is retried on next launch.
+    console.error('Failed to rename the motorcycle category icon:', error);
+  }
+};

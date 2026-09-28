@@ -186,7 +186,9 @@ Bottom tab bar height is set to 80px with 24px bottom padding.
 ### Assets Structure
 
 - `assets/i18n/`: Translation files, one per language (en.json, it.json, ru.json, es.json, fr.json, zh.json, de.json, hy.json, ja.json, ko.json, pt.json)
-- `assets/currencies.json`: Currency list for accounts
+- `assets/currencies.json`: Currency list for accounts. Its `decimal_digits` decide how many decimals every amount in that currency keeps (input, rounding at save, conversion, display), read through `Currency.getDecimalPlaces`.
+  - **Whole-unit currencies are a deliberate product decision, not a bug:** RUB, CNY, THB, TRY and AMD have `decimal_digits: 0`, like JPY and KRW, although ISO 4217 gives them 2. Amounts entered or edited in those currencies are rounded to whole units when saved, the amount field takes no decimal point, and balances show no fraction. Do not "correct" them to 2 — `__tests__/assets/currencies.test.js` pins the table, and changing a value means revisiting this decision.
+  - No currency may carry more than 2 decimals: amount parsing reads a lone 3-digit tail as thousands grouping, and SQL money sums scale by 10^4 (`app/services/sqlMoney.js`).
 - `assets/*.png`: App icons and splash screens
 
 ### Build Configuration

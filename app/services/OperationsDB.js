@@ -12,6 +12,14 @@ import { parseLabels, isHiddenLabel } from '../utils/labelUtils';
 const searchNormExpr = (columnExpr) =>
   isSearchNormAvailable() ? `SEARCH_NORM(${columnExpr})` : buildSearchNormSql(columnExpr);
 const normalizeSearchQuery = (text) => normalizeSearchText(text);
+
+// LIKE reads `%` and `_` in the pattern as wildcards, so a search for "50%" or
+// "a_b" would match rows the in-memory pass then drops, leaving short or empty
+// pages while real matches wait further down. Escape them (and the escape
+// character itself) so the query matches literally; every LIKE that takes the
+// escaped value must carry LIKE_ESCAPE (a test fails on one that does not).
+const escapeLikePattern = (text) => text.replace(/[\\%_]/g, '\\$&');
+const LIKE_ESCAPE = "ESCAPE '\\'";
 import * as Currency from './currency';
 import { formatDate, updateTodayBalance, applyPastBalanceChanges } from './BalanceHistoryDB';
 import * as AccountsDB from './AccountsDB';
@@ -326,13 +334,13 @@ const buildFilteredOperationsQuery = (baseCondition, baseParams, filters = {}, o
 
   // Apply search text filter (searches across multiple fields)
   if (searchText) {
-    const searchLower = `%${normalizeSearchQuery(searchText)}%`;
-    let searchGroup = `${searchNormExpr('o.description')} LIKE ?
-        OR o.amount LIKE ?
-        OR ${searchNormExpr('a.name')} LIKE ?
-        OR ${searchNormExpr('to_a.name')} LIKE ?
-        OR ${searchNormExpr('c.name')} LIKE ?
-        OR ${searchNormExpr('pc.name')} LIKE ?`;
+    const searchLower = `%${escapeLikePattern(normalizeSearchQuery(searchText))}%`;
+    let searchGroup = `${searchNormExpr('o.description')} LIKE ? ${LIKE_ESCAPE}
+        OR o.amount LIKE ? ${LIKE_ESCAPE}
+        OR ${searchNormExpr('a.name')} LIKE ? ${LIKE_ESCAPE}
+        OR ${searchNormExpr('to_a.name')} LIKE ? ${LIKE_ESCAPE}
+        OR ${searchNormExpr('c.name')} LIKE ? ${LIKE_ESCAPE}
+        OR ${searchNormExpr('pc.name')} LIKE ? ${LIKE_ESCAPE}`;
     const searchParams = [searchLower, searchLower, searchLower, searchLower, searchLower, searchLower];
 
     // Operation types whose *localized* label matches the query ("transfer",

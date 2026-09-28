@@ -756,5 +756,9 @@
   "no_backup_yet": "Aucune sauvegarde automatique pour le moment",
   "backup_skipped_row_count": "Ignorée : les données ont diminué depuis la dernière sauvegarde",
   "accept_new_baseline": "Accepter la nouvelle référence",
-  "backup_accept_failed": "Impossible de créer la sauvegarde. Réessayez."
+  "backup_accept_failed": "Impossible de créer la sauvegarde. Réessayez.",
+  "account": "Compte",
+  "notification_template_name": "Nom",
+  "remove": "Retirer",
+  "operations_count": "Transactions : {count}"
 }

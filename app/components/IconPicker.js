@@ -19,7 +19,7 @@ export const COMMON_ICONS = [
 
   // Transportation
   'car', 'car-side', 'bus', 'train', 'airplane', 'bike', 'walk',
-  'gas-station', 'taxi', 'ferry', 'motorcycle',
+  'gas-station', 'taxi', 'ferry', 'motorbike',
 
   // Shopping
   'shopping', 'shopping-outline', 'hanger', 'tshirt-crew', 'watch',

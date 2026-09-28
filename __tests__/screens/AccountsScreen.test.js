@@ -1202,7 +1202,7 @@ describe('AccountsScreen', () => {
       const mockGetOperationCount = jest.fn(() => Promise.resolve(5)); // Has operations
 
       useLocalization.mockReturnValue({
-        t: jest.fn((key) => key),
+        t: jest.fn((key) => (key === 'operations_count' ? 'Transactions: {count}' : key)),
         language: 'en',
       });
 
@@ -1215,7 +1215,7 @@ describe('AccountsScreen', () => {
         getOperationCount: mockGetOperationCount,
       }));
 
-      const { getAllByText, getByTestId } = await render(<AccountsScreen />);
+      const { getAllByText, getByTestId, findByText } = await render(<AccountsScreen />);
 
       // Open edit modal for first account
       const accountRows = getAllByText('Cash');
@@ -1231,6 +1231,8 @@ describe('AccountsScreen', () => {
       await waitFor(() => {
         expect(mockGetOperationCount).toHaveBeenCalled();
       });
+      // The count reads the localized template, not hardcoded English.
+      expect(await findByText('Transactions: 5')).toBeTruthy();
     });
 
     it('deletes account after confirmation', async () => {

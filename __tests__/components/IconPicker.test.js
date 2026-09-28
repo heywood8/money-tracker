@@ -462,3 +462,35 @@ describe('IconPicker', () => {
     });
   });
 });
+
+// The picker offered "motorcycle", which is not in the icon set, so a category
+// saved with it drew the missing-glyph box. Every offered name, and every icon
+// a default category ships with, must be a real glyph.
+describe('icon names', () => {
+  // The real glyph map, through the icon set's public glyphMap static.
+  const glyphs = jest.requireActual('@expo/vector-icons/MaterialCommunityIcons').default.glyphMap;
+
+  it('reads a real glyph map', () => {
+    expect(glyphs.motorbike).toBeDefined();
+    expect(Object.keys(glyphs).length).toBeGreaterThan(1000);
+  });
+
+  it('maps every legacy icon name to a glyph that exists', () => {
+    const { LEGACY_ICON_NAMES } = require('../../app/utils/categoryUtils');
+    for (const [legacy, current] of Object.entries(LEGACY_ICON_NAMES)) {
+      expect(legacy in glyphs).toBe(false);
+      expect(current in glyphs).toBe(true);
+    }
+  });
+
+  it('offers only glyphs MaterialCommunityIcons has', () => {
+    expect(COMMON_ICONS.filter(name => !(name in glyphs))).toEqual([]);
+  });
+
+  it('ships default categories with glyphs MaterialCommunityIcons has', () => {
+    const defaults = JSON.stringify(require('../../app/defaults/defaultCategories.json'));
+    const icons = [...defaults.matchAll(/"icon":"([^"]+)"/g)].map(match => match[1]);
+    expect(icons.length).toBeGreaterThan(0);
+    expect(icons.filter(name => !(name in glyphs))).toEqual([]);
+  });
+});

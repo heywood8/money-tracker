@@ -10,6 +10,7 @@ import { appEvents } from './eventEmitter';
 import { acceptBaseline, countRows } from './backupBaseline';
 import * as BudgetPlansDB from './BudgetPlansDB';
 import { toOperationDate, todayLocalDate } from '../utils/dateUtils';
+import { resolveCategoryIcon } from '../utils/categoryUtils';
 
 const BACKUP_VERSION = 1;
 
@@ -927,7 +928,10 @@ export const restoreBackup = async (backup, cancelToken) => {
             catType,
             catKind,
             parentId,
-            category.icon || null,
+            // An old backup can carry an icon name the icon set lacks. The
+            // startup repair only runs at launch (and never again if the backup
+            // carries its flag), so map the name here.
+            resolveCategoryIcon(category.icon) || null,
             category.color || null,
             // '0' from a CSV cell is truthy — read the flag numerically (#1693).
             asFlag(category.is_shadow, 0),

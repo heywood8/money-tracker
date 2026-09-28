@@ -756,5 +756,9 @@
   "no_backup_yet": "尚无自动备份",
   "backup_skipped_row_count": "已跳过：数据较上次备份减少",
   "accept_new_baseline": "接受新的基准",
-  "backup_accept_failed": "无法写入备份，请重试。"
+  "backup_accept_failed": "无法写入备份，请重试。",
+  "account": "账户",
+  "notification_template_name": "名称",
+  "remove": "移除",
+  "operations_count": "交易：{count}"
 }

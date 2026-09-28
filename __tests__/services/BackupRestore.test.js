@@ -2666,6 +2666,24 @@ line-cat,plan-1,Groceries,400.00,"${NON_ASCII_COMMENT}",cat-1,,0`;
       expect(insertedValue(budgetInsert, 'rollover_enabled')).toBe(0);
     });
 
+    // The picker once offered "motorcycle", which the icon set lacks. The startup
+    // repair renames it in the live DB, but a restore runs after that repair and
+    // would bring the missing-glyph box straight back.
+    it('restores a legacy icon name as the glyph that exists', async () => {
+      const { dbInstance } = await restoreCSV(backupWith({
+        categories: [
+          { ...category, icon: 'motorcycle' },
+          { ...category, id: 'cat-2', icon: 'food' },
+        ],
+      }));
+
+      const catInserts = insertsInto(dbInstance, 'categories')
+        .filter(call => String(insertedValue(call, 'id')).startsWith('cat-'));
+      expect(catInserts).toHaveLength(2);
+      expect(insertedValue(catInserts[0], 'icon')).toBe('motorbike');
+      expect(insertedValue(catInserts[1], 'icon')).toBe('food');
+    });
+
     // #1694: categories are exported in creation order, so a category moved into
     // a folder created later than itself sorted before its own parent and its
     // INSERT failed the immediate parent_id FK, rolling back the whole restore.

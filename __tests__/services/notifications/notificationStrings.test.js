@@ -70,6 +70,17 @@ describe('notificationStrings.getPendingAlertCopy', () => {
     );
   });
 
+  // The app picks only between "one" and "other", but Russian has three
+  // forms: "3 операций ожидают" was ungrammatical. The Russian copy is worded
+  // so that any count reads correctly.
+  it('reads grammatically in Russian for any count', async () => {
+    PreferencesDB.getPreference.mockResolvedValue('ru');
+    for (const count of [2, 3, 5, 21, 22, 25, 101]) {
+      const copy = await getPendingAlertCopy(count);
+      expect(copy.body).toBe(`Ожидают добавления: ${count}`);
+    }
+  });
+
   it('falls back to English for an unknown language', async () => {
     PreferencesDB.getPreference.mockResolvedValue('xx');
     const copy = await getPendingAlertCopy(2);

@@ -756,5 +756,9 @@
   "no_backup_yet": "자동 백업이 아직 없습니다",
   "backup_skipped_row_count": "건너뜀: 마지막 백업보다 데이터가 줄었습니다",
   "accept_new_baseline": "새 기준 적용",
-  "backup_accept_failed": "백업을 저장하지 못했습니다. 다시 시도해 주세요."
+  "backup_accept_failed": "백업을 저장하지 못했습니다. 다시 시도해 주세요.",
+  "account": "계정",
+  "notification_template_name": "이름",
+  "remove": "제거",
+  "operations_count": "거래: {count}"
 }

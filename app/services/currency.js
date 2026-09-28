@@ -23,6 +23,11 @@ Decimal.set({
 
 /**
  * Get decimal places for a currency
+ *
+ * Read from assets/currencies.json, whose values are a product decision rather
+ * than ISO 4217: RUB, CNY, THB, TRY and AMD are deliberately whole units (0),
+ * like JPY and KRW. See CLAUDE.md, "Assets Structure".
+ *
  * @param {string} currencyCode - Currency code (e.g., 'USD', 'AMD')
  * @returns {number} Number of decimal places
  */
