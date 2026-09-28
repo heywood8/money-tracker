@@ -107,3 +107,22 @@ export const getCategoryColorSlot = (category, categories) => {
   const index = siblings.findIndex(cat => cat.id === category.id);
   return index === -1 ? 0 : index;
 };
+
+/**
+ * Icon names categories were saved with that the icon set does not have,
+ * mapped to the glyph the picker now offers in their place. The picker once
+ * offered "motorcycle", which MaterialCommunityIcons lacks ("motorbike" is the
+ * glyph), so a category saved with it drew the missing-glyph box.
+ */
+export const LEGACY_ICON_NAMES = {
+  motorcycle: 'motorbike',
+};
+
+/**
+ * The icon to store for a category coming from outside the live database (a
+ * restored backup), with legacy names mapped to the glyph that exists.
+ * @param {string|null|undefined} icon
+ * @returns {string|null|undefined}
+ */
+export const resolveCategoryIcon = (icon) =>
+  (Object.prototype.hasOwnProperty.call(LEGACY_ICON_NAMES, icon) ? LEGACY_ICON_NAMES[icon] : icon);
