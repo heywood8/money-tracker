@@ -2279,6 +2279,35 @@ describe('OperationsDB Service', () => {
       expect(params).toContain('%самолет%');
     });
 
+    it('matches LIKE wildcards in the search text literally', async () => {
+      // '%' and '_' are LIKE wildcards: unescaped, "50%" matched every amount
+      // or name containing "50", and the in-memory pass then dropped those
+      // rows, leaving short or empty pages.
+      queryAll.mockResolvedValue([]);
+
+      await OperationsDB.getFilteredOperationsByDateRange('2025-12-01', '2025-12-31', {
+        searchText: '50%_off\\',
+      });
+
+      const [sqlCall, params] = queryAll.mock.calls[0];
+      expect(params).toContain('%50\\%\\_off\\\\%');
+      // Every LIKE that takes the escaped term declares the escape character.
+      const likes = sqlCall.match(/LIKE \?/g) || [];
+      const escapedLikes = sqlCall.match(/LIKE \? ESCAPE '\\'/g) || [];
+      expect(likes.length).toBe(6);
+      expect(escapedLikes.length).toBe(likes.length);
+    });
+
+    it('leaves search text without wildcards unchanged', async () => {
+      queryAll.mockResolvedValue([]);
+
+      await OperationsDB.getFilteredOperationsByDateRange('2025-12-01', '2025-12-31', {
+        searchText: 'coffee 5.00',
+      });
+
+      expect(queryAll.mock.calls[0][1]).toContain('%coffee 5.00%');
+    });
+
     it('trims search text before searching', async () => {
       queryAll.mockResolvedValue([]);
 
