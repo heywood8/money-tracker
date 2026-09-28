@@ -757,8 +757,7 @@
   "accept_new_baseline": "Neuen Referenzwert übernehmen",
   "backup_accept_failed": "Backup konnte nicht geschrieben werden. Bitte erneut versuchen.",
   "account": "Konto",
-  "name": "Name",
-  "type": "Typ",
+  "notification_template_name": "Name",
   "remove": "Entfernen",
-  "operations_count": "Vorgänge: {count}"
+  "operations_count": "Transaktionen: {count}"
 }

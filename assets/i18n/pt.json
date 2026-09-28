@@ -757,8 +757,7 @@
   "accept_new_baseline": "Aceitar o novo tamanho",
   "backup_accept_failed": "Não foi possível gravar o backup. Tente novamente.",
   "account": "Conta",
-  "name": "Nome",
-  "type": "Tipo",
+  "notification_template_name": "Nome",
   "remove": "Remover",
-  "operations_count": "Operações: {count}"
+  "operations_count": "Transações: {count}"
 }

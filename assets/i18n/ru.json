@@ -757,8 +757,7 @@
   "accept_new_baseline": "Принять новый объём",
   "backup_accept_failed": "Не удалось создать копию. Попробуйте ещё раз.",
   "account": "Счёт",
-  "name": "Название",
-  "type": "Тип",
+  "notification_template_name": "Название",
   "remove": "Убрать",
-  "operations_count": "Операций: {count}"
+  "operations_count": "Транзакций: {count}"
 }

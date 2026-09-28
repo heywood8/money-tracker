@@ -757,8 +757,7 @@
   "accept_new_baseline": "新しい基準を受け入れる",
   "backup_accept_failed": "バックアップを作成できませんでした。もう一度お試しください。",
   "account": "口座",
-  "name": "名前",
-  "type": "タイプ",
+  "notification_template_name": "名前",
   "remove": "削除",
   "operations_count": "取引: {count}"
 }

@@ -757,8 +757,7 @@
   "accept_new_baseline": "Ընդունել նոր ելակետը",
   "backup_accept_failed": "Չհաջողվեց ստեղծել պահուստը։ Փորձեք կրկին։",
   "account": "Հաշիվ",
-  "name": "Անվանում",
-  "type": "Տեսակ",
+  "notification_template_name": "Անվանում",
   "remove": "Հեռացնել",
   "operations_count": "Գործարքներ՝ {count}"
 }

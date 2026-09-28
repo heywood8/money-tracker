@@ -757,8 +757,7 @@
   "accept_new_baseline": "Accept new baseline",
   "backup_accept_failed": "Could not write a backup. Try again.",
   "account": "Account",
-  "name": "Name",
-  "type": "Type",
+  "notification_template_name": "Name",
   "remove": "Remove",
-  "operations_count": "Operations: {count}"
+  "operations_count": "Transactions: {count}"
 }

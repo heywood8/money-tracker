@@ -556,7 +556,7 @@ export default function NotificationTemplateEditorPanel({
       </Text>
 
       <Text style={[styles.fieldLabel, { color: colors.mutedText }]}>
-        {label('name', 'Name').toUpperCase()}
+        {label('notification_template_name', 'Name').toUpperCase()}
       </Text>
       <FormInput
         value={name}
@@ -566,7 +566,7 @@ export default function NotificationTemplateEditorPanel({
       />
 
       <Text style={[styles.fieldLabel, { color: colors.mutedText }]}>
-        {label('type', 'Type').toUpperCase()}
+        {label('operation_type', 'Type').toUpperCase()}
       </Text>
       <View style={styles.typeRow}>
         {['expense', 'income'].map((option) => {

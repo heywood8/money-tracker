@@ -757,8 +757,7 @@
   "accept_new_baseline": "Accetta il nuovo riferimento",
   "backup_accept_failed": "Impossibile creare il backup. Riprova.",
   "account": "Conto",
-  "name": "Nome",
-  "type": "Tipo",
+  "notification_template_name": "Nome",
   "remove": "Rimuovi",
-  "operations_count": "Operazioni: {count}"
+  "operations_count": "Transazioni: {count}"
 }
