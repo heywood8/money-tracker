@@ -167,7 +167,7 @@ describe('useOperationForm — saving multi-currency operations', () => {
       Currency.fetchLiveExchangeRate.mockResolvedValue({ rate: null, source: 'none' });
     });
 
-    it('keeps crediting what it credited when only the label changes', async () => {
+    it('writes its money columns back as stored when only the label changes', async () => {
       const props = makeProps({ operation: sameCurrencyAtBooking, isNew: false });
       const { result } = await renderHook(() => useOperationForm(props));
       // The form prices the pair at today's rate for display.
@@ -180,9 +180,12 @@ describe('useOperationForm — saving multi-currency operations', () => {
         await result.current.handleSave();
       });
 
+      // Unchanged columns: the DB layer re-applies exactly what it reverses.
       const payload = props.updateOperation.mock.calls[0][1];
-      expect(payload.amount).toBe('50000');
-      expect(payload.destinationAmount).toBe('50000.00');
+      expect(payload).toEqual(expect.objectContaining({
+        amount: '50000', destinationAmount: '', exchangeRate: '',
+        sourceCurrency: null, destinationCurrency: null, description: 'Moved',
+      }));
     });
 
     it('re-prices it when the user types a rate', async () => {
@@ -200,6 +203,62 @@ describe('useOperationForm — saving multi-currency operations', () => {
 
       const payload = props.updateOperation.mock.calls[0][1];
       expect(payload.destinationAmount).toBe('125.00');
+    });
+  });
+
+  // Re-rounding a stored amount to an account's current decimals moved a
+  // fraction: 100.50 credited while both accounts were USD, target now JPY.
+  describe('transfer whose target now has other decimals', () => {
+    const jpy = { id: 'acc-jpy', name: 'Yen', currency: 'JPY', balance: '0' };
+    const bookedInUsd = {
+      id: 'op-t4', type: 'transfer', amount: '100.50', accountId: 'acc-usd', toAccountId: 'acc-jpy',
+      exchangeRate: null, destinationAmount: null, sourceCurrency: null, destinationCurrency: null,
+      date: '2024-01-15', description: '',
+    };
+
+    it('does not re-round the stored credit on a label-only edit', async () => {
+      const props = makeProps({ operation: bookedInUsd, isNew: false, accounts: [usd, jpy, amd] });
+      const { result } = await renderHook(() => useOperationForm(props));
+      await waitFor(() => expect(result.current.values.amount).toBe('100.50'));
+
+      await act(async () => {
+        result.current.setValues(v => ({ ...v, description: 'Moved' }));
+      });
+      await act(async () => {
+        await result.current.handleSave();
+      });
+
+      const payload = props.updateOperation.mock.calls[0][1];
+      expect(payload.amount).toBe('100.50');
+      expect(payload.destinationAmount).toBe('');
+    });
+  });
+
+  // quick-add's target chip used to book a same-currency transfer with another
+  // pair's figure and no currencies; re-saving it is what corrects the credit.
+  describe('same-currency transfer carrying a stale destination amount', () => {
+    const usd2 = { id: 'acc-usd2', name: 'Savings', currency: 'USD', balance: '0' };
+    const corrupted = {
+      id: 'op-t5', type: 'transfer', amount: '100.00', accountId: 'acc-usd', toAccountId: 'acc-usd2',
+      exchangeRate: '0.92', destinationAmount: '92.00', sourceCurrency: null, destinationCurrency: null,
+      date: '2024-01-15', description: '',
+    };
+
+    it('still clears it on a label-only edit', async () => {
+      const props = makeProps({ operation: corrupted, isNew: false, accounts: [usd, usd2, amd] });
+      const { result } = await renderHook(() => useOperationForm(props));
+      await waitFor(() => expect(result.current.values.amount).toBe('100.00'));
+      await waitFor(() => expect(result.current.values.destinationAmount).toBe(''));
+
+      await act(async () => {
+        result.current.setValues(v => ({ ...v, description: 'Moved' }));
+      });
+      await act(async () => {
+        await result.current.handleSave();
+      });
+
+      const payload = props.updateOperation.mock.calls[0][1];
+      expect(payload.destinationAmount).toBe('');
     });
   });
 
