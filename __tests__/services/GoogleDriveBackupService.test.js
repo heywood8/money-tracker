@@ -771,6 +771,20 @@ describe('GoogleDriveBackupService', () => {
       expect(console.warn).toHaveBeenCalledWith(expect.stringContaining('Kept 3 larger file(s)'), weekly.join(', '));
     });
 
+    it('counts a lone surrogate as the 3 bytes it is sent as, not half of a pair', async () => {
+      // "\uD800" alone goes out as U+FFFD (3 bytes) and "é" is 2: 5 bytes,
+      // exactly half of the file in Drive, so not "much smaller". Reading the
+      // lone surrogate as a 4-byte pair swallowed the "é" and made it 4.
+      setPreferences({ drive_backup_last_weekly_week: THIS_WEEK, drive_backup_formats: JSON.stringify(['csv']) });
+      mockBackupRestore.buildCombinedCSV.mockReturnValueOnce('\uD800\u00e9');
+      routeExisting({ csv: { id: 'old-csv', size: '10' } });
+
+      const result = await performDriveBackup({ mode: 'auto', getAccessToken });
+
+      expect(result.status).toBe('success');
+      expect(writes().map(([url]) => url)).toEqual([expect.stringContaining('/upload/drive/v3/files/old-csv')]);
+    });
+
     it('records it on a database created from scratch as well', async () => {
       routeExisting({});
 

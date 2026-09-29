@@ -25,6 +25,14 @@ const BASELINE_ROWS_KEY = 'backup_baseline_rows';
 const LAST_SKIPPED_KEY = 'backup_last_skipped';
 
 /**
+ * How much of what came before a new snapshot must keep to count as normal:
+ * one that holds less than this share is refused. Shared by the local guard
+ * (DailyBackupService.isSnapshotValid) and the Google Drive one, which asks the
+ * same question of the files already in Drive.
+ */
+export const SHRINK_GUARD_RATIO = 0.5;
+
+/**
  * Row count of a backup, as the guard counts it: accounts + operations.
  *
  * @param {Object} backup - A createBackup()/restore payload.

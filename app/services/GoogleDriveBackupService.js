@@ -22,7 +22,7 @@ import {
   isSnapshotValid,
 } from './DailyBackupService';
 import { getPreference, setPreference, PREF_KEYS } from './PreferencesDB';
-import { countRows } from './backupBaseline';
+import { countRows, SHRINK_GUARD_RATIO } from './backupBaseline';
 import { appEvents } from './eventEmitter';
 
 const DRIVE_API = 'https://www.googleapis.com/drive/v3/files';
@@ -62,10 +62,10 @@ const FORMAT_META = {
 // exist as a file on disk before it can be uploaded.
 const STAGING_DIR = `${FileSystem.documentDirectory}drive_backup_tmp/`;
 
-/**
+/*
  * How small a backup may be, relative to one already in Drive, before it is no
- * longer allowed to take that one's place — the same 50% floor as the local
- * snapshot guard (isSnapshotValid).
+ * longer allowed to take that one's place: SHRINK_GUARD_RATIO, the floor the
+ * local snapshot guard (isSnapshotValid) uses too.
  *
  * The local guard measures against local history, and a fresh install (a new
  * phone, a reinstall) has none: turning the Drive backup on before restoring
@@ -75,7 +75,6 @@ const STAGING_DIR = `${FileSystem.documentDirectory}drive_backup_tmp/`;
  * count every upload records on its file (ROWS_PROPERTY), and by byte size for
  * a file uploaded before that existed.
  */
-const SHRINK_GUARD_RATIO = 0.5;
 
 /**
  * The Drive `appProperties` key each upload records its snapshot's row count
@@ -144,11 +143,12 @@ const utf8ByteLength = (text) => {
     const code = text.charCodeAt(i);
     if (code < 0x80) bytes += 1;
     else if (code < 0x800) bytes += 2;
-    else if (code >= 0xd800 && code <= 0xdbff) {
+    else if (code >= 0xd800 && code <= 0xdbff && i + 1 < text.length
+      && text.charCodeAt(i + 1) >= 0xdc00 && text.charCodeAt(i + 1) <= 0xdfff) {
       // A surrogate pair is one 4-byte character.
       bytes += 4;
       i += 1;
-    } else bytes += 3;
+    } else bytes += 3; // including a lone surrogate, sent as U+FFFD
   }
   return bytes;
 };

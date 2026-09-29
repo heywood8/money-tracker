@@ -18,6 +18,7 @@ import {
   MAX_DAILY_BACKUPS,
   MAX_WEEKLY_BACKUPS,
 } from '../../app/services/DailyBackupService';
+import { SHRINK_GUARD_RATIO } from '../../app/services/backupBaseline';
 
 // ─── Mocks ────────────────────────────────────────────────────────────────────
 
@@ -619,6 +620,12 @@ describe('DailyBackupService', () => {
 
     describe('row-count regression protection (layer 2)', () => {
       beforeEach(() => mockPrefs({ daily: null, weekly: null }));
+
+      it('measures the drop against the floor it shares with the Drive guard', () => {
+        // One constant for both, so the local and remote guards can never
+        // disagree about what "much smaller" means.
+        expect(SHRINK_GUARD_RATIO).toBe(0.5);
+      });
 
       it('skips write when total rows drop by more than 50% vs prior backup', async () => {
         // New snapshot: 1 account, 0 operations = 1 total row
