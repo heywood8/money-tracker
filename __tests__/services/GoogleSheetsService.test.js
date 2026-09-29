@@ -489,7 +489,7 @@ describe('GoogleSheetsService', () => {
         expect(callsTo('values:batchClear')).toHaveLength(0);
       });
 
-      it('clears only the rows and columns past the written data, after writing it', async () => {
+      it('blanks the rows past the new data inside the write itself', async () => {
         getPreference.mockResolvedValue('sheet-id');
         mockFetch.mockResolvedValue({ ok: true, json: async () => ({}) });
         mockFetch.mockResolvedValueOnce({ ok: true, json: async () => mockMetadata }); // getSheetsByTitle
@@ -497,28 +497,69 @@ describe('GoogleSheetsService', () => {
 
         await exportToSheets('access-token', mockBackup, event => progress.push(event));
 
-        const urls = mockFetch.mock.calls.map(([url]) => url);
-        const writeIndex = urls.findIndex(url => url.includes('values:batchUpdate'));
-        const clearIndex = urls.findIndex(url => url.includes('values:batchClear'));
-        expect(writeIndex).toBeGreaterThan(-1);
-        expect(clearIndex).toBeGreaterThan(writeIndex);
+        // One request carries the new rows AND the blanking of the old tail, so
+        // a failure after it can no longer leave the two mixed.
+        const { data } = JSON.parse(callsTo('values:batchUpdate')[0][1].body);
+        const accounts = data.find(d => d.range === 'Accounts!A1');
+        // A header plus one row, then blank rows down to the tab's 1000.
+        expect(accounts.values).toHaveLength(1000);
+        expect(accounts.values[1][1]).toBe('Cash');
+        expect(accounts.values[2]).toEqual(Array(12).fill(''));
+        expect(accounts.values[999]).toEqual(Array(12).fill(''));
+        const history = data.find(d => d.range === 'Balance History!A1');
+        expect(history.values).toHaveLength(1000);
+        expect(history.values[1]).toEqual(['', '', '', '']);
 
+        // What the blank rows cannot reach — the columns right of the data — is
+        // the only thing still cleared, and never a whole row or tab.
+        const urls = mockFetch.mock.calls.map(([url]) => url);
+        expect(urls.findIndex(url => url.includes('values:batchClear')))
+          .toBeGreaterThan(urls.findIndex(url => url.includes('values:batchUpdate')));
         const { ranges } = JSON.parse(callsTo('values:batchClear')[0][1].body);
-        // Accounts: a header plus one row, 12 columns wide.
-        expect(ranges).toContain('\'Accounts\'!3:1000');
         expect(ranges).toContain('\'Accounts\'!M:Z');
-        // Balance History: a header only, 4 columns wide.
-        expect(ranges).toContain('\'Balance History\'!2:1000');
         expect(ranges).toContain('\'Balance History\'!E:Z');
-        // Never a bare tab, which would wipe the rows just written.
-        for (const range of ranges) expect(range).toMatch(/!/);
-        expect(ranges).not.toContain('Accounts');
+        for (const range of ranges) expect(range).toMatch(/^'[^']+'![A-Z]+:[A-Z]+$/);
 
         expect(progress.map(p => `${p.step}:${p.status}`)).toEqual([
           'connect:in_progress', 'connect:completed',
           'write:in_progress', 'write:completed',
-          'clear:in_progress', 'clear:completed',
         ]);
+      });
+
+      it('sends no clear and no blank rows into a spreadsheet created in this run', async () => {
+        getPreference.mockResolvedValue(null);
+        setPreference.mockResolvedValue(undefined);
+        mockFetch.mockResolvedValue({ ok: true, json: async () => ({}) });
+        mockFetch.mockResolvedValueOnce({ ok: true, json: async () => ({ spreadsheetId: 'new-sheet-id' }) }); // create
+        mockFetch.mockResolvedValueOnce({ ok: true, json: async () => mockMetadata }); // its metadata
+
+        await exportToSheets('access-token', mockBackup);
+
+        expect(callsTo('values:batchClear')).toHaveLength(0);
+        const { data } = JSON.parse(callsTo('values:batchUpdate')[0][1].body);
+        expect(data.find(d => d.range === 'Accounts!A1').values).toHaveLength(2);
+      });
+
+      it('sends no clear and no blank rows into a tab this run adds', async () => {
+        getPreference.mockResolvedValue('sheet-id');
+        // An older spreadsheet, before the groups tab existed.
+        const older = { sheets: mockMetadata.sheets.filter(s => s.properties.title !== 'Budget Line Groups') };
+        mockFetch.mockResolvedValue({ ok: true, json: async () => ({}) });
+        mockFetch.mockResolvedValueOnce({ ok: true, json: async () => older }); // getSheetsByTitle
+        mockFetch.mockResolvedValueOnce({ // addSheets
+          ok: true,
+          json: async () => ({
+            replies: [{ addSheet: { properties: { title: 'Budget Line Groups', sheetId: 9, gridProperties: grid } } }],
+          }),
+        });
+
+        await exportToSheets('access-token', mockBackup);
+
+        const { data } = JSON.parse(callsTo('values:batchUpdate')[0][1].body);
+        expect(data.find(d => d.range === 'Budget Line Groups!A1').values).toHaveLength(1);
+        const { ranges } = JSON.parse(callsTo('values:batchClear')[0][1].body);
+        expect(ranges.some(range => range.includes('Budget Line Groups'))).toBe(false);
+        expect(ranges).toContain('\'Accounts\'!M:Z');
       });
 
       it('writes an empty string where a value is missing, so no old value shows through', async () => {
