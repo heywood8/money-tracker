@@ -324,7 +324,7 @@ describe('GoogleSheetsService', () => {
     // spots the tabs a spreadsheet is missing, supplies the IDs the filters hang
     // off and the grid sizes that bound the stale-area clear), so a spreadsheet
     // described here as complete makes the export exactly four calls: metadata,
-    // write, filters, clear.
+    // write, filters, and the trim of each tab to its new size.
     const grid = { rowCount: 1000, columnCount: 26 };
     const mockMetadata = {
       sheets: [
@@ -402,7 +402,7 @@ describe('GoogleSheetsService', () => {
       mockFetch.mockResolvedValueOnce({ ok: true, json: async () => mockMetadata }); // getSheetsByTitle
       mockFetch.mockResolvedValueOnce({ ok: true, json: async () => ({}) }); // writeSheets
       mockFetch.mockResolvedValueOnce({ ok: true, json: async () => ({}) }); // applyFilters
-      mockFetch.mockResolvedValueOnce({ ok: true, json: async () => ({}) }); // clearSheets
+      mockFetch.mockResolvedValueOnce({ ok: true, json: async () => ({}) }); // trimSheets
 
       const url = await exportToSheets('access-token', mockBackup);
 
@@ -425,23 +425,6 @@ describe('GoogleSheetsService', () => {
       expect(body.requests).toHaveLength(8);
       expect(body.requests[0].setBasicFilter.filter.range.sheetId).toBe(0);
       expect(body.requests[7].setBasicFilter.filter.range.sheetId).toBe(7);
-    });
-
-    it('throws refresh_failed and signs out when clearSheets returns 401', async () => {
-      getPreference.mockResolvedValue('sheet-id');
-      GoogleSignin.revokeAccess.mockResolvedValue(undefined);
-      GoogleSignin.signOut.mockResolvedValue(undefined);
-      mockFetch.mockResolvedValueOnce({ ok: true, json: async () => mockMetadata }); // getSheetsByTitle
-      mockFetch.mockResolvedValueOnce({ ok: true, json: async () => ({}) }); // writeSheets
-      mockFetch.mockResolvedValueOnce({ ok: true, json: async () => ({}) }); // applyFilters
-      mockFetch.mockResolvedValueOnce({
-        ok: false,
-        status: 401,
-        json: async () => ({ error: { message: 'Unauthorized' } }),
-      });
-
-      await expect(exportToSheets('expired-token', mockBackup)).rejects.toThrow('refresh_failed');
-      expect(GoogleSignin.signOut).toHaveBeenCalled();
     });
 
     it('throws refresh_failed and signs out when writeSheets returns 401', async () => {
@@ -510,15 +493,22 @@ describe('GoogleSheetsService', () => {
         expect(history.values).toHaveLength(1000);
         expect(history.values[1]).toEqual(['', '', '', '']);
 
-        // What the blank rows cannot reach — the columns right of the data — is
-        // the only thing still cleared, and never a whole row or tab.
-        const urls = mockFetch.mock.calls.map(([url]) => url);
-        expect(urls.findIndex(url => url.includes('values:batchClear')))
-          .toBeGreaterThan(urls.findIndex(url => url.includes('values:batchUpdate')));
-        const { ranges } = JSON.parse(callsTo('values:batchClear')[0][1].body);
-        expect(ranges).toContain('\'Accounts\'!M:Z');
-        expect(ranges).toContain('\'Balance History\'!E:Z');
-        for (const range of ranges) expect(range).toMatch(/^'[^']+'![A-Z]+:[A-Z]+$/);
+        // Nothing is cleared in a call of its own any more.
+        expect(callsTo('values:batchClear')).toHaveLength(0);
+
+        // Each tab is then cut down to exactly what was written into it, so the
+        // next export's blank rows reach this one's length and no further.
+        const trim = mockFetch.mock.calls
+          .map(([url, options]) => ({ url, body: JSON.parse(options?.body || '{}') }))
+          .find(({ body }) => body.requests?.some(r => r.updateSheetProperties));
+        const sizeOf = sheetId => trim.body.requests
+          .find(r => r.updateSheetProperties.properties.sheetId === sheetId).updateSheetProperties;
+        expect(sizeOf(0)).toEqual({
+          properties: { sheetId: 0, gridProperties: { rowCount: 2, columnCount: 12 } },
+          fields: 'gridProperties.rowCount,gridProperties.columnCount',
+        });
+        expect(sizeOf(4).properties.gridProperties).toEqual({ rowCount: 1, columnCount: 4 });
+        expect(trim.body.requests).toHaveLength(8);
 
         expect(progress.map(p => `${p.step}:${p.status}`)).toEqual([
           'connect:in_progress', 'connect:completed',
@@ -538,6 +528,7 @@ describe('GoogleSheetsService', () => {
         expect(callsTo('values:batchClear')).toHaveLength(0);
         const { data } = JSON.parse(callsTo('values:batchUpdate')[0][1].body);
         expect(data.find(d => d.range === 'Accounts!A1').values).toHaveLength(2);
+        expect(mockFetch.mock.calls.some(([, o]) => (o?.body || '').includes('updateSheetProperties'))).toBe(false);
       });
 
       it('sends no clear and no blank rows into a tab this run adds', async () => {
@@ -557,9 +548,52 @@ describe('GoogleSheetsService', () => {
 
         const { data } = JSON.parse(callsTo('values:batchUpdate')[0][1].body);
         expect(data.find(d => d.range === 'Budget Line Groups!A1').values).toHaveLength(1);
-        const { ranges } = JSON.parse(callsTo('values:batchClear')[0][1].body);
-        expect(ranges.some(range => range.includes('Budget Line Groups'))).toBe(false);
-        expect(ranges).toContain('\'Accounts\'!M:Z');
+        expect(callsTo('values:batchClear')).toHaveLength(0);
+        const trim = JSON.parse(mockFetch.mock.calls
+          .find(([, o]) => (o?.body || '').includes('updateSheetProperties'))[1].body);
+        const trimmedIds = trim.requests.map(r => r.updateSheetProperties.properties.sheetId);
+        expect(trimmedIds).not.toContain(9);
+        expect(trimmedIds).toContain(0);
+      });
+
+      it('does not fail an export whose data landed when the tidy-up after it fails', async () => {
+        // The data and the blank rows are in; a transient failure of the call
+        // after them is no reason to report the export as failed.
+        getPreference.mockResolvedValue('sheet-id');
+        mockFetch.mockResolvedValueOnce({ ok: true, json: async () => mockMetadata }); // getSheetsByTitle
+        mockFetch.mockResolvedValueOnce({ ok: true, json: async () => ({}) }); // writeSheets
+        mockFetch.mockResolvedValueOnce({ ok: true, json: async () => ({}) }); // applyFilters
+        mockFetch.mockResolvedValue({
+          ok: false, status: 503, json: async () => ({ error: { message: 'Service unavailable' } }),
+        });
+        jest.spyOn(console, 'warn').mockImplementation(() => {});
+
+        const url = await exportToSheets('access-token', mockBackup);
+
+        expect(url).toBe('https://docs.google.com/spreadsheets/d/sheet-id');
+        expect(console.warn).toHaveBeenCalledWith(
+          expect.stringContaining('Could not trim'), 503, 'Service unavailable',
+        );
+        console.warn.mockRestore();
+      });
+
+      it('never trims a tab below its frozen rows and columns', async () => {
+        getPreference.mockResolvedValue('sheet-id');
+        const frozen = {
+          sheets: mockMetadata.sheets.map(sheet => (sheet.properties.title === 'Balance History'
+            ? { properties: { ...sheet.properties, gridProperties: { ...grid, frozenRowCount: 1, frozenColumnCount: 5 } } }
+            : sheet)),
+        };
+        mockFetch.mockResolvedValue({ ok: true, json: async () => ({}) });
+        mockFetch.mockResolvedValueOnce({ ok: true, json: async () => frozen }); // getSheetsByTitle
+
+        await exportToSheets('access-token', mockBackup);
+
+        const trim = JSON.parse(mockFetch.mock.calls
+          .find(([, o]) => (o?.body || '').includes('updateSheetProperties'))[1].body);
+        const history = trim.requests.find(r => r.updateSheetProperties.properties.sheetId === 4);
+        // A header only and 4 columns, but row 1 and columns A–E are frozen.
+        expect(history.updateSheetProperties.properties.gridProperties).toEqual({ rowCount: 2, columnCount: 6 });
       });
 
       it('writes an empty string where a value is missing, so no old value shows through', async () => {
