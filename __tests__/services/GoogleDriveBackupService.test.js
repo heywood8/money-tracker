@@ -745,6 +745,32 @@ describe('GoogleDriveBackupService', () => {
       expect(bodyOf('/drive/v3/files/old-db?', 'PATCH')).toBe(`{${recorded}}`);
     });
 
+    it('records which files it kept when only part of the run was refused', async () => {
+      // Today's daily is new; this week's weekly already came from the old
+      // device, with far more rows in it.
+      routeFetch([
+        { method: 'GET', match: (u) => u.includes(`/files/${FOLDER_ID}?`), body: { id: FOLDER_ID, trashed: false } },
+        {
+          method: 'GET',
+          match: (u) => u.includes('name%3D') && u.includes('penny_weekly_'),
+          body: { files: [{ id: 'old-weekly', size: FULL_SIZE, appProperties: { pennyRows: '500' } }] },
+        },
+        { method: 'GET', match: (u) => u.includes('q='), body: { files: [] } },
+        { method: 'POST', match: (u) => u.includes('/upload/drive/v3/files'), body: { id: 'uploaded-file' } },
+        { method: 'POST', match: (u) => u.includes('/drive/v3/files'), body: { id: 'created-file' } },
+      ]);
+
+      const result = await performDriveBackup({ mode: 'auto', getAccessToken });
+
+      const weekly = ['penny_weekly_2026-W09.json', 'penny_weekly_2026-W09.csv', 'penny_weekly_2026-W09.db'];
+      expect(result).toMatchObject({ status: 'success', kept: weekly });
+      expect(result.files.every(name => name.startsWith('penny_daily_'))).toBe(true);
+      const stored = mockPreferencesDB.setPreference.mock.calls
+        .find(([key]) => key === 'drive_backup_last_result');
+      expect(JSON.parse(stored[1])).toMatchObject({ status: 'success', kept: weekly });
+      expect(console.warn).toHaveBeenCalledWith(expect.stringContaining('Kept 3 larger file(s)'), weekly.join(', '));
+    });
+
     it('records it on a database created from scratch as well', async () => {
       routeExisting({});
 

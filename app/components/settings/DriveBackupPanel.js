@@ -127,6 +127,14 @@ export default function DriveBackupPanel({ bottomInset }) {
     if (lastResult.status === 'cancelled') {
       return `${t('drive_backup_last_cancelled') || 'Last run cancelled'}: ${when}`;
     }
+    if (lastResult.status === 'skipped' && lastResult.reason === 'remote_larger') {
+      // Not the generic "skipped": nothing was uploaded because Drive holds a
+      // backup with far more in it — most likely the old phone's, on a fresh
+      // install that has not been restored yet. That is worth knowing.
+      const text = t('drive_backup_last_skipped_remote_larger')
+        || 'Skipped: Drive already has a larger backup from another device or install';
+      return `${text} (${when})`;
+    }
     return `${t('drive_backup_last_skipped') || 'Last run skipped'}: ${when}`;
   })();
 

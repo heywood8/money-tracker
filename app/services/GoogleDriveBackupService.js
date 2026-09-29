@@ -886,7 +886,7 @@ export const performDriveBackup = async ({ mode = 'auto', getAccessToken }) => {
       // Every file was refused in favour of a much larger one already in Drive:
       // reporting that as a successful backup would tell the user their data is
       // safe when nothing of theirs was uploaded.
-      const result = { status: 'skipped', reason: 'remote_larger', at: new Date().toISOString() };
+      const result = { status: 'skipped', reason: 'remote_larger', at: new Date().toISOString(), kept };
       await setLastDriveBackupResult(result);
       onProgress({ phase: 'skipped', reason: 'remote_larger' });
       return result;
@@ -897,6 +897,13 @@ export const performDriveBackup = async ({ mode = 'auto', getAccessToken }) => {
       at: new Date().toISOString(),
       files: uploaded.length,
     };
+    if (kept.length > 0) {
+      // Part of the run landed and part was refused — one snapshot kept its
+      // larger file in Drive while the other went up. Recorded, not just logged:
+      // "success" alone would say every file of this run is in Drive.
+      result.kept = kept;
+      console.warn(`[DriveBackup] Kept ${kept.length} larger file(s) in Drive instead of this run's:`, kept.join(', '));
+    }
     await setLastDriveBackupResult(result);
     onProgress({ phase: 'done', files: uploaded });
     console.log(`[DriveBackup] Uploaded ${uploaded.length} file(s):`, uploaded.join(', '));

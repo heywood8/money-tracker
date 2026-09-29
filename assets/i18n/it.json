@@ -724,6 +724,7 @@
   "drive_backup_last_success": "Ultimo backup",
   "drive_backup_last_error": "Ultimo backup non riuscito",
   "drive_backup_last_skipped": "Ultima esecuzione saltata",
+  "drive_backup_last_skipped_remote_larger": "Saltato: su Drive c'è già un backup più grande da un altro dispositivo o installazione",
   "drive_backup_last_cancelled": "Ultima esecuzione annullata",
   "drive_backup_now": "Esegui backup ora",
   "drive_backup_retention": "I backup programmati conservano le ultime 7 copie giornaliere e 15 settimanali per ogni formato. I backup creati con il pulsante restano finché non li elimini.",

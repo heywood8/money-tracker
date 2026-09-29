@@ -724,6 +724,7 @@
   "drive_backup_last_success": "最後のバックアップ",
   "drive_backup_last_error": "最後のバックアップに失敗しました",
   "drive_backup_last_skipped": "前回の実行はスキップされました",
+  "drive_backup_last_skipped_remote_larger": "スキップ：別の端末またはインストールからの、より大きなバックアップが既にドライブにあります",
   "drive_backup_last_cancelled": "前回の実行はキャンセルされました",
   "drive_backup_now": "今すぐバックアップ",
   "drive_backup_retention": "定期バックアップは形式ごとに日次 7 件・週次 15 件を保持します。ボタンで作成したバックアップは削除するまで残ります。",

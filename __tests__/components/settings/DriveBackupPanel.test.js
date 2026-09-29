@@ -233,5 +233,16 @@ describe('DriveBackupPanel', () => {
       expect(getByText(/drive_backup_last_error/)).toBeTruthy();
       expect(getByText('storage_full')).toBeTruthy();
     });
+
+    it('says why, when the run kept a larger backup already in Drive', async () => {
+      mockDriveState = {
+        isRunning: false,
+        progress: null,
+        lastResult: { status: 'skipped', reason: 'remote_larger', at: '2026-02-26T10:00:00.000Z' },
+      };
+      const { getByText, queryByText } = await setup();
+      expect(getByText(/drive_backup_last_skipped_remote_larger/)).toBeTruthy();
+      expect(queryByText(/drive_backup_last_skipped:/)).toBeNull();
+    });
   });
 });
