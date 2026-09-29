@@ -52,6 +52,53 @@ const FORMAT_META = {
 const STAGING_DIR = `${FileSystem.documentDirectory}drive_backup_tmp/`;
 
 /**
+ * How small a backup may be, relative to one already in Drive, before it is no
+ * longer allowed to take that one's place — the same 50% floor as the local
+ * snapshot guard (isSnapshotValid).
+ *
+ * The local guard measures against local history, and a fresh install (a new
+ * phone, a reinstall) has none: turning the Drive backup on before restoring
+ * used to replace today's and this week's files with a near-empty snapshot, and
+ * the rotation then deleted the old device's dailies one per day. Drive knows
+ * each file's size, so both the overwrite and the rotation measure against it.
+ */
+const SHRINK_GUARD_RATIO = 0.5;
+
+/**
+ * Whether `size` bytes is too small to replace `remoteSize` bytes. An unknown
+ * size on either side never blocks — the guard only acts on a measured drop.
+ * @param {number|string} size
+ * @param {number|string} remoteSize - Drive reports sizes as strings
+ * @returns {boolean}
+ */
+const isMuchSmaller = (size, remoteSize) => {
+  const local = Number(size);
+  const remote = Number(remoteSize);
+  if (!Number.isFinite(local) || !Number.isFinite(remote) || remote <= 0) return false;
+  return local < remote * SHRINK_GUARD_RATIO;
+};
+
+/**
+ * UTF-8 byte length of a string — what Drive will report as the file's size.
+ * @param {string} text
+ * @returns {number}
+ */
+const utf8ByteLength = (text) => {
+  let bytes = 0;
+  for (let i = 0; i < text.length; i += 1) {
+    const code = text.charCodeAt(i);
+    if (code < 0x80) bytes += 1;
+    else if (code < 0x800) bytes += 2;
+    else if (code >= 0xd800 && code <= 0xdbff) {
+      // A surrogate pair is one 4-byte character.
+      bytes += 4;
+      i += 1;
+    } else bytes += 3;
+  }
+  return bytes;
+};
+
+/**
  * Translate a failed Drive response into one of the error codes the UI maps to a
  * message. Anything unrecognised keeps the HTTP status so logs stay useful.
  * @param {Response} response
@@ -248,12 +295,12 @@ const deleteDriveFile = async (accessToken, fileId, name = fileId) => {
  * Every file the app put in the backup folder, newest last.
  * @param {string} accessToken
  * @param {string} folderId
- * @returns {Promise<Array<{id: string, name: string}>>}
+ * @returns {Promise<Array<{id: string, name: string, size?: string}>>}
  */
 export const listBackupFiles = async (accessToken, folderId) => {
   const query = `'${folderId}' in parents and trashed=false`;
   const response = await fetch(
-    `${DRIVE_API}?q=${encodeURIComponent(query)}&fields=files(id,name)&pageSize=1000&orderBy=name`,
+    `${DRIVE_API}?q=${encodeURIComponent(query)}&fields=files(id,name,size)&pageSize=1000&orderBy=name`,
     { headers: { Authorization: `Bearer ${accessToken}` } },
   );
   if (!response.ok) throw await driveError(response);
@@ -268,18 +315,30 @@ export const listBackupFiles = async (accessToken, folderId) => {
  * @param {string} accessToken
  * @param {string} folderId
  * @param {string} name
- * @returns {Promise<string|null>} File id, or null
+ * @returns {Promise<{id: string, size?: string}|null>} The file, or null
  */
-const findFileIdByName = async (accessToken, folderId, name) => {
+const findFileByName = async (accessToken, folderId, name) => {
   const escapedName = escapeDriveQueryValue(name);
   const query = `'${folderId}' in parents and name='${escapedName}' and trashed=false`;
   const response = await fetch(
-    `${DRIVE_API}?q=${encodeURIComponent(query)}&fields=files(id)&pageSize=1`,
+    `${DRIVE_API}?q=${encodeURIComponent(query)}&fields=files(id,size)&pageSize=1`,
     { headers: { Authorization: `Bearer ${accessToken}` } },
   );
   if (!response.ok) throw await driveError(response);
   const { files } = await response.json();
-  return files && files.length > 0 ? files[0].id : null;
+  return files && files.length > 0 ? files[0] : null;
+};
+
+/**
+ * Log why an upload is not replacing the file already under its name.
+ * @param {string} name
+ * @param {number} size
+ * @param {string} remoteSize
+ */
+const warnRefusedOverwrite = (name, size, remoteSize) => {
+  console.warn(
+    `[DriveBackup] Not replacing ${name}: ${size} bytes against ${remoteSize} already in Drive — keeping the larger backup`,
+  );
 };
 
 /**
@@ -289,10 +348,19 @@ const findFileIdByName = async (accessToken, folderId, name) => {
  * already a string in memory — writing it to disk first would buy nothing.
  * @param {string} accessToken
  * @param {{folderId: string, name: string, mimeType: string, content: string}} params
- * @returns {Promise<string>} File id
+ * @returns {Promise<string|null>} File id, or null when a much larger file
+ *   already holds the name and was kept (see SHRINK_GUARD_RATIO)
  */
 export const uploadTextFile = async (accessToken, { folderId, name, mimeType, content }) => {
-  const existingId = await findFileIdByName(accessToken, folderId, name);
+  const existing = await findFileByName(accessToken, folderId, name);
+  if (existing) {
+    const size = utf8ByteLength(content);
+    if (isMuchSmaller(size, existing.size)) {
+      warnRefusedOverwrite(name, size, existing.size);
+      return null;
+    }
+  }
+  const existingId = existing?.id ?? null;
   const boundary = `penny-${Date.now()}-${Math.random().toString(36).slice(2)}`;
 
   // A PATCH must not carry `parents` — Drive rejects it there and takes moves
@@ -337,10 +405,19 @@ export const uploadTextFile = async (accessToken, { folderId, name, mimeType, co
  * never materialises the file in JS at all.
  * @param {string} accessToken
  * @param {{folderId: string, name: string, mimeType: string, fileUri: string}} params
- * @returns {Promise<string>} File id
+ * @returns {Promise<string|null>} File id, or null when a much larger file
+ *   already holds the name and was kept (see SHRINK_GUARD_RATIO)
  */
 export const uploadBinaryFile = async (accessToken, { folderId, name, mimeType, fileUri }) => {
-  let fileId = await findFileIdByName(accessToken, folderId, name);
+  const existing = await findFileByName(accessToken, folderId, name);
+  if (existing) {
+    const { size } = await FileSystem.getInfoAsync(fileUri);
+    if (isMuchSmaller(size, existing.size)) {
+      warnRefusedOverwrite(name, size, existing.size);
+      return null;
+    }
+  }
+  let fileId = existing?.id ?? null;
   // Whether this call is what brought the file into existence, which decides
   // whether a failed upload should take it away again.
   const createdHere = !fileId;
@@ -396,6 +473,13 @@ export const uploadBinaryFile = async (accessToken, { folderId, name, mimeType, 
  * window, so turning CSV on later does not push seven days of JSON out of the
  * folder. Only files this service names are ever considered — anything else the
  * user put in the folder is left alone.
+ *
+ * A file much larger than the group's newest is kept whatever its age: the
+ * newest is the dataset as it stands now, and one that small next to an older
+ * backup is a fresh install (or a second device on the same account) whose
+ * uploads would otherwise push the real backups out one per day. The group can
+ * then run past `maxToKeep`, but by at most `maxToKeep` files — the smaller
+ * ones keep rotating — and it drains once the newest backup is full-size again.
  * @param {string} accessToken
  * @param {string} folderId
  * @param {string} prefix - 'penny_daily_' or 'penny_weekly_'
@@ -415,8 +499,15 @@ export const cleanupDriveBackups = async (accessToken, folderId, prefix, maxToKe
     // Names embed a sortable date (YYYY-MM-DD / YYYY-Www), so lexical order is
     // chronological order and the excess is always at the front.
     group.sort((a, b) => a.name.localeCompare(b.name));
+    const newest = group[group.length - 1];
     const excess = group.slice(0, Math.max(0, group.length - maxToKeep));
     for (const file of excess) {
+      if (isMuchSmaller(newest.size, file.size)) {
+        console.warn(
+          `[DriveBackup] Keeping ${file.name} (${file.size} bytes): the newest backup, ${newest.name}, is ${newest.size}`,
+        );
+        continue;
+      }
       await deleteDriveFile(accessToken, file.id, file.name);
     }
   }
@@ -429,10 +520,12 @@ export const cleanupDriveBackups = async (accessToken, folderId, prefix, maxToKe
  * given day describe the same instant rather than three reads seconds apart.
  * @param {string} accessToken
  * @param {Object} params
- * @returns {Promise<string[]>} Names of the uploaded files
+ * @returns {Promise<{uploaded: string[], kept: string[]}>} Names of the uploaded
+ *   files, and of the ones not uploaded because a much larger file holds the name
  */
 const uploadSnapshot = async (accessToken, { folderId, label, backup, formats, onProgress }) => {
   const uploaded = [];
+  const kept = [];
   const total = formats.length;
 
   for (let index = 0; index < formats.length; index += 1) {
@@ -446,6 +539,8 @@ const uploadSnapshot = async (accessToken, { folderId, label, backup, formats, o
 
     onProgress?.({ phase: 'uploading', format, current: index + 1, total, name });
 
+    let fileId;
+
     if (format === 'sqlite') {
       // Staged on disk first: the upload streams from a file, and copying the
       // live database also gets the WAL checkpointed into it.
@@ -456,7 +551,7 @@ const uploadSnapshot = async (accessToken, { folderId, label, backup, formats, o
       const stagedUri = `${STAGING_DIR}${name}`;
       try {
         await writeSQLiteSnapshot(stagedUri);
-        await uploadBinaryFile(accessToken, { folderId, name, mimeType, fileUri: stagedUri });
+        fileId = await uploadBinaryFile(accessToken, { folderId, name, mimeType, fileUri: stagedUri });
       } finally {
         // Always reclaim the staged copy, including when the upload threw —
         // a whole database left behind on every failed run adds up fast.
@@ -466,13 +561,13 @@ const uploadSnapshot = async (accessToken, { folderId, label, backup, formats, o
       const content = format === 'json'
         ? JSON.stringify(backup)
         : buildCombinedCSV(backup);
-      await uploadTextFile(accessToken, { folderId, name, mimeType, content });
+      fileId = await uploadTextFile(accessToken, { folderId, name, mimeType, content });
     }
 
-    uploaded.push(name);
+    (fileId ? uploaded : kept).push(name);
   }
 
-  return uploaded;
+  return { uploaded, kept };
 };
 
 // True while a run is in flight. The guard lives here rather than in the React
@@ -610,25 +705,28 @@ export const performDriveBackup = async ({ mode = 'auto', getAccessToken }) => {
     const folderId = await ensureBackupFolder(accessToken);
 
     const uploaded = [];
+    const kept = [];
+    const upload = async (label) => {
+      const run = await uploadSnapshot(accessToken, { folderId, label, backup, formats, onProgress });
+      uploaded.push(...run.uploaded);
+      kept.push(...run.kept);
+    };
 
     if (mode === 'manual') {
       const now = new Date();
       const pad = (n) => String(n).padStart(2, '0');
       const stamp = `${today}_${pad(now.getHours())}-${pad(now.getMinutes())}-${pad(now.getSeconds())}`;
-      uploaded.push(...await uploadSnapshot(accessToken, {
-        folderId, label: `manual_${stamp}`, backup, formats, onProgress,
-      }));
+      await upload(`manual_${stamp}`);
     } else {
+      // A file kept in place of this run's still covers its day or week — the
+      // marks advance either way, or every launch today would rebuild the
+      // snapshot only to be refused again.
       if (needsDaily) {
-        uploaded.push(...await uploadSnapshot(accessToken, {
-          folderId, label: `daily_${today}`, backup, formats, onProgress,
-        }));
+        await upload(`daily_${today}`);
         await setPreference(PREF_KEYS.DRIVE_BACKUP_LAST_DAILY, today);
       }
       if (needsWeekly) {
-        uploaded.push(...await uploadSnapshot(accessToken, {
-          folderId, label: `weekly_${currentWeek}`, backup, formats, onProgress,
-        }));
+        await upload(`weekly_${currentWeek}`);
         await setPreference(PREF_KEYS.DRIVE_BACKUP_LAST_WEEKLY, currentWeek);
       }
 
@@ -643,6 +741,16 @@ export const performDriveBackup = async ({ mode = 'auto', getAccessToken }) => {
       // the folder unrotated for a day (the next launch sees the marks and skips).
       await cleanupDriveBackups(accessToken, folderId, 'penny_daily_', MAX_DAILY_BACKUPS);
       await cleanupDriveBackups(accessToken, folderId, 'penny_weekly_', MAX_WEEKLY_BACKUPS);
+    }
+
+    if (uploaded.length === 0 && kept.length > 0) {
+      // Every file was refused in favour of a much larger one already in Drive:
+      // reporting that as a successful backup would tell the user their data is
+      // safe when nothing of theirs was uploaded.
+      const result = { status: 'skipped', reason: 'remote_larger', at: new Date().toISOString() };
+      await setLastDriveBackupResult(result);
+      onProgress({ phase: 'skipped', reason: 'remote_larger' });
+      return result;
     }
 
     const result = {

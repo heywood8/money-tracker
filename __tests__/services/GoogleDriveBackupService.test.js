@@ -644,6 +644,109 @@ describe('GoogleDriveBackupService', () => {
     });
   });
 
+  // A new phone or a reinstall with the Drive backup turned on before restoring:
+  // its snapshot is near-empty and it has no local history for the snapshot
+  // guard to compare with. It used to replace today's and this week's files and
+  // then rotate the old device's dailies out one per day.
+  describe('A fresh install next to an existing backup set', () => {
+    const FULL_SIZE = String(512 * 1024);
+    const dailyFiles = (fromDay, toDay, size, idPrefix) => {
+      const files = [];
+      for (let day = fromDay; day <= toDay; day += 1) {
+        const date = `2026-02-${String(day).padStart(2, '0')}`;
+        files.push({ id: `${idPrefix}-${day}`, name: `penny_daily_${date}.json`, size });
+      }
+      return files;
+    };
+
+    it('does not replace a much larger file under the same name', async () => {
+      routeFetch([
+        { method: 'GET', match: (u) => u.includes('q='), body: { files: [{ id: 'old-device-file', size: FULL_SIZE }] } },
+      ]);
+
+      const id = await uploadTextFile('token-abc', {
+        folderId: FOLDER_ID, name: 'penny_daily_2026-02-26.json',
+        mimeType: 'application/json', content: '{"a":1}',
+      });
+
+      expect(id).toBeNull();
+      const writes = global.fetch.mock.calls.filter(([, o]) => ['POST', 'PATCH'].includes(o?.method));
+      expect(writes).toHaveLength(0);
+    });
+
+    it('still replaces a file of comparable size, so a same-day re-run works', async () => {
+      routeFetch([
+        { method: 'GET', match: (u) => u.includes('q='), body: { files: [{ id: 'existing-file', size: '8' }] } },
+        { method: 'PATCH', match: (u) => u.includes('/upload/drive/v3/files/existing-file'), body: { id: 'existing-file' } },
+      ]);
+
+      const id = await uploadTextFile('token-abc', {
+        folderId: FOLDER_ID, name: 'penny_daily_2026-02-26.json',
+        mimeType: 'application/json', content: '{"a":1}',
+      });
+
+      expect(id).toBe('existing-file');
+    });
+
+    it('keeps the old device\'s daily and weekly files and reports the run as skipped', async () => {
+      // The staged database is as small as the rest of the fresh install.
+      mockFileSystem.getInfoAsync.mockResolvedValue({ exists: true, size: 4096 });
+      routeFetch([
+        { method: 'GET', match: (u) => u.includes(`/files/${FOLDER_ID}?`), body: { id: FOLDER_ID, trashed: false } },
+        // Every name this run writes is already taken by the old device's backup.
+        { method: 'GET', match: (u) => u.includes('name%3D'), body: { files: [{ id: 'old-device-file', size: FULL_SIZE }] } },
+        { method: 'GET', match: (u) => u.includes('orderBy=name'), body: { files: [] } },
+      ]);
+
+      const result = await performDriveBackup({ mode: 'auto', getAccessToken });
+
+      expect(result).toMatchObject({ status: 'skipped', reason: 'remote_larger' });
+      const writes = global.fetch.mock.calls.filter(([, o]) => ['POST', 'PATCH', 'DELETE'].includes(o?.method));
+      expect(writes).toHaveLength(0);
+      expect(mockFileSystem.uploadAsync).not.toHaveBeenCalled();
+    });
+
+    it('does not rotate the old device\'s backups out with its own small ones', async () => {
+      // Seven full-size dailies from the old device, then the fresh install's first.
+      const files = [...dailyFiles(1, 7, FULL_SIZE, 'old'), ...dailyFiles(8, 8, '2048', 'fresh')];
+      const deleted = [];
+      routeFetch([
+        { method: 'GET', match: (u) => u.includes('q='), body: { files } },
+        { method: 'DELETE', match: (u) => { deleted.push(u.split('/').pop()); return true; }, body: {} },
+      ]);
+
+      await cleanupDriveBackups('token-abc', FOLDER_ID, 'penny_daily_', MAX_DAILY_BACKUPS);
+
+      expect(deleted).toEqual([]);
+    });
+
+    it('keeps rotating the small files, so the folder stays bounded', async () => {
+      const files = [...dailyFiles(1, 7, FULL_SIZE, 'old'), ...dailyFiles(8, 15, '2048', 'fresh')];
+      const deleted = [];
+      routeFetch([
+        { method: 'GET', match: (u) => u.includes('q='), body: { files } },
+        { method: 'DELETE', match: (u) => { deleted.push(u.split('/').pop()); return true; }, body: {} },
+      ]);
+
+      await cleanupDriveBackups('token-abc', FOLDER_ID, 'penny_daily_', MAX_DAILY_BACKUPS);
+
+      expect(deleted).toEqual(['fresh-8']);
+    });
+
+    it('rotates the old files normally once the newest backup is full-size again', async () => {
+      const files = dailyFiles(1, 8, FULL_SIZE, 'day');
+      const deleted = [];
+      routeFetch([
+        { method: 'GET', match: (u) => u.includes('q='), body: { files } },
+        { method: 'DELETE', match: (u) => { deleted.push(u.split('/').pop()); return true; }, body: {} },
+      ]);
+
+      await cleanupDriveBackups('token-abc', FOLDER_ID, 'penny_daily_', MAX_DAILY_BACKUPS);
+
+      expect(deleted).toEqual(['day-1']);
+    });
+  });
+
   describe('Snapshot guard', () => {
     it('refuses to upload a snapshot that looks like a failed database read', async () => {
       mockDailyBackup.isSnapshotValid.mockResolvedValue(false);
