@@ -7,6 +7,7 @@
  * line reports what is happening.
  */
 import React from 'react';
+import { StyleSheet } from 'react-native';
 import { render, fireEvent, act, waitFor } from '@testing-library/react-native';
 import DriveBackupPanel from '../../../app/components/settings/DriveBackupPanel';
 
@@ -240,9 +241,36 @@ describe('DriveBackupPanel', () => {
         progress: null,
         lastResult: { status: 'skipped', reason: 'remote_larger', at: '2026-02-26T10:00:00.000Z' },
       };
-      const { getByText, queryByText } = await setup();
-      expect(getByText(/drive_backup_last_skipped_remote_larger/)).toBeTruthy();
-      expect(queryByText(/drive_backup_last_skipped:/)).toBeNull();
+      const { getByText, getByTestId } = await setup();
+      expect(getByText(/drive_backup_last_skipped:/)).toBeTruthy();
+      expect(getByTestId('drive-backup-kept-note').props.children).toBe('drive_backup_kept_larger_remote');
+    });
+
+    it('does not show a partly refused run as a plain green success', async () => {
+      // The daily went up; this week's weekly was left to the larger one in Drive.
+      mockDriveState = {
+        isRunning: false,
+        progress: null,
+        lastResult: {
+          status: 'success', at: '2026-02-26T10:00:00.000Z', files: 3,
+          kept: ['penny_weekly_2026-W09.json', 'penny_weekly_2026-W09.csv', 'penny_weekly_2026-W09.db'],
+        },
+      };
+      const { getByText, getByTestId } = await setup();
+      const status = getByText(/drive_backup_last_success/);
+      expect(StyleSheet.flatten(status.props.style).color).toBe('#888');
+      expect(getByTestId('drive-backup-kept-note')).toBeTruthy();
+    });
+
+    it('keeps a fully uploaded run green, with no note', async () => {
+      mockDriveState = {
+        isRunning: false,
+        progress: null,
+        lastResult: { status: 'success', at: '2026-02-26T10:00:00.000Z', files: 3 },
+      };
+      const { getByText, queryByTestId } = await setup();
+      expect(StyleSheet.flatten(getByText(/drive_backup_last_success/).props.style).color).toBe('#4caf50');
+      expect(queryByTestId('drive-backup-kept-note')).toBeNull();
     });
   });
 });

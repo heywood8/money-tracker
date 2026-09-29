@@ -127,20 +127,21 @@ export default function DriveBackupPanel({ bottomInset }) {
     if (lastResult.status === 'cancelled') {
       return `${t('drive_backup_last_cancelled') || 'Last run cancelled'}: ${when}`;
     }
-    if (lastResult.status === 'skipped' && lastResult.reason === 'remote_larger') {
-      // Not the generic "skipped": nothing was uploaded because Drive holds a
-      // backup with far more in it — most likely the old phone's, on a fresh
-      // install that has not been restored yet. That is worth knowing.
-      const text = t('drive_backup_last_skipped_remote_larger')
-        || 'Skipped: Drive already has a larger backup from another device or install';
-      return `${text} (${when})`;
-    }
     return `${t('drive_backup_last_skipped') || 'Last run skipped'}: ${when}`;
   })();
 
+  // The last run left a larger backup in Drive in place of its own — for all of
+  // it ('skipped'), or for part of it ('success' with `kept`: say the daily went
+  // up and the weekly did not). Neither is the plain green success a user reads
+  // as "everything is in Drive", so the line is muted and a note says why.
+  const keptLargerRemote = !isRunning && (
+    (lastResult?.status === 'skipped' && lastResult.reason === 'remote_larger')
+    || (lastResult?.status === 'success' && lastResult.kept?.length > 0)
+  );
+
   const statusColor = isRunning
     ? colors.primary
-    : lastResult?.status === 'success'
+    : lastResult?.status === 'success' && !keptLargerRemote
       ? SUCCESS_GREEN
       : lastResult?.status === 'error'
         ? colors.destructive
@@ -235,6 +236,12 @@ export default function DriveBackupPanel({ bottomInset }) {
 
       {lastResult?.status === 'error' && !isRunning && (
         <Text style={[styles.errorText, { color: colors.mutedText }]}>{lastResult.error}</Text>
+      )}
+      {keptLargerRemote && (
+        <Text style={[styles.errorText, { color: colors.mutedText }]} testID="drive-backup-kept-note">
+          {t('drive_backup_kept_larger_remote')
+            || 'Drive already holds a larger backup for this day or week, so it was kept'}
+        </Text>
       )}
 
       <TouchableOpacity
