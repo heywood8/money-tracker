@@ -114,9 +114,11 @@ export const loadBookedPayees = async () => {
 
 /**
  * The amounts an operation booked from this notification could carry, in the
- * account's currency: the raw charge, plus the value it would round to under the
- * account's automatic-transaction rounding (so a 1 683 charge on an account that
- * rounds to the nearest 100 also matches a hand-entered 1 700).
+ * account's currency: the raw charge, the charge at the currency's own precision
+ * (a 1 234,56 ₽ charge books as 1235 on a whole-unit RUB account, by hand or by
+ * the pipeline), plus the value it would round to under the account's
+ * automatic-transaction rounding (so a 1 683 charge on an account that rounds to
+ * the nearest 100 also matches a hand-entered 1 700).
  *
  * @param {{ amount: string }} item
  * @param {{ autoTxnRounding?: number|null, autoTxnRoundingMode?: string|null, currency?: string|null }} [account]
@@ -124,6 +126,9 @@ export const loadBookedPayees = async () => {
  */
 const candidateAmounts = (item, account) => {
   const amounts = [item.amount];
+  if (account && account.currency) {
+    amounts.push(Currency.formatAmount(item.amount, account.currency));
+  }
   const rounding = account && account.autoTxnRounding;
   if (rounding) {
     amounts.push(
