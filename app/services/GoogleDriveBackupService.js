@@ -22,6 +22,7 @@ import {
   isSnapshotValid,
 } from './DailyBackupService';
 import { getPreference, setPreference, PREF_KEYS } from './PreferencesDB';
+import { countRows } from './backupBaseline';
 import { appEvents } from './eventEmitter';
 
 const DRIVE_API = 'https://www.googleapis.com/drive/v3/files';
@@ -59,14 +60,29 @@ const STAGING_DIR = `${FileSystem.documentDirectory}drive_backup_tmp/`;
  * The local guard measures against local history, and a fresh install (a new
  * phone, a reinstall) has none: turning the Drive backup on before restoring
  * used to replace today's and this week's files with a near-empty snapshot, and
- * the rotation then deleted the old device's dailies one per day. Drive knows
- * each file's size, so both the overwrite and the rotation measure against it.
+ * the rotation then deleted the old device's dailies one per day. So both the
+ * overwrite and the rotation measure against what is in Drive — by the row
+ * count every upload records on its file (ROWS_PROPERTY), and by byte size for
+ * a file uploaded before that existed.
  */
 const SHRINK_GUARD_RATIO = 0.5;
 
 /**
- * Whether `size` bytes is too small to replace `remoteSize` bytes. An unknown
- * size on either side never blocks — the guard only acts on a measured drop.
+ * The Drive `appProperties` key each upload records its snapshot's row count
+ * under: accounts + operations, the measure the local guard uses (countRows),
+ * so both guards agree on what "much smaller" means. Categories are left out on
+ * purpose — a fresh install seeds a whole tree of them.
+ *
+ * Bytes alone mislead for the database: a fresh install's .db is schema pages
+ * and seed data, never vacuumed, and often weighs more than half a light user's
+ * real one, while holding none of their operations.
+ */
+const ROWS_PROPERTY = 'pennyRows';
+
+/**
+ * Whether `size` is too small to replace `remoteSize` — bytes, or rows. An
+ * unknown measure on either side never blocks: the guard only acts on a
+ * measured drop.
  * @param {number|string} size
  * @param {number|string} remoteSize - Drive reports sizes as strings
  * @returns {boolean}
@@ -76,6 +92,35 @@ const isMuchSmaller = (size, remoteSize) => {
   const remote = Number(remoteSize);
   if (!Number.isFinite(local) || !Number.isFinite(remote) || remote <= 0) return false;
   return local < remote * SHRINK_GUARD_RATIO;
+};
+
+/**
+ * The row count a Drive file was uploaded with, or null for one uploaded before
+ * ROWS_PROPERTY existed.
+ * @param {{appProperties?: Object}} file
+ * @returns {number|null}
+ */
+const rowsOf = (file) => {
+  const value = file?.appProperties?.[ROWS_PROPERTY];
+  if (value === undefined || value === null || value === '') return null;
+  const rows = Number(value);
+  return Number.isFinite(rows) ? rows : null;
+};
+
+/**
+ * Whether Drive file `candidate` holds too little to take `reference`'s place:
+ * by the row count when both carry one, by byte size otherwise.
+ * @param {{size?: string, appProperties?: Object}} candidate
+ * @param {{size?: string, appProperties?: Object}} reference
+ * @returns {boolean}
+ */
+const holdsMuchLess = (candidate, reference) => {
+  const candidateRows = rowsOf(candidate);
+  const referenceRows = rowsOf(reference);
+  if (candidateRows !== null && referenceRows !== null) {
+    return isMuchSmaller(candidateRows, referenceRows);
+  }
+  return isMuchSmaller(candidate.size, reference.size);
 };
 
 /**
@@ -295,12 +340,12 @@ const deleteDriveFile = async (accessToken, fileId, name = fileId) => {
  * Every file the app put in the backup folder, newest last.
  * @param {string} accessToken
  * @param {string} folderId
- * @returns {Promise<Array<{id: string, name: string, size?: string}>>}
+ * @returns {Promise<Array<{id: string, name: string, size?: string, appProperties?: Object}>>}
  */
 export const listBackupFiles = async (accessToken, folderId) => {
   const query = `'${folderId}' in parents and trashed=false`;
   const response = await fetch(
-    `${DRIVE_API}?q=${encodeURIComponent(query)}&fields=files(id,name,size)&pageSize=1000&orderBy=name`,
+    `${DRIVE_API}?q=${encodeURIComponent(query)}&fields=files(id,name,size,appProperties)&pageSize=1000&orderBy=name`,
     { headers: { Authorization: `Bearer ${accessToken}` } },
   );
   if (!response.ok) throw await driveError(response);
@@ -315,13 +360,13 @@ export const listBackupFiles = async (accessToken, folderId) => {
  * @param {string} accessToken
  * @param {string} folderId
  * @param {string} name
- * @returns {Promise<{id: string, size?: string}|null>} The file, or null
+ * @returns {Promise<{id: string, size?: string, appProperties?: Object}|null>} The file, or null
  */
 const findFileByName = async (accessToken, folderId, name) => {
   const escapedName = escapeDriveQueryValue(name);
   const query = `'${folderId}' in parents and name='${escapedName}' and trashed=false`;
   const response = await fetch(
-    `${DRIVE_API}?q=${encodeURIComponent(query)}&fields=files(id,size)&pageSize=1`,
+    `${DRIVE_API}?q=${encodeURIComponent(query)}&fields=files(id,size,appProperties)&pageSize=1`,
     { headers: { Authorization: `Bearer ${accessToken}` } },
   );
   if (!response.ok) throw await driveError(response);
@@ -330,37 +375,31 @@ const findFileByName = async (accessToken, folderId, name) => {
 };
 
 /**
- * Log why an upload is not replacing the file already under its name.
- * @param {string} name
- * @param {number} size
- * @param {string} remoteSize
- */
-const warnRefusedOverwrite = (name, size, remoteSize) => {
-  console.warn(
-    `[DriveBackup] Not replacing ${name}: ${size} bytes against ${remoteSize} already in Drive — keeping the larger backup`,
-  );
-};
-
-/**
  * Upload a text document (JSON or CSV) in one multipart request.
  *
  * Text goes through fetch rather than a file upload because the content is
  * already a string in memory — writing it to disk first would buy nothing.
+ *
+ * Whether the upload may replace a file of the same name is decided before
+ * this is called, for the whole snapshot at once (see uploadSnapshot).
  * @param {string} accessToken
- * @param {{folderId: string, name: string, mimeType: string, content: string}} params
- * @returns {Promise<string|null>} File id, or null when a much larger file
- *   already holds the name and was kept (see SHRINK_GUARD_RATIO)
+ * @param {Object} params
+ * @param {string} params.folderId
+ * @param {string} params.name
+ * @param {string} params.mimeType
+ * @param {string} params.content
+ * @param {?Object} [params.existing] - the file already under `name`, when the
+ *   caller has looked it up (null: none); looked up here when omitted
+ * @param {Object} [params.appProperties] - recorded on the file (see ROWS_PROPERTY)
+ * @returns {Promise<string>} File id
  */
-export const uploadTextFile = async (accessToken, { folderId, name, mimeType, content }) => {
-  const existing = await findFileByName(accessToken, folderId, name);
-  if (existing) {
-    const size = utf8ByteLength(content);
-    if (isMuchSmaller(size, existing.size)) {
-      warnRefusedOverwrite(name, size, existing.size);
-      return null;
-    }
-  }
-  const existingId = existing?.id ?? null;
+export const uploadTextFile = async (accessToken, {
+  folderId, name, mimeType, content, existing, appProperties,
+}) => {
+  const current = existing === undefined
+    ? await findFileByName(accessToken, folderId, name)
+    : existing;
+  const existingId = current?.id ?? null;
   const boundary = `penny-${Date.now()}-${Math.random().toString(36).slice(2)}`;
 
   // A PATCH must not carry `parents` — Drive rejects it there and takes moves
@@ -368,6 +407,7 @@ export const uploadTextFile = async (accessToken, { folderId, name, mimeType, co
   const metadata = existingId
     ? { name, mimeType }
     : { name, mimeType, parents: [folderId] };
+  if (appProperties) metadata.appProperties = appProperties;
 
   const body =
     `--${boundary}\r\n` +
@@ -403,21 +443,27 @@ export const uploadTextFile = async (accessToken, { folderId, name, mimeType, co
  * base64 string to build a multipart body is what makes large files run the app
  * out of memory (see the base64 notes in AppUpdateService), and uploadAsync
  * never materialises the file in JS at all.
+ *
+ * A media upload carries no metadata, so on a file that already exists the
+ * `appProperties` go in a metadata PATCH once the bytes have landed; a new
+ * file gets them with its create.
  * @param {string} accessToken
- * @param {{folderId: string, name: string, mimeType: string, fileUri: string}} params
- * @returns {Promise<string|null>} File id, or null when a much larger file
- *   already holds the name and was kept (see SHRINK_GUARD_RATIO)
+ * @param {Object} params
+ * @param {string} params.folderId
+ * @param {string} params.name
+ * @param {string} params.mimeType
+ * @param {string} params.fileUri
+ * @param {?Object} [params.existing] - as for uploadTextFile
+ * @param {Object} [params.appProperties] - as for uploadTextFile
+ * @returns {Promise<string>} File id
  */
-export const uploadBinaryFile = async (accessToken, { folderId, name, mimeType, fileUri }) => {
-  const existing = await findFileByName(accessToken, folderId, name);
-  if (existing) {
-    const { size } = await FileSystem.getInfoAsync(fileUri);
-    if (isMuchSmaller(size, existing.size)) {
-      warnRefusedOverwrite(name, size, existing.size);
-      return null;
-    }
-  }
-  let fileId = existing?.id ?? null;
+export const uploadBinaryFile = async (accessToken, {
+  folderId, name, mimeType, fileUri, existing, appProperties,
+}) => {
+  const current = existing === undefined
+    ? await findFileByName(accessToken, folderId, name)
+    : existing;
+  let fileId = current?.id ?? null;
   // Whether this call is what brought the file into existence, which decides
   // whether a failed upload should take it away again.
   const createdHere = !fileId;
@@ -429,7 +475,9 @@ export const uploadBinaryFile = async (accessToken, { folderId, name, mimeType, 
         Authorization: `Bearer ${accessToken}`,
         'Content-Type': 'application/json',
       },
-      body: JSON.stringify({ name, mimeType, parents: [folderId] }),
+      body: JSON.stringify({
+        name, mimeType, parents: [folderId], ...(appProperties ? { appProperties } : {}),
+      }),
     });
     if (!createResponse.ok) throw await driveError(createResponse);
     ({ id: fileId } = await createResponse.json());
@@ -463,6 +511,18 @@ export const uploadBinaryFile = async (accessToken, { folderId, name, mimeType, 
     });
   }
 
+  if (!createdHere && appProperties) {
+    const metadataResponse = await fetch(`${DRIVE_API}/${fileId}?fields=id`, {
+      method: 'PATCH',
+      headers: {
+        Authorization: `Bearer ${accessToken}`,
+        'Content-Type': 'application/json',
+      },
+      body: JSON.stringify({ appProperties }),
+    });
+    if (!metadataResponse.ok) throw await driveError(metadataResponse);
+  }
+
   return fileId;
 };
 
@@ -474,12 +534,13 @@ export const uploadBinaryFile = async (accessToken, { folderId, name, mimeType, 
  * folder. Only files this service names are ever considered — anything else the
  * user put in the folder is left alone.
  *
- * A file much larger than the group's newest is kept whatever its age: the
- * newest is the dataset as it stands now, and one that small next to an older
- * backup is a fresh install (or a second device on the same account) whose
- * uploads would otherwise push the real backups out one per day. The group can
- * then run past `maxToKeep`, but by at most `maxToKeep` files — the smaller
- * ones keep rotating — and it drains once the newest backup is full-size again.
+ * A file holding much more than the group's newest (see holdsMuchLess) is kept
+ * whatever its age: the newest is the dataset as it stands now, and one that
+ * small next to an older backup is a fresh install (or a second device on the
+ * same account) whose uploads would otherwise push the real backups out one per
+ * day. The group can then run past `maxToKeep`, but by at most `maxToKeep`
+ * files — the smaller ones keep rotating — and it drains once the newest backup
+ * is full-size again.
  * @param {string} accessToken
  * @param {string} folderId
  * @param {string} prefix - 'penny_daily_' or 'penny_weekly_'
@@ -502,10 +563,8 @@ export const cleanupDriveBackups = async (accessToken, folderId, prefix, maxToKe
     const newest = group[group.length - 1];
     const excess = group.slice(0, Math.max(0, group.length - maxToKeep));
     for (const file of excess) {
-      if (isMuchSmaller(newest.size, file.size)) {
-        console.warn(
-          `[DriveBackup] Keeping ${file.name} (${file.size} bytes): the newest backup, ${newest.name}, is ${newest.size}`,
-        );
+      if (holdsMuchLess(newest, file)) {
+        console.warn(`[DriveBackup] Keeping ${file.name}: it holds much more than the newest backup, ${newest.name}`);
         continue;
       }
       await deleteDriveFile(accessToken, file.id, file.name);
@@ -518,56 +577,98 @@ export const cleanupDriveBackups = async (accessToken, folderId, prefix, maxToKe
  *
  * One snapshot serves all three files so the JSON, CSV and database copies of a
  * given day describe the same instant rather than three reads seconds apart.
+ *
+ * Whether it may replace files already under those names is decided once, for
+ * the snapshot as a whole: if ANY of its formats holds much less than the file
+ * it would replace, none is uploaded. Deciding per file let the one format
+ * whose measure misleads (bytes, for a never-vacuumed .db) through while the
+ * others were refused — and that .db then took a real backup's slot.
  * @param {string} accessToken
  * @param {Object} params
  * @returns {Promise<{uploaded: string[], kept: string[]}>} Names of the uploaded
- *   files, and of the ones not uploaded because a much larger file holds the name
+ *   files, and of the ones not uploaded because a much larger backup holds the slot
  */
 const uploadSnapshot = async (accessToken, { folderId, label, backup, formats, onProgress }) => {
-  const uploaded = [];
-  const kept = [];
-  const total = formats.length;
-
-  for (let index = 0; index < formats.length; index += 1) {
-    // Between files, not inside one: a format already uploaded stays uploaded,
-    // and the one being streamed finishes rather than landing truncated.
-    throwIfCancelled();
-
-    const format = formats[index];
+  const rows = countRows(backup);
+  const appProperties = { [ROWS_PROPERTY]: String(rows) };
+  const targets = formats.map((format) => {
     const { ext, mimeType } = FORMAT_META[format];
-    const name = `penny_${label}.${ext}`;
+    return { format, mimeType, name: `penny_${label}.${ext}`, existing: null };
+  });
 
-    onProgress?.({ phase: 'uploading', format, current: index + 1, total, name });
+  // Each built at most once, and only when something needs it — the byte-size
+  // comparison against a file uploaded before ROWS_PROPERTY, or the upload.
+  const contents = new Map();
+  const contentOf = (format) => {
+    if (!contents.has(format)) {
+      contents.set(format, format === 'json' ? JSON.stringify(backup) : buildCombinedCSV(backup));
+    }
+    return contents.get(format);
+  };
+  let stagedUri = null;
+  const stageDatabase = async (name) => {
+    if (stagedUri) return stagedUri;
+    // Staged on disk: the upload streams from a file, and copying the live
+    // database also gets the WAL checkpointed into it.
+    const dirInfo = await FileSystem.getInfoAsync(STAGING_DIR);
+    if (!dirInfo.exists) {
+      await FileSystem.makeDirectoryAsync(STAGING_DIR, { intermediates: true });
+    }
+    stagedUri = `${STAGING_DIR}${name}`;
+    await writeSQLiteSnapshot(stagedUri);
+    return stagedUri;
+  };
+  const localBytes = async (target) => (target.format === 'sqlite'
+    ? (await FileSystem.getInfoAsync(await stageDatabase(target.name))).size
+    : utf8ByteLength(contentOf(target.format)));
 
-    let fileId;
-
-    if (format === 'sqlite') {
-      // Staged on disk first: the upload streams from a file, and copying the
-      // live database also gets the WAL checkpointed into it.
-      const dirInfo = await FileSystem.getInfoAsync(STAGING_DIR);
-      if (!dirInfo.exists) {
-        await FileSystem.makeDirectoryAsync(STAGING_DIR, { intermediates: true });
-      }
-      const stagedUri = `${STAGING_DIR}${name}`;
-      try {
-        await writeSQLiteSnapshot(stagedUri);
-        fileId = await uploadBinaryFile(accessToken, { folderId, name, mimeType, fileUri: stagedUri });
-      } finally {
-        // Always reclaim the staged copy, including when the upload threw —
-        // a whole database left behind on every failed run adds up fast.
-        await FileSystem.deleteAsync(stagedUri, { idempotent: true }).catch(() => {});
-      }
-    } else {
-      const content = format === 'json'
-        ? JSON.stringify(backup)
-        : buildCombinedCSV(backup);
-      fileId = await uploadTextFile(accessToken, { folderId, name, mimeType, content });
+  try {
+    throwIfCancelled();
+    for (const target of targets) {
+      target.existing = await findFileByName(accessToken, folderId, target.name);
     }
 
-    (fileId ? uploaded : kept).push(name);
-  }
+    for (const target of targets) {
+      if (!target.existing) continue;
+      const remoteRows = rowsOf(target.existing);
+      const refused = remoteRows !== null
+        ? isMuchSmaller(rows, remoteRows)
+        : isMuchSmaller(await localBytes(target), target.existing.size);
+      if (refused) {
+        const measure = remoteRows !== null
+          ? `${remoteRows} rows against ${rows}`
+          : `${target.existing.size} bytes`;
+        console.warn(`[DriveBackup] Keeping the ${label} backup in Drive: ${target.name} holds much more (${measure})`);
+        return { uploaded: [], kept: targets.map(t => t.name) };
+      }
+    }
 
-  return { uploaded, kept };
+    const uploaded = [];
+    for (let index = 0; index < targets.length; index += 1) {
+      // Between files, not inside one: a format already uploaded stays uploaded,
+      // and the one being streamed finishes rather than landing truncated.
+      throwIfCancelled();
+
+      const { format, mimeType, name, existing } = targets[index];
+      onProgress?.({ phase: 'uploading', format, current: index + 1, total: targets.length, name });
+
+      if (format === 'sqlite') {
+        const fileUri = await stageDatabase(name);
+        await uploadBinaryFile(accessToken, { folderId, name, mimeType, fileUri, existing, appProperties });
+      } else {
+        await uploadTextFile(accessToken, {
+          folderId, name, mimeType, content: contentOf(format), existing, appProperties,
+        });
+        contents.delete(format);
+      }
+      uploaded.push(name);
+    }
+    return { uploaded, kept: [] };
+  } finally {
+    // Always reclaim the staged copy, including when the upload threw — a
+    // whole database left behind on every failed run adds up fast.
+    if (stagedUri) await FileSystem.deleteAsync(stagedUri, { idempotent: true }).catch(() => {});
+  }
 };
 
 // True while a run is in flight. The guard lives here rather than in the React
