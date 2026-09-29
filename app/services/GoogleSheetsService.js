@@ -817,14 +817,15 @@ const getSheetTitles = async (accessToken, spreadsheetId) => {
 };
 
 /**
- * Every tab's title → sheetId. One metadata read serves both jobs the export
- * needs it for: knowing which tabs are missing, and knowing the IDs to hang the
- * basic filters on.
+ * Every tab's title → its properties. One metadata read serves every job the
+ * export needs it for: knowing which tabs are missing, the IDs to hang the basic
+ * filters on, and each tab's grid size, which bounds the stale area cleared
+ * after the write.
  * @param {string} accessToken
  * @param {string} spreadsheetId
- * @returns {Promise<Map<string, number>>}
+ * @returns {Promise<Map<string, Object>>}
  */
-const getSheetIdsByTitle = async (accessToken, spreadsheetId) => {
+const getSheetsByTitle = async (accessToken, spreadsheetId) => {
   const response = await fetch(
     `${SHEETS_API}/${spreadsheetId}?fields=sheets.properties`,
     { headers: { Authorization: `Bearer ${accessToken}` } },
@@ -845,19 +846,19 @@ const getSheetIdsByTitle = async (accessToken, spreadsheetId) => {
     throw new Error(data.error?.message || 'get_sheet_ids_failed');
   }
   const data = await response.json();
-  return new Map((data.sheets || []).map(s => [s.properties?.title, s.properties?.sheetId]));
+  return new Map((data.sheets || []).map(s => [s.properties?.title, s.properties]));
 };
 
 /**
- * Create any of `sheetNames` the spreadsheet is missing, returning the IDs of the
- * ones created. A no-op when it already has them all, which is the usual case —
- * this exists for the spreadsheet a user has been exporting into since before the
- * newest tab was added, where naming an absent tab in a batchClear range fails
+ * Create any of `sheetNames` the spreadsheet is missing, returning the properties
+ * of the ones created. A no-op when it already has them all, which is the usual
+ * case — this exists for the spreadsheet a user has been exporting into since
+ * before the newest tab was added, where naming an absent tab in a range fails
  * the whole call with a 400.
  * @param {string} accessToken
  * @param {string} spreadsheetId
  * @param {Array<string>} missing
- * @returns {Promise<Map<string, number>>}
+ * @returns {Promise<Map<string, Object>>}
  */
 const addSheets = async (accessToken, spreadsheetId, missing) => {
   const response = await fetch(`${SHEETS_API}/${spreadsheetId}:batchUpdate`, {
@@ -884,7 +885,7 @@ const addSheets = async (accessToken, spreadsheetId, missing) => {
   const added = new Map();
   for (const reply of data.replies || []) {
     const properties = reply.addSheet?.properties;
-    if (properties?.title != null) added.set(properties.title, properties.sheetId);
+    if (properties?.title != null) added.set(properties.title, properties);
   }
   return added;
 };
@@ -934,6 +935,45 @@ const clearSheets = async (accessToken, spreadsheetId, ranges) => {
   await response.json().catch(() => {});
 };
 
+// Widest row of a tab's values — the header, in every tab the export builds.
+const sheetWidth = values => values.reduce((width, row) => Math.max(width, row.length), 0);
+
+// 1 → A, 26 → Z, 27 → AA.
+const columnLetter = (index) => {
+  let letters = '';
+  for (let n = index; n > 0; n = Math.floor((n - 1) / 26)) {
+    letters = String.fromCharCode(65 + ((n - 1) % 26)) + letters;
+  }
+  return letters;
+};
+
+/**
+ * What a previous, larger export left on each tab past this one's data: the
+ * rows below it and the columns right of it. The export writes first and clears
+ * only this afterwards, so a write that fails (quota, a dropped connection)
+ * leaves the previous export in place instead of a spreadsheet of empty tabs —
+ * which the import refuses, taking the only off-device copy with it.
+ * Bounded by each tab's grid size from the metadata read.
+ * @param {Array<{range: string, values: Array<Array>}>} sheets
+ * @param {Map<string, Object>} sheetByTitle
+ * @returns {Array<string>}
+ */
+const staleRanges = (sheets, sheetByTitle) => {
+  const ranges = [];
+  for (const { range, values } of sheets) {
+    const title = range.split('!')[0];
+    const grid = sheetByTitle.get(title)?.gridProperties;
+    if (!grid) continue;
+    const tab = `'${title.replace(/'/g, '\'\'')}'`;
+    const width = sheetWidth(values);
+    if (grid.rowCount > values.length) ranges.push(`${tab}!${values.length + 1}:${grid.rowCount}`);
+    if (grid.columnCount > width) {
+      ranges.push(`${tab}!${columnLetter(width + 1)}:${columnLetter(grid.columnCount)}`);
+    }
+  }
+  return ranges;
+};
+
 const writeSheets = async (accessToken, spreadsheetId, sheets) => {
   const response = await fetch(`${SHEETS_API}/${spreadsheetId}/values:batchUpdate`, {
     method: 'POST',
@@ -943,7 +983,16 @@ const writeSheets = async (accessToken, spreadsheetId, sheets) => {
     },
     body: JSON.stringify({
       valueInputOption: 'RAW',
-      data: sheets.map(s => ({ range: s.range, values: s.values })),
+      // Every cell of each block carries a value. The tab is no longer cleared
+      // before the write, and the API skips a null (or a row's missing tail)
+      // rather than emptying it — the old export's value would show through.
+      data: sheets.map(s => {
+        const width = sheetWidth(s.values);
+        return {
+          range: s.range,
+          values: s.values.map(row => Array.from({ length: width }, (_, i) => row[i] ?? '')),
+        };
+      }),
     }),
   });
   if (!response.ok) {
@@ -963,7 +1012,7 @@ const writeSheets = async (accessToken, spreadsheetId, sheets) => {
  * @param {string} accessToken - Valid Google OAuth access token
  * @param {Object} backup - Backup object from createBackup()
  * @param {Function} [onProgress] - Optional callback({ step, status }) for progress reporting.
- *   Steps: 'connect' | 'clear' | 'write'. Statuses: 'in_progress' | 'completed'.
+ *   Steps: 'connect' | 'write' | 'clear', in that order. Statuses: 'in_progress' | 'completed'.
  * @returns {Promise<string>} URL of the spreadsheet
  */
 export const exportToSheets = async (accessToken, backup, onProgress) => {
@@ -973,13 +1022,13 @@ export const exportToSheets = async (accessToken, backup, onProgress) => {
   let spreadsheetId = await getPreference(PREF_KEYS.GOOGLE_SHEETS_SPREADSHEET_ID);
   // One metadata read up front, before anything names a range: a spreadsheet
   // from an older build lacks the newest tabs, and naming an absent one in a
-  // batchClear range fails the entire call. The same read supplies the sheet IDs
-  // the filters need at the end, and tells whether the stored spreadsheet can
-  // still be opened at all.
-  let sheetIdByTitle = null;
+  // range fails the entire call. The same read supplies the sheet IDs the
+  // filters need, the grid sizes that bound the stale-area clear, and tells
+  // whether the stored spreadsheet can still be opened at all.
+  let sheetByTitle = null;
   if (spreadsheetId) {
     try {
-      sheetIdByTitle = await getSheetIdsByTitle(accessToken, spreadsheetId);
+      sheetByTitle = await getSheetsByTitle(accessToken, spreadsheetId);
     } catch (error) {
       if (error.message !== 'spreadsheet_not_found') throw error;
       // The stored spreadsheet was deleted, or belongs to another Google
@@ -991,29 +1040,34 @@ export const exportToSheets = async (accessToken, backup, onProgress) => {
   if (!spreadsheetId) {
     spreadsheetId = await createSpreadsheet(accessToken);
     await setPreference(PREF_KEYS.GOOGLE_SHEETS_SPREADSHEET_ID, spreadsheetId);
-    sheetIdByTitle = await getSheetIdsByTitle(accessToken, spreadsheetId);
+    sheetByTitle = await getSheetsByTitle(accessToken, spreadsheetId);
   }
   report('connect', 'completed');
 
   const sheets = buildSheetsData(backup);
   const sheetNames = sheets.map(s => s.range.split('!')[0]);
 
-  report('clear', 'in_progress');
-  const missing = sheetNames.filter(name => !sheetIdByTitle.has(name));
+  // Write first, clear after. Clearing every tab up front meant a write that
+  // failed left the whole spreadsheet empty; now the old rows are only ever
+  // overwritten, and just the part the new data doesn't reach is cleared once
+  // it is safely in.
+  report('write', 'in_progress');
+  const missing = sheetNames.filter(name => !sheetByTitle.has(name));
   if (missing.length > 0) {
     const added = await addSheets(accessToken, spreadsheetId, missing);
-    for (const [title, id] of added) sheetIdByTitle.set(title, id);
+    for (const [title, properties] of added) sheetByTitle.set(title, properties);
   }
-  await clearSheets(accessToken, spreadsheetId, sheetNames);
-  report('clear', 'completed');
-
-  report('write', 'in_progress');
   await writeSheets(accessToken, spreadsheetId, sheets);
   const sheetIds = sheetNames
-    .map(name => sheetIdByTitle.get(name))
+    .map(name => sheetByTitle.get(name)?.sheetId)
     .filter(id => id !== undefined);
   await applyFilters(accessToken, spreadsheetId, sheetIds);
   report('write', 'completed');
+
+  report('clear', 'in_progress');
+  const stale = staleRanges(sheets, sheetByTitle);
+  if (stale.length > 0) await clearSheets(accessToken, spreadsheetId, stale);
+  report('clear', 'completed');
 
   return `https://docs.google.com/spreadsheets/d/${spreadsheetId}`;
 };
