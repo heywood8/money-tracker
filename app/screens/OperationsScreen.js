@@ -1073,6 +1073,21 @@ const OperationsScreen = () => {
     // Determine multi-currency status using effective account IDs (including overrides)
     const effectiveSourceAccount = accounts.find(acc => acc.id === operationData.accountId);
     const effectiveDestAccount = accounts.find(acc => acc.id === operationData.toAccountId);
+
+    // The form's rate and destination amount were synced (QuickAddRateSync) for
+    // ITS target account. A target chip books to another one: if that target's
+    // currency differs, those values belong to the old pair. Kept, a USD → EUR
+    // rate of 0.92 booked a 100 USD transfer to an AMD account as 92 AMD, and a
+    // same-currency target was credited the old EUR figure.
+    const formDestAccount = accounts.find(acc => acc.id === formValues.toAccountId);
+    if (
+      overrideToAccountId !== undefined
+      && overrideToAccountId !== formValues.toAccountId
+      && formDestAccount?.currency !== effectiveDestAccount?.currency
+    ) {
+      operationData.exchangeRate = '';
+      operationData.destinationAmount = '';
+    }
     const effectiveIsMultiCurrency = operationData.type === 'transfer'
       && effectiveSourceAccount
       && effectiveDestAccount
@@ -1184,6 +1199,11 @@ const OperationsScreen = () => {
       } else if (effectiveSourceAccount) {
         // Format amount for same-currency operations
         operationData.amount = Currency.formatAmount(operationData.amount, effectiveSourceAccount.currency);
+        // A same-currency operation carries no conversion. The form can still
+        // hold one computed for another target (see above), and a leftover
+        // destinationAmount is what the balance layer credits the target with.
+        operationData.exchangeRate = '';
+        operationData.destinationAmount = '';
       }
     }
 
