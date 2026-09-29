@@ -512,6 +512,9 @@ export default function AccountsScreen({ onBackStateChange, tabKey = 'Accounts' 
   // keeps the form panel open until the write actually succeeds.
   const [saving, setSaving] = useState(false);
   const savingRef = useRef(false);
+  // The balance an edit form opened with, as shown. Saving sends a balance only
+  // when the user changed it — see saveEdit.
+  const openedBalanceRef = useRef(null);
   // Pinned default account for QuickAdd. A single stored id (or null = "latest
   // used"), so making one account the default inherently clears any previous one.
   const [defaultAccountId, setDefaultAccountIdState] = useState(null);
@@ -616,6 +619,7 @@ export default function AccountsScreen({ onBackStateChange, tabKey = 'Accounts' 
     }
     setErrors({});
     setCreateAdjustmentOperation(true);
+    openedBalanceRef.current = balance;
     openFormPanel(id, { ...acc, balance });
   }, [accounts, openFormPanel]);
 
@@ -636,7 +640,15 @@ export default function AccountsScreen({ onBackStateChange, tabKey = 'Accounts' 
       if (editingId === 'new') {
         await addAccount(editValues);
       } else {
-        await updateAccount(editingId, editValues, createAdjustmentOperation);
+        // The form holds the balance as it was when it opened. Sent back on a
+        // plain rename, it undid whatever was booked meanwhile (a bank
+        // notification, an edit elsewhere): the context saw 1000 against a live
+        // 950 and booked a +50 adjustment. The form also shows a whole-unit
+        // balance truncated (1500.50 RUB as 1500), which turned a rename into a
+        // -0.50 adjustment. An untouched balance is therefore left out.
+        const { balance, ...otherValues } = editValues;
+        const balanceEdited = String(balance ?? '') !== String(openedBalanceRef.current ?? '');
+        await updateAccount(editingId, balanceEdited ? editValues : otherValues, createAdjustmentOperation);
       }
       closeFormPanel();
     } catch {
@@ -1174,6 +1186,7 @@ export default function AccountsScreen({ onBackStateChange, tabKey = 'Accounts' 
             ) : (
               <PaperTextInput
                 ref={balanceInputRef}
+                testID="account-balance-input"
                 mode="outlined"
                 theme={paperInputTheme}
                 value={editValues.balance}
