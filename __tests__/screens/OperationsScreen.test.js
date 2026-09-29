@@ -1391,15 +1391,15 @@ describe('OperationsScreen', () => {
       expect(getByTestId('quick-add-form').props.saving).toBe(false);
     });
 
-    it('keeps the typed entry when a category chip is tapped during a pending save', async () => {
+    it('books a category chip tapped during a pending save once that save ends', async () => {
       const OperationsScreen = require('../../app/screens/OperationsScreen').default;
       const { useOperationsData } = require('../../app/contexts/OperationsDataContext');
       const { useOperationsActions } = require('../../app/contexts/OperationsActionsContext');
       const { useAccountsData } = require('../../app/contexts/AccountsDataContext');
       const useQuickAddForm = require('../../app/hooks/useQuickAddForm');
 
-      let resolveWrite;
-      const mockAddOperation = jest.fn(() => new Promise((resolve) => { resolveWrite = resolve; }));
+      const pendingWrites = [];
+      const mockAddOperation = jest.fn(() => new Promise((resolve) => { pendingWrites.push(resolve); }));
       const mockResetForm = jest.fn();
       useQuickAddForm.mockReturnValue({
         quickAddValues: { type: 'expense', amount: '100', accountId: 'acc-1', categoryId: 'cat-1' },
@@ -1431,22 +1431,89 @@ describe('OperationsScreen', () => {
 
       const { getByTestId } = await render(<OperationsScreen />);
 
-      let pending;
+      let first;
+      let chip;
       await act(async () => {
-        pending = getByTestId('quick-add-form').props.handleQuickAdd();
+        first = getByTestId('quick-add-form').props.handleQuickAdd();
       });
       await act(async () => {
-        await getByTestId('quick-add-form').props.onAutoAddWithCategory('cat-2');
+        chip = getByTestId('quick-add-form').props.onAutoAddWithCategory('cat-2');
       });
-
-      // The refused tap left the form alone, so the next one books the entry.
-      expect(mockResetForm).not.toHaveBeenCalled();
+      // Waiting its turn, not refused.
       expect(mockAddOperation).toHaveBeenCalledTimes(1);
 
       await act(async () => {
-        resolveWrite({ id: 'op-1' });
-        await pending;
+        pendingWrites[0]({ id: 'op-1' });
+        await first;
       });
+      await act(async () => {
+        pendingWrites[1]({ id: 'op-2' });
+        await chip;
+      });
+
+      expect(mockAddOperation).toHaveBeenCalledTimes(2);
+      expect(mockAddOperation.mock.calls[1][0]).toEqual(expect.objectContaining({ amount: '100', categoryId: 'cat-2' }));
+      // Cleared once, by the chip itself when it was tapped (the first save's
+      // own reset is the Add button's); the chip's save does not clear the
+      // form again, which by then holds whatever the user typed next.
+      expect(mockResetForm).toHaveBeenCalledTimes(2);
+    });
+
+    it('ignores a chip tapped twice while its save runs', async () => {
+      const OperationsScreen = require('../../app/screens/OperationsScreen').default;
+      const { useOperationsData } = require('../../app/contexts/OperationsDataContext');
+      const { useOperationsActions } = require('../../app/contexts/OperationsActionsContext');
+      const { useAccountsData } = require('../../app/contexts/AccountsDataContext');
+      const useQuickAddForm = require('../../app/hooks/useQuickAddForm');
+
+      const store = makeMockQuickAddStore({ type: 'expense', amount: '100', accountId: 'acc-1', categoryId: '' });
+      const pendingWrites = [];
+      const mockAddOperation = jest.fn(() => new Promise((resolve) => { pendingWrites.push(resolve); }));
+      useQuickAddForm.mockReturnValue({
+        quickAddValues: store.getSnapshot(),
+        quickAddValuesStore: store,
+        setQuickAddValues: jest.fn(),
+        getAccountName: jest.fn(() => 'Cash'),
+        getAccountBalance: jest.fn(() => '$1000.00'),
+        getCategoryInfo: jest.fn(() => ({ name: 'Food', icon: 'food' })),
+        getCategoryName: jest.fn(() => 'Food'),
+        filteredCategories: [],
+        // The real reset empties the amount.
+        resetForm: jest.fn(() => store.setValues(v => ({ ...v, amount: '' }))),
+        clearDate: jest.fn(),
+      });
+      useAccountsData.mockReturnValue({
+        accounts: [{ id: 'acc-1', currency: 'USD' }],
+        visibleAccounts: [{ id: 'acc-1', currency: 'USD' }],
+        loading: false,
+      });
+      useOperationsData.mockReturnValue({
+        operations: [], loading: false, loadingMore: false, hasMoreOperations: false,
+      });
+      const validateOperation = jest.fn(() => null);
+      useOperationsActions.mockReturnValue({
+        deleteOperation: jest.fn(),
+        addOperation: mockAddOperation,
+        validateOperation,
+        loadMoreOperations: jest.fn(),
+        jumpToDate: jest.fn(),
+      });
+
+      const { getByTestId } = await render(<OperationsScreen />);
+
+      let first;
+      let second;
+      await act(async () => {
+        first = getByTestId('quick-add-form').props.onAutoAddWithCategory('cat-2');
+        second = getByTestId('quick-add-form').props.onAutoAddWithCategory('cat-2');
+      });
+      await act(async () => {
+        pendingWrites.forEach(resolve => resolve({ id: 'op-1' }));
+        await Promise.all([first, second]);
+      });
+
+      expect(mockAddOperation).toHaveBeenCalledTimes(1);
+      expect(validateOperation).toHaveBeenCalledTimes(1);
     });
   });
 
