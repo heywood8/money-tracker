@@ -375,6 +375,24 @@ describe('SplitOperationModal', () => {
         expect(onConfirm).toHaveBeenCalledWith('30.00', 'cat-1');
       });
     });
+
+    // A refused split (e.g. a remainder that rounds to nothing) used to reach
+    // only console.error, leaving the sheet open with no explanation.
+    it('shows the reason when the split is refused', async () => {
+      const onConfirm = jest.fn(async () => ({ success: false, error: 'Split amount must be less than the original' }));
+      const { getByTestId, getByText } = await render(
+        <SplitOperationModal {...defaultProps} onConfirm={onConfirm} />,
+      );
+
+      await fireEvent.changeText(getByTestId('split-amount-input'), '30.00');
+      await fireEvent.press(getByTestId('category-picker-button'));
+      await fireEvent.press(getByText('Food'));
+      await fireEvent.press(getByTestId('confirm-button'));
+
+      await waitFor(() => {
+        expect(getByTestId('error-message').props.children).toBe('Split amount must be less than the original');
+      });
+    });
   });
 
   describe('Decimal Separator Normalization (QoL-2)', () => {

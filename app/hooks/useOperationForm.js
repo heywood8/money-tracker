@@ -77,6 +77,8 @@ const useOperationForm = ({
   // True while handleSave is in flight — see the guard in handleSave.
   const [isSaving, setIsSaving] = useState(false);
   const savingRef = useRef(false);
+  // True while handleSplit's DB write is in flight — see the guard there.
+  const splittingRef = useRef(false);
   const [lastEditedField, setLastEditedField] = useState(null);
   const [rateSource, setRateSource] = useState('offline');
 
@@ -691,6 +693,12 @@ const useOperationForm = ({
     if (!operation || isNew) {
       return { success: false, error: 'Cannot split new operations' };
     }
+    // A second tap while the first split is still writing read the same
+    // pre-split amount: both calls set the original to 70 and each inserted a
+    // 30 row, charging the account an extra 30. Ignore it (no error to show).
+    if (splittingRef.current) {
+      return { success: false, error: null };
+    }
 
     const currency = sourceAccount?.currency;
 
@@ -710,6 +718,7 @@ const useOperationForm = ({
       return { success: false, error: t('split_amount_error') };
     }
 
+    splittingRef.current = true;
     try {
       // Format both amounts to the account currency's decimal precision before persisting.
       // splitAmount is a raw calculator string; the remainder must also be formatted so
@@ -747,6 +756,8 @@ const useOperationForm = ({
     } catch (error) {
       console.error('[useOperationForm] Failed to split operation:', error);
       return { success: false, error: t('error') };
+    } finally {
+      splittingRef.current = false;
     }
   }, [operation, isNew, values, splitOperation, t, setValues, sourceAccount]);
 

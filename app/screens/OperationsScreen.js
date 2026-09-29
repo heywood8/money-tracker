@@ -1302,6 +1302,11 @@ const OperationsScreen = () => {
 
   // Handler for auto-add with category (from picker)
   const handleAutoAddWithCategory = useCallback(async (categoryId) => {
+    // The chips stay tappable while an earlier save is in flight, and
+    // handleQuickAdd refuses a second one. Checked before the form is cleared,
+    // or the entry the user just typed was wiped and never saved. Left as is,
+    // the next tap books it.
+    if (quickAddSavingRef.current) return;
     // Capture BEFORE clearing: the form is cleared immediately so the user never
     // sees stale values during the save, and the store makes that clear visible
     // at once.
@@ -1315,6 +1320,8 @@ const OperationsScreen = () => {
 
   // Handler for auto-add with target account (from transfer target shortcuts)
   const handleAutoAddWithAccount = useCallback(async (toAccountId) => {
+    // Refused before the reset while a save is in flight, as above.
+    if (quickAddSavingRef.current) return;
     // Captured before the reset, for the same reason as above.
     const capturedValues = quickAddValuesStore.getSnapshot();
     resetForm();

@@ -397,15 +397,14 @@ export default function OperationModal({
     && !isForeignCurrencyOp && Currency.isPositiveAmount(splitBaseAmount);
 
   // Handle split confirmation
+  // The result goes back to the split sheet, which shows a refusal (e.g. a
+  // remainder that rounds to nothing) instead of staying open silently.
   const handleSplitConfirm = useCallback(async (splitAmount, categoryId) => {
     const result = await handleSplit(splitAmount, categoryId);
     if (result.success) {
-      // Keep modal open with updated amount - user can split again
       setShowSplitModal(false);
-    } else {
-      // Show error (dialog is handled inside handleSplit if needed)
-      console.error('[OperationModal] Split failed:', result.error);
     }
+    return result;
   }, [handleSplit]);
 
   // Memoize calculator amount change handler for performance

@@ -1390,6 +1390,64 @@ describe('OperationsScreen', () => {
 
       expect(getByTestId('quick-add-form').props.saving).toBe(false);
     });
+
+    it('keeps the typed entry when a category chip is tapped during a pending save', async () => {
+      const OperationsScreen = require('../../app/screens/OperationsScreen').default;
+      const { useOperationsData } = require('../../app/contexts/OperationsDataContext');
+      const { useOperationsActions } = require('../../app/contexts/OperationsActionsContext');
+      const { useAccountsData } = require('../../app/contexts/AccountsDataContext');
+      const useQuickAddForm = require('../../app/hooks/useQuickAddForm');
+
+      let resolveWrite;
+      const mockAddOperation = jest.fn(() => new Promise((resolve) => { resolveWrite = resolve; }));
+      const mockResetForm = jest.fn();
+      useQuickAddForm.mockReturnValue({
+        quickAddValues: { type: 'expense', amount: '100', accountId: 'acc-1', categoryId: 'cat-1' },
+        quickAddValuesStore: makeMockQuickAddStore({ type: 'expense', amount: '100', accountId: 'acc-1', categoryId: 'cat-1' }),
+        setQuickAddValues: jest.fn(),
+        getAccountName: jest.fn(() => 'Cash'),
+        getAccountBalance: jest.fn(() => '$1000.00'),
+        getCategoryInfo: jest.fn(() => ({ name: 'Food', icon: 'food' })),
+        getCategoryName: jest.fn(() => 'Food'),
+        filteredCategories: [],
+        resetForm: mockResetForm,
+        clearDate: jest.fn(),
+      });
+      useAccountsData.mockReturnValue({
+        accounts: [{ id: 'acc-1', currency: 'USD' }],
+        visibleAccounts: [{ id: 'acc-1', currency: 'USD' }],
+        loading: false,
+      });
+      useOperationsData.mockReturnValue({
+        operations: [], loading: false, loadingMore: false, hasMoreOperations: false,
+      });
+      useOperationsActions.mockReturnValue({
+        deleteOperation: jest.fn(),
+        addOperation: mockAddOperation,
+        validateOperation: jest.fn(() => null),
+        loadMoreOperations: jest.fn(),
+        jumpToDate: jest.fn(),
+      });
+
+      const { getByTestId } = await render(<OperationsScreen />);
+
+      let pending;
+      await act(async () => {
+        pending = getByTestId('quick-add-form').props.handleQuickAdd();
+      });
+      await act(async () => {
+        await getByTestId('quick-add-form').props.onAutoAddWithCategory('cat-2');
+      });
+
+      // The refused tap left the form alone, so the next one books the entry.
+      expect(mockResetForm).not.toHaveBeenCalled();
+      expect(mockAddOperation).toHaveBeenCalledTimes(1);
+
+      await act(async () => {
+        resolveWrite({ id: 'op-1' });
+        await pending;
+      });
+    });
   });
 
   describe('Quick-add date chip (issue #1713)', () => {
