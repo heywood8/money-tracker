@@ -21,6 +21,7 @@ import {
   setDriveBackupFormats,
   BACKUP_FORMATS,
   MAX_DAILY_BACKUPS,
+  MAX_WEEKLY_BACKUPS,
   DAILY_PROTECTION_DAYS,
   WEEKLY_PROTECTION_DAYS,
   DRIVE_BACKUP_PROGRESS_EVENT,
@@ -918,45 +919,94 @@ describe('GoogleDriveBackupService', () => {
       expect(deleted).toEqual(['day-1']);
     });
 
-    it('lets a much larger daily go once it is past the protection period', async () => {
-      // A shrink that lasts — the user really did start over — must not keep
-      // the old dailies forever. Today is 2026-02-26: 2026-01-20 is 37 days back.
-      const files = [
-        { id: 'old-jan-20', name: 'penny_daily_2026-01-20.json', size: FULL_SIZE },
-        { id: 'old-feb-01', name: 'penny_daily_2026-02-01.json', size: FULL_SIZE },
-        ...dailyFiles(20, 26, '2048', 'small'),
-      ];
+    // Every backup in `files` routed as the folder listing; returns what rotation deleted.
+    const rotate = async (files, prefix, maxToKeep, protectDays) => {
       const deleted = [];
       routeFetch([
         { method: 'GET', match: (u) => u.includes('q='), body: { files } },
         { method: 'DELETE', match: (u) => { deleted.push(u.split('/').pop()); return true; }, body: {} },
       ]);
+      await cleanupDriveBackups('token-abc', FOLDER_ID, prefix, maxToKeep, protectDays);
+      return deleted;
+    };
+    const dated = (id, date, size, ext = 'json') => ({ id, name: `penny_daily_${date}.${ext}`, size });
+    const days = (month, from, to, size, idPrefix) => {
+      const list = [];
+      for (let day = from; day <= to; day += 1) {
+        list.push(dated(`${idPrefix}-${month}-${day}`, `2026-${month}-${String(day).padStart(2, '0')}`, size));
+      }
+      return list;
+    };
+    // ISO weeks counted back from this one, 2026-W09 (2025 has 52 of them).
+    const weekBefore = (offset) => {
+      let year = 2026;
+      let week = 9 - offset;
+      while (week < 1) { year -= 1; week += 52; }
+      return `${year}-W${String(week).padStart(2, '0')}`;
+    };
+    const weeklies = (fromOffset, toOffset, size, idPrefix) => {
+      const list = [];
+      for (let offset = fromOffset; offset <= toOffset; offset += 1) {
+        list.push({ id: `${idPrefix}-${offset}`, name: `penny_weekly_${weekBefore(offset)}.json`, size });
+      }
+      return list;
+    };
 
-      await cleanupDriveBackups('token-abc', FOLDER_ID, 'penny_daily_', MAX_DAILY_BACKUPS, DAILY_PROTECTION_DAYS);
+    it('counts the protection from when the shrink began, not from each file\'s age', async () => {
+      // Full-size dailies up to 2026-02-18, 8 days before today: the shrink began
+      // then, so every one of them is kept — January's too, though each is more
+      // than 30 days old by itself.
+      const files = [...days('01', 10, 31, FULL_SIZE, 'old'), ...days('02', 1, 18, FULL_SIZE, 'old'), ...days('02', 19, 26, '2048', 'small')];
 
-      // 25 days back is still protected.
-      expect(deleted).toEqual(['old-jan-20']);
+      const deleted = await rotate(files, 'penny_daily_', MAX_DAILY_BACKUPS, DAILY_PROTECTION_DAYS);
+
+      expect(deleted).toEqual(['small-02-19']);
     });
 
-    it('protects a much larger weekly for twelve weeks, then lets it go', async () => {
-      // Today is in 2026-W09: 2025-W48 began 13 weeks before it, 2026-W01 8.
-      const weekly = (id, week, size) => ({ id, name: `penny_weekly_${week}.json`, size });
-      const files = [
-        weekly('old-w48', '2025-W48', FULL_SIZE),
-        weekly('old-w01', '2026-W01', FULL_SIZE),
-        ...['2026-W02', '2026-W03', '2026-W04', '2026-W05', '2026-W06', '2026-W07', '2026-W08', '2026-W09']
-          .map(week => weekly(`small-${week}`, week, '2048')),
-      ];
-      const deleted = [];
-      routeFetch([
-        { method: 'GET', match: (u) => u.includes('q='), body: { files } },
-        { method: 'DELETE', match: (u) => { deleted.push(u.split('/').pop()); return true; }, body: {} },
-      ]);
+    it('lets the larger dailies go once the shrink is older than the protection period', async () => {
+      // The last full-size daily is 2026-01-20, 37 days ago.
+      const files = [...days('01', 10, 20, FULL_SIZE, 'old'), ...days('02', 20, 26, '2048', 'small')];
 
-      // A window of 8 so the two large weeklies are both past it.
-      await cleanupDriveBackups('token-abc', FOLDER_ID, 'penny_weekly_', 8, WEEKLY_PROTECTION_DAYS);
+      const deleted = await rotate(files, 'penny_daily_', MAX_DAILY_BACKUPS, DAILY_PROTECTION_DAYS);
 
-      expect(deleted).toEqual(['old-w48']);
+      expect(deleted.sort()).toEqual(days('01', 10, 20, FULL_SIZE, 'old').map(f => f.id).sort());
+    });
+
+    it('protects larger weeklies past the real window while the shrink is under twelve weeks old', async () => {
+      // 20 full-size weeklies up to 6 weeks ago, then 5 small ones. The 10 past
+      // the 15-file window are each over 15 weeks old; judged by their own age
+      // none could ever be protected.
+      const files = [...weeklies(6, 25, FULL_SIZE, 'old'), ...weeklies(0, 4, '2048', 'small')];
+
+      const deleted = await rotate(files, 'penny_weekly_', MAX_WEEKLY_BACKUPS, WEEKLY_PROTECTION_DAYS);
+
+      expect(deleted).toEqual([]);
+    });
+
+    it('lets the larger weeklies go once the shrink is over twelve weeks old', async () => {
+      // The last full-size weekly is 13 weeks back.
+      const files = [...weeklies(13, 32, FULL_SIZE, 'old'), ...weeklies(0, 4, '2048', 'small')];
+
+      const deleted = await rotate(files, 'penny_weekly_', MAX_WEEKLY_BACKUPS, WEEKLY_PROTECTION_DAYS);
+
+      expect(deleted.sort()).toEqual(weeklies(23, 32, FULL_SIZE, 'old').map(f => f.id).sort());
+    });
+
+    it('keeps every format of a day whose backup is protected in any format', async () => {
+      // The JSON carries row counts and shows the shrink; the database predates
+      // them, and its bytes barely moved. Rotating the .db out beside its kept
+      // JSON would leave half a backup for that day.
+      const json = (day, rows) => ({
+        id: `json-${day}`, name: `penny_daily_2026-02-0${day}.json`, size: '1000', appProperties: { pennyRows: rows },
+      });
+      const db = (day, size) => ({ id: `db-${day}`, name: `penny_daily_2026-02-0${day}.db`, size });
+      const files = [];
+      for (let day = 1; day <= 7; day += 1) files.push(json(day, '1000'), db(day, '300000'));
+      files.push(json(8, '3'), db(8, '200000'));
+
+      const deleted = await rotate(files, 'penny_daily_', MAX_DAILY_BACKUPS, DAILY_PROTECTION_DAYS);
+
+      expect(deleted).toEqual([]);
     });
 
     it('rotates the old files normally once the newest backup is full-size again', async () => {

@@ -40,9 +40,9 @@ export const MAX_DAILY_BACKUPS = 7;
 export const MAX_WEEKLY_BACKUPS = 15;
 
 /**
- * How long, from the date in its name, rotation keeps a backup that holds much
- * more than the newest one (see cleanupDriveBackups): long enough to restore it
- * onto a fresh install, not forever after a deliberate, lasting shrink.
+ * How long after a shrink began rotation keeps the backups from before it (see
+ * cleanupDriveBackups): the time a user has to restore one onto a fresh install,
+ * and not forever after a deliberate, lasting shrink.
  */
 export const DAILY_PROTECTION_DAYS = 30;
 export const WEEKLY_PROTECTION_DAYS = 84;
@@ -569,15 +569,24 @@ const backupDateOf = (name) => {
  * folder. Only files this service names are ever considered — anything else the
  * user put in the folder is left alone.
  *
- * A file holding much more than the group's newest (see holdsMuchLess) is kept
- * past the window for `protectDays` from the date in its name: the newest is
- * the dataset as it stands now, and one that small next to an older backup is a
- * fresh install (or a second device on the same account) whose uploads would
- * otherwise push the real backups out one per day. That leaves time to restore
- * one. After it the file rotates like any other — the smaller dataset may be a
- * deliberate, lasting one, and the newest backup would then never be full-size
- * again. Meanwhile the group runs past `maxToKeep` by at most the protected
- * files, since the smaller ones keep rotating.
+ * Backups holding much more than their group's newest (see holdsMuchLess) are
+ * kept past the window. The newest is the dataset as it stands now, and one that
+ * small next to older backups is a fresh install (or a second device on the same
+ * account) whose uploads would otherwise push the real backups out one per day.
+ *
+ * - The protection is decided per date label across formats: when any format of
+ *   a day (or week) is protected, every format of it is. Formats disagree when
+ *   one is measured by bytes (a .db uploaded before ROWS_PROPERTY), and a .db
+ *   rotated out beside its protected JSON is half a backup.
+ * - It lasts `protectDays` from when the shrink began — the date of the newest
+ *   much-larger backup — which is the time the user has to restore one. After
+ *   that the larger backups rotate like any other: the smaller dataset may be a
+ *   deliberate, lasting one, and the newest backup would never be full-size
+ *   again. Measured from each file's own age instead, a weekly could never be
+ *   protected at all: past a 15-file window it is already over 100 days old.
+ *
+ * Meanwhile the smaller backups keep rotating, so a group runs past `maxToKeep`
+ * by the protected backups only.
  * @param {string} accessToken
  * @param {string} folderId
  * @param {string} prefix - 'penny_daily_' or 'penny_weekly_'
@@ -597,22 +606,32 @@ export const cleanupDriveBackups = async (
     (byExtension[ext] ||= []).push(file);
   }
 
+  // A backup's date label: its name without the extension, shared by its formats.
+  const labelOf = name => name.slice(0, name.lastIndexOf('.'));
+  const protectedLabels = new Set();
+  const excess = [];
+
   for (const group of Object.values(byExtension)) {
     // Names embed a sortable date (YYYY-MM-DD / YYYY-Www), so lexical order is
     // chronological order and the excess is always at the front.
     group.sort((a, b) => a.name.localeCompare(b.name));
-    const newest = group[group.length - 1];
-    const excess = group.slice(0, Math.max(0, group.length - maxToKeep));
-    for (const file of excess) {
-      const fileDate = backupDateOf(file.name);
-      const withinProtection = fileDate !== null && today !== null
-        && (today - fileDate) / DAY_MS <= protectDays;
-      if (withinProtection && holdsMuchLess(measureOf(newest), measureOf(file))) {
-        console.warn(`[DriveBackup] Keeping ${file.name}: it holds much more than the newest backup, ${newest.name}`);
-        continue;
-      }
-      await deleteDriveFile(accessToken, file.id, file.name);
+    excess.push(...group.slice(0, Math.max(0, group.length - maxToKeep)));
+
+    const newest = measureOf(group[group.length - 1]);
+    const larger = group.filter(file => backupDateOf(file.name) !== null
+      && holdsMuchLess(newest, measureOf(file)));
+    if (larger.length === 0 || today === null) continue;
+    const shrinkBegan = Math.max(...larger.map(file => backupDateOf(file.name)));
+    if ((today - shrinkBegan) / DAY_MS > protectDays) continue;
+    for (const file of larger) protectedLabels.add(labelOf(file.name));
+  }
+
+  for (const file of excess) {
+    if (protectedLabels.has(labelOf(file.name))) {
+      console.warn(`[DriveBackup] Keeping ${file.name}: its backup holds much more than the newest one`);
+      continue;
     }
+    await deleteDriveFile(accessToken, file.id, file.name);
   }
 };
 
