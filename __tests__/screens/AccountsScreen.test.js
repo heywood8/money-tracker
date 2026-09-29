@@ -1222,6 +1222,45 @@ describe('AccountsScreen', () => {
       expect(values).toEqual(expect.objectContaining({ balance: '1500' }));
     });
 
+    it('drops the fraction of a whole-unit balance typed key by key', async () => {
+      const [, values] = await openEditAndSave(
+        { id: 'acc-1', name: 'Rubles', balance: '1000', currency: 'RUB', order: 0 },
+        async ({ getByTestId }) => {
+          const input = () => getByTestId('account-balance-input');
+          await fireEvent.changeText(input(), '1500,');
+          // Each keystroke appends to what the field shows.
+          await fireEvent.changeText(input(), `${input().props.value}5`);
+          await fireEvent.changeText(input(), `${input().props.value}0`);
+        },
+      );
+
+      expect(values).toEqual(expect.objectContaining({ balance: '1500' }));
+    });
+
+    it('reads a pasted "1,500" as grouping', async () => {
+      const [, values] = await openEditAndSave(
+        { id: 'acc-1', name: 'Cash', balance: '1000.00', currency: 'USD', order: 0 },
+        async ({ getByTestId }) => {
+          await fireEvent.changeText(getByTestId('account-balance-input'), '1,500');
+        },
+      );
+
+      expect(values).toEqual(expect.objectContaining({ balance: '1500' }));
+    });
+
+    // Typing the shown figure is still an edit: a whole-unit 1500.50 shown as
+    // 1500 is written off only when the user asks for it.
+    it('sends a retyped balance even when it matches what the form showed', async () => {
+      const [, values] = await openEditAndSave(
+        { id: 'acc-1', name: 'Rubles', balance: '1500.50', currency: 'RUB', order: 0 },
+        async ({ getByTestId }) => {
+          await fireEvent.changeText(getByTestId('account-balance-input'), '1500');
+        },
+      );
+
+      expect(values).toEqual(expect.objectContaining({ balance: '1500' }));
+    });
+
     it('sends a balance the user changed', async () => {
       const [, values] = await openEditAndSave(
         { id: 'acc-1', name: 'Cash', balance: '1000.00', currency: 'USD', order: 0 },

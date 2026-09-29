@@ -4,6 +4,7 @@ import { createBalanceHistorySource, isNetWorthSelection } from '../services/Bal
 import { appEvents, EVENTS } from '../services/eventEmitter';
 import { useTabFocusedEvent } from '../contexts/TabFocusContext';
 import * as Currency from '../services/currency';
+import { normalizeDecimalComma } from '../utils/amountInput';
 
 // Median of a numeric list; even counts average the two middle values.
 // Exported for unit testing.
@@ -723,9 +724,12 @@ const useBalanceHistory = (selectedAccount, selectedYear, selectedMonth, options
     // day's net worth, and a later back-dated operation rewrote it to its own
     // delta (Currency.add read it as 0). Store a number at the account
     // currency's precision, or nothing.
-    const typed = String(editingBalanceValue).replace(/\s/g, '');
-    const normalized = typed.includes('.') ? typed : typed.replace(',', '.');
-    if (!Currency.isValid(normalized)) return;
+    const normalized = normalizeDecimalComma(String(editingBalanceValue).replace(/\s/g, ''))
+      .replace(/\.$/, '');
+    if (!Currency.isValid(normalized)) {
+      console.warn('[useBalanceHistory] Ignoring a balance that is not a number');
+      return;
+    }
     const account = (accountsRef.current || []).find(acc => String(acc?.id) === String(selectedAccount));
     const balance = Currency.formatAmount(normalized, account?.currency ?? 2);
 

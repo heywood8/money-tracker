@@ -486,6 +486,16 @@ describe('useBalanceHistory', () => {
         expect(BalanceHistoryDB.upsertBalanceHistory).toHaveBeenCalledWith(mockAccountId, '2024-01-15', '1235');
       });
 
+      it('ignores a trailing separator', async () => {
+        await saveTyped('1234,', [{ id: mockAccountId, currency: 'USD' }]);
+        expect(BalanceHistoryDB.upsertBalanceHistory).toHaveBeenCalledWith(mockAccountId, '2024-01-15', '1234.00');
+      });
+
+      it('reads pasted grouping', async () => {
+        await saveTyped('1.234,56', [{ id: mockAccountId, currency: 'USD' }]);
+        expect(BalanceHistoryDB.upsertBalanceHistory).toHaveBeenCalledWith(mockAccountId, '2024-01-15', '1234.56');
+      });
+
       it('refuses text that is not a number', async () => {
         await saveTyped('12a4', [{ id: mockAccountId, currency: 'USD' }]);
         expect(BalanceHistoryDB.upsertBalanceHistory).not.toHaveBeenCalled();
