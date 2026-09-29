@@ -241,11 +241,14 @@ describe('BudgetPlansDB line groups', () => {
 
   describe('calculatePlanStatus', () => {
     it('totals a derived group from its children and leaves `allocated` alone', async () => {
+      // Each line on a category of its own: two lines on one category match the
+      // same operations, and the group counts those once (see
+      // BudgetPlansDB.spentOverlap.test.js).
       setupDb({
         lines: [
-          lineRow('l-fuel', '300', { groupId: 'g1' }),
-          lineRow('l-parking', '120', { groupId: 'g1', sortOrder: 1 }),
-          lineRow('l-loose', '50', { sortOrder: 2 }),
+          lineRow('l-fuel', '300', { groupId: 'g1', categoryId: 'cat-fuel' }),
+          lineRow('l-parking', '120', { groupId: 'g1', categoryId: 'cat-parking', sortOrder: 1 }),
+          lineRow('l-loose', '50', { categoryId: 'cat-loose', sortOrder: 2 }),
         ],
         groups: [groupRow('g1', 'Car')],
         spending: '60',

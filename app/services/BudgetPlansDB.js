@@ -11,7 +11,13 @@
 import uuid from 'react-native-uuid';
 import { executeQuery, queryAll, queryFirst, executeTransaction } from './db';
 import * as Currency from './currency';
-import { calculateSpendingForFilters, expandCategoryIds, deriveSpendingStatus, NOT_SHADOW_SQL } from './BudgetsDB';
+import {
+  calculateSpendingForFilters,
+  calculateSpendingForAnyFilters,
+  expandCategoryIds,
+  deriveSpendingStatus,
+  NOT_SHADOW_SQL,
+} from './BudgetsDB';
 import { formatDate as formatLocalDate } from './BalanceHistoryDB';
 import { normalizeLabel, matchesAnyLabel } from '../utils/labelUtils';
 import { sumMoneySql } from './sqlMoney';
@@ -2304,6 +2310,110 @@ const collectPlanSourceCurrencies = async (lines, startDate, endDate, convertAll
 };
 
 /**
+ * What a counted (non-income) line matches, in the terms two lines are compared
+ * on — decided by the same branch {@link calculateLineActual} takes. A spending
+ * line: its categories with descendants, and its source accounts, an empty set
+ * meaning "any". A transfer-target line: the account it receives into.
+ * @param {Object} line
+ * @returns {Promise<Object>}
+ */
+const lineMatchScope = async (line) => {
+  const categoryIds = line.categoryIds ?? (isSet(line.categoryId) ? [line.categoryId] : []);
+  const sourceAccountIds = line.sourceAccountIds ?? [];
+  if (categoryIds.length > 0 || sourceAccountIds.length > 0) {
+    return {
+      kind: 'spending',
+      categoryIds: await expandCategoryIds(categoryIds, true),
+      accountIds: sourceAccountIds.filter(isSet),
+    };
+  }
+  return { kind: 'transfer', accountId: String(line.toAccountId) };
+};
+
+// Whether some id satisfies both filters; an empty filter is "any".
+const filtersMeet = (a, b) => {
+  if (a.length === 0 || b.length === 0) return true;
+  const ids = new Set(a.map(String));
+  return b.some(id => ids.has(String(id)));
+};
+
+/**
+ * Whether one operation could count toward both lines. When this says no, the
+ * two can never share one — an operation has one category and one account — so
+ * their actuals simply add up.
+ * @param {Object} a - from lineMatchScope
+ * @param {Object} b - from lineMatchScope
+ * @returns {boolean}
+ */
+const mayShareOperations = (a, b) => {
+  // An expense and a transfer are never the same operation.
+  if (a.kind !== b.kind) return false;
+  if (a.kind === 'transfer') return a.accountId === b.accountId;
+  return filtersMeet(a.categoryIds, b.categoryIds) && filtersMeet(a.accountIds, b.accountIds);
+};
+
+/**
+ * The actual of a set of lines, every operation counted once.
+ *
+ * Summing line actuals counted an operation once per line that matched it, and
+ * lines overlap routinely: a parent category next to one of its children, a
+ * card-only line next to a category line, two lines receiving into one account.
+ * Lines that could share an operation are clustered. A lone line keeps the
+ * actual already computed for it; transfer lines cluster only on one account,
+ * so they share one actual, counted once; spending lines are summed as the
+ * union of their filters.
+ * @param {Array<{line: Object, actual: string, scope: Object}>} entries
+ * @param {Object} context
+ * @param {string} context.currency
+ * @param {string} context.startDate
+ * @param {string} context.endDate
+ * @param {boolean} context.convertAll
+ * @param {Map<string, Promise<string>>} context.cache - union sums by cluster,
+ *   since a cluster inside a group recurs in the month's total
+ * @returns {Promise<string>}
+ */
+const sumActualsOnce = async (entries, { currency, startDate, endDate, convertAll, cache }) => {
+  const root = entries.map((_, index) => index);
+  const find = (index) => {
+    let current = index;
+    while (root[current] !== current) current = root[current];
+    return current;
+  };
+  for (let i = 0; i < entries.length; i += 1) {
+    for (let j = i + 1; j < entries.length; j += 1) {
+      if (mayShareOperations(entries[i].scope, entries[j].scope)) root[find(j)] = find(i);
+    }
+  }
+  const clusters = new Map();
+  entries.forEach((entry, index) => {
+    const key = find(index);
+    if (!clusters.has(key)) clusters.set(key, []);
+    clusters.get(key).push(entry);
+  });
+
+  let total = '0';
+  for (const cluster of clusters.values()) {
+    if (cluster.length === 1 || cluster[0].scope.kind === 'transfer') {
+      total = Currency.add(total, cluster[0].actual, currency);
+      continue;
+    }
+    const key = JSON.stringify(cluster.map(entry => entry.line.id));
+    if (!cache.has(key)) {
+      cache.set(key, calculateSpendingForAnyFilters({
+        filterSets: cluster.map(({ scope }) => ({ categoryIds: scope.categoryIds, accountIds: scope.accountIds })),
+        currency,
+        startDate,
+        endDate,
+        includeChildren: false, // already expanded by lineMatchScope
+        convertAll,
+      }));
+    }
+    total = Currency.add(total, await cache.get(key), currency);
+  }
+  return total;
+};
+
+/**
  * Compute a plan's full plan-vs-actual status: per-line actuals with the shared
  * budget status bands, income vs expected, and totals — all expressed in
  * `displayCurrency` (defaults to the plan's own currency). Lines include BOTH the
@@ -2384,7 +2494,9 @@ const calculateStatusForPlan = async (plan, displayCurrency = null, convertAll =
     const tallyFor = (groupId) => {
       let tally = groupTallies.get(groupId);
       if (!tally) {
-        tally = { childAmount: '0', actual: '0', lineCount: 0 };
+        // `counted` holds the lines behind `actual`, which is only summed once
+        // every line is in — see sumActualsOnce.
+        tally = { childAmount: '0', actual: '0', lineCount: 0, counted: [] };
         groupTallies.set(groupId, tally);
       }
       return tally;
@@ -2393,7 +2505,10 @@ const calculateStatusForPlan = async (plan, displayCurrency = null, convertAll =
     const lineStatuses = [];
     const transferCurrencies = new Set();
     let allocated = '0';
-    let totalActual = '0';
+    // The lines whose actuals make up "Spent", each with the actual and what it
+    // matches. Not summed as the lines are walked: lines overlap, and a sum
+    // counted an operation once per line that matched it (see sumActualsOnce).
+    const countedLines = [];
     // Expected income is the sum of the plan's income lines (Budgets v3 phase 3);
     // the stored expected_income column is only a fallback for a plan that has
     // none — see the totals assembly below.
@@ -2523,9 +2638,10 @@ const calculateStatusForPlan = async (plan, displayCurrency = null, convertAll =
       if (sourceCurrency) {
         transferCurrencies.add(sourceCurrency);
       }
-      totalActual = Currency.add(totalActual, actual, target);
+      const counted = { line, actual, scope: await lineMatchScope(line) };
+      countedLines.push(counted);
       if (groupTally) {
-        groupTally.actual = Currency.add(groupTally.actual, actual, target);
+        groupTally.counted.push(counted);
       }
       const remaining = Currency.subtract(amount, actual, target);
       const { isExceeded, percentage, status } = deriveSpendingStatus(actual, amount);
@@ -2539,6 +2655,14 @@ const calculateStatusForPlan = async (plan, displayCurrency = null, convertAll =
         isExceeded,
         status,
       });
+    }
+
+    // "Spent" for the month and for each group: every operation once, however
+    // many of the lines match it. Line statuses above keep their own actuals.
+    const sumContext = { currency: target, startDate, endDate, convertAll, cache: new Map() };
+    const totalActual = await sumActualsOnce(countedLines, sumContext);
+    for (const tally of groupTallies.values()) {
+      tally.actual = await sumActualsOnce(tally.counted, sumContext);
     }
 
     // Group statuses, and the correction an OVERRIDE group makes to `allocated`.
