@@ -26,6 +26,7 @@ import { relativeDayLabel, sameDayPreviousMonth } from '../utils/dateUtils';
 import { useTabFocusedEvent } from '../contexts/TabFocusContext';
 import { appEvents, EVENTS } from '../services/eventEmitter';
 import { parseCardMasks, serializeCardMasks, cardMaskLast4 } from '../utils/cardMask';
+import { normalizeDecimalComma } from '../utils/amountInput';
 import currencies from '../../assets/currencies.json';
 import { CARD_SURFACE } from '../styles/componentStyles';
 import { authenticateWithBiometrics, BiometricResult } from '../services/BiometricService';
@@ -512,6 +513,9 @@ export default function AccountsScreen({ onBackStateChange, tabKey = 'Accounts' 
   // keeps the form panel open until the write actually succeeds.
   const [saving, setSaving] = useState(false);
   const savingRef = useRef(false);
+  // Whether the user typed in the balance field since the form opened. Saving
+  // sends a balance only then — see saveEdit.
+  const balanceTypedRef = useRef(false);
   // Pinned default account for QuickAdd. A single stored id (or null = "latest
   // used"), so making one account the default inherently clears any previous one.
   const [defaultAccountId, setDefaultAccountIdState] = useState(null);
@@ -616,6 +620,7 @@ export default function AccountsScreen({ onBackStateChange, tabKey = 'Accounts' 
     }
     setErrors({});
     setCreateAdjustmentOperation(true);
+    balanceTypedRef.current = false;
     openFormPanel(id, { ...acc, balance });
   }, [accounts, openFormPanel]);
 
@@ -624,7 +629,10 @@ export default function AccountsScreen({ onBackStateChange, tabKey = 'Accounts' 
   // the write fails, and stops the rejection escaping as an unhandled promise. The
   // in-flight flag doubles as the double-submit guard.
   const saveEdit = useCallback(async () => {
-    const validation = validateAccount(editValues, t);
+    // A trailing separator ("1500." on a whole-unit account, "12." mid-typing)
+    // is not part of the number.
+    const values = { ...editValues, balance: String(editValues.balance ?? '').replace(/\.$/, '') };
+    const validation = validateAccount(values, t);
     if (Object.keys(validation).length) {
       setErrors(validation);
       return;
@@ -634,9 +642,16 @@ export default function AccountsScreen({ onBackStateChange, tabKey = 'Accounts' 
     setSaving(true);
     try {
       if (editingId === 'new') {
-        await addAccount(editValues);
+        await addAccount(values);
       } else {
-        await updateAccount(editingId, editValues, createAdjustmentOperation);
+        // The form holds the balance as it was when it opened. Sent back on a
+        // plain rename, it undid whatever was booked meanwhile (a bank
+        // notification, an edit elsewhere): the context saw 1000 against a live
+        // 950 and booked a +50 adjustment. The form also shows a whole-unit
+        // balance truncated (1500.50 RUB as 1500), which turned a rename into a
+        // -0.50 adjustment. A balance the user did not type in is left out.
+        const { balance: _untyped, ...otherValues } = values;
+        await updateAccount(editingId, balanceTypedRef.current ? values : otherValues, createAdjustmentOperation);
       }
       closeFormPanel();
     } catch {
@@ -771,11 +786,15 @@ export default function AccountsScreen({ onBackStateChange, tabKey = 'Accounts' 
   }, []);
 
   const handleBalanceChange = useCallback((text) => {
+    balanceTypedRef.current = true;
     setEditValues(v => {
       const decimals = currencies[v.currency]?.decimal_digits ?? 2;
 
+      // A decimal-pad keyboard types "," as the decimal key in most locales.
+      // Stripped with the rest, "1234,56" was saved as 123456: a balance 100
+      // times too large, and an adjustment operation booked to reach it.
       // Strip anything that isn't a digit, minus, or decimal point
-      let filtered = text.replace(/[^0-9.-]/g, '');
+      let filtered = normalizeDecimalComma(text).replace(/[^0-9.-]/g, '');
 
       // Only allow a leading minus
       const isNegative = filtered.startsWith('-');
@@ -783,8 +802,11 @@ export default function AccountsScreen({ onBackStateChange, tabKey = 'Accounts' 
       if (isNegative) filtered = '-' + filtered;
 
       if (decimals === 0) {
-        // No fractional part allowed
-        filtered = filtered.replace(/\./g, '');
+        // No fractional part allowed. The separator is kept so the digits typed
+        // after it are dropped instead of appended to the units ("1500,50"
+        // became 150050); saveEdit trims it.
+        const dotIndex = filtered.indexOf('.');
+        if (dotIndex !== -1) filtered = filtered.substring(0, dotIndex + 1);
       } else {
         // Keep only the first decimal point, cap fractional digits
         const dotIndex = filtered.indexOf('.');
@@ -1174,6 +1196,7 @@ export default function AccountsScreen({ onBackStateChange, tabKey = 'Accounts' 
             ) : (
               <PaperTextInput
                 ref={balanceInputRef}
+                testID="account-balance-input"
                 mode="outlined"
                 theme={paperInputTheme}
                 value={editValues.balance}

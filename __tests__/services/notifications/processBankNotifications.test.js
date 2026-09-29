@@ -171,7 +171,8 @@ describe('processBankNotifications', () => {
     expect(summary).toMatchObject({ created: 1, pending: 0, skipped: 0 });
     expect(OperationsDB.createOperation).toHaveBeenCalledWith(
       expect.objectContaining({
-        type: 'expense', amount: '3900.00', accountId: 7,
+        // AMD is a whole-unit currency: booked at the account's precision.
+        type: 'expense', amount: '3900', accountId: 7,
         categoryId: 'cat-food', date: '2026-06-28', description: 'Groceries',
       }),
     );
@@ -193,7 +194,7 @@ describe('processBankNotifications', () => {
           // report of this booking from a receipt for a different one.
           operationId: 1,
           type: 'expense',
-          amount: '3900.00',
+          amount: '3900',
           currency: 'AMD',
           // The bound display name, not the raw bank string.
           merchant: 'Groceries',
@@ -473,8 +474,46 @@ describe('processBankNotifications', () => {
     await pipeline.processBankNotifications();
 
     expect(OperationsDB.createOperation).toHaveBeenCalledWith(
-      expect.objectContaining({ amount: '3900.00' }),
+      expect.objectContaining({ amount: '3900' }),
     );
+  });
+
+  it('books a same-currency charge at the account currency precision', async () => {
+    // A fractional charge on a whole-unit account books whole units, exactly as
+    // saving the same notification from the review queue does.
+    const FRACTIONAL = {
+      ...PURCHASE,
+      text: 'PURCHASE | 1,234.56 AMD | 4083***7027, | NAREK MEHRABYAN, AM | 28.06.2026 10:15 | BALANCE: 133,719.97 AMD',
+    };
+    NotificationAccess.getRecentNotifications.mockResolvedValue([FRACTIONAL]);
+    AccountsDB.getAccountByCardMask.mockResolvedValue({ id: 7, currency: 'AMD' });
+    NotificationRulesDB.getMerchantRule.mockResolvedValue({ categoryId: 'cat-food', labelOverride: 'Groceries' });
+    PreferencesDB.getJsonPreference.mockImplementation((key) => prefs([], [PKG])(key));
+
+    await pipeline.processBankNotifications();
+
+    expect(OperationsDB.createOperation).toHaveBeenCalledWith(
+      expect.objectContaining({ amount: '1235' }),
+    );
+  });
+
+  it('skips a fractional charge already entered by hand in whole units', async () => {
+    const FRACTIONAL = {
+      ...PURCHASE,
+      text: 'PURCHASE | 1,234.56 AMD | 4083***7027, | NAREK MEHRABYAN, AM | 28.06.2026 10:15 | BALANCE: 133,719.97 AMD',
+    };
+    NotificationAccess.getRecentNotifications.mockResolvedValue([FRACTIONAL]);
+    AccountsDB.getAccountByCardMask.mockResolvedValue({ id: 7, currency: 'AMD' });
+    NotificationRulesDB.getMerchantRule.mockResolvedValue({ categoryId: 'cat-food', labelOverride: 'Groceries' });
+    PreferencesDB.getJsonPreference.mockImplementation((key) => prefs([], [PKG])(key));
+    OperationsDB.getOperationsByAccountTypeAndDate.mockResolvedValue([
+      { id: 50, type: 'expense', amount: '1235', accountId: 7, date: '2026-06-28' },
+    ]);
+
+    const summary = await pipeline.processBankNotifications();
+
+    expect(summary).toMatchObject({ created: 0, pending: 0, skipped: 1 });
+    expect(OperationsDB.createOperation).not.toHaveBeenCalled();
   });
 
   it('queues instead of auto-creating when the source is not trusted', async () => {

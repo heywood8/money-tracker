@@ -134,6 +134,18 @@ describe('parseBankNotification', () => {
       });
       expect(incoming.merchant).toBe('A. PETROSYAN');
     });
+
+    it('books an incoming "FROM:" transfer as income', () => {
+      const incoming = parseBankNotification({
+        text: 'C2C | 5,000.00 AMD | 4083***7027 | FROM: A. PETROSYAN | 28.06.2026 16:23',
+      });
+      expect(incoming.type).toBe('income');
+      expect(incoming.requiresCategory).toBe(true);
+    });
+
+    it('keeps an outgoing "TO:" transfer an expense', () => {
+      expect(result.type).toBe('expense');
+    });
   });
 
   describe('E-POS PURCHASE template (online point-of-sale, foreign currency)', () => {

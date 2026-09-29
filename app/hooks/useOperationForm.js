@@ -77,7 +77,21 @@ const useOperationForm = ({
   // True while handleSave is in flight — see the guard in handleSave.
   const [isSaving, setIsSaving] = useState(false);
   const savingRef = useRef(false);
-  const [lastEditedField, setLastEditedField] = useState(null);
+  // True while handleSplit's DB write is in flight — see the guard there.
+  const splittingRef = useRef(false);
+  const [lastEditedField, setLastEditedFieldState] = useState(null);
+  // The money an edit form opened with, and whether the user has since typed an
+  // amount, a rate or a destination amount. Rate auto-fill and the effects below
+  // set lastEditedField too, so it cannot tell a money edit from a label edit —
+  // see moneyUntouched in prepareOperationData.
+  const loadedMoneyRef = useRef(null);
+  const moneyEditedRef = useRef(false);
+  // The setter handed to the form: every call comes from the user typing a money
+  // field. The hook's own effects use setLastEditedFieldState.
+  const setLastEditedField = useCallback((field) => {
+    if (field) moneyEditedRef.current = true;
+    setLastEditedFieldState(field);
+  }, []);
   const [rateSource, setRateSource] = useState('offline');
 
   // rateSource is shared for both multicurrency transfers and foreign currency ops
@@ -167,7 +181,7 @@ const useOperationForm = ({
     const pair = `${fromCurrency}:${toCurrency}`;
     if (ratePairRef.current && ratePairRef.current !== pair && values.exchangeRate) {
       setValues(v => ({ ...v, exchangeRate: '', destinationAmount: '' }));
-      setLastEditedField(null);
+      setLastEditedFieldState(null);
     }
     ratePairRef.current = pair;
   }, [visible, isMultiCurrencyTransfer, isForeignCurrencyOp, sourceAccount, destinationAccount, values.operationCurrency, values.exchangeRate]);
@@ -194,7 +208,7 @@ const useOperationForm = ({
         if (cancelled) return;
         if (rate) {
           setValues(v => ({ ...v, exchangeRate: rate }));
-          setLastEditedField('exchangeRate');
+          setLastEditedFieldState('exchangeRate');
         }
         setRateSource(source === 'live' ? 'live' : 'offline');
       })
@@ -203,7 +217,7 @@ const useOperationForm = ({
         const rate = Currency.getExchangeRate(fromCurrency, toCurrency);
         if (rate) {
           setValues(v => ({ ...v, exchangeRate: rate }));
-          setLastEditedField('exchangeRate');
+          setLastEditedFieldState('exchangeRate');
         }
         setRateSource('offline');
       });
@@ -218,7 +232,7 @@ const useOperationForm = ({
       // Clear exchange rate fields only for plain same-currency ops
       if (values.exchangeRate || values.destinationAmount) {
         setValues(v => ({ ...v, exchangeRate: '', destinationAmount: '' }));
-        setLastEditedField(null);
+        setLastEditedFieldState(null);
       }
       return;
     }
@@ -331,7 +345,7 @@ const useOperationForm = ({
           : String(operation.destinationAmount || '');
 
         if (!cancelled) {
-          setValues({
+          const loadedValues = {
             type: operation.type || 'expense',
             amount: loadAmount,
             accountId: operation.accountId || currentAccounts[0]?.id || '',
@@ -344,7 +358,13 @@ const useOperationForm = ({
             operationCurrency: operation.type !== 'transfer' ? (operation.sourceCurrency || '') : '',
             excludeFromAvg: !!operation.excludeFromAvg,
             excludeFromCharts: !!operation.excludeFromCharts,
-          });
+          };
+          loadedMoneyRef.current = loadedValues;
+          moneyEditedRef.current = false;
+          // A field left "last edited" by the previous operation would make the
+          // auto-calc re-derive this one's figures on open.
+          setLastEditedFieldState(null);
+          setValues(loadedValues);
         }
       } else if (isNew) {
         // A new operation defaults to an account the picker offers: `accounts`
@@ -450,6 +470,19 @@ const useOperationForm = ({
       data.amount = customAmount;
     }
 
+    // Whether this edit left the money alone (a label, the date, the category):
+    // no money field typed, and type, accounts, operation currency and amount
+    // as loaded. See the end of this function.
+    const loaded = loadedMoneyRef.current;
+    const moneyUntouched = !isNew && !!operation && !!loaded && !moneyEditedRef.current
+      && data.type === loaded.type
+      && String(data.accountId) === String(loaded.accountId)
+      && String(data.toAccountId || '') === String(loaded.toAccountId || '')
+      && String(data.operationCurrency || '') === String(loaded.operationCurrency || '')
+      && Currency.isPositiveAmount(String(data.amount))
+      && Currency.isPositiveAmount(String(loaded.amount))
+      && Currency.compare(data.amount, loaded.amount) === 0;
+
     if (isMultiCurrencyTransfer && sourceAccount && destinationAccount) {
       data.sourceCurrency = sourceAccount.currency;
       data.destinationCurrency = destinationAccount.currency;
@@ -467,29 +500,15 @@ const useOperationForm = ({
           }
         }
       } else if (data.amount && data.exchangeRate) {
-        // An edit that left the money alone (a label, the date) keeps the
-        // destination amount as stored. The stored rate is a 6-decimal rounding
-        // of what the user typed, so re-deriving the amount from it drifted: a
-        // 1,000,000 AMD → 2,564.10 USD transfer re-saved as 2,564.00 and the
-        // USD account silently lost 0.10.
-        const moneyUntouched = !isNew && operation && lastEditedField == null
-          && data.destinationAmount
-          && Currency.isValid(String(data.amount))
-          && Currency.compare(data.amount, String(operation.amount ?? '')) === 0
-          && String(data.exchangeRate) === String(operation.exchangeRate ?? '')
-          && String(data.accountId) === String(operation.accountId)
-          && String(data.toAccountId) === String(operation.toAccountId);
-        if (!moneyUntouched) {
-          // Recompute synchronously so a save before the async useEffect resolves
-          // never stores a destinationAmount that is inconsistent with amount × rate.
-          const recomputed = Currency.convertAmount(
-            data.amount,
-            sourceAccount.currency,
-            destinationAccount.currency,
-            data.exchangeRate,
-          );
-          if (recomputed) data.destinationAmount = recomputed;
-        }
+        // Recompute synchronously so a save before the async useEffect resolves
+        // never stores a destinationAmount that is inconsistent with amount × rate.
+        const recomputed = Currency.convertAmount(
+          data.amount,
+          sourceAccount.currency,
+          destinationAccount.currency,
+          data.exchangeRate,
+        );
+        if (recomputed) data.destinationAmount = recomputed;
       }
     } else if (isForeignCurrencyOp && sourceAccount && values.operationCurrency) {
       data.sourceCurrency = values.operationCurrency;
@@ -556,6 +575,33 @@ const useOperationForm = ({
 
     if (data.destinationAmount && destinationAccount) {
       data.destinationAmount = Currency.formatAmount(data.destinationAmount, destinationAccount.currency);
+    }
+
+    // An edit that left the money alone writes the row's money columns back as
+    // stored, so the DB layer re-applies exactly what it reverses. Re-deriving
+    // them moved balances: the stored rate is a 6-decimal rounding of what the
+    // user typed (1,000,000 AMD -> 2,564.10 USD re-saved as 2,564.00), a
+    // transfer booked before an account's currency changed was re-priced at
+    // today's rate (50,000 credited re-saved as 130 USD), and re-rounding to an
+    // account's current decimals shifted a fraction.
+    //
+    // Except a same-currency transfer carrying a destination amount but no
+    // currency pair: quick-add's target chip used to book those with another
+    // pair's figure, and re-saving it is how they get corrected.
+    const corruptSameCurrencyTransfer = data.type === 'transfer' && !isMultiCurrencyTransfer
+      && !!operation?.destinationAmount
+      && !(operation.sourceCurrency && operation.destinationCurrency
+        && operation.sourceCurrency !== operation.destinationCurrency);
+    if (moneyUntouched && !corruptSameCurrencyTransfer) {
+      data.amount = String(operation.amount);
+      data.destinationAmount = operation.destinationAmount ?? '';
+      data.sourceCurrency = operation.sourceCurrency ?? null;
+      data.destinationCurrency = operation.destinationCurrency ?? null;
+      // A rate old quick-add stored the wrong way round is still written back
+      // account→foreign (the branch above inverted it); no balance reads it.
+      if (!isRateStoredForeignToAccount(operation)) {
+        data.exchangeRate = operation.exchangeRate ?? '';
+      }
     }
 
     return data;
@@ -691,6 +737,12 @@ const useOperationForm = ({
     if (!operation || isNew) {
       return { success: false, error: 'Cannot split new operations' };
     }
+    // A second tap while the first split is still writing read the same
+    // pre-split amount: both calls set the original to 70 and each inserted a
+    // 30 row, charging the account an extra 30. Ignore it (no error to show).
+    if (splittingRef.current) {
+      return { success: false, error: null };
+    }
 
     const currency = sourceAccount?.currency;
 
@@ -710,6 +762,7 @@ const useOperationForm = ({
       return { success: false, error: t('split_amount_error') };
     }
 
+    splittingRef.current = true;
     try {
       // Format both amounts to the account currency's decimal precision before persisting.
       // splitAmount is a raw calculator string; the remainder must also be formatted so
@@ -747,6 +800,8 @@ const useOperationForm = ({
     } catch (error) {
       console.error('[useOperationForm] Failed to split operation:', error);
       return { success: false, error: t('error') };
+    } finally {
+      splittingRef.current = false;
     }
   }, [operation, isNew, values, splitOperation, t, setValues, sourceAccount]);
 

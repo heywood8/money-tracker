@@ -1141,6 +1141,138 @@ describe('AccountsScreen', () => {
     });
   });
 
+  // The form holds the balance as it was when it opened. Sent back on a rename,
+  // it undid whatever was booked meanwhile (a phantom adjustment), and a
+  // whole-unit balance shown truncated booked the dropped fraction.
+  describe('balance is sent only when edited', () => {
+    const { fireEvent, waitFor } = require('@testing-library/react-native');
+
+    const openEditAndSave = async (account, edit) => {
+      const AccountsScreen = require('../../app/screens/AccountsScreen').default;
+      const { useAccountsData } = require('../../app/contexts/AccountsDataContext');
+      const { useAccountsActions } = require('../../app/contexts/AccountsActionsContext');
+      const { useLocalization } = require('../../app/contexts/LocalizationContext');
+
+      const updateAccount = jest.fn(() => Promise.resolve());
+      useAccountsActions.mockReturnValue(createAccountsActionsMock({
+        updateAccount,
+        validateAccount: jest.fn(() => ({})),
+      }));
+      useAccountsData.mockReturnValue(createAccountsDataMock({
+        accounts: [account],
+        displayedAccounts: [account],
+      }));
+      useLocalization.mockReturnValue({ t: jest.fn((key) => key), language: 'en' });
+
+      const utils = await render(<AccountsScreen />);
+      await fireEvent.press(utils.getByLabelText('edit_account'));
+      await edit(utils);
+      await waitFor(() => {
+        fireEvent.press(utils.getAllByText('save')[0]);
+      });
+      await waitFor(() => expect(updateAccount).toHaveBeenCalledTimes(1));
+      return updateAccount.mock.calls[0];
+    };
+
+    it('leaves the balance out of a rename', async () => {
+      const [id, values] = await openEditAndSave(
+        { id: 'acc-1', name: 'Cash', balance: '1000.00', currency: 'USD', order: 0 },
+        async ({ getByTestId }) => {
+          await fireEvent.changeText(getByTestId('account-name-input'), 'Wallet');
+        },
+      );
+
+      expect(id).toBe('acc-1');
+      expect(values).toEqual(expect.objectContaining({ name: 'Wallet' }));
+      expect(values).not.toHaveProperty('balance');
+    });
+
+    it('does not book the fraction a whole-unit balance is shown without', async () => {
+      const [, values] = await openEditAndSave(
+        { id: 'acc-1', name: 'Rubles', balance: '1500.50', currency: 'RUB', order: 0 },
+        async ({ getByTestId }) => {
+          await fireEvent.changeText(getByTestId('account-name-input'), 'Card');
+        },
+      );
+
+      expect(values).not.toHaveProperty('balance');
+    });
+
+    // decimal-pad keyboards type "," in most locales; stripping it saved
+    // "1234,56" as 123456.
+    it('reads a lone decimal comma as the decimal point', async () => {
+      const [, values] = await openEditAndSave(
+        { id: 'acc-1', name: 'Cash', balance: '1000.00', currency: 'USD', order: 0 },
+        async ({ getByTestId }) => {
+          await fireEvent.changeText(getByTestId('account-balance-input'), '1234,56');
+        },
+      );
+
+      expect(values).toEqual(expect.objectContaining({ balance: '1234.56' }));
+    });
+
+    it('drops the fraction of a whole-unit balance instead of folding it in', async () => {
+      const [, values] = await openEditAndSave(
+        { id: 'acc-1', name: 'Rubles', balance: '1000', currency: 'RUB', order: 0 },
+        async ({ getByTestId }) => {
+          await fireEvent.changeText(getByTestId('account-balance-input'), '1500,50');
+        },
+      );
+
+      expect(values).toEqual(expect.objectContaining({ balance: '1500' }));
+    });
+
+    it('drops the fraction of a whole-unit balance typed key by key', async () => {
+      const [, values] = await openEditAndSave(
+        { id: 'acc-1', name: 'Rubles', balance: '1000', currency: 'RUB', order: 0 },
+        async ({ getByTestId }) => {
+          const input = () => getByTestId('account-balance-input');
+          await fireEvent.changeText(input(), '1500,');
+          // Each keystroke appends to what the field shows.
+          await fireEvent.changeText(input(), `${input().props.value}5`);
+          await fireEvent.changeText(input(), `${input().props.value}0`);
+        },
+      );
+
+      expect(values).toEqual(expect.objectContaining({ balance: '1500' }));
+    });
+
+    it('reads a pasted "1,500" as grouping', async () => {
+      const [, values] = await openEditAndSave(
+        { id: 'acc-1', name: 'Cash', balance: '1000.00', currency: 'USD', order: 0 },
+        async ({ getByTestId }) => {
+          await fireEvent.changeText(getByTestId('account-balance-input'), '1,500');
+        },
+      );
+
+      expect(values).toEqual(expect.objectContaining({ balance: '1500' }));
+    });
+
+    // Typing the shown figure is still an edit: a whole-unit 1500.50 shown as
+    // 1500 is written off only when the user asks for it.
+    it('sends a retyped balance even when it matches what the form showed', async () => {
+      const [, values] = await openEditAndSave(
+        { id: 'acc-1', name: 'Rubles', balance: '1500.50', currency: 'RUB', order: 0 },
+        async ({ getByTestId }) => {
+          await fireEvent.changeText(getByTestId('account-balance-input'), '1500');
+        },
+      );
+
+      expect(values).toEqual(expect.objectContaining({ balance: '1500' }));
+    });
+
+    it('sends a balance the user changed', async () => {
+      const [, values] = await openEditAndSave(
+        { id: 'acc-1', name: 'Cash', balance: '1000.00', currency: 'USD', order: 0 },
+        async ({ getByTestId }) => {
+          await fireEvent.changeText(getByTestId('account-balance-input'), '1200.00');
+        },
+      );
+
+      expect(values).toEqual(expect.objectContaining({ balance: '1200.00' }));
+    });
+  });
+
   describe('Account Delete Handlers', () => {
     const { fireEvent, act, waitFor } = require('@testing-library/react-native');
 

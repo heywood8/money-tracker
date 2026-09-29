@@ -130,7 +130,7 @@ export default function SplitOperationModal({
   }, [closeCategoryPicker]);
 
   // Handle confirm
-  const handleConfirm = useCallback(() => {
+  const handleConfirm = useCallback(async () => {
     // Validate amount
     const amountError = validateSplitAmount(splitAmount);
     if (amountError) {
@@ -144,7 +144,10 @@ export default function SplitOperationModal({
       return;
     }
 
-    onConfirm(splitAmount, selectedCategoryId);
+    const result = await onConfirm(splitAmount, selectedCategoryId);
+    if (result && !result.success && result.error) {
+      setError(result.error);
+    }
   }, [splitAmount, selectedCategoryId, validateSplitAmount, onConfirm, t]);
 
   // Empty handler for preventing event propagation

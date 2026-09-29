@@ -1390,6 +1390,131 @@ describe('OperationsScreen', () => {
 
       expect(getByTestId('quick-add-form').props.saving).toBe(false);
     });
+
+    it('books a category chip tapped during a pending save once that save ends', async () => {
+      const OperationsScreen = require('../../app/screens/OperationsScreen').default;
+      const { useOperationsData } = require('../../app/contexts/OperationsDataContext');
+      const { useOperationsActions } = require('../../app/contexts/OperationsActionsContext');
+      const { useAccountsData } = require('../../app/contexts/AccountsDataContext');
+      const useQuickAddForm = require('../../app/hooks/useQuickAddForm');
+
+      const pendingWrites = [];
+      const mockAddOperation = jest.fn(() => new Promise((resolve) => { pendingWrites.push(resolve); }));
+      const mockResetForm = jest.fn();
+      useQuickAddForm.mockReturnValue({
+        quickAddValues: { type: 'expense', amount: '100', accountId: 'acc-1', categoryId: 'cat-1' },
+        quickAddValuesStore: makeMockQuickAddStore({ type: 'expense', amount: '100', accountId: 'acc-1', categoryId: 'cat-1' }),
+        setQuickAddValues: jest.fn(),
+        getAccountName: jest.fn(() => 'Cash'),
+        getAccountBalance: jest.fn(() => '$1000.00'),
+        getCategoryInfo: jest.fn(() => ({ name: 'Food', icon: 'food' })),
+        getCategoryName: jest.fn(() => 'Food'),
+        filteredCategories: [],
+        resetForm: mockResetForm,
+        clearDate: jest.fn(),
+      });
+      useAccountsData.mockReturnValue({
+        accounts: [{ id: 'acc-1', currency: 'USD' }],
+        visibleAccounts: [{ id: 'acc-1', currency: 'USD' }],
+        loading: false,
+      });
+      useOperationsData.mockReturnValue({
+        operations: [], loading: false, loadingMore: false, hasMoreOperations: false,
+      });
+      useOperationsActions.mockReturnValue({
+        deleteOperation: jest.fn(),
+        addOperation: mockAddOperation,
+        validateOperation: jest.fn(() => null),
+        loadMoreOperations: jest.fn(),
+        jumpToDate: jest.fn(),
+      });
+
+      const { getByTestId } = await render(<OperationsScreen />);
+
+      let first;
+      let chip;
+      await act(async () => {
+        first = getByTestId('quick-add-form').props.handleQuickAdd();
+      });
+      await act(async () => {
+        chip = getByTestId('quick-add-form').props.onAutoAddWithCategory('cat-2');
+      });
+      // Waiting its turn, not refused.
+      expect(mockAddOperation).toHaveBeenCalledTimes(1);
+
+      await act(async () => {
+        pendingWrites[0]({ id: 'op-1' });
+        await first;
+      });
+      await act(async () => {
+        pendingWrites[1]({ id: 'op-2' });
+        await chip;
+      });
+
+      expect(mockAddOperation).toHaveBeenCalledTimes(2);
+      expect(mockAddOperation.mock.calls[1][0]).toEqual(expect.objectContaining({ amount: '100', categoryId: 'cat-2' }));
+      // Cleared once, by the chip itself when it was tapped (the first save's
+      // own reset is the Add button's); the chip's save does not clear the
+      // form again, which by then holds whatever the user typed next.
+      expect(mockResetForm).toHaveBeenCalledTimes(2);
+    });
+
+    it('ignores a chip tapped twice while its save runs', async () => {
+      const OperationsScreen = require('../../app/screens/OperationsScreen').default;
+      const { useOperationsData } = require('../../app/contexts/OperationsDataContext');
+      const { useOperationsActions } = require('../../app/contexts/OperationsActionsContext');
+      const { useAccountsData } = require('../../app/contexts/AccountsDataContext');
+      const useQuickAddForm = require('../../app/hooks/useQuickAddForm');
+
+      const store = makeMockQuickAddStore({ type: 'expense', amount: '100', accountId: 'acc-1', categoryId: '' });
+      const pendingWrites = [];
+      const mockAddOperation = jest.fn(() => new Promise((resolve) => { pendingWrites.push(resolve); }));
+      useQuickAddForm.mockReturnValue({
+        quickAddValues: store.getSnapshot(),
+        quickAddValuesStore: store,
+        setQuickAddValues: jest.fn(),
+        getAccountName: jest.fn(() => 'Cash'),
+        getAccountBalance: jest.fn(() => '$1000.00'),
+        getCategoryInfo: jest.fn(() => ({ name: 'Food', icon: 'food' })),
+        getCategoryName: jest.fn(() => 'Food'),
+        filteredCategories: [],
+        // The real reset empties the amount.
+        resetForm: jest.fn(() => store.setValues(v => ({ ...v, amount: '' }))),
+        clearDate: jest.fn(),
+      });
+      useAccountsData.mockReturnValue({
+        accounts: [{ id: 'acc-1', currency: 'USD' }],
+        visibleAccounts: [{ id: 'acc-1', currency: 'USD' }],
+        loading: false,
+      });
+      useOperationsData.mockReturnValue({
+        operations: [], loading: false, loadingMore: false, hasMoreOperations: false,
+      });
+      const validateOperation = jest.fn(() => null);
+      useOperationsActions.mockReturnValue({
+        deleteOperation: jest.fn(),
+        addOperation: mockAddOperation,
+        validateOperation,
+        loadMoreOperations: jest.fn(),
+        jumpToDate: jest.fn(),
+      });
+
+      const { getByTestId } = await render(<OperationsScreen />);
+
+      let first;
+      let second;
+      await act(async () => {
+        first = getByTestId('quick-add-form').props.onAutoAddWithCategory('cat-2');
+        second = getByTestId('quick-add-form').props.onAutoAddWithCategory('cat-2');
+      });
+      await act(async () => {
+        pendingWrites.forEach(resolve => resolve({ id: 'op-1' }));
+        await Promise.all([first, second]);
+      });
+
+      expect(mockAddOperation).toHaveBeenCalledTimes(1);
+      expect(validateOperation).toHaveBeenCalledTimes(1);
+    });
   });
 
   describe('Quick-add date chip (issue #1713)', () => {
@@ -1883,6 +2008,84 @@ describe('OperationsScreen', () => {
       expect(payload).toEqual(expect.objectContaining({ type: 'transfer', amount: '100', toAccountId: 'acc-2' }));
       expect(payload.sourceCurrency).toBeUndefined();
       expect(payload.destinationAmount).toBe('');
+    });
+
+    // The form's rate/destination were synced for its own target (a EUR account).
+    // A target chip that books to another account must not reuse them.
+    describe('transfer target chip', () => {
+      const src = { id: 'acc-1', name: 'Card', currency: 'USD' };
+      const eur = { id: 'acc-2', name: 'Euro', currency: 'EUR' };
+      const amd = { id: 'acc-3', name: 'Dram', currency: 'AMD' };
+      const usd = { id: 'acc-4', name: 'Savings', currency: 'USD' };
+
+      const renderWithEurRate = async () => {
+        const { useOperationsActions } = require('../../app/contexts/OperationsActionsContext');
+        const { useAccountsData } = require('../../app/contexts/AccountsDataContext');
+        const { useOperationsData } = require('../../app/contexts/OperationsDataContext');
+        const useQuickAddForm = require('../../app/hooks/useQuickAddForm');
+        const useOperationPicker = require('../../app/hooks/useOperationPicker');
+        const OperationsScreen = require('../../app/screens/OperationsScreen').default;
+
+        const values = {
+          type: 'transfer', amount: '100', accountId: 'acc-1', toAccountId: 'acc-2', categoryId: '',
+          operationCurrency: '', exchangeRate: '0.92', destinationAmount: '92', description: '',
+        };
+        useMultiCurrencyTransfer.mockReturnValue({
+          sourceAccount: src, destinationAccount: eur, isMultiCurrencyTransfer: true,
+          lastEditedField: 'amount', setLastEditedField: jest.fn(), rateSource: 'live', setRateSource: jest.fn(),
+        });
+        useOperationPicker.mockReturnValue({
+          pickerState: { visible: false, type: null, data: [] }, openPicker: jest.fn(), closePicker: jest.fn(),
+        });
+        const mockAddOperation = jest.fn(() => Promise.resolve({ id: 'new-op' }));
+        useQuickAddForm.mockReturnValue({
+          quickAddValues: values, quickAddValuesStore: makeMockQuickAddStore(values), setQuickAddValues: jest.fn(),
+          getAccountName: jest.fn(() => 'Card'), getAccountBalance: jest.fn(() => '1000'),
+          getCategoryInfo: jest.fn(() => ({ name: 'Food', icon: 'food' })), getCategoryName: jest.fn(() => 'Food'),
+          filteredCategories: [], resetForm: jest.fn(), clearDate: jest.fn(),
+        });
+        const accounts = [src, eur, amd, usd];
+        useAccountsData.mockReturnValue({ accounts, visibleAccounts: accounts, loading: false });
+        useOperationsData.mockReturnValue({ operations: [], loading: false, loadingMore: false, hasMoreOperations: false });
+        useOperationsActions.mockReturnValue({
+          deleteOperation: jest.fn(), addOperation: mockAddOperation, validateOperation: jest.fn(() => null),
+          loadMoreOperations: jest.fn(), jumpToDate: jest.fn(),
+        });
+        const utils = await render(<OperationsScreen />);
+        return { ...utils, mockAddOperation };
+      };
+
+      it('fetches the new pair rate for a target in another currency', async () => {
+        const Currency = require('../../app/services/currency');
+        const { getByTestId, mockAddOperation } = await renderWithEurRate();
+        Currency.fetchLiveExchangeRate.mockClear();
+        Currency.fetchLiveExchangeRate.mockResolvedValueOnce({ rate: '390', source: 'live' });
+        Currency.convertAmount.mockReturnValueOnce('39000');
+
+        await act(async () => {
+          await getByTestId('quick-add-form').props.handleQuickAdd(undefined, 'acc-3');
+        });
+
+        expect(Currency.fetchLiveExchangeRate).toHaveBeenCalledWith('USD', 'AMD');
+        const payload = mockAddOperation.mock.calls[0][0];
+        expect(payload).toEqual(expect.objectContaining({
+          toAccountId: 'acc-3', exchangeRate: '390', destinationAmount: '39000',
+          sourceCurrency: 'USD', destinationCurrency: 'AMD',
+        }));
+      });
+
+      it('credits a same-currency target the amount itself, not the old conversion', async () => {
+        const { getByTestId, mockAddOperation } = await renderWithEurRate();
+
+        await act(async () => {
+          await getByTestId('quick-add-form').props.handleQuickAdd(undefined, 'acc-4');
+        });
+
+        const payload = mockAddOperation.mock.calls[0][0];
+        expect(payload).toEqual(expect.objectContaining({ toAccountId: 'acc-4', amount: '100' }));
+        expect(payload.exchangeRate).toBe('');
+        expect(payload.destinationAmount).toBe('');
+      });
     });
   });
 

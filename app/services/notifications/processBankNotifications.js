@@ -464,10 +464,15 @@ const bookExpenseOrQueue = async (descriptor, resolution, date, allowedPackages,
 
   // When the account currency differs from the notification currency, convert the
   // amount at the current exchange rate. A failed conversion (no rate) means we
-  // must not book a wrong amount — leave it for manual review.
+  // must not book a wrong amount — leave it for manual review. A same-currency
+  // amount is still normalized to the account currency's precision, as the review
+  // save does: a 1 234,56 ₽ charge on a whole-unit RUB account books 1235, not a
+  // fractional 1234.56.
   let currencyFields = { amount: descriptor.amount };
   let currencyResolved = resolution.currencyMatch;
-  if (eligibleForAutoCreate && !resolution.currencyMatch) {
+  if (eligibleForAutoCreate && resolution.currencyMatch && resolution.accountCurrency) {
+    currencyFields = { amount: Currency.formatAmount(descriptor.amount, resolution.accountCurrency) };
+  } else if (eligibleForAutoCreate && !resolution.currencyMatch) {
     const built = await buildOperationCurrencyFields(descriptor, resolution.accountCurrency);
     if (built) {
       currencyFields = built;

@@ -63,6 +63,31 @@ describe('operationMatchesNotification', () => {
     expect(operationMatchesNotification(op({ amount: '1700' }), item(), AMD_ROUND_100)).toBe(true);
   });
 
+  it('matches a fractional charge booked in whole units on a whole-unit account', () => {
+    // 1 234,56 ₽ on a RUB account (0 decimals) is stored as 1235, by hand or by
+    // the pipeline.
+    const RUB = { id: 9, currency: 'RUB', autoTxnRounding: null, autoTxnRoundingMode: null };
+    expect(operationMatchesNotification(
+      op({ amount: '1235' }), item({ amount: '1234.56', currency: 'RUB' }), RUB,
+    )).toBe(true);
+  });
+
+  it("matches the pipeline's own rounded booking of a fractional charge", () => {
+    // Auto-create books 1234.56 on a whole-unit account rounding to 10 as
+    // 1235 -> 1240; rounding the raw charge would give 1230.
+    const RUB_ROUND_10 = { id: 9, currency: 'RUB', autoTxnRounding: 10, autoTxnRoundingMode: 'nearest' };
+    expect(operationMatchesNotification(
+      op({ amount: '1240' }), item({ amount: '1234.56', currency: 'RUB' }), RUB_ROUND_10,
+    )).toBe(true);
+  });
+
+  it('does not round a fractional charge on a two-decimal account', () => {
+    const USD = { id: 9, currency: 'USD', autoTxnRounding: null, autoTxnRoundingMode: null };
+    expect(operationMatchesNotification(
+      op({ amount: '1235' }), item({ amount: '1234.56', currency: 'USD' }), USD,
+    )).toBe(false);
+  });
+
   it('does not match the rounded amount when the account has no rounding', () => {
     expect(operationMatchesNotification(op({ amount: '1700' }), item(), AMD)).toBe(false);
   });

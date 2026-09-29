@@ -1275,6 +1275,36 @@ describe('useOperationForm', () => {
       expect(mockSplitOperation).not.toHaveBeenCalled();
     });
 
+    // Both taps read the same pre-split amount: each set the original to 70 and
+    // inserted a 30 row, charging the account an extra 30.
+    it('splits once when Split is tapped twice before the write settles', async () => {
+      const pendingWrites = [];
+      mockSplitOperation.mockImplementation(() => new Promise((resolve) => { pendingWrites.push(resolve); }));
+      try {
+        const props = { ...defaultProps, operation: existingOperation, isNew: false };
+        const { result } = await renderHook(() => useOperationForm(props));
+        await waitFor(() => expect(result.current.values.amount).toBe('100.00'));
+
+        let first;
+        let second;
+        await act(async () => {
+          first = result.current.handleSplit('30.00', 'cat-2');
+          second = result.current.handleSplit('30.00', 'cat-2');
+        });
+        let results;
+        await act(async () => {
+          pendingWrites.forEach(resolve => resolve());
+          results = await Promise.all([first, second]);
+        });
+
+        expect(mockSplitOperation).toHaveBeenCalledTimes(1);
+        expect(results[0].success).toBe(true);
+        expect(results[1]).toEqual({ success: false, error: null });
+      } finally {
+        mockSplitOperation.mockReset();
+      }
+    });
+
     it('should create new operation with split amount', async () => {
       mockSplitOperation.mockResolvedValue();
 

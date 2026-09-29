@@ -60,9 +60,10 @@ export const DISPLAY_NAME = 'Ameriabank';
  * support more notification kinds (e.g. REFUND -> income) without touching the
  * parsing logic below.
  *
- * C2C is a client-to-client transfer (money sent to another person). It is an
- * expense like a purchase, but unlike a merchant purchase its category cannot be
- * inferred — see KINDS_REQUIRING_CATEGORY below.
+ * C2C is a client-to-client transfer. Sent money ("TO: <name>") is an expense
+ * like a purchase; received money ("FROM: <name>") is income — see
+ * INCOMING_LABEL_RE. Either way, unlike a merchant purchase, its category cannot
+ * be inferred — see KINDS_REQUIRING_CATEGORY below.
  */
 const KIND_TO_TYPE = {
   PURCHASE: 'expense',
@@ -129,6 +130,11 @@ export const kindRequiresCategory = (kind) =>
 // descriptive part (the recipient) is what we keep as the merchant.
 const RECIPIENT_LABEL_RE = /^(?:TO|FROM)\s*:\s*/i;
 
+// "FROM: A. PETROSYAN" — the counterparty sent the money to this card, so the
+// C2C is incoming. Booking it with the kind's default type (expense) turned a
+// +5,000 AMD receipt into a -5,000 AMD charge.
+const INCOMING_LABEL_RE = /^FROM\s*:/i;
+
 // "3,900.00 AMD" — amount with optional thousands separators followed by a
 // 3-letter currency code, anchored so "BALANCE: 133,719.97 AMD" never matches.
 const AMOUNT_CURRENCY_RE = /^([\d.,]+)\s+([A-Z]{3})$/;
@@ -180,7 +186,7 @@ export const parse = (notification) => {
   );
   if (!kindSegment) return null;
   const kind = kindSegment.toUpperCase();
-  const type = KIND_TO_TYPE[kind];
+  let type = KIND_TO_TYPE[kind];
 
   // 2. Amount + currency — required; without it there's nothing to record.
   let amount = null;
@@ -236,6 +242,7 @@ export const parse = (notification) => {
       candidate = candidate.replace(TRAILING_COUNTRY_RE, '').trim();
     }
     candidate = candidate.replace(/,\s*$/, '').trim();
+    if (kind === 'C2C' && INCOMING_LABEL_RE.test(candidate)) type = 'income';
     // Strip a "TO:"/"FROM:" recipient label so a C2C transfer descriptor keeps
     // just the counterparty's name as its merchant/description.
     candidate = candidate.replace(RECIPIENT_LABEL_RE, '').trim();

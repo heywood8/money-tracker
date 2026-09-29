@@ -114,9 +114,11 @@ export const loadBookedPayees = async () => {
 
 /**
  * The amounts an operation booked from this notification could carry, in the
- * account's currency: the raw charge, plus the value it would round to under the
- * account's automatic-transaction rounding (so a 1 683 charge on an account that
- * rounds to the nearest 100 also matches a hand-entered 1 700).
+ * account's currency: the raw charge, the charge at the currency's own precision
+ * (a 1 234,56 ₽ charge books as 1235 on a whole-unit RUB account, by hand or by
+ * the pipeline), plus the value it would round to under the account's
+ * automatic-transaction rounding (so a 1 683 charge on an account that rounds to
+ * the nearest 100 also matches a hand-entered 1 700).
  *
  * @param {{ amount: string }} item
  * @param {{ autoTxnRounding?: number|null, autoTxnRoundingMode?: string|null, currency?: string|null }} [account]
@@ -124,11 +126,23 @@ export const loadBookedPayees = async () => {
  */
 const candidateAmounts = (item, account) => {
   const amounts = [item.amount];
+  const atPrecision = account && account.currency
+    ? Currency.formatAmount(item.amount, account.currency)
+    : null;
+  if (atPrecision) amounts.push(atPrecision);
   const rounding = account && account.autoTxnRounding;
   if (rounding) {
     amounts.push(
       Currency.roundToStep(item.amount, rounding, account.autoTxnRoundingMode, account.currency),
     );
+    // The pipeline rounds the amount it already brought to the account's
+    // precision: 1234.56 on a whole-unit account rounding to 10 books
+    // 1235 -> 1240, where rounding the raw charge gives 1230.
+    if (atPrecision) {
+      amounts.push(
+        Currency.roundToStep(atPrecision, rounding, account.autoTxnRoundingMode, account.currency),
+      );
+    }
   }
   return amounts;
 };

@@ -455,7 +455,51 @@ describe('useBalanceHistory', () => {
         await result.current.handleSaveBalance('2024-01-15');
       });
 
-      expect(BalanceHistoryDB.upsertBalanceHistory).toHaveBeenCalledWith(mockAccountId, '2024-01-15', '1500');
+      // Stored as a number at the currency's precision (2 when the account's
+      // currency is unknown), never as the raw text.
+      expect(BalanceHistoryDB.upsertBalanceHistory).toHaveBeenCalledWith(mockAccountId, '2024-01-15', '1500.00');
+    });
+
+    // decimal-pad keyboards type "," in most locales. Stored as typed, the
+    // snapshot charted as 1234, dropped out of net worth, and a later
+    // back-dated operation rewrote it.
+    describe('typed balance normalization', () => {
+      const saveTyped = async (typed, accounts) => {
+        BalanceHistoryDB.upsertBalanceHistory.mockResolvedValue();
+        const { result } = await renderHook(() => useBalanceHistory(mockAccountId, mockYear, mockMonth, { accounts }));
+        await act(async () => {
+          result.current.handleEditBalance('2024-01-15', null);
+          result.current.setEditingBalanceValue(typed);
+        });
+        await act(async () => {
+          await result.current.handleSaveBalance('2024-01-15');
+        });
+      };
+
+      it('reads a decimal comma as the decimal point', async () => {
+        await saveTyped('1234,56', [{ id: mockAccountId, currency: 'USD' }]);
+        expect(BalanceHistoryDB.upsertBalanceHistory).toHaveBeenCalledWith(mockAccountId, '2024-01-15', '1234.56');
+      });
+
+      it("rounds to the account currency's decimals", async () => {
+        await saveTyped('1234,56', [{ id: mockAccountId, currency: 'JPY' }]);
+        expect(BalanceHistoryDB.upsertBalanceHistory).toHaveBeenCalledWith(mockAccountId, '2024-01-15', '1235');
+      });
+
+      it('ignores a trailing separator', async () => {
+        await saveTyped('1234,', [{ id: mockAccountId, currency: 'USD' }]);
+        expect(BalanceHistoryDB.upsertBalanceHistory).toHaveBeenCalledWith(mockAccountId, '2024-01-15', '1234.00');
+      });
+
+      it('reads pasted grouping', async () => {
+        await saveTyped('1.234,56', [{ id: mockAccountId, currency: 'USD' }]);
+        expect(BalanceHistoryDB.upsertBalanceHistory).toHaveBeenCalledWith(mockAccountId, '2024-01-15', '1234.56');
+      });
+
+      it('refuses text that is not a number', async () => {
+        await saveTyped('12a4', [{ id: mockAccountId, currency: 'USD' }]);
+        expect(BalanceHistoryDB.upsertBalanceHistory).not.toHaveBeenCalled();
+      });
     });
 
     it('should not save if no editing value', async () => {

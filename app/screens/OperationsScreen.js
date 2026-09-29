@@ -204,6 +204,8 @@ const OperationsScreen = () => {
   // synchronously, so two taps in the same frame cannot both get through); the state
   // only drives the button's disabled/busy appearance.
   const quickAddSavingRef = useRef(false);
+  // The save quickAddSavingRef is guarding, for a shortcut waiting its turn.
+  const quickAddInFlightRef = useRef(null);
   const [quickAddSaving, setQuickAddSaving] = useState(false);
 
   const { searchMode, filtersExpanded, openSearch, closeSearch, reopenSearch, toggleFilters } = useSearch();
@@ -1073,6 +1075,21 @@ const OperationsScreen = () => {
     // Determine multi-currency status using effective account IDs (including overrides)
     const effectiveSourceAccount = accounts.find(acc => acc.id === operationData.accountId);
     const effectiveDestAccount = accounts.find(acc => acc.id === operationData.toAccountId);
+
+    // The form's rate and destination amount were synced (QuickAddRateSync) for
+    // ITS target account. A target chip books to another one: if that target's
+    // currency differs, those values belong to the old pair. Kept, a USD → EUR
+    // rate of 0.92 booked a 100 USD transfer to an AMD account as 92 AMD, and a
+    // same-currency target was credited the old EUR figure.
+    const formDestAccount = accounts.find(acc => acc.id === formValues.toAccountId);
+    if (
+      overrideToAccountId !== undefined
+      && overrideToAccountId !== formValues.toAccountId
+      && formDestAccount?.currency !== effectiveDestAccount?.currency
+    ) {
+      operationData.exchangeRate = '';
+      operationData.destinationAmount = '';
+    }
     const effectiveIsMultiCurrency = operationData.type === 'transfer'
       && effectiveSourceAccount
       && effectiveDestAccount
@@ -1184,6 +1201,11 @@ const OperationsScreen = () => {
       } else if (effectiveSourceAccount) {
         // Format amount for same-currency operations
         operationData.amount = Currency.formatAmount(operationData.amount, effectiveSourceAccount.currency);
+        // A same-currency operation carries no conversion. The form can still
+        // hold one computed for another target (see above), and a leftover
+        // destinationAmount is what the balance layer credits the target with.
+        operationData.exchangeRate = '';
+        operationData.destinationAmount = '';
       }
     }
 
@@ -1232,10 +1254,14 @@ const OperationsScreen = () => {
         setLastAccessedAccount(formValues.accountId);
       }
 
-      // Reset form but keep account and type
-      resetForm();
-      // The amount is cleared; the next entry starts fresh and re-primes location.
-      amountWasEmptyRef.current = true;
+      // Reset form but keep account and type. An auto-add shortcut already
+      // cleared it when the tap came in (capturedValues); whatever the form
+      // holds now is the next entry, typed while this save ran.
+      if (!capturedValues) {
+        resetForm();
+        // The amount is cleared; the next entry starts fresh and re-primes location.
+        amountWasEmptyRef.current = true;
+      }
 
       // The summoned form has done its job — fold it away. A no-op when the
       // panel is pinned open by the setting, which is why it is unconditional.
@@ -1272,37 +1298,53 @@ const OperationsScreen = () => {
     if (quickAddSavingRef.current) return;
     quickAddSavingRef.current = true;
     setQuickAddSaving(true);
-    try {
-      await performQuickAdd(overrideCategoryId, overrideToAccountId, capturedValues);
-    } finally {
-      quickAddSavingRef.current = false;
-      setQuickAddSaving(false);
-    }
+    const save = (async () => {
+      try {
+        await performQuickAdd(overrideCategoryId, overrideToAccountId, capturedValues);
+      } finally {
+        quickAddSavingRef.current = false;
+        setQuickAddSaving(false);
+      }
+    })();
+    quickAddInFlightRef.current = save;
+    await save;
   }, [performQuickAdd]);
 
-  // Handler for auto-add with category (from picker)
-  const handleAutoAddWithCategory = useCallback(async (categoryId) => {
+  // The auto-add shortcuts (a category chip, a transfer-target chip) stay
+  // tappable while an earlier save runs, and handleQuickAdd refuses a second
+  // save. Clearing the form first and then being refused lost the entry the
+  // user had just typed, so a shortcut tapped mid-save waits its turn instead.
+  // A tap with nothing typed during a save is the same chip tapped twice.
+  const autoAddWhenIdle = useCallback(async (overrideCategoryId, overrideToAccountId) => {
+    const capturedValues = quickAddValuesStore.getSnapshot();
+    const saveRunning = quickAddSavingRef.current;
+    if (saveRunning && !capturedValues.amount) return;
     // Capture BEFORE clearing: the form is cleared immediately so the user never
     // sees stale values during the save, and the store makes that clear visible
     // at once.
-    const capturedValues = quickAddValuesStore.getSnapshot();
     resetForm();
     closePicker();
-
-    // Pass the selected categoryId directly to avoid race conditions
-    await handleQuickAdd(categoryId, undefined, capturedValues);
+    while (quickAddSavingRef.current) {
+      try {
+        await quickAddInFlightRef.current;
+      } catch {
+        // That save reports its own failure.
+      }
+    }
+    await handleQuickAdd(overrideCategoryId, overrideToAccountId, capturedValues);
   }, [quickAddValuesStore, resetForm, closePicker, handleQuickAdd]);
+
+  // Handler for auto-add with category (from picker)
+  const handleAutoAddWithCategory = useCallback(async (categoryId) => {
+    // Pass the selected categoryId directly to avoid race conditions
+    await autoAddWhenIdle(categoryId, undefined);
+  }, [autoAddWhenIdle]);
 
   // Handler for auto-add with target account (from transfer target shortcuts)
   const handleAutoAddWithAccount = useCallback(async (toAccountId) => {
-    // Captured before the reset, for the same reason as above.
-    const capturedValues = quickAddValuesStore.getSnapshot();
-    resetForm();
-    closePicker();
-
     // Pass undefined for categoryId override, pass toAccountId override
-    await handleQuickAdd(undefined, toAccountId, capturedValues);
-  }, [quickAddValuesStore, resetForm, closePicker, handleQuickAdd]);
+    await autoAddWhenIdle(undefined, toAccountId);
+  }, [autoAddWhenIdle]);
 
   // Apply a suggested label by APPENDING it to the operation's existing labels.
   // The row stays open so the user can add several labels in a row; the applied

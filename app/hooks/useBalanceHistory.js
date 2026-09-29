@@ -3,6 +3,8 @@ import { upsertBalanceHistory, deleteBalanceHistory, formatDate } from '../servi
 import { createBalanceHistorySource, isNetWorthSelection } from '../services/BalanceHistorySource';
 import { appEvents, EVENTS } from '../services/eventEmitter';
 import { useTabFocusedEvent } from '../contexts/TabFocusContext';
+import * as Currency from '../services/currency';
+import { normalizeDecimalComma } from '../utils/amountInput';
 
 // Median of a numeric list; even counts average the two middle values.
 // Exported for unit testing.
@@ -717,13 +719,27 @@ const useBalanceHistory = (selectedAccount, selectedYear, selectedMonth, options
   const handleSaveBalance = useCallback(async (date) => {
     if (!selectedAccount || isNetWorth || !editingBalanceValue) return;
 
+    // The decimal-pad keyboard types "," in most locales, and the text used to be
+    // stored as typed: "1234,56" charted as 1234, dropped the account from that
+    // day's net worth, and a later back-dated operation rewrote it to its own
+    // delta (Currency.add read it as 0). Store a number at the account
+    // currency's precision, or nothing.
+    const normalized = normalizeDecimalComma(String(editingBalanceValue).replace(/\s/g, ''))
+      .replace(/\.$/, '');
+    if (!Currency.isValid(normalized)) {
+      console.warn('[useBalanceHistory] Ignoring a balance that is not a number');
+      return;
+    }
+    const account = (accountsRef.current || []).find(acc => String(acc?.id) === String(selectedAccount));
+    const balance = Currency.formatAmount(normalized, account?.currency ?? 2);
+
     try {
-      await upsertBalanceHistory(selectedAccount, date, editingBalanceValue);
+      await upsertBalanceHistory(selectedAccount, date, balance);
 
       // Update table data
       setBalanceHistoryTableData(prevData =>
         prevData.map(item =>
-          item.date === date ? { ...item, balance: editingBalanceValue } : item,
+          item.date === date ? { ...item, balance } : item,
         ),
       );
 
