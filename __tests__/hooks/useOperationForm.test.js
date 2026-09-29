@@ -1850,7 +1850,6 @@ describe('useOperationForm', () => {
       });
 
       it('saves the deduction unchanged and writes the rate back account→foreign', async () => {
-        Currency.convertAmount.mockReturnValue('244');
         mockUpdateOperation.mockResolvedValue();
 
         const props = { ...defaultProps, operation: legacyQuickAddExpense, isNew: false };
@@ -1864,7 +1863,9 @@ describe('useOperationForm', () => {
           await result.current.handleSave();
         });
 
-        expect(Currency.convertAmount).toHaveBeenCalledWith('263.52', 'EUR', 'USD', '0.925926');
+        // Nothing money-related was edited: the stored deduction is kept, not
+        // re-derived from the rate.
+        expect(Currency.convertAmount).not.toHaveBeenCalled();
         expect(mockUpdateOperation).toHaveBeenCalledWith(
           'op-fx',
           expect.objectContaining({

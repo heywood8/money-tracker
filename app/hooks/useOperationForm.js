@@ -79,7 +79,19 @@ const useOperationForm = ({
   const savingRef = useRef(false);
   // True while handleSplit's DB write is in flight — see the guard there.
   const splittingRef = useRef(false);
-  const [lastEditedField, setLastEditedField] = useState(null);
+  const [lastEditedField, setLastEditedFieldState] = useState(null);
+  // The money an edit form opened with, and whether the user has since typed an
+  // amount, a rate or a destination amount. Rate auto-fill and the effects below
+  // set lastEditedField too, so it cannot tell a money edit from a label edit —
+  // see moneyUntouched in prepareOperationData.
+  const loadedMoneyRef = useRef(null);
+  const moneyEditedRef = useRef(false);
+  // The setter handed to the form: every call comes from the user typing a money
+  // field. The hook's own effects use setLastEditedFieldState.
+  const setLastEditedField = useCallback((field) => {
+    if (field) moneyEditedRef.current = true;
+    setLastEditedFieldState(field);
+  }, []);
   const [rateSource, setRateSource] = useState('offline');
 
   // rateSource is shared for both multicurrency transfers and foreign currency ops
@@ -169,7 +181,7 @@ const useOperationForm = ({
     const pair = `${fromCurrency}:${toCurrency}`;
     if (ratePairRef.current && ratePairRef.current !== pair && values.exchangeRate) {
       setValues(v => ({ ...v, exchangeRate: '', destinationAmount: '' }));
-      setLastEditedField(null);
+      setLastEditedFieldState(null);
     }
     ratePairRef.current = pair;
   }, [visible, isMultiCurrencyTransfer, isForeignCurrencyOp, sourceAccount, destinationAccount, values.operationCurrency, values.exchangeRate]);
@@ -196,7 +208,7 @@ const useOperationForm = ({
         if (cancelled) return;
         if (rate) {
           setValues(v => ({ ...v, exchangeRate: rate }));
-          setLastEditedField('exchangeRate');
+          setLastEditedFieldState('exchangeRate');
         }
         setRateSource(source === 'live' ? 'live' : 'offline');
       })
@@ -205,7 +217,7 @@ const useOperationForm = ({
         const rate = Currency.getExchangeRate(fromCurrency, toCurrency);
         if (rate) {
           setValues(v => ({ ...v, exchangeRate: rate }));
-          setLastEditedField('exchangeRate');
+          setLastEditedFieldState('exchangeRate');
         }
         setRateSource('offline');
       });
@@ -220,7 +232,7 @@ const useOperationForm = ({
       // Clear exchange rate fields only for plain same-currency ops
       if (values.exchangeRate || values.destinationAmount) {
         setValues(v => ({ ...v, exchangeRate: '', destinationAmount: '' }));
-        setLastEditedField(null);
+        setLastEditedFieldState(null);
       }
       return;
     }
@@ -333,6 +345,14 @@ const useOperationForm = ({
           : String(operation.destinationAmount || '');
 
         if (!cancelled) {
+          loadedMoneyRef.current = {
+            type: operation.type || 'expense',
+            amount: loadAmount,
+            accountId: operation.accountId || currentAccounts[0]?.id || '',
+            toAccountId: operation.toAccountId || '',
+            operationCurrency: operation.type !== 'transfer' ? (operation.sourceCurrency || '') : '',
+          };
+          moneyEditedRef.current = false;
           setValues({
             type: operation.type || 'expense',
             amount: loadAmount,
@@ -452,10 +472,34 @@ const useOperationForm = ({
       data.amount = customAmount;
     }
 
+    // An edit that left the money alone (a label, the date, the category) keeps
+    // the amounts the row holds instead of re-deriving them from a rate. The
+    // stored rate is a 6-decimal rounding of what the user typed, so
+    // re-deriving drifted (1,000,000 AMD -> 2,564.10 USD re-saved as 2,564.00),
+    // and a transfer booked before an account's currency changed was re-priced
+    // at today's rate (50,000 AMD credited re-saved as 130 USD).
+    const loaded = loadedMoneyRef.current;
+    const moneyUntouched = !isNew && !!operation && !!loaded && !moneyEditedRef.current
+      && data.type === loaded.type
+      && String(data.accountId) === String(loaded.accountId)
+      && String(data.toAccountId || '') === String(loaded.toAccountId || '')
+      && String(data.operationCurrency || '') === String(loaded.operationCurrency || '')
+      && Currency.isPositiveAmount(String(data.amount))
+      && Currency.isPositiveAmount(String(loaded.amount))
+      && Currency.compare(data.amount, loaded.amount) === 0;
+
     if (isMultiCurrencyTransfer && sourceAccount && destinationAccount) {
       data.sourceCurrency = sourceAccount.currency;
       data.destinationCurrency = destinationAccount.currency;
-      if (lastEditedField === 'destinationAmount' && data.amount && data.destinationAmount) {
+      if (moneyUntouched && (operation.destinationAmount || !operation.exchangeRate)) {
+        // What the row credits the target today. A row booked while both
+        // accounts shared a currency has neither a destination amount nor a
+        // rate and credited its own amount; that credit is written down rather
+        // than priced anew. (A row with only a rate credits amount × rate, which
+        // the recompute below reproduces from the loaded rate.)
+        data.destinationAmount = String(operation.destinationAmount || operation.amount);
+        data.exchangeRate = operation.exchangeRate ? String(operation.exchangeRate) : '';
+      } else if (lastEditedField === 'destinationAmount' && data.amount && data.destinationAmount) {
         // User edited destination amount directly; back-calculate the rate synchronously
         // so the saved record is self-consistent even if the useEffect hasn't run yet.
         const srcAmt = parseFloat(data.amount);
@@ -469,34 +513,24 @@ const useOperationForm = ({
           }
         }
       } else if (data.amount && data.exchangeRate) {
-        // An edit that left the money alone (a label, the date) keeps the
-        // destination amount as stored. The stored rate is a 6-decimal rounding
-        // of what the user typed, so re-deriving the amount from it drifted: a
-        // 1,000,000 AMD → 2,564.10 USD transfer re-saved as 2,564.00 and the
-        // USD account silently lost 0.10.
-        const moneyUntouched = !isNew && operation && lastEditedField == null
-          && data.destinationAmount
-          && Currency.isValid(String(data.amount))
-          && Currency.compare(data.amount, String(operation.amount ?? '')) === 0
-          && String(data.exchangeRate) === String(operation.exchangeRate ?? '')
-          && String(data.accountId) === String(operation.accountId)
-          && String(data.toAccountId) === String(operation.toAccountId);
-        if (!moneyUntouched) {
-          // Recompute synchronously so a save before the async useEffect resolves
-          // never stores a destinationAmount that is inconsistent with amount × rate.
-          const recomputed = Currency.convertAmount(
-            data.amount,
-            sourceAccount.currency,
-            destinationAccount.currency,
-            data.exchangeRate,
-          );
-          if (recomputed) data.destinationAmount = recomputed;
-        }
+        // Recompute synchronously so a save before the async useEffect resolves
+        // never stores a destinationAmount that is inconsistent with amount × rate.
+        const recomputed = Currency.convertAmount(
+          data.amount,
+          sourceAccount.currency,
+          destinationAccount.currency,
+          data.exchangeRate,
+        );
+        if (recomputed) data.destinationAmount = recomputed;
       }
     } else if (isForeignCurrencyOp && sourceAccount && values.operationCurrency) {
       data.sourceCurrency = values.operationCurrency;
       data.destinationCurrency = sourceAccount.currency;
-      if (lastEditedField === 'destinationAmount' && data.amount && data.destinationAmount) {
+      if (moneyUntouched && operation.amount) {
+        // Form model: destinationAmount is the account-currency deduction, the
+        // row's stored amount.
+        data.destinationAmount = String(operation.amount);
+      } else if (lastEditedField === 'destinationAmount' && data.amount && data.destinationAmount) {
         // User edited the account-currency destination amount directly; back-calculate rate
         // synchronously so the saved record is self-consistent even if the useEffect hasn't run.
         const srcAmt = parseFloat(data.amount);       // foreign currency
@@ -544,6 +578,13 @@ const useOperationForm = ({
       // operation with an empty amount that could not be saved.
       data.sourceCurrency = null;
       data.destinationCurrency = null;
+      // A transfer booked across currencies whose accounts now share one: the
+      // form clears the conversion, and the target would be credited the plain
+      // amount while the reversal took back the stored destination amount.
+      if (moneyUntouched && data.type === 'transfer' && operation.destinationAmount) {
+        data.destinationAmount = String(operation.destinationAmount);
+        data.exchangeRate = operation.exchangeRate ? String(operation.exchangeRate) : '';
+      }
     }
 
     // Ensure amount is preserved when editing

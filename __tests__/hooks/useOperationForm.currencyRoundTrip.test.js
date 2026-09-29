@@ -9,6 +9,7 @@
  */
 import { renderHook, act, waitFor } from '@testing-library/react-native';
 import useOperationForm from '../../app/hooks/useOperationForm';
+import * as Currency from '../../app/services/currency';
 
 jest.mock('../../app/services/BalanceHistoryDB', () => ({
   formatDate: jest.fn((date) => `${date.getFullYear()}-${String(date.getMonth() + 1).padStart(2, '0')}-${String(date.getDate()).padStart(2, '0')}`),
@@ -115,6 +116,119 @@ describe('useOperationForm — saving multi-currency operations', () => {
 
       const payload = props.updateOperation.mock.calls[0][1];
       expect(payload.destinationAmount).toBe('1282.00');
+    });
+  });
+
+  // The foreign-currency expense path never got the transfer's guard: a
+  // label-only save rebuilt the account deduction from the rounded rate.
+  describe('foreign-currency expense', () => {
+    // 1,000,000 AMD spent, 2,564.10 USD deducted (typed by hand). The form
+    // derived the rate as 0.002564 (6 decimals) and stored it inverted.
+    const foreignExpense = {
+      id: 'op-fx', type: 'expense', amount: '2564.10', destinationAmount: '1000000', exchangeRate: '390.015601',
+      sourceCurrency: 'AMD', destinationCurrency: 'USD', accountId: 'acc-usd', categoryId: 'cat-1',
+      date: '2024-01-15', description: '',
+    };
+
+    it('keeps the stored deduction when only the label changes', async () => {
+      const props = makeProps({ operation: foreignExpense, isNew: false });
+      const { result } = await renderHook(() => useOperationForm(props));
+      await waitFor(() => expect(result.current.values.amount).toBe('1000000'));
+
+      await act(async () => {
+        result.current.setValues(v => ({ ...v, description: 'Groceries' }));
+      });
+      await act(async () => {
+        await result.current.handleSave();
+      });
+
+      const payload = props.updateOperation.mock.calls[0][1];
+      expect(payload.amount).toBe('2564.10');
+      expect(payload.destinationAmount).toBe('1000000');
+      expect(payload.description).toBe('Groceries');
+    });
+  });
+
+  // A transfer booked while both accounts shared a currency stores neither a
+  // destination amount nor a rate: it credited its own amount. After one
+  // account's currency changed, opening it fetched today's rate and a
+  // label-only save re-priced the credit.
+  describe('transfer booked before an account currency change', () => {
+    const sameCurrencyAtBooking = {
+      id: 'op-t2', type: 'transfer', amount: '50000', accountId: 'acc-amd', toAccountId: 'acc-usd',
+      exchangeRate: null, destinationAmount: null, sourceCurrency: null, destinationCurrency: null,
+      date: '2024-01-15', description: '',
+    };
+
+    beforeEach(() => {
+      Currency.fetchLiveExchangeRate.mockResolvedValue({ rate: '0.0026', source: 'live' });
+    });
+    afterEach(() => {
+      Currency.fetchLiveExchangeRate.mockResolvedValue({ rate: null, source: 'none' });
+    });
+
+    it('keeps crediting what it credited when only the label changes', async () => {
+      const props = makeProps({ operation: sameCurrencyAtBooking, isNew: false });
+      const { result } = await renderHook(() => useOperationForm(props));
+      // The form prices the pair at today's rate for display.
+      await waitFor(() => expect(result.current.values.destinationAmount).toBe('130.00'));
+
+      await act(async () => {
+        result.current.setValues(v => ({ ...v, description: 'Moved' }));
+      });
+      await act(async () => {
+        await result.current.handleSave();
+      });
+
+      const payload = props.updateOperation.mock.calls[0][1];
+      expect(payload.amount).toBe('50000');
+      expect(payload.destinationAmount).toBe('50000.00');
+    });
+
+    it('re-prices it when the user types a rate', async () => {
+      const props = makeProps({ operation: sameCurrencyAtBooking, isNew: false });
+      const { result } = await renderHook(() => useOperationForm(props));
+      await waitFor(() => expect(result.current.values.destinationAmount).toBe('130.00'));
+
+      await act(async () => {
+        result.current.setValues(v => ({ ...v, exchangeRate: '0.0025' }));
+        result.current.setLastEditedField('exchangeRate');
+      });
+      await act(async () => {
+        await result.current.handleSave();
+      });
+
+      const payload = props.updateOperation.mock.calls[0][1];
+      expect(payload.destinationAmount).toBe('125.00');
+    });
+  });
+
+  // The reverse: booked across currencies, and the accounts now share one. The
+  // form clears the conversion, so the target was credited the plain amount
+  // while the reversal took back the stored destination amount.
+  describe('cross-currency transfer whose accounts now share a currency', () => {
+    const usd2 = { id: 'acc-usd2', name: 'Savings', currency: 'USD', balance: '0' };
+    const bookedAcross = {
+      id: 'op-t3', type: 'transfer', amount: '100.00', accountId: 'acc-usd', toAccountId: 'acc-usd2',
+      exchangeRate: '0.92', destinationAmount: '92.00', sourceCurrency: 'USD', destinationCurrency: 'EUR',
+      date: '2024-01-15', description: '',
+    };
+
+    it('keeps the stored destination amount when only the label changes', async () => {
+      const props = makeProps({ operation: bookedAcross, isNew: false, accounts: [usd, usd2, amd] });
+      const { result } = await renderHook(() => useOperationForm(props));
+      await waitFor(() => expect(result.current.values.amount).toBe('100.00'));
+      await waitFor(() => expect(result.current.values.destinationAmount).toBe(''));
+
+      await act(async () => {
+        result.current.setValues(v => ({ ...v, description: 'Moved' }));
+      });
+      await act(async () => {
+        await result.current.handleSave();
+      });
+
+      const payload = props.updateOperation.mock.calls[0][1];
+      expect(payload.destinationAmount).toBe('92.00');
     });
   });
 });
