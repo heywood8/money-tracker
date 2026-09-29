@@ -2310,20 +2310,66 @@ const collectPlanSourceCurrencies = async (lines, startDate, endDate, convertAll
 };
 
 /**
+ * Every category's children, keyed by the parent's id as a string — the whole
+ * tree in one query. A status recompute expands each line's categories from
+ * it, rather than issuing a recursive descendant query per category per line
+ * on top of the one each line's own actual already runs.
+ * @returns {Promise<Map<string, Array<string>>>}
+ */
+const loadCategoryChildren = async () => {
+  const rows = await queryAll('SELECT id, parent_id FROM categories');
+  const children = new Map();
+  for (const row of rows || []) {
+    if (!isSet(row.parent_id)) continue;
+    const key = String(row.parent_id);
+    if (!children.has(key)) children.set(key, []);
+    children.get(key).push(row.id);
+  }
+  return children;
+};
+
+/**
+ * `categoryIds` with all their descendants, de-duplicated — what
+ * {@link expandCategoryIds} returns with children on, computed from a
+ * preloaded tree. The walk visits each category once, so a corrupt parent
+ * cycle ends instead of looping.
+ * @param {Array<string>} categoryIds
+ * @param {Map<string, Array<string>>} children - from loadCategoryChildren
+ * @returns {Array<string>}
+ */
+const withDescendants = (categoryIds, children) => {
+  const seen = new Set();
+  const out = [];
+  const push = (id) => {
+    if (!isSet(id) || seen.has(String(id))) return;
+    seen.add(String(id));
+    out.push(id);
+  };
+  for (const id of categoryIds) push(id);
+  // `out` grows as descendants are appended, which makes this a breadth-first walk.
+  for (let index = 0; index < out.length; index += 1) {
+    for (const child of children.get(String(out[index])) || []) push(child);
+  }
+  return out;
+};
+
+/**
  * What a counted (non-income) line matches, in the terms two lines are compared
  * on — decided by the same branch {@link calculateLineActual} takes. A spending
  * line: its categories with descendants, and its source accounts, an empty set
  * meaning "any". A transfer-target line: the account it receives into.
  * @param {Object} line
+ * @param {() => Promise<Map<string, Array<string>>>} categoryChildren - the
+ *   tree, loaded once per status (see loadCategoryChildren)
  * @returns {Promise<Object>}
  */
-const lineMatchScope = async (line) => {
+const lineMatchScope = async (line, categoryChildren) => {
   const categoryIds = line.categoryIds ?? (isSet(line.categoryId) ? [line.categoryId] : []);
   const sourceAccountIds = line.sourceAccountIds ?? [];
   if (categoryIds.length > 0 || sourceAccountIds.length > 0) {
     return {
       kind: 'spending',
-      categoryIds: await expandCategoryIds(categoryIds, true),
+      categoryIds: withDescendants(categoryIds, await categoryChildren()),
       accountIds: sourceAccountIds.filter(isSet),
     };
   }
@@ -2504,6 +2550,12 @@ const calculateStatusForPlan = async (plan, displayCurrency = null, convertAll =
 
     const lineStatuses = [];
     const transferCurrencies = new Set();
+    // The category tree, read on first use and once per recompute (see lineMatchScope).
+    let categoryChildrenLoad = null;
+    const categoryChildren = () => {
+      categoryChildrenLoad ||= loadCategoryChildren();
+      return categoryChildrenLoad;
+    };
     let allocated = '0';
     // The lines whose actuals make up "Spent", each with the actual and what it
     // matches. Not summed as the lines are walked: lines overlap, and a sum
@@ -2638,7 +2690,7 @@ const calculateStatusForPlan = async (plan, displayCurrency = null, convertAll =
       if (sourceCurrency) {
         transferCurrencies.add(sourceCurrency);
       }
-      const counted = { line, actual, scope: await lineMatchScope(line) };
+      const counted = { line, actual, scope: await lineMatchScope(line, categoryChildren) };
       countedLines.push(counted);
       if (groupTally) {
         groupTally.counted.push(counted);
@@ -2659,11 +2711,15 @@ const calculateStatusForPlan = async (plan, displayCurrency = null, convertAll =
 
     // "Spent" for the month and for each group: every operation once, however
     // many of the lines match it. Line statuses above keep their own actuals.
+    // Run together: the cache holds promises, so a cluster the month's total
+    // and a group share is still queried once.
     const sumContext = { currency: target, startDate, endDate, convertAll, cache: new Map() };
-    const totalActual = await sumActualsOnce(countedLines, sumContext);
-    for (const tally of groupTallies.values()) {
-      tally.actual = await sumActualsOnce(tally.counted, sumContext);
-    }
+    const [totalActual] = await Promise.all([
+      sumActualsOnce(countedLines, sumContext),
+      ...[...groupTallies.values()].map(async (tally) => {
+        tally.actual = await sumActualsOnce(tally.counted, sumContext);
+      }),
+    ]);
 
     // Group statuses, and the correction an OVERRIDE group makes to `allocated`.
     //

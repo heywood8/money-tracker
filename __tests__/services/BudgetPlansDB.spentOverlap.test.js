@@ -77,6 +77,10 @@ const setupDb = ({ lines, groups = [] }) => {
     return null;
   });
   queryAll.mockImplementation(async (sql, params) => {
+    if (sql.includes('SELECT id, parent_id FROM categories')) {
+      return Object.entries(CHILDREN).flatMap(([parent, children]) =>
+        children.map(id => ({ id, parent_id: parent })));
+    }
     if (sql.includes("o.type = 'expense'") && sql.includes('GROUP BY a.currency')) {
       // Convert-all form of the same sum: no currency param, one row per currency.
       const categories = new Set(params.slice(0, -2));
@@ -101,9 +105,8 @@ const stubLineSpending = () => {
   });
 };
 
-// Filter sets OR-ed together — not the shadow-category clause, which has an OR
-// of its own.
-const unionQueries = () => queryFirst.mock.calls.filter(([sql]) => sql.includes(') OR (o.'));
+// The per-line engine is stubbed, so any expense sum the db sees is the union.
+const unionQueries = () => queryFirst.mock.calls.filter(([sql]) => sql.includes("o.type = 'expense'"));
 
 describe('BudgetPlansDB — "Spent" with overlapping lines', () => {
   beforeEach(() => {
@@ -137,10 +140,29 @@ describe('BudgetPlansDB — "Spent" with overlapping lines', () => {
     expect(parseFloat(status.groups[0].actual)).toBe(100);
     expect(parseFloat(status.totals.actualRemainder)).toBe(-100);
 
-    // Asked as one union of both lines' filters, descendants included.
+    // Asked once, as the union of both lines' categories, descendants included
+    // and each bound once.
     const [[sql, params]] = unionQueries();
-    expect(sql).toContain('(o.category_id IN (?,?)) OR (o.category_id IN (?))');
-    expect(params.slice(0, 3)).toEqual(['cat-food', 'cat-rest', 'cat-rest']);
+    expect(unionQueries()).toHaveLength(1);
+    expect(sql).toContain('o.category_id IN (?,?)');
+    expect(params.slice(0, -3)).toEqual(['cat-food', 'cat-rest']);
+  });
+
+  it('reads the category tree once per status, not a descendant query per line', async () => {
+    setupDb({
+      lines: [
+        lineRow('l-food', '500', { categoryId: 'cat-food' }),
+        lineRow('l-rest', '200', { categoryId: 'cat-rest', sortOrder: 1 }),
+        lineRow('l-transport', '80', { categoryId: 'cat-transport', sortOrder: 2 }),
+      ],
+    });
+
+    const status = await BudgetPlansDB.calculatePlanStatus('p1', 'USD', false);
+
+    expect(parseFloat(status.totals.totalActual)).toBe(150);
+    expect(CategoriesDB.getAllDescendants).not.toHaveBeenCalled();
+    const treeReads = queryAll.mock.calls.filter(([sql]) => sql.includes('SELECT id, parent_id FROM categories'));
+    expect(treeReads).toHaveLength(1);
   });
 
   it('counts it once with convert-all on as well', async () => {

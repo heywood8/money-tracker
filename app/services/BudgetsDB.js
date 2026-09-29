@@ -711,11 +711,35 @@ export const calculateSpendingForAnyFilters = async ({
   convertAll = false,
 }) => {
   try {
-    const filters = [];
-    for (const set of filterSets) {
-      const filter = await buildSpendingFilter(set, includeChildren);
-      if (filter) filters.push(filter);
+    // Sets filtering on the same accounts differ only in their categories, so
+    // they merge into one clause with one de-duplicated category list — a
+    // parent line next to its children would otherwise bind every child id
+    // once per set, pushing a large plan toward SQLite's bound-parameter limit.
+    // A set with no category filter means "any category" on those accounts,
+    // and absorbs the rest of its group.
+    const byAccounts = new Map();
+    for (const { categoryIds = [], accountIds = [] } of filterSets) {
+      const expandedIds = await expandCategoryIds(categoryIds, includeChildren);
+      const filterAccountIds = normalizeAccountIds(accountIds);
+      // Tracks nothing: left out rather than widening the union to everything.
+      if (expandedIds.length === 0 && filterAccountIds.length === 0) continue;
+      const key = filterAccountIds.map(String).sort().join(',');
+      let merged = byAccounts.get(key);
+      if (!merged) {
+        merged = { accountIds: filterAccountIds, categoryIds: [], seen: new Set(), anyCategory: false };
+        byAccounts.set(key, merged);
+      }
+      if (expandedIds.length === 0) merged.anyCategory = true;
+      for (const id of expandedIds) {
+        if (merged.seen.has(String(id))) continue;
+        merged.seen.add(String(id));
+        merged.categoryIds.push(id);
+      }
     }
+    const filters = [...byAccounts.values()].map(merged => spendingFilterClause(
+      merged.anyCategory ? [] : merged.categoryIds,
+      merged.accountIds,
+    ));
     if (filters.length === 0) return '0';
 
     // One WHERE with the sets OR-ed together: SQLite visits each operation row
@@ -734,9 +758,6 @@ export const calculateSpendingForAnyFilters = async ({
 /**
  * One filter set as a WHERE fragment, or null when it tracks nothing (no
  * category and no account left to filter on).
- *
- * Each clause is added only when its set is non-empty — an empty `IN ()` is a
- * SQL syntax error, and an absent clause is exactly the "any" semantics.
  * @param {{categoryIds?: Array<string>, accountIds?: Array<string|number>}} set
  * @param {boolean} includeChildren
  * @returns {Promise<{clause: string, params: Array}|null>}
@@ -745,7 +766,19 @@ const buildSpendingFilter = async ({ categoryIds = [], accountIds = [] }, includ
   const expandedIds = await expandCategoryIds(categoryIds, includeChildren);
   const filterAccountIds = normalizeAccountIds(accountIds);
   if (expandedIds.length === 0 && filterAccountIds.length === 0) return null;
+  return spendingFilterClause(expandedIds, filterAccountIds);
+};
 
+/**
+ * The WHERE fragment for already expanded categories and normalized accounts.
+ *
+ * Each clause is added only when its set is non-empty — an empty `IN ()` is a
+ * SQL syntax error, and an absent clause is exactly the "any" semantics.
+ * @param {Array<string>} expandedIds
+ * @param {Array<string|number>} filterAccountIds
+ * @returns {{clause: string, params: Array}}
+ */
+const spendingFilterClause = (expandedIds, filterAccountIds) => {
   const conditions = [];
   const params = [];
   if (expandedIds.length > 0) {
