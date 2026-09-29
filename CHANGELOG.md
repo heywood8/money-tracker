@@ -1,5 +1,12 @@
 # Changelog
 
+## [0.293.2](https://github.com/heywood8/money-tracker/compare/penny-v0.293.1...penny-v0.293.2) (2026-09-29)
+
+
+### Bug Fixes
+
+* stop seven money-corrupting bugs from the new audit ([#1849](https://github.com/heywood8/money-tracker/issues/1849)) ([b588b31](https://github.com/heywood8/money-tracker/commit/b588b31b618f6b42d0e6981ac6512b219b609598))
+
 ## [0.293.1](https://github.com/heywood8/money-tracker/compare/penny-v0.293.0...penny-v0.293.1) (2026-09-28)
 
 
