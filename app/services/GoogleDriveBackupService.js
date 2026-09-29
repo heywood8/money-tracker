@@ -117,20 +117,26 @@ const rowsOf = (file) => {
 };
 
 /**
- * Whether Drive file `candidate` holds too little to take `reference`'s place:
- * by the row count when both carry one, by byte size otherwise.
- * @param {{size?: string, appProperties?: Object}} candidate
- * @param {{size?: string, appProperties?: Object}} reference
+ * What the shrink guard measures a Drive file by.
+ * @param {{size?: string, appProperties?: Object}} file
+ * @returns {{rows: number|null, bytes: string|undefined}}
+ */
+const measureOf = file => ({ rows: rowsOf(file), bytes: file?.size });
+
+// Whether two backups are compared on rows: only when both carry a row count.
+const comparedOnRows = (a, b) => a.rows !== null && b.rows !== null;
+
+/**
+ * Whether backup `candidate` holds too little to take `reference`'s place: by
+ * the row count when both carry one, by byte size otherwise. The one rule both
+ * the upload's pre-check and the rotation apply, so the two cannot drift apart.
+ * @param {{rows: number|null, bytes: number|string|null|undefined}} candidate
+ * @param {{rows: number|null, bytes: number|string|null|undefined}} reference
  * @returns {boolean}
  */
-const holdsMuchLess = (candidate, reference) => {
-  const candidateRows = rowsOf(candidate);
-  const referenceRows = rowsOf(reference);
-  if (candidateRows !== null && referenceRows !== null) {
-    return isMuchSmaller(candidateRows, referenceRows);
-  }
-  return isMuchSmaller(candidate.size, reference.size);
-};
+const holdsMuchLess = (candidate, reference) => (comparedOnRows(candidate, reference)
+  ? isMuchSmaller(candidate.rows, reference.rows)
+  : isMuchSmaller(candidate.bytes, reference.bytes));
 
 /**
  * UTF-8 byte length of a string — what Drive will report as the file's size.
@@ -601,7 +607,7 @@ export const cleanupDriveBackups = async (
       const fileDate = backupDateOf(file.name);
       const withinProtection = fileDate !== null && today !== null
         && (today - fileDate) / DAY_MS <= protectDays;
-      if (withinProtection && holdsMuchLess(newest, file)) {
+      if (withinProtection && holdsMuchLess(measureOf(newest), measureOf(file))) {
         console.warn(`[DriveBackup] Keeping ${file.name}: it holds much more than the newest backup, ${newest.name}`);
         continue;
       }
@@ -634,15 +640,11 @@ const uploadSnapshot = async (accessToken, { folderId, label, backup, formats, o
     return { format, mimeType, name: `penny_${label}.${ext}`, existing: null };
   });
 
-  // Each built at most once, and only when something needs it — the byte-size
-  // comparison against a file uploaded before ROWS_PROPERTY, or the upload.
-  const contents = new Map();
-  const contentOf = (format) => {
-    if (!contents.has(format)) {
-      contents.set(format, format === 'json' ? JSON.stringify(backup) : buildCombinedCSV(backup));
-    }
-    return contents.get(format);
-  };
+  // Built where it is used and dropped after: a byte comparison against a file
+  // uploaded before ROWS_PROPERTY measures a format and lets the string go, and
+  // the upload builds it again, so the JSON and the CSV of a large dataset are
+  // never held in memory together.
+  const contentOf = format => (format === 'json' ? JSON.stringify(backup) : buildCombinedCSV(backup));
   let stagedUri = null;
   const stageDatabase = async (name) => {
     if (stagedUri) return stagedUri;
@@ -662,20 +664,18 @@ const uploadSnapshot = async (accessToken, { folderId, label, backup, formats, o
 
   try {
     throwIfCancelled();
-    for (const target of targets) {
-      target.existing = await findFileByName(accessToken, folderId, target.name);
-    }
+    const existing = await Promise.all(targets.map(target => findFileByName(accessToken, folderId, target.name)));
+    targets.forEach((target, index) => { target.existing = existing[index]; });
 
     for (const target of targets) {
       if (!target.existing) continue;
-      const remoteRows = rowsOf(target.existing);
-      const refused = remoteRows !== null
-        ? isMuchSmaller(rows, remoteRows)
-        : isMuchSmaller(await localBytes(target), target.existing.size);
-      if (refused) {
-        const measure = remoteRows !== null
-          ? `${remoteRows} rows against ${rows}`
-          : `${target.existing.size} bytes`;
+      const remote = measureOf(target.existing);
+      // Bytes are only measured when the rows cannot decide.
+      const local = { rows, bytes: comparedOnRows({ rows }, remote) ? null : await localBytes(target) };
+      if (holdsMuchLess(local, remote)) {
+        const measure = comparedOnRows(local, remote)
+          ? `${remote.rows} rows against ${local.rows}`
+          : `${remote.bytes} bytes against ${local.bytes}`;
         console.warn(`[DriveBackup] Keeping the ${label} backup in Drive: ${target.name} holds much more (${measure})`);
         return { uploaded: [], kept: targets.map(t => t.name) };
       }
@@ -697,7 +697,6 @@ const uploadSnapshot = async (accessToken, { folderId, label, backup, formats, o
         await uploadTextFile(accessToken, {
           folderId, name, mimeType, content: contentOf(format), existing, appProperties,
         });
-        contents.delete(format);
       }
       uploaded.push(name);
     }

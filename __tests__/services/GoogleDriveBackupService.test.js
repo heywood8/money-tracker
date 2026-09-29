@@ -785,6 +785,46 @@ describe('GoogleDriveBackupService', () => {
       expect(writes().map(([url]) => url)).toEqual([expect.stringContaining('/upload/drive/v3/files/old-csv')]);
     });
 
+    it('measures a text format and lets it go, building it again for the upload', async () => {
+      // Files uploaded before the row count existed are compared on bytes.
+      // Holding each measured string until its upload kept the JSON and the CSV
+      // of a large dataset in memory together.
+      setPreferences({ drive_backup_last_weekly_week: THIS_WEEK, drive_backup_formats: JSON.stringify(['json', 'csv']) });
+      routeExisting({ json: { id: 'old-json', size: '10' }, csv: { id: 'old-csv', size: '10' } });
+
+      const result = await performDriveBackup({ mode: 'auto', getAccessToken });
+
+      expect(result.status).toBe('success');
+      // Once to measure, once to upload.
+      expect(mockBackupRestore.buildCombinedCSV).toHaveBeenCalledTimes(2);
+    });
+
+    it('looks up every format\'s existing file at once', async () => {
+      setPreferences({ drive_backup_last_weekly_week: THIS_WEEK });
+      routeExisting({});
+      const base = global.fetch;
+      const held = [];
+      let holding = true;
+      global.fetch = jest.fn((url, options) => {
+        if (holding && url.includes('name%3D')) {
+          return new Promise(resolve => held.push(() => resolve(base(url, options))));
+        }
+        return base(url, options);
+      });
+
+      const run = performDriveBackup({ mode: 'auto', getAccessToken });
+      for (let tick = 0; tick < 50 && held.length < 3; tick += 1) {
+        await new Promise(resolve => setTimeout(resolve, 0));
+      }
+      const inFlightTogether = held.length;
+      holding = false;
+      held.forEach(release => release());
+      const result = await run;
+
+      expect(inFlightTogether).toBe(3);
+      expect(result.status).toBe('success');
+    });
+
     it('records it on a database created from scratch as well', async () => {
       routeExisting({});
 
