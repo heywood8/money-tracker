@@ -72,6 +72,15 @@ describe('operationMatchesNotification', () => {
     )).toBe(true);
   });
 
+  it("matches the pipeline's own rounded booking of a fractional charge", () => {
+    // Auto-create books 1234.56 on a whole-unit account rounding to 10 as
+    // 1235 -> 1240; rounding the raw charge would give 1230.
+    const RUB_ROUND_10 = { id: 9, currency: 'RUB', autoTxnRounding: 10, autoTxnRoundingMode: 'nearest' };
+    expect(operationMatchesNotification(
+      op({ amount: '1240' }), item({ amount: '1234.56', currency: 'RUB' }), RUB_ROUND_10,
+    )).toBe(true);
+  });
+
   it('does not round a fractional charge on a two-decimal account', () => {
     const USD = { id: 9, currency: 'USD', autoTxnRounding: null, autoTxnRoundingMode: null };
     expect(operationMatchesNotification(
