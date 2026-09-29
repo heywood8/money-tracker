@@ -22,7 +22,7 @@ import {
   isSnapshotValid,
 } from './DailyBackupService';
 import { getPreference, setPreference, PREF_KEYS } from './PreferencesDB';
-import { countRows, SHRINK_GUARD_RATIO } from './backupBaseline';
+import { countRows, getRestoredOn, SHRINK_GUARD_RATIO } from './backupBaseline';
 import { appEvents } from './eventEmitter';
 
 const DRIVE_API = 'https://www.googleapis.com/drive/v3/files';
@@ -646,12 +646,17 @@ export const cleanupDriveBackups = async (
  * it would replace, none is uploaded. Deciding per file let the one format
  * whose measure misleads (bytes, for a never-vacuumed .db) through while the
  * others were refused — and that .db then took a real backup's slot.
+ *
+ * `restoredToday` skips that check: a restore today re-anchored what "normal"
+ * is, and the files uploaded this morning, before it, hold the data it replaced.
  * @param {string} accessToken
  * @param {Object} params
  * @returns {Promise<{uploaded: string[], kept: string[]}>} Names of the uploaded
  *   files, and of the ones not uploaded because a much larger backup holds the slot
  */
-const uploadSnapshot = async (accessToken, { folderId, label, backup, formats, onProgress }) => {
+const uploadSnapshot = async (accessToken, {
+  folderId, label, backup, formats, onProgress, restoredToday = false,
+}) => {
   const rows = countRows(backup);
   const appProperties = { [ROWS_PROPERTY]: String(rows) };
   const targets = formats.map((format) => {
@@ -687,7 +692,7 @@ const uploadSnapshot = async (accessToken, { folderId, label, backup, formats, o
     targets.forEach((target, index) => { target.existing = existing[index]; });
 
     for (const target of targets) {
-      if (!target.existing) continue;
+      if (!target.existing || restoredToday) continue;
       const remote = measureOf(target.existing);
       // Bytes are only measured when the rows cannot decide.
       const local = { rows, bytes: comparedOnRows({ rows }, remote) ? null : await localBytes(target) };
@@ -860,11 +865,16 @@ export const performDriveBackup = async ({ mode = 'auto', getAccessToken }) => {
     }
 
     const folderId = await ensureBackupFolder(accessToken);
+    // A restore today makes a smaller snapshot the user's own choice, not a
+    // fresh install's — see setRestoredOn.
+    const restoredToday = (await getRestoredOn()) === today;
 
     const uploaded = [];
     const kept = [];
     const upload = async (label) => {
-      const run = await uploadSnapshot(accessToken, { folderId, label, backup, formats, onProgress });
+      const run = await uploadSnapshot(accessToken, {
+        folderId, label, backup, formats, onProgress, restoredToday,
+      });
       uploaded.push(...run.uploaded);
       kept.push(...run.kept);
     };

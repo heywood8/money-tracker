@@ -7,7 +7,7 @@ import * as Sharing from 'expo-sharing';
 import * as DocumentPicker from 'expo-document-picker';
 import { queryAll, executeQuery, executeTransaction, getDatabase } from './db';
 import { appEvents } from './eventEmitter';
-import { acceptBaseline, countRows } from './backupBaseline';
+import { acceptBaseline, countRows, setRestoredOn } from './backupBaseline';
 import * as BudgetPlansDB from './BudgetPlansDB';
 import { toOperationDate, todayLocalDate } from '../utils/dateUtils';
 import { resolveCategoryIcon } from '../utils/categoryUtils';
@@ -1761,8 +1761,11 @@ export const restoreBackup = async (backup, cancelToken) => {
     // the pre-restore size, so it refuses them all — forever, because nothing
     // new is ever written for it to compare against next time. See
     // app/services/backupBaseline.js.
+    // The day is recorded with it, so the Drive backup can tell a dataset that
+    // shrank because the user restored it from one that shrank on its own.
     try {
       await acceptBaseline(countRows(backup));
+      await setRestoredOn(todayLocalDate());
     } catch (baselineError) {
       // Never fail a completed restore over bookkeeping.
       console.warn('Failed to re-anchor the backup baseline:', baselineError);

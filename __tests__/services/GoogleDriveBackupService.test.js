@@ -133,6 +133,7 @@ const setPreferences = (overrides = {}) => {
     drive_backup_last_daily_date: null,
     drive_backup_last_weekly_week: null,
     drive_backup_last_result: null,
+    backup_restored_on: null,
     ...overrides,
   };
   mockPreferencesDB.getPreference.mockImplementation(async (key, fallback = null) =>
@@ -824,6 +825,40 @@ describe('GoogleDriveBackupService', () => {
 
       expect(inFlightTogether).toBe(3);
       expect(result.status).toBe('success');
+    });
+
+    it('lets a snapshot replace this morning\'s larger file on the day of a restore', async () => {
+      // The user restored an older, smaller backup today, which also rolled the
+      // upload marks back — so today's files are uploaded again, over the
+      // pre-restore ones. That is their choice, not a fresh install's.
+      setPreferences({
+        drive_backup_last_weekly_week: THIS_WEEK,
+        drive_backup_formats: JSON.stringify(['json']),
+        backup_restored_on: TODAY,
+      });
+      routeExisting({ json: { id: 'pre-restore-json', size: FULL_SIZE, appProperties: { pennyRows: '400' } } });
+
+      const result = await performDriveBackup({ mode: 'auto', getAccessToken });
+
+      expect(result.status).toBe('success');
+      expect(result.kept).toBeUndefined();
+      expect(writes().map(([url]) => url)).toEqual([
+        expect.stringContaining('/upload/drive/v3/files/pre-restore-json'),
+      ]);
+    });
+
+    it('keeps guarding on any other day after a restore', async () => {
+      setPreferences({
+        drive_backup_last_weekly_week: THIS_WEEK,
+        drive_backup_formats: JSON.stringify(['json']),
+        backup_restored_on: '2026-02-25',
+      });
+      routeExisting({ json: { id: 'pre-restore-json', size: FULL_SIZE, appProperties: { pennyRows: '400' } } });
+
+      const result = await performDriveBackup({ mode: 'auto', getAccessToken });
+
+      expect(result).toMatchObject({ status: 'skipped', reason: 'remote_larger' });
+      expect(writes()).toHaveLength(0);
     });
 
     it('records it on a database created from scratch as well', async () => {
