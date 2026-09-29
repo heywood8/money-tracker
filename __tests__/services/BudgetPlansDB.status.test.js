@@ -338,16 +338,23 @@ describe('BudgetPlansDB plan-vs-actual', () => {
     });
 
     // Dispatch the db mocks by SQL shape: plan row, plan lines, income sums,
-    // distinct-currency collection, account currency lookup.
+    // distinct-currency collection, account currency lookup. The per-line
+    // spending engine is stubbed per test; `expenseByCategory` answers the one
+    // expense query left, the month's "Spent" over every line's categories.
     const setupDb = ({
       lines = [], recurringLines = [], incomeTotal = 0, incomeRows = [], expenseCurrencies = [], accountCurrency = 'USD',
-      planForMonth = null,
+      planForMonth = null, expenseByCategory = {},
     }) => {
-      queryFirst.mockImplementation(async (sql) => {
+      queryFirst.mockImplementation(async (sql, params) => {
         if (sql.includes('FROM budget_plans WHERE id')) return PLAN_ROW;
         if (sql.includes('FROM budget_plans WHERE month')) return planForMonth;
         if (sql.includes('SELECT currency FROM accounts')) return { currency: accountCurrency };
         if (sql.includes("o.type = 'income'")) return { total: incomeTotal };
+        if (sql.includes("o.type = 'expense'")) {
+          // Filter params first; the currency and the two dates close the list.
+          const categories = new Set(params.slice(0, -3));
+          return { total: [...categories].reduce((sum, id) => sum + Number(expenseByCategory[id] || 0), 0) };
+        }
         return null;
       });
       queryAll.mockImplementation(async (sql) => {
@@ -375,6 +382,7 @@ describe('BudgetPlansDB plan-vs-actual', () => {
           lineRow('l-over', '100', 'cat-over', null, 3),
         ],
         incomeTotal: 900,
+        expenseByCategory: { 'cat-safe': 50, 'cat-warn': 70, 'cat-danger': 95, 'cat-over': 150 },
       });
       const spendingByCategory = {
         'cat-safe': '50', 'cat-warn': '70', 'cat-danger': '95', 'cat-over': '150',
@@ -408,6 +416,7 @@ describe('BudgetPlansDB plan-vs-actual', () => {
           lineRow('l-broken', '40', null, null, 1),
         ],
         incomeTotal: 0,
+        expenseByCategory: { cat1: 30 },
       });
       calculateSpendingForFilters.mockResolvedValue('30');
 
@@ -632,6 +641,7 @@ describe('BudgetPlansDB plan-vs-actual', () => {
           lines: [lineRow('stray', '999', 'cat9', null, 0)],
           recurringLines: [recurringLineRow('rent', '200', 'USD', 'cat1', null, 0)],
           incomeTotal: 500,
+          expenseByCategory: { cat1: 50, cat9: 999 },
         });
         calculateSpendingForFilters.mockResolvedValue('50');
 

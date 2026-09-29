@@ -2310,151 +2310,45 @@ const collectPlanSourceCurrencies = async (lines, startDate, endDate, convertAll
 };
 
 /**
- * Every category's children, keyed by the parent's id as a string — the whole
- * tree in one query. A status recompute expands each line's categories from
- * it, rather than issuing a recursive descendant query per category per line
- * on top of the one each line's own actual already runs.
- * @returns {Promise<Map<string, Array<string>>>}
- */
-const loadCategoryChildren = async () => {
-  const rows = await queryAll('SELECT id, parent_id FROM categories');
-  const children = new Map();
-  for (const row of rows || []) {
-    if (!isSet(row.parent_id)) continue;
-    const key = String(row.parent_id);
-    if (!children.has(key)) children.set(key, []);
-    children.get(key).push(row.id);
-  }
-  return children;
-};
-
-/**
- * `categoryIds` with all their descendants, de-duplicated — what
- * {@link expandCategoryIds} returns with children on, computed from a
- * preloaded tree. The walk visits each category once, so a corrupt parent
- * cycle ends instead of looping.
- * @param {Array<string>} categoryIds
- * @param {Map<string, Array<string>>} children - from loadCategoryChildren
- * @returns {Array<string>}
- */
-const withDescendants = (categoryIds, children) => {
-  const seen = new Set();
-  const out = [];
-  const push = (id) => {
-    if (!isSet(id) || seen.has(String(id))) return;
-    seen.add(String(id));
-    out.push(id);
-  };
-  for (const id of categoryIds) push(id);
-  // `out` grows as descendants are appended, which makes this a breadth-first walk.
-  for (let index = 0; index < out.length; index += 1) {
-    for (const child of children.get(String(out[index])) || []) push(child);
-  }
-  return out;
-};
-
-/**
- * What a counted (non-income) line matches, in the terms two lines are compared
- * on — decided by the same branch {@link calculateLineActual} takes. A spending
- * line: its categories with descendants, and its source accounts, an empty set
- * meaning "any". A transfer-target line: the account it receives into.
- * @param {Object} line
- * @param {() => Promise<Map<string, Array<string>>>} categoryChildren - the
- *   tree, loaded once per status (see loadCategoryChildren)
- * @returns {Promise<Object>}
- */
-const lineMatchScope = async (line, categoryChildren) => {
-  const categoryIds = line.categoryIds ?? (isSet(line.categoryId) ? [line.categoryId] : []);
-  const sourceAccountIds = line.sourceAccountIds ?? [];
-  if (categoryIds.length > 0 || sourceAccountIds.length > 0) {
-    return {
-      kind: 'spending',
-      categoryIds: withDescendants(categoryIds, await categoryChildren()),
-      accountIds: sourceAccountIds.filter(isSet),
-    };
-  }
-  return { kind: 'transfer', accountId: String(line.toAccountId) };
-};
-
-// Whether some id satisfies both filters; an empty filter is "any".
-const filtersMeet = (a, b) => {
-  if (a.length === 0 || b.length === 0) return true;
-  const ids = new Set(a.map(String));
-  return b.some(id => ids.has(String(id)));
-};
-
-/**
- * Whether one operation could count toward both lines. When this says no, the
- * two can never share one — an operation has one category and one account — so
- * their actuals simply add up.
- * @param {Object} a - from lineMatchScope
- * @param {Object} b - from lineMatchScope
- * @returns {boolean}
- */
-const mayShareOperations = (a, b) => {
-  // An expense and a transfer are never the same operation.
-  if (a.kind !== b.kind) return false;
-  if (a.kind === 'transfer') return a.accountId === b.accountId;
-  return filtersMeet(a.categoryIds, b.categoryIds) && filtersMeet(a.accountIds, b.accountIds);
-};
-
-/**
- * The actual of a set of lines, every operation counted once.
+ * "Spent" for a set of counted (non-income) lines, every operation once.
  *
  * Summing line actuals counted an operation once per line that matched it, and
  * lines overlap routinely: a parent category next to one of its children, a
  * card-only line next to a category line, two lines receiving into one account.
- * Lines that could share an operation are clustered. A lone line keeps the
- * actual already computed for it; transfer lines cluster only on one account,
- * so they share one actual, counted once; spending lines are summed as the
- * union of their filters.
- * @param {Array<{line: Object, actual: string, scope: Object}>} entries
+ * So the spending lines are summed as ONE union of their filters (see
+ * calculateSpendingForAnyFilters), and the transfer-target lines — decided by
+ * the same branch calculateLineActual takes — by account: two lines receiving
+ * into one account share one actual, counted once.
+ * @param {Array<{line: Object, actual: string}>} counted
  * @param {Object} context
  * @param {string} context.currency
  * @param {string} context.startDate
  * @param {string} context.endDate
  * @param {boolean} context.convertAll
- * @param {Map<string, Promise<string>>} context.cache - union sums by cluster,
- *   since a cluster inside a group recurs in the month's total
  * @returns {Promise<string>}
  */
-const sumActualsOnce = async (entries, { currency, startDate, endDate, convertAll, cache }) => {
-  const root = entries.map((_, index) => index);
-  const find = (index) => {
-    let current = index;
-    while (root[current] !== current) current = root[current];
-    return current;
-  };
-  for (let i = 0; i < entries.length; i += 1) {
-    for (let j = i + 1; j < entries.length; j += 1) {
-      if (mayShareOperations(entries[i].scope, entries[j].scope)) root[find(j)] = find(i);
+const sumSpentOnce = async (counted, { currency, startDate, endDate, convertAll }) => {
+  const filterSets = [];
+  const transferActualByAccount = new Map();
+  for (const { line, actual } of counted) {
+    const categoryIds = line.categoryIds ?? (isSet(line.categoryId) ? [line.categoryId] : []);
+    const accountIds = line.sourceAccountIds ?? [];
+    if (categoryIds.length > 0 || accountIds.length > 0) {
+      filterSets.push({ categoryIds, accountIds });
+    } else {
+      transferActualByAccount.set(String(line.toAccountId), actual);
     }
   }
-  const clusters = new Map();
-  entries.forEach((entry, index) => {
-    const key = find(index);
-    if (!clusters.has(key)) clusters.set(key, []);
-    clusters.get(key).push(entry);
-  });
 
   let total = '0';
-  for (const cluster of clusters.values()) {
-    if (cluster.length === 1 || cluster[0].scope.kind === 'transfer') {
-      total = Currency.add(total, cluster[0].actual, currency);
-      continue;
-    }
-    const key = JSON.stringify(cluster.map(entry => entry.line.id));
-    if (!cache.has(key)) {
-      cache.set(key, calculateSpendingForAnyFilters({
-        filterSets: cluster.map(({ scope }) => ({ categoryIds: scope.categoryIds, accountIds: scope.accountIds })),
-        currency,
-        startDate,
-        endDate,
-        includeChildren: false, // already expanded by lineMatchScope
-        convertAll,
-      }));
-    }
-    total = Currency.add(total, await cache.get(key), currency);
+  if (filterSets.length > 0) {
+    const spent = await calculateSpendingForAnyFilters({
+      filterSets, currency, startDate, endDate, includeChildren: true, convertAll,
+    });
+    total = Currency.add(total, spent, currency);
+  }
+  for (const actual of transferActualByAccount.values()) {
+    total = Currency.add(total, actual, currency);
   }
   return total;
 };
@@ -2541,7 +2435,7 @@ const calculateStatusForPlan = async (plan, displayCurrency = null, convertAll =
       let tally = groupTallies.get(groupId);
       if (!tally) {
         // `counted` holds the lines behind `actual`, which is only summed once
-        // every line is in — see sumActualsOnce.
+        // every line is in — see sumSpentOnce.
         tally = { childAmount: '0', actual: '0', lineCount: 0, counted: [] };
         groupTallies.set(groupId, tally);
       }
@@ -2550,16 +2444,10 @@ const calculateStatusForPlan = async (plan, displayCurrency = null, convertAll =
 
     const lineStatuses = [];
     const transferCurrencies = new Set();
-    // The category tree, read on first use and once per recompute (see lineMatchScope).
-    let categoryChildrenLoad = null;
-    const categoryChildren = () => {
-      categoryChildrenLoad ||= loadCategoryChildren();
-      return categoryChildrenLoad;
-    };
     let allocated = '0';
     // The lines whose actuals make up "Spent", each with the actual and what it
     // matches. Not summed as the lines are walked: lines overlap, and a sum
-    // counted an operation once per line that matched it (see sumActualsOnce).
+    // counted an operation once per line that matched it (see sumSpentOnce).
     const countedLines = [];
     // Expected income is the sum of the plan's income lines (Budgets v3 phase 3);
     // the stored expected_income column is only a fallback for a plan that has
@@ -2690,7 +2578,7 @@ const calculateStatusForPlan = async (plan, displayCurrency = null, convertAll =
       if (sourceCurrency) {
         transferCurrencies.add(sourceCurrency);
       }
-      const counted = { line, actual, scope: await lineMatchScope(line, categoryChildren) };
+      const counted = { line, actual };
       countedLines.push(counted);
       if (groupTally) {
         groupTally.counted.push(counted);
@@ -2711,13 +2599,11 @@ const calculateStatusForPlan = async (plan, displayCurrency = null, convertAll =
 
     // "Spent" for the month and for each group: every operation once, however
     // many of the lines match it. Line statuses above keep their own actuals.
-    // Run together: the cache holds promises, so a cluster the month's total
-    // and a group share is still queried once.
-    const sumContext = { currency: target, startDate, endDate, convertAll, cache: new Map() };
+    const sumContext = { currency: target, startDate, endDate, convertAll };
     const [totalActual] = await Promise.all([
-      sumActualsOnce(countedLines, sumContext),
+      sumSpentOnce(countedLines, sumContext),
       ...[...groupTallies.values()].map(async (tally) => {
-        tally.actual = await sumActualsOnce(tally.counted, sumContext);
+        tally.actual = await sumSpentOnce(tally.counted, sumContext);
       }),
     ]);
 

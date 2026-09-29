@@ -69,9 +69,11 @@ const groupRow = (id, label, { amount = null, currency = null, sortOrder = 0 } =
 // Dispatch the db mocks by SQL shape, like the status suite. Note the group
 // table's name is NOT a substring of the line table's, so the two never collide.
 const setupDb = ({ lines = [], groups = [], spending = '0' }) => {
-  queryFirst.mockImplementation(async (sql) => {
+  queryFirst.mockImplementation(async (sql, params) => {
     if (sql.includes('FROM budget_plans WHERE id')) return PLAN_ROW;
     if (sql.includes("o.type = 'income'")) return { total: 0 };
+    // "Spent" over several lines: each category spent `spending`, counted once.
+    if (sql.includes("o.type = 'expense'")) return { total: new Set(params.slice(0, -3)).size * Number(spending) };
     return null;
   });
   queryAll.mockImplementation(async (sql) => {
