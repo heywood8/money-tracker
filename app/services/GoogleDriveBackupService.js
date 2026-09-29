@@ -39,6 +39,16 @@ export const DEFAULT_FOLDER_NAME = 'Penny Backups';
 export const MAX_DAILY_BACKUPS = 7;
 export const MAX_WEEKLY_BACKUPS = 15;
 
+/**
+ * How long, from the date in its name, rotation keeps a backup that holds much
+ * more than the newest one (see cleanupDriveBackups): long enough to restore it
+ * onto a fresh install, not forever after a deliberate, lasting shrink.
+ */
+export const DAILY_PROTECTION_DAYS = 30;
+export const WEEKLY_PROTECTION_DAYS = 84;
+
+const DAY_MS = 24 * 60 * 60 * 1000;
+
 /** The three formats a run can upload, in the order they are written. */
 export const BACKUP_FORMATS = ['json', 'csv', 'sqlite'];
 
@@ -527,6 +537,25 @@ export const uploadBinaryFile = async (accessToken, {
 };
 
 /**
+ * The day a backup's name dates it to, as a UTC timestamp: the date of a daily
+ * (`…_YYYY-MM-DD.ext`), the Monday of a weekly's ISO week (`…_YYYY-Www.ext`).
+ * @param {string} name
+ * @returns {number|null} null for a name carrying neither
+ */
+const backupDateOf = (name) => {
+  const day = /_(\d{4})-(\d{2})-(\d{2})\./.exec(name);
+  if (day) return Date.UTC(Number(day[1]), Number(day[2]) - 1, Number(day[3]));
+  const week = /_(\d{4})-W(\d{2})\./.exec(name);
+  if (week) {
+    // 4 January always falls in ISO week 1, so its week's Monday anchors the count.
+    const jan4 = Date.UTC(Number(week[1]), 0, 4);
+    const weekOneMonday = jan4 - ((new Date(jan4).getUTCDay() || 7) - 1) * DAY_MS;
+    return weekOneMonday + (Number(week[2]) - 1) * 7 * DAY_MS;
+  }
+  return null;
+};
+
+/**
  * Delete the oldest files until at most `maxToKeep` remain in each group.
  *
  * Grouping is by prefix *and* extension: three formats each rotate over their own
@@ -535,18 +564,24 @@ export const uploadBinaryFile = async (accessToken, {
  * user put in the folder is left alone.
  *
  * A file holding much more than the group's newest (see holdsMuchLess) is kept
- * whatever its age: the newest is the dataset as it stands now, and one that
- * small next to an older backup is a fresh install (or a second device on the
- * same account) whose uploads would otherwise push the real backups out one per
- * day. The group can then run past `maxToKeep`, but by at most `maxToKeep`
- * files — the smaller ones keep rotating — and it drains once the newest backup
- * is full-size again.
+ * past the window for `protectDays` from the date in its name: the newest is
+ * the dataset as it stands now, and one that small next to an older backup is a
+ * fresh install (or a second device on the same account) whose uploads would
+ * otherwise push the real backups out one per day. That leaves time to restore
+ * one. After it the file rotates like any other — the smaller dataset may be a
+ * deliberate, lasting one, and the newest backup would then never be full-size
+ * again. Meanwhile the group runs past `maxToKeep` by at most the protected
+ * files, since the smaller ones keep rotating.
  * @param {string} accessToken
  * @param {string} folderId
  * @param {string} prefix - 'penny_daily_' or 'penny_weekly_'
  * @param {number} maxToKeep
+ * @param {number} [protectDays=DAILY_PROTECTION_DAYS]
  */
-export const cleanupDriveBackups = async (accessToken, folderId, prefix, maxToKeep) => {
+export const cleanupDriveBackups = async (
+  accessToken, folderId, prefix, maxToKeep, protectDays = DAILY_PROTECTION_DAYS,
+) => {
+  const today = backupDateOf(`_${getTodayDateString()}.`);
   const files = await listBackupFiles(accessToken, folderId);
 
   const byExtension = {};
@@ -563,7 +598,10 @@ export const cleanupDriveBackups = async (accessToken, folderId, prefix, maxToKe
     const newest = group[group.length - 1];
     const excess = group.slice(0, Math.max(0, group.length - maxToKeep));
     for (const file of excess) {
-      if (holdsMuchLess(newest, file)) {
+      const fileDate = backupDateOf(file.name);
+      const withinProtection = fileDate !== null && today !== null
+        && (today - fileDate) / DAY_MS <= protectDays;
+      if (withinProtection && holdsMuchLess(newest, file)) {
         console.warn(`[DriveBackup] Keeping ${file.name}: it holds much more than the newest backup, ${newest.name}`);
         continue;
       }
@@ -840,8 +878,8 @@ export const performDriveBackup = async ({ mode = 'auto', getAccessToken }) => {
       // the run is a success whatever the user tapped a second ago, and honouring
       // a cancel here would both report a finished backup as cancelled and leave
       // the folder unrotated for a day (the next launch sees the marks and skips).
-      await cleanupDriveBackups(accessToken, folderId, 'penny_daily_', MAX_DAILY_BACKUPS);
-      await cleanupDriveBackups(accessToken, folderId, 'penny_weekly_', MAX_WEEKLY_BACKUPS);
+      await cleanupDriveBackups(accessToken, folderId, 'penny_daily_', MAX_DAILY_BACKUPS, DAILY_PROTECTION_DAYS);
+      await cleanupDriveBackups(accessToken, folderId, 'penny_weekly_', MAX_WEEKLY_BACKUPS, WEEKLY_PROTECTION_DAYS);
     }
 
     if (uploaded.length === 0 && kept.length > 0) {

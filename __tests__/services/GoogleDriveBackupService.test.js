@@ -21,6 +21,8 @@ import {
   setDriveBackupFormats,
   BACKUP_FORMATS,
   MAX_DAILY_BACKUPS,
+  DAILY_PROTECTION_DAYS,
+  WEEKLY_PROTECTION_DAYS,
   DRIVE_BACKUP_PROGRESS_EVENT,
 } from '../../app/services/GoogleDriveBackupService';
 import { appEvents } from '../../app/services/eventEmitter';
@@ -834,6 +836,47 @@ describe('GoogleDriveBackupService', () => {
       await cleanupDriveBackups('token-abc', FOLDER_ID, 'penny_daily_', MAX_DAILY_BACKUPS);
 
       expect(deleted).toEqual(['day-1']);
+    });
+
+    it('lets a much larger daily go once it is past the protection period', async () => {
+      // A shrink that lasts — the user really did start over — must not keep
+      // the old dailies forever. Today is 2026-02-26: 2026-01-20 is 37 days back.
+      const files = [
+        { id: 'old-jan-20', name: 'penny_daily_2026-01-20.json', size: FULL_SIZE },
+        { id: 'old-feb-01', name: 'penny_daily_2026-02-01.json', size: FULL_SIZE },
+        ...dailyFiles(20, 26, '2048', 'small'),
+      ];
+      const deleted = [];
+      routeFetch([
+        { method: 'GET', match: (u) => u.includes('q='), body: { files } },
+        { method: 'DELETE', match: (u) => { deleted.push(u.split('/').pop()); return true; }, body: {} },
+      ]);
+
+      await cleanupDriveBackups('token-abc', FOLDER_ID, 'penny_daily_', MAX_DAILY_BACKUPS, DAILY_PROTECTION_DAYS);
+
+      // 25 days back is still protected.
+      expect(deleted).toEqual(['old-jan-20']);
+    });
+
+    it('protects a much larger weekly for twelve weeks, then lets it go', async () => {
+      // Today is in 2026-W09: 2025-W48 began 13 weeks before it, 2026-W01 8.
+      const weekly = (id, week, size) => ({ id, name: `penny_weekly_${week}.json`, size });
+      const files = [
+        weekly('old-w48', '2025-W48', FULL_SIZE),
+        weekly('old-w01', '2026-W01', FULL_SIZE),
+        ...['2026-W02', '2026-W03', '2026-W04', '2026-W05', '2026-W06', '2026-W07', '2026-W08', '2026-W09']
+          .map(week => weekly(`small-${week}`, week, '2048')),
+      ];
+      const deleted = [];
+      routeFetch([
+        { method: 'GET', match: (u) => u.includes('q='), body: { files } },
+        { method: 'DELETE', match: (u) => { deleted.push(u.split('/').pop()); return true; }, body: {} },
+      ]);
+
+      // A window of 8 so the two large weeklies are both past it.
+      await cleanupDriveBackups('token-abc', FOLDER_ID, 'penny_weekly_', 8, WEEKLY_PROTECTION_DAYS);
+
+      expect(deleted).toEqual(['old-w48']);
     });
 
     it('rotates the old files normally once the newest backup is full-size again', async () => {
