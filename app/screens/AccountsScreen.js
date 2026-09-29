@@ -786,8 +786,15 @@ export default function AccountsScreen({ onBackStateChange, tabKey = 'Accounts' 
     setEditValues(v => {
       const decimals = currencies[v.currency]?.decimal_digits ?? 2;
 
+      // A decimal-pad keyboard types "," as the decimal key in most locales. A
+      // lone comma with no dot is that separator; any other comma is grouping.
+      // Stripped with the rest, "1234,56" was saved as 123456: a balance 100
+      // times too large, and an adjustment operation booked to reach it.
+      const commas = (text.match(/,/g) || []).length;
+      const withDot = commas === 1 && !text.includes('.') ? text.replace(',', '.') : text;
+
       // Strip anything that isn't a digit, minus, or decimal point
-      let filtered = text.replace(/[^0-9.-]/g, '');
+      let filtered = withDot.replace(/[^0-9.-]/g, '');
 
       // Only allow a leading minus
       const isNegative = filtered.startsWith('-');
@@ -795,8 +802,9 @@ export default function AccountsScreen({ onBackStateChange, tabKey = 'Accounts' 
       if (isNegative) filtered = '-' + filtered;
 
       if (decimals === 0) {
-        // No fractional part allowed
-        filtered = filtered.replace(/\./g, '');
+        // No fractional part allowed: drop it rather than fold its digits into
+        // the whole units ("1500.50" pasted used to become 150050).
+        filtered = filtered.replace(/\..*$/, '');
       } else {
         // Keep only the first decimal point, cap fractional digits
         const dotIndex = filtered.indexOf('.');

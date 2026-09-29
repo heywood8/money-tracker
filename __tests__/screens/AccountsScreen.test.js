@@ -1198,6 +1198,30 @@ describe('AccountsScreen', () => {
       expect(values).not.toHaveProperty('balance');
     });
 
+    // decimal-pad keyboards type "," in most locales; stripping it saved
+    // "1234,56" as 123456.
+    it('reads a lone decimal comma as the decimal point', async () => {
+      const [, values] = await openEditAndSave(
+        { id: 'acc-1', name: 'Cash', balance: '1000.00', currency: 'USD', order: 0 },
+        async ({ getByTestId }) => {
+          await fireEvent.changeText(getByTestId('account-balance-input'), '1234,56');
+        },
+      );
+
+      expect(values).toEqual(expect.objectContaining({ balance: '1234.56' }));
+    });
+
+    it('drops the fraction of a whole-unit balance instead of folding it in', async () => {
+      const [, values] = await openEditAndSave(
+        { id: 'acc-1', name: 'Rubles', balance: '1000', currency: 'RUB', order: 0 },
+        async ({ getByTestId }) => {
+          await fireEvent.changeText(getByTestId('account-balance-input'), '1500,50');
+        },
+      );
+
+      expect(values).toEqual(expect.objectContaining({ balance: '1500' }));
+    });
+
     it('sends a balance the user changed', async () => {
       const [, values] = await openEditAndSave(
         { id: 'acc-1', name: 'Cash', balance: '1000.00', currency: 'USD', order: 0 },
