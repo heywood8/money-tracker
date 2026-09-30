@@ -817,14 +817,15 @@ const getSheetTitles = async (accessToken, spreadsheetId) => {
 };
 
 /**
- * Every tab's title → sheetId. One metadata read serves both jobs the export
- * needs it for: knowing which tabs are missing, and knowing the IDs to hang the
- * basic filters on.
+ * Every tab's title → its properties. One metadata read serves every job the
+ * export needs it for: knowing which tabs are missing, the IDs to hang the basic
+ * filters on, and each tab's grid size — how far down a previous export can
+ * reach, and so how many rows the write has to blank.
  * @param {string} accessToken
  * @param {string} spreadsheetId
- * @returns {Promise<Map<string, number>>}
+ * @returns {Promise<Map<string, Object>>}
  */
-const getSheetIdsByTitle = async (accessToken, spreadsheetId) => {
+const getSheetsByTitle = async (accessToken, spreadsheetId) => {
   const response = await fetch(
     `${SHEETS_API}/${spreadsheetId}?fields=sheets.properties`,
     { headers: { Authorization: `Bearer ${accessToken}` } },
@@ -845,19 +846,19 @@ const getSheetIdsByTitle = async (accessToken, spreadsheetId) => {
     throw new Error(data.error?.message || 'get_sheet_ids_failed');
   }
   const data = await response.json();
-  return new Map((data.sheets || []).map(s => [s.properties?.title, s.properties?.sheetId]));
+  return new Map((data.sheets || []).map(s => [s.properties?.title, s.properties]));
 };
 
 /**
- * Create any of `sheetNames` the spreadsheet is missing, returning the IDs of the
- * ones created. A no-op when it already has them all, which is the usual case —
- * this exists for the spreadsheet a user has been exporting into since before the
- * newest tab was added, where naming an absent tab in a batchClear range fails
+ * Create any of `sheetNames` the spreadsheet is missing, returning the properties
+ * of the ones created. A no-op when it already has them all, which is the usual
+ * case — this exists for the spreadsheet a user has been exporting into since
+ * before the newest tab was added, where naming an absent tab in a range fails
  * the whole call with a 400.
  * @param {string} accessToken
  * @param {string} spreadsheetId
  * @param {Array<string>} missing
- * @returns {Promise<Map<string, number>>}
+ * @returns {Promise<Map<string, Object>>}
  */
 const addSheets = async (accessToken, spreadsheetId, missing) => {
   const response = await fetch(`${SHEETS_API}/${spreadsheetId}:batchUpdate`, {
@@ -884,7 +885,7 @@ const addSheets = async (accessToken, spreadsheetId, missing) => {
   const added = new Map();
   for (const reply of data.replies || []) {
     const properties = reply.addSheet?.properties;
-    if (properties?.title != null) added.set(properties.title, properties.sheetId);
+    if (properties?.title != null) added.set(properties.title, properties);
   }
   return added;
 };
@@ -914,24 +915,77 @@ const applyFilters = async (accessToken, spreadsheetId, sheetIds) => {
   await response.json().catch(() => {});
 };
 
-const clearSheets = async (accessToken, spreadsheetId, ranges) => {
-  const response = await fetch(`${SHEETS_API}/${spreadsheetId}/values:batchClear`, {
-    method: 'POST',
-    headers: {
-      Authorization: `Bearer ${accessToken}`,
-      'Content-Type': 'application/json',
-    },
-    body: JSON.stringify({ ranges }),
-  });
-  if (!response.ok) {
-    const data = await response.json();
-    if (response.status === 401) {
-      await signOut();
-      throw new Error('refresh_failed');
+/**
+ * Shrink each tab to exactly the export just written into it, so the next
+ * export's blank rows (see writeBlock) only reach this one's length. Without
+ * it a tab's grid only ever grew: one that once held 80,000 operations would
+ * be padded with tens of thousands of blank rows on every export after. It
+ * also drops the columns right of the data that a wider export once filled.
+ *
+ * Best effort, and never thrown: by now the data is safely written, and an
+ * export must not fail over tidying up after it. A tab left untrimmed is
+ * trimmed by the next export.
+ * @param {string} accessToken
+ * @param {string} spreadsheetId
+ * @param {Array<{sheetId: number, rowCount: number, columnCount: number}>} sizes
+ */
+const trimSheets = async (accessToken, spreadsheetId, sizes) => {
+  try {
+    const response = await fetch(`${SHEETS_API}/${spreadsheetId}:batchUpdate`, {
+      method: 'POST',
+      headers: {
+        Authorization: `Bearer ${accessToken}`,
+        'Content-Type': 'application/json',
+      },
+      body: JSON.stringify({
+        requests: sizes.map(({ sheetId, rowCount, columnCount }) => ({
+          updateSheetProperties: {
+            properties: { sheetId, gridProperties: { rowCount, columnCount } },
+            fields: 'gridProperties.rowCount,gridProperties.columnCount',
+          },
+        })),
+      }),
+    });
+    if (!response.ok) {
+      const data = await response.json().catch(() => ({}));
+      console.warn('[GoogleSheets] Could not trim the exported tabs:', response.status, data.error?.message);
+      return;
     }
-    throw new Error(data.error?.message || 'clear_sheets_failed');
+    await response.json().catch(() => {});
+  } catch (error) {
+    console.warn('[GoogleSheets] Could not trim the exported tabs:', error?.message);
   }
-  await response.json().catch(() => {});
+};
+
+// Widest row of a tab's values — the header, in every tab the export builds.
+const sheetWidth = values => values.reduce((width, row) => Math.max(width, row.length), 0);
+
+/**
+ * A tab's values as the export writes them: every row as wide as the widest,
+ * then blank rows down to the bottom of the tab as it stood before this run.
+ *
+ * The blank rows are what clears a previous, longer export — in the same
+ * request as the new data, so the two land or fail together. Clearing those
+ * rows in a call of their own after the write meant that call failing left the
+ * old export's tail under the new data, and the import took the mix, bringing
+ * deleted operations back. Every cell carries a value because the API skips a
+ * null (or a row's missing tail) rather than emptying it.
+ *
+ * The tab's size is what the previous export left once trimSheets cut the tab
+ * down to it, so the padding reaches that export's length and no further. Data
+ * longer than the tab grows it — the export has always relied on that for more
+ * than the default 1000 rows of operations.
+ * @param {{range: string, values: Array<Array>}} sheet
+ * @param {?{rowCount: number}} grid - the tab's size before this run; null for a
+ *   tab this run created, which has nothing to clear
+ * @returns {{range: string, values: Array<Array>}}
+ */
+const writeBlock = ({ range, values }, grid) => {
+  const width = sheetWidth(values);
+  const rows = values.map(row => Array.from({ length: width }, (_, i) => row[i] ?? ''));
+  const blank = Array(width).fill('');
+  for (let row = rows.length; row < (grid?.rowCount ?? 0); row += 1) rows.push(blank);
+  return { range, values: rows };
 };
 
 const writeSheets = async (accessToken, spreadsheetId, sheets) => {
@@ -963,7 +1017,7 @@ const writeSheets = async (accessToken, spreadsheetId, sheets) => {
  * @param {string} accessToken - Valid Google OAuth access token
  * @param {Object} backup - Backup object from createBackup()
  * @param {Function} [onProgress] - Optional callback({ step, status }) for progress reporting.
- *   Steps: 'connect' | 'clear' | 'write'. Statuses: 'in_progress' | 'completed'.
+ *   Steps: 'connect' | 'write'. Statuses: 'in_progress' | 'completed'.
  * @returns {Promise<string>} URL of the spreadsheet
  */
 export const exportToSheets = async (accessToken, backup, onProgress) => {
@@ -973,13 +1027,14 @@ export const exportToSheets = async (accessToken, backup, onProgress) => {
   let spreadsheetId = await getPreference(PREF_KEYS.GOOGLE_SHEETS_SPREADSHEET_ID);
   // One metadata read up front, before anything names a range: a spreadsheet
   // from an older build lacks the newest tabs, and naming an absent one in a
-  // batchClear range fails the entire call. The same read supplies the sheet IDs
-  // the filters need at the end, and tells whether the stored spreadsheet can
-  // still be opened at all.
-  let sheetIdByTitle = null;
+  // range fails the entire call. The same read supplies the sheet IDs the
+  // filters need, each tab's size (how far down a previous export can reach),
+  // and tells whether the stored spreadsheet can still be opened at all.
+  let sheetByTitle = null;
+  let createdHere = false;
   if (spreadsheetId) {
     try {
-      sheetIdByTitle = await getSheetIdsByTitle(accessToken, spreadsheetId);
+      sheetByTitle = await getSheetsByTitle(accessToken, spreadsheetId);
     } catch (error) {
       if (error.message !== 'spreadsheet_not_found') throw error;
       // The stored spreadsheet was deleted, or belongs to another Google
@@ -991,28 +1046,51 @@ export const exportToSheets = async (accessToken, backup, onProgress) => {
   if (!spreadsheetId) {
     spreadsheetId = await createSpreadsheet(accessToken);
     await setPreference(PREF_KEYS.GOOGLE_SHEETS_SPREADSHEET_ID, spreadsheetId);
-    sheetIdByTitle = await getSheetIdsByTitle(accessToken, spreadsheetId);
+    sheetByTitle = await getSheetsByTitle(accessToken, spreadsheetId);
+    createdHere = true;
   }
   report('connect', 'completed');
 
   const sheets = buildSheetsData(backup);
   const sheetNames = sheets.map(s => s.range.split('!')[0]);
 
-  report('clear', 'in_progress');
-  const missing = sheetNames.filter(name => !sheetIdByTitle.has(name));
+  // Nothing is cleared up front. Clearing every tab before the write meant a
+  // write that failed left the whole spreadsheet empty; now the new data and the
+  // blanking of the rows below it are one request (see writeBlock), so a failure
+  // leaves the previous export exactly as it was.
+  report('write', 'in_progress');
+  const missing = sheetNames.filter(name => !sheetByTitle.has(name));
   if (missing.length > 0) {
     const added = await addSheets(accessToken, spreadsheetId, missing);
-    for (const [title, id] of added) sheetIdByTitle.set(title, id);
+    for (const [title, properties] of added) sheetByTitle.set(title, properties);
   }
-  await clearSheets(accessToken, spreadsheetId, sheetNames);
-  report('clear', 'completed');
-
-  report('write', 'in_progress');
-  await writeSheets(accessToken, spreadsheetId, sheets);
+  // A tab's size as the previous export left it — none for a spreadsheet or tab
+  // this run created, which are empty.
+  const gridOf = title => (createdHere || missing.includes(title)
+    ? null
+    : sheetByTitle.get(title)?.gridProperties ?? null);
+  const blocks = sheets.map(sheet => writeBlock(sheet, gridOf(sheet.range.split('!')[0])));
+  await writeSheets(accessToken, spreadsheetId, blocks);
   const sheetIds = sheetNames
-    .map(name => sheetIdByTitle.get(name))
+    .map(name => sheetByTitle.get(name)?.sheetId)
     .filter(id => id !== undefined);
   await applyFilters(accessToken, spreadsheetId, sheetIds);
+  // Each tab that existed before this run, cut down to what was just written.
+  // Never below a frozen row or column plus one: Sheets refuses to delete every
+  // unfrozen row, and one refusal would fail the whole trim.
+  const sizes = [];
+  for (const { range, values } of sheets) {
+    const title = range.split('!')[0];
+    const grid = gridOf(title);
+    const sheetId = sheetByTitle.get(title)?.sheetId;
+    if (!grid || sheetId === undefined) continue;
+    sizes.push({
+      sheetId,
+      rowCount: Math.max(values.length, (grid.frozenRowCount ?? 0) + 1, 1),
+      columnCount: Math.max(sheetWidth(values), (grid.frozenColumnCount ?? 0) + 1, 1),
+    });
+  }
+  if (sizes.length > 0) await trimSheets(accessToken, spreadsheetId, sizes);
   report('write', 'completed');
 
   return `https://docs.google.com/spreadsheets/d/${spreadsheetId}`;

@@ -23,6 +23,15 @@ import { getPreference, setPreference } from './PreferencesDB';
 
 const BASELINE_ROWS_KEY = 'backup_baseline_rows';
 const LAST_SKIPPED_KEY = 'backup_last_skipped';
+const RESTORED_ON_KEY = 'backup_restored_on';
+
+/**
+ * How much of what came before a new snapshot must keep to count as normal:
+ * one that holds less than this share is refused. Shared by the local guard
+ * (DailyBackupService.isSnapshotValid) and the Google Drive one, which asks the
+ * same question of the files already in Drive.
+ */
+export const SHRINK_GUARD_RATIO = 0.5;
 
 /**
  * Row count of a backup, as the guard counts it: accounts + operations.
@@ -95,6 +104,28 @@ export const setLastSkipped = async (detail) => {
 export const clearLastSkipped = async () => {
   await setPreference(LAST_SKIPPED_KEY, '');
 };
+
+/**
+ * Record the local day (YYYY-MM-DD) a restore happened on. Set by the restore,
+ * right after it re-anchors the baseline.
+ *
+ * A restore also rolls the Drive backup's "already uploaded today" marks back
+ * to the backup's own, so the next launch uploads again — and a deliberately
+ * restored smaller dataset would be refused against the file uploaded that
+ * same morning, before the restore. The Drive guard lets it through on this day.
+ *
+ * @param {string} day - YYYY-MM-DD, local
+ */
+export const setRestoredOn = async (day) => {
+  await setPreference(RESTORED_ON_KEY, day);
+};
+
+/**
+ * The local day of the last restore, or null when none is recorded.
+ *
+ * @returns {Promise<string|null>}
+ */
+export const getRestoredOn = async () => (await getPreference(RESTORED_ON_KEY, null)) || null;
 
 /**
  * Take the current dataset size as the new normal and forget the refusal, so

@@ -724,6 +724,7 @@
   "drive_backup_last_success": "Última copia",
   "drive_backup_last_error": "La última copia falló",
   "drive_backup_last_skipped": "Última ejecución omitida",
+  "drive_backup_kept_larger_remote": "Drive ya tiene una copia de seguridad más grande de este día o semana, así que se ha conservado",
   "drive_backup_last_cancelled": "Última ejecución cancelada",
   "drive_backup_now": "Hacer copia ahora",
   "drive_backup_retention": "Las copias programadas conservan las últimas 7 diarias y 15 semanales de cada formato. Las copias hechas con el botón se conservan hasta que las borres.",

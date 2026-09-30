@@ -69,9 +69,11 @@ const groupRow = (id, label, { amount = null, currency = null, sortOrder = 0 } =
 // Dispatch the db mocks by SQL shape, like the status suite. Note the group
 // table's name is NOT a substring of the line table's, so the two never collide.
 const setupDb = ({ lines = [], groups = [], spending = '0' }) => {
-  queryFirst.mockImplementation(async (sql) => {
+  queryFirst.mockImplementation(async (sql, params) => {
     if (sql.includes('FROM budget_plans WHERE id')) return PLAN_ROW;
     if (sql.includes("o.type = 'income'")) return { total: 0 };
+    // "Spent" over several lines: each category spent `spending`, counted once.
+    if (sql.includes("o.type = 'expense'")) return { total: new Set(params.slice(0, -3)).size * Number(spending) };
     return null;
   });
   queryAll.mockImplementation(async (sql) => {
@@ -241,11 +243,14 @@ describe('BudgetPlansDB line groups', () => {
 
   describe('calculatePlanStatus', () => {
     it('totals a derived group from its children and leaves `allocated` alone', async () => {
+      // Each line on a category of its own: two lines on one category match the
+      // same operations, and the group counts those once (see
+      // BudgetPlansDB.spentOverlap.test.js).
       setupDb({
         lines: [
-          lineRow('l-fuel', '300', { groupId: 'g1' }),
-          lineRow('l-parking', '120', { groupId: 'g1', sortOrder: 1 }),
-          lineRow('l-loose', '50', { sortOrder: 2 }),
+          lineRow('l-fuel', '300', { groupId: 'g1', categoryId: 'cat-fuel' }),
+          lineRow('l-parking', '120', { groupId: 'g1', categoryId: 'cat-parking', sortOrder: 1 }),
+          lineRow('l-loose', '50', { categoryId: 'cat-loose', sortOrder: 2 }),
         ],
         groups: [groupRow('g1', 'Car')],
         spending: '60',

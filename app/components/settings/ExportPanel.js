@@ -31,7 +31,8 @@ const SHEETS_STEPS = [
   { id: 'auth', label: 'Signing in to Google' },
   { id: 'backup', label: 'Preparing data' },
   { id: 'connect', label: 'Connecting to spreadsheet' },
-  { id: 'clear', label: 'Clearing existing data' },
+  // No separate clear step: the export overwrites the previous one in place, and
+  // blanks what the new data does not reach in the same request.
   { id: 'write', label: 'Uploading data' },
   { id: 'complete', label: 'Export complete' },
 ];

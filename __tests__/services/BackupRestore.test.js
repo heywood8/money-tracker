@@ -410,6 +410,25 @@ describe('BackupRestore', () => {
       await expect(BackupRestore.restoreBackup(validBackup)).resolves.not.toThrow();
     });
 
+    it('records the day of the restore alongside the re-anchored baseline', async () => {
+      // The Drive backup reads it to let a deliberately restored, smaller
+      // dataset replace the file uploaded earlier the same day.
+      mockDb.executeTransaction.mockImplementation(async (callback) => {
+        await callback({
+          runAsync: jest.fn().mockResolvedValue({ lastInsertRowId: 1 }),
+          getAllAsync: jest.fn().mockResolvedValue([]),
+        });
+      });
+
+      await BackupRestore.restoreBackup(validBackup);
+
+      const now = new Date();
+      const today = `${now.getFullYear()}-${String(now.getMonth() + 1).padStart(2, '0')}-${String(now.getDate()).padStart(2, '0')}`;
+      const writes = mockDb.executeQuery.mock.calls.map(([, params]) => params?.slice(0, 2));
+      expect(writes).toContainEqual(['backup_baseline_rows', '0']);
+      expect(writes).toContainEqual(['backup_restored_on', today]);
+    });
+
     it('rejects backup without version', async () => {
       const invalidBackup = { ...validBackup, version: undefined };
 

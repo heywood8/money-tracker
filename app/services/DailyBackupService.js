@@ -18,6 +18,7 @@ import {
   getLastSkipped,
   setBaselineRows,
   setLastSkipped,
+  SHRINK_GUARD_RATIO,
 } from './backupBaseline';
 
 const LAST_DAILY_BACKUP_DATE_KEY = 'last_daily_backup_date';
@@ -227,9 +228,9 @@ export const isSnapshotValid = async (backup) => {
 
   // Only fire when what came before was substantial (>0 rows) and the new
   // snapshot has dropped by more than half.
-  if (prevTotal !== null && prevTotal > 0 && newTotal < prevTotal * 0.5) {
+  if (prevTotal !== null && prevTotal > 0 && newTotal < prevTotal * SHRINK_GUARD_RATIO) {
     console.warn(
-      `[DailyBackup] Suspicious row-count drop: ${prevTotal} → ${newTotal} rows (>${50}% reduction) — skipping write to protect existing backups`,
+      `[DailyBackup] Suspicious row-count drop: ${prevTotal} → ${newTotal} rows (>${(1 - SHRINK_GUARD_RATIO) * 100}% reduction) — skipping write to protect existing backups`,
     );
     // Recorded, not just warned: the whole failure mode here is that the user
     // believes they are backed up while every run is being skipped. Only the

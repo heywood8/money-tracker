@@ -666,78 +666,187 @@ export const calculateSpendingForFilters = async ({
   convertAll = false,
 }) => {
   try {
-    const expandedIds = await expandCategoryIds(categoryIds, includeChildren);
-    const filterAccountIds = normalizeAccountIds(accountIds);
+    const filter = await buildSpendingFilter({ categoryIds, accountIds }, includeChildren);
 
     // Nothing to filter on: a line whose every category AND account was deleted.
     // Summing without a filter would report the user's entire spend as this one
     // line's actual, so the empty set means zero, not everything.
-    if (expandedIds.length === 0 && filterAccountIds.length === 0) return '0';
+    if (!filter) return '0';
 
-    // Each clause is added only when its set is non-empty — an empty `IN ()` is a
-    // SQL syntax error, and an absent clause is exactly the "any" semantics.
-    const conditions = [];
-    const filterParams = [];
-    if (expandedIds.length > 0) {
-      conditions.push(`o.category_id IN (${expandedIds.map(() => '?').join(',')})`);
-      filterParams.push(...expandedIds);
-    }
-    if (filterAccountIds.length > 0) {
-      conditions.push(`o.account_id IN (${filterAccountIds.map(() => '?').join(',')})`);
-      filterParams.push(...filterAccountIds);
-    }
-    // Balance adjustments (the hidden shadow categories) are corrections, not
-    // spending: a line tracking "everything on card X" counted a downward
-    // correction of card X's balance as money spent.
-    conditions.push(NOT_SHADOW_SQL);
-    const filterClause = conditions.join(' AND ');
-
-    if (convertAll) {
-      const rows = await queryAll(
-        `SELECT a.currency as currency, ${sumMoneySql()} as total
-         FROM operations o
-         JOIN accounts a ON o.account_id = a.id
-         LEFT JOIN categories c ON o.category_id = c.id
-         WHERE ${filterClause}
-           AND o.type = 'expense'
-           AND o.date >= ?
-           AND o.date <= ?
-         GROUP BY a.currency`,
-        [...filterParams, startDate, endDate],
-      );
-
-      const rowList = rows || [];
-      const rateByCurrency = await fetchRatesToTarget(rowList.map(r => r.currency), currency);
-      let total = '0';
-      for (const row of rowList) {
-        const converted = convertWithRateMap(String(row.total ?? '0'), row.currency, currency, rateByCurrency);
-        if (converted === null) continue;
-        total = Currency.add(total, converted);
-      }
-      return total;
-    }
-
-    // Query operations in date range for these filters and currency
-    const query = `
-      SELECT ${sumMoneySql()} as total
-      FROM operations o
-      JOIN accounts a ON o.account_id = a.id
-      LEFT JOIN categories c ON o.category_id = c.id
-      WHERE ${filterClause}
-        AND o.type = 'expense'
-        AND a.currency = ?
-        AND o.date >= ?
-        AND o.date <= ?
-    `;
-
-    const params = [...filterParams, currency, startDate, endDate];
-    const result = await queryFirst(query, params);
-
-    return result && result.total != null ? String(result.total) : '0';
+    return await sumSpendingWhere(
+      `${filter.clause} AND ${NOT_SHADOW_SQL}`,
+      filter.params,
+      { currency, startDate, endDate, convertAll },
+    );
   } catch (error) {
     console.error('Failed to calculate spending:', error);
     throw error;
   }
+};
+
+/**
+ * Expense spending matching ANY of several filter sets, each operation counted
+ * once however many of the sets it matches. The union form of
+ * {@link calculateSpendingForFilters} — each set follows its rules, and a set
+ * that tracks nothing is left out rather than widening the union to everything.
+ *
+ * What a month's "Spent" total needs: budget lines routinely overlap (a parent
+ * category next to one of its children, a card-only line next to a category
+ * line), and adding their actuals up counted a shared operation once per line.
+ * @param {Object} params
+ * @param {Array<{categoryIds?: Array<string>, accountIds?: Array<string|number>}>} params.filterSets
+ * @param {string} params.currency
+ * @param {string} params.startDate
+ * @param {string} params.endDate
+ * @param {boolean} [params.includeChildren=true]
+ * @param {boolean} [params.convertAll=false]
+ * @returns {Promise<string>} Total spending amount (decimal string)
+ */
+export const calculateSpendingForAnyFilters = async ({
+  filterSets = [],
+  currency,
+  startDate,
+  endDate,
+  includeChildren = true,
+  convertAll = false,
+}) => {
+  try {
+    // Sets filtering on the same accounts differ only in their categories, so
+    // they merge into one clause with one de-duplicated category list — a
+    // parent line next to its children would otherwise bind every child id
+    // once per set, pushing a large plan toward SQLite's bound-parameter limit.
+    // A set with no category filter means "any category" on those accounts,
+    // and absorbs the rest of its group.
+    const byAccounts = new Map();
+    for (const { categoryIds = [], accountIds = [] } of filterSets) {
+      const expandedIds = await expandCategoryIds(categoryIds, includeChildren);
+      const filterAccountIds = normalizeAccountIds(accountIds);
+      // Tracks nothing: left out rather than widening the union to everything.
+      if (expandedIds.length === 0 && filterAccountIds.length === 0) continue;
+      const key = filterAccountIds.map(String).sort().join(',');
+      let merged = byAccounts.get(key);
+      if (!merged) {
+        merged = { accountIds: filterAccountIds, categoryIds: [], seen: new Set(), anyCategory: false };
+        byAccounts.set(key, merged);
+      }
+      if (expandedIds.length === 0) merged.anyCategory = true;
+      for (const id of expandedIds) {
+        if (merged.seen.has(String(id))) continue;
+        merged.seen.add(String(id));
+        merged.categoryIds.push(id);
+      }
+    }
+    const filters = [...byAccounts.values()].map(merged => spendingFilterClause(
+      merged.anyCategory ? [] : merged.categoryIds,
+      merged.accountIds,
+    ));
+    if (filters.length === 0) return '0';
+
+    // One WHERE with the sets OR-ed together: SQLite visits each operation row
+    // once, so a row matching several sets is still summed once.
+    return await sumSpendingWhere(
+      `(${filters.map(f => `(${f.clause})`).join(' OR ')}) AND ${NOT_SHADOW_SQL}`,
+      filters.flatMap(f => f.params),
+      { currency, startDate, endDate, convertAll },
+    );
+  } catch (error) {
+    console.error('Failed to calculate spending for filter union:', error);
+    throw error;
+  }
+};
+
+/**
+ * One filter set as a WHERE fragment, or null when it tracks nothing (no
+ * category and no account left to filter on).
+ * @param {{categoryIds?: Array<string>, accountIds?: Array<string|number>}} set
+ * @param {boolean} includeChildren
+ * @returns {Promise<{clause: string, params: Array}|null>}
+ */
+const buildSpendingFilter = async ({ categoryIds = [], accountIds = [] }, includeChildren) => {
+  const expandedIds = await expandCategoryIds(categoryIds, includeChildren);
+  const filterAccountIds = normalizeAccountIds(accountIds);
+  if (expandedIds.length === 0 && filterAccountIds.length === 0) return null;
+  return spendingFilterClause(expandedIds, filterAccountIds);
+};
+
+/**
+ * The WHERE fragment for already expanded categories and normalized accounts.
+ *
+ * Each clause is added only when its set is non-empty — an empty `IN ()` is a
+ * SQL syntax error, and an absent clause is exactly the "any" semantics.
+ * @param {Array<string>} expandedIds
+ * @param {Array<string|number>} filterAccountIds
+ * @returns {{clause: string, params: Array}}
+ */
+const spendingFilterClause = (expandedIds, filterAccountIds) => {
+  const conditions = [];
+  const params = [];
+  if (expandedIds.length > 0) {
+    conditions.push(`o.category_id IN (${expandedIds.map(() => '?').join(',')})`);
+    params.push(...expandedIds);
+  }
+  if (filterAccountIds.length > 0) {
+    conditions.push(`o.account_id IN (${filterAccountIds.map(() => '?').join(',')})`);
+    params.push(...filterAccountIds);
+  }
+  return { clause: conditions.join(' AND '), params };
+};
+
+/**
+ * Sum the month's expenses matching `filterClause`, in `currency`.
+ *
+ * The clause must carry {@link NOT_SHADOW_SQL}: balance adjustments (the hidden
+ * shadow categories) are corrections, not spending — a line tracking
+ * "everything on card X" counted a downward correction of card X's balance as
+ * money spent.
+ * @param {string} filterClause
+ * @param {Array} filterParams
+ * @param {{currency: string, startDate: string, endDate: string, convertAll: boolean}} options
+ * @returns {Promise<string>}
+ */
+const sumSpendingWhere = async (filterClause, filterParams, { currency, startDate, endDate, convertAll }) => {
+  if (convertAll) {
+    const rows = await queryAll(
+      `SELECT a.currency as currency, ${sumMoneySql()} as total
+       FROM operations o
+       JOIN accounts a ON o.account_id = a.id
+       LEFT JOIN categories c ON o.category_id = c.id
+       WHERE ${filterClause}
+         AND o.type = 'expense'
+         AND o.date >= ?
+         AND o.date <= ?
+       GROUP BY a.currency`,
+      [...filterParams, startDate, endDate],
+    );
+
+    const rowList = rows || [];
+    const rateByCurrency = await fetchRatesToTarget(rowList.map(r => r.currency), currency);
+    let total = '0';
+    for (const row of rowList) {
+      const converted = convertWithRateMap(String(row.total ?? '0'), row.currency, currency, rateByCurrency);
+      if (converted === null) continue;
+      total = Currency.add(total, converted);
+    }
+    return total;
+  }
+
+  // Query operations in date range for these filters and currency
+  const query = `
+    SELECT ${sumMoneySql()} as total
+    FROM operations o
+    JOIN accounts a ON o.account_id = a.id
+    LEFT JOIN categories c ON o.category_id = c.id
+    WHERE ${filterClause}
+      AND o.type = 'expense'
+      AND a.currency = ?
+      AND o.date >= ?
+      AND o.date <= ?
+  `;
+
+  const params = [...filterParams, currency, startDate, endDate];
+  const result = await queryFirst(query, params);
+
+  return result && result.total != null ? String(result.total) : '0';
 };
 
 /**

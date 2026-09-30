@@ -727,6 +727,7 @@
   "drive_backup_last_success": "Last backup",
   "drive_backup_last_error": "Last backup failed",
   "drive_backup_last_skipped": "Last run skipped",
+  "drive_backup_kept_larger_remote": "Drive already holds a larger backup for this day or week, so it was kept",
   "drive_backup_last_cancelled": "Last run cancelled",
   "drive_backup_now": "Back up now",
   "drive_backup_retention": "Scheduled backups keep the last 7 daily and 15 weekly copies of each format. Backups you make with the button are kept until you delete them.",

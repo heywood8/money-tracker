@@ -369,4 +369,61 @@ describe('BudgetsDB convert-all spending', () => {
       }
     });
   });
+
+  // The month's "Spent" across overlapping plan lines (BudgetPlansDB).
+  describe('calculateSpendingForAnyFilters (union of filter sets)', () => {
+    const RANGE = { currency: 'USD', startDate: '2026-07-01', endDate: '2026-07-31' };
+
+    it('merges sets on the same accounts into one de-duplicated category list', async () => {
+      // A parent line next to a child line: Food expands to Food + Restaurants,
+      // so the child's id would otherwise be bound twice.
+      CategoriesDB.getAllDescendants.mockImplementation(async id => (id === 'food' ? [{ id: 'rest' }] : []));
+      queryFirst.mockResolvedValue({ total: 100 });
+
+      const total = await BudgetsDB.calculateSpendingForAnyFilters({
+        filterSets: [{ categoryIds: ['food'] }, { categoryIds: ['rest'] }],
+        ...RANGE,
+      });
+
+      expect(total).toBe('100');
+      const [sql, params] = queryFirst.mock.calls[0];
+      expect(sql).toContain('((o.category_id IN (?,?)))');
+      expect(sql).not.toContain(' OR (o.');
+      expect(params).toEqual(['food', 'rest', 'USD', '2026-07-01', '2026-07-31']);
+    });
+
+    it('lets a set with no category filter absorb the others on its accounts', async () => {
+      queryFirst.mockResolvedValue({ total: 0 });
+
+      await BudgetsDB.calculateSpendingForAnyFilters({
+        filterSets: [
+          { categoryIds: ['food'], accountIds: [3] },
+          { categoryIds: [], accountIds: ['3'] }, // everything on card 3
+        ],
+        ...RANGE,
+      });
+
+      const [sql, params] = queryFirst.mock.calls[0];
+      expect(sql).toContain('((o.account_id IN (?)))');
+      expect(sql).not.toContain('o.category_id IN');
+      expect(params).toEqual([3, 'USD', '2026-07-01', '2026-07-31']);
+    });
+
+    it('keeps sets on different accounts as separate OR-ed clauses', async () => {
+      queryFirst.mockResolvedValue({ total: 0 });
+
+      await BudgetsDB.calculateSpendingForAnyFilters({
+        filterSets: [
+          { categoryIds: ['food'] },
+          { categoryIds: ['fuel'], accountIds: [3] },
+          { categoryIds: [], accountIds: [] }, // tracks nothing: left out
+        ],
+        ...RANGE,
+      });
+
+      const [sql, params] = queryFirst.mock.calls[0];
+      expect(sql).toContain('((o.category_id IN (?)) OR (o.category_id IN (?) AND o.account_id IN (?)))');
+      expect(params).toEqual(['food', 'fuel', 3, 'USD', '2026-07-01', '2026-07-31']);
+    });
+  });
 });

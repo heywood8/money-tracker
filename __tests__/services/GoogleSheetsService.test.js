@@ -321,21 +321,24 @@ describe('GoogleSheetsService', () => {
     };
 
     // Every tab today's export writes. The metadata read happens FIRST now (it
-    // both spots the tabs a spreadsheet is missing and supplies the IDs the
-    // filters hang off), so a spreadsheet described here as complete makes the
-    // export exactly four calls: metadata, clear, write, filters.
+    // spots the tabs a spreadsheet is missing, supplies the IDs the filters hang
+    // off and the grid sizes that bound the stale-area clear), so a spreadsheet
+    // described here as complete makes the export exactly four calls: metadata,
+    // write, filters, and the trim of each tab to its new size.
+    const grid = { rowCount: 1000, columnCount: 26 };
     const mockMetadata = {
       sheets: [
-        { properties: { title: 'Accounts', sheetId: 0 } },
-        { properties: { title: 'Operations', sheetId: 1 } },
-        { properties: { title: 'Categories', sheetId: 2 } },
-        { properties: { title: 'Budgets', sheetId: 3 } },
-        { properties: { title: 'Balance History', sheetId: 4 } },
-        { properties: { title: 'Budget Plans', sheetId: 5 } },
-        { properties: { title: 'Budget Plan Lines', sheetId: 6 } },
-        { properties: { title: 'Budget Line Groups', sheetId: 7 } },
+        { properties: { title: 'Accounts', sheetId: 0, gridProperties: grid } },
+        { properties: { title: 'Operations', sheetId: 1, gridProperties: grid } },
+        { properties: { title: 'Categories', sheetId: 2, gridProperties: grid } },
+        { properties: { title: 'Budgets', sheetId: 3, gridProperties: grid } },
+        { properties: { title: 'Balance History', sheetId: 4, gridProperties: grid } },
+        { properties: { title: 'Budget Plans', sheetId: 5, gridProperties: grid } },
+        { properties: { title: 'Budget Plan Lines', sheetId: 6, gridProperties: grid } },
+        { properties: { title: 'Budget Line Groups', sheetId: 7, gridProperties: grid } },
       ],
     };
+    const callsTo = (path) => mockFetch.mock.calls.filter(([url]) => url.includes(path));
 
     it('creates a new spreadsheet and stores its ID on first export', async () => {
       getPreference.mockResolvedValue(null);
@@ -344,10 +347,10 @@ describe('GoogleSheetsService', () => {
         ok: true,
         json: async () => ({ spreadsheetId: 'new-sheet-id' }),
       });
-      mockFetch.mockResolvedValueOnce({ ok: true, json: async () => mockMetadata }); // getSheetIdsByTitle
-      mockFetch.mockResolvedValueOnce({ ok: true, json: async () => ({}) }); // clearSheets
+      mockFetch.mockResolvedValueOnce({ ok: true, json: async () => mockMetadata }); // getSheetsByTitle
       mockFetch.mockResolvedValueOnce({ ok: true, json: async () => ({}) }); // writeSheets
       mockFetch.mockResolvedValueOnce({ ok: true, json: async () => ({}) }); // applyFilters
+      mockFetch.mockResolvedValueOnce({ ok: true, json: async () => ({}) }); // clearSheets
 
       const url = await exportToSheets('access-token', mockBackup);
 
@@ -365,9 +368,9 @@ describe('GoogleSheetsService', () => {
         mockFetch.mockResolvedValueOnce(failedMetadataResponse); // stored spreadsheet
         mockFetch.mockResolvedValueOnce({ ok: true, json: async () => ({ spreadsheetId: 'fresh-sheet-id' }) }); // create
         mockFetch.mockResolvedValueOnce({ ok: true, json: async () => mockMetadata }); // its metadata
-        mockFetch.mockResolvedValueOnce({ ok: true, json: async () => ({}) }); // clearSheets
         mockFetch.mockResolvedValueOnce({ ok: true, json: async () => ({}) }); // writeSheets
         mockFetch.mockResolvedValueOnce({ ok: true, json: async () => ({}) }); // applyFilters
+        mockFetch.mockResolvedValueOnce({ ok: true, json: async () => ({}) }); // clearSheets
 
         const url = await exportToSheets('access-token', mockBackup);
 
@@ -396,10 +399,10 @@ describe('GoogleSheetsService', () => {
 
     it('updates existing spreadsheet without creating a new one on re-export', async () => {
       getPreference.mockResolvedValue('existing-sheet-id');
-      mockFetch.mockResolvedValueOnce({ ok: true, json: async () => mockMetadata }); // getSheetIdsByTitle
-      mockFetch.mockResolvedValueOnce({ ok: true, json: async () => ({}) }); // clearSheets
+      mockFetch.mockResolvedValueOnce({ ok: true, json: async () => mockMetadata }); // getSheetsByTitle
       mockFetch.mockResolvedValueOnce({ ok: true, json: async () => ({}) }); // writeSheets
       mockFetch.mockResolvedValueOnce({ ok: true, json: async () => ({}) }); // applyFilters
+      mockFetch.mockResolvedValueOnce({ ok: true, json: async () => ({}) }); // trimSheets
 
       const url = await exportToSheets('access-token', mockBackup);
 
@@ -410,41 +413,25 @@ describe('GoogleSheetsService', () => {
 
     it('applies basic filters to every exported sheet after writing data', async () => {
       getPreference.mockResolvedValue('sheet-id');
-      mockFetch.mockResolvedValueOnce({ ok: true, json: async () => mockMetadata }); // getSheetIdsByTitle
-      mockFetch.mockResolvedValueOnce({ ok: true, json: async () => ({}) }); // clearSheets
+      mockFetch.mockResolvedValueOnce({ ok: true, json: async () => mockMetadata }); // getSheetsByTitle
       mockFetch.mockResolvedValueOnce({ ok: true, json: async () => ({}) }); // writeSheets
       mockFetch.mockResolvedValueOnce({ ok: true, json: async () => ({}) }); // applyFilters
+      mockFetch.mockResolvedValueOnce({ ok: true, json: async () => ({}) }); // clearSheets
 
       await exportToSheets('access-token', mockBackup);
 
-      const applyFiltersCall = mockFetch.mock.calls[3];
+      const applyFiltersCall = mockFetch.mock.calls[2];
       const body = JSON.parse(applyFiltersCall[1].body);
       expect(body.requests).toHaveLength(8);
       expect(body.requests[0].setBasicFilter.filter.range.sheetId).toBe(0);
       expect(body.requests[7].setBasicFilter.filter.range.sheetId).toBe(7);
     });
 
-    it('throws refresh_failed and signs out when clearSheets returns 401', async () => {
-      getPreference.mockResolvedValue('sheet-id');
-      GoogleSignin.revokeAccess.mockResolvedValue(undefined);
-      GoogleSignin.signOut.mockResolvedValue(undefined);
-      mockFetch.mockResolvedValueOnce({ ok: true, json: async () => mockMetadata }); // getSheetIdsByTitle
-      mockFetch.mockResolvedValueOnce({
-        ok: false,
-        status: 401,
-        json: async () => ({ error: { message: 'Unauthorized' } }),
-      });
-
-      await expect(exportToSheets('expired-token', mockBackup)).rejects.toThrow('refresh_failed');
-      expect(GoogleSignin.signOut).toHaveBeenCalled();
-    });
-
     it('throws refresh_failed and signs out when writeSheets returns 401', async () => {
       getPreference.mockResolvedValue('sheet-id');
       GoogleSignin.revokeAccess.mockResolvedValue(undefined);
       GoogleSignin.signOut.mockResolvedValue(undefined);
-      mockFetch.mockResolvedValueOnce({ ok: true, json: async () => mockMetadata }); // getSheetIdsByTitle
-      mockFetch.mockResolvedValueOnce({ ok: true, json: async () => ({}) }); // clearSheets
+      mockFetch.mockResolvedValueOnce({ ok: true, json: async () => mockMetadata }); // getSheetsByTitle
       mockFetch.mockResolvedValueOnce({
         ok: false,
         status: 401,
@@ -457,8 +444,7 @@ describe('GoogleSheetsService', () => {
 
     it('throws quota_exceeded when batchUpdate returns 429', async () => {
       getPreference.mockResolvedValue('sheet-id');
-      mockFetch.mockResolvedValueOnce({ ok: true, json: async () => mockMetadata }); // getSheetIdsByTitle
-      mockFetch.mockResolvedValueOnce({ ok: true, json: async () => ({}) }); // clearSheets
+      mockFetch.mockResolvedValueOnce({ ok: true, json: async () => mockMetadata }); // getSheetsByTitle
       mockFetch.mockResolvedValueOnce({
         ok: false,
         status: 429,
@@ -466,6 +452,164 @@ describe('GoogleSheetsService', () => {
       });
 
       await expect(exportToSheets('access-token', mockBackup)).rejects.toThrow('quota_exceeded');
+    });
+
+    // The export used to clear every tab and then write. A write that failed
+    // (quota, a dropped connection, an oversized payload) left the spreadsheet
+    // empty — which the import refuses — so the only off-device copy was gone.
+    describe('a failed write keeps the previous export', () => {
+      it('does not clear anything before a write that fails with 429', async () => {
+        getPreference.mockResolvedValue('sheet-id');
+        mockFetch.mockResolvedValueOnce({ ok: true, json: async () => mockMetadata }); // getSheetsByTitle
+        mockFetch.mockResolvedValueOnce({
+          ok: false,
+          status: 429,
+          json: async () => ({ error: { message: 'Quota exceeded' } }),
+        });
+
+        await expect(exportToSheets('access-token', mockBackup)).rejects.toThrow('quota_exceeded');
+
+        expect(callsTo('values:batchClear')).toHaveLength(0);
+      });
+
+      it('blanks the rows past the new data inside the write itself', async () => {
+        getPreference.mockResolvedValue('sheet-id');
+        mockFetch.mockResolvedValue({ ok: true, json: async () => ({}) });
+        mockFetch.mockResolvedValueOnce({ ok: true, json: async () => mockMetadata }); // getSheetsByTitle
+        const progress = [];
+
+        await exportToSheets('access-token', mockBackup, event => progress.push(event));
+
+        // One request carries the new rows AND the blanking of the old tail, so
+        // a failure after it can no longer leave the two mixed.
+        const { data } = JSON.parse(callsTo('values:batchUpdate')[0][1].body);
+        const accounts = data.find(d => d.range === 'Accounts!A1');
+        // A header plus one row, then blank rows down to the tab's 1000.
+        expect(accounts.values).toHaveLength(1000);
+        expect(accounts.values[1][1]).toBe('Cash');
+        expect(accounts.values[2]).toEqual(Array(12).fill(''));
+        expect(accounts.values[999]).toEqual(Array(12).fill(''));
+        const history = data.find(d => d.range === 'Balance History!A1');
+        expect(history.values).toHaveLength(1000);
+        expect(history.values[1]).toEqual(['', '', '', '']);
+
+        // Nothing is cleared in a call of its own any more.
+        expect(callsTo('values:batchClear')).toHaveLength(0);
+
+        // Each tab is then cut down to exactly what was written into it, so the
+        // next export's blank rows reach this one's length and no further.
+        const trim = mockFetch.mock.calls
+          .map(([url, options]) => ({ url, body: JSON.parse(options?.body || '{}') }))
+          .find(({ body }) => body.requests?.some(r => r.updateSheetProperties));
+        const sizeOf = sheetId => trim.body.requests
+          .find(r => r.updateSheetProperties.properties.sheetId === sheetId).updateSheetProperties;
+        expect(sizeOf(0)).toEqual({
+          properties: { sheetId: 0, gridProperties: { rowCount: 2, columnCount: 12 } },
+          fields: 'gridProperties.rowCount,gridProperties.columnCount',
+        });
+        expect(sizeOf(4).properties.gridProperties).toEqual({ rowCount: 1, columnCount: 4 });
+        expect(trim.body.requests).toHaveLength(8);
+
+        expect(progress.map(p => `${p.step}:${p.status}`)).toEqual([
+          'connect:in_progress', 'connect:completed',
+          'write:in_progress', 'write:completed',
+        ]);
+      });
+
+      it('sends no clear and no blank rows into a spreadsheet created in this run', async () => {
+        getPreference.mockResolvedValue(null);
+        setPreference.mockResolvedValue(undefined);
+        mockFetch.mockResolvedValue({ ok: true, json: async () => ({}) });
+        mockFetch.mockResolvedValueOnce({ ok: true, json: async () => ({ spreadsheetId: 'new-sheet-id' }) }); // create
+        mockFetch.mockResolvedValueOnce({ ok: true, json: async () => mockMetadata }); // its metadata
+
+        await exportToSheets('access-token', mockBackup);
+
+        expect(callsTo('values:batchClear')).toHaveLength(0);
+        const { data } = JSON.parse(callsTo('values:batchUpdate')[0][1].body);
+        expect(data.find(d => d.range === 'Accounts!A1').values).toHaveLength(2);
+        expect(mockFetch.mock.calls.some(([, o]) => (o?.body || '').includes('updateSheetProperties'))).toBe(false);
+      });
+
+      it('sends no clear and no blank rows into a tab this run adds', async () => {
+        getPreference.mockResolvedValue('sheet-id');
+        // An older spreadsheet, before the groups tab existed.
+        const older = { sheets: mockMetadata.sheets.filter(s => s.properties.title !== 'Budget Line Groups') };
+        mockFetch.mockResolvedValue({ ok: true, json: async () => ({}) });
+        mockFetch.mockResolvedValueOnce({ ok: true, json: async () => older }); // getSheetsByTitle
+        mockFetch.mockResolvedValueOnce({ // addSheets
+          ok: true,
+          json: async () => ({
+            replies: [{ addSheet: { properties: { title: 'Budget Line Groups', sheetId: 9, gridProperties: grid } } }],
+          }),
+        });
+
+        await exportToSheets('access-token', mockBackup);
+
+        const { data } = JSON.parse(callsTo('values:batchUpdate')[0][1].body);
+        expect(data.find(d => d.range === 'Budget Line Groups!A1').values).toHaveLength(1);
+        expect(callsTo('values:batchClear')).toHaveLength(0);
+        const trim = JSON.parse(mockFetch.mock.calls
+          .find(([, o]) => (o?.body || '').includes('updateSheetProperties'))[1].body);
+        const trimmedIds = trim.requests.map(r => r.updateSheetProperties.properties.sheetId);
+        expect(trimmedIds).not.toContain(9);
+        expect(trimmedIds).toContain(0);
+      });
+
+      it('does not fail an export whose data landed when the tidy-up after it fails', async () => {
+        // The data and the blank rows are in; a transient failure of the call
+        // after them is no reason to report the export as failed.
+        getPreference.mockResolvedValue('sheet-id');
+        mockFetch.mockResolvedValueOnce({ ok: true, json: async () => mockMetadata }); // getSheetsByTitle
+        mockFetch.mockResolvedValueOnce({ ok: true, json: async () => ({}) }); // writeSheets
+        mockFetch.mockResolvedValueOnce({ ok: true, json: async () => ({}) }); // applyFilters
+        mockFetch.mockResolvedValue({
+          ok: false, status: 503, json: async () => ({ error: { message: 'Service unavailable' } }),
+        });
+        jest.spyOn(console, 'warn').mockImplementation(() => {});
+
+        const url = await exportToSheets('access-token', mockBackup);
+
+        expect(url).toBe('https://docs.google.com/spreadsheets/d/sheet-id');
+        expect(console.warn).toHaveBeenCalledWith(
+          expect.stringContaining('Could not trim'), 503, 'Service unavailable',
+        );
+        console.warn.mockRestore();
+      });
+
+      it('never trims a tab below its frozen rows and columns', async () => {
+        getPreference.mockResolvedValue('sheet-id');
+        const frozen = {
+          sheets: mockMetadata.sheets.map(sheet => (sheet.properties.title === 'Balance History'
+            ? { properties: { ...sheet.properties, gridProperties: { ...grid, frozenRowCount: 1, frozenColumnCount: 5 } } }
+            : sheet)),
+        };
+        mockFetch.mockResolvedValue({ ok: true, json: async () => ({}) });
+        mockFetch.mockResolvedValueOnce({ ok: true, json: async () => frozen }); // getSheetsByTitle
+
+        await exportToSheets('access-token', mockBackup);
+
+        const trim = JSON.parse(mockFetch.mock.calls
+          .find(([, o]) => (o?.body || '').includes('updateSheetProperties'))[1].body);
+        const history = trim.requests.find(r => r.updateSheetProperties.properties.sheetId === 4);
+        // A header only and 4 columns, but row 1 and columns A–E are frozen.
+        expect(history.updateSheetProperties.properties.gridProperties).toEqual({ rowCount: 2, columnCount: 6 });
+      });
+
+      it('writes an empty string where a value is missing, so no old value shows through', async () => {
+        getPreference.mockResolvedValue('sheet-id');
+        mockFetch.mockResolvedValue({ ok: true, json: async () => ({}) });
+        mockFetch.mockResolvedValueOnce({ ok: true, json: async () => mockMetadata }); // getSheetsByTitle
+        const backup = { data: { ...mockBackup.data, accounts: [{ id: 1, name: 'Cash', currency: 'USD' }] } };
+
+        await exportToSheets('access-token', backup);
+
+        const { data } = JSON.parse(callsTo('values:batchUpdate')[0][1].body);
+        const accounts = data.find(d => d.range === 'Accounts!A1');
+        // `balance` was undefined — serialised as null, which the API skips.
+        expect(accounts.values[1][2]).toBe('');
+        expect(accounts.values[1]).not.toContain(null);
+      });
     });
   });
 

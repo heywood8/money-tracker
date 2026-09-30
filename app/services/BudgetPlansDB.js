@@ -11,7 +11,13 @@
 import uuid from 'react-native-uuid';
 import { executeQuery, queryAll, queryFirst, executeTransaction } from './db';
 import * as Currency from './currency';
-import { calculateSpendingForFilters, expandCategoryIds, deriveSpendingStatus, NOT_SHADOW_SQL } from './BudgetsDB';
+import {
+  calculateSpendingForFilters,
+  calculateSpendingForAnyFilters,
+  expandCategoryIds,
+  deriveSpendingStatus,
+  NOT_SHADOW_SQL,
+} from './BudgetsDB';
 import { formatDate as formatLocalDate } from './BalanceHistoryDB';
 import { normalizeLabel, matchesAnyLabel } from '../utils/labelUtils';
 import { sumMoneySql } from './sqlMoney';
@@ -2304,6 +2310,50 @@ const collectPlanSourceCurrencies = async (lines, startDate, endDate, convertAll
 };
 
 /**
+ * "Spent" for a set of counted (non-income) lines, every operation once.
+ *
+ * Summing line actuals counted an operation once per line that matched it, and
+ * lines overlap routinely: a parent category next to one of its children, a
+ * card-only line next to a category line, two lines receiving into one account.
+ * So the spending lines are summed as ONE union of their filters (see
+ * calculateSpendingForAnyFilters), and the transfer-target lines — decided by
+ * the same branch calculateLineActual takes — by account: two lines receiving
+ * into one account share one actual, counted once.
+ * @param {Array<{line: Object, actual: string}>} counted
+ * @param {Object} context
+ * @param {string} context.currency
+ * @param {string} context.startDate
+ * @param {string} context.endDate
+ * @param {boolean} context.convertAll
+ * @returns {Promise<string>}
+ */
+const sumSpentOnce = async (counted, { currency, startDate, endDate, convertAll }) => {
+  const filterSets = [];
+  const transferActualByAccount = new Map();
+  for (const { line, actual } of counted) {
+    const categoryIds = line.categoryIds ?? (isSet(line.categoryId) ? [line.categoryId] : []);
+    const accountIds = line.sourceAccountIds ?? [];
+    if (categoryIds.length > 0 || accountIds.length > 0) {
+      filterSets.push({ categoryIds, accountIds });
+    } else {
+      transferActualByAccount.set(String(line.toAccountId), actual);
+    }
+  }
+
+  let total = '0';
+  if (filterSets.length > 0) {
+    const spent = await calculateSpendingForAnyFilters({
+      filterSets, currency, startDate, endDate, includeChildren: true, convertAll,
+    });
+    total = Currency.add(total, spent, currency);
+  }
+  for (const actual of transferActualByAccount.values()) {
+    total = Currency.add(total, actual, currency);
+  }
+  return total;
+};
+
+/**
  * Compute a plan's full plan-vs-actual status: per-line actuals with the shared
  * budget status bands, income vs expected, and totals — all expressed in
  * `displayCurrency` (defaults to the plan's own currency). Lines include BOTH the
@@ -2384,7 +2434,9 @@ const calculateStatusForPlan = async (plan, displayCurrency = null, convertAll =
     const tallyFor = (groupId) => {
       let tally = groupTallies.get(groupId);
       if (!tally) {
-        tally = { childAmount: '0', actual: '0', lineCount: 0 };
+        // `counted` holds the lines behind `actual`, which is only summed once
+        // every line is in — see sumSpentOnce.
+        tally = { childAmount: '0', actual: '0', lineCount: 0, counted: [] };
         groupTallies.set(groupId, tally);
       }
       return tally;
@@ -2393,7 +2445,10 @@ const calculateStatusForPlan = async (plan, displayCurrency = null, convertAll =
     const lineStatuses = [];
     const transferCurrencies = new Set();
     let allocated = '0';
-    let totalActual = '0';
+    // The lines whose actuals make up "Spent", each with the actual and what it
+    // matches. Not summed as the lines are walked: lines overlap, and a sum
+    // counted an operation once per line that matched it (see sumSpentOnce).
+    const countedLines = [];
     // Expected income is the sum of the plan's income lines (Budgets v3 phase 3);
     // the stored expected_income column is only a fallback for a plan that has
     // none — see the totals assembly below.
@@ -2523,9 +2578,10 @@ const calculateStatusForPlan = async (plan, displayCurrency = null, convertAll =
       if (sourceCurrency) {
         transferCurrencies.add(sourceCurrency);
       }
-      totalActual = Currency.add(totalActual, actual, target);
+      const counted = { line, actual };
+      countedLines.push(counted);
       if (groupTally) {
-        groupTally.actual = Currency.add(groupTally.actual, actual, target);
+        groupTally.counted.push(counted);
       }
       const remaining = Currency.subtract(amount, actual, target);
       const { isExceeded, percentage, status } = deriveSpendingStatus(actual, amount);
@@ -2540,6 +2596,16 @@ const calculateStatusForPlan = async (plan, displayCurrency = null, convertAll =
         status,
       });
     }
+
+    // "Spent" for the month and for each group: every operation once, however
+    // many of the lines match it. Line statuses above keep their own actuals.
+    const sumContext = { currency: target, startDate, endDate, convertAll };
+    const [totalActual] = await Promise.all([
+      sumSpentOnce(countedLines, sumContext),
+      ...[...groupTallies.values()].map(async (tally) => {
+        tally.actual = await sumSpentOnce(tally.counted, sumContext);
+      }),
+    ]);
 
     // Group statuses, and the correction an OVERRIDE group makes to `allocated`.
     //

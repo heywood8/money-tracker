@@ -724,6 +724,7 @@
   "drive_backup_last_success": "Letztes Backup",
   "drive_backup_last_error": "Letztes Backup fehlgeschlagen",
   "drive_backup_last_skipped": "Letzter Lauf übersprungen",
+  "drive_backup_kept_larger_remote": "In Drive liegt bereits eine größere Sicherung für diesen Tag oder diese Woche, daher wurde sie beibehalten",
   "drive_backup_last_cancelled": "Letzter Lauf abgebrochen",
   "drive_backup_now": "Jetzt sichern",
   "drive_backup_retention": "Geplante Backups behalten die letzten 7 täglichen und 15 wöchentlichen Kopien je Format. Mit der Schaltfläche erstellte Backups bleiben, bis du sie löschst.",
