@@ -21,7 +21,7 @@ jest.mock('../../app/services/notifications/duplicateOperations', () => ({
 }));
 jest.mock('../../app/services/PendingNotificationsDB');
 jest.mock('../../app/services/NotificationRulesDB', () => ({
-  getLabelForMerchant: jest.fn(),
+  getMerchantRule: jest.fn(),
 }));
 jest.mock('../../app/services/AccountsDB', () => ({
   getAccountByCardMask: jest.fn(),
@@ -46,9 +46,11 @@ const TRANSFER = {
 // labelDirty is false until the user actually types a custom name.
 const EXPENSE_CHOICE = {
   accountId: 1, categoryId: 'c1', toAccountId: null, labelOverride: '', labelDirty: false,
+  skipCategoryBinding: false, skipCategoryLocked: false,
 };
 const TRANSFER_CHOICE = {
   accountId: 1, categoryId: null, toAccountId: 2, labelOverride: '', labelDirty: false,
+  skipCategoryBinding: false, skipCategoryLocked: false,
 };
 // The resolve payload for an untouched card: the label is omitted (not authoritative)
 // so the resolver applies and preserves the learned merchant label at resolve time.
@@ -90,7 +92,7 @@ describe('usePendingOperationSuggestions', () => {
     pipeline.processBankNotifications.mockResolvedValue({ created: 0, pending: 0, skipped: 0 });
     pipeline.resolvePendingNotification.mockResolvedValue({ id: 'op1' });
     pipeline.dismissPendingNotification.mockResolvedValue();
-    NotificationRulesDB.getLabelForMerchant.mockResolvedValue(null);
+    NotificationRulesDB.getMerchantRule.mockResolvedValue(null);
     AccountsDB.getAccountByCardMask.mockResolvedValue(null);
     kindRequiresCategory.mockReturnValue(false);
   });
@@ -185,10 +187,10 @@ describe('usePendingOperationSuggestions', () => {
     });
 
     it('seeds the label from the learned merchant override', async () => {
-      NotificationRulesDB.getLabelForMerchant.mockResolvedValue('Groceries');
+      NotificationRulesDB.getMerchantRule.mockResolvedValue({ labelOverride: 'Groceries' });
       const { result } = await renderHook(() => usePendingOperationSuggestions());
       await waitFor(() => expect(result.current.choices.p1?.labelOverride).toBe('Groceries'));
-      expect(NotificationRulesDB.getLabelForMerchant).toHaveBeenCalledWith('SAS SUPERMARKET', 'am.bank');
+      expect(NotificationRulesDB.getMerchantRule).toHaveBeenCalledWith('SAS SUPERMARKET', 'am.bank');
     });
 
     it('does not clobber a user-edited choice on reload', async () => {
@@ -207,7 +209,7 @@ describe('usePendingOperationSuggestions', () => {
     });
 
     it('keeps a user-cleared label cleared across reload (does not re-seed it)', async () => {
-      NotificationRulesDB.getLabelForMerchant.mockResolvedValue('Coffee Bros');
+      NotificationRulesDB.getMerchantRule.mockResolvedValue({ labelOverride: 'Coffee Bros' });
       const { result } = await renderHook(() => usePendingOperationSuggestions());
       await waitFor(() => expect(result.current.choices.p1?.labelOverride).toBe('Coffee Bros'));
 
@@ -426,6 +428,140 @@ describe('usePendingOperationSuggestions', () => {
     });
   });
 
+  describe('don’t bind to category', () => {
+    it('starts unticked and unlocked for a merchant with no flag', async () => {
+      NotificationRulesDB.getMerchantRule.mockResolvedValue({ categoryId: 'c1', skipCategory: false });
+      const { result } = await renderHook(() => usePendingOperationSuggestions());
+      await waitFor(() => expect(result.current.choices.p1).toBeTruthy());
+      expect(result.current.choices.p1.skipCategoryBinding).toBe(false);
+      expect(result.current.choices.p1.skipCategoryLocked).toBe(false);
+    });
+
+    it('seeds a ticked, locked box for a merchant flagged by an earlier save', async () => {
+      NotificationRulesDB.getMerchantRule.mockResolvedValue({ categoryId: null, skipCategory: true });
+      const { result } = await renderHook(() => usePendingOperationSuggestions());
+      await waitFor(() => expect(result.current.choices.p1?.skipCategoryLocked).toBe(true));
+      expect(result.current.choices.p1.skipCategoryBinding).toBe(true);
+    });
+
+    it('lets the user tick and untick an unlocked box', async () => {
+      const { result } = await renderHook(() => usePendingOperationSuggestions());
+      await waitFor(() => expect(result.current.choices.p1).toEqual(EXPENSE_CHOICE));
+
+      await act(async () => {
+        result.current.setChoice('p1', { skipCategoryBinding: true });
+      });
+      expect(result.current.choices.p1.skipCategoryBinding).toBe(true);
+      await act(async () => {
+        result.current.setChoice('p1', { skipCategoryBinding: false });
+      });
+      expect(result.current.choices.p1.skipCategoryBinding).toBe(false);
+    });
+
+    it('opens a flagged merchant with no category, dropping the one the queue pre-filled', async () => {
+      // EXPENSE was queued with c1 from a binding the user has since replaced
+      // with the flag.
+      NotificationRulesDB.getMerchantRule.mockResolvedValue({ skipCategory: true });
+      const { result } = await renderHook(() => usePendingOperationSuggestions());
+      await waitFor(() => expect(result.current.choices.p1?.skipCategoryLocked).toBe(true));
+      expect(result.current.choices.p1.categoryId).toBeNull();
+    });
+
+    it('drops the pre-filled category when a sibling save locks the card', async () => {
+      const { result } = await renderHook(() => usePendingOperationSuggestions());
+      await waitFor(() => expect(result.current.choices.p1).toEqual(EXPENSE_CHOICE));
+
+      NotificationRulesDB.getMerchantRule.mockResolvedValue({ skipCategory: true });
+      await act(async () => {
+        appEvents.emit(EVENTS.RELOAD_ALL);
+      });
+      await waitFor(() => expect(result.current.choices.p1.skipCategoryLocked).toBe(true));
+      expect(result.current.choices.p1.categoryId).toBeNull();
+    });
+
+    it('keeps a category the user picked when a sibling save locks the card', async () => {
+      const { result } = await renderHook(() => usePendingOperationSuggestions());
+      await waitFor(() => expect(result.current.choices.p1).toEqual(EXPENSE_CHOICE));
+      await act(async () => {
+        result.current.setChoice('p1', { categoryId: 'c7' });
+      });
+
+      NotificationRulesDB.getMerchantRule.mockResolvedValue({ skipCategory: true });
+      await act(async () => {
+        appEvents.emit(EVENTS.RELOAD_ALL);
+      });
+      await waitFor(() => expect(result.current.choices.p1.skipCategoryLocked).toBe(true));
+      expect(result.current.choices.p1.categoryId).toBe('c7');
+    });
+
+    it('looks each merchant up once however many of its notifications are queued', async () => {
+      PendingNotificationsDB.getPendingNotifications.mockResolvedValue([
+        EXPENSE, { ...EXPENSE, id: 'p5' }, { ...EXPENSE, id: 'p6' },
+      ]);
+      const { result } = await renderHook(() => usePendingOperationSuggestions());
+      await waitFor(() => expect(Object.keys(result.current.choices)).toHaveLength(3));
+      expect(NotificationRulesDB.getMerchantRule).toHaveBeenCalledTimes(1);
+    });
+
+    it('locks an open card once a sibling save flags the same merchant', async () => {
+      const { result } = await renderHook(() => usePendingOperationSuggestions());
+      await waitFor(() => expect(result.current.choices.p1).toEqual(EXPENSE_CHOICE));
+
+      NotificationRulesDB.getMerchantRule.mockResolvedValue({ skipCategory: true });
+      await act(async () => {
+        appEvents.emit(EVENTS.RELOAD_ALL);
+      });
+      await waitFor(() => expect(result.current.choices.p1.skipCategoryLocked).toBe(true));
+      expect(result.current.choices.p1.skipCategoryBinding).toBe(true);
+    });
+
+    it('frees and clears the box when the flag is lifted in Settings', async () => {
+      NotificationRulesDB.getMerchantRule.mockResolvedValue({ skipCategory: true });
+      const { result } = await renderHook(() => usePendingOperationSuggestions());
+      await waitFor(() => expect(result.current.choices.p1?.skipCategoryLocked).toBe(true));
+
+      NotificationRulesDB.getMerchantRule.mockResolvedValue({ skipCategory: false });
+      await act(async () => {
+        appEvents.emit(EVENTS.RELOAD_ALL);
+      });
+      await waitFor(() => expect(result.current.choices.p1.skipCategoryLocked).toBe(false));
+      expect(result.current.choices.p1.skipCategoryBinding).toBe(false);
+    });
+
+    it('keeps the lock when the rule lookup fails on a later reload', async () => {
+      NotificationRulesDB.getMerchantRule.mockResolvedValue({ skipCategory: true });
+      const { result } = await renderHook(() => usePendingOperationSuggestions());
+      await waitFor(() => expect(result.current.choices.p1?.skipCategoryLocked).toBe(true));
+
+      NotificationRulesDB.getMerchantRule.mockRejectedValue(new Error('db busy'));
+      const lookupsBefore = NotificationRulesDB.getMerchantRule.mock.calls.length;
+      await act(async () => {
+        appEvents.emit(EVENTS.RELOAD_ALL);
+      });
+      await waitFor(() => expect(NotificationRulesDB.getMerchantRule.mock.calls.length)
+        .toBeGreaterThan(lookupsBefore));
+      await act(async () => {});
+      expect(result.current.choices.p1.skipCategoryLocked).toBe(true);
+      expect(result.current.choices.p1.skipCategoryBinding).toBe(true);
+    });
+
+    it('sends skipCategoryBinding to resolve when the box is ticked', async () => {
+      const { result } = await renderHook(() => usePendingOperationSuggestions());
+      await waitFor(() => expect(result.current.choices.p1).toEqual(EXPENSE_CHOICE));
+
+      await act(async () => {
+        result.current.setChoice('p1', { skipCategoryBinding: true });
+      });
+      PendingNotificationsDB.getPendingNotifications.mockResolvedValue([]);
+      await act(async () => {
+        await result.current.accept(EXPENSE);
+      });
+      expect(pipeline.resolvePendingNotification).toHaveBeenCalledWith('p1', {
+        ...EXPENSE_RESOLVE, skipCategoryBinding: true,
+      });
+    });
+  });
+
   describe('accept', () => {
     it('resolves an untouched expense WITHOUT a label override and drops it from the deck', async () => {
       const { result } = await renderHook(() => usePendingOperationSuggestions());
@@ -442,7 +578,7 @@ describe('usePendingOperationSuggestions', () => {
     });
 
     it('does not send a label override even when a label was seeded from the learned name', async () => {
-      NotificationRulesDB.getLabelForMerchant.mockResolvedValue('Groceries');
+      NotificationRulesDB.getMerchantRule.mockResolvedValue({ labelOverride: 'Groceries' });
       const { result } = await renderHook(() => usePendingOperationSuggestions());
       await waitFor(() => expect(result.current.choices.p1?.labelOverride).toBe('Groceries'));
 

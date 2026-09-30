@@ -1251,6 +1251,75 @@ describe('processBankNotifications', () => {
       });
     });
 
+    describe('"don’t bind to category"', () => {
+      it('books the chosen category but marks the merchant instead of learning it', async () => {
+        PendingNotificationsDB.getPendingNotificationById.mockResolvedValue(pending);
+
+        await pipeline.resolvePendingNotification('p1', {
+          accountId: 7, categoryId: 'cat-food', skipCategoryBinding: true,
+        });
+
+        expect(OperationsDB.createOperation).toHaveBeenCalledWith(
+          expect.objectContaining({ accountId: 7, categoryId: 'cat-food' }),
+        );
+        expect(NotificationRulesDB.upsertMerchantSkipCategory).toHaveBeenCalledWith(
+          'NAREK MEHRABYAN', PKG, { labelIfNew: 'Narek Mehrabyan' },
+        );
+        expect(NotificationRulesDB.upsertMerchantRule).not.toHaveBeenCalled();
+        // Everything else is still learned as usual.
+        expect(AccountsDB.addAccountCardMask).toHaveBeenCalledWith(7, '4083***7027');
+        expect(NotificationRulesDB.touchMerchantRuleMatch).toHaveBeenCalledWith('NAREK MEHRABYAN', PKG);
+      });
+
+      it('marks the merchant even when no category was picked', async () => {
+        PendingNotificationsDB.getPendingNotificationById.mockResolvedValue(pending);
+
+        await pipeline.resolvePendingNotification('p1', {
+          accountId: 7, categoryId: null, skipCategoryBinding: true,
+        });
+
+        expect(NotificationRulesDB.upsertMerchantSkipCategory).toHaveBeenCalledWith(
+          'NAREK MEHRABYAN', PKG, { labelIfNew: 'Narek Mehrabyan' },
+        );
+      });
+
+      it('leaves the flag alone when the box is off (the default)', async () => {
+        PendingNotificationsDB.getPendingNotificationById.mockResolvedValue(pending);
+
+        await pipeline.resolvePendingNotification('p1', { accountId: 7, categoryId: 'cat-food' });
+
+        expect(NotificationRulesDB.upsertMerchantSkipCategory).not.toHaveBeenCalled();
+        expect(NotificationRulesDB.upsertMerchantRule).toHaveBeenCalled();
+      });
+
+      it('writes no rule for a kind that never learns a category (C2C)', async () => {
+        PendingNotificationsDB.getPendingNotificationById.mockResolvedValue({
+          ...pending, kind: 'C2C', merchant: 'N. DORVANYAN',
+        });
+
+        await pipeline.resolvePendingNotification('p1', {
+          accountId: 7, categoryId: 'cat-loan', skipCategoryBinding: true,
+        });
+
+        expect(NotificationRulesDB.upsertMerchantSkipCategory).not.toHaveBeenCalled();
+        expect(NotificationRulesDB.upsertMerchantRule).not.toHaveBeenCalled();
+      });
+
+      it('still books the operation when marking the merchant fails', async () => {
+        PendingNotificationsDB.getPendingNotificationById.mockResolvedValue(pending);
+        NotificationRulesDB.upsertMerchantSkipCategory.mockRejectedValueOnce(new Error('db busy'));
+        const errorSpy = jest.spyOn(console, 'error').mockImplementation(() => {});
+
+        const created = await pipeline.resolvePendingNotification('p1', {
+          accountId: 7, categoryId: 'cat-food', skipCategoryBinding: true,
+        });
+
+        expect(created).toEqual({ id: 1 });
+        expect(PendingNotificationsDB.deletePendingNotification).toHaveBeenCalledWith('p1');
+        errorSpy.mockRestore();
+      });
+    });
+
     it('does not learn a merchant rule for a C2C transfer, even with a category', async () => {
       PendingNotificationsDB.getPendingNotificationById.mockResolvedValue({
         ...pending, kind: 'C2C', merchant: 'N. DORVANYAN',

@@ -378,4 +378,122 @@ describe('NotificationRulesDB', () => {
       expect(params[params.length - 1]).toBe('r2');
     });
   });
+
+  describe('"don’t bind to category" flag', () => {
+    const DELETE_SQL = 'DELETE FROM notification_merchant_rules WHERE id = ?';
+
+    it('maps skip_category onto skipCategory (false for rows that predate it)', async () => {
+      mockDb.queryAll.mockResolvedValue([
+        { id: 'r1', merchant: 'A', skip_category: 1 },
+        { id: 'r2', merchant: 'B', skip_category: 0 },
+        { id: 'r3', merchant: 'C' },
+        { id: 'r4', merchant: 'D', skip_category: '1' },
+      ]);
+      const rules = await NotificationRulesDB.getAllMerchantRules();
+      expect(rules.map((r) => r.skipCategory)).toEqual([true, false, false, true]);
+    });
+
+    it('writes skip_category = 0 on every newly inserted rule', async () => {
+      mockDb.queryFirst.mockResolvedValue(null);
+      await NotificationRulesDB.upsertMerchantRule('SHOP', 'cat-1');
+      const [sql, params] = mockDb.executeQuery.mock.calls[0];
+      expect(sql).toContain('skip_category');
+      // (id, merchant, package_name, category_id, label_override, skip_category, ...)
+      expect(params[5]).toBe(0);
+    });
+
+    describe('upsertMerchantSkipCategory', () => {
+      it('returns null for an empty merchant key', async () => {
+        expect(await NotificationRulesDB.upsertMerchantSkipCategory('')).toBeNull();
+        expect(mockDb.executeQuery).not.toHaveBeenCalled();
+      });
+
+      it('inserts a flagged rule with no category, learning the name when new', async () => {
+        mockDb.queryFirst.mockResolvedValue(null);
+        const rule = await NotificationRulesDB.upsertMerchantSkipCategory(
+          'Ameriabank Api Gate', 'am.bank', { labelIfNew: 'Ameriabank Api Gate' },
+        );
+        const [sql, params] = mockDb.executeQuery.mock.calls[0];
+        expect(sql).toContain('INSERT INTO notification_merchant_rules');
+        expect(params.slice(1, 6)).toEqual(['AMERIABANK API GATE', 'am.bank', null, 'Ameriabank Api Gate', 1]);
+        expect(rule.skipCategory).toBe(true);
+        expect(rule.categoryId).toBeNull();
+      });
+
+      it('drops a learned category and sets the flag on an existing rule, keeping its label', async () => {
+        mockDb.queryFirst.mockResolvedValue({
+          id: 'r1', merchant: 'SHOP', package_name: null, category_id: 'cat-1', label_override: 'Shop', skip_category: 0,
+        });
+        const rule = await NotificationRulesDB.upsertMerchantSkipCategory('SHOP', null, { labelIfNew: 'Other' });
+        const [sql, params] = mockDb.executeQuery.mock.calls[0];
+        expect(sql).toMatch(/^UPDATE notification_merchant_rules SET skip_category = \?, category_id = \?, updated_at = \? WHERE id = \?$/);
+        expect(params).toEqual([1, null, expect.any(String), 'r1']);
+        expect(rule.labelOverride).toBe('Shop');
+        expect(rule.skipCategory).toBe(true);
+      });
+
+      it('writes nothing when the rule is already flagged', async () => {
+        mockDb.queryFirst.mockResolvedValue({
+          id: 'r1', merchant: 'SHOP', package_name: null, category_id: null, skip_category: 1,
+        });
+        const rule = await NotificationRulesDB.upsertMerchantSkipCategory('SHOP');
+        expect(mockDb.executeQuery).not.toHaveBeenCalled();
+        expect(rule.skipCategory).toBe(true);
+      });
+    });
+
+    describe('upsertMerchantRule on a flagged merchant', () => {
+      const FLAGGED = {
+        id: 'r1', merchant: 'SHOP', package_name: null, category_id: null, label_override: null, skip_category: 1,
+      };
+
+      it('leaves the flagged rule untouched when learning from a review', async () => {
+        mockDb.queryFirst.mockResolvedValue(FLAGGED);
+        const rule = await NotificationRulesDB.upsertMerchantRule('SHOP', 'cat-food');
+        expect(mockDb.executeQuery).not.toHaveBeenCalled();
+        expect(rule.skipCategory).toBe(true);
+        expect(rule.categoryId).toBeNull();
+      });
+
+      it('replaces the flag with the category on an explicit edit (overrideSkip)', async () => {
+        mockDb.queryFirst.mockResolvedValue(FLAGGED);
+        const rule = await NotificationRulesDB.upsertMerchantRule('SHOP', 'cat-food', null, { overrideSkip: true });
+        const [sql, params] = mockDb.executeQuery.mock.calls[0];
+        expect(sql).toMatch(/^UPDATE notification_merchant_rules SET category_id = \?, skip_category = \?, updated_at = \? WHERE id = \?$/);
+        expect(params).toEqual(['cat-food', 0, expect.any(String), 'r1']);
+        expect(rule.skipCategory).toBe(false);
+        expect(rule.categoryId).toBe('cat-food');
+      });
+    });
+
+    describe('clearMerchantRuleSkipCategory', () => {
+      it('does nothing when the rule is not found', async () => {
+        mockDb.queryFirst.mockResolvedValue(null);
+        await NotificationRulesDB.clearMerchantRuleSkipCategory('missing');
+        expect(mockDb.executeQuery).not.toHaveBeenCalled();
+      });
+
+      it('deletes the whole row when nothing else is bound on it', async () => {
+        mockDb.queryFirst.mockResolvedValue({ id: 'r1', category_id: null, label_override: null, skip_category: 1 });
+        await NotificationRulesDB.clearMerchantRuleSkipCategory('r1');
+        expect(mockDb.executeQuery).toHaveBeenCalledWith(DELETE_SQL, ['r1']);
+      });
+
+      it('lifts only the flag when a name binding remains', async () => {
+        mockDb.queryFirst.mockResolvedValue({ id: 'r1', category_id: null, label_override: 'Gate', skip_category: 1 });
+        await NotificationRulesDB.clearMerchantRuleSkipCategory('r1');
+        const [sql, params] = mockDb.executeQuery.mock.calls[0];
+        expect(sql).toContain('SET skip_category = 0');
+        expect(params[params.length - 1]).toBe('r1');
+        expect(mockDb.executeQuery).not.toHaveBeenCalledWith(DELETE_SQL, ['r1']);
+      });
+    });
+
+    it('keeps a flagged row alive when its name binding is removed', async () => {
+      mockDb.queryFirst.mockResolvedValue({ id: 'r1', category_id: null, label_override: 'Gate', skip_category: 1 });
+      await NotificationRulesDB.clearMerchantRuleLabel('r1');
+      expect(mockDb.executeQuery).not.toHaveBeenCalledWith(DELETE_SQL, ['r1']);
+      expect(mockDb.executeQuery.mock.calls[0][0]).toContain('SET label_override = NULL');
+    });
+  });
 });

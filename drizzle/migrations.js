@@ -32,6 +32,7 @@ import m0027 from './0027_pending_notification_force_added.js';
 import m0028 from './0028_plan_line_labels.js';
 import m0029 from './0029_dismissed_notifications.js';
 import m0030 from './0030_operations_transfer_indexes.js';
+import m0031 from './0031_merchant_rule_skip_category.js';
 import { normalizeOperationDates, renameMotorcycleIcon } from './dataRepairs.js';
 
 export default {
@@ -68,6 +69,7 @@ export default {
     m0028,
     m0029,
     m0030,
+    m0031,
   },
   postMigrationHandlers: {
     m0003: m0003PostMigration,

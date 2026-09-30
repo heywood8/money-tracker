@@ -5,6 +5,7 @@ import * as pipeline from '../../app/services/notifications/processBankNotificat
 import * as PendingNotificationsDB from '../../app/services/PendingNotificationsDB';
 import * as NotificationAccess from '../../app/services/NotificationAccess';
 import * as notificationFilters from '../../app/services/notifications/notificationFilters';
+import * as NotificationRulesDB from '../../app/services/NotificationRulesDB';
 
 jest.mock('../../app/contexts/LocalizationContext', () => ({
   useLocalization: () => ({ t: (key) => key }),
@@ -133,6 +134,52 @@ describe('NotificationProcessingContentPanel', () => {
         'p1', expect.objectContaining({ accountId: 1 }),
       ),
     );
+  });
+
+  describe('"Don’t bind to category"', () => {
+    afterEach(() => {
+      jest.restoreAllMocks();
+    });
+
+    it('is off by default, and a ticked box rides along with the save', async () => {
+      PendingNotificationsDB.getPendingNotifications.mockResolvedValue([{ ...PENDING, accountId: 1 }]);
+      const { getByText, getByTestId } = await render(<NotificationProcessingContentPanel />);
+      const toggle = await waitFor(() => getByTestId('pending-skip-category-p1'));
+      expect(toggle.props.accessibilityState.checked).toBe(false);
+
+      await fireEvent.press(toggle);
+      await waitFor(() =>
+        expect(getByTestId('pending-skip-category-p1').props.accessibilityState.checked).toBe(true),
+      );
+      fireEvent.press(getByText('save'));
+      await waitFor(() =>
+        expect(pipeline.resolvePendingNotification).toHaveBeenCalledWith(
+          'p1', expect.objectContaining({ accountId: 1, skipCategoryBinding: true }),
+        ),
+      );
+    });
+
+    it('locks the box for a merchant flagged earlier and explains why on tap', async () => {
+      jest.spyOn(NotificationRulesDB, 'getMerchantRule').mockResolvedValue({ skipCategory: true });
+      PendingNotificationsDB.getPendingNotifications.mockResolvedValue([{ ...PENDING, accountId: 1 }]);
+      const { getByText, getByTestId } = await render(<NotificationProcessingContentPanel />);
+      await waitFor(() =>
+        expect(getByTestId('pending-skip-category-p1').props.accessibilityState).toEqual(
+          expect.objectContaining({ checked: true, disabled: true }),
+        ),
+      );
+
+      await fireEvent.press(getByTestId('pending-skip-category-p1'));
+      expect(getByText('bank_notifications_skip_category_locked_hint')).toBeTruthy();
+      expect(getByTestId('pending-skip-category-p1').props.accessibilityState.checked).toBe(true);
+
+      fireEvent.press(getByText('save'));
+      await waitFor(() =>
+        expect(pipeline.resolvePendingNotification).toHaveBeenCalledWith(
+          'p1', expect.objectContaining({ skipCategoryBinding: true }),
+        ),
+      );
+    });
   });
 
   it('saves a category picked from the inline grid', async () => {

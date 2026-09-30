@@ -247,6 +247,17 @@ These were chosen up front and drive the architecture:
    shop name tidied from ALL CAPS, `GURMAN` → `Gurman`) is bound as the merchant's
    name too, so the next transaction can auto-create instead of asking again.
 
+   **"Don't bind to category"** (off by default) opts a merchant out: the review
+   card's checkbox books the chosen category for that one operation and marks the
+   merchant's rule `skip_category` instead of learning it (migration 0031). A
+   marked merchant resolves no category at all, not even a template's default, so
+   every one of its notifications waits in the review queue. On those later cards
+   the box shows ticked and locked; a tap explains the choice was saved and lives
+   in Settings. Settings → Bindings lists the merchant under category bindings,
+   where the mark can be removed or replaced by a category. Kinds that never learn
+   a category (C2C, DEBIT ACCOUNT) show the box ticked and locked too, with their
+   own explanation.
+
 ## Architecture
 
 ```
@@ -339,6 +350,7 @@ Covered by `__tests__/services/notifications/parseBankNotification.test.js`
   | `merchant`  | text    | normalized merchant key (uppercased)    |
   | `packageName` | text NULL | scope rules per bank app when needed  |
   | `categoryId`| text FK | → categories.id                         |
+  | `skipCategory` | integer | 1 = "don't bind to category" (0031)  |
   | `createdAt` / `updatedAt` | text | ISO timestamps             |
 - `pending_notifications` — the review queue (parsed descriptor + best-effort
   account/category suggestions).

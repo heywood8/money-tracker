@@ -2824,6 +2824,29 @@ line-cat,plan-1,Groceries,400.00,"${NON_ASCII_COMMENT}",cat-1,,0`;
       expect(insertedValue(templateInsert, 'priority')).toBe(7);
     });
 
+    // Migration 0031's "don't bind to category" mark lives on the rule row; a
+    // restore that drops it quietly starts auto-categorizing the merchant again.
+    it('CSV round trip keeps the "don’t bind to category" mark, and reads an old backup as unmarked', async () => {
+      const base = {
+        package_name: 'com.bank', label_override: null, last_matched_at: null,
+        created_at: '2024-01-01T00:00:00.000Z', updated_at: '2024-01-01T00:00:00.000Z',
+      };
+      const marked = { ...base, id: 'rule-skip', merchant: 'API GATE', category_id: null, skip_category: 1 };
+      // A backup taken before the column existed carries no such field at all.
+      const legacy = { ...base, id: 'rule-old', merchant: 'Rewe', category_id: 'cat-1' };
+
+      const { dbInstance } = await restoreCSV(backupWith({
+        notification_merchant_rules: [marked, legacy],
+      }));
+
+      const inserts = insertsInto(dbInstance, 'notification_merchant_rules');
+      const byMerchant = (m) => inserts.find((c) => insertedValue(c, 'merchant') === m);
+      // A CSV cell comes back as the string '1'; it must land as the flag 1.
+      expect(insertedValue(byMerchant('API GATE'), 'skip_category')).toBe(1);
+      expect(insertedValue(byMerchant('API GATE'), 'category_id')).toBeNull();
+      expect(insertedValue(byMerchant('Rewe'), 'skip_category')).toBe(0);
+    });
+
     // A live database whose notification tables hold data the backup cannot
     // carry — the "Import from Google Sheets" case.
     const makeDbInstanceWithLiveNotificationData = (rules, templates) => {

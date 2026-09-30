@@ -201,6 +201,10 @@ export const notificationMerchantRules = sqliteTable('notification_merchant_rule
   // Nullable — NULL until the first post-0016 match; ordering falls back to
   // updatedAt for such rows.
   lastMatchedAt: text('last_matched_at'),
+  // 1 when the user chose "don't bind to category" for this merchant: it never
+  // learns or auto-applies a category, so each notification waits for a manual
+  // pick. Mutually exclusive with categoryId (setting one clears the other).
+  skipCategory: integer('skip_category').default(0),
   createdAt: text('created_at').notNull(),
   updatedAt: text('updated_at').notNull(),
 }, (table) => ({

@@ -11,8 +11,10 @@ import Ionicons from '@expo/vector-icons/Ionicons';
 import SimplePicker from '../SimplePicker';
 import FormInput from '../FormInput';
 import CategoryGridSelector from '../CategoryGridSelector';
+import SkipCategoryBindingToggle from '../SkipCategoryBindingToggle';
 import useTopCategoryIds from '../../hooks/useTopCategoryIds';
 import { canSaveSuggestion } from '../../hooks/usePendingOperationSuggestions';
+import { kindRequiresCategory } from '../../services/notifications/parseBankNotification';
 import { getCategoryDisplayName } from '../../utils/categoryUtils';
 import { normalizeMerchantLabel } from '../../utils/labelUtils';
 import * as Currency from '../../services/currency';
@@ -57,6 +59,11 @@ const NotificationBindingCard = ({
 }) => {
   const isTransfer = item.type === 'transfer';
   const canSave = canSaveSuggestion(item, choice);
+  // "Don't bind to category": a kind that never learns a category (C2C, DEBIT
+  // ACCOUNT) is never bound, so its box shows ticked and locked. Any other kind
+  // needs a merchant to key the rule on.
+  const neverBindsCategory = !isTransfer && kindRequiresCategory(item.kind, item.packageName);
+  const showSkipCategory = !isTransfer && (neverBindsCategory || !!item.merchant);
   // Most-frequent categories drive the QuickAdd-style shortcut grid below, so the
   // card's category picker matches the quick-add form it sits over.
   const topCategoryIds = useTopCategoryIds();
@@ -198,6 +205,17 @@ const NotificationBindingCard = ({
                   {getCategoryDisplayName(choice.categoryId, categories, t)}
                 </Text>
               </View>
+            ) : null}
+            {showSkipCategory ? (
+              <SkipCategoryBindingToggle
+                checked={neverBindsCategory || !!choice.skipCategoryBinding}
+                locked={neverBindsCategory || !!choice.skipCategoryLocked}
+                lockReason={neverBindsCategory ? 'kind' : 'saved'}
+                onChange={(skipCategoryBinding) => onChoiceChange({ skipCategoryBinding })}
+                colors={colors}
+                t={t}
+                testID="binding-card-skip-category"
+              />
             ) : null}
             <CategoryGridSelector
               categories={categories}

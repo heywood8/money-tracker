@@ -249,6 +249,74 @@ describe('NotificationBindingStack', () => {
     expect(onDismiss).toHaveBeenCalledWith(EXPENSE);
   });
 
+  describe('"Don’t bind to category" checkbox', () => {
+    const toggleOf = (utils) => utils.getByTestId('binding-card-skip-category');
+
+    it('is off by default and ticks through a choice patch', async () => {
+      const onChoiceChange = jest.fn();
+      const utils = await renderStack({ onChoiceChange });
+      const toggle = toggleOf(utils);
+      expect(toggle.props.accessibilityState).toEqual({ checked: false, disabled: false });
+      await fireEvent.press(toggle);
+      expect(onChoiceChange).toHaveBeenCalledWith('p1', { skipCategoryBinding: true });
+    });
+
+    it('unticks again while it is not locked', async () => {
+      const onChoiceChange = jest.fn();
+      const utils = await renderStack({
+        onChoiceChange,
+        choices: { p1: { accountId: 1, categoryId: 'c1', skipCategoryBinding: true } },
+      });
+      await fireEvent.press(toggleOf(utils));
+      expect(onChoiceChange).toHaveBeenCalledWith('p1', { skipCategoryBinding: false });
+    });
+
+    it('shows ticked and locked for a merchant flagged by an earlier save, explaining on tap', async () => {
+      const onChoiceChange = jest.fn();
+      const utils = await renderStack({
+        onChoiceChange,
+        choices: {
+          p1: { accountId: 1, categoryId: null, skipCategoryBinding: true, skipCategoryLocked: true },
+        },
+      });
+      const toggle = toggleOf(utils);
+      expect(toggle.props.accessibilityState).toEqual({ checked: true, disabled: true });
+      expect(utils.queryByTestId('binding-card-skip-category-hint')).toBeNull();
+
+      await fireEvent.press(toggle);
+      expect(onChoiceChange).not.toHaveBeenCalled();
+      expect(utils.getByText('bank_notifications_skip_category_locked_hint')).toBeTruthy();
+    });
+
+    it('shows ticked and locked for a kind that never binds a category, with its own reason', async () => {
+      kindRequiresCategory.mockReturnValue(true);
+      const onChoiceChange = jest.fn();
+      const utils = await renderStack({
+        onChoiceChange,
+        suggestions: [{ ...EXPENSE, kind: 'DEBIT ACCOUNT', merchant: 'AMERIABANK API GATE' }],
+        choices: { p1: { accountId: 1, categoryId: null } },
+      });
+      const toggle = toggleOf(utils);
+      expect(toggle.props.accessibilityState).toEqual({ checked: true, disabled: true });
+      await fireEvent.press(toggle);
+      expect(onChoiceChange).not.toHaveBeenCalled();
+      expect(utils.getByText('bank_notifications_skip_category_kind_hint')).toBeTruthy();
+    });
+
+    it('is absent without a merchant to key the rule on', async () => {
+      const utils = await renderStack({ suggestions: [{ ...EXPENSE, merchant: null }] });
+      expect(utils.queryByTestId('binding-card-skip-category')).toBeNull();
+    });
+
+    it('is absent on a transfer card', async () => {
+      const utils = await renderStack({
+        suggestions: [TRANSFER],
+        choices: { p2: { accountId: 1, categoryId: null, toAccountId: 2, labelOverride: '' } },
+      });
+      expect(utils.queryByTestId('binding-card-skip-category')).toBeNull();
+    });
+  });
+
   it('shows an inline error when the front card has a save error', async () => {
     const { getByText } = await renderStack({ saveErrors: { p1: true } });
     expect(getByText('bank_notifications_save_error')).toBeTruthy();

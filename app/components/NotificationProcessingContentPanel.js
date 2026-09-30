@@ -22,6 +22,7 @@ import { useCategories } from '../contexts/CategoriesContext';
 import SimplePicker from './SimplePicker';
 import FormInput from './FormInput';
 import CategoryGridSelector from './CategoryGridSelector';
+import SkipCategoryBindingToggle from './SkipCategoryBindingToggle';
 import { getCategoryDisplayName } from '../utils/categoryUtils';
 import { NotificationCard } from './NotificationsContentPanel';
 import { BORDER_RADIUS, FONT_SIZE, HORIZONTAL_PADDING, SPACING } from '../styles/designTokens';
@@ -43,7 +44,11 @@ import {
 } from '../services/notifications/notificationFilters';
 import { getPendingNotifications } from '../services/PendingNotificationsDB';
 import { reconcilePendingNotifications } from '../services/notifications/duplicateOperations';
-import { getLabelForMerchant } from '../services/NotificationRulesDB';
+import {
+  readMerchantRules,
+  seedSkipCategory,
+  followSkipCategory,
+} from '../services/notifications/skipCategoryChoice';
 import { getRecentNotifications } from '../services/NotificationAccess';
 import { normalizeMerchantLabel } from '../utils/labelUtils';
 import * as Currency from '../services/currency';
@@ -100,8 +105,10 @@ export default function NotificationProcessingContentPanel({ active = true, onCr
   const [pending, setPending] = useState([]);
   const [recent, setRecent] = useState([]);
   const [hidden, setHidden] = useState([]);
-  // Per-item chosen { accountId, categoryId, toAccountId, labelOverride } keyed by
-  // pending id. `toAccountId` is only used by transfer items (ATM withdrawals).
+  // Per-item chosen { accountId, categoryId, toAccountId, labelOverride,
+  // skipCategoryBinding, skipCategoryLocked } keyed by pending id. `toAccountId` is
+  // only used by transfer items (ATM withdrawals); `skipCategoryLocked` mirrors a
+  // merchant already flagged "don't bind to category" (its box stays ticked).
   const [choices, setChoices] = useState({});
   // Per-recent-card re-add feedback: key -> 'loading' | 'created' | 'pending'.
   const [reAddState, setReAddState] = useState({});
@@ -146,27 +153,28 @@ export default function NotificationProcessingContentPanel({ active = true, onCr
     }
     const atmId = atmAccount ? atmAccount.id : null;
     const prevChoices = choicesRef.current;
-    // Pre-fill the custom-name field with any override already learned for the
-    // merchant. Cards whose field already holds a name are settled and skipped —
-    // avoiding an O(N) lookup fan-out on every reload (each save/dismiss reloads).
-    // New and still-blank cards are looked up, so a name just learned on one card
-    // surfaces on its siblings from the same shop.
-    const overrides = await Promise.all(
-      items.map((item) => {
-        const settled = prevChoices[item.id]?.labelOverride;
-        if (settled) return Promise.resolve(settled);
-        return item.merchant
-          ? getLabelForMerchant(item.merchant, item.packageName).catch(() => null)
-          : Promise.resolve(null);
-      }),
-    );
+    // Read each merchant's rule for two things: the learned name that pre-fills
+    // the custom-name field, and the "don't bind to category" flag that locks the
+    // card's checkbox. The flag can flip under a card at any time (a sibling save,
+    // or the Bindings tab next door), so every merchant is looked up, not just
+    // the still-blank cards — once per distinct merchant, however many of its
+    // notifications are queued. A failed lookup keeps the card as it is.
+    const rules = await readMerchantRules(items);
+    const ruleSeeds = items.map((item, i) => {
+      const rule = rules[i];
+      if (rule === undefined) {
+        return { label: null, skipCategory: prevChoices[item.id]?.skipCategoryLocked ?? false };
+      }
+      return { label: rule?.labelOverride || null, skipCategory: !!rule?.skipCategory };
+    });
     if (!mountedRef.current) return;
     setPending(items);
     // Seed choices with any suggested account/category/target and learned label.
     setChoices((prev) => {
       const next = { ...prev };
       items.forEach((item, i) => {
-        const learned = overrides[i] ?? '';
+        const learned = ruleSeeds[i].label ?? '';
+        const skipLocked = ruleSeeds[i].skipCategory;
         if (!next[item.id]) {
           next[item.id] = {
             accountId: item.accountId ?? null,
@@ -174,12 +182,18 @@ export default function NotificationProcessingContentPanel({ active = true, onCr
             // Transfer (ATM) items pre-fill the target with the bound cash account.
             toAccountId: item.type === 'transfer' ? atmId : null,
             labelOverride: learned,
+            ...seedSkipCategory(skipLocked),
           };
-        } else if (learned && !next[item.id].labelOverride) {
+          return;
+        }
+        if (learned && !next[item.id].labelOverride) {
           // A sibling save just learned this shop's name — surface it on a
           // still-blank card without clobbering a value the user is editing.
           next[item.id] = { ...next[item.id], labelOverride: learned };
         }
+        // Follow the merchant's "don't bind" flag if it changed under the card
+        // (a sibling's save, or the Bindings tab lifting it).
+        next[item.id] = followSkipCategory(next[item.id], item, skipLocked);
       });
       return next;
     });
@@ -335,6 +349,7 @@ export default function NotificationProcessingContentPanel({ active = true, onCr
         // Send the field verbatim (string, possibly blank) so resolve treats it as
         // authoritative — a cleared field reverts to the raw shop name.
         labelOverride: choice.labelOverride ?? '',
+        skipCategoryBinding: !!choice.skipCategoryBinding,
       });
       // The pending row is deleted now; reloading drops the collapsed card from
       // the queue (the effect above prunes its stale saving flag).
@@ -627,6 +642,20 @@ export default function NotificationProcessingContentPanel({ active = true, onCr
                       </View>
                     ) : null}
                   </View>
+                  {/* A kind that never learns a category (C2C, DEBIT ACCOUNT) shows
+                      the box ticked and locked; any other needs a merchant to key
+                      the rule on. */}
+                  {categoryRequired || item.merchant ? (
+                    <SkipCategoryBindingToggle
+                      checked={categoryRequired || !!choice.skipCategoryBinding}
+                      locked={categoryRequired || !!choice.skipCategoryLocked}
+                      lockReason={categoryRequired ? 'kind' : 'saved'}
+                      onChange={(skipCategoryBinding) => setChoice(item.id, { skipCategoryBinding })}
+                      colors={colors}
+                      t={t}
+                      testID={`pending-skip-category-${item.id}`}
+                    />
+                  ) : null}
                   <CategoryGridSelector
                     categories={categories}
                     categoryType={item.type}

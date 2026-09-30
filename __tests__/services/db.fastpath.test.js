@@ -103,7 +103,10 @@ const mockSchemaComplete = (db, storedUserVersion) => {
     }
     if (q.includes('table_info(categories)')) return Promise.resolve([{ name: 'id', type: 'INTEGER' }]);
     if (q.includes('table_info(notification_merchant_rules)')) {
-      return Promise.resolve([{ name: 'label_override', type: 'TEXT' }, { name: 'last_matched_at', type: 'TEXT' }]);
+      return Promise.resolve([
+        { name: 'label_override', type: 'TEXT' }, { name: 'last_matched_at', type: 'TEXT' },
+        { name: 'skip_category', type: 'INTEGER' },
+      ]);
     }
     if (q.includes('table_info(pending_notifications)')) {
       return Promise.resolve([
