@@ -18,6 +18,7 @@ import {
   getAllMerchantRules,
   clearMerchantRuleCategory,
   clearMerchantRuleLabel,
+  clearMerchantRuleSkipCategory,
   upsertMerchantRule,
   upsertMerchantLabel,
 } from '../services/NotificationRulesDB';
@@ -40,7 +41,9 @@ import EmptyState from './EmptyState';
  *      ATM withdrawals are booked into. Learned the first time a card / ATM
  *      notification is resolved; a card can also be bound by hand here.
  *   2. Category bindings: merchant -> category rules that auto-categorize future
- *      notifications from the same shop.
+ *      notifications from the same shop, plus merchants marked "don't bind to
+ *      category" on a review card (the one place that mark can be lifted: remove
+ *      it, or pick a category to bind instead).
  *   3. Name bindings: merchant -> custom-name overrides that relabel a shop's
  *      transactions (e.g. "ECOSENSE BYUZAND" -> "Ecosense").
  *
@@ -204,19 +207,23 @@ export default function NotificationBindingsContentPanel({ active = true, bottom
 
   // ── Category bindings ──
   const categoryBindings = useMemo(
-    () => rules.filter((r) => r.categoryId),
+    () => rules.filter((r) => r.categoryId || r.skipCategory),
     [rules],
   );
+  const skipCategoryLabel = t('bank_notifications_skip_category_binding') || 'Don’t bind to category';
 
   const handleChangeCategory = useCallback(async (rule, categoryId) => {
     setExpandedCategoryRuleId(null);
     if (!categoryId || categoryId === rule.categoryId) return;
-    await upsertMerchantRule(rule.merchant, categoryId, rule.packageName);
+    // An edit made here is deliberate, so it also replaces a "don't bind" mark.
+    await upsertMerchantRule(rule.merchant, categoryId, rule.packageName, { overrideSkip: true });
     await reload();
   }, [reload]);
 
   const handleRemoveCategory = useCallback(async (rule) => {
-    await clearMerchantRuleCategory(rule.id);
+    // Removing a "don't bind" mark lets the merchant learn a category again.
+    if (rule.skipCategory) await clearMerchantRuleSkipCategory(rule.id);
+    else await clearMerchantRuleCategory(rule.id);
     await reload();
   }, [reload]);
 
@@ -287,10 +294,13 @@ export default function NotificationBindingsContentPanel({ active = true, bottom
   const visibleCategories = useMemo(
     () => (isSearching
       ? categoryBindings.filter(
-        (r) => matches(r.merchant, getCategoryDisplayName(r.categoryId, categories, t)),
+        (r) => matches(
+          r.merchant,
+          r.skipCategory ? skipCategoryLabel : getCategoryDisplayName(r.categoryId, categories, t),
+        ),
       )
       : categoryBindings),
-    [categoryBindings, matches, categories, t, isSearching],
+    [categoryBindings, matches, categories, t, isSearching, skipCategoryLabel],
   );
   const visibleLabels = useMemo(
     () => (isSearching
@@ -420,9 +430,21 @@ export default function NotificationBindingsContentPanel({ active = true, bottom
           accessibilityLabel={t('category') || 'Category'}
           testID={`binding-category-field-${rule.id}`}
         >
-          <Ionicons name="pricetag-outline" size={16} color={colors.mutedText} />
-          <Text style={[styles.categoryFieldText, { color: colors.text }]} numberOfLines={1}>
-            {getCategoryDisplayName(rule.categoryId, categories, t)}
+          <Ionicons
+            name={rule.skipCategory ? 'remove-circle-outline' : 'pricetag-outline'}
+            size={16}
+            color={colors.mutedText}
+          />
+          <Text
+            style={[
+              styles.categoryFieldText,
+              { color: rule.skipCategory ? colors.mutedText : colors.text },
+            ]}
+            numberOfLines={1}
+          >
+            {rule.skipCategory
+              ? skipCategoryLabel
+              : getCategoryDisplayName(rule.categoryId, categories, t)}
           </Text>
           <Ionicons name={expanded ? 'chevron-up' : 'chevron-down'} size={16} color={colors.mutedText} />
         </TouchableOpacity>

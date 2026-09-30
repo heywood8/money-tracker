@@ -55,6 +55,10 @@ const CATEGORY_RULE = {
 const LABEL_RULE = {
   id: 'r2', merchant: 'GROCERY', packageName: null, categoryId: null, labelOverride: 'Grocery Co',
 };
+const SKIP_RULE = {
+  id: 'r3', merchant: 'AMERIABANK API GATE', packageName: 'am.bank', categoryId: null,
+  labelOverride: null, skipCategory: true,
+};
 
 describe('NotificationBindingsContentPanel', () => {
   beforeEach(() => {
@@ -65,6 +69,7 @@ describe('NotificationBindingsContentPanel', () => {
     NotificationRulesDB.getAllMerchantRules.mockResolvedValue([CATEGORY_RULE, LABEL_RULE]);
     NotificationRulesDB.clearMerchantRuleCategory.mockResolvedValue();
     NotificationRulesDB.clearMerchantRuleLabel.mockResolvedValue();
+    NotificationRulesDB.clearMerchantRuleSkipCategory.mockResolvedValue();
     NotificationRulesDB.upsertMerchantRule.mockResolvedValue();
     NotificationRulesDB.upsertMerchantLabel.mockResolvedValue();
     AccountsDB.addAccountCardMask.mockResolvedValue();
@@ -163,9 +168,41 @@ describe('NotificationBindingsContentPanel', () => {
       await fireEvent.press(getByTestId('binding-category-option-r1-f1'));
       await fireEvent.press(getByTestId('binding-category-option-r1-c3'));
       await waitFor(() => expect(NotificationRulesDB.upsertMerchantRule)
-        .toHaveBeenCalledWith('COFFEE HOUSE', 'c3', 'am.bank'));
+        .toHaveBeenCalledWith('COFFEE HOUSE', 'c3', 'am.bank', { overrideSkip: true }));
       // Picking collapses the grid.
       expect(queryByTestId('binding-category-option-r1-c1')).toBeNull();
+    });
+  });
+
+  describe('"Don’t bind to category" merchants', () => {
+    beforeEach(() => {
+      mockAccounts = [CASH_ACCOUNT];
+      NotificationRulesDB.getAllMerchantRules.mockResolvedValue([SKIP_RULE]);
+      pipeline.resolveAtmTargetAccount.mockResolvedValue(null);
+    });
+
+    it('lists the merchant under category bindings with the option as its value', async () => {
+      const { getByText, getByTestId } = await render(<NotificationBindingsContentPanel />);
+      await waitFor(() => expect(getByText('AMERIABANK API GATE')).toBeTruthy());
+      expect(getByTestId('binding-category-field-r3')).toBeTruthy();
+      expect(getByText('bank_notifications_skip_category_binding')).toBeTruthy();
+    });
+
+    it('lifts the mark via clearMerchantRuleSkipCategory, not clearMerchantRuleCategory', async () => {
+      const { getAllByLabelText, getByLabelText, getByText } = await render(<NotificationBindingsContentPanel />);
+      await waitFor(() => expect(getByText('AMERIABANK API GATE')).toBeTruthy());
+      fireEvent.press(getAllByLabelText('notification_bindings_remove')[0]);
+      fireEvent.press(await waitFor(() => getByLabelText('delete')));
+      await waitFor(() => expect(NotificationRulesDB.clearMerchantRuleSkipCategory).toHaveBeenCalledWith('r3'));
+      expect(NotificationRulesDB.clearMerchantRuleCategory).not.toHaveBeenCalled();
+    });
+
+    it('replaces the mark with a category picked from the grid', async () => {
+      const { getByTestId } = await render(<NotificationBindingsContentPanel />);
+      await fireEvent.press(await waitFor(() => getByTestId('binding-category-field-r3')));
+      await fireEvent.press(getByTestId('binding-category-option-r3-c1'));
+      await waitFor(() => expect(NotificationRulesDB.upsertMerchantRule)
+        .toHaveBeenCalledWith('AMERIABANK API GATE', 'c1', 'am.bank', { overrideSkip: true }));
     });
   });
 

@@ -142,7 +142,10 @@ describe('DB post-migration handler retry (data-loss regression, adversarial rev
         }
         if (sql.includes('table_info(categories)')) return Promise.resolve([{ name: 'id', type: 'INTEGER' }]);
         if (sql.includes('table_info(notification_merchant_rules)')) {
-          return Promise.resolve([{ name: 'label_override', type: 'TEXT' }, { name: 'last_matched_at', type: 'TEXT' }]);
+          return Promise.resolve([
+            { name: 'label_override', type: 'TEXT' }, { name: 'last_matched_at', type: 'TEXT' },
+            { name: 'skip_category', type: 'INTEGER' },
+          ]);
         }
         if (sql.includes('table_info(pending_notifications)')) {
           return Promise.resolve([{ name: 'latitude', type: 'REAL' }, { name: 'longitude', type: 'REAL' }]);

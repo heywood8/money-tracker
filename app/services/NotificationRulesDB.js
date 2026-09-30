@@ -19,6 +19,10 @@ import { sanitizeLabel } from '../utils/labelUtils';
 export const normalizeMerchant = (merchant) =>
   (merchant || '').trim().replace(/\s+/g, ' ').toUpperCase();
 
+// SQLite hands the flag back as 0/1; a CSV restore can leave it as '0'/'1'.
+const isSkipCategoryRow = (row) =>
+  !!row && (row.skip_category === 1 || row.skip_category === true || row.skip_category === '1');
+
 const mapRuleFields = (row) => {
   if (!row) return null;
   return {
@@ -27,6 +31,9 @@ const mapRuleFields = (row) => {
     packageName: row.package_name,
     categoryId: row.category_id,
     labelOverride: row.label_override ?? null,
+    // "Don't bind to category": the merchant never learns or auto-applies one.
+    // Rows written before migration 0031 carry no column at all — read as false.
+    skipCategory: isSkipCategoryRow(row),
     lastMatchedAt: row.last_matched_at ?? null,
     createdAt: row.created_at,
     updatedAt: row.updated_at,
@@ -105,9 +112,11 @@ export const getLabelForMerchant = async (merchant, packageName = null) => {
  * @param {Object} columns - DB column -> value to set (e.g. { category_id } or { label_override })
  * @param {Object} [insertOnlyColumns] - DB column -> value written only when a new
  *   row is inserted; an existing row keeps whatever it already holds
+ * @param {(row: Object) => boolean} [keepExisting] - when it returns true for the
+ *   existing row, nothing is written and that row is returned as it stands
  * @returns {Promise<Object>} the stored rule
  */
-const upsertRuleRow = async (key, packageName, columns, insertOnlyColumns = {}) => {
+const upsertRuleRow = async (key, packageName, columns, insertOnlyColumns = {}, keepExisting = null) => {
   const now = new Date().toISOString();
   let existing = await queryFirst(
     packageName
@@ -128,6 +137,10 @@ const upsertRuleRow = async (key, packageName, columns, insertOnlyColumns = {}) 
     );
   }
 
+  if (existing && keepExisting && keepExisting(existing)) {
+    return mapRuleFields(existing);
+  }
+
   if (existing) {
     const names = Object.keys(columns);
     const assignments = names.map((c) => `${c} = ?`).join(', ');
@@ -144,14 +157,15 @@ const upsertRuleRow = async (key, packageName, columns, insertOnlyColumns = {}) 
     package_name: packageName || null,
     category_id: null,
     label_override: null,
+    skip_category: 0,
     ...insertOnlyColumns,
     ...columns,
     created_at: now,
     updated_at: now,
   };
   await executeQuery(
-    'INSERT INTO notification_merchant_rules (id, merchant, package_name, category_id, label_override, created_at, updated_at) VALUES (?, ?, ?, ?, ?, ?, ?)',
-    [row.id, row.merchant, row.package_name, row.category_id, row.label_override, row.created_at, row.updated_at],
+    'INSERT INTO notification_merchant_rules (id, merchant, package_name, category_id, label_override, skip_category, created_at, updated_at) VALUES (?, ?, ?, ?, ?, ?, ?, ?)',
+    [row.id, row.merchant, row.package_name, row.category_id, row.label_override, row.skip_category, row.created_at, row.updated_at],
   );
   return mapRuleFields(row);
 };
@@ -168,13 +182,22 @@ const upsertRuleRow = async (key, packageName, columns, insertOnlyColumns = {}) 
  * review card just saved) always wins. Deciding inside the same write keeps the
  * name and the category from landing half-saved.
  *
+ * A merchant the user marked "don't bind to category" keeps that choice: learning
+ * from a reviewed notification leaves its rule untouched. Only an explicit edit
+ * (the bindings UI, via `overrideSkip`) replaces the flag with a category.
+ *
  * @param {string} merchant
  * @param {string} categoryId
  * @param {string|null} packageName
- * @param {{ labelIfNew?: string|null }} [options]
+ * @param {{ labelIfNew?: string|null, overrideSkip?: boolean }} [options]
  * @returns {Promise<Object|null>} the stored rule, or null if nothing was learned
  */
-export const upsertMerchantRule = async (merchant, categoryId, packageName = null, { labelIfNew = null } = {}) => {
+export const upsertMerchantRule = async (
+  merchant,
+  categoryId,
+  packageName = null,
+  { labelIfNew = null, overrideSkip = false } = {},
+) => {
   const key = normalizeMerchant(merchant);
   if (!key || !categoryId) return null;
   // Same sanitation as upsertMerchantLabel; '' -> no label on the new row.
@@ -183,11 +206,45 @@ export const upsertMerchantRule = async (merchant, categoryId, packageName = nul
     return await upsertRuleRow(
       key,
       packageName,
-      { category_id: categoryId },
+      overrideSkip ? { category_id: categoryId, skip_category: 0 } : { category_id: categoryId },
       label ? { label_override: label } : {},
+      overrideSkip ? null : isSkipCategoryRow,
     );
   } catch (error) {
     console.error('Failed to upsert merchant rule:', error);
+    throw error;
+  }
+};
+
+/**
+ * Mark a merchant "don't bind to category" (the review card's checkbox).
+ *
+ * Upserts on the (merchant, packageName) pair: sets the flag and drops any
+ * learned category, so the merchant's notifications stop being auto-categorized
+ * and always wait for a category picked by hand. The label override on the same
+ * row is preserved. `labelIfNew` works as in upsertMerchantRule: a source bound
+ * for the first time also learns the name it was booked under.
+ *
+ * @param {string} merchant
+ * @param {string|null} packageName
+ * @param {{ labelIfNew?: string|null }} [options]
+ * @returns {Promise<Object|null>} the stored rule, or null if merchant is empty
+ */
+export const upsertMerchantSkipCategory = async (merchant, packageName = null, { labelIfNew = null } = {}) => {
+  const key = normalizeMerchant(merchant);
+  if (!key) return null;
+  const label = sanitizeLabel(labelIfNew);
+  try {
+    return await upsertRuleRow(
+      key,
+      packageName,
+      { skip_category: 1, category_id: null },
+      label ? { label_override: label } : {},
+      // Already flagged: nothing to change, so skip the redundant write.
+      isSkipCategoryRow,
+    );
+  } catch (error) {
+    console.error('Failed to mark merchant as skip-category:', error);
     throw error;
   }
 };
@@ -300,8 +357,8 @@ export const clearMerchantRuleCategory = async (id) => {
       [id],
     );
     if (!row) return;
-    // No label left to keep the row alive — drop it entirely.
-    if (!row.label_override) {
+    // No label (or skip flag) left to keep the row alive — drop it entirely.
+    if (!row.label_override && !isSkipCategoryRow(row)) {
       await deleteMerchantRule(id);
       return;
     }
@@ -330,8 +387,8 @@ export const clearMerchantRuleLabel = async (id) => {
       [id],
     );
     if (!row) return;
-    // No category left to keep the row alive — drop it entirely.
-    if (row.category_id == null) {
+    // No category (or skip flag) left to keep the row alive — drop it entirely.
+    if (row.category_id == null && !isSkipCategoryRow(row)) {
       await deleteMerchantRule(id);
       return;
     }
@@ -341,6 +398,36 @@ export const clearMerchantRuleLabel = async (id) => {
     );
   } catch (error) {
     console.error('Failed to clear merchant rule label:', error);
+    throw error;
+  }
+};
+
+/**
+ * Lift a merchant's "don't bind to category" flag by rule id, so its next
+ * reviewed notification learns a category again. When the rule would then hold
+ * neither a category nor a label the whole row is deleted. Used by the
+ * bindings-management UI.
+ *
+ * @param {string} id
+ * @returns {Promise<void>}
+ */
+export const clearMerchantRuleSkipCategory = async (id) => {
+  try {
+    const row = await queryFirst(
+      'SELECT * FROM notification_merchant_rules WHERE id = ?',
+      [id],
+    );
+    if (!row) return;
+    if (!row.label_override && row.category_id == null) {
+      await deleteMerchantRule(id);
+      return;
+    }
+    await executeQuery(
+      'UPDATE notification_merchant_rules SET skip_category = 0, updated_at = ? WHERE id = ?',
+      [new Date().toISOString(), id],
+    );
+  } catch (error) {
+    console.error('Failed to clear merchant rule skip-category flag:', error);
     throw error;
   }
 };

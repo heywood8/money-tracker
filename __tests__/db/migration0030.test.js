@@ -32,8 +32,10 @@ describe('Migration 0030 — operations transfer/date indexes', () => {
     expect(entry.tag).toBe('0030_operations_transfer_indexes');
   });
 
-  it('is the last journal entry, so SCHEMA_VERSION covers it', () => {
-    const last = migrations.journal.entries[migrations.journal.entries.length - 1];
-    expect(last.idx).toBe(30);
+  it('sits inside the journal, so SCHEMA_VERSION covers it', () => {
+    // SCHEMA_VERSION is the journal length; an entry at idx 30 needs at least 31.
+    // (This used to pin 0030 as the *last* entry, which every later migration
+    // breaks without saying anything about 0030 itself.)
+    expect(migrations.journal.entries.length).toBeGreaterThan(30);
   });
 });

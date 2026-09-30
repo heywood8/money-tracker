@@ -892,9 +892,12 @@ const runProcess = async () => {
  *
  * @param {string} pendingId
  * @param {Object} choices - { accountId, categoryId, labelOverride?,
- *   learnCardMask?, learnMerchant?, learnAccountBinding?, learnSource? }.
+ *   skipCategoryBinding?, learnCardMask?, learnMerchant?, learnAccountBinding?,
+ *   learnSource? }.
  *   `labelOverride` omitted keeps any learned name; a string (blank included) is
  *   authoritative, and a blank one clears a learned name.
+ *   `skipCategoryBinding: true` books the chosen category for this operation only
+ *   and marks the merchant "don't bind to category" from now on.
  * @returns {Promise<Object|null>} the created operation, or null if not found
  */
 export const resolvePendingNotification = async (pendingId, choices = {}) => {
@@ -1035,12 +1038,26 @@ export const resolvePendingNotification = async (pendingId, choices = {}) => {
   // its placeholder (the tidied shop name), so saving blank confirms it the same
   // way typing it would. An existing rule keeps its name (or its lack of one: the
   // user may have removed it) — `labelIfNew` only applies when the rule is created.
-  if (
+  //
+  // "Don't bind to category" replaces the category with a flag on the same rule:
+  // the operation keeps the category picked for it, but the merchant never learns
+  // one. A merchant already flagged stays flagged whatever this save says —
+  // upsertMerchantRule leaves such a rule alone; only the bindings UI lifts it.
+  const canLearnMerchant =
     choices.learnMerchant !== false &&
     pending.merchant &&
-    categoryId &&
-    !kindRequiresCategory(pending.kind, pending.packageName)
-  ) {
+    !kindRequiresCategory(pending.kind, pending.packageName);
+  if (canLearnMerchant && choices.skipCategoryBinding === true) {
+    try {
+      await NotificationRulesDB.upsertMerchantSkipCategory(
+        pending.merchant,
+        pending.packageName,
+        { labelIfNew: label },
+      );
+    } catch (error) {
+      console.error('[resolvePendingNotification] Failed to learn skip-category rule:', error);
+    }
+  } else if (canLearnMerchant && categoryId) {
     try {
       await NotificationRulesDB.upsertMerchantRule(
         pending.merchant,

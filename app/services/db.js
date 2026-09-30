@@ -257,6 +257,12 @@ const isSchemaComplete = async (rawDb) => {
     // would throw, wiping the category and name bindings from the UI.
     if (!merchantRuleCols.some(c => c.name === 'last_matched_at')) return false;
 
+    // Check notification_merchant_rules has skip_category column (migration 0031).
+    // Same reasoning as 0016's check: an install complete through 0030 would
+    // otherwise skip migrate(), and every rule write (which names the column)
+    // would throw `no such column: skip_category`.
+    if (!merchantRuleCols.some(c => c.name === 'skip_category')) return false;
+
     // Check pending_notifications has BOTH latitude and longitude (migration 0017).
     // Both are checked for the same reason as operations' 0009 columns: a
     // half-applied 0017 (latitude only) must not be mistaken for complete. Without
@@ -777,6 +783,11 @@ const detectAppliedMigrations = async (rawDb) => {
     const ruleCols = await getColumns('notification_merchant_rules');
     if (ruleCols.some(c => c.name === 'last_matched_at')) {
       applied.push(16);
+    }
+
+    // Migration 0031: Adds notification_merchant_rules.skip_category column.
+    if (ruleCols.some(c => c.name === 'skip_category')) {
+      applied.push(31);
     }
   }
 

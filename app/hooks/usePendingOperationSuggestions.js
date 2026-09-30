@@ -9,9 +9,13 @@ import {
 } from '../services/notifications/processBankNotifications';
 import { reconcilePendingNotifications } from '../services/notifications/duplicateOperations';
 import { kindRequiresCategory } from '../services/notifications/parseBankNotification';
-import { getLabelForMerchant } from '../services/NotificationRulesDB';
 import { getAccountByCardMask } from '../services/AccountsDB';
 import { resolveAccountBinding } from '../services/notifications/accountBindings';
+import {
+  readMerchantRules,
+  seedSkipCategory,
+  followSkipCategory,
+} from '../services/notifications/skipCategoryChoice';
 import { appEvents, EVENTS } from '../services/eventEmitter';
 import useOnForeground from './useOnForeground';
 
@@ -96,9 +100,12 @@ export default function usePendingOperationSuggestions({
   // booking), so the card can show an inline error instead of failing silently.
   const [saveErrors, setSaveErrors] = useState({});
   // Per-item chosen { accountId, categoryId, toAccountId, labelOverride,
-  // labelDirty } keyed by pending id — the editable bindings behind the inline
-  // review cards. `labelDirty` marks a label the user has actually typed, so a
-  // best-effort learned-label seed is never mistaken for a deliberate value.
+  // labelDirty, skipCategoryBinding, skipCategoryLocked } keyed by pending id —
+  // the editable bindings behind the inline review cards. `labelDirty` marks a
+  // label the user has actually typed, so a best-effort learned-label seed is
+  // never mistaken for a deliberate value. `skipCategoryLocked` mirrors a
+  // merchant already flagged "don't bind to category": the box is then ticked and
+  // cannot be unticked from the card.
   const [choices, setChoices] = useState({});
   // Mirror of `choices` so reload/accept can read the latest values without
   // depending on `choices` (which would re-create them on every keystroke).
@@ -168,22 +175,29 @@ export default function usePendingOperationSuggestions({
       const list = Array.isArray(items) ? items : [];
       const atmId = atmAccount ? atmAccount.id : null;
       console.log('[deck] reload read', { seq, pending: list.length, pruned, ms: Date.now() - started });
-      // Pre-fill the custom-name field with any override already learned for the
-      // merchant. A field the user has edited (labelDirty) is authoritative and
-      // never re-queried or overwritten; other cards are looked up so a name just
-      // learned on one card surfaces on its siblings. On a transient lookup
-      // failure keep the current display value rather than blanking it — the seed
-      // is best-effort and the save path no longer depends on it.
+      // Read each merchant's rule once for two things. The custom-name field is
+      // pre-filled with any override already learned for the merchant; a field the
+      // user has edited (labelDirty) is authoritative and never overwritten, while
+      // other cards pick up a name just learned on a sibling. The rule's "don't
+      // bind to category" flag locks that card's checkbox. On a transient lookup
+      // failure keep the card's current values rather than blanking them — both
+      // are best-effort seeds, and the save path re-checks the flag itself.
       const prevChoices = choicesRef.current;
-      const overrides = await Promise.all(
-        list.map((item) => {
-          const existing = prevChoices[item.id];
-          if (existing?.labelDirty) return Promise.resolve(existing.labelOverride ?? '');
-          if (!item.merchant) return Promise.resolve(existing?.labelOverride ?? '');
-          return getLabelForMerchant(item.merchant, item.packageName)
-            .catch(() => existing?.labelOverride ?? '');
-        }),
-      );
+      const rules = await readMerchantRules(list);
+      const ruleSeeds = list.map((item, i) => {
+        const existing = prevChoices[item.id];
+        const rule = rules[i];
+        const current = {
+          label: existing?.labelOverride ?? '',
+          skipCategory: existing?.skipCategoryLocked ?? false,
+        };
+        // No merchant, or the lookup failed: keep the card as it stands.
+        if (!item.merchant || rule === undefined) return current;
+        return {
+          label: existing?.labelDirty ? current.label : (rule?.labelOverride || ''),
+          skipCategory: !!rule?.skipCategory,
+        };
+      });
       // Re-resolve the account for any item the pipeline enqueued without one: a
       // binding created (or made matchable) after the item was queued should
       // backfill its account instead of leaving the field blank. A card item
@@ -218,7 +232,8 @@ export default function usePendingOperationSuggestions({
       setChoices((prev) => {
         const next = { ...prev };
         list.forEach((item, i) => {
-          const learned = overrides[i] ?? '';
+          const learned = ruleSeeds[i].label;
+          const skipLocked = ruleSeeds[i].skipCategory;
           const resolvedAccountId = resolvedAccountIds[i];
           const existing = next[item.id];
           if (!existing) {
@@ -228,6 +243,7 @@ export default function usePendingOperationSuggestions({
               toAccountId: item.type === 'transfer' ? atmId : null,
               labelOverride: learned,
               labelDirty: false,
+              ...seedSkipCategory(skipLocked),
             };
             return;
           }
@@ -249,6 +265,9 @@ export default function usePendingOperationSuggestions({
           if (!existing.labelDirty && learned !== existing.labelOverride) {
             updated = { ...updated, labelOverride: learned };
           }
+          // Follow the merchant's "don't bind" flag if it changed under the card
+          // (a sibling's save, or Settings lifting it).
+          updated = followSkipCategory(updated, item, skipLocked);
           if (updated !== existing) next[item.id] = updated;
         });
         return next;
@@ -446,6 +465,9 @@ export default function usePendingOperationSuggestions({
       // lookup, book the raw shop name and wipe the learned label.
       if (choice.labelDirty) {
         resolveChoices.labelOverride = choice.labelOverride ?? '';
+      }
+      if (choice.skipCategoryBinding) {
+        resolveChoices.skipCategoryBinding = true;
       }
       const created = await resolvePendingNotification(item.id, resolveChoices);
       // Booked: swap the placeholder for the persisted row deterministically, so a

@@ -146,6 +146,11 @@ describe('resolveNotification', () => {
       expect(await resolver.resolveCategoryId(c2c)).toBeNull();
       expect(NotificationRulesDB.getMerchantRule).not.toHaveBeenCalled();
     });
+
+    it('resolves nothing for a merchant marked "don’t bind to category", not even the template default', async () => {
+      NotificationRulesDB.getMerchantRule.mockResolvedValue({ categoryId: null, skipCategory: true });
+      expect(await resolver.resolveCategoryId({ ...descriptor, defaultCategoryId: 'cat-template' })).toBeNull();
+    });
   });
 
   describe('resolveLabelOverride', () => {
@@ -226,6 +231,19 @@ describe('resolveNotification', () => {
       expect(r.matchedAccount).toBe(true);
       expect(r.matchedCategory).toBe(false);
       expect(r.fullyMatched).toBe(false);
+    });
+
+    it('never matches a category (so never auto-creates) for a "don’t bind" merchant', async () => {
+      AccountsDB.getAccountByCardMask.mockResolvedValue({ id: 7, currency: 'AMD' });
+      NotificationRulesDB.getMerchantRule.mockResolvedValue({
+        categoryId: null, labelOverride: 'Gate', skipCategory: true,
+      });
+      const r = await resolver.resolveNotification({ ...descriptor, defaultCategoryId: 'cat-template' });
+      expect(r.categoryId).toBeNull();
+      expect(r.matchedCategory).toBe(false);
+      expect(r.fullyMatched).toBe(false);
+      // The name binding on the same rule still applies.
+      expect(r.labelOverride).toBe('Gate');
     });
 
     it('is never fullyMatched for a C2C transfer, even with a learned rule', async () => {

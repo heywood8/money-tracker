@@ -218,6 +218,13 @@
       "when": 1768400000000,
       "tag": "0030_operations_transfer_indexes",
       "breakpoints": true
+    },
+    {
+      "idx": 31,
+      "version": "6",
+      "when": 1768500000000,
+      "tag": "0031_merchant_rule_skip_category",
+      "breakpoints": true
     }
   ]
 }

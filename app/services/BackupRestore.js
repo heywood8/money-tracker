@@ -132,7 +132,8 @@ const TABLE_FIELDS = {
   planned_operations: ['id', 'name', 'type', 'amount', 'account_id', 'category_id', 'to_account_id', 'description', 'is_recurring', 'last_executed_month', 'display_order', 'created_at', 'updated_at'],
   // `last_matched_at` orders the bindings list (NotificationRulesDB), so a rule
   // that loses it sinks under rules the user has not seen in months.
-  notification_merchant_rules: ['id', 'merchant', 'package_name', 'category_id', 'label_override', 'last_matched_at', 'created_at', 'updated_at'],
+  // `skip_category` (migration 0031) is the "don't bind to category" mark.
+  notification_merchant_rules: ['id', 'merchant', 'package_name', 'category_id', 'label_override', 'skip_category', 'last_matched_at', 'created_at', 'updated_at'],
   // `fields` and `triggers` are JSON blobs; they round-trip as opaque text.
   notification_templates: ['id', 'name', 'package_name', 'type', 'enabled', 'priority', 'category_id', 'currency', 'date_order', 'fields', 'triggers', 'sample_title', 'sample_text', 'created_at', 'updated_at'],
   budget_plans: ['id', 'month', 'currency', 'expected_income', 'created_at', 'updated_at'],
@@ -1593,13 +1594,17 @@ export const restoreBackup = async (backup, cancelToken) => {
           // INSERT OR IGNORE: a rule whose category was not restored is skipped
           // rather than aborting the whole import.
           await db.runAsync(
-            'INSERT OR IGNORE INTO notification_merchant_rules (id, merchant, package_name, category_id, label_override, last_matched_at, created_at, updated_at) VALUES (?, ?, ?, ?, ?, ?, ?, ?)',
+            'INSERT OR IGNORE INTO notification_merchant_rules (id, merchant, package_name, category_id, label_override, skip_category, last_matched_at, created_at, updated_at) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)',
             [
               rule.id,
               rule.merchant,
               rule.package_name || null,
               resolveCategoryReference(rule.category_id, 'merchant rule'),
               rule.label_override || null,
+              // Absent from a backup taken before migration 0031: 0, which is
+              // what every rule was then (category learning on). asFlag also
+              // reads a CSV cell's '1'.
+              asFlag(rule.skip_category, 0),
               // Absent from any backup taken before this column was written out;
               // NULL then, which is what NotificationRulesDB already falls back
               // from (it orders on COALESCE(last_matched_at, updated_at)).
@@ -1661,13 +1666,14 @@ export const restoreBackup = async (backup, cancelToken) => {
         for (const rule of preservedRules) {
           if (!rule.id || !rule.merchant) continue;
           await db.runAsync(
-            'INSERT OR IGNORE INTO notification_merchant_rules (id, merchant, package_name, category_id, label_override, last_matched_at, created_at, updated_at) VALUES (?, ?, ?, ?, ?, ?, ?, ?)',
+            'INSERT OR IGNORE INTO notification_merchant_rules (id, merchant, package_name, category_id, label_override, skip_category, last_matched_at, created_at, updated_at) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)',
             [
               rule.id,
               rule.merchant,
               rule.package_name || null,
               resolveCategoryReference(rule.category_id, 'preserved merchant rule'),
               rule.label_override || null,
+              asFlag(rule.skip_category, 0),
               // The row came from the live table, so this is the real
               // last-matched stamp: dropping it would push exactly the rules
               // the user matches most often to the bottom of the bindings list.

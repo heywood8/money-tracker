@@ -71,7 +71,8 @@ export const resolveAccountId = async (descriptor) => {
  *
  * Kinds flagged `requiresCategory` (client-to-client transfers) never resolve a
  * category automatically: the same counterparty maps to different categories
- * across transfers, so the user must always pick one in the review queue.
+ * across transfers, so the user must always pick one in the review queue. A
+ * merchant rule flagged `skipCategory` does the same for a single merchant.
  *
  * @param {Object} descriptor
  * @param {Object|null} rule - merchant rule row, or null
@@ -79,6 +80,10 @@ export const resolveAccountId = async (descriptor) => {
  */
 const categoryFromRule = (descriptor, rule) => {
   if (!descriptor || descriptor.requiresCategory) return null;
+  // The user chose "don't bind to category" for this merchant: it is picked by
+  // hand every time, so neither a learned category nor the template's default
+  // may pre-fill it (and without one the notification never auto-creates).
+  if (descriptor.merchant && rule && rule.skipCategory) return null;
   const learned = descriptor.merchant && rule ? rule.categoryId : null;
   // A learned merchant rule is the more specific fact and always wins. A parse
   // template's default category is the fallback for a payee nothing has been
