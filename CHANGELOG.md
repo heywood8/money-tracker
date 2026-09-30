@@ -1,5 +1,12 @@
 # Changelog
 
+## [0.294.0](https://github.com/heywood8/money-tracker/compare/penny-v0.293.3...penny-v0.294.0) (2026-09-30)
+
+
+### Features
+
+* **notifications:** add "don't bind to category" option ([#1853](https://github.com/heywood8/money-tracker/issues/1853)) ([5971460](https://github.com/heywood8/money-tracker/commit/59714606b3fe0d4cfe219766f902e34cb00f09d5))
+
 ## [0.293.3](https://github.com/heywood8/money-tracker/compare/penny-v0.293.2...penny-v0.293.3) (2026-09-30)
 
 
