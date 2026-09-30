@@ -1,5 +1,12 @@
 # Changelog
 
+## [0.293.3](https://github.com/heywood8/money-tracker/compare/penny-v0.293.2...penny-v0.293.3) (2026-09-30)
+
+
+### Bug Fixes
+
+* keep backups safe and count budget spending once ([#1851](https://github.com/heywood8/money-tracker/issues/1851)) ([86d6dee](https://github.com/heywood8/money-tracker/commit/86d6dee9e602b55494095082cb7540c4044a1d86))
+
 ## [0.293.2](https://github.com/heywood8/money-tracker/compare/penny-v0.293.1...penny-v0.293.2) (2026-09-29)
 
 
