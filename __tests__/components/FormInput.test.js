@@ -292,6 +292,23 @@ describe('FormInput', () => {
       expect(input.props.multiline).toBe(true);
     });
 
+    it('autoGrow stays a one-line-tall field that can still wrap', async () => {
+      const { getByPlaceholderText } = await render(
+        <FormInput
+          value=""
+          onChangeText={jest.fn()}
+          placeholder="Note"
+          autoGrow
+          numberOfLines={4}
+        />,
+        { wrapper },
+      );
+
+      const input = getByPlaceholderText('Note');
+      expect(input.props.multiline).toBe(true);
+      expect(input.props.numberOfLines).toBe(1);
+    });
+
     it('renders as single line by default', async () => {
       const { getByPlaceholderText } = await render(
         <FormInput

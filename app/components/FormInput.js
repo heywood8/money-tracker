@@ -50,6 +50,7 @@ export default function FormInput({
   error,
   leftIcon,
   multiline = false,
+  autoGrow = false,
   numberOfLines = 1,
   keyboardType = 'default',
   editable = true,
@@ -72,7 +73,8 @@ export default function FormInput({
             backgroundColor: colors.inputBackground || colors.surface,
             borderColor: error ? colors.delete : (colors.inputBorder || colors.border),
           },
-          multiline && styles.multilineContainer,
+          multiline && !autoGrow && styles.multilineContainer,
+          autoGrow && styles.autoGrowContainer,
           !editable && styles.disabled,
         ]}
       >
@@ -92,14 +94,15 @@ export default function FormInput({
           style={[
             styles.input,
             { color: colors.text },
-            multiline && styles.multilineInput,
+            multiline && !autoGrow && styles.multilineInput,
+            autoGrow && styles.autoGrowInput,
           ]}
           value={value}
           onChangeText={onChangeText}
           placeholder={placeholder}
           placeholderTextColor={colors.mutedText}
-          multiline={multiline}
-          numberOfLines={numberOfLines}
+          multiline={multiline || autoGrow}
+          numberOfLines={autoGrow ? 1 : numberOfLines}
           keyboardType={keyboardType}
           editable={editable}
           autoFocus={autoFocus}
@@ -121,6 +124,15 @@ export default function FormInput({
 }
 
 const styles = StyleSheet.create({
+  // Rests at the height of a one-line field and grows with its text; the input's
+  // own cap keeps a pasted essay from pushing the rest of the form off screen.
+  autoGrowContainer: {
+    paddingVertical: SPACING.xs,
+  },
+  autoGrowInput: {
+    maxHeight: HEIGHTS.input * 2.5,
+    textAlignVertical: 'center',
+  },
   container: {
     marginBottom: SPACING.sm,
   },
@@ -187,6 +199,12 @@ FormInput.propTypes = {
    * Whether input should be multiline
    */
   multiline: PropTypes.bool,
+
+  /**
+   * A multiline input that looks like a single-line one until its text wraps,
+   * then grows (up to a cap) — for optional notes that are usually one line.
+   */
+  autoGrow: PropTypes.bool,
 
   /**
    * Number of lines for multiline input
