@@ -1075,7 +1075,6 @@ export default function BudgetPlanLineModal({
             placeholder="0"
             placeholderTextColor={colors.mutedText}
             keyboardType="decimal-pad"
-            selectTextOnFocus
             style={[styles.amountInput, { color: colors.text }]}
             accessibilityLabel={t('amount')}
             testID="plan-line-amount"
@@ -1256,8 +1255,7 @@ export default function BudgetPlanLineModal({
           value={comment}
           onChangeText={setComment}
           placeholder={t('allocation_comment')}
-          multiline
-          numberOfLines={2}
+          autoGrow
           testID="plan-line-comment"
         />
 

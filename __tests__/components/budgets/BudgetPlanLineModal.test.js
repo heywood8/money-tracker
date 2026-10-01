@@ -68,6 +68,20 @@ const baseProps = () => ({
 });
 
 describe('BudgetPlanLineModal', () => {
+  // Regression: selectTextOnFocus on Android left the first typed digit
+  // selected, so the second digit replaced it ("1000" became "000").
+  it('does not select the amount on focus, so typing never overwrites a digit', async () => {
+    const { getByTestId } = await render(<BudgetPlanLineModal {...baseProps()} />);
+    await waitFor(() => expect(getByTestId('plan-line-amount')).toBeTruthy());
+    expect(getByTestId('plan-line-amount').props.selectTextOnFocus).toBeFalsy();
+  });
+
+  it('keeps the optional comment to one line until its text wraps', async () => {
+    const { getByTestId } = await render(<BudgetPlanLineModal {...baseProps()} />);
+    await waitFor(() => expect(getByTestId('plan-line-comment')).toBeTruthy());
+    expect(getByTestId('plan-line-comment').props.numberOfLines).toBe(1);
+  });
+
   it('refuses to save a line with no tracking target', async () => {
     const props = baseProps();
     const { getByTestId } = await render(<BudgetPlanLineModal {...props} />);
