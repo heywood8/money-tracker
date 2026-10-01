@@ -1,5 +1,12 @@
 # Changelog
 
+## [0.294.1](https://github.com/heywood8/money-tracker/compare/penny-v0.294.0...penny-v0.294.1) (2026-10-01)
+
+
+### Bug Fixes
+
+* **budgets:** stop amount overwrite and shrink comment field ([#1855](https://github.com/heywood8/money-tracker/issues/1855)) ([5cddb38](https://github.com/heywood8/money-tracker/commit/5cddb38a1529d988f665c5aa59dcd3373aaff572))
+
 ## [0.294.0](https://github.com/heywood8/money-tracker/compare/penny-v0.293.3...penny-v0.294.0) (2026-09-30)
 
 
