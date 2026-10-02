@@ -13,6 +13,7 @@ import FormInput from '../FormInput';
 import CategoryGridSelector from '../CategoryGridSelector';
 import SkipCategoryBindingToggle from '../SkipCategoryBindingToggle';
 import useTopCategoryIds from '../../hooks/useTopCategoryIds';
+import useSourceCategoryIds from '../../hooks/useSourceCategoryIds';
 import { canSaveSuggestion } from '../../hooks/usePendingOperationSuggestions';
 import { kindRequiresCategory } from '../../services/notifications/parseBankNotification';
 import { getCategoryDisplayName } from '../../utils/categoryUtils';
@@ -66,7 +67,22 @@ const NotificationBindingCard = ({
   const showSkipCategory = !isTransfer && (neverBindsCategory || !!item.merchant);
   // Most-frequent categories drive the QuickAdd-style shortcut grid below, so the
   // card's category picker matches the quick-add form it sits over.
-  const topCategoryIds = useTopCategoryIds();
+  const globalTopCategoryIds = useTopCategoryIds();
+  // With "don't bind to category" ticked nothing is pre-selected, so shortcuts
+  // come from what this source was booked under before; the global ranking only
+  // fills in behind them (and stands alone for a source with no history).
+  const skipChecked = showSkipCategory && (neverBindsCategory || !!choice.skipCategoryBinding);
+  const sourceCategoryIds = useSourceCategoryIds(
+    item,
+    choice.labelDirty ? '' : (choice.labelOverride ?? ''),
+    skipChecked,
+  );
+  const topCategoryIds = useMemo(
+    () => (skipChecked && sourceCategoryIds.length > 0
+      ? [...new Set([...sourceCategoryIds, ...globalTopCategoryIds])]
+      : globalTopCategoryIds),
+    [skipChecked, sourceCategoryIds, globalTopCategoryIds],
+  );
 
   const accountItems = useMemo(
     () => accounts.map((a) => ({ label: a.name, subLabel: a.currency, value: a.id })),
