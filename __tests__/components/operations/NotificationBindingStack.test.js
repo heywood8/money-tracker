@@ -32,6 +32,11 @@ jest.mock('../../../app/hooks/useTopCategoryIds', () => ({
   default: jest.fn(() => []),
 }));
 
+jest.mock('../../../app/hooks/useSourceCategoryIds', () => ({
+  __esModule: true,
+  default: jest.fn(() => []),
+}));
+
 const COLORS = {
   background: '#fff', surface: '#f5f5f5', primary: '#6200ee',
   text: '#000', mutedText: '#888', border: '#ddd', selected: '#eee',
@@ -259,6 +264,20 @@ describe('NotificationBindingStack', () => {
       expect(toggle.props.accessibilityState).toEqual({ checked: false, disabled: false });
       await fireEvent.press(toggle);
       expect(onChoiceChange).toHaveBeenCalledWith('p1', { skipCategoryBinding: true });
+    });
+
+    it('ranks the shortcuts by the source’s own history only while ticked', async () => {
+      const useSourceCategoryIds = require('../../../app/hooks/useSourceCategoryIds').default;
+      useSourceCategoryIds.mockClear();
+
+      await renderStack();
+      expect(useSourceCategoryIds).toHaveBeenLastCalledWith(EXPENSE, '', false);
+
+      useSourceCategoryIds.mockClear();
+      await renderStack({
+        choices: { p1: { accountId: 1, categoryId: null, skipCategoryBinding: true, labelOverride: 'Super' } },
+      });
+      expect(useSourceCategoryIds).toHaveBeenLastCalledWith(EXPENSE, 'Super', true);
     });
 
     it('unticks again while it is not locked', async () => {

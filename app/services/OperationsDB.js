@@ -1,6 +1,6 @@
 import { executeQuery, queryAll, queryFirst, executeTransaction, isSearchNormAvailable } from './db';
 import { normalizeSearchText, buildSearchNormSql } from './searchNormalize';
-import { parseLabels, isHiddenLabel } from '../utils/labelUtils';
+import { parseLabels, isHiddenLabel, normalizeLabel } from '../utils/labelUtils';
 
 // Build the SQL expression that normalizes a searchable column. When the
 // SEARCH_NORM custom function registered (full Cyrillic case-folding + ё/е
@@ -2402,6 +2402,58 @@ export const getTopCategoriesFromLastMonth = async (limitPerType = 3) => {
   } catch (error) {
     console.error('Failed to get top categories from last month:', error);
     throw error;
+  }
+};
+
+/**
+ * Categories past operations of one payee were booked under, most-used first
+ * (ties: the most recently used first).
+ *
+ * A payee is a label: the pipeline books a notification's operation with the
+ * shop's label as its whole description, so "the same source" is "carries one of
+ * these labels". The LIKE only narrows the scan (folded like the operations
+ * search, so Cyrillic case and ё/е do not matter); the exact, case-insensitive
+ * label match is made in JS on the parsed labels.
+ *
+ * @param {string} type - 'expense' | 'income'
+ * @param {string[]} payees - names the payee goes by (raw merchant, tidied, learned label)
+ * @param {number} [limit=10]
+ * @returns {Promise<string[]>} category ids, best first (empty when no payee matches)
+ */
+export const getCategoryIdsForPayees = async (type, payees, limit = 10) => {
+  const wanted = new Set(
+    (payees || []).map((p) => normalizeLabel(p).toLowerCase()).filter(Boolean),
+  );
+  if (wanted.size === 0) return [];
+  try {
+    const folded = [...new Set(
+      (payees || []).map((p) => normalizeSearchQuery(normalizeLabel(p))).filter(Boolean),
+    )];
+    const likes = folded
+      .map(() => `${searchNormExpr('description')} LIKE ? ${LIKE_ESCAPE}`)
+      .join(' OR ');
+    const params = folded.map((p) => `%${escapeLikePattern(p)}%`);
+    const rows = await queryAll(
+      `SELECT category_id, description, date FROM operations
+       WHERE type = ? AND category_id IS NOT NULL AND (${likes})`,
+      [type, ...params],
+    );
+    const stats = new Map();
+    for (const row of rows || []) {
+      const hit = parseLabels(row.description).some((l) => wanted.has(l.toLowerCase()));
+      if (!hit) continue;
+      const stat = stats.get(row.category_id) || { count: 0, last: '' };
+      stat.count += 1;
+      if (row.date && row.date > stat.last) stat.last = row.date;
+      stats.set(row.category_id, stat);
+    }
+    return [...stats.entries()]
+      .sort(([, a], [, b]) => b.count - a.count || (a.last < b.last ? 1 : a.last > b.last ? -1 : 0))
+      .slice(0, limit)
+      .map(([categoryId]) => categoryId);
+  } catch (error) {
+    console.error('Failed to get categories for payees:', error);
+    return [];
   }
 };
 

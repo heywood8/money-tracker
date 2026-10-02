@@ -1616,6 +1616,74 @@ describe('OperationsDB Service', () => {
       expect(result[2]).toEqual({ categoryId: 'cat3', count: 8 });
     });
 
+    describe('getCategoryIdsForPayees', () => {
+      it('ranks categories by how often the payee was booked under them', async () => {
+        queryAll.mockResolvedValue([
+          { category_id: 'cafe', description: 'Ameriabank Api Gate', date: '2026-09-01' },
+          { category_id: 'taxi', description: 'Ameriabank Api Gate', date: '2026-09-02' },
+          { category_id: 'taxi', description: 'ameriabank api gate', date: '2026-09-03' },
+        ]);
+
+        const result = await OperationsDB.getCategoryIdsForPayees(
+          'expense', ['AMERIABANK API GATE', 'Ameriabank Api Gate'],
+        );
+
+        expect(result).toEqual(['taxi', 'cafe']);
+        const [sql, params] = queryAll.mock.calls[0];
+        expect(sql).toContain('category_id IS NOT NULL');
+        expect(params[0]).toBe('expense');
+      });
+
+      it('breaks ties by the most recently used category', async () => {
+        queryAll.mockResolvedValue([
+          { category_id: 'old', description: 'Shop', date: '2026-01-01' },
+          { category_id: 'new', description: 'Shop', date: '2026-09-01' },
+        ]);
+
+        expect(await OperationsDB.getCategoryIdsForPayees('expense', ['Shop']))
+          .toEqual(['new', 'old']);
+      });
+
+      it('ignores rows whose labels only contain the payee as a substring', async () => {
+        queryAll.mockResolvedValue([
+          { category_id: 'c1', description: 'Shop Plus | Gift', date: '2026-09-01' },
+          { category_id: 'c2', description: 'Gift | Shop', date: '2026-09-02' },
+        ]);
+
+        expect(await OperationsDB.getCategoryIdsForPayees('expense', ['Shop'])).toEqual(['c2']);
+      });
+
+      it('escapes LIKE wildcards in the payee name', async () => {
+        queryAll.mockResolvedValue([]);
+        await OperationsDB.getCategoryIdsForPayees('expense', ['100%_shop']);
+        expect(queryAll.mock.calls[0][1]).toContain('%100\\%\\_shop%');
+      });
+
+      it('narrows with the folded search expression so Cyrillic case does not matter', async () => {
+        queryAll.mockResolvedValue([
+          { category_id: 'food', description: 'МАГНИТ', date: '2026-09-01' },
+        ]);
+
+        const result = await OperationsDB.getCategoryIdsForPayees('expense', ['Магнит']);
+
+        expect(result).toEqual(['food']);
+        const [sql, params] = queryAll.mock.calls[0];
+        expect(sql).toMatch(/LIKE \? ESCAPE/);
+        expect(sql).not.toMatch(/description LIKE/);
+        expect(params[1]).toBe('%магнит%');
+      });
+
+      it('skips the query without a usable payee and degrades to [] on error', async () => {
+        expect(await OperationsDB.getCategoryIdsForPayees('expense', ['', null])).toEqual([]);
+        expect(queryAll).not.toHaveBeenCalled();
+
+        queryAll.mockRejectedValue(new Error('db down'));
+        const spy = jest.spyOn(console, 'error').mockImplementation(() => {});
+        expect(await OperationsDB.getCategoryIdsForPayees('expense', ['Shop'])).toEqual([]);
+        spy.mockRestore();
+      });
+    });
+
     it('returns empty array when no operations in last 3 months', async () => {
       queryAll.mockResolvedValue([]);
 
