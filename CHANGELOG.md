@@ -1,5 +1,12 @@
 # Changelog
 
+## [0.295.0](https://github.com/heywood8/money-tracker/compare/penny-v0.294.1...penny-v0.295.0) (2026-10-02)
+
+
+### Features
+
+* **operations:** suggest categories from the source's past operations ([#1857](https://github.com/heywood8/money-tracker/issues/1857)) ([510d968](https://github.com/heywood8/money-tracker/commit/510d968a9f6d15b9de7ca34ede911333ce65c215))
+
 ## [0.294.1](https://github.com/heywood8/money-tracker/compare/penny-v0.294.0...penny-v0.294.1) (2026-10-01)
 
 
