@@ -1,5 +1,12 @@
 # Changelog
 
+## [0.295.1](https://github.com/heywood8/money-tracker/compare/penny-v0.295.0...penny-v0.295.1) (2026-10-03)
+
+
+### Bug Fixes
+
+* **tabs:** drop rectangular ripple behind the tab pill ([#1859](https://github.com/heywood8/money-tracker/issues/1859)) ([f3b5325](https://github.com/heywood8/money-tracker/commit/f3b5325add0ea85dee096e6251c9397665b91259))
+
 ## [0.295.0](https://github.com/heywood8/money-tracker/compare/penny-v0.294.1...penny-v0.295.0) (2026-10-02)
 
 
