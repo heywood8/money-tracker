@@ -366,7 +366,7 @@ describe('SimpleTabs Component Rendering', () => {
   it('does not render the Accounts tab when showAccountsTab is off', async () => {
     const { queryByTestId } = await render(<SimpleTabs />);
 
-    expect(queryByTestId('tab-accounts')).toBeNull();
+    expect(queryByTestId('tab-Accounts')).toBeNull();
     expect(queryByTestId('accounts-screen')).toBeNull();
   });
 
@@ -390,11 +390,24 @@ describe('SimpleTabs Component Rendering', () => {
 
     // The tab button is present from frame 1 (TABS is unaffected by deferral);
     // the Accounts screen is a background slot, so it mounts after the idle flip.
-    expect(getByTestId('tab-accounts')).toBeTruthy();
+    expect(getByTestId('tab-Accounts')).toBeTruthy();
     await waitFor(() => expect(getByTestId('accounts-screen')).toBeTruthy());
     // The rest of the tabs are still present alongside it.
     expect(getByTestId('tab-Operations')).toBeTruthy();
     expect(getByTestId('tab-Graphs')).toBeTruthy();
+  });
+
+  it('draws no ripple on the tab buttons, so the pill is the only selection', async () => {
+    // Regression: the ripple filled the whole rectangular tab and kept fading
+    // while the rounded pill slid in, flashing two selections on every switch.
+    const { getByTestId } = await render(<SimpleTabs />);
+
+    ['tab-Operations', 'tab-Graphs', 'tab-Budget', 'tab-Settings'].forEach((id) => {
+      const tab = getByTestId(id);
+      expect(tab.props.rippleColor).toBeUndefined();
+      expect(tab.props.borderless).toBeUndefined();
+      expect(tab.props.android_ripple).toBeUndefined();
+    });
   });
 
   it('renders all four screens after visiting each tab', async () => {
@@ -407,10 +420,10 @@ describe('SimpleTabs Component Rendering', () => {
     await act(async () => { fireEvent.press(getByTestId('tab-Graphs')); });
     await waitFor(() => expect(getByTestId('graphs-screen')).toBeTruthy());
 
-    await act(async () => { fireEvent.press(getByTestId('tab-budget')); });
+    await act(async () => { fireEvent.press(getByTestId('tab-Budget')); });
     await waitFor(() => expect(getByTestId('budget-screen')).toBeTruthy());
 
-    await act(async () => { fireEvent.press(getByTestId('tab-settings')); });
+    await act(async () => { fireEvent.press(getByTestId('tab-Settings')); });
     await waitFor(() => expect(getByTestId('settings-screen')).toBeTruthy());
   });
 
@@ -503,10 +516,10 @@ describe('SimpleTabs Component Rendering', () => {
     // Press each tab
     await fireEvent.press(getByTestId('tab-Operations'));
     await fireEvent.press(getByTestId('tab-Graphs'));
-    await fireEvent.press(getByTestId('tab-budget'));
+    await fireEvent.press(getByTestId('tab-Budget'));
 
     // All should work without errors
-    expect(getByTestId('tab-budget')).toBeTruthy();
+    expect(getByTestId('tab-Budget')).toBeTruthy();
   });
 
   it('applies styles based on active state', async () => {
@@ -532,7 +545,7 @@ describe('SimpleTabs Component Rendering', () => {
     for (let i = 0; i < 5; i++) {
       await fireEvent.press(getByTestId('tab-Operations'));
       await fireEvent.press(getByTestId('tab-Graphs'));
-      await fireEvent.press(getByTestId('tab-budget'));
+      await fireEvent.press(getByTestId('tab-Budget'));
     }
 
     // Component should still be stable (overlay may duplicate a screen testID)
@@ -565,7 +578,7 @@ describe('SimpleTabs Component Rendering', () => {
     const { getByTestId, getByText } = await render(<SimpleTabs />);
 
     // Press Budget tab
-    await fireEvent.press(getByTestId('tab-budget'));
+    await fireEvent.press(getByTestId('tab-Budget'));
 
     await waitFor(() => {
       expect(getByText('budget')).toBeTruthy();
@@ -674,10 +687,10 @@ describe('SimpleTabs Component Rendering', () => {
     const { getByTestId } = await render(<SimpleTabs />);
 
     // Operations (index 0) → Budget (index 2) — distance=2, triggers overlay path
-    fireEvent.press(getByTestId('tab-budget'));
+    fireEvent.press(getByTestId('tab-Budget'));
 
     await waitFor(() => {
-      expect(getByTestId('tab-budget').props.accessibilityState).toEqual({ selected: true });
+      expect(getByTestId('tab-Budget').props.accessibilityState).toEqual({ selected: true });
     });
   });
 });
@@ -1847,9 +1860,9 @@ describe('SimpleTabs deep link to the review deck', () => {
 
   it('switches to Operations when a tapped review notification routes here', async () => {
     const { getByTestId } = await render(<SimpleTabs />);
-    await act(async () => { fireEvent.press(getByTestId('tab-settings')); });
+    await act(async () => { fireEvent.press(getByTestId('tab-Settings')); });
     await waitFor(() => {
-      expect(getByTestId('tab-settings').props.accessibilityState).toEqual({ selected: true });
+      expect(getByTestId('tab-Settings').props.accessibilityState).toEqual({ selected: true });
     });
 
     await act(async () => { appEvents.emit(EVENTS.OPEN_PENDING_OPERATIONS); });
@@ -1869,7 +1882,7 @@ describe('SimpleTabs deep link to the review deck', () => {
     const { getByTestId } = await render(<SimpleTabs />);
 
     // Operations (0) → Settings (3): the non-adjacent path, spring interrupted.
-    await act(async () => { fireEvent.press(getByTestId('tab-settings')); });
+    await act(async () => { fireEvent.press(getByTestId('tab-Settings')); });
 
     global.__mockSpringFinished = true;
     await act(async () => { fireEvent.press(getByTestId('tab-Graphs')); });
@@ -1881,9 +1894,9 @@ describe('SimpleTabs deep link to the review deck', () => {
 
   it('switches to Operations when a tapped "operations added" notification routes here', async () => {
     const { getByTestId } = await render(<SimpleTabs />);
-    await act(async () => { fireEvent.press(getByTestId('tab-settings')); });
+    await act(async () => { fireEvent.press(getByTestId('tab-Settings')); });
     await waitFor(() => {
-      expect(getByTestId('tab-settings').props.accessibilityState).toEqual({ selected: true });
+      expect(getByTestId('tab-Settings').props.accessibilityState).toEqual({ selected: true });
     });
 
     await act(async () => { appEvents.emit(EVENTS.OPEN_ADDED_OPERATIONS); });
@@ -1897,9 +1910,9 @@ describe('SimpleTabs deep link to the review deck', () => {
     // The form the press asks for is a modal over this tab; the tab underneath
     // is what the user is returned to when they close it.
     const { getByTestId } = await render(<SimpleTabs />);
-    await act(async () => { fireEvent.press(getByTestId('tab-settings')); });
+    await act(async () => { fireEvent.press(getByTestId('tab-Settings')); });
     await waitFor(() => {
-      expect(getByTestId('tab-settings').props.accessibilityState).toEqual({ selected: true });
+      expect(getByTestId('tab-Settings').props.accessibilityState).toEqual({ selected: true });
     });
 
     await act(async () => {
@@ -1917,9 +1930,9 @@ describe('SimpleTabs deep link to the review deck', () => {
     global.__mockSpringPending = true;
     const { getByTestId } = await render(<SimpleTabs />);
 
-    await act(async () => { fireEvent.press(getByTestId('tab-settings')); });
+    await act(async () => { fireEvent.press(getByTestId('tab-Settings')); });
     await waitFor(() => {
-      expect(getByTestId('tab-settings').props.accessibilityState).toEqual({ selected: true });
+      expect(getByTestId('tab-Settings').props.accessibilityState).toEqual({ selected: true });
     });
 
     await act(async () => { appEvents.emit(EVENTS.OPEN_ADDED_OPERATIONS); });
@@ -1936,9 +1949,9 @@ describe('SimpleTabs deep link to the review deck', () => {
     global.__mockSpringPending = true;
     const { getByTestId } = await render(<SimpleTabs />);
 
-    await act(async () => { fireEvent.press(getByTestId('tab-settings')); });
+    await act(async () => { fireEvent.press(getByTestId('tab-Settings')); });
     await waitFor(() => {
-      expect(getByTestId('tab-settings').props.accessibilityState).toEqual({ selected: true });
+      expect(getByTestId('tab-Settings').props.accessibilityState).toEqual({ selected: true });
     });
 
     await act(async () => { appEvents.emit(EVENTS.OPEN_PENDING_OPERATIONS); });
