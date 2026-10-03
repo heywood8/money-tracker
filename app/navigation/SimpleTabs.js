@@ -1,8 +1,8 @@
 import React, { useMemo, useCallback, useRef, useEffect, memo } from 'react';
 import PropTypes from 'prop-types';
-import { View, StyleSheet, Dimensions, Platform, BackHandler } from 'react-native';
+import { View, StyleSheet, Dimensions, Platform, BackHandler, Pressable } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
-import { TouchableRipple, Text } from 'react-native-paper';
+import { Text } from 'react-native-paper';
 import { GestureDetector, Gesture } from 'react-native-gesture-handler';
 import Animated, {
   useSharedValue,
@@ -163,12 +163,14 @@ const TabButton = memo(({ tab, isActive = false, colors, onPress = () => {}, isU
     },
   ], [isActive, colors.primary, colors.mutedText]);
 
+  // A plain Pressable, not a ripple. The ripple filled the tab's whole
+  // rectangle and kept fading out while the rounded pill slid in, so every
+  // switch flashed two selections at once. The pill is the press feedback.
   return (
-    <TouchableRipple
+    <Pressable
       style={styles.tab}
       onPress={handlePress}
-      rippleColor={colors.ripple}
-      borderless
+      testID={`tab-${tab.key}`}
       accessibilityRole="button"
       accessibilityState={{ selected: isActive }}
       accessibilityLabel={tab.label}
@@ -191,7 +193,7 @@ const TabButton = memo(({ tab, isActive = false, colors, onPress = () => {}, isU
           {tab.label}
         </Text>
       </View>
-    </TouchableRipple>
+    </Pressable>
   );
 });
 
@@ -207,7 +209,6 @@ TabButton.propTypes = {
   colors: PropTypes.shape({
     mutedText: PropTypes.string,
     primary: PropTypes.string,
-    ripple: PropTypes.string,
   }).isRequired,
   onPress: PropTypes.func,
   isUpdating: PropTypes.bool,
