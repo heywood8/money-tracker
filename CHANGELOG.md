@@ -1,5 +1,12 @@
 # Changelog
 
+## [0.295.2](https://github.com/heywood8/money-tracker/compare/penny-v0.295.1...penny-v0.295.2) (2026-10-11)
+
+
+### Bug Fixes
+
+* **notifications:** allow marking a bound merchant as "don't bind" ([#1861](https://github.com/heywood8/money-tracker/issues/1861)) ([8108858](https://github.com/heywood8/money-tracker/commit/81088586d4345e7ffe8debaac9efca0b9acaeaee))
+
 ## [0.295.1](https://github.com/heywood8/money-tracker/compare/penny-v0.295.0...penny-v0.295.1) (2026-10-03)
 
 
