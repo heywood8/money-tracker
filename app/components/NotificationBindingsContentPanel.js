@@ -21,6 +21,7 @@ import {
   clearMerchantRuleSkipCategory,
   upsertMerchantRule,
   upsertMerchantLabel,
+  upsertMerchantSkipCategory,
 } from '../services/NotificationRulesDB';
 import * as AccountsDB from '../services/AccountsDB';
 import {
@@ -28,7 +29,9 @@ import {
   setAtmTargetAccount,
   clearAtmTargetAccount,
 } from '../services/notifications/processBankNotifications';
-import { BUTTON_COMPACT, BUTTON_TEXT, CARD_SURFACE, SECTION_LABEL } from '../styles/componentStyles';
+import {
+  BUTTON_COMPACT, BUTTON_TEXT, CARD_SURFACE, CHIP, CHIP_TEXT, SECTION_LABEL,
+} from '../styles/componentStyles';
 import EmptyState from './EmptyState';
 
 /**
@@ -43,7 +46,8 @@ import EmptyState from './EmptyState';
  *   2. Category bindings: merchant -> category rules that auto-categorize future
  *      notifications from the same shop, plus merchants marked "don't bind to
  *      category" on a review card (the one place that mark can be lifted: remove
- *      it, or pick a category to bind instead).
+ *      it, or pick a category to bind instead). A bound merchant can be switched
+ *      to "don't bind" here too, from the top of its unfolded category grid.
  *   3. Name bindings: merchant -> custom-name overrides that relabel a shop's
  *      transactions (e.g. "ECOSENSE BYUZAND" -> "Ecosense").
  *
@@ -217,6 +221,15 @@ export default function NotificationBindingsContentPanel({ active = true, bottom
     if (!categoryId || categoryId === rule.categoryId) return;
     // An edit made here is deliberate, so it also replaces a "don't bind" mark.
     await upsertMerchantRule(rule.merchant, categoryId, rule.packageName, { overrideSkip: true });
+    await reload();
+  }, [reload]);
+
+  // Swap a learned category for the "don't bind" mark. Removing the binding
+  // instead would only let the merchant learn a category again on the next save.
+  const handleSkipCategory = useCallback(async (rule) => {
+    setExpandedCategoryRuleId(null);
+    if (rule.skipCategory) return;
+    await upsertMerchantSkipCategory(rule.merchant, rule.packageName);
     await reload();
   }, [reload]);
 
@@ -450,6 +463,20 @@ export default function NotificationBindingsContentPanel({ active = true, bottom
         </TouchableOpacity>
         {expanded && (
           <View style={styles.categoryGrid}>
+            {!rule.skipCategory && (
+              <TouchableOpacity
+                onPress={() => handleSkipCategory(rule)}
+                style={[styles.skipChip, { borderColor: colors.border }]}
+                accessibilityRole="button"
+                accessibilityLabel={skipCategoryLabel}
+                testID={`binding-category-skip-${rule.id}`}
+              >
+                <Ionicons name="remove-circle-outline" size={16} color={colors.mutedText} />
+                <Text style={[styles.skipChipText, { color: colors.text }]} numberOfLines={1}>
+                  {skipCategoryLabel}
+                </Text>
+              </TouchableOpacity>
+            )}
             <CategoryGridSelector
               categories={categories}
               categoryType={categoryType}
@@ -768,6 +795,7 @@ const styles = StyleSheet.create({
     fontWeight: '500',
   },
   categoryGrid: {
+    gap: SPACING.sm,
     marginTop: SPACING.sm,
   },
   centered: {
@@ -859,4 +887,9 @@ const styles = StyleSheet.create({
   sectionTitleInRow: {
     marginTop: 0,
   },
+  skipChip: {
+    ...CHIP,
+    alignSelf: 'flex-start',
+  },
+  skipChipText: CHIP_TEXT,
 });
