@@ -7,6 +7,7 @@
  */
 
 import React from 'react';
+import { StyleSheet } from 'react-native';
 import { render, fireEvent } from '@testing-library/react-native';
 import OperationListItem from '../../../app/components/operations/OperationListItem';
 
@@ -476,6 +477,63 @@ describe('OperationListItem', () => {
         />,
       );
       expect(getByText(/→ €13\.20/)).toBeTruthy();
+    });
+
+    it('tints a multi-currency transfer like expense → income, landed amount larger', async () => {
+      const { getByTestId } = await render(
+        <OperationListItem
+          {...baseProps}
+          operation={{
+            ...baseOperation,
+            type: 'transfer',
+            toAccountId: 'acc2',
+            exchangeRate: 1.1,
+            destinationAmount: '13.20',
+          }}
+          formatCurrency={(id, amount) => (id === 'acc1' ? `$${amount}` : `€${amount}`)}
+        />,
+      );
+      const source = getByTestId('op-transfer-source-amount');
+      const destination = getByTestId('op-transfer-destination-amount');
+      const sourceStyle = StyleSheet.flatten(source.props.style);
+      const destinationStyle = StyleSheet.flatten(destination.props.style);
+      const rowStyle = StyleSheet.flatten(destination.parent.props.style);
+
+      expect(source).toHaveTextContent('$12.00');
+      expect(destination).toHaveTextContent('€13.20');
+      expect(sourceStyle.color).toBe(mockColors.expense);
+      expect(destinationStyle.color).toBe(mockColors.income);
+      // The destination inherits the row's full amount size; the source is smaller.
+      expect(destinationStyle.fontSize).toBeUndefined();
+      expect(sourceStyle.fontSize).toBeLessThan(rowStyle.fontSize);
+    });
+
+    it('announces both sides of a multi-currency transfer', async () => {
+      const { getByLabelText } = await render(
+        <OperationListItem
+          {...baseProps}
+          operation={{
+            ...baseOperation,
+            type: 'transfer',
+            toAccountId: 'acc2',
+            exchangeRate: 1.1,
+            destinationAmount: '13.20',
+          }}
+          formatCurrency={(id, amount) => (id === 'acc1' ? `$${amount}` : `€${amount}`)}
+        />,
+      );
+      expect(getByLabelText('transfer_label, transfer, $12.00 → €13.20')).toBeTruthy();
+    });
+
+    it('keeps a same-currency transfer amount in the transfer colour', async () => {
+      const { getByText, queryByTestId } = await render(
+        <OperationListItem
+          {...baseProps}
+          operation={{ ...baseOperation, type: 'transfer', toAccountId: 'acc2' }}
+        />,
+      );
+      expect(queryByTestId('op-transfer-source-amount')).toBeNull();
+      expect(StyleSheet.flatten(getByText('$12.00').props.style).color).toBe(mockColors.transfer);
     });
 
     it('shows parentName · accountName subtitle when no description but category has parent', async () => {
