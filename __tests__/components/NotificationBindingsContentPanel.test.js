@@ -72,6 +72,7 @@ describe('NotificationBindingsContentPanel', () => {
     NotificationRulesDB.clearMerchantRuleSkipCategory.mockResolvedValue();
     NotificationRulesDB.upsertMerchantRule.mockResolvedValue();
     NotificationRulesDB.upsertMerchantLabel.mockResolvedValue();
+    NotificationRulesDB.upsertMerchantSkipCategory.mockResolvedValue();
     AccountsDB.addAccountCardMask.mockResolvedValue();
     AccountsDB.removeAccountCardMask.mockResolvedValue();
     pipeline.resolveAtmTargetAccount.mockResolvedValue({ id: 2, name: 'Cash', currency: 'AMD' });
@@ -172,6 +173,16 @@ describe('NotificationBindingsContentPanel', () => {
       // Picking collapses the grid.
       expect(queryByTestId('binding-category-option-r1-c1')).toBeNull();
     });
+
+    it('switches a bound merchant to "don’t bind" from the unfolded grid', async () => {
+      const { getByTestId, queryByTestId } = await render(<NotificationBindingsContentPanel />);
+      await fireEvent.press(await waitFor(() => getByTestId('binding-category-field-r1')));
+      await fireEvent.press(getByTestId('binding-category-skip-r1'));
+      await waitFor(() => expect(NotificationRulesDB.upsertMerchantSkipCategory)
+        .toHaveBeenCalledWith('COFFEE HOUSE', 'am.bank'));
+      expect(NotificationRulesDB.upsertMerchantRule).not.toHaveBeenCalled();
+      expect(queryByTestId('binding-category-option-r1-c1')).toBeNull();
+    });
   });
 
   describe('"Don’t bind to category" merchants', () => {
@@ -203,6 +214,13 @@ describe('NotificationBindingsContentPanel', () => {
       await fireEvent.press(getByTestId('binding-category-option-r3-c1'));
       await waitFor(() => expect(NotificationRulesDB.upsertMerchantRule)
         .toHaveBeenCalledWith('AMERIABANK API GATE', 'c1', 'am.bank', { overrideSkip: true }));
+    });
+
+    it('offers no "don’t bind" option for a merchant already marked that way', async () => {
+      const { getByTestId, queryByTestId } = await render(<NotificationBindingsContentPanel />);
+      await fireEvent.press(await waitFor(() => getByTestId('binding-category-field-r3')));
+      expect(getByTestId('binding-category-option-r3-c1')).toBeTruthy();
+      expect(queryByTestId('binding-category-skip-r3')).toBeNull();
     });
   });
 
