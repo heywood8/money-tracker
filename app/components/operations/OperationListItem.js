@@ -118,6 +118,9 @@ const OperationListItem = ({
   // Build accessibility label
   const typeLabel = isExpense ? t('expense_label') : isIncome ? t('income_label') : t('transfer_label');
   let accessibilityLabel = `${typeLabel}, ${title}, ${displayAmount}`;
+  if (isMultiCurrencyTransfer && operation.toAccountId) {
+    accessibilityLabel += ` → ${formatCurrency(operation.toAccountId, operation.destinationAmount)}`;
+  }
   if (labels.length > 0) {
     accessibilityLabel += `, ${t('labels')}: ${labels.map(displayLabel).join(', ')}`;
   }
@@ -189,14 +192,26 @@ const OperationListItem = ({
 
           {/* Amount */}
           <View style={styles.amountContainer}>
-            <Text style={[styles.amount, { color: amountColor }]} numberOfLines={1}>
-              {displayAmount}
-              {isMultiCurrencyTransfer && operation.toAccountId && (
-                <Text style={[styles.destinationAmount, { color: colors.mutedText }]}>
-                  {' → '}{formatCurrency(operation.toAccountId, operation.destinationAmount)}
+            {isMultiCurrencyTransfer && operation.toAccountId ? (
+              // Across currencies the two sides are different numbers, so each is
+              // tinted by its direction: what leaves the source reads as an
+              // expense, what lands on the destination as income. The landed
+              // amount leads; the source is the secondary figure. The row icon
+              // keeps the transfer colour.
+              <Text style={[styles.amount, { color: colors.mutedText }]} numberOfLines={1}>
+                <Text style={[styles.sourceAmount, { color: colors.expense }]} testID="op-transfer-source-amount">
+                  {displayAmount}
                 </Text>
-              )}
-            </Text>
+                <Text style={styles.sourceAmount}>{' → '}</Text>
+                <Text style={{ color: colors.income }} testID="op-transfer-destination-amount">
+                  {formatCurrency(operation.toAccountId, operation.destinationAmount)}
+                </Text>
+              </Text>
+            ) : (
+              <Text style={[styles.amount, { color: amountColor }]} numberOfLines={1}>
+                {displayAmount}
+              </Text>
+            )}
             {isForeignCurrencyOp && (
               <Text style={[styles.foreignAmount, { color: colors.mutedText }]} numberOfLines={1}>
                 {getForeignSymbol(operation.sourceCurrency)}{operation.destinationAmount}
@@ -270,10 +285,6 @@ const styles = StyleSheet.create({
     alignItems: 'flex-end',
     marginLeft: SPACING.md,
   },
-  destinationAmount: {
-    fontSize: FONT_SIZE.sm,
-    fontWeight: FONT_WEIGHT.regular,
-  },
   foreignAmount: {
     fontSize: FONT_SIZE.sm,
     fontWeight: FONT_WEIGHT.regular,
@@ -309,6 +320,10 @@ const styles = StyleSheet.create({
   separator: {
     height: 1,
     marginLeft: SPACING.lg + 32 + SPACING.md,
+  },
+  sourceAmount: {
+    fontSize: FONT_SIZE.sm,
+    fontWeight: FONT_WEIGHT.regular,
   },
   subtitle: {
     fontSize: FONT_SIZE.sm,
