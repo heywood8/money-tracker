@@ -1,5 +1,12 @@
 # Changelog
 
+## [0.296.0](https://github.com/heywood8/money-tracker/compare/penny-v0.295.2...penny-v0.296.0) (2026-10-12)
+
+
+### Features
+
+* **operations:** tint cross-currency transfer amounts by direction ([#1863](https://github.com/heywood8/money-tracker/issues/1863)) ([d30a8e2](https://github.com/heywood8/money-tracker/commit/d30a8e2f7136ee62ef04aaa23d2e069879a63c14))
+
 ## [0.295.2](https://github.com/heywood8/money-tracker/compare/penny-v0.295.1...penny-v0.295.2) (2026-10-11)
 
 
