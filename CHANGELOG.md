@@ -1,5 +1,12 @@
 # Changelog
 
+## [0.297.0](https://github.com/heywood8/money-tracker/compare/penny-v0.296.0...penny-v0.297.0) (2026-10-18)
+
+
+### Features
+
+* **operations:** rank quick-add category suggestions by account ([#1865](https://github.com/heywood8/money-tracker/issues/1865)) ([e2b8604](https://github.com/heywood8/money-tracker/commit/e2b86045873497395d1370ae09e37de76165af2c))
+
 ## [0.296.0](https://github.com/heywood8/money-tracker/compare/penny-v0.295.2...penny-v0.296.0) (2026-10-12)
 
 
