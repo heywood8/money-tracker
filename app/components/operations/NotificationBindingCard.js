@@ -66,10 +66,11 @@ const NotificationBindingCard = ({
   const neverBindsCategory = !isTransfer && kindRequiresCategory(item.kind, item.packageName);
   const showSkipCategory = !isTransfer && (neverBindsCategory || !!item.merchant);
   // Most-frequent categories drive the QuickAdd-style shortcut grid below, so the
-  // card's category picker matches the quick-add form it sits over.
-  const globalTopCategoryIds = useTopCategoryIds();
+  // card's category picker matches the quick-add form it sits over — ranked, like
+  // the form, by the account the operation is booked from first.
+  const accountTopCategoryIds = useTopCategoryIds(10, choice.accountId);
   // With "don't bind to category" ticked nothing is pre-selected, so shortcuts
-  // come from what this source was booked under before; the global ranking only
+  // come from what this source was booked under before; the account ranking only
   // fills in behind them (and stands alone for a source with no history).
   const skipChecked = showSkipCategory && (neverBindsCategory || !!choice.skipCategoryBinding);
   const sourceCategoryIds = useSourceCategoryIds(
@@ -79,9 +80,9 @@ const NotificationBindingCard = ({
   );
   const topCategoryIds = useMemo(
     () => (skipChecked && sourceCategoryIds.length > 0
-      ? [...new Set([...sourceCategoryIds, ...globalTopCategoryIds])]
-      : globalTopCategoryIds),
-    [skipChecked, sourceCategoryIds, globalTopCategoryIds],
+      ? [...new Set([...sourceCategoryIds, ...accountTopCategoryIds])]
+      : accountTopCategoryIds),
+    [skipChecked, sourceCategoryIds, accountTopCategoryIds],
   );
 
   const accountItems = useMemo(

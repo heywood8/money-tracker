@@ -1,31 +1,30 @@
-import { useEffect, useSyncExternalStore } from 'react';
+import { useEffect, useMemo, useSyncExternalStore } from 'react';
 import * as OperationsDB from '../services/OperationsDB';
 import { appEvents, EVENTS } from '../services/eventEmitter';
 
 /**
- * One shared load per limit, however many components ask for it.
+ * One shared load of the usage history, however many components ask for it.
  *
  * The Operations screen alone mounted two independent consumers — the quick-add
- * form's category shortcuts and this hook — so every operation change issued
- * `getTopCategoriesFromLastMonth(10)` twice, for identical results. The stores
- * live at module scope, keyed by limit, so a second consumer joins the first
- * one's load instead of starting its own.
+ * form's category shortcuts and the notification binding card — so every
+ * operation change used to issue the same query twice, for identical results.
+ * The store lives at module scope, so a second consumer joins the first one's
+ * load instead of starting its own. It holds the raw per-account usage rows;
+ * each consumer ranks them for its own limit and account (see
+ * `rankTopCategoryIds`), which costs no query.
  */
-const stores = new Map();
+let sharedStore = null;
 
-const getStore = (limitPerType) => {
-  let store = stores.get(limitPerType);
-  if (store) return store;
-
-  store = {
-    ids: [],
+const createStore = () => {
+  const store = {
+    rows: [],
     loaded: false,
     inFlight: null,
     restartPending: false,
     listeners: new Set(),
     unsubscribeEvents: null,
 
-    getSnapshot: () => store.ids,
+    getSnapshot: () => store.rows,
 
     // The store — not each consumer — listens for the events that invalidate it.
     // Per-consumer subscriptions meant one event produced one refresh PER mounted
@@ -48,7 +47,7 @@ const getStore = (limitPerType) => {
     },
 
     /**
-     * Make sure the ids are loaded, joining a load already in flight rather than
+     * Make sure the rows are loaded, joining a load already in flight rather than
      * starting a second one. This is what a mounting consumer calls: several of
      * them arriving in the same commit must cost one query, not one each.
      */
@@ -76,12 +75,12 @@ const getStore = (limitPerType) => {
 
     load: () => {
       store.restartPending = false;
-      store.inFlight = OperationsDB.getTopCategoriesFromLastMonth(limitPerType)
+      store.inFlight = OperationsDB.getRecentCategoryUsage()
         .then((rows) => {
-          store.ids = (rows || []).map(row => row.categoryId).filter(Boolean);
+          store.rows = (rows || []).filter(row => row && row.categoryId);
         })
         .catch(() => {
-          store.ids = [];
+          store.rows = [];
         })
         .finally(() => {
           store.inFlight = null;
@@ -92,40 +91,109 @@ const getStore = (limitPerType) => {
       return store.inFlight;
     },
   };
-
-  stores.set(limitPerType, store);
   return store;
+};
+
+const getStore = () => {
+  if (!sharedStore) sharedStore = createStore();
+  return sharedStore;
 };
 
 // Exported for tests: a module-level cache outlives a test's render.
 export const __resetTopCategoryStores = () => {
-  for (const store of stores.values()) {
-    store.unsubscribeEvents?.forEach(unsubscribe => unsubscribe());
+  sharedStore?.unsubscribeEvents?.forEach(unsubscribe => unsubscribe());
+  sharedStore = null;
+};
+
+const TYPES = ['expense', 'income'];
+
+// Most-used first; ties go to the most recently used. Dates are 'YYYY-MM-DD',
+// so they compare as strings.
+const byUse = (a, b) => (b.count - a.count) || b.lastDate.localeCompare(a.lastDate);
+
+/**
+ * Up to `limitPerType` category ids per type, expense ids before income ids,
+ * each run ranked by `byUse` (the rows arrive unordered). Rows for the same category from several accounts
+ * are summed, so this is the ranking across everything the rows cover.
+ */
+const rankByType = (rows, limitPerType) => {
+  const totals = new Map();
+  for (const row of rows) {
+    const key = `${row.type}|${row.categoryId}`;
+    const total = totals.get(key);
+    const lastDate = row.lastDate || '';
+    if (total) {
+      total.count += Number(row.count) || 0;
+      if (lastDate > total.lastDate) total.lastDate = lastDate;
+    } else {
+      totals.set(key, { categoryId: row.categoryId, type: row.type, count: Number(row.count) || 0, lastDate });
+    }
   }
-  stores.clear();
+  const ranked = [...totals.values()].sort(byUse);
+  return TYPES.flatMap(type => ranked
+    .filter(total => total.type === type)
+    .slice(0, limitPerType)
+    .map(total => total.categoryId));
+};
+
+/**
+ * Rank the usage rows into the ids a shortcut grid shows.
+ *
+ * With an account, what was booked from that account comes first and the
+ * ranking across all accounts fills in behind it, so a card used only for
+ * groceries offers groceries even when rent dominates overall, and an account
+ * with little history still gets a full grid. Without one, it is the ranking
+ * across all accounts alone.
+ *
+ * Account ids are compared as strings: the DB hands back integers, while a
+ * form may hold the id as a string.
+ *
+ * @param {Array<{accountId, categoryId, type, count, lastDate}>} rows
+ * @param {number} limitPerType
+ * @param {string|number|null} [accountId]
+ * @returns {string[]} ordered, de-duplicated category ids
+ */
+export const rankTopCategoryIds = (rows, limitPerType, accountId = null) => {
+  const overall = rankByType(rows, limitPerType);
+  if (accountId === null || accountId === undefined || accountId === '') return overall;
+  const wanted = String(accountId);
+  const own = rankByType(rows.filter(row => String(row.accountId) === wanted), limitPerType);
+  return [...new Set([...own, ...overall])];
 };
 
 /**
  * The ids of the most-frequently-used categories over the last 90 days, ordered
  * most-frequent first, across both expense and income (the consumer filters to
- * the type it needs). This is the same history signal the quick-add form uses
+ * the type it needs). With `accountId`, that account's own ranking leads and the
+ * overall one follows, so the first id is the account's favourite, not
+ * necessarily the most-used category overall. This is the same history signal the quick-add form uses
  * for its category shortcuts, exposed as a hook so other surfaces — e.g. the
  * notification binding card — can offer the same "All categories + top
  * shortcuts" grid instead of a flat all-categories list.
+ *
+ * Pass `accountId` to put what was booked from that account first (see
+ * `rankTopCategoryIds`). Switching it re-ranks the rows already loaded, so the
+ * grid follows an account tap at once rather than after a query.
  *
  * Stays fresh by reloading on the app-wide OPERATION_CHANGED and RELOAD_ALL
  * events (a booked/edited operation shifts the frequencies), once per event
  * however many consumers are mounted.
  *
- * @param {number} [limitPerType=10] - how many top ids to fetch per type.
+ * @param {number} [limitPerType=10] - how many top ids to rank per type. With an
+ *   account this caps the account's ranking and the overall one separately, so up
+ *   to twice as many ids per type come back (fewer where the two overlap).
+ * @param {string|number|null} [accountId] - the account the operation is booked from.
  * @returns {string[]} ordered category ids (may be empty).
  */
-export default function useTopCategoryIds(limitPerType = 10) {
-  const store = getStore(limitPerType);
+export default function useTopCategoryIds(limitPerType = 10, accountId = null) {
+  const store = getStore();
 
-  const ids = useSyncExternalStore(store.subscribe, store.getSnapshot);
+  const rows = useSyncExternalStore(store.subscribe, store.getSnapshot);
 
   useEffect(() => { store.ensureLoaded(); }, [store]);
 
-  return ids;
+  return useMemo(
+    () => rankTopCategoryIds(rows, limitPerType, accountId),
+    [rows, limitPerType, accountId],
+  );
 }

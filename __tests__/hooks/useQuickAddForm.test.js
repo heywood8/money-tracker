@@ -7,10 +7,10 @@ import { appEvents, EVENTS } from '../../app/services/eventEmitter';
 import * as PreferencesDB from '../../app/services/PreferencesDB';
 
 // Mock OperationsDB
-const mockGetTopCategories = jest.fn().mockResolvedValue([]);
+const mockGetCategoryUsage = jest.fn().mockResolvedValue([]);
 const mockGetTopTransferTargets = jest.fn().mockResolvedValue([]);
 jest.mock('../../app/services/OperationsDB', () => ({
-  getTopCategoriesFromLastMonth: (...args) => mockGetTopCategories(...args),
+  getRecentCategoryUsage: (...args) => mockGetCategoryUsage(...args),
   getTopTransferTargetAccounts: (...args) => mockGetTopTransferTargets(...args),
 }));
 
@@ -423,9 +423,9 @@ describe('useQuickAddForm', () => {
     ];
 
     it('should use history-based categories when available', async () => {
-      mockGetTopCategories.mockResolvedValue([
-        { categoryId: 'cat-e2', count: 10 },
-        { categoryId: 'cat-e4', count: 5 },
+      mockGetCategoryUsage.mockResolvedValue([
+        { accountId: 'acc-1', categoryId: 'cat-e2', type: 'expense', count: 10 },
+        { accountId: 'acc-1', categoryId: 'cat-e4', type: 'expense', count: 5 },
       ]);
 
       const { result } = await renderHook(() =>
@@ -444,7 +444,7 @@ describe('useQuickAddForm', () => {
     });
 
     it('should fall back to up to 7 leaf categories when no history for expense', async () => {
-      mockGetTopCategories.mockResolvedValue([]);
+      mockGetCategoryUsage.mockResolvedValue([]);
 
       const { result } = await renderHook(() =>
         useQuickAddForm(mockAccounts, mockAccounts, categoriesWithLeaves, mockT),
@@ -461,7 +461,7 @@ describe('useQuickAddForm', () => {
     });
 
     it('should fall back to up to 7 leaf categories when no history for income', async () => {
-      mockGetTopCategories.mockResolvedValue([]);
+      mockGetCategoryUsage.mockResolvedValue([]);
 
       const { result } = await renderHook(() =>
         useQuickAddForm(mockAccounts, mockAccounts, categoriesWithLeaves, mockT),
@@ -480,7 +480,7 @@ describe('useQuickAddForm', () => {
     });
 
     it('should exclude shadow and folder categories from fallback', async () => {
-      mockGetTopCategories.mockResolvedValue([]);
+      mockGetCategoryUsage.mockResolvedValue([]);
 
       const { result } = await renderHook(() =>
         useQuickAddForm(mockAccounts, mockAccounts, categoriesWithLeaves, mockT),
@@ -496,10 +496,10 @@ describe('useQuickAddForm', () => {
     });
 
     it('should exclude folder categories from history-based results', async () => {
-      mockGetTopCategories.mockResolvedValue([
-        { categoryId: 'cat-folder', count: 20 },
-        { categoryId: 'cat-i1', count: 10 },
-        { categoryId: 'cat-i2', count: 5 },
+      mockGetCategoryUsage.mockResolvedValue([
+        { accountId: 'acc-1', categoryId: 'cat-folder', type: 'income', count: 20 },
+        { accountId: 'acc-1', categoryId: 'cat-i1', type: 'income', count: 10 },
+        { accountId: 'acc-1', categoryId: 'cat-i2', type: 'income', count: 5 },
       ]);
 
       const { result } = await renderHook(() =>
@@ -519,7 +519,7 @@ describe('useQuickAddForm', () => {
     });
 
     it('should return empty array for transfer type even with fallback categories available', async () => {
-      mockGetTopCategories.mockResolvedValue([]);
+      mockGetCategoryUsage.mockResolvedValue([]);
 
       const { result } = await renderHook(() =>
         useQuickAddForm(mockAccounts, mockAccounts, categoriesWithLeaves, mockT),
@@ -534,9 +534,9 @@ describe('useQuickAddForm', () => {
 
     it('should prefer history over fallback when history has entries for current type', async () => {
       // History has income categories but not expense
-      mockGetTopCategories.mockResolvedValue([
-        { categoryId: 'cat-i3', count: 8 },
-        { categoryId: 'cat-i1', count: 3 },
+      mockGetCategoryUsage.mockResolvedValue([
+        { accountId: 'acc-1', categoryId: 'cat-i3', type: 'income', count: 8 },
+        { accountId: 'acc-1', categoryId: 'cat-i1', type: 'income', count: 3 },
       ]);
 
       const { result } = await renderHook(() =>
@@ -560,6 +560,81 @@ describe('useQuickAddForm', () => {
       // Filled from remaining leaf categories by id order
       expect(result.current.topCategoriesForType[2].id).toBe('cat-i2');
       expect(result.current.topCategoriesForType[3].id).toBe('cat-i4');
+    });
+    describe('Account-aware suggestions', () => {
+      beforeEach(() => {
+        PreferencesDB.getDefaultAccountId.mockResolvedValue(null);
+        LastAccount.getLastAccessedAccount.mockResolvedValue(null);
+        mockGetCategoryUsage.mockResolvedValue([
+          { accountId: 'acc-1', categoryId: 'cat-e1', type: 'expense', count: 10 },
+          { accountId: 'acc-1', categoryId: 'cat-e2', type: 'expense', count: 5 },
+          { accountId: 'acc-2', categoryId: 'cat-e3', type: 'expense', count: 2 },
+          { accountId: 'acc-2', categoryId: 'cat-i2', type: 'income', count: 1 },
+          { accountId: 'acc-1', categoryId: 'cat-i1', type: 'income', count: 7 },
+        ]);
+      });
+
+      // clearAllMocks keeps implementations, so put back what later suites expect.
+      afterEach(() => {
+        mockGetCategoryUsage.mockResolvedValue([]);
+      });
+
+      it('ranks what was booked from the selected account first', async () => {
+        const { result } = await renderHook(() =>
+          useQuickAddForm(mockAccounts, mockAccounts, categoriesWithLeaves, mockT),
+        );
+        await waitFor(() => expect(result.current.quickAddValues.accountId).toBe('acc-1'));
+
+        await act(async () => {
+          result.current.setQuickAddValues(prev => ({ ...prev, accountId: 'acc-2' }));
+        });
+
+        // acc-2's own history (cat-e3) leads; the overall ranking fills in behind
+        // it, then the leaf fillers.
+        await waitFor(() => {
+          expect(result.current.topCategoriesForType.map(c => c.id))
+            .toEqual(['cat-e3', 'cat-e1', 'cat-e2', 'cat-e4']);
+        });
+      });
+
+      it('follows an account switch back and forth without a new query', async () => {
+        const { result } = await renderHook(() =>
+          useQuickAddForm(mockAccounts, mockAccounts, categoriesWithLeaves, mockT),
+        );
+        await waitFor(() => {
+          expect(result.current.topCategoriesForType.map(c => c.id))
+            .toEqual(['cat-e1', 'cat-e2', 'cat-e3', 'cat-e4']);
+        });
+        const callsBefore = mockGetCategoryUsage.mock.calls.length;
+
+        await act(async () => {
+          result.current.setQuickAddValues(prev => ({ ...prev, accountId: 'acc-2' }));
+        });
+        expect(result.current.topCategoriesForType[0].id).toBe('cat-e3');
+
+        await act(async () => {
+          result.current.setQuickAddValues(prev => ({ ...prev, accountId: 'acc-1' }));
+        });
+        expect(result.current.topCategoriesForType[0].id).toBe('cat-e1');
+
+        expect(mockGetCategoryUsage.mock.calls.length).toBe(callsBefore);
+      });
+
+      it('applies the account to income suggestions too', async () => {
+        const { result } = await renderHook(() =>
+          useQuickAddForm(mockAccounts, mockAccounts, categoriesWithLeaves, mockT),
+        );
+        await waitFor(() => expect(result.current.quickAddValues.accountId).toBe('acc-1'));
+
+        await act(async () => {
+          result.current.setQuickAddValues(prev => ({ ...prev, type: 'income', accountId: 'acc-2' }));
+        });
+
+        await waitFor(() => {
+          expect(result.current.topCategoriesForType.map(c => c.id))
+            .toEqual(['cat-i2', 'cat-i1', 'cat-i3', 'cat-i4']);
+        });
+      });
     });
   });
 
@@ -1216,13 +1291,13 @@ describe('useQuickAddForm', () => {
 
   describe('event subscription', () => {
     it('reloads suggestions when OPERATION_CHANGED fires', async () => {
-      mockGetTopCategories.mockResolvedValue([]);
+      mockGetCategoryUsage.mockResolvedValue([]);
       mockGetTopTransferTargets.mockResolvedValue([]);
 
       await renderHook(() => useQuickAddForm(mockAccounts, mockAccounts, mockCategories, mockT));
 
       await waitFor(() => {
-        expect(mockGetTopCategories).toHaveBeenCalledTimes(1);
+        expect(mockGetCategoryUsage).toHaveBeenCalledTimes(1);
       });
 
       await act(async () => {
@@ -1230,12 +1305,12 @@ describe('useQuickAddForm', () => {
       });
 
       await waitFor(() => {
-        expect(mockGetTopCategories).toHaveBeenCalledTimes(2);
+        expect(mockGetCategoryUsage).toHaveBeenCalledTimes(2);
       });
     });
 
     it('cleans up event subscription on unmount', async () => {
-      mockGetTopCategories.mockResolvedValue([]);
+      mockGetCategoryUsage.mockResolvedValue([]);
       mockGetTopTransferTargets.mockResolvedValue([]);
 
       const { unmount } = await renderHook(() =>
@@ -1243,27 +1318,27 @@ describe('useQuickAddForm', () => {
       );
 
       await waitFor(() => {
-        expect(mockGetTopCategories).toHaveBeenCalledTimes(1);
+        expect(mockGetCategoryUsage).toHaveBeenCalledTimes(1);
       });
 
       await unmount();
-      mockGetTopCategories.mockClear();
+      mockGetCategoryUsage.mockClear();
 
       await act(async () => {
         appEvents.emit(EVENTS.OPERATION_CHANGED);
       });
 
-      expect(mockGetTopCategories).not.toHaveBeenCalled();
+      expect(mockGetCategoryUsage).not.toHaveBeenCalled();
     });
 
     it('reloads suggestions when RELOAD_ALL fires', async () => {
-      mockGetTopCategories.mockResolvedValue([]);
+      mockGetCategoryUsage.mockResolvedValue([]);
       mockGetTopTransferTargets.mockResolvedValue([]);
 
       await renderHook(() => useQuickAddForm(mockAccounts, mockAccounts, mockCategories, mockT));
 
       await waitFor(() => {
-        expect(mockGetTopCategories).toHaveBeenCalledTimes(1);
+        expect(mockGetCategoryUsage).toHaveBeenCalledTimes(1);
       });
 
       await act(async () => {
@@ -1271,12 +1346,12 @@ describe('useQuickAddForm', () => {
       });
 
       await waitFor(() => {
-        expect(mockGetTopCategories).toHaveBeenCalledTimes(2);
+        expect(mockGetCategoryUsage).toHaveBeenCalledTimes(2);
       });
     });
 
     it('cleans up RELOAD_ALL subscription on unmount', async () => {
-      mockGetTopCategories.mockResolvedValue([]);
+      mockGetCategoryUsage.mockResolvedValue([]);
       mockGetTopTransferTargets.mockResolvedValue([]);
 
       const { unmount } = await renderHook(() =>
@@ -1284,17 +1359,17 @@ describe('useQuickAddForm', () => {
       );
 
       await waitFor(() => {
-        expect(mockGetTopCategories).toHaveBeenCalledTimes(1);
+        expect(mockGetCategoryUsage).toHaveBeenCalledTimes(1);
       });
 
       await unmount();
-      mockGetTopCategories.mockClear();
+      mockGetCategoryUsage.mockClear();
 
       await act(async () => {
         appEvents.emit(EVENTS.RELOAD_ALL);
       });
 
-      expect(mockGetTopCategories).not.toHaveBeenCalled();
+      expect(mockGetCategoryUsage).not.toHaveBeenCalled();
     });
   });
 });

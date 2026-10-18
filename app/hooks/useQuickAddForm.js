@@ -219,11 +219,14 @@ const useQuickAddForm = (visibleAccounts, accounts, categories, t) => {
     return displayName || t('select_category');
   }, [categories, t]);
 
-  // Top most used categories (fetch extra to account for type filtering). Shared
-  // with every other consumer of the same history signal — this hook used to
-  // issue getTopCategoriesFromLastMonth(10) itself, so the Operations screen ran
-  // the identical query twice on mount and again on every operation change.
-  const topCategoryIds = useTopCategoryIds(10);
+  // Top most used categories (10 per type, more than the 8 slots, so folders and
+  // shadow categories dropped below still leave a full grid), with what was
+  // booked from the selected account first: a card used for groceries
+  // and a cash wallet used for coffee should not offer the same shortcuts. The
+  // history is shared with every other consumer of the same signal — this hook
+  // used to issue its own query, so the Operations screen ran the identical
+  // query twice on mount and again on every operation change.
+  const topCategoryIds = useTopCategoryIds(10, quickAddValues.accountId);
 
   // Top transfer target accounts from last 90 days
   const [topTransferTargets, setTopTransferTargets] = useState([]);
