@@ -197,6 +197,16 @@ describe('NotificationBindingStack', () => {
     expect(queryByTestId('category-grid-c1')).toBeNull();
   });
 
+  it('ranks the category shortcuts by the account chosen on the card', async () => {
+    // Same signal as the quick-add form it sits over: what was booked from the
+    // chosen account comes first.
+    const useTopCategoryIds = require('../../../app/hooks/useTopCategoryIds').default;
+    await renderStack({
+      choices: { p1: { accountId: 3, categoryId: 'c1', toAccountId: null, labelOverride: '' } },
+    });
+    expect(useTopCategoryIds).toHaveBeenLastCalledWith(10, 3);
+  });
+
   it('shows a converted-amount preview when the chosen account currency differs', async () => {
     const { getByText } = await renderStack({
       choices: { p1: { accountId: 3, categoryId: 'c1', toAccountId: null, labelOverride: '' } },

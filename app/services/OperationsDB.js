@@ -2304,11 +2304,10 @@ export const getMonthlyTotalsHistoryByCategories = async (
 };
 
 /**
- * Get top N most frequently used categories per type from the last 3 months.
- * Returns top categories for both expense and income types, ensuring
- * each type is represented independently.
- * @param {number} limitPerType - Number of top categories per type (default: 3)
- * @returns {Promise<Array<{categoryId: string, count: number}>>} Array of category IDs with usage count
+ * The accounts transfers went to most often over the last 90 days (today
+ * included), most-used first.
+ * @param {number} [limit=3] - how many target accounts to return
+ * @returns {Promise<Array<{accountId: number, count: number}>>}
  */
 export const getTopTransferTargetAccounts = async (limit = 3) => {
   try {
@@ -2361,46 +2360,44 @@ export const getTopSourceCurrencies = async (limit = 5) => {
   }
 };
 
-export const getTopCategoriesFromLastMonth = async (limitPerType = 3) => {
+/**
+ * How often each category was booked from each account over the last 90 days
+ * (today included): one row per account, category and type, with its use count
+ * and the day it was last used.
+ *
+ * Unranked and unlimited on purpose. The quick-add shortcuts rank by the account
+ * the operation is booked from and fall back to the ranking across all accounts,
+ * so both come out of this one result in JS. Ranking in SQL instead meant a query
+ * per account, and a shortcut grid that reshuffled a moment after every account
+ * tap while that account's query ran. The result stays small: one row per
+ * account and category actually used in the window.
+ *
+ * @returns {Promise<Array<{accountId: number, categoryId: string, type: string,
+ *   count: number, lastDate: string}>>}
+ */
+export const getRecentCategoryUsage = async () => {
   try {
-    // Calculate date range for last 90 days (includes today)
     const now = new Date();
     const ninetyDaysAgo = new Date(now.getFullYear(), now.getMonth(), now.getDate() - 90);
 
-    const startDateStr = formatLocalDate(ninetyDaysAgo);
-    const endDateStr = formatLocalDate(now);
-
-    // Fetch top categories per type using UNION ALL so both expense and
-    // income categories are represented independently
     const results = await queryAll(
-      `SELECT category_id, count FROM (
-         SELECT category_id, COUNT(*) as count
-         FROM operations
-         WHERE date >= ? AND date <= ?
-           AND category_id IS NOT NULL AND type = 'expense'
-         GROUP BY category_id
-         ORDER BY count DESC
-         LIMIT ?
-       )
-       UNION ALL
-       SELECT category_id, count FROM (
-         SELECT category_id, COUNT(*) as count
-         FROM operations
-         WHERE date >= ? AND date <= ?
-           AND category_id IS NOT NULL AND type = 'income'
-         GROUP BY category_id
-         ORDER BY count DESC
-         LIMIT ?
-       )`,
-      [startDateStr, endDateStr, limitPerType, startDateStr, endDateStr, limitPerType],
+      `SELECT account_id, category_id, type, COUNT(*) as count, MAX(date) as last_date
+       FROM operations
+       WHERE date >= ? AND date <= ?
+         AND category_id IS NOT NULL AND type IN ('expense', 'income')
+       GROUP BY account_id, category_id, type`,
+      [formatLocalDate(ninetyDaysAgo), formatLocalDate(now)],
     );
 
     return (results || []).map(row => ({
+      accountId: row.account_id,
       categoryId: row.category_id,
+      type: row.type,
       count: row.count,
+      lastDate: row.last_date,
     }));
   } catch (error) {
-    console.error('Failed to get top categories from last month:', error);
+    console.error('Failed to get recent category usage:', error);
     throw error;
   }
 };

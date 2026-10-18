@@ -1596,24 +1596,59 @@ describe('OperationsDB Service', () => {
       });
     });
 
-    it('gets top categories from last 3 months', async () => {
-      const mockResults = [
-        { category_id: 'cat1', count: 15 },
-        { category_id: 'cat2', count: 10 },
-        { category_id: 'cat3', count: 8 },
-      ];
-      queryAll.mockResolvedValue(mockResults);
+    describe('getRecentCategoryUsage', () => {
+      it('maps one row per account, category and type', async () => {
+        queryAll.mockResolvedValue([
+          { account_id: 1, category_id: 'food', type: 'expense', count: 15, last_date: '2026-09-02' },
+          { account_id: 2, category_id: 'salary', type: 'income', count: 2, last_date: '2026-09-01' },
+        ]);
 
-      const result = await OperationsDB.getTopCategoriesFromLastMonth(3);
+        const result = await OperationsDB.getRecentCategoryUsage();
 
-      expect(queryAll).toHaveBeenCalledWith(
-        expect.stringContaining('COUNT(*) as count'),
-        expect.arrayContaining([expect.any(String), expect.any(String), 3]),
-      );
-      expect(result).toHaveLength(3);
-      expect(result[0]).toEqual({ categoryId: 'cat1', count: 15 });
-      expect(result[1]).toEqual({ categoryId: 'cat2', count: 10 });
-      expect(result[2]).toEqual({ categoryId: 'cat3', count: 8 });
+        expect(result).toEqual([
+          { accountId: 1, categoryId: 'food', type: 'expense', count: 15, lastDate: '2026-09-02' },
+          { accountId: 2, categoryId: 'salary', type: 'income', count: 2, lastDate: '2026-09-01' },
+        ]);
+      });
+
+      it('groups by account so the quick-add form can rank by the account it books from', async () => {
+        queryAll.mockResolvedValue([]);
+        await OperationsDB.getRecentCategoryUsage();
+
+        const [sql] = queryAll.mock.calls[0];
+        expect(sql).toContain('GROUP BY account_id, category_id, type');
+        expect(sql).toContain('category_id IS NOT NULL');
+        expect(sql).toContain("type IN ('expense', 'income')");
+        expect(sql).toContain('MAX(date) as last_date');
+        // Unlimited: per-account ranking happens in JS, and a SQL limit would cut
+        // an account's own history off before it was ranked.
+        expect(sql).not.toContain('LIMIT');
+      });
+
+      it('returns [] when there are no operations in the window', async () => {
+        queryAll.mockResolvedValue([]);
+        expect(await OperationsDB.getRecentCategoryUsage()).toEqual([]);
+      });
+
+      it('rethrows a query failure', async () => {
+        queryAll.mockRejectedValue(new Error('db down'));
+        const spy = jest.spyOn(console, 'error').mockImplementation(() => {});
+        await expect(OperationsDB.getRecentCategoryUsage()).rejects.toThrow('db down');
+        spy.mockRestore();
+      });
+
+      it('queries the last 90 days including today', async () => {
+        queryAll.mockResolvedValue([]);
+
+        await OperationsDB.getRecentCategoryUsage();
+
+        const [, params] = queryAll.mock.calls[0];
+        const now = new Date();
+        const ninetyDaysAgo = new Date(now.getFullYear(), now.getMonth(), now.getDate() - 90);
+        const fmt = (d) => `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}-${String(d.getDate()).padStart(2, '0')}`;
+
+        expect(params).toEqual([fmt(ninetyDaysAgo), fmt(now)]);
+      });
     });
 
     describe('getCategoryIdsForPayees', () => {
@@ -1684,86 +1719,6 @@ describe('OperationsDB Service', () => {
       });
     });
 
-    it('returns empty array when no operations in last 3 months', async () => {
-      queryAll.mockResolvedValue([]);
-
-      const result = await OperationsDB.getTopCategoriesFromLastMonth(3);
-
-      expect(result).toEqual([]);
-    });
-
-    it('uses custom limit per type for top categories', async () => {
-      const mockResults = [
-        { category_id: 'cat1', count: 15 },
-        { category_id: 'cat2', count: 10 },
-        { category_id: 'cat3', count: 8 },
-        { category_id: 'cat4', count: 5 },
-        { category_id: 'cat5', count: 3 },
-      ];
-      queryAll.mockResolvedValue(mockResults);
-
-      const result = await OperationsDB.getTopCategoriesFromLastMonth(5);
-
-      expect(queryAll).toHaveBeenCalledWith(
-        expect.any(String),
-        expect.arrayContaining([expect.any(String), expect.any(String), 5]),
-      );
-      expect(result).toHaveLength(5);
-    });
-
-    it('queries expense and income types separately using UNION ALL', async () => {
-      queryAll.mockResolvedValue([]);
-      await OperationsDB.getTopCategoriesFromLastMonth(3);
-
-      const sql = queryAll.mock.calls[0][0];
-      expect(sql).toContain('category_id IS NOT NULL');
-      expect(sql).toContain("type = 'expense'");
-      expect(sql).toContain("type = 'income'");
-      expect(sql).toContain('UNION ALL');
-    });
-
-    it('passes limit per type (duplicated for expense and income sub-queries)', async () => {
-      queryAll.mockResolvedValue([]);
-      await OperationsDB.getTopCategoriesFromLastMonth(4);
-
-      const [, params] = queryAll.mock.calls[0];
-      // params: [startDate, endDate, limitExpense, startDate, endDate, limitIncome]
-      expect(params).toHaveLength(6);
-      expect(params[2]).toBe(4);
-      expect(params[5]).toBe(4);
-    });
-
-    it('queries last 90 days including today', async () => {
-      queryAll.mockResolvedValue([]);
-
-      await OperationsDB.getTopCategoriesFromLastMonth(3);
-
-      const [, params] = queryAll.mock.calls[0];
-      const [startDateStr, endDateStr] = params;
-
-      const now = new Date();
-      const ninetyDaysAgo = new Date(now.getFullYear(), now.getMonth(), now.getDate() - 90);
-
-      const expectedStart = `${ninetyDaysAgo.getFullYear()}-${String(ninetyDaysAgo.getMonth() + 1).padStart(2, '0')}-${String(ninetyDaysAgo.getDate()).padStart(2, '0')}`;
-      const expectedEnd = `${now.getFullYear()}-${String(now.getMonth() + 1).padStart(2, '0')}-${String(now.getDate()).padStart(2, '0')}`;
-
-      expect(startDateStr).toBe(expectedStart);
-      expect(endDateStr).toBe(expectedEnd);
-    });
-
-    it('includes operations from today in top categories query', async () => {
-      queryAll.mockResolvedValue([]);
-
-      await OperationsDB.getTopCategoriesFromLastMonth(3);
-
-      const [, params] = queryAll.mock.calls[0];
-      const endDateStr = params[1];
-
-      const now = new Date();
-      const todayStr = `${now.getFullYear()}-${String(now.getMonth() + 1).padStart(2, '0')}-${String(now.getDate()).padStart(2, '0')}`;
-
-      expect(endDateStr).toBe(todayStr);
-    });
   });
 
   describe('Utility Functions', () => {
