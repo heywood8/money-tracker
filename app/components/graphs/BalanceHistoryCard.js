@@ -335,6 +335,8 @@ export const computeBalanceChart = ({
 
   let actualDailyAvg = null;
   if (spendingPrediction && isCurrentMonth) {
+    // The rate the forecast runs at (the trailing 30-day average, see
+    // utils/spendingPrediction), so this row's Daily Avg and End agree.
     actualDailyAvg = -spendingPrediction.dailyAverage;
   } else if (actualValues.length >= 1) {
     const actualDataPoints = balanceHistoryData.actual || [];

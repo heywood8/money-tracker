@@ -4203,4 +4203,25 @@ describe('OperationsDB Service', () => {
       expect(await OperationsDB.getEarliestTrendMonth()).toBeNull();
     });
   });
+
+  describe('getFirstOperationDate', () => {
+    it('returns the day of the account\'s first operation, either side of a transfer', async () => {
+      queryAll.mockResolvedValue([{ first_date: '2024-05-10' }]);
+
+      const result = await OperationsDB.getFirstOperationDate('acc1');
+
+      const [sql, params] = queryAll.mock.calls[0];
+      expect(sql).toContain('account_id = ? OR to_account_id = ?');
+      // date() trims an imported timestamp to its day before MIN compares (#773).
+      expect(sql).toContain('MIN(date(date))');
+      expect(params).toEqual(['acc1', 'acc1']);
+      expect(result).toBe('2024-05-10');
+    });
+
+    it('returns null for an account with no operations', async () => {
+      queryAll.mockResolvedValue([{ first_date: null }]);
+
+      expect(await OperationsDB.getFirstOperationDate('acc1')).toBeNull();
+    });
+  });
 });

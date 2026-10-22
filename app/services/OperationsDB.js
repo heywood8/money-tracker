@@ -1160,6 +1160,33 @@ export const getMonthlyExpenseTotals = async (accountId, startDate, endDate) => 
 };
 
 /**
+ * Calendar day of the first operation an account took part in, on either side of
+ * a transfer.
+ *
+ * Unfiltered on purpose: a balance adjustment or a chart-hidden operation still
+ * shows the account was being tracked that day. Consumed by the spending
+ * forecast, which spreads its trailing window only over days the account existed
+ * (see utils/spendingPrediction).
+ *
+ * @param {string} accountId
+ * @returns {Promise<string|null>} 'YYYY-MM-DD', or null when the account has none
+ */
+export const getFirstOperationDate = async (accountId) => {
+  try {
+    // date() trims an imported timestamp tail to its calendar day (#773).
+    const rows = await queryAll(
+      `SELECT MIN(date(date)) AS first_date FROM operations
+       WHERE account_id = ? OR to_account_id = ?`,
+      [accountId, accountId],
+    );
+    return rows?.[0]?.first_date || null;
+  } catch (error) {
+    console.error('Failed to get first operation date:', error);
+    throw error;
+  }
+};
+
+/**
  * Get total income for account in date range
  * @param {string} accountId
  * @param {string} startDate
