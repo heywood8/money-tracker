@@ -1,5 +1,12 @@
 # Changelog
 
+## [0.298.0](https://github.com/heywood8/money-tracker/compare/penny-v0.297.0...penny-v0.298.0) (2026-10-22)
+
+
+### Features
+
+* **graphs:** forecast spending from the last 30 days ([#1868](https://github.com/heywood8/money-tracker/issues/1868)) ([7e7dcc4](https://github.com/heywood8/money-tracker/commit/7e7dcc4c6f280fdb9671bc9f52cb0f283f8d4d5b))
+
 ## [0.297.0](https://github.com/heywood8/money-tracker/compare/penny-v0.296.0...penny-v0.297.0) (2026-10-18)
 
 
