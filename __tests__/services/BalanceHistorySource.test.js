@@ -28,6 +28,7 @@ import {
   getTransferTotals,
   getMonthlyExpenseTotals,
   getAccountDayDeltas,
+  getFirstOperationDate,
   fetchRatesToTarget,
   convertWithRateMap,
 } from '../../app/services/OperationsDB';
@@ -45,6 +46,7 @@ jest.mock('../../app/services/OperationsDB', () => ({
   getTransferTotals: jest.fn(),
   getMonthlyExpenseTotals: jest.fn(),
   getAccountDayDeltas: jest.fn(),
+  getFirstOperationDate: jest.fn(),
   fetchRatesToTarget: jest.fn(),
   convertWithRateMap: jest.fn(),
 }));
@@ -191,6 +193,7 @@ describe('BalanceHistorySource', () => {
       await source.getTransferTotals('2024-01-02', '2024-01-31');
       await source.getMonthlyExpenseTotals('2023-01-01', '2023-12-31');
       await source.getDayDeltas('2024-01-01');
+      await source.getFirstOperationDate();
 
       expect(source.isNetWorth).toBe(false);
       expect(getBalanceHistory).toHaveBeenCalledWith('account-1', '2024-01-01', '2024-01-31');
@@ -200,6 +203,7 @@ describe('BalanceHistorySource', () => {
       expect(getTransferTotals).toHaveBeenCalledWith('account-1', '2024-01-02', '2024-01-31');
       expect(getMonthlyExpenseTotals).toHaveBeenCalledWith('account-1', '2023-01-01', '2023-12-31');
       expect(getAccountDayDeltas).toHaveBeenCalledWith('account-1', '2024-01-01');
+      expect(getFirstOperationDate).toHaveBeenCalledWith('account-1');
       expect(fetchRatesToTarget).not.toHaveBeenCalled();
     });
   });
@@ -306,6 +310,33 @@ describe('BalanceHistorySource', () => {
         '2023-11': '1000.00',
         '2023-12': '4000.00',
       });
+    });
+
+    it('dates the portfolio from its oldest account\'s first operation', async () => {
+      stubRates({ USD: '400' });
+      getFirstOperationDate.mockImplementation(async (accountId) => (accountId === 'a' ? '2024-05-10' : '2023-11-02'));
+
+      const source = createNetWorthSource(accounts, 'AMD');
+
+      await expect(source.getFirstOperationDate()).resolves.toBe('2023-11-02');
+    });
+
+    it('skips accounts with no operations when dating the portfolio', async () => {
+      stubRates({ USD: '400' });
+      getFirstOperationDate.mockImplementation(async (accountId) => (accountId === 'a' ? null : '2024-05-10'));
+
+      await expect(createNetWorthSource(accounts, 'AMD').getFirstOperationDate()).resolves.toBe('2024-05-10');
+      await expect(createNetWorthSource([], 'AMD').getFirstOperationDate()).resolves.toBeNull();
+    });
+
+    it('does not date the portfolio from an account left out of its totals', async () => {
+      // No USD rate: account b's spending is dropped, so its older history must
+      // not stretch the window the remaining spending is averaged over.
+      stubRates({});
+      getFirstOperationDate.mockImplementation(async (accountId) => (accountId === 'a' ? '2024-05-10' : '2020-01-01'));
+
+      await expect(createNetWorthSource(accounts, 'AMD').getFirstOperationDate()).resolves.toBe('2024-05-10');
+      expect(getFirstOperationDate).not.toHaveBeenCalledWith('b');
     });
 
     it('orders one day\'s deltas across accounts and converts each into the display currency', async () => {

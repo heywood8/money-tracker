@@ -1,14 +1,15 @@
 /**
  * Balance History Source
  *
- * The balance chart reads seven things about "the thing being charted": its daily
+ * The balance chart reads eight things about "the thing being charted": its daily
  * snapshots, its balance carried in from before a window, its expenses, its
- * income, its transfers, its expenses bucketed by month, and the ordered balance
- * moves of a single day. For a single account each is one query. For the *net
- * worth* selection — every account at once — each is the same query per account,
- * with every foreign-currency figure converted to one display currency and summed.
+ * income, its transfers, its expenses bucketed by month, the ordered balance
+ * moves of a single day, and the day its first operation happened. For a single
+ * account each is one query. For the *net worth* selection — every account at
+ * once — each is the same query per account, with every foreign-currency figure
+ * converted to one display currency and summed.
  *
- * Both shapes are exposed as the same seven-method object so the hook that drives
+ * Both shapes are exposed as the same eight-method object so the hook that drives
  * the chart asks the same questions either way and never branches on which one
  * it is holding.
  */
@@ -25,6 +26,7 @@ import {
   getTransferTotals,
   getMonthlyExpenseTotals,
   getAccountDayDeltas,
+  getFirstOperationDate,
   fetchRatesToTarget,
   convertWithRateMap,
 } from './OperationsDB';
@@ -111,10 +113,11 @@ export const createSingleAccountSource = (accountId) => ({
   getTransferTotals: (startDate, endDate) => getTransferTotals(accountId, startDate, endDate),
   getMonthlyExpenseTotals: (startDate, endDate) => getMonthlyExpenseTotals(accountId, startDate, endDate),
   getDayDeltas: async (date) => (await getAccountDayDeltas(accountId, date)).map(row => row.delta),
+  getFirstOperationDate: () => getFirstOperationDate(accountId),
 });
 
 /**
- * The net-worth source: the same seven questions asked of every account and summed
+ * The net-worth source: the same eight questions asked of every account and summed
  * in `targetCurrency`.
  *
  * The rate map is fetched once and shared by every method of a given source, so a
@@ -277,6 +280,15 @@ export const createNetWorthSource = (accounts, targetCurrency) => {
         });
       });
       return merged;
+    },
+
+    // The portfolio has been tracked since its oldest account's first operation.
+    // An account with no rate adds nothing to the totals, so it doesn't date them.
+    getFirstOperationDate: async () => {
+      const rateMap = await rates();
+      const counted = list.filter(acc => convert('0', acc.currency, rateMap) !== null);
+      const dates = await Promise.all(counted.map(acc => getFirstOperationDate(acc.id)));
+      return dates.filter(Boolean).sort()[0] || null;
     },
 
   };

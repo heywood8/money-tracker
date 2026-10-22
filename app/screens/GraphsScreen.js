@@ -21,6 +21,7 @@ import {
   fullYearKeyOf, isFullYearKey,
 } from '../utils/monthUtils';
 import { TIMING_ENTER } from '../utils/motion';
+import { computeSpendingPrediction } from '../utils/spendingPrediction';
 import BalanceHistoryCard from '../components/graphs/BalanceHistoryCard';
 import CategoryBackChip from '../components/graphs/CategoryBackChip';
 import { chartTransition, CHART_DROP } from '../components/graphs/chartTransitions';
@@ -359,64 +360,20 @@ const GraphsScreen = () => {
   // totalExpenses from useExpenseData covers all accounts in the currency (by design),
   // but the forecast line on the balance history chart must reflect only the selected account.
   const accountTotalExpenses = parseFloat(balanceHistoryData.currentMonthTotalExpenses ?? 0) || 0;
+  // The forecast's daily rate: the account's spending over the last 30 days
+  // (see utils/spendingPrediction). Absent outside the running month.
+  const accountRecentExpenses = balanceHistoryData.recentTotalExpenses == null
+    ? null
+    : parseFloat(balanceHistoryData.recentTotalExpenses) || 0;
+  const accountRecentDays = balanceHistoryData.recentExpenseDays ?? null;
 
-  // Calculate spending prediction
-  const spendingPrediction = useMemo(() => {
-    if (accountTotalExpenses === 0) {
-      return null; // No spending data yet
-    }
-
-    // Don't show prediction for full year view
-    if (selectedMonth === null) {
-      return null;
-    }
-
-    const now = new Date();
-    const currentYear = now.getFullYear();
-    const currentMonth = now.getMonth();
-
-    // If viewing a past month, don't show prediction
-    if (selectedYear < currentYear || (selectedYear === currentYear && selectedMonth < currentMonth)) {
-      return null;
-    }
-
-    // If viewing a future month, don't show prediction
-    if (selectedYear > currentYear || (selectedYear === currentYear && selectedMonth > currentMonth)) {
-      return null;
-    }
-
-    // Calculate days in the selected month
-    const daysInMonth = new Date(selectedYear, selectedMonth + 1, 0).getDate();
-
-    // Days elapsed includes today: the expense total feeding this prediction
-    // covers the 1st through today, so the denominator must span the same days
-    // (dividing by currentDay - 1 would inflate the average every day).
-    const currentDay = now.getDate();
-    const daysElapsed = currentDay;
-
-    if (daysElapsed < 1) {
-      return null;
-    }
-
-    // Calculate daily average
-    const dailyAverage = accountTotalExpenses / daysElapsed;
-
-    // Predict total spending by month end
-    const predictedTotal = dailyAverage * daysInMonth;
-
-    // Calculate percentage of month elapsed
-    const percentElapsed = (daysElapsed / daysInMonth) * 100;
-
-    return {
-      currentSpending: accountTotalExpenses,
-      predictedTotal,
-      predictedRemaining: predictedTotal - accountTotalExpenses,
-      dailyAverage,
-      daysElapsed,
-      daysInMonth,
-      percentElapsed,
-    };
-  }, [accountTotalExpenses, selectedYear, selectedMonth]);
+  const spendingPrediction = useMemo(() => computeSpendingPrediction({
+    monthToDateExpenses: accountTotalExpenses,
+    recentExpenses: accountRecentExpenses,
+    recentDays: accountRecentDays,
+    selectedYear,
+    selectedMonth,
+  }), [accountTotalExpenses, accountRecentExpenses, accountRecentDays, selectedYear, selectedMonth]);
 
   // Calculate if the selected period is the current month
   const isCurrentMonth = useMemo(() => {

@@ -9,6 +9,7 @@ import useBalanceHistory, {
 } from '../../app/hooks/useBalanceHistory';
 import * as BalanceHistoryDB from '../../app/services/BalanceHistoryDB';
 import * as OperationsDB from '../../app/services/OperationsDB';
+import { formatLocalDate } from '../../app/utils/dateUtils';
 
 // Mock the BalanceHistoryDB service
 jest.mock('../../app/services/BalanceHistoryDB', () => ({
@@ -31,6 +32,7 @@ jest.mock('../../app/services/OperationsDB', () => ({
   getTransferTotals: jest.fn(),
   getMonthlyExpenseTotals: jest.fn(),
   getAccountDayDeltas: jest.fn(),
+  getFirstOperationDate: jest.fn(),
 }));
 
 describe('useBalanceHistory', () => {
@@ -50,6 +52,8 @@ describe('useBalanceHistory', () => {
     OperationsDB.getMonthlyExpenseTotals.mockResolvedValue({});
     // Day-1 intraday walk (the day-zero peak): no operations unless a test says so.
     OperationsDB.getAccountDayDeltas.mockResolvedValue([]);
+    // Spending forecast window: an account older than the window by default.
+    OperationsDB.getFirstOperationDate.mockResolvedValue(null);
     BalanceHistoryDB.getAccountBalanceOnOrBeforeDate.mockResolvedValue(null);
     // Mock console.error to suppress error logs in tests
     jest.spyOn(console, 'error').mockImplementation(() => {});
@@ -714,6 +718,65 @@ describe('useBalanceHistory', () => {
       });
     });
   });
+  describe('Spending forecast window', () => {
+    // The forecast's daily rate is the last 30 days' spending, not the month's so
+    // far, so one big expense early in the month doesn't dominate it. Dates are
+    // read when each test runs, as the hook reads its own, not at collection.
+    const daysAgo = (days) => {
+      const now = new Date();
+      return formatLocalDate(new Date(now.getFullYear(), now.getMonth(), now.getDate() - days));
+    };
+
+    const loadCurrentMonth = async () => {
+      const now = new Date();
+      BalanceHistoryDB.getBalanceHistory.mockResolvedValue([]);
+      const { result } = await renderHook(() => useBalanceHistory(mockAccountId, now.getFullYear(), now.getMonth()));
+      await act(async () => {
+        await result.current.loadBalanceHistory();
+      });
+      await waitFor(() => {
+        expect(result.current.loadingBalanceHistory).toBe(false);
+      });
+      return result;
+    };
+
+    it('totals the last 30 days up to today for the running month', async () => {
+      const windowStartStr = daysAgo(29);
+      OperationsDB.getTotalExpenses.mockImplementation(async (_id, start) => (start === windowStartStr ? '6000' : '0'));
+      OperationsDB.getFirstOperationDate.mockResolvedValue('2020-01-01');
+
+      const result = await loadCurrentMonth();
+
+      expect(OperationsDB.getTotalExpenses).toHaveBeenCalledWith(mockAccountId, windowStartStr, daysAgo(0));
+      expect(OperationsDB.getFirstOperationDate).toHaveBeenCalledWith(mockAccountId);
+      expect(result.current.balanceHistoryData.recentTotalExpenses).toBe('6000');
+      expect(result.current.balanceHistoryData.recentExpenseDays).toBe(30);
+    });
+
+    it('spreads the window only over the days a younger account existed', async () => {
+      OperationsDB.getFirstOperationDate.mockResolvedValue(daysAgo(9));
+
+      const result = await loadCurrentMonth();
+
+      expect(result.current.balanceHistoryData.recentExpenseDays).toBe(10);
+    });
+
+    it('skips both reads for a month that is not running', async () => {
+      BalanceHistoryDB.getBalanceHistory.mockResolvedValue([]);
+      const { result } = await renderHook(() => useBalanceHistory(mockAccountId, mockYear, mockMonth));
+
+      await act(async () => {
+        await result.current.loadBalanceHistory();
+      });
+
+      // Only the previous and the selected month's totals.
+      expect(OperationsDB.getTotalExpenses).toHaveBeenCalledTimes(2);
+      expect(OperationsDB.getFirstOperationDate).not.toHaveBeenCalled();
+      expect(result.current.balanceHistoryData.recentTotalExpenses).toBeNull();
+      expect(result.current.balanceHistoryData.recentExpenseDays).toBeNull();
+    });
+  });
+
   describe('Day-zero peak (first day of the month)', () => {
     // A day's snapshot is its *closing* balance, so a month that opened on 100k
     // and spent 20k on the 1st recorded 80k and lost the 100k entirely. Walking

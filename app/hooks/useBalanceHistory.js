@@ -5,6 +5,7 @@ import { appEvents, EVENTS } from '../services/eventEmitter';
 import { useTabFocusedEvent } from '../contexts/TabFocusContext';
 import * as Currency from '../services/currency';
 import { normalizeDecimalComma } from '../utils/amountInput';
+import { spendingWindowStart, spendingWindowDays } from '../utils/spendingPrediction';
 
 // Median of a numeric list; even counts average the two middle values.
 // Exported for unit testing.
@@ -436,6 +437,12 @@ const useBalanceHistory = (selectedAccount, selectedYear, selectedMonth, options
       // month) must not inflate the average.
       const expenseEndStr = isCurrentMonth ? formatDate(now) : endDateStr;
 
+      // The forecast's daily rate comes from the last 30 days rather than the
+      // month so far, so a big expense early in the month doesn't dominate it
+      // (see utils/spendingPrediction). Only the running month has a forecast,
+      // so the other months skip both reads.
+      const recentStartStr = formatDate(spendingWindowStart(now));
+
       // Burndown ("plain avg") max is anchored to the balance at end of day 1 plus
       // every inflow/outflow *after* day 1 — day-1 activity is already baked into
       // that anchor, so the post-day-1 window starts on the 2nd (see plainAvgMax).
@@ -458,6 +465,8 @@ const useBalanceHistory = (selectedAccount, selectedYear, selectedMonth, options
         yearMonthlyExpenses,
         firstDayDeltas,
         openingBalance,
+        recentTotalExpenses,
+        firstOperationDate,
       ] = await Promise.all([
         source.getHistory(startDateStr, endDateStr),
         // One read covers both comparison lines: the previous month is just the
@@ -474,6 +483,8 @@ const useBalanceHistory = (selectedAccount, selectedYear, selectedMonth, options
         // land back on for its operations to be the ones day 1's snapshot was
         // written from (see computeDayPeakBalance).
         source.getAnchorBalance(prevEndDateStr),
+        isCurrentMonth ? source.getTotalExpenses(recentStartStr, expenseEndStr) : null,
+        isCurrentMonth ? source.getFirstOperationDate() : null,
       ]);
 
       const prevMonthKey = `${prevYear}-${String(prevMonth + 1).padStart(2, '0')}`;
@@ -646,6 +657,10 @@ const useBalanceHistory = (selectedAccount, selectedYear, selectedMonth, options
         prevMonthTotalExpenses,
         prevMonthDaysCount: prevMonthDays,
         currentMonthTotalExpenses,
+        recentTotalExpenses,
+        // How many days recentTotalExpenses is spread over: 30, or fewer for an
+        // account younger than that.
+        recentExpenseDays: isCurrentMonth ? spendingWindowDays(now, firstOperationDate) : null,
         plainAvgMax,
         firstDayPeak,
         labels: allDays,
