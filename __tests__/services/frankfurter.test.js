@@ -1,6 +1,8 @@
 import {
   buildRatesUrl,
   fetchRates,
+  HOME_PROVIDERS,
+  pairProviders,
   parseRateRows,
   RateSourceError,
 } from '../../app/services/frankfurter';
@@ -18,6 +20,33 @@ describe('frankfurter', () => {
     expect(buildRatesUrl({ base: 'USD', quotes: 'RUB', from: '2026-10-01', group: null }))
       .toBe('https://api.frankfurter.dev/v2/rates?base=USD&quotes=RUB&from=2026-10-01');
     expect(buildRatesUrl()).toBe('https://api.frankfurter.dev/v2/rates');
+  });
+
+  it('buildRatesUrl sends a providers filter, and leaves an empty one out', () => {
+    expect(buildRatesUrl({ base: 'USD', providers: 'CBA,CBR' }))
+      .toBe('https://api.frankfurter.dev/v2/rates?base=USD&providers=CBA%2CCBR');
+    expect(buildRatesUrl({ base: 'USD', providers: '' })).toBe('https://api.frankfurter.dev/v2/rates?base=USD');
+  });
+
+  describe('pairProviders', () => {
+    it('names both home banks of a pair in one order, whichever way it is read', () => {
+      expect(pairProviders('RUB', 'AMD')).toBe('CBA,CBR');
+      expect(pairProviders('AMD', 'RUB')).toBe('CBA,CBR');
+    });
+
+    it('names the one home bank a pair has', () => {
+      expect(pairProviders('USD', 'RUB')).toBe('CBR');
+      expect(pairProviders('AMD', 'EUR')).toBe('CBA');
+    });
+
+    it('leaves the blend to a pair with none', () => {
+      expect(pairProviders('USD', 'EUR')).toBe('');
+      expect(pairProviders('CNY', 'JPY')).toBe('');
+    });
+
+    it('covers the rouble and the dram, the two the blend measurably trails', () => {
+      expect(HOME_PROVIDERS).toEqual({ AMD: 'CBA', RUB: 'CBR' });
+    });
   });
 
   it('parseRateRows keeps only usable rates', () => {

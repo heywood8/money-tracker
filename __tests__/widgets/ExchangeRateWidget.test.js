@@ -38,6 +38,10 @@ const nodesOf = (tree, type, found = []) => {
   return found;
 };
 const textsOf = (tree) => nodesOf(tree, 'TextWidget').map((node) => node.props.text);
+// The colour a text is drawn in, found by the start of its text. The builder
+// lifts it out of `style` onto the node's own props.
+const colorOf = (tree, start) => nodesOf(tree, 'TextWidget')
+  .find((node) => node.props.text.startsWith(start)).props.color;
 
 describe('ExchangeRateWidget', () => {
   describe('ready', () => {
@@ -89,6 +93,19 @@ describe('ExchangeRateWidget', () => {
       expect(tree.children[0].children[1].props.text).toBe('Oct 23');
     });
 
+    it('colours the move by its direction, in the theme asked for', () => {
+      const falling = { status: 'ready', chart: CHART, points: POINTS };
+      const rising = { ...falling, points: [...POINTS].reverse().map((p, i) => ({ ...p, date: POINTS[i].date })) };
+      const flat = { ...falling, points: [POINTS[0], { ...POINTS[0], date: '2026-10-23' }] };
+
+      expect(colorOf(render(falling), '▼')).toBe(lightTheme.colors.overspend);
+      expect(colorOf(render(rising), '▲')).toBe(lightTheme.colors.success);
+      expect(colorOf(render(flat), '•')).toBe(lightTheme.colors.mutedText);
+      expect(colorOf(render(falling, { theme: 'dark' }), '▼')).toBe(darkTheme.colors.overspend);
+      // The rest of the row stays muted: only the move carries the signal.
+      expect(colorOf(render(falling), '1 USD')).toBe(lightTheme.colors.mutedText);
+    });
+
     it('opens the Graphs tab when tapped', () => {
       const tree = render({ status: 'ready', chart: CHART, points: POINTS });
 
@@ -135,6 +152,12 @@ describe('ExchangeRateWidget', () => {
       const figures = describeRate(CHART, [{ date: '2026-10-22', rate: 81 }, { date: '2026-10-23', rate: 81 }], 'en');
       expect(figures.arrow).toBe('•');
       expect(figures.change).toBe('0.00 (0.00%)');
+      expect(figures.delta).toBe(0);
+    });
+
+    it('treats a move too small to print as no move', () => {
+      const figures = describeRate(CHART, [{ date: '2026-10-22', rate: 81.55 }, { date: '2026-10-23', rate: 81.551 }], 'en');
+      expect(figures).toMatchObject({ arrow: '•', change: '0.00 (0.00%)', delta: 0 });
     });
   });
 

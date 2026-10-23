@@ -5,16 +5,20 @@
  */
 
 import * as FileSystem from 'expo-file-system/legacy';
+import { fetchRateSource } from '../../app/services/currency';
 import {
   fetchRateHistory,
   clearRateHistoryCache,
   rangeStart,
   resolveRequestDirection,
   parseCacheEntry,
+  dropRateSpikes,
   summarizeRateSeries,
   rateDecimals,
   formatRateValue,
   formatRateChange,
+  rateChangeColor,
+  shownRateChange,
   toIsoDate,
   HISTORY_REFRESH_MS,
   RATE_CACHE_DIR,
@@ -28,18 +32,27 @@ jest.mock('expo-file-system/legacy', () => ({
   makeDirectoryAsync: jest.fn(),
 }));
 
-// The live table the direction is read from. A pair missing here answers like
-// a failed lookup with no offline rate.
+// The live table the direction and source are read from. A pair missing here
+// answers like a failed lookup with no offline rate.
 const mockLiveRates = {
   'USD|RUB': '81.55', 'RUB|USD': '0.01226', 'USD|AMD': '361', 'AMD|USD': '0.00277',
-  'KRW|USD': '0.000755', 'USD|KRW': '1324.48',
+  'KRW|USD': '0.000755', 'USD|KRW': '1324.48', 'AMD|THB': '0.0934',
 };
-jest.mock('../../app/services/currency', () => ({
-  fetchLiveExchangeRate: jest.fn(async (from, to) => {
-    const rate = mockLiveRates[`${from}|${to}`] ?? null;
-    return { rate, source: rate ? 'live' : 'none' };
-  }),
-}));
+// The source each pair's daily series reads: its home banks unless listed here
+// ('' the blend, null not known).
+const mockSources = { 'AMD|THB': '', 'THB|AMD': '' };
+jest.mock('../../app/services/currency', () => {
+  const { pairProviders } = jest.requireActual('../../app/services/frankfurter');
+  return {
+    fetchLiveExchangeRate: jest.fn(async (from, to) => {
+      const rate = mockLiveRates[`${from}|${to}`] ?? null;
+      return { rate, source: rate ? 'live' : 'none' };
+    }),
+    fetchRateSource: jest.fn(async (from, to) => (
+      `${from}|${to}` in mockSources ? mockSources[`${from}|${to}`] : pairProviders(from, to)
+    )),
+  };
+});
 
 const NOW = new Date(2026, 9, 23, 12, 0, 0); // 23 Oct 2026, local
 
@@ -190,13 +203,15 @@ describe('ExchangeRateHistory', () => {
     it('downloads the missing older days when a longer range is opened', async () => {
       global.fetch.mockResolvedValueOnce(rowsResponse('USD', 'RUB', [['2026-10-23', 81.55]]));
       await fetchRateHistory('USD', 'RUB', 'week', { now: NOW });
+      // A short range still downloads a month (see the quiet-spell test).
+      expect(requestedUrl(0).searchParams.get('from')).toBe('2026-09-23');
 
       global.fetch.mockResolvedValueOnce(rowsResponse('USD', 'RUB', [['2025-10-23', 80.9]]));
       const { points } = await fetchRateHistory('USD', 'RUB', 'year', { now: NOW });
 
-      // Only the days before the saved week, not the whole year again.
+      // Only the days before the saved month, not the whole year again.
       expect(requestedUrl(1).searchParams.get('from')).toBe('2025-10-23');
-      expect(requestedUrl(1).searchParams.get('to')).toBe('2026-10-15');
+      expect(requestedUrl(1).searchParams.get('to')).toBe('2026-09-22');
       expect(global.fetch).toHaveBeenCalledTimes(2);
       expect(points.map((p) => p.date)).toEqual(['2025-10-23', '2026-10-23']);
     });
@@ -374,6 +389,128 @@ describe('ExchangeRateHistory', () => {
       expect(global.fetch).not.toHaveBeenCalled();
     });
 
+    it('asks the daily series from the home banks and the monthly one from the blend', async () => {
+      global.fetch.mockImplementation(async (url) => (
+        new URL(url).searchParams.get('group') === 'month'
+          ? rowsResponse('USD', 'RUB', [['2026-10-01', 83.86]])
+          : rowsResponse('USD', 'RUB', [['2026-10-23', 81.13]])
+      ));
+
+      await fetchRateHistory('RUB', 'USD', 'all', { now: NOW });
+
+      const calls = global.fetch.mock.calls.map(([url]) => new URL(url).searchParams);
+      const daily = calls.find((params) => !params.has('group'));
+      const monthly = calls.find((params) => params.get('group') === 'month');
+      expect(daily.get('providers')).toBe('CBR');
+      expect(monthly.has('providers')).toBe(false);
+      expect(lastWrite().providers).toBe('CBR');
+    });
+
+    it('sends no providers filter for a pair the blend serves', async () => {
+      global.fetch.mockResolvedValueOnce(rowsResponse('USD', 'KRW', [['2026-10-23', 1324.48]]));
+
+      await fetchRateHistory('USD', 'KRW', 'week', { now: NOW });
+
+      expect(requestedUrl(0).searchParams.has('providers')).toBe(false);
+      expect(lastWrite().providers).toBe('');
+    });
+
+    it('keeps topping up from the saved source without asking for it again', async () => {
+      global.fetch.mockResolvedValueOnce(rowsResponse('USD', 'RUB', [['2026-10-22', 81.97]]));
+      await fetchRateHistory('USD', 'RUB', 'week', { now: NOW });
+      expect(fetchRateSource).toHaveBeenCalledTimes(1);
+
+      clearRateHistoryCache();
+      Date.now.mockReturnValue(NOW.getTime() + HISTORY_REFRESH_MS + 1);
+      global.fetch.mockResolvedValueOnce(rowsResponse('USD', 'RUB', [['2026-10-23', 81.13]]));
+      await fetchRateHistory('USD', 'RUB', 'week', { now: NOW });
+
+      expect(requestedUrl(1).searchParams.get('providers')).toBe('CBR');
+      expect(fetchRateSource).toHaveBeenCalledTimes(1);
+    });
+
+    it('reads the blend for a pair the home banks do not quote, and re-checks it', async () => {
+      global.fetch.mockResolvedValueOnce(rowsResponse('THB', 'AMD', [['2026-10-23', 10.71]]));
+      await fetchRateHistory('AMD', 'THB', 'week', { now: NOW });
+      expect(requestedUrl(0).searchParams.has('providers')).toBe(false);
+      expect(lastWrite().providers).toBe('');
+
+      // The bank starts quoting the pair: the series is started over from it,
+      // not spliced onto the blend's.
+      mockSources['AMD|THB'] = 'CBA';
+      global.fetch.mockResolvedValueOnce(rowsResponse('THB', 'AMD', [['2026-10-23', 10.75]]));
+      const { points } = await fetchRateHistory('AMD', 'THB', 'week', { now: NOW });
+
+      expect(requestedUrl(1).searchParams.get('providers')).toBe('CBA');
+      expect(requestedUrl(1).searchParams.get('from')).toBe('2026-09-23');
+      expect(points.map((point) => point.rate)).toEqual([1 / 10.75]);
+      mockSources['AMD|THB'] = '';
+    });
+
+    it('starts over a series saved from a bank the pair no longer reads', async () => {
+      // As after an edit to HOME_PROVIDERS: no cache version bump needed.
+      disk[`${RATE_CACHE_DIR}RUB_USD.json`] = JSON.stringify({
+        v: 2,
+        base: 'USD',
+        quote: 'RUB',
+        providers: 'OLD',
+        daily: { from: '2026-09-23', checkedAt: NOW.getTime(), rows: [['2026-10-23', 99]] },
+        monthly: null,
+      });
+      global.fetch.mockResolvedValueOnce(rowsResponse('USD', 'RUB', [['2026-10-23', 81.13]]));
+
+      const { points } = await fetchRateHistory('USD', 'RUB', 'week', { now: NOW });
+
+      expect(points).toEqual([{ date: '2026-10-23', rate: 81.13 }]);
+      expect(lastWrite().providers).toBe('CBR');
+    });
+
+    it('downloads no daily rows while the source is unknown, and asks again next time', async () => {
+      mockSources['USD|RUB'] = null;
+      global.fetch.mockImplementation(async () => rowsResponse('USD', 'RUB', [['2026-10-01', 83.86]]));
+
+      // The monthly series reads the blend whatever the source, so it still draws.
+      await expect(fetchRateHistory('USD', 'RUB', 'all', { now: NOW })).resolves.toEqual({
+        points: [{ date: '2026-10-01', rate: 83.86 }],
+        stale: true,
+      });
+      expect(global.fetch).toHaveBeenCalledTimes(1);
+      expect(requestedUrl(0).searchParams.get('group')).toBe('month');
+
+      delete mockSources['USD|RUB'];
+      global.fetch.mockResolvedValueOnce(rowsResponse('USD', 'RUB', [['2026-10-23', 81.13]]));
+      await fetchRateHistory('USD', 'RUB', 'week', { now: NOW });
+      expect(requestedUrl(1).searchParams.get('providers')).toBe('CBR');
+    });
+
+    it('starts a short range from the last fixings when the bank has gone quiet', async () => {
+      // The Bank of Russia publishes nothing from 1 to 12 January.
+      const jan10 = new Date(2026, 0, 10, 12, 0, 0);
+      Date.now.mockReturnValue(jan10.getTime());
+      global.fetch.mockResolvedValueOnce(rowsResponse('USD', 'RUB', [
+        ['2025-12-26', 78.0], ['2025-12-30', 78.5], ['2025-12-31', 78.9],
+      ]));
+
+      const day = await fetchRateHistory('USD', 'RUB', 'day', { now: jan10 });
+      const week = await fetchRateHistory('USD', 'RUB', 'week', { now: jan10 });
+
+      expect(requestedUrl(0).searchParams.get('from')).toBe('2025-12-10');
+      expect(day.points.map((point) => point.date)).toEqual(['2025-12-30', '2025-12-31']);
+      expect(week.points.map((point) => point.date)).toEqual(['2025-12-30', '2025-12-31']);
+    });
+
+    it('leaves a one-day spike out of the chart but keeps it on disk', async () => {
+      global.fetch.mockResolvedValueOnce(rowsResponse('USD', 'AMD', [
+        ['2026-10-19', 361.4], ['2026-10-20', 361.5], ['2026-10-21', 3.61],
+        ['2026-10-22', 361.3], ['2026-10-23', 361.1],
+      ]));
+
+      const { points } = await fetchRateHistory('USD', 'AMD', 'week', { now: NOW });
+
+      expect(points.map((point) => point.date)).toEqual(['2026-10-19', '2026-10-20', '2026-10-22', '2026-10-23']);
+      expect(lastWrite().daily.rows).toHaveLength(5);
+    });
+
     it('drops saved daily rows older than a year', async () => {
       global.fetch.mockResolvedValueOnce(rowsResponse('USD', 'RUB', [['2025-10-23', 80.9], ['2026-10-23', 81.55]]));
       await fetchRateHistory('USD', 'RUB', 'year', { now: NOW });
@@ -389,26 +526,76 @@ describe('ExchangeRateHistory', () => {
   });
 
   describe('parseCacheEntry', () => {
-    const EMPTY = { v: 1, base: null, quote: null, daily: null, monthly: null };
+    const EMPTY = { v: 2, base: null, quote: null, providers: null, daily: null, monthly: null };
 
     it('ignores a file of another version or shape', () => {
       expect(parseCacheEntry(null)).toEqual(EMPTY);
-      expect(parseCacheEntry({ v: 2, base: 'USD', quote: 'RUB', daily: {} })).toEqual(EMPTY);
-      expect(parseCacheEntry({ v: 1, daily: {} })).toEqual(EMPTY);
+      expect(parseCacheEntry({ v: 3, base: 'USD', quote: 'RUB', providers: '', daily: {} })).toEqual(EMPTY);
+      expect(parseCacheEntry({ v: 2, providers: '', daily: {} })).toEqual(EMPTY);
       expect(parseCacheEntry({
-        v: 1, base: 'USD', quote: 'RUB', daily: { from: '2026-01-01', checkedAt: 1, rows: [['x', -1]] },
+        v: 2, base: 'USD', quote: 'RUB', providers: '', daily: { from: '2026-01-01', checkedAt: 1, rows: [['x', -1]] },
       }).daily).toBeNull();
+    });
+
+    it('drops a version-1 file, saved from the blend before pairs had a source', () => {
+      expect(parseCacheEntry({
+        v: 1, base: 'USD', quote: 'RUB', daily: { from: '2026-10-01', checkedAt: 1, rows: [['2026-10-23', 81.55]] },
+      })).toEqual(EMPTY);
+    });
+
+    it('drops an entry whose source is missing or malformed', () => {
+      const base = { v: 2, base: 'USD', quote: 'RUB', daily: null, monthly: null };
+      expect(parseCacheEntry(base)).toEqual(EMPTY);
+      expect(parseCacheEntry({ ...base, providers: 'cbr&x=1' })).toEqual(EMPTY);
+    });
+
+    it('keeps an entry whose source is not known yet', () => {
+      const entry = { v: 2, base: 'USD', quote: 'RUB', providers: null, daily: null, monthly: { checkedAt: 1, rows: [] } };
+      expect(parseCacheEntry(entry)).toEqual(entry);
     });
 
     it('keeps a well-formed entry', () => {
       const entry = {
-        v: 1,
+        v: 2,
         base: 'USD',
         quote: 'RUB',
+        providers: 'CBR',
         daily: { from: '2026-10-01', checkedAt: 1, rows: [['2026-10-23', 81.55]] },
         monthly: { checkedAt: 1, rows: [] },
       };
       expect(parseCacheEntry(entry)).toEqual(entry);
+    });
+  });
+
+  describe('dropRateSpikes', () => {
+    const series = (rates) => rates.map((rate, i) => [`2026-10-${String(10 + i).padStart(2, '0')}`, rate]);
+    const ratesOf = (rows) => rows.map(([, rate]) => rate);
+
+    it('drops a lone day far off its neighbours, either way', () => {
+      expect(ratesOf(dropRateSpikes(series([5.16, 5.18, 5.17, 10.14, 5.16, 5.19, 5.17]))))
+        .toEqual([5.16, 5.18, 5.17, 5.16, 5.19, 5.17]);
+      expect(ratesOf(dropRateSpikes(series([81.5, 81.6, 1.0, 81.4, 81.2]))))
+        .toEqual([81.5, 81.6, 81.4, 81.2]);
+    });
+
+    it('drops a spike on the newest day too', () => {
+      expect(ratesOf(dropRateSpikes(series([4.43, 4.45, 4.47, 367.74])))).toEqual([4.43, 4.45, 4.47]);
+    });
+
+    it('keeps a move that lasts, however steep', () => {
+      // Shaped like the rouble in March 2022: +40% within a week, and it stayed.
+      const crash = [80.4, 83.6, 94.9, 95.5, 106.8, 104.8, 116.1, 120.4, 117.0, 114.3];
+      expect(ratesOf(dropRateSpikes(series(crash)))).toEqual(crash);
+    });
+
+    it('keeps the ordinary wobble of a calm month', () => {
+      const calm = [4.31, 4.29, 4.28, 4.31, 4.35, 4.25, 4.23, 4.22, 4.24, 4.27, 4.30, 4.43];
+      expect(dropRateSpikes(series(calm))).toHaveLength(calm.length);
+    });
+
+    it('leaves a series too short to judge alone', () => {
+      expect(ratesOf(dropRateSpikes(series([4.4, 9.9])))).toEqual([4.4, 9.9]);
+      expect(dropRateSpikes([])).toEqual([]);
     });
   });
 
@@ -440,6 +627,28 @@ describe('ExchangeRateHistory', () => {
       expect(formatRateChange(1.55, 1.9375, 'en', 2)).toBe('+1.55 (+1.94%)');
       expect(formatRateChange(-0.0213, -1.86, 'en', 3)).toBe('-0.021 (-1.86%)');
       expect(formatRateChange(0, 0, 'en', 2)).toBe('0.00 (0.00%)');
+    });
+  });
+
+  describe('shownRateChange', () => {
+    it('keeps a move the rate is shown to', () => {
+      expect(shownRateChange(0.1204, 2.78, 3)).toEqual({ change: 0.12, changePercent: 2.78 });
+    });
+
+    it('turns a move too small to show into no move, never a negative zero', () => {
+      expect(shownRateChange(0.0004, 0.0005, 2)).toEqual({ change: 0, changePercent: 0 });
+      const fall = shownRateChange(-0.0004, -0.0005, 2);
+      expect(Object.is(fall.change, 0)).toBe(true);
+    });
+  });
+
+  describe('rateChangeColor', () => {
+    const palette = { success: 'green', overspend: 'red', mutedText: 'grey' };
+
+    it('greens a rise, reds a fall and mutes no move', () => {
+      expect(rateChangeColor(0.12, palette)).toBe('green');
+      expect(rateChangeColor(-2.74, palette)).toBe('red');
+      expect(rateChangeColor(0, palette)).toBe('grey');
     });
   });
 
