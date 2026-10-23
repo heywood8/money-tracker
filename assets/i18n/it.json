@@ -787,5 +787,13 @@
   "rate_change_since": "dal",
   "rate_offline": "offline",
   "rate_load_failed": "Impossibile caricare i tassi",
-  "rate_not_available_pair": "Nessun tasso per questa coppia di valute"
+  "rate_not_available_pair": "Nessun tasso per questa coppia di valute",
+  "widget_rate_label": "Tasso di cambio",
+  "widget_rate_description": "Una delle tue coppie di valute: il tasso di oggi, la variazione e il grafico",
+  "widget_rate_empty": "Aggiungi un grafico del tasso in Impostazioni → Grafici",
+  "widget_config_title": "Quale tasso deve mostrare il widget?",
+  "widget_add_anyway": "Aggiungi comunque",
+  "widget_add_to_home": "Aggiungi widget alla schermata Home",
+  "widget_add_hint": "Mostra un tasso e la sua variazione nella schermata Home",
+  "widget_pin_unsupported": "Il tuo launcher non può aggiungerlo da qui: tieni premuto sulla schermata Home → Widget → Penny"
 }

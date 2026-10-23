@@ -455,3 +455,65 @@ export const formatRateValue = (value, language, decimals = rateDecimals(value))
     return fixed;
   }
 };
+
+/**
+ * A move as "+1.55 (+1.94%)" — the change in the rate's own decimals, then in
+ * percent. Shared by the Graphs card and the home-screen widget so the two say
+ * it the same way.
+ *
+ * @param {number} change
+ * @param {number} changePercent
+ * @param {string} [language]
+ * @param {number} decimals - The headline rate's decimals
+ * @returns {string}
+ */
+export const formatRateChange = (change, changePercent, language, decimals) => {
+  const signed = (value, text) => (value > 0 ? `+${text}` : text);
+  return `${signed(change, formatRateValue(change, language, decimals))} `
+    + `(${signed(changePercent, formatRateValue(changePercent, language, 2))}%)`;
+};
+
+// A YYYY-MM-DD date as a local Date, for the locale formatter.
+const parseDate = (date) => {
+  const [year, month, day] = String(date).split('-').map(Number);
+  return new Date(year, month - 1, day || 1);
+};
+
+// In the app's language, not the device's — the two are independent here.
+const localeDate = (date, language, options) => {
+  try {
+    return parseDate(date).toLocaleDateString(language || undefined, options);
+  } catch {
+    return String(date);
+  }
+};
+
+/**
+ * "23 Oct 2026" in the app's language, or "Oct 2026" for a monthly average
+ * (the all-time series, whose points stand for a whole month).
+ *
+ * @param {string} date - YYYY-MM-DD
+ * @param {string} [language]
+ * @param {boolean} [monthOnly]
+ * @returns {string}
+ */
+export const formatRateDate = (date, language, monthOnly = false) => localeDate(
+  date,
+  language,
+  monthOnly ? { month: 'short', year: 'numeric' } : { day: 'numeric', month: 'short', year: 'numeric' },
+);
+
+/**
+ * An x-axis label for a range: the day for the short ranges, the month for a
+ * year, the year for all time.
+ *
+ * @param {string} date - YYYY-MM-DD
+ * @param {string} range
+ * @param {string} [language]
+ * @returns {string}
+ */
+export const formatAxisDate = (date, range, language) => {
+  if (range === 'all') return String(date).slice(0, 4);
+  if (range === 'year') return localeDate(date, language, { month: 'short' });
+  return localeDate(date, language, { day: 'numeric', month: 'short' });
+};

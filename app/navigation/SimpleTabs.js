@@ -1,6 +1,6 @@
 import React, { useMemo, useCallback, useRef, useEffect, memo } from 'react';
 import PropTypes from 'prop-types';
-import { View, StyleSheet, Dimensions, Platform, BackHandler, Pressable } from 'react-native';
+import { View, StyleSheet, Dimensions, Platform, BackHandler, Pressable, Linking } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { Text } from 'react-native-paper';
 import { GestureDetector, Gesture } from 'react-native-gesture-handler';
@@ -37,6 +37,8 @@ import AccountsScreen from '../screens/AccountsScreen';
 import GraphsScreen from '../screens/GraphsScreen';
 import BudgetScreen from '../screens/BudgetScreen';
 import { useThemeColors } from '../contexts/ThemeColorsContext';
+import { isGraphsDeepLink } from '../widgets/widgetConstants';
+import useExchangeRateWidgetSync from '../widgets/useExchangeRateWidgetSync';
 import { useLocalization } from '../contexts/LocalizationContext';
 import { useDisplaySettings } from '../contexts/DisplaySettingsContext';
 import { useSetActiveTab } from '../contexts/TabFocusContext';
@@ -498,22 +500,56 @@ export default function SimpleTabs() {
   // quietly went nowhere is exactly what "I pressed Select and no panel came up"
   // looks like, and the old log could not tell that apart from a panel that
   // arrived and was not seen.
-  const openOperationsForNotification = useCallback((label) => {
-    const outcome = handleTabPress('Operations');
+  const openTabFromOutside = useCallback((tabKey, label) => {
+    const outcome = handleTabPress(tabKey);
     // 'already-active' is read off `active`, which can lag the strip: the pan
     // gesture moves `activeIndex` the moment the finger lifts but only calls
     // setActive from the spring's completion, over a runOnJS hop. Mid-swipe the
     // two disagree, and trusting the stale one would open the deck on a tab the
     // user is not looking at — so the strip's own index gets the last word.
     const strayed = outcome === 'already-active'
-      && activeIndex.value !== TABS.findIndex((tab) => tab.key === 'Operations');
+      && activeIndex.value !== TABS.findIndex((tab) => tab.key === tabKey);
     const snapped = outcome === 'busy' || outcome === 'unknown' || strayed
-      ? snapToTab('Operations')
+      ? snapToTab(tabKey)
       : false;
-    console.log(`[deck] ${label}: switching to Operations`, {
+    console.log(`[deck] ${label}: switching to ${tabKey}`, {
       from: activeRef.current, outcome, strayed, snapped,
     });
   }, [handleTabPress, snapToTab, activeIndex, TABS]);
+
+  const openOperationsForNotification = useCallback(
+    (label) => openTabFromOutside('Operations', label),
+    [openTabFromOutside],
+  );
+
+  // A tap on the exchange-rate home-screen widget opens the app through its
+  // deep link and lands on the Graphs tab, where the full chart is. Read on a
+  // cold start (the URL the app was launched with) and while running.
+  //
+  // Subscribed once, with the opener read through a ref. The opener changes on
+  // every tab switch, and getInitialURL keeps answering with the launch URL for
+  // the activity's whole life — re-running this on each switch would send a
+  // user who came in from the widget back to Graphs every time they left it.
+  const openTabFromOutsideRef = useRef(openTabFromOutside);
+  openTabFromOutsideRef.current = openTabFromOutside;
+  useEffect(() => {
+    let mounted = true;
+    const handleUrl = (url) => {
+      if (mounted && isGraphsDeepLink(url)) openTabFromOutsideRef.current('Graphs', 'widget deep link');
+    };
+    Promise.resolve(Linking.getInitialURL?.())
+      .then(handleUrl)
+      .catch(() => {});
+    const subscription = Linking.addEventListener?.('url', ({ url }) => handleUrl(url));
+    return () => {
+      mounted = false;
+      subscription?.remove?.();
+    };
+  }, []);
+
+  // The home-screen widgets draw the same rates; the navigator lives for the
+  // whole session, so it is what keeps them in step.
+  useExchangeRateWidgetSync();
 
   // A tapped "transactions to review" notification routes here: jump to the
   // Operations tab. OperationsScreen listens for the same event and surfaces the

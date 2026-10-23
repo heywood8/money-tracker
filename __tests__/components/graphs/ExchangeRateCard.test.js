@@ -1,10 +1,7 @@
 import React from 'react';
 import { render, fireEvent, waitFor, screen } from '@testing-library/react-native';
-import ExchangeRateCard, {
-  formatRateDate,
-  formatAxisDate,
-  xTickIndices,
-} from '../../../app/components/graphs/ExchangeRateCard';
+import ExchangeRateCard, { xTickIndices } from '../../../app/components/graphs/ExchangeRateCard';
+import { formatRateDate, formatAxisDate } from '../../../app/services/ExchangeRateHistory';
 import { fetchRateHistory } from '../../../app/services/ExchangeRateHistory';
 import { TabFocusProvider } from '../../../app/contexts/TabFocusContext';
 

@@ -787,5 +787,13 @@
   "rate_change_since": "自",
   "rate_offline": "离线",
   "rate_load_failed": "无法加载汇率",
-  "rate_not_available_pair": "此货币对暂无汇率"
+  "rate_not_available_pair": "此货币对暂无汇率",
+  "widget_rate_label": "汇率",
+  "widget_rate_description": "您的一个货币对：今日汇率、涨跌和走势图",
+  "widget_rate_empty": "请在 设置 → 图表 中添加汇率图表",
+  "widget_config_title": "小组件显示哪个汇率？",
+  "widget_add_anyway": "仍然添加",
+  "widget_add_to_home": "添加小组件到主屏幕",
+  "widget_add_hint": "在主屏幕上显示汇率及其涨跌",
+  "widget_pin_unsupported": "您的桌面启动器无法从这里添加：长按主屏幕 → 小组件 → Penny"
 }

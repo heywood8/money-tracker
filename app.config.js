@@ -26,6 +26,35 @@ const ANDROID_ARCHITECTURES = IS_PREVIEW
 // (see app/services/distribution.js for the runtime half of this).
 const IS_PLAY = process.env.DISTRIBUTION_CHANNEL === 'play';
 
+// The home-screen widgets (react-native-android-widget). The name is the key the
+// launcher hands back on every update (app/widgets/widgetConstants.js) and must
+// never change. The label is a string resource rather than text so the widget
+// picker shows it in the phone's language; plugins/withWidgetStrings.js writes
+// that resource and the description's translations from assets/i18n.
+const WIDGETS = {
+  widgets: [
+    {
+      name: 'ExchangeRate',
+      label: '@string/widget_exchange_rate_label',
+      description: require('./assets/i18n/en.json').widget_rate_description,
+      // Two cells either way is the smallest the rate and its change fit in;
+      // three by two leaves room for the line under them.
+      minWidth: '110dp',
+      minHeight: '110dp',
+      targetCellWidth: 3,
+      targetCellHeight: 2,
+      resizeMode: 'horizontal|vertical',
+      previewImage: './assets/widget-preview/exchange-rate.png',
+      // Rates are daily fixings: hourly is plenty, and the app redraws the
+      // widget itself whenever it has fresher data (useExchangeRateWidgetSync).
+      updatePeriodMillis: 60 * 60 * 1000,
+      // Placing the widget opens its screen to pick which chart it shows; a long
+      // press → reconfigure opens it again later.
+      widgetFeatures: 'reconfigurable',
+    },
+  ],
+};
+
 module.exports = {
   expo: {
     name: 'Penny',
@@ -160,6 +189,10 @@ module.exports = {
       // Gives the "transactions to review" and "operations added" alerts their
       // own status-bar icons, which expo-notifications alone cannot express.
       './plugins/withNotificationIcons.js',
+      // Before the widget library on purpose: it edits the strings the library
+      // writes, and Expo runs the mods of earlier plugins last.
+      './plugins/withWidgetStrings.js',
+      ['react-native-android-widget', WIDGETS],
     ],
     updates: {
       'url': 'https://u.expo.dev/89372eb2-93f5-475a-a630-9caa827d8406',

@@ -787,5 +787,13 @@
   "rate_change_since": "desde",
   "rate_offline": "offline",
   "rate_load_failed": "Não foi possível carregar as cotações",
-  "rate_not_available_pair": "Sem cotações para este par de moedas"
+  "rate_not_available_pair": "Sem cotações para este par de moedas",
+  "widget_rate_label": "Câmbio",
+  "widget_rate_description": "Um dos seus pares de moedas: a cotação de hoje, a variação e o gráfico",
+  "widget_rate_empty": "Adicione um gráfico de câmbio em Configurações → Gráficos",
+  "widget_config_title": "Qual cotação o widget deve mostrar?",
+  "widget_add_anyway": "Adicionar mesmo assim",
+  "widget_add_to_home": "Adicionar widget à tela inicial",
+  "widget_add_hint": "Mostra uma cotação e sua variação na tela inicial",
+  "widget_pin_unsupported": "Seu launcher não consegue adicionar daqui: toque e segure a tela inicial → Widgets → Penny"
 }

@@ -787,5 +787,13 @@
   "rate_change_since": "с",
   "rate_offline": "нет сети",
   "rate_load_failed": "Не удалось загрузить курсы",
-  "rate_not_available_pair": "Нет курсов для этой пары валют"
+  "rate_not_available_pair": "Нет курсов для этой пары валют",
+  "widget_rate_label": "Курс валюты",
+  "widget_rate_description": "Одна из ваших валютных пар: курс сегодня, изменение и график",
+  "widget_rate_empty": "Добавьте график курса в Настройки → Графики",
+  "widget_config_title": "Какой курс показывать в виджете?",
+  "widget_add_anyway": "Всё равно добавить",
+  "widget_add_to_home": "Добавить виджет на рабочий стол",
+  "widget_add_hint": "Курс и его изменение прямо на рабочем столе",
+  "widget_pin_unsupported": "Ваш лаунчер не умеет добавлять отсюда: удерживайте палец на рабочем столе → Виджеты → Penny"
 }

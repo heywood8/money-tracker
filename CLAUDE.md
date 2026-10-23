@@ -81,6 +81,10 @@ The app follows a feature-based organization under the `app/` directory:
   - Logging: `LogService.js`, `LogsFile.js`
   - Monitoring: `sentry.js` - Privacy-protective crash/error reporting (Sentry)
 
+- **widgets/** - Android home-screen widgets (react-native-android-widget)
+  - `ExchangeRateWidget.js` (the widget's layout, built from the library's primitives), `exchangeRateWidgetRender.js` (data + render + `refreshExchangeRateWidgets`), `widgetTaskHandler.js` (launcher entry point, registered in `index.js`)
+  - `ExchangeRateWidgetConfigScreen.js` (pick the chart when the widget is placed), `exchangeRateWidgetStore.js` (widgetId → chart, a file of its own, not in backups), `useExchangeRateWidgetSync.js` (redraws on chart changes, restores and backgrounding; mounted in `SimpleTabs`), `widgetConstants.js`
+
 - **db/** (1 file) - Database schema
   - `schema.js` - Drizzle ORM schema (tables: accounts, categories, operations, budgets, budgetPlans, budgetPlanLines, budgetPlanLineCategories, budgetPlanLineAccounts, budgetPlanLineLabels, budgetPlanLineGroups, plannedOperations, balanceHistory, appMetadata; `budgets` and `plannedOperations` are legacy/append-only since Budgets v3 — see docs/DATABASE.md)
 
@@ -354,6 +358,17 @@ const closeSubPanel = useCallback(() => {
 **Share-sheet exports (Expo `Sharing.shareAsync`):** Do not show a success dialog — the share sheet is the user feedback. `shareAsync` resolves when the sheet is dismissed with no cancel signal, so you cannot distinguish cancel from success.
 
 **Log/chat-style lists:** Use `FlatList` with `inverted={true}` and `data={entries.slice().reverse()}`. Newest entry is always item[0], shown at the bottom automatically — no `scrollToEnd` calls needed, and no mount cost from rendering all entries at once.
+
+### Home-Screen Widgets
+
+The exchange-rate widget is built with `react-native-android-widget` (configured in `app.config.js`, `WIDGETS`). Things that are easy to get wrong:
+
+- **Widget components are plain functions, not React components.** The library builds the RemoteViews tree by calling them directly: no hooks, no context, no state. They read palettes from `ThemeColorsContext`'s exported `lightTheme`/`darkTheme` and text through `translate(language, key)` (`notificationStrings.js`), and return `{ light, dark }` variants.
+- **The task handler runs headless** (app closed) for WIDGET_ADDED/UPDATE/RESIZED/DELETED, like the background bank task. It reads the same services the app does (`ExchangeRateHistory`, `ExchangeRateCharts`); every read must degrade to an "empty"/"error" widget rather than throw.
+- **A tap opens `com.heywood8.monkeep://graphs`**, which `SimpleTabs` routes to the Graphs tab. Taps never reach the task handler.
+- **The widget name (`ExchangeRate`) must never change**: the launcher keys placed widgets by it.
+- **Picker label and description are localized** by `plugins/withWidgetStrings.js` from `assets/i18n` (`widget_rate_label`, `widget_rate_description`). It must stay *before* the library in `plugins` (Expo runs earlier plugins' mods last), because it strips the library's `translatable="false"` from the description; a translated untranslatable string fails release builds (lint `ExtraTranslation`).
+- **Native changes need a new APK/AAB**: OTA updates cannot add or change a widget, and widgets do not run in Expo Go.
 
 ### Category Selection
 

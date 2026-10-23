@@ -14,6 +14,7 @@ import {
   summarizeRateSeries,
   rateDecimals,
   formatRateValue,
+  formatRateChange,
   toIsoDate,
   HISTORY_REFRESH_MS,
   RATE_CACHE_DIR,
@@ -431,6 +432,14 @@ describe('ExchangeRateHistory', () => {
     it('returns null for no points', () => {
       expect(summarizeRateSeries([])).toBeNull();
       expect(summarizeRateSeries(null)).toBeNull();
+    });
+  });
+
+  describe('formatRateChange', () => {
+    it('signs the move and its percentage, in the rate’s decimals', () => {
+      expect(formatRateChange(1.55, 1.9375, 'en', 2)).toBe('+1.55 (+1.94%)');
+      expect(formatRateChange(-0.0213, -1.86, 'en', 3)).toBe('-0.021 (-1.86%)');
+      expect(formatRateChange(0, 0, 'en', 2)).toBe('0.00 (0.00%)');
     });
   });
 

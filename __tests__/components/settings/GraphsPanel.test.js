@@ -10,6 +10,7 @@ import GraphsPanel, { accountCurrencies, defaultNewChart } from '../../../app/co
 import { pickCurrency } from '../../../app/components/settings/RateChartEditor';
 import { upsertRateChart, removeRateChart, loadRateCharts } from '../../../app/services/ExchangeRateCharts';
 import { fetchLiveExchangeRate } from '../../../app/services/currency';
+import { requestPinWidget } from 'react-native-android-widget';
 
 const mockAccounts = { list: [] };
 
@@ -34,6 +35,7 @@ jest.mock('../../../app/services/ExchangeRateCharts', () => ({
   upsertRateChart: jest.fn(),
   removeRateChart: jest.fn(),
 }));
+jest.mock('react-native-android-widget', () => ({ requestPinWidget: jest.fn() }));
 jest.mock('../../../app/services/currency', () => ({
   ...jest.requireActual('../../../app/services/currency'),
   fetchLiveExchangeRate: jest.fn(),
@@ -204,6 +206,51 @@ describe('GraphsPanel', () => {
     expect(screen.getByText('rate_chart_need_two_currencies')).toBeTruthy();
     await fireEvent.press(screen.getByTestId('rate-chart-add'));
     expect(screen.queryByTestId('rate-editor-save')).toBeNull();
+  });
+
+  describe('home-screen widget', () => {
+    it('offers the widget only once there is a chart to show', async () => {
+      await render(<Host />);
+      await waitFor(() => expect(loadRateCharts).toHaveBeenCalled());
+      expect(screen.queryByTestId('rate-widget-pin')).toBeNull();
+    });
+
+    it('asks the launcher to place the widget', async () => {
+      loadRateCharts.mockResolvedValue([USD_RUB]);
+      requestPinWidget.mockResolvedValue(true);
+      await render(<Host />);
+      await waitFor(() => expect(screen.getByTestId('rate-widget-pin')).toBeTruthy());
+      expect(screen.getByText('widget_add_hint')).toBeTruthy();
+
+      await fireEvent.press(screen.getByTestId('rate-widget-pin'));
+
+      expect(requestPinWidget).toHaveBeenCalledWith({ widgetName: 'ExchangeRate' });
+      await waitFor(() => expect(screen.getByText('widget_add_hint')).toBeTruthy());
+    });
+
+    it('says where to find the widget when the launcher cannot pin it', async () => {
+      loadRateCharts.mockResolvedValue([USD_RUB]);
+      requestPinWidget.mockResolvedValue(false);
+      await render(<Host />);
+      await waitFor(() => expect(screen.getByTestId('rate-widget-pin')).toBeTruthy());
+
+      await fireEvent.press(screen.getByTestId('rate-widget-pin'));
+
+      await waitFor(() => expect(screen.getByText('widget_pin_unsupported')).toBeTruthy());
+    });
+
+    it('treats a failed pin request like an unsupported launcher', async () => {
+      jest.spyOn(console, 'warn').mockImplementation(() => {});
+      loadRateCharts.mockResolvedValue([USD_RUB]);
+      requestPinWidget.mockRejectedValue(new Error('not linked'));
+      await render(<Host />);
+      await waitFor(() => expect(screen.getByTestId('rate-widget-pin')).toBeTruthy());
+
+      await fireEvent.press(screen.getByTestId('rate-widget-pin'));
+
+      await waitFor(() => expect(screen.getByText('widget_pin_unsupported')).toBeTruthy());
+      console.warn.mockRestore();
+    });
   });
 
   describe('helpers', () => {
