@@ -1,5 +1,12 @@
 # Changelog
 
+## [0.301.0](https://github.com/heywood8/money-tracker/compare/penny-v0.300.0...penny-v0.301.0) (2026-10-23)
+
+
+### Features
+
+* **graphs:** color rate moves, read rub/amd from central banks ([#1874](https://github.com/heywood8/money-tracker/issues/1874)) ([285593f](https://github.com/heywood8/money-tracker/commit/285593f5dcee5388dbcac1ac47dfd5ac13e07b88))
+
 ## [0.300.0](https://github.com/heywood8/money-tracker/compare/penny-v0.299.0...penny-v0.300.0) (2026-10-23)
 
 
