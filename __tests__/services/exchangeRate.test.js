@@ -1,4 +1,4 @@
-import { fetchLiveExchangeRate, clearExchangeRateCache } from '../../app/services/currency';
+import { fetchLiveExchangeRate, fetchRateSource, clearExchangeRateCache } from '../../app/services/currency';
 
 // We need to mock the exchange-rates.json import used by getExchangeRate
 jest.mock('../../assets/exchange-rates.json', () => ({
@@ -6,6 +6,7 @@ jest.mock('../../assets/exchange-rates.json', () => ({
   rates: {
     USD: { EUR: 0.92, GBP: 0.79 },
     EUR: { USD: 1.09 },
+    RUB: { AMD: 4.35 },
   },
 }));
 
@@ -59,14 +60,14 @@ describe('fetchLiveExchangeRate', () => {
     expect(global.fetch.mock.calls[0][0]).toBe('https://api.frankfurter.dev/v2/rates?base=USD');
   });
 
-  it('reads a pair without USD as a cross rate off the same table', async () => {
-    global.fetch.mockResolvedValueOnce(usdTable({ RUB: 81.55, AMD: 361.0 }));
+  it('reads a pair without USD as a cross rate off a USD table', async () => {
+    global.fetch.mockResolvedValueOnce(usdTable({ GBP: 0.8, EUR: 0.93 }));
 
-    const result = await fetchLiveExchangeRate('RUB', 'AMD');
+    const result = await fetchLiveExchangeRate('GBP', 'EUR');
 
     expect(result.source).toBe('live');
-    expect(Number(result.rate)).toBeCloseTo(361.0 / 81.55, 8);
-    // Still one request: the base of the conversion no longer picks the URL.
+    expect(Number(result.rate)).toBeCloseTo(0.93 / 0.8, 8);
+    // Still one request: the base of the conversion does not pick the URL.
     expect(global.fetch.mock.calls[0][0]).toContain('base=USD');
   });
 
@@ -78,6 +79,139 @@ describe('fetchLiveExchangeRate', () => {
     const result = await fetchLiveExchangeRate('AMD', 'USD');
 
     expect(result).toEqual({ rate: '0.002770083102', source: 'live' });
+  });
+
+  describe('home central banks', () => {
+    const urlOf = (call) => global.fetch.mock.calls[call][0];
+    const BLEND_URL = 'https://api.frankfurter.dev/v2/rates?base=USD';
+
+    it('reads a pair of two home-bank currencies off both banks', async () => {
+      global.fetch.mockResolvedValueOnce(usdTable({ RUB: 80.81, AMD: 361.24 }));
+
+      const result = await fetchLiveExchangeRate('RUB', 'AMD');
+
+      expect(global.fetch).toHaveBeenCalledTimes(1);
+      expect(urlOf(0)).toBe(`${BLEND_URL}&providers=CBA%2CCBR`);
+      expect(result.source).toBe('live');
+      expect(Number(result.rate)).toBeCloseTo(361.24 / 80.81, 8);
+    });
+
+    it('asks only the bank of the one side that has one', async () => {
+      global.fetch.mockResolvedValueOnce(usdTable({ RUB: 81.13 }));
+
+      expect(await fetchLiveExchangeRate('USD', 'RUB')).toEqual({ rate: '81.13', source: 'live' });
+      expect(urlOf(0)).toBe(`${BLEND_URL}&providers=CBR`);
+    });
+
+    it('keeps one table per source and serves each from its own cache', async () => {
+      global.fetch
+        .mockResolvedValueOnce(usdTable({ RUB: 81.13, EUR: 0.9 }))
+        .mockResolvedValueOnce(usdTable({ EUR: 0.93 }));
+
+      expect((await fetchLiveExchangeRate('EUR', 'RUB')).source).toBe('live');
+      expect(await fetchLiveExchangeRate('USD', 'EUR')).toEqual({ rate: '0.93', source: 'live' });
+      expect((await fetchLiveExchangeRate('RUB', 'USD')).source).toBe('live');
+      expect(await fetchLiveExchangeRate('USD', 'EUR')).toEqual({ rate: '0.93', source: 'live' });
+      expect(global.fetch).toHaveBeenCalledTimes(2);
+      expect(urlOf(1)).toBe(BLEND_URL);
+    });
+
+    it('reads the blend when the home banks do not quote the other side', async () => {
+      global.fetch
+        .mockResolvedValueOnce(usdTable({ AMD: 361.14 })) // CBA, no THB
+        .mockResolvedValueOnce(usdTable({ AMD: 360.98, THB: 33.7 }));
+
+      const result = await fetchLiveExchangeRate('AMD', 'THB');
+
+      expect(Number(result.rate)).toBeCloseTo(33.7 / 360.98, 8);
+      expect(urlOf(1)).toBe(BLEND_URL);
+    });
+
+    it('reads the blend, not the offline table, when the source stops carrying a bank', async () => {
+      global.fetch
+        .mockResolvedValueOnce(usdTable({})) // a filter naming no bank it has
+        .mockResolvedValueOnce(usdTable({ RUB: 81.52 }));
+
+      expect(await fetchLiveExchangeRate('USD', 'RUB')).toEqual({ rate: '81.52', source: 'live' });
+      // The empty answer is kept like any other: no second request for it.
+      expect((await fetchLiveExchangeRate('RUB', 'USD')).source).toBe('live');
+      expect(global.fetch).toHaveBeenCalledTimes(2);
+    });
+
+    it('reads the blend when the API refuses a bank outright', async () => {
+      global.fetch
+        .mockResolvedValueOnce({ ok: false, status: 400 })
+        .mockResolvedValueOnce(usdTable({ RUB: 81.52 }));
+
+      expect(await fetchLiveExchangeRate('USD', 'RUB')).toEqual({ rate: '81.52', source: 'live' });
+    });
+
+    it('reads the blend when a home bank publishes an absurd figure', async () => {
+      // Regression guard: the Central Bank of Armenia once published its dollar
+      // rate in the rouble's slot, which put RUB → AMD at ~367 for the day.
+      global.fetch
+        .mockResolvedValueOnce(usdTable({ RUB: 1.0, AMD: 367.74 }))
+        .mockResolvedValueOnce(usdTable({ RUB: 81.52, AMD: 360.98 }));
+
+      const result = await fetchLiveExchangeRate('RUB', 'AMD');
+
+      expect(Number(result.rate)).toBeCloseTo(360.98 / 81.52, 8);
+      expect(urlOf(1)).toBe(BLEND_URL);
+    });
+
+    it('goes offline, without a second request, when the home table cannot be fetched', async () => {
+      global.fetch.mockRejectedValueOnce(new Error('Network error'));
+
+      expect(await fetchLiveExchangeRate('RUB', 'AMD')).toEqual({ rate: '4.35', source: 'offline' });
+      expect(global.fetch).toHaveBeenCalledTimes(1);
+    });
+
+    it('still answers from a cached blend table when the home table cannot be fetched', async () => {
+      global.fetch
+        .mockResolvedValueOnce(usdTable({ EUR: 0.93, RUB: 81.52 }))
+        .mockRejectedValueOnce(new Error('Network error'));
+      await fetchLiveExchangeRate('USD', 'EUR'); // the blend, cached
+
+      expect(await fetchLiveExchangeRate('USD', 'RUB')).toEqual({ rate: '81.52', source: 'live' });
+      expect(global.fetch).toHaveBeenCalledTimes(2);
+    });
+  });
+
+  describe('fetchRateSource', () => {
+    it('names the home banks when their table quotes both sides', async () => {
+      global.fetch.mockResolvedValueOnce(usdTable({ RUB: 80.81, AMD: 361.24 }));
+
+      await expect(fetchRateSource('RUB', 'AMD')).resolves.toBe('CBA,CBR');
+    });
+
+    it('answers the blend for a pair the home banks do not quote, or that has none', async () => {
+      global.fetch.mockResolvedValueOnce(usdTable({ AMD: 361.14 }));
+
+      await expect(fetchRateSource('AMD', 'THB')).resolves.toBe('');
+      await expect(fetchRateSource('USD', 'EUR')).resolves.toBe('');
+      expect(global.fetch).toHaveBeenCalledTimes(1);
+    });
+
+    it('keeps the home banks on a day their figure is absurd', async () => {
+      // A chart must not move to the blend for good over one bad day.
+      global.fetch.mockResolvedValueOnce(usdTable({ RUB: 1.0, AMD: 367.74 }));
+
+      await expect(fetchRateSource('RUB', 'AMD')).resolves.toBe('CBA,CBR');
+    });
+
+    it('does not know when no table can be had', async () => {
+      global.fetch.mockRejectedValueOnce(new Error('Network error'));
+
+      await expect(fetchRateSource('USD', 'RUB')).resolves.toBeNull();
+    });
+
+    it('shares the table the conversions read', async () => {
+      global.fetch.mockResolvedValueOnce(usdTable({ RUB: 81.13 }));
+      await fetchLiveExchangeRate('USD', 'RUB');
+
+      await expect(fetchRateSource('RUB', 'USD')).resolves.toBe('CBR');
+      expect(global.fetch).toHaveBeenCalledTimes(1);
+    });
   });
 
   it('falls back to the offline rate when the API fails', async () => {

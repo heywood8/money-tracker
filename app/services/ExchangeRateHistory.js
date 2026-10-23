@@ -1,6 +1,6 @@
 import * as FileSystem from 'expo-file-system/legacy';
-import { fetchRates, RateSourceError } from './frankfurter';
-import { fetchLiveExchangeRate } from './currency';
+import { fetchRates, pairProviders, RateSourceError } from './frankfurter';
+import { fetchLiveExchangeRate, fetchRateSource } from './currency';
 
 /**
  * Exchange-rate history for the rate charts on the Graphs tab.
@@ -14,6 +14,13 @@ import { fetchLiveExchangeRate } from './currency';
  * changes, so once a pair has been drawn, opening it again asks the network for
  * the days since the last visit — usually one or two rows — and a chart opened
  * offline draws what was saved, marked stale, instead of an error.
+ *
+ * The daily series reads the same source as the live conversion rate: the
+ * blend, or a pair's home central banks (frankfurter.js, HOME_PROVIDERS). The
+ * monthly averages behind the all-time line always read the blend: a day's lag
+ * does not show in a month's average, and a median over a dozen banks cannot be
+ * thrown by one bank's bad day the way a single bank's own feed can. (The line
+ * still ends on the newest daily rate, so it ends where the card's headline is.)
  */
 
 // The ranges a chart offers, shortest first: the order of its chip row.
@@ -45,10 +52,13 @@ export const HISTORY_REFRESH_MS = 60 * 60 * 1000;
 const HISTORY_TIMEOUT_MS = 15000;
 
 // Bumped when the saved shape changes; a file of another version is ignored.
-const CACHE_VERSION = 1;
+// 2: pairs with a home central bank read it instead of the blend, and the file
+// records which (`providers`), so a top-up never splices two sources together.
+const CACHE_VERSION = 2;
 export const RATE_CACHE_DIR = `${FileSystem.cacheDirectory}exchange-rates/`;
 
 const CURRENCY_CODE = /^[A-Z]{3}$/;
+const PROVIDER_FILTER = /^[A-Z0-9,]*$/;
 
 const pad2 = (n) => String(n).padStart(2, '0');
 
@@ -147,7 +157,11 @@ export const clearRateHistoryCache = () => {
   pairQueues.clear();
 };
 
-const emptyEntry = () => ({ v: CACHE_VERSION, base: null, quote: null, daily: null, monthly: null });
+// `providers` is the daily series' source: a filter, '' for the blend, or null
+// until it is known (see fetchRateSource).
+const emptyEntry = () => ({
+  v: CACHE_VERSION, base: null, quote: null, providers: null, daily: null, monthly: null,
+});
 
 const isRowList = (rows) => Array.isArray(rows) && rows.every((row) => (
   Array.isArray(row) && typeof row[0] === 'string' && typeof row[1] === 'number' && row[1] > 0
@@ -162,7 +176,8 @@ const isSeries = (series) => (
  * another version — it is a cache, so the worst case is downloading again.
  *
  * @param {*} raw - Parsed file contents
- * @returns {{v: number, base: string|null, quote: string|null, daily: Object|null, monthly: Object|null}}
+ * @returns {{v: number, base: string|null, quote: string|null, providers: string|null,
+ *   daily: Object|null, monthly: Object|null}}
  */
 export const parseCacheEntry = (raw) => {
   if (
@@ -170,6 +185,7 @@ export const parseCacheEntry = (raw) => {
     || raw.v !== CACHE_VERSION
     || !CURRENCY_CODE.test(raw.base ?? '')
     || !CURRENCY_CODE.test(raw.quote ?? '')
+    || !(raw.providers === null || (typeof raw.providers === 'string' && PROVIDER_FILTER.test(raw.providers)))
   ) {
     return emptyEntry();
   }
@@ -177,6 +193,7 @@ export const parseCacheEntry = (raw) => {
     v: CACHE_VERSION,
     base: raw.base,
     quote: raw.quote,
+    providers: raw.providers,
     daily: isSeries(raw.daily) && typeof raw.daily.from === 'string' ? raw.daily : null,
     monthly: isSeries(raw.monthly) ? raw.monthly : null,
   };
@@ -231,6 +248,7 @@ const lastDate = (series, fallback) => (
 
 const isFresh = (series, force) => !force && Date.now() - series.checkedAt < HISTORY_REFRESH_MS;
 
+// `params.providers` narrows the source; left out, the API blends every bank.
 const requestRows = (base, quote, params) => fetchRates(
   { base, quotes: quote, ...params },
   { timeoutMs: HISTORY_TIMEOUT_MS },
@@ -245,7 +263,9 @@ const requestRows = (base, quote, params) => fetchRates(
  * stale. Returns whether the entry changed.
  */
 const topUpDaily = async (entry, start, yearStart, force) => {
-  const { base, quote } = entry;
+  const { base, quote, providers } = entry;
+  // Rows from a guessed source could be the wrong bank's; ask once it is known.
+  if (providers === null) throw new RateSourceError('network', 'The rate source is not known yet');
   const daily = entry.daily;
   let rows = daily ? daily.rows : [];
   let from = daily ? daily.from : start;
@@ -253,20 +273,20 @@ const topUpDaily = async (entry, start, yearStart, force) => {
   let changed = false;
 
   if (!daily) {
-    rows = await requestRows(base, quote, { from: start });
+    rows = await requestRows(base, quote, { from: start, providers });
     checkedAt = Date.now();
     changed = true;
   } else {
     if (daily.from > start) {
       // Only the older days: the saved span already covers the rest.
-      rows = mergeRows(rows, await requestRows(base, quote, { from: start, to: dayBefore(daily.from) }));
+      rows = mergeRows(rows, await requestRows(base, quote, { from: start, to: dayBefore(daily.from), providers }));
       from = start;
       changed = true;
     }
     if (!isFresh(daily, force)) {
       // From the newest saved day, not the day after: that day may have been
       // saved before every provider had published it.
-      rows = mergeRows(rows, await requestRows(base, quote, { from: lastDate(daily, daily.from) }));
+      rows = mergeRows(rows, await requestRows(base, quote, { from: lastDate(daily, daily.from), providers }));
       checkedAt = Date.now();
       changed = true;
     }
@@ -294,15 +314,48 @@ const topUpMonthly = async (entry, force) => {
   if (monthly && isFresh(monthly, force)) return false;
   // From the newest saved month: its average is still moving until it ends.
   const from = monthly ? lastDate(monthly, EARLIEST_DATE) : EARLIEST_DATE;
+  // The blend whatever the pair's daily source: see the note at the top.
   const rows = await requestRows(base, quote, { from, group: 'month' });
   entry.monthly = { checkedAt: Date.now(), rows: mergeRows(monthly ? monthly.rows : [], rows) };
   return true;
 };
 
+// How far a day may sit from the days around it before it is taken for a
+// publishing error. The errors seen in a bank's feed are another currency's
+// figure in the slot (367 where the rate was 5), off by several times; the
+// steepest real day among the app's currencies, the rouble in March 2022, moved
+// 14%. The same half the live lookup allows a home bank (isReasonableRate).
+const SPIKE_RATIO = 1.5;
+// Days either side that a day is judged against.
+const SPIKE_WINDOW = 3;
+
+/**
+ * The rows without one-off spikes: a day further than SPIKE_RATIO from the
+ * median of the days around it (itself included) is left out. A move that
+ * lasts is kept, since the median moves with it within a day or two, and a
+ * series too short to judge is returned as it is.
+ *
+ * @param {Array<[string, number]>} rows - [date, rate], oldest first
+ * @returns {Array<[string, number]>}
+ */
+export const dropRateSpikes = (rows) => {
+  if (rows.length < 3) return rows;
+  return rows.filter(([, rate], i) => {
+    const near = rows
+      .slice(Math.max(0, i - SPIKE_WINDOW), i + SPIKE_WINDOW + 1)
+      .map((row) => row[1])
+      .sort((a, b) => a - b);
+    const median = near[Math.floor(near.length / 2)];
+    return rate <= median * SPIKE_RATIO && rate >= median / SPIKE_RATIO;
+  });
+};
+
 // The points a range draws, in the direction the chart reads.
 const pointsFor = (entry, range, start, invert) => {
   const toPoint = ([date, rate]) => ({ date, rate: invert ? 1 / rate : rate });
-  const daily = entry.daily ? entry.daily.rows : [];
+  // Judged over the whole saved span, so the first days of a range still have
+  // neighbours on both sides.
+  const daily = dropRateSpikes(entry.daily ? entry.daily.rows : []);
 
   if (range === 'all') {
     const monthly = entry.monthly ? entry.monthly.rows.map(toPoint) : [];
@@ -315,8 +368,12 @@ const pointsFor = (entry, range, start, invert) => {
     return monthly;
   }
 
-  const points = daily.filter(([date]) => date >= start).map(toPoint);
-  return range === 'day' ? points.slice(-2) : points;
+  // Never fewer than two fixings while two are saved: a single bank can go
+  // quiet for longer than a short range (the Bank of Russia publishes nothing
+  // from 1 to 12 January), and the range then starts from its last fixings.
+  const inRange = daily.filter(([date]) => date >= start);
+  const rows = range === 'day' || inRange.length < 2 ? daily.slice(-2) : inRange;
+  return rows.map(toPoint);
 };
 
 /**
@@ -345,6 +402,10 @@ export const fetchRateHistory = (from, to, range, { now = new Date(), force = fa
   const pairKey = [from, to].sort().join('_');
   const start = rangeStart(range, now);
   const yearStart = rangeStart('year', now);
+  // Downloads reach back at least a month, so a short range opened in a bank's
+  // quiet spell still has fixings from before it to start from.
+  const monthStart = rangeStart('month', now);
+  const downloadStart = start < monthStart ? start : monthStart;
 
   return runExclusive(pairKey, async () => {
     const entry = await readEntry(pairKey);
@@ -355,12 +416,24 @@ export const fetchRateHistory = (from, to, range, { now = new Date(), force = fa
     }
     const invert = entry.base !== from;
 
+    // The daily series' source is re-checked whenever it differs from what the
+    // pair would read now: not yet known, the home banks not quoting the pair,
+    // or HOME_PROVIDERS changed since it was saved. A different answer starts
+    // the daily series over rather than splicing two sources into one line.
+    if (entry.providers !== pairProviders(from, to)) {
+      const source = await fetchRateSource(from, to);
+      if (source !== null && source !== entry.providers) {
+        entry.providers = source;
+        entry.daily = null;
+      }
+    }
+
     // The all-time line also ends on the newest daily rate, so it tops up the
-    // last week of the daily series alongside its own — independently, so one
-    // answering is enough to draw something.
+    // daily series alongside its own — independently, so one answering is
+    // enough to draw something.
     const updates = range === 'all'
-      ? [topUpDaily(entry, rangeStart('day', now), yearStart, force), topUpMonthly(entry, force)]
-      : [topUpDaily(entry, start, yearStart, force)];
+      ? [topUpDaily(entry, monthStart, yearStart, force), topUpMonthly(entry, force)]
+      : [topUpDaily(entry, downloadStart, yearStart, force)];
     const results = await Promise.allSettled(updates);
     const failed = results.find((result) => result.status === 'rejected');
     const changed = results.some((result) => result.status === 'fulfilled' && result.value);
@@ -472,6 +545,40 @@ export const formatRateChange = (change, changePercent, language, decimals) => {
   return `${signed(change, formatRateValue(change, language, decimals))} `
     + `(${signed(changePercent, formatRateValue(changePercent, language, 2))}%)`;
 };
+
+/**
+ * A move as it is printed: rounded to the rate's decimals, so one too small to
+ * show is no move at all, with no sign, arrow or colour that the "0.00" beside
+ * it would contradict. (Two fixings can differ in a digit the rate is not
+ * shown to.)
+ *
+ * @param {number} change
+ * @param {number} changePercent
+ * @param {number} decimals - The decimals the rate is shown to
+ * @returns {{change: number, changePercent: number}}
+ */
+export const shownRateChange = (change, changePercent, decimals) => {
+  const rounded = Number(change.toFixed(decimals));
+  // A literal 0, not the -0 a small fall rounds to, which would print as "-0.00".
+  return rounded === 0 ? { change: 0, changePercent: 0 } : { change: rounded, changePercent };
+};
+
+/**
+ * The colour a rate's move is printed in: green for a rise, red for a fall,
+ * muted when it did not move. It says which way the rate went, like the arrow
+ * beside it; whether that is good news depends on which side of the pair the
+ * reader holds.
+ *
+ * The green is `success`, not `income`: the move is small text, and `income`
+ * reaches only 4.2:1 on the light surface, under AA.
+ *
+ * @param {number} change
+ * @param {Object} colors - A theme palette
+ * @returns {string}
+ */
+export const rateChangeColor = (change, colors) => (
+  change > 0 ? colors.success : change < 0 ? colors.overspend : colors.mutedText
+);
 
 // A YYYY-MM-DD date as a local Date, for the locale formatter.
 const parseDate = (date) => {

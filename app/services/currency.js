@@ -12,7 +12,7 @@ import Decimal from 'decimal.js';
 import exchangeRatesData from '../../assets/exchange-rates.json';
 import currenciesData from '../../assets/currencies.json';
 import { SLOW_PHASE_MS } from './perfTrace';
-import { fetchRates } from './frankfurter';
+import { fetchRates, pairProviders } from './frankfurter';
 
 // Configure Decimal.js for financial calculations
 Decimal.set({
@@ -805,8 +805,11 @@ export const getExchangeRatesLastUpdated = () => {
   return exchangeRatesData.lastUpdated;
 };
 
-// In-memory cache of the live rate table (1-hour TTL). One table serves every
-// pair: it is quoted against USD and a pair is read off it as a cross rate.
+// In-memory cache of the live rate tables (1-hour TTL). A table is quoted
+// against USD and a pair is read off it as a cross rate, so one table serves
+// every pair drawn from the same source: the blend for most, a home central
+// bank's own table for a pair with a currency in HOME_PROVIDERS (see
+// frankfurter.js), so a transfer is converted at the figure its chart shows.
 //
 // It used to be one table per *source* currency, fetched from that currency's
 // own endpoint. Frankfurter rounds each rate to about five significant digits
@@ -816,8 +819,10 @@ export const getExchangeRatesLastUpdated = () => {
 // nothing. It also means a batch converting from five currencies makes one
 // request instead of five.
 const LIVE_TABLE_BASE = 'USD';
-let liveRateTable = null; // { rates: { CODE: number }, timestamp }
-let liveTableRequest = null; // in-flight fetch, shared by concurrent callers
+// providers filter ('' for the blend) -> { rates: { CODE: number }, timestamp }
+const liveRateTables = new Map();
+// providers filter -> in-flight fetch, shared by concurrent callers
+const liveTableRequests = new Map();
 const CACHE_TTL_MS = 60 * 60 * 1000; // 1 hour
 // One URL now, so one timeout is the whole wait. Longer than the 5 s each of the
 // two old mirrors got, shorter than the 10 s the pair could cost together.
@@ -851,37 +856,47 @@ let failedFetch = null;
  * Clear the in-memory exchange rate cache (for testing)
  */
 export const clearExchangeRateCache = () => {
-  liveRateTable = null;
-  liveTableRequest = null;
+  liveRateTables.clear();
+  liveTableRequests.clear();
   failedFetch = null;
 };
 
 /**
- * Fetch the USD-based rate table, or null when no usable answer came back.
+ * Fetch a USD-based rate table, or null when no usable answer came back.
  *
  * Concurrent callers share one request, and the backoff counts the request
  * rather than its callers: a batch that converts five items at once on a single
  * failed fetch has seen one failure, not five, and must not arm the backoff.
  *
+ * @param {string} providers - The providers filter, '' for the blend
  * @returns {Promise<Object<string, number>|null>}
  */
-const loadLiveRateTable = () => {
-  if (liveTableRequest) return liveTableRequest;
-  liveTableRequest = (async () => {
+const loadLiveRateTable = (providers) => {
+  const pending = liveTableRequests.get(providers);
+  if (pending) return pending;
+  const request = (async () => {
     let rates = null;
     try {
-      const rows = await fetchRates({ base: LIVE_TABLE_BASE }, { timeoutMs: FETCH_TIMEOUT_MS });
+      const rows = await fetchRates(
+        { base: LIVE_TABLE_BASE, providers },
+        { timeoutMs: FETCH_TIMEOUT_MS },
+      );
       const table = { [LIVE_TABLE_BASE]: 1 };
       for (const row of rows) {
         if (row.base === LIVE_TABLE_BASE) table[row.quote] = row.rate;
       }
-      // The base alone is not a table: an empty answer is a failed lookup.
-      if (Object.keys(table).length > 1) rates = table;
-    } catch {
-      rates = null;
+      // The base alone is not a table: an empty answer is a failed lookup. Not
+      // so for a home bank's table, which is empty when the source stops
+      // carrying that bank. The answer came, so it is kept: it quotes no pair,
+      // and the pair moves on to the blend instead of going offline.
+      if (Object.keys(table).length > 1 || providers) rates = table;
+    } catch (error) {
+      // Likewise a filter the API refuses outright (4xx): the network works,
+      // that bank is just not on offer.
+      rates = providers && error?.code === 'unsupported' ? { [LIVE_TABLE_BASE]: 1 } : null;
     }
     if (rates) {
-      liveRateTable = { rates, timestamp: Date.now() };
+      liveRateTables.set(providers, { rates, timestamp: Date.now() });
       failedFetch = null;
     } else {
       failedFetch = {
@@ -889,10 +904,23 @@ const loadLiveRateTable = () => {
         consecutive: (failedFetch ? failedFetch.consecutive : 0) + 1,
       };
     }
-    liveTableRequest = null;
+    liveTableRequests.delete(providers);
     return rates;
   })();
-  return liveTableRequest;
+  liveTableRequests.set(providers, request);
+  return request;
+};
+
+// Whether the live lookups keep failing outright, so the offline table should
+// answer now instead of after another timeout.
+const isBackingOff = () => failedFetch !== null
+  && failedFetch.consecutive >= FETCH_FAILURES_BEFORE_BACKOFF
+  && Date.now() - failedFetch.at < FETCH_FAILURE_BACKOFF_MS;
+
+// A source's table while its cached copy is fresh, or null.
+const cachedLiveTable = (providers) => {
+  const cached = liveRateTables.get(providers);
+  return cached && Date.now() - cached.timestamp < CACHE_TTL_MS ? cached.rates : null;
 };
 
 /**
@@ -915,7 +943,13 @@ const crossRate = (rates, fromCurrency, toCurrency) => {
 
 /**
  * Fetch a live exchange rate between two currencies.
- * Reads the shared live table (Frankfurter), then falls back to offline rates.
+ * Reads the pair's live table (Frankfurter), then falls back to offline rates.
+ *
+ * A pair with a currency in HOME_PROVIDERS is read off its home banks' table,
+ * and off the blend when that table does not quote one side of it, or quotes an
+ * absurd figure. When the home table cannot be fetched, a blend table already
+ * cached still answers, but none is fetched: the network is down for both, and
+ * a second timeout would only delay the offline answer.
  *
  * @param {string} fromCurrency - Source currency code (e.g., 'USD')
  * @param {string} toCurrency - Destination currency code (e.g., 'EUR')
@@ -932,26 +966,21 @@ export const fetchLiveExchangeRate = async (fromCurrency, toCurrency) => {
 
   const fromCode = fromCurrency.toUpperCase();
   const toCode = toCurrency.toUpperCase();
+  const homeProviders = pairProviders(fromCode, toCode);
+  let networkDown = false;
 
-  // Check cache. A pair the cached table does not quote is a fact about the
-  // data, not the network, so it goes to the offline table without refetching.
-  if (liveRateTable && Date.now() - liveRateTable.timestamp < CACHE_TTL_MS) {
-    const rate = crossRate(liveRateTable.rates, fromCode, toCode);
-    if (rate) return { rate, source: 'live' };
-  } else {
-    // Try the network — unless the lookups keep failing, in which case the
-    // offline table answers now instead of after another timeout.
-    const backingOff = failedFetch !== null
-      && failedFetch.consecutive >= FETCH_FAILURES_BEFORE_BACKOFF
-      && Date.now() - failedFetch.at < FETCH_FAILURE_BACKOFF_MS;
-
-    if (!backingOff) {
+  for (const providers of homeProviders ? [homeProviders, ''] : ['']) {
+    // A pair the cached table does not quote is a fact about the data, not the
+    // network, so it moves on without refetching.
+    let rates = cachedLiveTable(providers);
+    if (!rates) {
+      if (networkDown || isBackingOff()) {
+        networkDown = true;
+        continue;
+      }
       const fetchStartedAt = Date.now();
-      const rates = await loadLiveRateTable();
-      if (rates) {
-        const rate = crossRate(rates, fromCode, toCode);
-        if (rate) return { rate, source: 'live' };
-      } else {
+      rates = await loadLiveRateTable(providers);
+      if (!rates) {
         // Say so in the log when the attempt was slow enough for a caller to
         // feel it — a conversion silently waiting on the network is not
         // something the screen that triggered it shows.
@@ -961,7 +990,16 @@ export const fetchLiveExchangeRate = async (fromCurrency, toCurrency) => {
             `[perf] currency.rate ${fromCurrency}->${toCurrency} ${elapsed}ms (live lookup failed, using offline rates)`,
           );
         }
+        networkDown = true;
+        continue;
       }
+    }
+    const rate = crossRate(rates, fromCode, toCode);
+    // A home bank's figure has no median of other banks to outvote a bad day,
+    // and its feed has had them (a dollar rate published in the rouble's slot,
+    // once in two years). One the offline table calls absurd reads the blend.
+    if (rate && (providers === '' || isReasonableRate(rate, fromCode, toCode))) {
+      return { rate, source: 'live' };
     }
   }
 
@@ -972,4 +1010,29 @@ export const fetchLiveExchangeRate = async (fromCurrency, toCurrency) => {
   }
 
   return { rate: null, source: 'none' };
+};
+
+/**
+ * Which source a pair's rates come from on an ordinary day: its home banks'
+ * filter when their table quotes both sides, '' (the blend) when it does not or
+ * the pair has no home bank, null when that cannot be known now (no table
+ * cached and none could be fetched).
+ *
+ * The rate charts keep a pair's history to this. Unlike fetchLiveExchangeRate
+ * it asks only whether the banks quote the pair, not whether today's figure is
+ * plausible: one bad day must not move a chart onto the blend for good.
+ *
+ * @param {string} fromCurrency
+ * @param {string} toCurrency
+ * @returns {Promise<string|null>}
+ */
+export const fetchRateSource = async (fromCurrency, toCurrency) => {
+  const fromCode = String(fromCurrency).toUpperCase();
+  const toCode = String(toCurrency).toUpperCase();
+  const providers = pairProviders(fromCode, toCode);
+  if (!providers) return '';
+  const rates = cachedLiveTable(providers)
+    || (isBackingOff() ? null : await loadLiveRateTable(providers));
+  if (!rates) return null;
+  return rates[fromCode] > 0 && rates[toCode] > 0 ? providers : '';
 };

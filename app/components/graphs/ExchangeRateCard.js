@@ -13,6 +13,8 @@ import {
   fetchRateHistory,
   formatAxisDate,
   formatRateChange,
+  rateChangeColor,
+  shownRateChange,
   formatRateDate,
   formatRateValue,
   rateDecimals,
@@ -218,9 +220,14 @@ const ExchangeRateCard = ({ chart, colors, t, language }) => {
   const shownPoint = points[shownIndex];
   const shownValue = shownPoint ? shownPoint.rate * amount : null;
   const decimals = summary ? rateDecimals(summary.current) : 2;
-  const change = summary && shownValue != null ? shownValue - summary.first : 0;
-  const changePercent = summary && summary.first > 0 ? (change / summary.first) * 100 : 0;
+  const rawChange = summary && shownValue != null ? shownValue - summary.first : 0;
+  const { change, changePercent } = shownRateChange(
+    rawChange,
+    summary && summary.first > 0 ? (rawChange / summary.first) * 100 : 0,
+    decimals,
+  );
   const changeIcon = change > 0 ? 'arrow-up' : change < 0 ? 'arrow-down' : 'minus';
+  const changeColor = rateChangeColor(change, colors);
   // A monthly average stands for its month, so it is not dated to a day; the
   // all-time line's last point is the latest daily rate and is.
   const shownIsMonthly = range === 'all' && shownIndex < points.length - 1;
@@ -250,8 +257,8 @@ const ExchangeRateCard = ({ chart, colors, t, language }) => {
         </Text>
         {summary && (
           <View style={styles.changeRow} testID="exchange-rate-change">
-            <Icon name={changeIcon} size={14} color={colors.mutedText} />
-            <Text style={[styles.changeText, { color: colors.mutedText }]} numberOfLines={1}>{changeText}</Text>
+            <Icon name={changeIcon} size={14} color={changeColor} />
+            <Text style={[styles.changeText, { color: changeColor }]} numberOfLines={1}>{changeText}</Text>
           </View>
         )}
       </View>

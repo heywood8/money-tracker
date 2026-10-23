@@ -18,7 +18,14 @@ const colors = {
   primary: '#007aff',
   primaryStrong: '#0057b8',
   altRow: '#ffffff',
+  success: '#2e7d32',
+  overspend: '#c62828',
 };
+
+// The colour the move's text is drawn in.
+const changeColorOf = (text) => [screen.getByText(text).props.style].flat().reduce(
+  (merged, style) => ({ ...merged, ...style }), {},
+).color;
 
 const t = (key) => ({
   rate_range_day: 'Day',
@@ -61,6 +68,7 @@ describe('ExchangeRateCard', () => {
     resolve(series([['2026-09-23', 80], ['2026-10-23', 81.55]]));
     await waitFor(() => expect(screen.getByTestId('exchange-rate-value')).toHaveTextContent('₽81.55'));
     expect(screen.getByText('+1.55 (+1.94%)')).toBeTruthy();
+    expect(changeColorOf('+1.55 (+1.94%)')).toBe(colors.success);
     expect(screen.getByText('Oct 23, 2026 · since Sep 23, 2026')).toBeTruthy();
     expect(screen.getByText('1 USD → RUB')).toBeTruthy();
   });
@@ -73,7 +81,27 @@ describe('ExchangeRateCard', () => {
     await waitFor(() => expect(screen.getByTestId('exchange-rate-value')).toHaveTextContent('₽22.46'));
     expect(screen.getByText('100 AMD → RUB')).toBeTruthy();
     expect(screen.getByText('-0.13 (-0.58%)')).toBeTruthy();
+    expect(changeColorOf('-0.13 (-0.58%)')).toBe(colors.overspend);
     expect(fetchRateHistory).toHaveBeenCalledWith('AMD', 'RUB', 'day');
+  });
+
+  it('leaves a rate that did not move in the muted colour', async () => {
+    fetchRateHistory.mockResolvedValue(series([['2026-10-22', 81.55], ['2026-10-23', 81.55]]));
+
+    await renderCard();
+
+    await waitFor(() => expect(screen.getByText('0.00 (0.00%)')).toBeTruthy());
+    expect(changeColorOf('0.00 (0.00%)')).toBe(colors.mutedText);
+  });
+
+  it('treats a move too small to print as no move', async () => {
+    // Two fixings a digit apart past the two decimals the rate is shown to.
+    fetchRateHistory.mockResolvedValue(series([['2026-10-22', 81.55], ['2026-10-23', 81.551]]));
+
+    await renderCard();
+
+    await waitFor(() => expect(screen.getByText('0.00 (0.00%)')).toBeTruthy());
+    expect(changeColorOf('0.00 (0.00%)')).toBe(colors.mutedText);
   });
 
   it('switches range from the chip row', async () => {

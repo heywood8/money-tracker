@@ -12,7 +12,9 @@ import {
   formatAxisDate,
   formatRateChange,
   formatRateValue,
+  rateChangeColor,
   rateDecimals,
+  shownRateChange,
   summarizeRateSeries,
 } from '../services/ExchangeRateHistory';
 import { rateChartTitle } from '../services/ExchangeRateCharts';
@@ -114,17 +116,20 @@ export const buildSparklineSvg = (values, width, height, color) => {
  * @param {Object} chart - { from, to, amount }
  * @param {Array<{date: string, rate: number}>} points
  * @param {string} language
- * @returns {{title: string, value: string, change: string, arrow: string, date: string}|null}
+ * @returns {{title: string, value: string, change: string, delta: number, arrow: string,
+ *   date: string}|null} `delta` is the move as a number, for its colour
  */
 export const describeRate = (chart, points, language) => {
   const summary = summarizeRateSeries(points, chart.amount);
   if (!summary) return null;
   const decimals = rateDecimals(summary.current);
+  const { change, changePercent } = shownRateChange(summary.change, summary.changePercent, decimals);
   return {
     title: rateChartTitle(chart),
     value: `${getCurrencySymbol(chart.to)}${formatRateValue(summary.current, language, decimals)}`,
-    change: formatRateChange(summary.change, summary.changePercent, language, decimals),
-    arrow: summary.change > 0 ? '▲' : summary.change < 0 ? '▼' : '•',
+    change: formatRateChange(change, changePercent, language, decimals),
+    delta: change,
+    arrow: change > 0 ? '▲' : change < 0 ? '▼' : '•',
     // The day and month, as the Graphs card labels a month's axis.
     date: formatAxisDate(summary.date, 'month', language),
   };
@@ -225,7 +230,12 @@ export function ExchangeRateWidget({ model, theme, width, height }) {
       />
       <FlexWidget style={ROW_STYLE}>
         <FlexWidget style={ROW_GROW_STYLE}>
-          <TextWidget text={`${figures.arrow} ${figures.change}`} maxLines={1} truncate="END" style={mutedText} />
+          <TextWidget
+            text={`${figures.arrow} ${figures.change}`}
+            maxLines={1}
+            truncate="END"
+            style={{ ...SMALL_TEXT, color: rateChangeColor(figures.delta, colors) }}
+          />
         </FlexWidget>
         {model.stale && (
           <TextWidget
