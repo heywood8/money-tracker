@@ -1,5 +1,12 @@
 # Changelog
 
+## [0.299.0](https://github.com/heywood8/money-tracker/compare/penny-v0.298.0...penny-v0.299.0) (2026-10-23)
+
+
+### Features
+
+* **graphs:** add exchange rate charts configured in settings ([#1870](https://github.com/heywood8/money-tracker/issues/1870)) ([7e95ea9](https://github.com/heywood8/money-tracker/commit/7e95ea9671cf56f7dbacfd4c846b1f530f1d15f2))
+
 ## [0.298.0](https://github.com/heywood8/money-tracker/compare/penny-v0.297.0...penny-v0.298.0) (2026-10-22)
 
 
