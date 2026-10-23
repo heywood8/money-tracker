@@ -77,6 +77,7 @@ The app follows a feature-based organization under the `app/` directory:
   - Database: `BudgetPlansDB.js`, `BalanceHistoryDB.js`, `PreferencesDB.js`
   - Utilities: `BackupRestore.js`, `currency.js`, `db.js`, `eventEmitter.js`, `LastAccount.js`
   - Features: `GoogleSheetsService.js`, `DailyBackupService.js`, `AppUpdateService.js`
+  - Exchange rates: `frankfurter.js` (the one rate source), `ExchangeRateHistory.js` (on-disk, top-up-only history for the rate charts), `ExchangeRateCharts.js` (the charts configured in Settings → Graphs)
   - Logging: `LogService.js`, `LogsFile.js`
   - Monitoring: `sentry.js` - Privacy-protective crash/error reporting (Sentry)
 
@@ -166,6 +167,7 @@ Bottom tab bar height is set to 80px with 24px bottom padding.
 **Database Services**:
 - `app/services/db.js` - SQLite wrapper with transaction support
 - `app/services/currency.js` - Precise currency calculations using `decimal.js` (avoids floating-point errors)
+- **Exchange rates have one source: the Frankfurter v2 API** (`app/services/frankfurter.js`, free, keyless, daily central-bank rates). `currency.fetchLiveExchangeRate` (conversions in operations and transfers) reads one cached USD-based table and returns cross rates off it; the Graphs tab's rate charts read `ExchangeRateHistory`, which saves each pair's history under the cache directory and only asks for the days since the last visit. Do not add a second rate API. Frankfurter rounds to ~5 significant digits *in the direction asked*, so a rate below 1 is asked the other way round and inverted.
 - `app/services/GoogleSheetsService.js` - Google Sheets export via native `@react-native-google-signin/google-signin` and Sheets REST API
 - `app/services/DailyBackupService.js` - Automatic daily/weekly backup management
 - `app/services/BackupRestore.js` - Import/export in JSON, CSV, SQLite formats

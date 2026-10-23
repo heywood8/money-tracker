@@ -22,6 +22,7 @@ import ImportPanel from '../components/settings/ImportPanel';
 import NotificationPanel from '../components/settings/NotificationPanel';
 import LogsPanel from '../components/settings/LogsPanel';
 import ResetPanel from '../components/settings/ResetPanel';
+import GraphsPanel from '../components/settings/GraphsPanel';
 import { useThemeColors } from '../contexts/ThemeColorsContext';
 import { useLocalization } from '../contexts/LocalizationContext';
 import { appEvents, EVENTS } from '../services/eventEmitter';
@@ -63,6 +64,7 @@ export default function SettingsScreen({ setSubPanelActive }) {
   const [containerSize, setContainerSize] = useState(null);
   const exportStep = panelStack.stepOf('export');
   const importStep = panelStack.stepOf('import');
+  const graphsStep = panelStack.stepOf('graphs');
 
 
   // Back navigation is locked while the open panel says it is mid-flight — a
@@ -271,8 +273,14 @@ export default function SettingsScreen({ setSubPanelActive }) {
       return t('notification_processing') || 'Notification processing';
     }
     if (activeSubPanel === 'reset') return t('reset_database') || 'Reset Database';
+    if (activeSubPanel === 'graphs') {
+      if (graphsStep === 'rateEditor') {
+        return panelStack.params?.editing ? t('rate_chart_edit') : t('rate_chart_new');
+      }
+      return t('graphs');
+    }
     return '';
-  }, [panelTitle, activeSubPanel, exportStep, importStep, notificationView, panelStack.params, t]);
+  }, [panelTitle, activeSubPanel, exportStep, importStep, notificationView, graphsStep, panelStack.params, t]);
 
   // Resolver behind navigateBack — the single answer for all three back paths
   // (swipe, hardware back, header arrow). An embedded Accounts/Categories screen
@@ -415,6 +423,16 @@ export default function SettingsScreen({ setSubPanelActive }) {
               <UpdatePanel
                 onRegisterTitle={registerPanelTitle}
                 onDone={closeSubPanel}
+                bottomInset={scrollBottomInset}
+              />
+            )}
+
+            {activeSubPanel === 'graphs' && (
+              <GraphsPanel
+                step={graphsStep}
+                onPushStep={pushStep}
+                onPopStep={popStep}
+                onRegisterBack={registerPanelBack}
                 bottomInset={scrollBottomInset}
               />
             )}

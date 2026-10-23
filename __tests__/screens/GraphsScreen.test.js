@@ -1,3 +1,4 @@
+/* eslint-disable react/prop-types */
 /**
  * Tests for GraphsScreen - Financial graphs and charts screen
  * Logic-based tests focusing on component behavior and integration patterns
@@ -72,6 +73,23 @@ jest.mock('../../assets/currencies.json', () => ({
   RUB: { name: 'Russian Ruble', symbol: '₽', decimal_digits: 2 },
 }), { virtual: true });
 
+// The exchange-rate charts configured in Settings → Graphs. None unless a test
+// sets some; the card itself is covered by ExchangeRateCard.test.js.
+const mockRateCharts = { list: [] };
+jest.mock('../../app/hooks/useExchangeRateCharts', () => () => ({
+  charts: mockRateCharts.list,
+  loaded: true,
+  upsertChart: jest.fn(),
+  removeChart: jest.fn(),
+}));
+jest.mock('../../app/components/graphs/ExchangeRateCard', () => {
+  const React = require('react');
+  const { Text } = require('react-native');
+  return function MockExchangeRateCard({ chart }) {
+    return React.createElement(Text, { testID: `rate-card-${chart.id}` }, `${chart.from}/${chart.to}`);
+  };
+});
+
 // Compiled once at module scope so the screen's module graph — which now reaches
 // OperationModal and the pickers behind it — is built during file evaluation
 // instead of inside the first test's 5s budget. The per-test requires below are
@@ -130,6 +148,32 @@ describe('GraphsScreen', () => {
       await render(<GraphsScreen />);
 
       expect(useAccountsData).toHaveBeenCalled();
+    });
+  });
+
+  describe('Exchange-rate charts', () => {
+    afterEach(() => {
+      mockRateCharts.list = [];
+    });
+
+    it('draws no rate card until one is configured', async () => {
+      const GraphsScreen = require('../../app/screens/GraphsScreen').default;
+
+      const { queryByTestId } = await render(<GraphsScreen />);
+
+      expect(queryByTestId(/^rate-card-/)).toBeNull();
+    });
+
+    it('draws one card per configured chart, in order', async () => {
+      mockRateCharts.list = [
+        { id: 'a', from: 'USD', to: 'RUB', amount: 1, range: 'month' },
+        { id: 'b', from: 'AMD', to: 'RUB', amount: 100, range: 'week' },
+      ];
+      const GraphsScreen = require('../../app/screens/GraphsScreen').default;
+
+      const { getAllByTestId } = await render(<GraphsScreen />);
+
+      expect(getAllByTestId(/^rate-card-/).map((node) => node.props.testID)).toEqual(['rate-card-a', 'rate-card-b']);
     });
   });
 

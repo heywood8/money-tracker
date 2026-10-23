@@ -27,6 +27,7 @@ import CategoryBackChip from '../components/graphs/CategoryBackChip';
 import { chartTransition, CHART_DROP } from '../components/graphs/chartTransitions';
 import TrendsCard from '../components/graphs/TrendsCard';
 import OperationsHeatmapCard from '../components/graphs/OperationsHeatmapCard';
+import ExchangeRateCard from '../components/graphs/ExchangeRateCard';
 import ExpenseSummaryCard from '../components/graphs/ExpenseSummaryCard';
 import IncomeSummaryCard from '../components/graphs/IncomeSummaryCard';
 import IncomePieChart from '../components/graphs/IncomePieChart';
@@ -35,6 +36,7 @@ import useExpenseData from '../hooks/useExpenseData';
 import useIncomeData from '../hooks/useIncomeData';
 import useCategoryOperations from '../hooks/useCategoryOperations';
 import useBalanceHistory from '../hooks/useBalanceHistory';
+import useExchangeRateCharts from '../hooks/useExchangeRateCharts';
 import { NET_WORTH_ACCOUNT_ID, isNetWorthSelection } from '../services/BalanceHistorySource';
 import OperationModal from '../modals/OperationModal';
 import { CARD_SURFACE } from '../styles/componentStyles';
@@ -110,6 +112,9 @@ const GraphsScreen = () => {
   // null lets the trends card fall back to its own default pair (income vs
   // expenses). Lifted so the pick survives the card unmounting with the panel.
   const [trendSeries, setTrendSeries] = useState(null);
+  // Exchange-rate charts set up in Settings → Graphs, drawn at the foot of the
+  // screen. Empty until the user adds one, in which case nothing is drawn.
+  const { charts: rateCharts } = useExchangeRateCharts();
 
 
   // Account selection state
@@ -844,6 +849,18 @@ const GraphsScreen = () => {
               selectedMonth={selectedMonth}
               periodLabel={selectedPeriodLabel}
             />
+
+            {/* Exchange rates. Not scoped by the period header: each chart picks
+                its own range from the chip row under its line. */}
+            {rateCharts.map((chart) => (
+              <ExchangeRateCard
+                key={chart.id}
+                chart={chart}
+                colors={colors}
+                t={t}
+                language={language}
+              />
+            ))}
           </View>
         </ScrollView>
       </Animated.View>

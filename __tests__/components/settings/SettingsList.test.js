@@ -55,6 +55,7 @@ describe('SettingsList', () => {
       ['settings-privacy-row', 'privacy'],
       ['settings-accounts-row', 'accounts'],
       ['settings-categories-row', 'categories'],
+      ['settings-graphs-row', 'graphs'],
       ['settings-notification-processing-row', 'notificationProcessing'],
       ['settings-export-row', 'export'],
       ['settings-import-row', 'import'],

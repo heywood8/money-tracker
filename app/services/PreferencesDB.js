@@ -27,6 +27,11 @@ export const PREF_KEYS = {
   // ('prevMonth' | 'yearAvg' | 'prevYear' | 'none'). Remembered across restarts
   // so the reader's choice of baseline survives leaving the Graphs tab.
   BALANCE_CHART_COMPARISON: 'balance_chart_comparison',
+  // JSON array of the exchange-rate charts the Graphs tab draws, in display
+  // order: [{ id, from, to, amount, range }] — "amount units of `from`, priced in
+  // `to`", opening on `range`. Configured in Settings → Graphs. Lives here (not
+  // in a table) so it travels with backups like every other preference.
+  EXCHANGE_RATE_CHARTS: 'exchange_rate_charts',
   GOOGLE_SHEETS_SPREADSHEET_ID: 'google_sheets_spreadsheet_id',
   // Google Drive automatic backup. Off unless the user turns it on; the folder id
   // is what binds the destination, so renaming or moving the folder in Drive

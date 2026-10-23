@@ -29,6 +29,7 @@ export const PANEL_ROOT_STEP = {
   export: 'list',
   import: 'source',
   notificationProcessing: 'main',
+  graphs: 'list',
 };
 
 export const EMPTY_STACK = [];
