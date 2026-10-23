@@ -787,5 +787,13 @@
   "rate_change_since": "desde",
   "rate_offline": "sin conexión",
   "rate_load_failed": "No se pudieron cargar los tipos",
-  "rate_not_available_pair": "No hay tipos para este par de monedas"
+  "rate_not_available_pair": "No hay tipos para este par de monedas",
+  "widget_rate_label": "Tipo de cambio",
+  "widget_rate_description": "Uno de tus pares de monedas: el tipo de hoy, su cambio y gráfico",
+  "widget_rate_empty": "Añade un gráfico de tipo de cambio en Ajustes → Gráficos",
+  "widget_config_title": "¿Qué tipo debe mostrar el widget?",
+  "widget_add_anyway": "Añadir de todos modos",
+  "widget_add_to_home": "Añadir widget a la pantalla de inicio",
+  "widget_add_hint": "Muestra un tipo y su cambio en la pantalla de inicio",
+  "widget_pin_unsupported": "Tu launcher no puede añadirlo desde aquí: mantén pulsada la pantalla de inicio → Widgets → Penny"
 }

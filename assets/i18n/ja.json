@@ -787,5 +787,13 @@
   "rate_change_since": "起点",
   "rate_offline": "オフライン",
   "rate_load_failed": "レートを読み込めませんでした",
-  "rate_not_available_pair": "この通貨ペアのレートはありません"
+  "rate_not_available_pair": "この通貨ペアのレートはありません",
+  "widget_rate_label": "為替レート",
+  "widget_rate_description": "通貨ペアの今日のレート、変動、グラフ",
+  "widget_rate_empty": "設定 → グラフで為替レートのグラフを追加してください",
+  "widget_config_title": "ウィジェットに表示するレート",
+  "widget_add_anyway": "このまま追加",
+  "widget_add_to_home": "ホーム画面にウィジェットを追加",
+  "widget_add_hint": "ホーム画面にレートとその変動を表示します",
+  "widget_pin_unsupported": "このランチャーはここから追加できません：ホーム画面を長押し → ウィジェット → Penny"
 }

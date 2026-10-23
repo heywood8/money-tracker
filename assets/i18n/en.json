@@ -787,5 +787,13 @@
   "rate_change_since": "since",
   "rate_offline": "offline",
   "rate_load_failed": "Could not load rates",
-  "rate_not_available_pair": "No rates for this currency pair"
+  "rate_not_available_pair": "No rates for this currency pair",
+  "widget_rate_label": "Exchange rate",
+  "widget_rate_description": "One of your currency pairs: today's rate, its change and chart",
+  "widget_rate_empty": "Add an exchange rate chart in Settings → Graphs",
+  "widget_config_title": "Which rate should the widget show?",
+  "widget_add_anyway": "Add anyway",
+  "widget_add_to_home": "Add widget to home screen",
+  "widget_add_hint": "Shows a rate and its change on the home screen",
+  "widget_pin_unsupported": "Your launcher can’t add it from here: long-press the home screen → Widgets → Penny"
 }

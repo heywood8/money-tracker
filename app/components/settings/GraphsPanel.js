@@ -1,15 +1,17 @@
 import React, { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import PropTypes from 'prop-types';
 import { StyleSheet, ScrollView, Text } from 'react-native';
+import { requestPinWidget } from 'react-native-android-widget';
 import { useThemeColors } from '../../contexts/ThemeColorsContext';
 import { useLocalization } from '../../contexts/LocalizationContext';
 import { useAccountsData } from '../../contexts/AccountsDataContext';
 import useExchangeRateCharts from '../../hooks/useExchangeRateCharts';
-import { createRateChartId } from '../../services/ExchangeRateCharts';
+import { createRateChartId, rateChartTitle } from '../../services/ExchangeRateCharts';
 import { DEFAULT_RATE_RANGE, RANGE_LABEL_KEYS } from '../../services/ExchangeRateHistory';
 import EmptyState from '../EmptyState';
 import RateChartEditor from './RateChartEditor';
 import { SettingsNavRow, SETTINGS_LIST_CONTENT } from './SettingsRows';
+import { EXCHANGE_RATE_WIDGET } from '../../widgets/widgetConstants';
 import { SECTION_LABEL } from '../../styles/componentStyles';
 import { FONT_SIZE, HORIZONTAL_PADDING, SPACING } from '../../styles/designTokens';
 
@@ -121,6 +123,21 @@ export default function GraphsPanel({ step, onPushStep, onPopStep, onRegisterBac
     if (draft) persist(() => removeChart(draft.id));
   }, [draft, persist, removeChart]);
 
+  // Asks the launcher to place the exchange-rate widget, which then opens the
+  // widget's own screen to pick the pair. Launchers that cannot pin from an app
+  // (some third-party ones) answer false; the row then says where to find the
+  // widget instead of doing nothing.
+  const [pinUnsupported, setPinUnsupported] = useState(false);
+  const handlePinWidget = useCallback(async () => {
+    let accepted = false;
+    try {
+      accepted = await requestPinWidget({ widgetName: EXCHANGE_RATE_WIDGET });
+    } catch (error) {
+      console.warn('[GraphsPanel] Could not request widget pinning:', error?.message);
+    }
+    setPinUnsupported(!accepted);
+  }, []);
+
   if (step === 'rateEditor' && draft) {
     return (
       <RateChartEditor
@@ -156,7 +173,7 @@ export default function GraphsPanel({ step, onPushStep, onPopStep, onRegisterBac
         <SettingsNavRow
           key={chart.id}
           icon="swap-horizontal-outline"
-          label={`${chart.amount} ${chart.from} → ${chart.to}`}
+          label={rateChartTitle(chart)}
           hint={`${t('rate_chart_default_range')}: ${t(RANGE_LABEL_KEYS[chart.range])}`}
           onPress={() => handleEdit(chart)}
           testID={`rate-chart-row-${chart.id}`}
@@ -171,6 +188,16 @@ export default function GraphsPanel({ step, onPushStep, onPopStep, onRegisterBac
         disabled={!canAdd}
         testID="rate-chart-add"
       />
+
+      {charts.length > 0 && (
+        <SettingsNavRow
+          icon="apps-outline"
+          label={t('widget_add_to_home')}
+          hint={pinUnsupported ? t('widget_pin_unsupported') : t('widget_add_hint')}
+          onPress={handlePinWidget}
+          testID="rate-widget-pin"
+        />
+      )}
 
       <Text style={[styles.note, { color: colors.mutedText }]}>{t('rate_source_note')}</Text>
     </ScrollView>

@@ -11,10 +11,14 @@ import {
   RATE_RANGES,
   axisDecimals,
   fetchRateHistory,
+  formatAxisDate,
+  formatRateChange,
+  formatRateDate,
   formatRateValue,
   rateDecimals,
   summarizeRateSeries,
 } from '../../services/ExchangeRateHistory';
+import { rateChartTitle } from '../../services/ExchangeRateCharts';
 import { useTabFocused } from '../../contexts/TabFocusContext';
 import useOnForeground from '../../hooks/useOnForeground';
 import { withAlpha } from '../../utils/colorUtils';
@@ -28,51 +32,6 @@ const VALUE_FONT_SIZE = 22;
 const CHART_ANIMATION = { type: 'timing', duration: 300 };
 // Four labels fit a phone-width axis at this size without colliding.
 const X_TICKS = 4;
-
-// A YYYY-MM-DD date as a local Date, for the locale formatter.
-const parseDate = (date) => {
-  const [year, month, day] = String(date).split('-').map(Number);
-  return new Date(year, month - 1, day || 1);
-};
-
-// In the app's language, not the device's — the two are independent here.
-const localeDate = (date, language, options) => {
-  try {
-    return parseDate(date).toLocaleDateString(language || undefined, options);
-  } catch {
-    return String(date);
-  }
-};
-
-/**
- * "23 Oct 2026" in the app's language, or "Oct 2026" for a monthly average
- * (the all-time series, whose points stand for a whole month).
- *
- * @param {string} date - YYYY-MM-DD
- * @param {string} [language]
- * @param {boolean} [monthOnly]
- * @returns {string}
- */
-export const formatRateDate = (date, language, monthOnly = false) => localeDate(
-  date,
-  language,
-  monthOnly ? { month: 'short', year: 'numeric' } : { day: 'numeric', month: 'short', year: 'numeric' },
-);
-
-/**
- * An x-axis label for a range: the day for the short ranges, the month for a
- * year, the year for all time.
- *
- * @param {string} date - YYYY-MM-DD
- * @param {string} range
- * @param {string} [language]
- * @returns {string}
- */
-export const formatAxisDate = (date, range, language) => {
-  if (range === 'all') return String(date).slice(0, 4);
-  if (range === 'year') return localeDate(date, language, { month: 'short' });
-  return localeDate(date, language, { day: 'numeric', month: 'short' });
-};
 
 /**
  * Evenly spread integer indices for the x-axis ticks, first and last included.
@@ -269,11 +228,10 @@ const ExchangeRateCard = ({ chart, colors, t, language }) => {
   const sinceDate = points.length > 0 ? formatRateDate(points[0].date, language, range === 'all') : '';
   const yDecimals = summary ? axisDecimals(summary.min, summary.max) : 2;
 
-  const signed = (value, text) => (value > 0 ? `+${text}` : text);
-  const changeText = `${signed(change, formatRateValue(change, language, decimals))} (${signed(changePercent, formatRateValue(changePercent, language, 2))}%)`;
+  const changeText = formatRateChange(change, changePercent, language, decimals);
   const symbol = getCurrencySymbol(to);
   const valueText = shownValue != null ? `${symbol}${formatRateValue(shownValue, language, decimals)}` : '';
-  const title = `${amount} ${from} → ${to}`;
+  const title = rateChartTitle(chart);
 
   return (
     <View

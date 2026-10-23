@@ -6,6 +6,7 @@
 
 import React from 'react';
 import { render, fireEvent, waitFor, act } from '@testing-library/react-native';
+import { Linking } from 'react-native';
 import SimpleTabs from '../../app/navigation/SimpleTabs';
 
 // Mock ThemeColorsContext
@@ -437,6 +438,67 @@ describe('SimpleTabs Component Rendering', () => {
     // Give React time to update
     await waitFor(() => {
       expect(graphsTab).toBeTruthy();
+    });
+  });
+
+  describe('widget deep link', () => {
+    // The exchange-rate home-screen widget opens the app on this URL.
+    const GRAPHS_URL = 'com.heywood8.monkeep://graphs';
+    let urlListener;
+
+    beforeEach(() => {
+      urlListener = undefined;
+      jest.spyOn(Linking, 'getInitialURL').mockResolvedValue(null);
+      jest.spyOn(Linking, 'addEventListener').mockImplementation((event, listener) => {
+        urlListener = listener;
+        return { remove: jest.fn() };
+      });
+    });
+
+    afterEach(() => {
+      Linking.getInitialURL.mockRestore();
+      Linking.addEventListener.mockRestore();
+    });
+
+    const graphsSelected = (getByTestId) => getByTestId('tab-Graphs').props.accessibilityState?.selected;
+
+    it('lands on the Graphs tab when the app is launched from the widget', async () => {
+      Linking.getInitialURL.mockResolvedValue(GRAPHS_URL);
+      const { getByTestId } = await render(<SimpleTabs />);
+
+      await waitFor(() => expect(graphsSelected(getByTestId)).toBe(true));
+    });
+
+    it('lets the user leave Graphs after a launch from the widget', async () => {
+      // Regression: the launch URL outlives the first read, and re-reading it on
+      // every tab switch pulled the user straight back to Graphs.
+      Linking.getInitialURL.mockResolvedValue(GRAPHS_URL);
+      const { getByTestId } = await render(<SimpleTabs />);
+      await waitFor(() => expect(graphsSelected(getByTestId)).toBe(true));
+
+      await act(async () => { fireEvent.press(getByTestId('tab-Operations')); });
+      await act(async () => { await new Promise((resolve) => setTimeout(resolve, 50)); });
+
+      expect(getByTestId('tab-Operations').props.accessibilityState?.selected).toBe(true);
+      expect(graphsSelected(getByTestId)).toBe(false);
+      expect(Linking.getInitialURL).toHaveBeenCalledTimes(1);
+    });
+
+    it('switches to the Graphs tab when the widget is tapped with the app open', async () => {
+      const { getByTestId } = await render(<SimpleTabs />);
+      expect(graphsSelected(getByTestId)).toBe(false);
+
+      await act(async () => { urlListener({ url: GRAPHS_URL }); });
+
+      await waitFor(() => expect(graphsSelected(getByTestId)).toBe(true));
+    });
+
+    it('ignores other URLs, such as an opened backup file', async () => {
+      const { getByTestId } = await render(<SimpleTabs />);
+
+      await act(async () => { urlListener({ url: 'content://downloads/penny.sqlite' }); });
+
+      expect(graphsSelected(getByTestId)).toBe(false);
     });
   });
 

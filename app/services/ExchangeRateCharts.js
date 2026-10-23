@@ -72,6 +72,14 @@ export const normalizeRateCharts = (raw) => {
 export const reverseRateChart = (chart) => ({ ...chart, from: chart.to, to: chart.from });
 
 /**
+ * How a chart is named everywhere it appears: "100 AMD → RUB".
+ *
+ * @param {{amount: number, from: string, to: string}} chart
+ * @returns {string}
+ */
+export const rateChartTitle = ({ amount, from, to }) => `${amount} ${from} → ${to}`;
+
+/**
  * The stored list.
  *
  * Reads the row itself rather than through getJsonPreference, whose error path

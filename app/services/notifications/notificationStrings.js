@@ -38,18 +38,22 @@ const i18nData = {
 
 /**
  * Translate a key for a language, falling back to English then to the key.
+ *
+ * Exported, with resolveLanguage below, for the other code that renders text
+ * with no LocalizationProvider above it: the home-screen widget, which runs in
+ * the same headless context the background alerts do.
  * @param {string} language
  * @param {string} key
  * @returns {string}
  */
-const translate = (language, key) =>
+export const translate = (language, key) =>
   i18nData[language]?.[key] || i18nData.en?.[key] || key;
 
 /**
  * Resolve the stored UI language, or 'en' when unset/unavailable.
  * @returns {Promise<string>}
  */
-const resolveLanguage = async () => {
+export const resolveLanguage = async () => {
   try {
     const stored = await PreferencesDB.getPreference(PreferencesDB.PREF_KEYS.LANGUAGE);
     return stored && i18nData[stored] ? stored : 'en';

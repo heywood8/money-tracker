@@ -787,5 +787,13 @@
   "rate_change_since": "seit",
   "rate_offline": "offline",
   "rate_load_failed": "Kurse konnten nicht geladen werden",
-  "rate_not_available_pair": "Keine Kurse für dieses Währungspaar"
+  "rate_not_available_pair": "Keine Kurse für dieses Währungspaar",
+  "widget_rate_label": "Wechselkurs",
+  "widget_rate_description": "Eines Ihrer Währungspaare: heutiger Kurs, Veränderung und Diagramm",
+  "widget_rate_empty": "Fügen Sie unter Einstellungen → Diagramme ein Kursdiagramm hinzu",
+  "widget_config_title": "Welchen Kurs soll das Widget zeigen?",
+  "widget_add_anyway": "Trotzdem hinzufügen",
+  "widget_add_to_home": "Widget zum Startbildschirm hinzufügen",
+  "widget_add_hint": "Zeigt einen Kurs und seine Veränderung auf dem Startbildschirm",
+  "widget_pin_unsupported": "Ihr Launcher kann es nicht von hier hinzufügen: Startbildschirm gedrückt halten → Widgets → Penny"
 }

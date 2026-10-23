@@ -787,5 +787,13 @@
   "rate_change_since": "depuis le",
   "rate_offline": "hors ligne",
   "rate_load_failed": "Impossible de charger les taux",
-  "rate_not_available_pair": "Aucun taux pour cette paire de devises"
+  "rate_not_available_pair": "Aucun taux pour cette paire de devises",
+  "widget_rate_label": "Taux de change",
+  "widget_rate_description": "Une de vos paires de devises : le taux du jour, sa variation et son graphique",
+  "widget_rate_empty": "Ajoutez un graphique de taux dans Paramètres → Graphiques",
+  "widget_config_title": "Quel taux le widget doit-il afficher ?",
+  "widget_add_anyway": "Ajouter quand même",
+  "widget_add_to_home": "Ajouter le widget à l’écran d’accueil",
+  "widget_add_hint": "Affiche un taux et sa variation sur l’écran d’accueil",
+  "widget_pin_unsupported": "Votre lanceur ne peut pas l’ajouter d’ici : appui long sur l’écran d’accueil → Widgets → Penny"
 }

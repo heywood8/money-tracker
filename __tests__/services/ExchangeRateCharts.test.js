@@ -2,6 +2,7 @@ import {
   normalizeRateChart,
   normalizeRateCharts,
   reverseRateChart,
+  rateChartTitle,
   loadRateCharts,
   saveRateCharts,
   upsertRateChart,
@@ -67,6 +68,10 @@ describe('ExchangeRateCharts', () => {
   it('reverseRateChart swaps the currencies and keeps the rest', () => {
     expect(reverseRateChart({ id: 'a', from: 'USD', to: 'RUB', amount: 10, range: 'day' }))
       .toEqual({ id: 'a', from: 'RUB', to: 'USD', amount: 10, range: 'day' });
+  });
+
+  it('rateChartTitle names a chart the way every screen shows it', () => {
+    expect(rateChartTitle({ amount: 100, from: 'AMD', to: 'RUB' })).toBe('100 AMD → RUB');
   });
 
   describe('loadRateCharts', () => {
