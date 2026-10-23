@@ -1,5 +1,12 @@
 # Changelog
 
+## [0.300.0](https://github.com/heywood8/money-tracker/compare/penny-v0.299.0...penny-v0.300.0) (2026-10-23)
+
+
+### Features
+
+* **graphs:** add exchange rate home-screen widget ([#1872](https://github.com/heywood8/money-tracker/issues/1872)) ([fd4232e](https://github.com/heywood8/money-tracker/commit/fd4232eeabf16dbd49d29165913062a14c9687cb))
+
 ## [0.299.0](https://github.com/heywood8/money-tracker/compare/penny-v0.298.0...penny-v0.299.0) (2026-10-23)
 
 
