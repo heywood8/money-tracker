@@ -75,6 +75,7 @@ describe('PreferencesDB', () => {
         'SHOW_QUICKADD_PANEL',
         'BUDGET_EXPANDED_GROUPS',
         'BALANCE_CHART_COMPARISON',
+        'EXCHANGE_RATE_CHARTS',
         'GOOGLE_SHEETS_SPREADSHEET_ID',
         'DRIVE_BACKUP_ENABLED',
         'DRIVE_BACKUP_FOLDER_ID',

@@ -254,6 +254,7 @@ describe('useSettingsPanelStack', () => {
       export: 'list',
       import: 'source',
       notificationProcessing: 'main',
+      graphs: 'list',
     });
   });
 });

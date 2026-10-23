@@ -64,4 +64,8 @@ export const EVENTS = {
   // OperationsScreen (open that operation's form on its category picker): the
   // booking is right, its auto-guessed category is what the user came to fix.
   OPEN_OPERATION_CATEGORY: 'navigate:operationCategory',
+  // Emitted with the saved list whenever the exchange-rate charts are added,
+  // edited, reordered or removed in Settings → Graphs, so the Graphs tab (which
+  // stays mounted) redraws without a restart.
+  EXCHANGE_RATE_CHARTS_CHANGED: 'exchangeRates:chartsChanged',
 };

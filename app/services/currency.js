@@ -12,6 +12,7 @@ import Decimal from 'decimal.js';
 import exchangeRatesData from '../../assets/exchange-rates.json';
 import currenciesData from '../../assets/currencies.json';
 import { SLOW_PHASE_MS } from './perfTrace';
+import { fetchRates } from './frankfurter';
 
 // Configure Decimal.js for financial calculations
 Decimal.set({
@@ -804,22 +805,35 @@ export const getExchangeRatesLastUpdated = () => {
   return exchangeRatesData.lastUpdated;
 };
 
-// In-memory cache for live exchange rates (1-hour TTL)
-const liveRateCache = new Map();
+// In-memory cache of the live rate table (1-hour TTL). One table serves every
+// pair: it is quoted against USD and a pair is read off it as a cross rate.
+//
+// It used to be one table per *source* currency, fetched from that currency's
+// own endpoint. Frankfurter rounds each rate to about five significant digits
+// in the direction asked for, so a weak base keeps far fewer: AMD → USD arrives
+// as 0.00277. Every USD → X rate is at least ~0.3, so the USD table keeps four
+// or more digits for every currency, and dividing two of them loses almost
+// nothing. It also means a batch converting from five currencies makes one
+// request instead of five.
+const LIVE_TABLE_BASE = 'USD';
+let liveRateTable = null; // { rates: { CODE: number }, timestamp }
+let liveTableRequest = null; // in-flight fetch, shared by concurrent callers
 const CACHE_TTL_MS = 60 * 60 * 1000; // 1 hour
-const FETCH_TIMEOUT_MS = 5000; // 5 seconds
+// One URL now, so one timeout is the whole wait. Longer than the 5 s each of the
+// two old mirrors got, shorter than the 10 s the pair could cost together.
+const FETCH_TIMEOUT_MS = 8000;
 
-// How long a currency whose live lookup keeps failing outright goes straight to
-// the offline rates instead of trying the network again.
+// How long the live lookup goes straight to the offline rates once it keeps
+// failing outright, instead of trying the network again.
 //
 // Only a *success* used to be remembered, so with no working connection every
-// caller paid the full two-URL timeout — 10 s each — and a caller that converts
-// in a loop paid it once per item. Bank-notification ingestion is exactly that
-// loop, which is how opening the notification feed could sit on its spinner for
-// a minute over work that needs no network at all (the offline table answers
-// the same question immediately). A minute is short enough that a connection
-// coming back is picked up almost at once, and long enough that one offline
-// batch pays the timeout a couple of times rather than once per item.
+// caller paid the full timeout and a caller that converts in a loop paid it once
+// per item. Bank-notification ingestion is exactly that loop, which is how
+// opening the notification feed could sit on its spinner for a minute over work
+// that needs no network at all (the offline table answers the same question
+// immediately). A minute is short enough that a connection coming back is
+// picked up almost at once, and long enough that one offline batch pays the
+// timeout a couple of times rather than once per item.
 const FETCH_FAILURE_BACKOFF_MS = 60 * 1000;
 
 // Consecutive outright failures before the backoff arms. The offline table is a
@@ -830,20 +844,78 @@ const FETCH_FAILURE_BACKOFF_MS = 60 * 1000;
 // instead of one per item.
 const FETCH_FAILURES_BEFORE_BACKOFF = 2;
 
-// fromCurrency (lowercase) -> { at, consecutive } for lookups that reached no URL
-const failedFetches = new Map();
+// { at, consecutive } for table fetches that got no usable answer, or null
+let failedFetch = null;
 
 /**
  * Clear the in-memory exchange rate cache (for testing)
  */
 export const clearExchangeRateCache = () => {
-  liveRateCache.clear();
-  failedFetches.clear();
+  liveRateTable = null;
+  liveTableRequest = null;
+  failedFetch = null;
+};
+
+/**
+ * Fetch the USD-based rate table, or null when no usable answer came back.
+ *
+ * Concurrent callers share one request, and the backoff counts the request
+ * rather than its callers: a batch that converts five items at once on a single
+ * failed fetch has seen one failure, not five, and must not arm the backoff.
+ *
+ * @returns {Promise<Object<string, number>|null>}
+ */
+const loadLiveRateTable = () => {
+  if (liveTableRequest) return liveTableRequest;
+  liveTableRequest = (async () => {
+    let rates = null;
+    try {
+      const rows = await fetchRates({ base: LIVE_TABLE_BASE }, { timeoutMs: FETCH_TIMEOUT_MS });
+      const table = { [LIVE_TABLE_BASE]: 1 };
+      for (const row of rows) {
+        if (row.base === LIVE_TABLE_BASE) table[row.quote] = row.rate;
+      }
+      // The base alone is not a table: an empty answer is a failed lookup.
+      if (Object.keys(table).length > 1) rates = table;
+    } catch {
+      rates = null;
+    }
+    if (rates) {
+      liveRateTable = { rates, timestamp: Date.now() };
+      failedFetch = null;
+    } else {
+      failedFetch = {
+        at: Date.now(),
+        consecutive: (failedFetch ? failedFetch.consecutive : 0) + 1,
+      };
+    }
+    liveTableRequest = null;
+    return rates;
+  })();
+  return liveTableRequest;
+};
+
+/**
+ * The cross rate from → to off a USD-based table, or null when either side is
+ * missing from it.
+ *
+ * @param {Object<string, number>} rates
+ * @param {string} fromCurrency
+ * @param {string} toCurrency
+ * @returns {string|null}
+ */
+const crossRate = (rates, fromCurrency, toCurrency) => {
+  const from = rates[fromCurrency];
+  const to = rates[toCurrency];
+  if (!(from > 0) || !(to > 0)) return null;
+  // Ten significant digits is more than either input carries; it only stops the
+  // division from printing a 20-digit tail into the operation's rate field.
+  return new Decimal(to).div(from).toSignificantDigits(10).toFixed();
 };
 
 /**
  * Fetch a live exchange rate between two currencies.
- * Tries primary CDN, then fallback CDN, then falls back to offline rates.
+ * Reads the shared live table (Frankfurter), then falls back to offline rates.
  *
  * @param {string} fromCurrency - Source currency code (e.g., 'USD')
  * @param {string} toCurrency - Destination currency code (e.g., 'EUR')
@@ -858,86 +930,37 @@ export const fetchLiveExchangeRate = async (fromCurrency, toCurrency) => {
     return { rate: '1.0', source: 'live' };
   }
 
-  const fromLower = fromCurrency.toLowerCase();
-  const toLower = toCurrency.toLowerCase();
+  const fromCode = fromCurrency.toUpperCase();
+  const toCode = toCurrency.toUpperCase();
 
-  // Check cache
-  const cached = liveRateCache.get(fromLower);
-  if (cached && Date.now() - cached.timestamp < CACHE_TTL_MS) {
-    const rate = cached.rates[toLower];
-    if (typeof rate === 'number' && rate > 0 && isFinite(rate)) {
-      return { rate: rate.toString(), source: 'live' };
-    }
-  }
+  // Check cache. A pair the cached table does not quote is a fact about the
+  // data, not the network, so it goes to the offline table without refetching.
+  if (liveRateTable && Date.now() - liveRateTable.timestamp < CACHE_TTL_MS) {
+    const rate = crossRate(liveRateTable.rates, fromCode, toCode);
+    if (rate) return { rate, source: 'live' };
+  } else {
+    // Try the network — unless the lookups keep failing, in which case the
+    // offline table answers now instead of after another timeout.
+    const backingOff = failedFetch !== null
+      && failedFetch.consecutive >= FETCH_FAILURES_BEFORE_BACKOFF
+      && Date.now() - failedFetch.at < FETCH_FAILURE_BACKOFF_MS;
 
-  // Try fetching from APIs — unless this currency's lookups keep failing, in
-  // which case the offline table answers now instead of after two more timeouts.
-  const failure = failedFetches.get(fromLower);
-  const backingOff = failure !== undefined
-    && failure.consecutive >= FETCH_FAILURES_BEFORE_BACKOFF
-    && Date.now() - failure.at < FETCH_FAILURE_BACKOFF_MS;
-
-  if (!backingOff) {
-    const urls = [
-      `https://cdn.jsdelivr.net/npm/@fawazahmed0/currency-api@latest/v1/currencies/${fromLower}.min.json`,
-      `https://latest.currency-api.pages.dev/v1/currencies/${fromLower}.min.json`,
-    ];
-
-    const fetchStartedAt = Date.now();
-    // Whether any URL answered with a usable rate table. A base currency that
-    // loaded but simply doesn't quote `toCurrency` is not a failed lookup — the
-    // table is cached for an hour, so nothing is gained by re-fetching it.
-    let ratesLoaded = false;
-    for (const url of urls) {
-      try {
-        const controller = new AbortController();
-        const timeoutId = setTimeout(() => controller.abort(), FETCH_TIMEOUT_MS);
-
-        const response = await fetch(url, { signal: controller.signal });
-        clearTimeout(timeoutId);
-
-        if (!response.ok) continue;
-
-        const data = await response.json();
-        const rates = data[fromLower];
-        if (rates && typeof rates === 'object') {
-          const validatedRates = {};
-          for (const [key, value] of Object.entries(rates)) {
-            if (typeof value === 'number' && value > 0 && isFinite(value)) {
-              validatedRates[key] = value;
-            }
-          }
-          liveRateCache.set(fromLower, {
-            rates: validatedRates,
-            timestamp: Date.now(),
-          });
-          failedFetches.delete(fromLower);
-          ratesLoaded = true;
-
-          const rate = validatedRates[toLower];
-          if (rate !== undefined) {
-            return { rate: rate.toString(), source: 'live' };
-          }
+    if (!backingOff) {
+      const fetchStartedAt = Date.now();
+      const rates = await loadLiveRateTable();
+      if (rates) {
+        const rate = crossRate(rates, fromCode, toCode);
+        if (rate) return { rate, source: 'live' };
+      } else {
+        // Say so in the log when the attempt was slow enough for a caller to
+        // feel it — a conversion silently waiting on the network is not
+        // something the screen that triggered it shows.
+        const elapsed = Date.now() - fetchStartedAt;
+        if (elapsed >= SLOW_PHASE_MS) {
+          console.debug(
+            `[perf] currency.rate ${fromCurrency}->${toCurrency} ${elapsed}ms (live lookup failed, using offline rates)`,
+          );
         }
-      } catch {
-        // Network error or timeout, try next URL
-        continue;
-      }
-    }
-
-    // Every URL failed. Count it towards the backoff, and say so in the log when
-    // the attempt was slow enough for a caller to feel it — a conversion silently
-    // waiting on the network is not something the screen that triggered it shows.
-    if (!ratesLoaded) {
-      failedFetches.set(fromLower, {
-        at: Date.now(),
-        consecutive: (failure ? failure.consecutive : 0) + 1,
-      });
-      const elapsed = Date.now() - fetchStartedAt;
-      if (elapsed >= SLOW_PHASE_MS) {
-        console.debug(
-          `[perf] currency.rate ${fromCurrency}->${toCurrency} ${elapsed}ms (live lookup failed, using offline rates)`,
-        );
       }
     }
   }

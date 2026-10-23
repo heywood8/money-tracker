@@ -95,6 +95,14 @@ export default function SettingsList({ onOpenPanel }) {
       />
 
       <SettingsNavRow
+        icon="stats-chart-outline"
+        label={t('graphs')}
+        hint={t('graphs_settings_hint')}
+        onPress={() => onOpenPanel('graphs')}
+        testID="settings-graphs-row"
+      />
+
+      <SettingsNavRow
         icon="notifications-outline"
         label={t('notification_processing') || 'Notification processing'}
         hint={t('notification_processing_hint') || 'Read notifications and turn purchases into operations'}
