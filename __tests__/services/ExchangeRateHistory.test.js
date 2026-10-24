@@ -17,6 +17,7 @@ import {
   rateDecimals,
   formatRateValue,
   formatRateChange,
+  formatCheckedAt,
   rateChangeColor,
   shownRateChange,
   toIsoDate,
@@ -137,6 +138,7 @@ describe('ExchangeRateHistory', () => {
 
       expect(result).toEqual({
         stale: false,
+        checkedAt: NOW.getTime(),
         points: [
           { date: '2026-09-23', rate: 84.1 },
           { date: '2026-10-22', rate: 81.81 },
@@ -281,6 +283,7 @@ describe('ExchangeRateHistory', () => {
       await expect(fetchRateHistory('USD', 'RUB', 'month', { now: NOW })).resolves.toEqual({
         points: [{ date: '2026-10-23', rate: 81.55 }],
         stale: true,
+        checkedAt: NOW.getTime(),
       });
     });
 
@@ -372,6 +375,7 @@ describe('ExchangeRateHistory', () => {
       await expect(fetchRateHistory('USD', 'RUB', 'all', { now: NOW })).resolves.toEqual({
         points: [{ date: '2026-09-01', rate: 84.99 }, { date: '2026-10-01', rate: 83.86 }],
         stale: true,
+        checkedAt: NOW.getTime(),
       });
     });
 
@@ -473,6 +477,7 @@ describe('ExchangeRateHistory', () => {
       await expect(fetchRateHistory('USD', 'RUB', 'all', { now: NOW })).resolves.toEqual({
         points: [{ date: '2026-10-01', rate: 83.86 }],
         stale: true,
+        checkedAt: NOW.getTime(),
       });
       expect(global.fetch).toHaveBeenCalledTimes(1);
       expect(requestedUrl(0).searchParams.get('group')).toBe('month');
@@ -509,6 +514,46 @@ describe('ExchangeRateHistory', () => {
 
       expect(points.map((point) => point.date)).toEqual(['2026-10-19', '2026-10-20', '2026-10-22', '2026-10-23']);
       expect(lastWrite().daily.rows).toHaveLength(5);
+    });
+
+    it('says when the source last answered, not when the copy was served', async () => {
+      global.fetch.mockResolvedValueOnce(rowsResponse('USD', 'RUB', [['2026-10-23', 81.55]]));
+      await fetchRateHistory('USD', 'RUB', 'week', { now: NOW });
+
+      Date.now.mockReturnValue(NOW.getTime() + 10 * 60 * 1000); // fresh: no request
+      const { checkedAt } = await fetchRateHistory('USD', 'RUB', 'week', { now: NOW });
+
+      expect(global.fetch).toHaveBeenCalledTimes(1);
+      expect(checkedAt).toBe(NOW.getTime());
+    });
+
+    it('reads only what is saved when asked to, without a request', async () => {
+      global.fetch.mockResolvedValueOnce(rowsResponse('USD', 'RUB', [['2026-10-23', 81.55]]));
+      await fetchRateHistory('USD', 'RUB', 'week', { now: NOW });
+      Date.now.mockReturnValue(NOW.getTime() + HISTORY_REFRESH_MS * 5); // stale, still no request
+
+      await expect(fetchRateHistory('RUB', 'USD', 'week', { now: NOW, cacheOnly: true })).resolves.toEqual({
+        points: [{ date: '2026-10-23', rate: 1 / 81.55 }],
+        stale: false,
+        checkedAt: NOW.getTime(),
+      });
+      expect(global.fetch).toHaveBeenCalledTimes(1);
+    });
+
+    it('reads the cache without waiting for a top-up of the same pair', async () => {
+      global.fetch.mockResolvedValueOnce(rowsResponse('USD', 'RUB', [['2026-10-23', 81.55]]));
+      await fetchRateHistory('USD', 'RUB', 'week', { now: NOW });
+      global.fetch.mockReturnValueOnce(new Promise(() => {})); // a top-up that never ends
+      fetchRateHistory('USD', 'RUB', 'week', { now: NOW, force: true });
+
+      await expect(fetchRateHistory('USD', 'RUB', 'week', { now: NOW, cacheOnly: true }))
+        .resolves.toMatchObject({ points: [{ date: '2026-10-23', rate: 81.55 }] });
+    });
+
+    it('has nothing to serve from the cache for a pair never drawn', async () => {
+      await expect(fetchRateHistory('USD', 'EUR', 'week', { now: NOW, cacheOnly: true }))
+        .rejects.toMatchObject({ code: 'empty' });
+      expect(global.fetch).not.toHaveBeenCalled();
     });
 
     it('drops saved daily rows older than a year', async () => {
@@ -627,6 +672,15 @@ describe('ExchangeRateHistory', () => {
       expect(formatRateChange(1.55, 1.9375, 'en', 2)).toBe('+1.55 (+1.94%)');
       expect(formatRateChange(-0.0213, -1.86, 'en', 3)).toBe('-0.021 (-1.86%)');
       expect(formatRateChange(0, 0, 'en', 2)).toBe('0.00 (0.00%)');
+    });
+  });
+
+  describe('formatCheckedAt', () => {
+    const now = new Date(2026, 9, 24, 15, 0);
+
+    it('gives the time for today and the day for before', () => {
+      expect(formatCheckedAt(new Date(2026, 9, 24, 9, 16).getTime(), 'ru', now)).toBe('09:16');
+      expect(formatCheckedAt(new Date(2026, 9, 23, 22, 40).getTime(), 'en', now)).toBe('Oct 23');
     });
   });
 

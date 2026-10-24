@@ -795,5 +795,11 @@
   "widget_add_anyway": "Trotzdem hinzufügen",
   "widget_add_to_home": "Widget zum Startbildschirm hinzufügen",
   "widget_add_hint": "Zeigt einen Kurs und seine Veränderung auf dem Startbildschirm",
-  "widget_pin_unsupported": "Ihr Launcher kann es nicht von hier hinzufügen: Startbildschirm gedrückt halten → Widgets → Penny"
+  "widget_pin_unsupported": "Ihr Launcher kann es nicht von hier hinzufügen: Startbildschirm gedrückt halten → Widgets → Penny",
+  "widget_pair_label": "Zwei Wechselkurse",
+  "widget_pair_description": "Zwei Ihrer Währungspaare nebeneinander, für eine ganze Reihe",
+  "widget_pair_config_title": "Welche zwei Kurse soll das Widget zeigen? Der Reihe nach antippen: links, dann rechts",
+  "widget_pair_add_to_home": "Widget mit zwei Kursen hinzufügen",
+  "widget_pair_add_hint": "Zwei Kurse nebeneinander über eine ganze Reihe des Startbildschirms",
+  "widget_refresh": "Kurse aktualisieren"
 }

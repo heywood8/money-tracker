@@ -795,5 +795,11 @@
   "widget_add_anyway": "Adicionar mesmo assim",
   "widget_add_to_home": "Adicionar widget à tela inicial",
   "widget_add_hint": "Mostra uma cotação e sua variação na tela inicial",
-  "widget_pin_unsupported": "Seu launcher não consegue adicionar daqui: toque e segure a tela inicial → Widgets → Penny"
+  "widget_pin_unsupported": "Seu launcher não consegue adicionar daqui: toque e segure a tela inicial → Widgets → Penny",
+  "widget_pair_label": "Duas taxas de câmbio",
+  "widget_pair_description": "Dois dos seus pares de moedas lado a lado, para uma linha inteira",
+  "widget_pair_config_title": "Quais duas taxas o widget deve mostrar? Toque nelas em ordem: esquerda, depois direita",
+  "widget_pair_add_to_home": "Adicionar widget de duas taxas",
+  "widget_pair_add_hint": "Duas taxas lado a lado em uma linha inteira da tela inicial",
+  "widget_refresh": "Atualizar taxas"
 }

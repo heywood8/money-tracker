@@ -4,7 +4,7 @@ import { render, fireEvent, waitFor, screen, act } from '@testing-library/react-
 import ExchangeRateWidgetConfigScreen from '../../app/widgets/ExchangeRateWidgetConfigScreen';
 import { loadRateCharts } from '../../app/services/ExchangeRateCharts';
 import { resolveLanguage } from '../../app/services/notifications/notificationStrings';
-import { getWidgetChart, setWidgetChart } from '../../app/widgets/exchangeRateWidgetStore';
+import { getWidgetChart, getWidgetCharts, setWidgetChart, setWidgetCharts } from '../../app/widgets/exchangeRateWidgetStore';
 import { renderExchangeRateWidget, refreshExchangeRateWidgets } from '../../app/widgets/exchangeRateWidgetRender';
 
 jest.mock('../../app/services/ExchangeRateCharts', () => ({
@@ -17,7 +17,9 @@ jest.mock('../../app/services/notifications/notificationStrings', () => ({
 }));
 jest.mock('../../app/widgets/exchangeRateWidgetStore', () => ({
   getWidgetChart: jest.fn(),
+  getWidgetCharts: jest.fn(),
   setWidgetChart: jest.fn(),
+  setWidgetCharts: jest.fn(),
 }));
 jest.mock('../../app/widgets/exchangeRateWidgetRender', () => ({
   renderExchangeRateWidget: jest.fn(),
@@ -29,8 +31,8 @@ const AMD_RUB = { id: 'b', from: 'AMD', to: 'RUB', amount: 100, range: 'week' };
 const widgetInfo = { widgetName: 'ExchangeRate', widgetId: 7, width: 250, height: 180 };
 const RENDERED = { light: 'l', dark: 'd' };
 
-const setup = async () => {
-  const props = { widgetInfo, renderWidget: jest.fn(), setResult: jest.fn() };
+const setup = async (info = widgetInfo) => {
+  const props = { widgetInfo: info, renderWidget: jest.fn(), setResult: jest.fn() };
   await render(<ExchangeRateWidgetConfigScreen {...props} />);
   return props;
 };
@@ -42,6 +44,8 @@ describe('ExchangeRateWidgetConfigScreen', () => {
     resolveLanguage.mockResolvedValue('en');
     getWidgetChart.mockResolvedValue(null);
     setWidgetChart.mockResolvedValue(undefined);
+    getWidgetCharts.mockResolvedValue([]);
+    setWidgetCharts.mockResolvedValue(undefined);
     renderExchangeRateWidget.mockResolvedValue(RENDERED);
   });
 
@@ -154,5 +158,85 @@ describe('ExchangeRateWidgetConfigScreen', () => {
 
     await waitFor(() => expect(screen.getByText('Какой курс показывать в виджете?')).toBeTruthy());
     expect(screen.getByText('Отмена')).toBeTruthy();
+  });
+
+  describe('two-rate widget', () => {
+    const EUR_RUB = { id: 'c', from: 'EUR', to: 'RUB', amount: 1, range: 'year' };
+    const pairInfo = { widgetName: 'ExchangeRatePair', widgetId: 8, width: 380, height: 180 };
+    const orderOf = (id) => screen.queryByTestId(`widget-config-order-${id}`);
+
+    beforeEach(() => {
+      loadRateCharts.mockResolvedValue([USD_RUB, AMD_RUB, EUR_RUB]);
+    });
+
+    it('starts from the first two charts, numbered left and right', async () => {
+      await setup(pairInfo);
+
+      await waitFor(() => expect(orderOf('a')).toHaveTextContent('1'));
+      expect(orderOf('b')).toHaveTextContent('2');
+      expect(orderOf('c')).toBeNull();
+      expect(screen.getByText('Which two rates should the widget show? Tap them in order: left, then right')).toBeTruthy();
+    });
+
+    it('starts from what the widget shows when it is reconfigured', async () => {
+      getWidgetCharts.mockResolvedValue([EUR_RUB, USD_RUB]);
+      await setup(pairInfo);
+
+      await waitFor(() => expect(orderOf('c')).toHaveTextContent('1'));
+      expect(orderOf('a')).toHaveTextContent('2');
+    });
+
+    it('drops a pick on a second tap and replaces the right-hand one with a third chart', async () => {
+      await setup(pairInfo);
+      await waitFor(() => expect(orderOf('b')).toHaveTextContent('2'));
+
+      await fireEvent.press(screen.getByTestId('widget-config-chart-a'));
+      expect(orderOf('a')).toBeNull();
+      expect(orderOf('b')).toHaveTextContent('1');
+
+      await fireEvent.press(screen.getByTestId('widget-config-chart-c'));
+      await fireEvent.press(screen.getByTestId('widget-config-chart-a'));
+      expect(orderOf('b')).toHaveTextContent('1');
+      expect(orderOf('a')).toHaveTextContent('2');
+      expect(orderOf('c')).toBeNull();
+    });
+
+    it('saves the picks in order on Done, draws and finishes', async () => {
+      const { renderWidget, setResult } = await setup(pairInfo);
+      await waitFor(() => expect(orderOf('b')).toHaveTextContent('2'));
+      await fireEvent.press(screen.getByTestId('widget-config-chart-a'));
+      await fireEvent.press(screen.getByTestId('widget-config-chart-c'));
+
+      await fireEvent.press(screen.getByTestId('widget-config-done'));
+
+      await waitFor(() => expect(setResult).toHaveBeenCalledWith('ok'));
+      expect(setWidgetCharts).toHaveBeenCalledWith(8, [AMD_RUB, EUR_RUB]);
+      expect(setWidgetChart).not.toHaveBeenCalled();
+      expect(renderExchangeRateWidget).toHaveBeenCalledWith(pairInfo);
+      expect(renderWidget).toHaveBeenCalledWith(RENDERED);
+    });
+
+    it('keeps a chart since deleted in Settings, listed after the others', async () => {
+      const GONE = { id: 'gone', from: 'GBP', to: 'RUB', amount: 1, range: 'month' };
+      getWidgetCharts.mockResolvedValue([GONE, USD_RUB]);
+      await setup(pairInfo);
+
+      await waitFor(() => expect(orderOf('gone')).toHaveTextContent('1'));
+      expect(screen.getByText('1 GBP → RUB')).toBeTruthy();
+      await fireEvent.press(screen.getByTestId('widget-config-done'));
+
+      await waitFor(() => expect(setWidgetCharts).toHaveBeenCalledWith(8, [GONE, USD_RUB]));
+    });
+
+    it('does not finish with nothing picked', async () => {
+      const { setResult } = await setup(pairInfo);
+      await waitFor(() => expect(orderOf('b')).toHaveTextContent('2'));
+      await fireEvent.press(screen.getByTestId('widget-config-chart-a'));
+      await fireEvent.press(screen.getByTestId('widget-config-chart-b'));
+
+      expect(screen.getByTestId('widget-config-done').props.accessibilityState).toMatchObject({ disabled: true });
+      await fireEvent.press(screen.getByTestId('widget-config-done'));
+      expect(setResult).not.toHaveBeenCalled();
+    });
   });
 });

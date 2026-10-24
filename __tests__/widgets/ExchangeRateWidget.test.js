@@ -8,6 +8,7 @@
 import React from 'react';
 import { buildWidgetTree } from 'react-native-android-widget/lib/commonjs/api/build-widget-tree';
 import {
+  ExchangeRatePairWidget,
   ExchangeRateWidget,
   buildSparklineSvg,
   describeRate,
@@ -38,6 +39,17 @@ const nodesOf = (tree, type, found = []) => {
   return found;
 };
 const textsOf = (tree) => nodesOf(tree, 'TextWidget').map((node) => node.props.text);
+// The node directly holding a given node, depth first.
+const parentOf = (tree, target) => {
+  for (const child of tree.children || []) {
+    if (child === target) return tree;
+    const found = parentOf(child, target);
+    if (found) return found;
+  }
+  return null;
+};
+const textNode = (tree, start) => nodesOf(tree, 'TextWidget').find((node) => node.props.text.startsWith(start));
+
 // The colour a text is drawn in, found by the start of its text. The builder
 // lifts it out of `style` onto the node's own props.
 const colorOf = (tree, start) => nodesOf(tree, 'TextWidget')
@@ -86,11 +98,51 @@ describe('ExchangeRateWidget', () => {
 
     it('lets the title give way rather than the date', () => {
       const tree = render({ status: 'ready', chart: { ...CHART, amount: 1000, from: 'AMD' }, points: POINTS }, { width: 110 });
-      const titleBox = tree.children[0].children[0];
+      const title = textNode(tree, '1000 AMD');
+      const titleBox = parentOf(tree, title);
       // The title sits in the row's flexing box, the date beside it at its own width.
       expect(titleBox.props.weight).toBe(1);
-      expect(titleBox.children[0].props).toMatchObject({ text: '1000 AMD → RUB', truncate: 'END', maxLines: 1 });
-      expect(tree.children[0].children[1].props.text).toBe('Oct 23');
+      expect(title.props).toMatchObject({ truncate: 'END', maxLines: 1 });
+      expect(parentOf(tree, titleBox).children[1].props.text).toBe('Oct 23');
+    });
+
+    it('says when the rates were last fetched, beside the rate', () => {
+      const today = new Date();
+      today.setHours(14, 5, 0, 0);
+      const tree = render({ status: 'ready', chart: CHART, points: POINTS, checkedAt: today.getTime() });
+
+      const fetched = textNode(tree, '↻');
+      expect(fetched.props.text).toMatch(/^↻ 0?2:05|^↻ 14:05/);
+      // On the rate's row, pinned right of the rate, which is what gives way.
+      const row = parentOf(tree, parentOf(tree, fetched));
+      expect(row.children[0].children[0].props.text).toBe('₽81.55');
+    });
+
+    it('makes the fetch time a refresh button, and says when one is running', () => {
+      const tree = render({ status: 'ready', chart: CHART, points: POINTS, checkedAt: Date.now() });
+      const area = parentOf(tree, textNode(tree, '↻'));
+
+      expect(area.props.clickAction).toBe('REFRESH_RATES');
+      expect(area.props.accessibilityLabel).toBe('Refresh rates');
+      expect(textNode(render({ status: 'ready', chart: CHART, points: POINTS, refreshing: true }), '↻').props.text)
+        .toBe('↻ …');
+    });
+
+    it('leaves the fetch time out when there is none', () => {
+      expect(textNode(render({ status: 'ready', chart: CHART, points: POINTS }), '↻')).toBeUndefined();
+    });
+
+    it('runs the line to the widget’s edges and bottom, rounding its corners', () => {
+      const tree = render({ status: 'ready', chart: CHART, points: POINTS }, { width: 250, height: 180 });
+      const [line] = nodesOf(tree, 'SvgWidget');
+
+      // No padding around it: the root has none, the text keeps its own.
+      expect(tree.props.paddingLeft ?? 0).toBe(0);
+      expect(line.props.svgString).toContain('width="250"');
+      // Down to the bottom edge: 180 less the padding and text above it.
+      expect(line.props.svgString).toContain('height="96"');
+      expect(line.props.svgString).toContain('A28 28 0 0 1 222 96');
+      expect(line.props.svgString).toContain('clip-path="url(#c)"');
     });
 
     it('colours the move by its direction, in the theme asked for', () => {
@@ -134,13 +186,93 @@ describe('ExchangeRateWidget', () => {
   it('names the pair and the failure when nothing could be loaded', () => {
     const tree = render({ status: 'error', chart: CHART });
 
-    expect(textsOf(tree)).toEqual(['1 USD → RUB\nCould not load rates']);
+    expect(textsOf(tree)).toEqual(['1 USD → RUB\nCould not load rates ↻']);
+    expect(tree.props.accessibilityLabel).toBe('1 USD → RUB: Could not load rates');
+  });
+
+  it('offers a refresh by tap when nothing could be loaded, and shows it running', () => {
+    const tree = render({ status: 'error', chart: CHART });
+    expect(parentOf(tree, textNode(tree, '1 USD')).props.clickAction).toBe('REFRESH_RATES');
+
+    expect(textsOf(render({ status: 'error', chart: CHART, refreshing: true }))).toEqual(['1 USD → RUB\n↻ …']);
+  });
+
+  it('keeps the setup prompt a plain link to the app', () => {
+    const tree = render({ status: 'empty' });
+    expect(parentOf(tree, textNode(tree, 'Add')).props.clickAction).toBeUndefined();
   });
 
   it('speaks the language it is given', () => {
     const tree = render({ status: 'empty', language: 'ru' });
 
     expect(textsOf(tree)).toEqual(['Добавьте график курса в Настройки → Графики']);
+  });
+
+  describe('ExchangeRatePairWidget', () => {
+    const AMD = { id: 'c2', from: 'RUB', to: 'AMD', amount: 1, range: 'month' };
+    const AMD_POINTS = [{ date: '2026-09-23', rate: 4.32 }, { date: '2026-10-23', rate: 4.47 }];
+    const renderPair = (models, { theme = 'light', width = 380, height = 180 } = {}) => buildWidgetTree(
+      <ExchangeRatePairWidget models={models.map((m) => ({ language: 'en', ...m }))} theme={theme} width={width} height={height} />,
+    );
+
+    it('draws two rates side by side in one card, a plain gap between', () => {
+      const tree = renderPair([
+        { status: 'ready', chart: CHART, points: POINTS },
+        { status: 'ready', chart: AMD, points: AMD_POINTS },
+      ]);
+
+      expect(tree.props.orientation).toBe('HORIZONTAL');
+      expect(tree.props.backgroundColor).toBe(lightTheme.colors.surface);
+      // Two halves and nothing else: no divider line.
+      const [first, second] = tree.children;
+      expect(tree.children).toHaveLength(2);
+      expect(first.props.width).toBe(184);
+      expect(second.props.margin).toMatchObject({ left: 12 });
+      expect(textsOf(first)).toContain('₽81.55');
+      expect(textsOf(second)).toContain('֏4.470');
+      expect(tree.props.clickActionData).toEqual({ uri: GRAPHS_DEEP_LINK });
+    });
+
+    it('rounds each half’s line only at the card’s outer corner', () => {
+      const tree = renderPair([
+        { status: 'ready', chart: CHART, points: POINTS },
+        { status: 'ready', chart: AMD, points: AMD_POINTS },
+      ]);
+      const [left, right] = nodesOf(tree, 'SvgWidget').map((node) => node.props.svgString);
+
+      // (380 - 12) / 2 wide each.
+      expect(left).toContain('width="184"');
+      expect(left).toContain('A0 0 0 0 1 184 96');
+      expect(left).toContain('A28 28 0 0 1 0 68');
+      expect(right).toContain('A28 28 0 0 1 156 96');
+      expect(right).toContain('A0 0 0 0 1 0 96');
+    });
+
+    it('says what is missing in one half and draws the other', () => {
+      const tree = renderPair([
+        { status: 'ready', chart: CHART, points: POINTS },
+        { status: 'empty' },
+      ]);
+
+      expect(textsOf(tree.children[1])).toEqual(['Add an exchange rate chart in Settings → Graphs']);
+      expect(nodesOf(tree.children[0], 'SvgWidget')).toHaveLength(1);
+    });
+
+    it('shows one prompt across the widget when nothing is set up', () => {
+      const tree = renderPair([{ status: 'empty' }, { status: 'empty' }]);
+
+      expect(textsOf(tree)).toEqual(['Add an exchange rate chart in Settings → Graphs']);
+    });
+
+    it('names both rates to a screen reader', () => {
+      const tree = renderPair([
+        { status: 'ready', chart: CHART, points: POINTS, stale: true },
+        { status: 'error', chart: AMD },
+      ]);
+
+      expect(tree.props.accessibilityLabel)
+        .toBe('1 USD → RUB: ₽81.55, -2.74 (-3.25%), offline; 1 RUB → AMD: Could not load rates');
+    });
   });
 
   describe('describeRate', () => {
@@ -169,6 +301,14 @@ describe('ExchangeRateWidget', () => {
       // First point (1) at the bottom inset, second (3) at the top inset.
       expect(svg).toContain('M0.0 48.0 L50.0 2.0 L100.0 25.0');
       expect(svg).toContain('stroke="#007AFF"');
+    });
+
+    it('leaves room under the line and rounds the bottom corners when asked', () => {
+      const svg = buildSparklineSvg([1, 3], 100, 50, '#007AFF', { bottomInset: 10, radiusLeft: 20, radiusRight: 0 });
+
+      // Lowest point 10 above the bottom; the fill still reaches it.
+      expect(svg).toContain('M0.0 40.0 L100.0 2.0 L100 50 L0 50 Z');
+      expect(svg).toContain('<clipPath id="c"><path d="M0 0 H100 V50 A0 0 0 0 1 100 50 H20 A20 20 0 0 1 0 30 Z"/>');
     });
 
     it('draws nothing at all when no value is a number', () => {

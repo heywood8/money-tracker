@@ -11,7 +11,7 @@ import { DEFAULT_RATE_RANGE, RANGE_LABEL_KEYS } from '../../services/ExchangeRat
 import EmptyState from '../EmptyState';
 import RateChartEditor from './RateChartEditor';
 import { SettingsNavRow, SETTINGS_LIST_CONTENT } from './SettingsRows';
-import { EXCHANGE_RATE_WIDGET } from '../../widgets/widgetConstants';
+import { EXCHANGE_RATE_PAIR_WIDGET, EXCHANGE_RATE_WIDGET } from '../../widgets/widgetConstants';
 import { SECTION_LABEL } from '../../styles/componentStyles';
 import { FONT_SIZE, HORIZONTAL_PADDING, SPACING } from '../../styles/designTokens';
 
@@ -123,20 +123,22 @@ export default function GraphsPanel({ step, onPushStep, onPopStep, onRegisterBac
     if (draft) persist(() => removeChart(draft.id));
   }, [draft, persist, removeChart]);
 
-  // Asks the launcher to place the exchange-rate widget, which then opens the
+  // Asks the launcher to place an exchange-rate widget, which then opens the
   // widget's own screen to pick the pair. Launchers that cannot pin from an app
-  // (some third-party ones) answer false; the row then says where to find the
-  // widget instead of doing nothing.
+  // (some third-party ones) answer false; the rows then say where to find the
+  // widgets instead of doing nothing.
   const [pinUnsupported, setPinUnsupported] = useState(false);
-  const handlePinWidget = useCallback(async () => {
+  const pinWidget = useCallback(async (widgetName) => {
     let accepted = false;
     try {
-      accepted = await requestPinWidget({ widgetName: EXCHANGE_RATE_WIDGET });
+      accepted = await requestPinWidget({ widgetName });
     } catch (error) {
       console.warn('[GraphsPanel] Could not request widget pinning:', error?.message);
     }
     setPinUnsupported(!accepted);
   }, []);
+  const handlePinWidget = useCallback(() => pinWidget(EXCHANGE_RATE_WIDGET), [pinWidget]);
+  const handlePinPairWidget = useCallback(() => pinWidget(EXCHANGE_RATE_PAIR_WIDGET), [pinWidget]);
 
   if (step === 'rateEditor' && draft) {
     return (
@@ -189,14 +191,25 @@ export default function GraphsPanel({ step, onPushStep, onPopStep, onRegisterBac
         testID="rate-chart-add"
       />
 
+      {/* Whether a launcher can pin from an app is the launcher's, not the
+          widget's: one refusal changes both rows' hints. */}
       {charts.length > 0 && (
-        <SettingsNavRow
-          icon="apps-outline"
-          label={t('widget_add_to_home')}
-          hint={pinUnsupported ? t('widget_pin_unsupported') : t('widget_add_hint')}
-          onPress={handlePinWidget}
-          testID="rate-widget-pin"
-        />
+        <>
+          <SettingsNavRow
+            icon="apps-outline"
+            label={t('widget_add_to_home')}
+            hint={pinUnsupported ? t('widget_pin_unsupported') : t('widget_add_hint')}
+            onPress={handlePinWidget}
+            testID="rate-widget-pin"
+          />
+          <SettingsNavRow
+            icon="albums-outline"
+            label={t('widget_pair_add_to_home')}
+            hint={pinUnsupported ? t('widget_pin_unsupported') : t('widget_pair_add_hint')}
+            onPress={handlePinPairWidget}
+            testID="rate-widget-pin-pair"
+          />
+        </>
       )}
 
       <Text style={[styles.note, { color: colors.mutedText }]}>{t('rate_source_note')}</Text>

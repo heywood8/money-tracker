@@ -795,5 +795,11 @@
   "widget_add_anyway": "Aggiungi comunque",
   "widget_add_to_home": "Aggiungi widget alla schermata Home",
   "widget_add_hint": "Mostra un tasso e la sua variazione nella schermata Home",
-  "widget_pin_unsupported": "Il tuo launcher non può aggiungerlo da qui: tieni premuto sulla schermata Home → Widget → Penny"
+  "widget_pin_unsupported": "Il tuo launcher non può aggiungerlo da qui: tieni premuto sulla schermata Home → Widget → Penny",
+  "widget_pair_label": "Due tassi di cambio",
+  "widget_pair_description": "Due delle tue coppie di valute affiancate, per una riga intera",
+  "widget_pair_config_title": "Quali due tassi deve mostrare il widget? Toccali in ordine: sinistra, poi destra",
+  "widget_pair_add_to_home": "Aggiungi widget con due tassi",
+  "widget_pair_add_hint": "Due tassi affiancati su un’intera riga della schermata Home",
+  "widget_refresh": "Aggiorna i tassi"
 }

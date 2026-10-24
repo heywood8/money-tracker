@@ -1,5 +1,6 @@
 import { requestWidgetUpdate } from 'react-native-android-widget';
 import {
+  loadExchangeRatePairModels,
   loadExchangeRateWidgetModel,
   renderExchangeRateWidget,
   refreshExchangeRateWidgets,
@@ -7,8 +8,8 @@ import {
 import { loadRateCharts } from '../../app/services/ExchangeRateCharts';
 import { fetchRateHistory } from '../../app/services/ExchangeRateHistory';
 import { resolveLanguage } from '../../app/services/notifications/notificationStrings';
-import { getWidgetChart } from '../../app/widgets/exchangeRateWidgetStore';
-import { EXCHANGE_RATE_WIDGET } from '../../app/widgets/widgetConstants';
+import { getWidgetChart, getWidgetCharts } from '../../app/widgets/exchangeRateWidgetStore';
+import { EXCHANGE_RATE_PAIR_WIDGET, EXCHANGE_RATE_WIDGET } from '../../app/widgets/widgetConstants';
 
 jest.mock('react-native-android-widget', () => ({
   ...jest.requireActual('react-native-android-widget'),
@@ -26,6 +27,7 @@ jest.mock('../../app/services/notifications/notificationStrings', () => ({
 jest.mock('../../app/widgets/exchangeRateWidgetStore', () => ({
   ...jest.requireActual('../../app/widgets/exchangeRateWidgetStore'),
   getWidgetChart: jest.fn(),
+  getWidgetCharts: jest.fn(),
 }));
 jest.mock('../../app/contexts/ThemeColorsContext', () => jest.requireActual('../../app/contexts/ThemeColorsContext'));
 
@@ -38,8 +40,9 @@ describe('exchangeRateWidgetRender', () => {
     jest.clearAllMocks();
     loadRateCharts.mockResolvedValue([USD_RUB, AMD_RUB]);
     getWidgetChart.mockResolvedValue(null);
+    getWidgetCharts.mockResolvedValue([]);
     resolveLanguage.mockResolvedValue('ru');
-    fetchRateHistory.mockResolvedValue({ points: POINTS, stale: false });
+    fetchRateHistory.mockResolvedValue({ points: POINTS, stale: false, checkedAt: 1000 });
   });
 
   describe('loadExchangeRateWidgetModel', () => {
@@ -47,9 +50,9 @@ describe('exchangeRateWidgetRender', () => {
       getWidgetChart.mockResolvedValue(AMD_RUB);
 
       await expect(loadExchangeRateWidgetModel(7)).resolves.toEqual({
-        status: 'ready', chart: AMD_RUB, points: POINTS, stale: false, language: 'ru',
+        status: 'ready', chart: AMD_RUB, points: POINTS, stale: false, checkedAt: 1000, refreshing: false, language: 'ru',
       });
-      expect(fetchRateHistory).toHaveBeenCalledWith('AMD', 'RUB', 'week');
+      expect(fetchRateHistory).toHaveBeenCalledWith('AMD', 'RUB', 'week', {});
       expect(getWidgetChart).toHaveBeenCalledWith(7);
     });
 
@@ -66,7 +69,7 @@ describe('exchangeRateWidgetRender', () => {
 
     it('reports an error rather than throwing when the rates cannot be had', async () => {
       fetchRateHistory.mockRejectedValue(Object.assign(new Error('offline'), { code: 'network' }));
-      await expect(loadExchangeRateWidgetModel(7)).resolves.toEqual({ status: 'error', chart: USD_RUB, language: 'ru' });
+      await expect(loadExchangeRateWidgetModel(7)).resolves.toEqual({ status: 'error', chart: USD_RUB, refreshing: false, language: 'ru' });
     });
 
     it('draws the pair picked while it was loading, not the one it started with', async () => {
@@ -77,7 +80,7 @@ describe('exchangeRateWidgetRender', () => {
       const model = await loadExchangeRateWidgetModel(7);
 
       expect(model.chart).toEqual(AMD_RUB);
-      expect(fetchRateHistory).toHaveBeenLastCalledWith('AMD', 'RUB', 'week');
+      expect(fetchRateHistory).toHaveBeenLastCalledWith('AMD', 'RUB', 'week', {});
     });
 
     it('re-reads the choice only once', async () => {
@@ -98,6 +101,81 @@ describe('exchangeRateWidgetRender', () => {
       getWidgetChart.mockRejectedValue(new Error('io'));
       await expect(loadExchangeRateWidgetModel(7)).resolves.toEqual({ status: 'empty', language: 'ru' });
     });
+
+    it('passes a forced or cache-only read through, and marks a refresh in progress', async () => {
+      await loadExchangeRateWidgetModel(7, { force: true });
+      expect(fetchRateHistory).toHaveBeenLastCalledWith('USD', 'RUB', 'month', { force: true });
+
+      const model = await loadExchangeRateWidgetModel(7, { cacheOnly: true, refreshing: true });
+      expect(fetchRateHistory).toHaveBeenLastCalledWith('USD', 'RUB', 'month', { cacheOnly: true });
+      expect(model.refreshing).toBe(true);
+    });
+  });
+
+  describe('preferCache', () => {
+    it('reads the saved rates without the network when there are some', async () => {
+      const model = await loadExchangeRateWidgetModel(7, { preferCache: true });
+
+      expect(fetchRateHistory).toHaveBeenCalledTimes(1);
+      expect(fetchRateHistory).toHaveBeenCalledWith('USD', 'RUB', 'month', { cacheOnly: true });
+      expect(model.status).toBe('ready');
+    });
+
+    it('goes to the network when nothing is saved, rather than showing an error', async () => {
+      fetchRateHistory.mockRejectedValueOnce(Object.assign(new Error('nothing saved'), { code: 'empty' }));
+
+      const model = await loadExchangeRateWidgetModel(7, { preferCache: true });
+
+      expect(fetchRateHistory).toHaveBeenLastCalledWith('USD', 'RUB', 'month', {});
+      expect(model.status).toBe('ready');
+    });
+  });
+
+  describe('loadExchangeRatePairModels', () => {
+    it('loads the widget’s own two charts, in its order', async () => {
+      getWidgetCharts.mockResolvedValue([AMD_RUB, USD_RUB]);
+
+      const models = await loadExchangeRatePairModels(7);
+
+      expect(models.map((model) => model.chart)).toEqual([AMD_RUB, USD_RUB]);
+      expect(models.every((model) => model.status === 'ready')).toBe(true);
+      expect(getWidgetCharts).toHaveBeenCalledWith(7);
+    });
+
+    it('shows the first two charts on a widget never configured', async () => {
+      const models = await loadExchangeRatePairModels(7);
+      expect(models.map((model) => model.chart)).toEqual([USD_RUB, AMD_RUB]);
+    });
+
+    it('leaves the second half empty when there is only one chart', async () => {
+      loadRateCharts.mockResolvedValue([USD_RUB]);
+
+      const models = await loadExchangeRatePairModels(7);
+
+      expect(models[0].chart).toEqual(USD_RUB);
+      expect(models[1]).toEqual({ status: 'empty', language: 'ru' });
+    });
+
+    it('draws the charts picked while it was loading', async () => {
+      getWidgetCharts.mockResolvedValueOnce([]).mockResolvedValue([AMD_RUB]);
+
+      const models = await loadExchangeRatePairModels(7);
+
+      expect(models[0].chart).toEqual(AMD_RUB);
+      expect(models[1].status).toBe('empty');
+    });
+  });
+
+  it('draws the two-rate widget for its name', async () => {
+    getWidgetCharts.mockResolvedValue([USD_RUB, AMD_RUB]);
+
+    const result = await renderExchangeRateWidget({
+      widgetName: EXCHANGE_RATE_PAIR_WIDGET, widgetId: 7, width: 380, height: 180,
+    });
+
+    expect(result.light.props).toMatchObject({ theme: 'light', width: 380, height: 180 });
+    expect(result.light.props.models).toHaveLength(2);
+    expect(getWidgetChart).not.toHaveBeenCalled();
   });
 
   it('renders both theme variants at the widget’s size', async () => {
@@ -117,6 +195,10 @@ describe('exchangeRateWidgetRender', () => {
 
       expect(requestWidgetUpdate).toHaveBeenCalledWith({
         widgetName: EXCHANGE_RATE_WIDGET,
+        renderWidget: renderExchangeRateWidget,
+      });
+      expect(requestWidgetUpdate).toHaveBeenCalledWith({
+        widgetName: EXCHANGE_RATE_PAIR_WIDGET,
         renderWidget: renderExchangeRateWidget,
       });
     });

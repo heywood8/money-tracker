@@ -320,6 +320,15 @@ const topUpMonthly = async (entry, force) => {
   return true;
 };
 
+// When the source last answered for what a range draws: the daily series, or
+// for all time whichever of the two was asked most recently. Null if neither.
+const lastChecked = (entry, range) => {
+  const checks = (range === 'all' ? [entry.daily, entry.monthly] : [entry.daily])
+    .filter(Boolean)
+    .map((series) => series.checkedAt);
+  return checks.length ? Math.max(...checks) : null;
+};
+
 // How far a day may sit from the days around it before it is taken for a
 // publishing error. The errors seen in a bank's feed are another currency's
 // figure in the slot (367 where the rate was 5), off by several times; the
@@ -392,10 +401,13 @@ const pointsFor = (entry, range, start, invert) => {
  * @param {Object} [options]
  * @param {Date} [options.now]
  * @param {boolean} [options.force] - Top up even if the saved copy is fresh
- * @returns {Promise<{points: Array<{date: string, rate: number}>, stale: boolean}>}
+ * @param {boolean} [options.cacheOnly] - Only what is saved, no network at all
+ *   (a widget's instant redraw while a refresh it was tapped for is running)
+ * @returns {Promise<{points: Array<{date: string, rate: number}>, stale: boolean, checkedAt: number|null}>}
+ *   `checkedAt` is when the source last answered for these rates (ms)
  * @throws {RateSourceError} code 'network' | 'unsupported' | 'invalid' | 'empty'
  */
-export const fetchRateHistory = (from, to, range, { now = new Date(), force = false } = {}) => {
+export const fetchRateHistory = (from, to, range, { now = new Date(), force = false, cacheOnly = false } = {}) => {
   if (!from || !to || from === to) {
     return Promise.reject(new RateSourceError('unsupported', 'A rate needs two different currencies'));
   }
@@ -406,6 +418,16 @@ export const fetchRateHistory = (from, to, range, { now = new Date(), force = fa
   // quiet spell still has fixings from before it to start from.
   const monthStart = rangeStart('month', now);
   const downloadStart = start < monthStart ? start : monthStart;
+
+  if (cacheOnly) {
+    // Outside the pair's queue: it only reads, and it is asked for exactly
+    // when a slow top-up of the same pair may be holding that queue.
+    return readEntry(pairKey).then((entry) => {
+      const points = entry.base ? pointsFor(entry, range, start, entry.base !== from) : [];
+      if (points.length === 0) throw new RateSourceError('empty', `Nothing saved for ${from}/${to}`);
+      return { points, stale: false, checkedAt: lastChecked(entry, range) };
+    });
+  }
 
   return runExclusive(pairKey, async () => {
     const entry = await readEntry(pairKey);
@@ -444,7 +466,7 @@ export const fetchRateHistory = (from, to, range, { now = new Date(), force = fa
     if (points.length === 0) {
       throw failed ? failed.reason : new RateSourceError('empty', `No rates for ${from}/${to}`);
     }
-    return { points, stale: failed !== undefined };
+    return { points, stale: failed !== undefined, checkedAt: lastChecked(entry, range) };
   });
 };
 
@@ -609,6 +631,27 @@ export const formatRateDate = (date, language, monthOnly = false) => localeDate(
   language,
   monthOnly ? { month: 'short', year: 'numeric' } : { day: 'numeric', month: 'short', year: 'numeric' },
 );
+
+/**
+ * When rates were last fetched, as briefly as a widget has room for: the time
+ * for today ("14:05"), the day and month before that ("23 Oct"), in the app's
+ * language.
+ *
+ * @param {number} timestamp - ms
+ * @param {string} [language]
+ * @param {Date} [now]
+ * @returns {string}
+ */
+export const formatCheckedAt = (timestamp, language, now = new Date()) => {
+  const at = new Date(timestamp);
+  try {
+    return at.toDateString() === now.toDateString()
+      ? at.toLocaleTimeString(language || undefined, { hour: '2-digit', minute: '2-digit' })
+      : at.toLocaleDateString(language || undefined, { day: 'numeric', month: 'short' });
+  } catch {
+    return at.toISOString().slice(0, 16).replace('T', ' ');
+  }
+};
 
 /**
  * An x-axis label for a range: the day for the short ranges, the month for a

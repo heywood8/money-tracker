@@ -8,6 +8,14 @@
 // launcher passes it back with every update, so it must never change: a renamed
 // widget is a new widget, and every placed copy of the old one goes blank.
 export const EXCHANGE_RATE_WIDGET = 'ExchangeRate';
+// The two-rate widget, under the same rule.
+export const EXCHANGE_RATE_PAIR_WIDGET = 'ExchangeRatePair';
+// Every widget that draws exchange rates, for the code that serves them all.
+export const EXCHANGE_RATE_WIDGETS = [EXCHANGE_RATE_WIDGET, EXCHANGE_RATE_PAIR_WIDGET];
+
+// The click action of the "↻ 14:05" on a widget: fetch fresh rates now. Unlike
+// a tap anywhere else, it reaches the task handler (WIDGET_CLICK).
+export const REFRESH_RATES_ACTION = 'REFRESH_RATES';
 
 // Where a tap on the widget goes: the Graphs tab, where the full chart is.
 // The scheme is app.config.js's `scheme`.

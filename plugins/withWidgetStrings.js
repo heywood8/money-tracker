@@ -3,8 +3,8 @@ const fs = require('fs');
 const path = require('path');
 
 /**
- * Expo Config Plugin: translate the home-screen widget's name and description
- * in the launcher's widget picker.
+ * Expo Config Plugin: translate the home-screen widgets' names and
+ * descriptions in the launcher's widget picker.
  *
  * react-native-android-widget writes the description into the default
  * strings.xml only, and the label straight into the manifest as a literal, so
@@ -14,16 +14,28 @@ const path = require('path');
  * values/, every other app language in its own values-<lang>/ file. Android
  * then picks by the phone's language, as it does for any app.
  *
- * The text comes from assets/i18n/<lang>.json (`widget_rate_label`,
- * `widget_rate_description`), so the picker and the app say the same thing and
- * a new language needs nothing here beyond its JSON file.
+ * The text comes from assets/i18n/<lang>.json (WIDGET_STRINGS names the keys),
+ * so the picker and the app say the same thing and a new language needs
+ * nothing here beyond its JSON file.
  */
 
-// The resource app.config.js names as the widget's label.
-const LABEL_STRING = 'widget_exchange_rate_label';
-// The resource react-native-android-widget names as the description:
+// The resource app.config.js names as each widget's label, and the one
+// react-native-android-widget names as its description:
 // `widget_<name lowercased>_description` for the widget named "ExchangeRate".
+const LABEL_STRING = 'widget_exchange_rate_label';
 const DESCRIPTION_STRING = 'widget_exchangerate_description';
+const PAIR_LABEL_STRING = 'widget_exchange_rate_pair_label';
+const PAIR_DESCRIPTION_STRING = 'widget_exchangeratepair_description';
+
+// Resource name → the assets/i18n key its text comes from.
+const WIDGET_STRINGS = [
+  [LABEL_STRING, 'widget_rate_label'],
+  [DESCRIPTION_STRING, 'widget_rate_description'],
+  [PAIR_LABEL_STRING, 'widget_pair_label'],
+  [PAIR_DESCRIPTION_STRING, 'widget_pair_description'],
+];
+const LABEL_STRINGS = [LABEL_STRING, PAIR_LABEL_STRING];
+const DESCRIPTION_STRINGS = [DESCRIPTION_STRING, PAIR_DESCRIPTION_STRING];
 // One file of our own per locale, so nothing else's values-<lang>/strings.xml
 // is read or overwritten.
 const STRINGS_FILE = 'widget_strings.xml';
@@ -59,25 +71,22 @@ const escapeAndroidString = (text) => String(text)
 /**
  * The resources file for one locale.
  *
- * @param {{label: string, description: string}} strings
+ * @param {Object<string, string>} strings - Resource name → text
  * @returns {string}
  */
-const localeStringsXml = ({ label, description }) => [
+const localeStringsXml = (strings) => [
   '<?xml version="1.0" encoding="utf-8"?>',
   '<resources>',
-  `  <string name="${LABEL_STRING}">${escapeAndroidString(label)}</string>`,
-  `  <string name="${DESCRIPTION_STRING}">${escapeAndroidString(description)}</string>`,
+  ...Object.entries(strings).map(([name, text]) => `  <string name="${name}">${escapeAndroidString(text)}</string>`),
   '</resources>',
   '',
 ].join('\n');
 
+// Resource name → text in one language, English where it has none.
 const widgetStringsFor = (language) => {
   const translations = readTranslations(language);
   const english = language === 'en' ? translations : readTranslations('en');
-  return {
-    label: translations.widget_rate_label || english.widget_rate_label,
-    description: translations.widget_rate_description || english.widget_rate_description,
-  };
+  return Object.fromEntries(WIDGET_STRINGS.map(([name, key]) => [name, translations[key] || english[key]]));
 };
 
 /**
@@ -95,7 +104,7 @@ const widgetStringsFor = (language) => {
  */
 const allowDescriptionTranslations = (stringsXml) => {
   (stringsXml?.resources?.string ?? []).forEach((item) => {
-    if (item?.$?.name !== DESCRIPTION_STRING || item.$.translatable === undefined) return;
+    if (!DESCRIPTION_STRINGS.includes(item?.$?.name) || item.$.translatable === undefined) return;
     delete item.$.translatable;
     item._ = String(item._).replace(/\\(.)/g, '$1');
   });
@@ -103,8 +112,8 @@ const allowDescriptionTranslations = (stringsXml) => {
 };
 
 const withWidgetStrings = (config) => {
-  // English label in the default values/ (the library's own plugin writes the
-  // English description there). Every locale needs a default to fall back to.
+  // English labels in the default values/ (the library's own plugin writes the
+  // English descriptions there). Every locale needs a default to fall back to.
   //
   // This mod has to see the library's description, so app.config.js lists
   // this plugin *before* the library's: Expo runs the mods of later plugins
@@ -112,7 +121,7 @@ const withWidgetStrings = (config) => {
   config = withStringsXml(config, (stringsConfig) => {
     stringsConfig.modResults = allowDescriptionTranslations(AndroidConfig.Strings.setStringItem(
       // Plain text: Expo's strings writer escapes translatable strings itself.
-      [{ $: { name: LABEL_STRING }, _: widgetStringsFor('en').label }],
+      LABEL_STRINGS.map((name) => ({ $: { name }, _: widgetStringsFor('en')[name] })),
       stringsConfig.modResults,
     ));
     return stringsConfig;
@@ -137,6 +146,8 @@ const withWidgetStrings = (config) => {
 module.exports = withWidgetStrings;
 module.exports.LABEL_STRING = LABEL_STRING;
 module.exports.DESCRIPTION_STRING = DESCRIPTION_STRING;
+module.exports.PAIR_LABEL_STRING = PAIR_LABEL_STRING;
+module.exports.PAIR_DESCRIPTION_STRING = PAIR_DESCRIPTION_STRING;
 module.exports.escapeAndroidString = escapeAndroidString;
 module.exports.localeStringsXml = localeStringsXml;
 module.exports.allowDescriptionTranslations = allowDescriptionTranslations;

@@ -795,5 +795,11 @@
   "widget_add_anyway": "그래도 추가",
   "widget_add_to_home": "홈 화면에 위젯 추가",
   "widget_add_hint": "홈 화면에 환율과 변동을 표시합니다",
-  "widget_pin_unsupported": "이 런처는 여기서 추가할 수 없습니다: 홈 화면을 길게 누르기 → 위젯 → Penny"
+  "widget_pin_unsupported": "이 런처는 여기서 추가할 수 없습니다: 홈 화면을 길게 누르기 → 위젯 → Penny",
+  "widget_pair_label": "환율 두 개",
+  "widget_pair_description": "두 통화쌍을 나란히, 한 줄 가득 표시",
+  "widget_pair_config_title": "위젯에 표시할 환율 두 개: 왼쪽, 오른쪽 순서로 탭하세요",
+  "widget_pair_add_to_home": "환율 두 개 위젯 추가",
+  "widget_pair_add_hint": "홈 화면 한 줄에 환율 두 개를 나란히 표시",
+  "widget_refresh": "환율 새로고침"
 }

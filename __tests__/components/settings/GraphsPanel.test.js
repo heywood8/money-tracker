@@ -213,6 +213,19 @@ describe('GraphsPanel', () => {
       await render(<Host />);
       await waitFor(() => expect(loadRateCharts).toHaveBeenCalled());
       expect(screen.queryByTestId('rate-widget-pin')).toBeNull();
+      expect(screen.queryByTestId('rate-widget-pin-pair')).toBeNull();
+    });
+
+    it('asks the launcher to place the two-rate widget', async () => {
+      loadRateCharts.mockResolvedValue([USD_RUB]);
+      requestPinWidget.mockResolvedValue(true);
+      await render(<Host />);
+      await waitFor(() => expect(screen.getByTestId('rate-widget-pin-pair')).toBeTruthy());
+      expect(screen.getByText('widget_pair_add_hint')).toBeTruthy();
+
+      await fireEvent.press(screen.getByTestId('rate-widget-pin-pair'));
+
+      expect(requestPinWidget).toHaveBeenCalledWith({ widgetName: 'ExchangeRatePair' });
     });
 
     it('asks the launcher to place the widget', async () => {
@@ -236,7 +249,8 @@ describe('GraphsPanel', () => {
 
       await fireEvent.press(screen.getByTestId('rate-widget-pin'));
 
-      await waitFor(() => expect(screen.getByText('widget_pin_unsupported')).toBeTruthy());
+      // Under both rows: a launcher that cannot pin one cannot pin the other.
+      await waitFor(() => expect(screen.getAllByText('widget_pin_unsupported')).toHaveLength(2));
     });
 
     it('treats a failed pin request like an unsupported launcher', async () => {
@@ -248,7 +262,7 @@ describe('GraphsPanel', () => {
 
       await fireEvent.press(screen.getByTestId('rate-widget-pin'));
 
-      await waitFor(() => expect(screen.getByText('widget_pin_unsupported')).toBeTruthy());
+      await waitFor(() => expect(screen.getAllByText('widget_pin_unsupported')).toHaveLength(2));
       console.warn.mockRestore();
     });
   });
