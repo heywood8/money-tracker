@@ -80,14 +80,12 @@ const SMALL_TEXT = { fontSize: FONT_SIZE.sm };
 const MESSAGE_TEXT = { fontSize: FONT_SIZE.md };
 const VALUE_TEXT = { fontSize: VALUE_FONT_SIZE, fontWeight: 'bold' };
 
-// The two-rate widget: one card holding two halves, a strip of the card's
-// own background between them (no line), so neither half's fill runs into
-// the other's.
-const PAIR_GAP = SPACING.md;
-// Text inset from a half's inner edge: the gap already separates the halves.
-const PAIR_INNER_PADDING = PADDING / 2;
+// The two-rate widget: one card holding two halves that meet at a hairline
+// running the card's full height, the fills on either side touching it.
+const DIVIDER_WIDTH = 1;
 const PAIR_ROOT_STYLE = { flexDirection: 'row', padding: 0 };
-const HALF_MESSAGE_STYLE = { ...PANEL_STYLE, justifyContent: 'center' };
+const DIVIDER_STYLE = { width: DIVIDER_WIDTH, height: 'match_parent' };
+const HALF_MESSAGE_STYLE = { ...PANEL_STYLE, justifyContent: 'center', paddingLeft: PADDING, paddingRight: PADDING };
 
 /**
  * Evenly thinned values, first and last kept.
@@ -429,7 +427,7 @@ ExchangeRateWidget.propTypes = {
  * would leave half empty: five cells wide is too much for one rate and splits
  * unevenly into two widgets. One card, each half laid out like the one-rate
  * widget at half the width, its line running to the card's outer edge and
- * bottom, with a small gap between the halves.
+ * bottom and up to a hairline between the halves.
  *
  * @param {Object} props
  * @param {Array<Object>} props.models - Two models, as the one-rate widget takes
@@ -446,12 +444,9 @@ export function ExchangeRatePairWidget({ models, theme, width, height }) {
   }
 
   const views = models.map(viewOf);
-  const halfWidth = (width - PAIR_GAP) / 2;
+  const halfWidth = (width - DIVIDER_WIDTH) / 2;
   const half = (model, view, side) => {
     const first = side === 'first';
-    const padLeft = first ? PADDING : PAIR_INNER_PADDING;
-    const padRight = first ? PAIR_INNER_PADDING : PADDING;
-    const gap = first ? null : { marginLeft: PAIR_GAP };
     if (!view.figures) {
       return (
         <MessageBox
@@ -459,24 +454,25 @@ export function ExchangeRatePairWidget({ models, theme, width, height }) {
           colors={colors}
           text={view.message}
           retry={view.retry}
-          style={{ ...HALF_MESSAGE_STYLE, ...gap, width: halfWidth, paddingLeft: padLeft, paddingRight: padRight }}
+          style={{ ...HALF_MESSAGE_STYLE, width: halfWidth }}
         />
       );
     }
     return ratePanel(model, view.figures, colors, {
       width: halfWidth,
       height,
-      padLeft,
-      padRight,
+      padLeft: PADDING,
+      padRight: PADDING,
+      // Rounded only at the card's own corner; square where it meets the line.
       radiusLeft: first ? CORNER_RADIUS : 0,
       radiusRight: first ? 0 : CORNER_RADIUS,
-      style: gap,
     }, side);
   };
 
   return (
     <Root colors={colors} label={views.map((view) => view.label).join('; ')} style={PAIR_ROOT_STYLE}>
       {half(models[0], views[0], 'first')}
+      <FlexWidget style={{ ...DIVIDER_STYLE, backgroundColor: colors.border }} />
       {half(models[1], views[1], 'second')}
     </Root>
   );
