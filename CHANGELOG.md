@@ -1,5 +1,12 @@
 # Changelog
 
+## [0.302.0](https://github.com/heywood8/money-tracker/compare/penny-v0.301.0...penny-v0.302.0) (2026-10-24)
+
+
+### Features
+
+* **widgets:** add two-rate widget, fetch time and tap-to-refresh ([#1876](https://github.com/heywood8/money-tracker/issues/1876)) ([b9c591d](https://github.com/heywood8/money-tracker/commit/b9c591de79f9fcc166bc89c724a69fdb171553ce))
+
 ## [0.301.0](https://github.com/heywood8/money-tracker/compare/penny-v0.300.0...penny-v0.301.0) (2026-10-23)
 
 
