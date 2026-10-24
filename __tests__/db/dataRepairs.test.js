@@ -1,7 +1,12 @@
 /**
  * One-off repair of operations.date values that carry a timestamp (#773).
  */
-import { normalizeOperationDates, renameMotorcycleIcon } from '../../drizzle/dataRepairs';
+import { normalizeOperationDates, renameMotorcycleIcon, clearStoredLocations } from '../../drizzle/dataRepairs';
+
+jest.mock('expo-file-system/legacy', () => ({
+  cacheDirectory: 'file:///cache/',
+  deleteAsync: jest.fn(async () => {}),
+}));
 
 describe('normalizeOperationDates', () => {
   it('trims timestamped dates to their day and records completion', async () => {
@@ -74,5 +79,71 @@ describe('renameMotorcycleIcon', () => {
     await renameMotorcycleIcon(db);
 
     expect(db.runAsync.mock.calls[1][0]).toContain(`'post_migration_${key}_completed'`);
+  });
+});
+
+// The location feature is gone; the coordinates it stored can no longer be seen
+// or deleted from the app, so they are cleared rather than left behind.
+describe('clearStoredLocations', () => {
+  const FileSystem = require('expo-file-system/legacy');
+
+  beforeEach(() => {
+    jest.clearAllMocks();
+  });
+
+  it('nulls every stored coordinate, drops the preference and records completion', async () => {
+    const db = { runAsync: jest.fn(async () => ({ changes: 1 })) };
+
+    await clearStoredLocations(db);
+
+    const sql = db.runAsync.mock.calls.map(([statement]) => statement);
+    expect(sql[0]).toContain('UPDATE operations SET latitude = NULL, longitude = NULL');
+    expect(sql[1]).toContain('UPDATE pending_notifications SET latitude = NULL, longitude = NULL');
+    expect(sql[2]).toBe("DELETE FROM app_metadata WHERE key = 'attach_location'");
+    expect(sql[3]).toContain('post_migration_clearStoredLocations_completed');
+  });
+
+  it('deletes the heatmap tile cache', async () => {
+    const db = { runAsync: jest.fn(async () => ({ changes: 0 })) };
+
+    await clearStoredLocations(db);
+
+    expect(FileSystem.deleteAsync).toHaveBeenCalledWith(
+      `${FileSystem.cacheDirectory}map-tiles/`,
+      { idempotent: true },
+    );
+  });
+
+  it('still records completion when the tile cache cannot be deleted', async () => {
+    FileSystem.deleteAsync.mockRejectedValueOnce(new Error('io'));
+    const warnSpy = jest.spyOn(console, 'warn').mockImplementation(() => {});
+    const db = { runAsync: jest.fn(async () => ({ changes: 0 })) };
+
+    await clearStoredLocations(db);
+
+    expect(db.runAsync.mock.calls[3][0]).toContain('post_migration_clearStoredLocations_completed');
+    warnSpy.mockRestore();
+  });
+
+  it('leaves the completion flag unset when a statement fails, so it is retried', async () => {
+    const db = { runAsync: jest.fn(async () => { throw new Error('locked'); }) };
+    const errorSpy = jest.spyOn(console, 'error').mockImplementation(() => {});
+
+    await clearStoredLocations(db);
+
+    expect(db.runAsync).toHaveBeenCalledTimes(1);
+    errorSpy.mockRestore();
+  });
+
+  it('is registered with a migration every install has, under the key its flag names', async () => {
+    const migrations = jest.requireActual('../../drizzle/migrations').default;
+    const [key] = Object.entries(migrations.postMigrationHandlers)
+      .find(([, handler]) => handler === clearStoredLocations);
+    const tag = migrations.postMigrationTags[key];
+    expect(migrations.journal.entries.some(entry => entry.tag === tag)).toBe(true);
+
+    const db = { runAsync: jest.fn(async () => ({ changes: 0 })) };
+    await clearStoredLocations(db);
+    expect(db.runAsync.mock.calls[3][0]).toContain(`'post_migration_${key}_completed'`);
   });
 });

@@ -125,7 +125,7 @@ export const createBackup = async () => {
 const TABLE_FIELDS = {
   accounts:           ['id', 'name', 'balance', 'currency', 'display_order', 'hidden', 'monthly_target', 'card_mask', 'auto_txn_rounding', 'auto_txn_rounding_mode', 'deleted_at', 'created_at', 'updated_at'],
   categories:         ['id', 'name', 'type', 'category_type', 'parent_id', 'icon', 'color', 'is_shadow', 'created_at', 'updated_at'],
-  operations:         ['id', 'type', 'amount', 'account_id', 'category_id', 'to_account_id', 'date', 'created_at', 'description', 'exchange_rate', 'destination_amount', 'source_currency', 'destination_currency', 'original_balance', 'exclude_from_avg', 'exclude_from_charts', 'latitude', 'longitude'],
+  operations:         ['id', 'type', 'amount', 'account_id', 'category_id', 'to_account_id', 'date', 'created_at', 'description', 'exchange_rate', 'destination_amount', 'source_currency', 'destination_currency', 'original_balance', 'exclude_from_avg', 'exclude_from_charts'],
   budgets:            ['id', 'category_id', 'amount', 'currency', 'period_type', 'start_date', 'end_date', 'is_recurring', 'rollover_enabled', 'created_at', 'updated_at'],
   app_metadata:       ['key', 'value', 'updated_at'],
   balance_history:    ['id', 'account_id', 'date', 'balance', 'created_at'],
@@ -1063,11 +1063,9 @@ export const restoreBackup = async (backup, cancelToken) => {
         }
 
         // Note: id is omitted as it's now auto-increment integer.
-        // latitude/longitude are optional — older backups lack them, so a missing
-        // value falls through to null (?? null) rather than failing the insert.
         const opType = VALID_OPERATION_TYPES.includes(operation.type) ? operation.type : 'expense';
         await db.runAsync(
-          'INSERT INTO operations (type, amount, account_id, category_id, to_account_id, date, created_at, description, exchange_rate, destination_amount, source_currency, destination_currency, original_balance, exclude_from_avg, exclude_from_charts, latitude, longitude) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)',
+          'INSERT INTO operations (type, amount, account_id, category_id, to_account_id, date, created_at, description, exchange_rate, destination_amount, source_currency, destination_currency, original_balance, exclude_from_avg, exclude_from_charts) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)',
           [
             opType,
             operation.amount || '0',
@@ -1091,8 +1089,6 @@ export const restoreBackup = async (backup, cancelToken) => {
             asFlag(operation.exclude_from_avg, 0),
             // Same for the chart-exclusion flag (added in migration 0023) → 0 (shown).
             asFlag(operation.exclude_from_charts, 0),
-            asNullable(operation.latitude),
-            asNullable(operation.longitude),
           ],
         );
       }
@@ -1722,14 +1718,14 @@ export const restoreBackup = async (backup, cancelToken) => {
             : null;
           const inserted = await db.runAsync(
             `INSERT OR IGNORE INTO pending_notifications
-              (id, kind, type, amount, currency, card_mask, merchant, country, date, time, account_id, category_id, package_name, raw, latitude, longitude, force_added, created_at)
-             VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
+              (id, kind, type, amount, currency, card_mask, merchant, country, date, time, account_id, category_id, package_name, raw, force_added, created_at)
+             VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
             [
               item.id, item.kind, item.type, item.amount, item.currency, item.card_mask ?? null,
               item.merchant ?? null, item.country ?? null, item.date ?? null, item.time ?? null,
               account ? account.id : null,
               item.category_id ? resolveCategoryReference(item.category_id, 'preserved review item') : null,
-              item.package_name ?? null, item.raw ?? null, item.latitude ?? null, item.longitude ?? null,
+              item.package_name ?? null, item.raw ?? null,
               item.force_added ? 1 : 0, item.created_at || new Date().toISOString(),
             ],
           ).catch((e) => { console.warn('Skipping preserved review item:', e.message); return null; });

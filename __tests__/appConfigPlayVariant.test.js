@@ -37,13 +37,9 @@ describe('app.config.js distribution variants', () => {
       expect(config.extra.distributionChannel).toBe('play');
     });
 
-    it('keeps the location permissions the feature needs', () => {
-      expect(config.android.permissions).toEqual(
-        expect.arrayContaining([
-          'android.permission.ACCESS_COARSE_LOCATION',
-          'android.permission.ACCESS_FINE_LOCATION',
-        ]),
-      );
+    it('declares no location permission', () => {
+      expect(config.android.permissions).not.toContain('android.permission.ACCESS_COARSE_LOCATION');
+      expect(config.android.permissions).not.toContain('android.permission.ACCESS_FINE_LOCATION');
     });
   });
 

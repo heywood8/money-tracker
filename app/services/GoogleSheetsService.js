@@ -168,7 +168,7 @@ export const buildSheetsData = (backup) => {
     {
       range: 'Operations!A1',
       values: [
-        ['id', 'date', 'type', 'amount', 'currency', 'category', 'account', 'to_account', 'description', 'account_id', 'category_id', 'to_account_id', 'exchange_rate', 'destination_amount', 'destination_currency', 'original_balance', 'exclude_from_avg', 'exclude_from_charts', 'latitude', 'longitude', 'created_at'],
+        ['id', 'date', 'type', 'amount', 'currency', 'category', 'account', 'to_account', 'description', 'account_id', 'category_id', 'to_account_id', 'exchange_rate', 'destination_amount', 'destination_currency', 'original_balance', 'exclude_from_avg', 'exclude_from_charts', 'created_at'],
         ...operations.map(o => [
           o.id, o.date, o.type, o.amount,
           o.source_currency || '',
@@ -183,13 +183,11 @@ export const buildSheetsData = (backup) => {
           o.destination_amount || '',
           o.destination_currency || '',
           // Everything below used to be dropped on the way out, so a Sheets
-          // round trip silently re-included excluded operations in the charts,
-          // lost every pinned location, and scrambled same-day order (#1695).
+          // round trip silently re-included excluded operations in the charts
+          // and scrambled same-day order (#1695).
           o.original_balance ?? '',
           o.exclude_from_avg ?? 0,
           o.exclude_from_charts ?? 0,
-          o.latitude ?? '',
-          o.longitude ?? '',
           o.created_at ?? '',
         ]),
       ],
@@ -544,8 +542,6 @@ export const importFromSheets = async (accessToken, onProgress) => {
     original_balance: blankToNull(o.original_balance),
     exclude_from_avg: asSheetFlag(o.exclude_from_avg, 0),
     exclude_from_charts: asSheetFlag(o.exclude_from_charts, 0),
-    latitude: o.latitude !== '' && o.latitude != null ? Number(o.latitude) : null,
-    longitude: o.longitude !== '' && o.longitude != null ? Number(o.longitude) : null,
   }));
 
   const budgets = budgetRows.map(b => ({
@@ -962,7 +958,8 @@ const sheetWidth = values => values.reduce((width, row) => Math.max(width, row.l
 
 /**
  * A tab's values as the export writes them: every row as wide as the widest,
- * then blank rows down to the bottom of the tab as it stood before this run.
+ * or as the tab as it stood before this run if that was wider, then blank rows
+ * down to the bottom of that tab.
  *
  * The blank rows are what clears a previous, longer export — in the same
  * request as the new data, so the two land or fail together. Clearing those
@@ -971,17 +968,22 @@ const sheetWidth = values => values.reduce((width, row) => Math.max(width, row.l
  * deleted operations back. Every cell carries a value because the API skips a
  * null (or a row's missing tail) rather than emptying it.
  *
+ * The blank columns do the same for a previous, wider export (the Operations
+ * tab lost its location columns): without them the old tail columns, header
+ * included, outlived the write whenever the trim after it failed, and the
+ * import read the stale `created_at` header over the real one.
+ *
  * The tab's size is what the previous export left once trimSheets cut the tab
  * down to it, so the padding reaches that export's length and no further. Data
  * longer than the tab grows it — the export has always relied on that for more
  * than the default 1000 rows of operations.
  * @param {{range: string, values: Array<Array>}} sheet
- * @param {?{rowCount: number}} grid - the tab's size before this run; null for a
- *   tab this run created, which has nothing to clear
+ * @param {?{rowCount: number, columnCount: number}} grid - the tab's size before
+ *   this run; null for a tab this run created, which has nothing to clear
  * @returns {{range: string, values: Array<Array>}}
  */
 const writeBlock = ({ range, values }, grid) => {
-  const width = sheetWidth(values);
+  const width = Math.max(sheetWidth(values), grid?.columnCount ?? 0);
   const rows = values.map(row => Array.from({ length: width }, (_, i) => row[i] ?? ''));
   const blank = Array(width).fill('');
   for (let row = rows.length; row < (grid?.rowCount ?? 0); row += 1) rows.push(blank);

@@ -114,8 +114,7 @@ export default function NotificationProcessingContentPanel({ active = true, onCr
   const [reAddState, setReAddState] = useState({});
   // Per-review-card save state: pending id -> true while its save is in flight.
   // A card mid-save collapses into a compact "Adding…" row and drops its action
-  // buttons, so the up-to-8s best-effort location fix inside the save can't be
-  // double-tapped into duplicate operations (the reason this is async at all).
+  // buttons, so a slow save can't be double-tapped into duplicate operations.
   const [savingIds, setSavingIds] = useState({});
   // Mirror of `choices` so reloadPending can read the latest values without
   // taking `choices` as a dependency (which would re-create it on every keystroke).
@@ -334,10 +333,9 @@ export default function NotificationProcessingContentPanel({ active = true, onCr
     if (savingIds[item.id]) return;
 
     // Collapse the card into an "Adding…" state right away so the save feels
-    // instant even while the best-effort location fix inside resolve resolves in
-    // the background (it can take up to 8s). Dropping the Save button from the
-    // tree, together with the guard above, stops a second tap from booking a
-    // duplicate operation during the capture.
+    // instant while resolve runs in the background. Dropping the Save button
+    // from the tree, together with the guard above, stops a second tap from
+    // booking a duplicate operation during the save.
     LayoutAnimation.configureNext(CARD_COLLAPSE_ANIMATION);
     setSavingIds((prev) => ({ ...prev, [item.id]: true }));
 
@@ -498,7 +496,7 @@ export default function NotificationProcessingContentPanel({ active = true, onCr
         pending.map((item) => {
           // Mid-save: the full form is collapsed into a compact progress row so
           // the save reads as instant, and the (now-absent) Save button can't be
-          // tapped again while the location fix resolves.
+          // tapped again while the save resolves.
           if (savingIds[item.id]) {
             return (
               <View

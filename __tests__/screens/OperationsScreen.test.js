@@ -218,8 +218,6 @@ jest.mock('../../app/components/operations/PickerModal', () => {
 });
 /* eslint-enable react/prop-types */
 
-// Location wiring: default to the feature off / no fix so existing tests are
-// unaffected; the location-specific test overrides these.
 // Every tab stays mounted, so the screen asks this whether it is the one on
 // screen — it is what retires a parked quick-add date when the user walks away.
 jest.mock('../../app/contexts/TabFocusContext', () => ({
@@ -227,13 +225,8 @@ jest.mock('../../app/contexts/TabFocusContext', () => ({
 }));
 
 jest.mock('../../app/contexts/DisplaySettingsContext', () => ({
-  useDisplaySettings: jest.fn(() => ({ attachLocation: false })),
+  useDisplaySettings: jest.fn(() => ({})),
 }));
-
-jest.mock('../../app/hooks/useQuickAddLocation', () => jest.fn(() => ({
-  getLocation: jest.fn(() => null),
-  prime: jest.fn(),
-})));
 
 // Mock the notification-suggestions hook so the screen render stays deterministic
 // and fast — its real form hits the notification DB + ingestion pipeline on mount,
@@ -1656,7 +1649,7 @@ describe('OperationsScreen', () => {
       // Panel setting off, so the + button exists. Dismissing the summoned form
       // is the user saying they are done — unlike the fold after an add.
       const { useDisplaySettings } = require('../../app/contexts/DisplaySettingsContext');
-      useDisplaySettings.mockReturnValue({ attachLocation: false, showQuickAddPanel: false });
+      useDisplaySettings.mockReturnValue({ showQuickAddPanel: false });
 
       try {
         const { getByTestId, clearDate } = await mountWithValues({ ...BASE_VALUES, date: '2026-09-04' });
@@ -1667,7 +1660,7 @@ describe('OperationsScreen', () => {
 
         expect(clearDate).toHaveBeenCalled();
       } finally {
-        useDisplaySettings.mockReturnValue({ attachLocation: false });
+        useDisplaySettings.mockReturnValue({});
       }
     });
 
@@ -1683,7 +1676,7 @@ describe('OperationsScreen', () => {
       // walking away, so the day they picked has to survive it — otherwise
       // back-filling six entries means picking the day six times.
       const { useDisplaySettings } = require('../../app/contexts/DisplaySettingsContext');
-      useDisplaySettings.mockReturnValue({ attachLocation: false, showQuickAddPanel: false });
+      useDisplaySettings.mockReturnValue({ showQuickAddPanel: false });
 
       try {
         const { getByTestId, clearDate } = await mountWithValues({ ...BASE_VALUES, date: '2026-09-04' });
@@ -1698,21 +1691,20 @@ describe('OperationsScreen', () => {
 
         expect(clearDate).not.toHaveBeenCalled();
       } finally {
-        useDisplaySettings.mockReturnValue({ attachLocation: false });
+        useDisplaySettings.mockReturnValue({});
       }
     });
   });
 
-  describe('Quick-add location', () => {
+  describe('Quick-add without location', () => {
     const { act } = require('@testing-library/react-native');
 
-    it('attaches the primed location to a quick-added operation', async () => {
+    it('quick-adds without coordinates', async () => {
       const OperationsScreen = require('../../app/screens/OperationsScreen').default;
       const { useOperationsData } = require('../../app/contexts/OperationsDataContext');
       const { useOperationsActions } = require('../../app/contexts/OperationsActionsContext');
       const { useAccountsData } = require('../../app/contexts/AccountsDataContext');
       const useQuickAddForm = require('../../app/hooks/useQuickAddForm');
-      const useQuickAddLocation = require('../../app/hooks/useQuickAddLocation');
       const useOperationPicker = require('../../app/hooks/useOperationPicker');
 
       useOperationPicker.mockReturnValue({
@@ -1722,76 +1714,6 @@ describe('OperationsScreen', () => {
         closePicker: jest.fn(),
         navigateIntoFolder: jest.fn(),
         navigateBack: jest.fn(),
-      });
-
-      useQuickAddLocation.mockReturnValue({
-        getLocation: jest.fn(() => ({ latitude: '40.1', longitude: '44.2' })),
-        prime: jest.fn(),
-      });
-
-      const mockAddOperation = jest.fn(() => Promise.resolve({ id: 'new-op' }));
-      useQuickAddForm.mockReturnValue({
-        quickAddValues: { type: 'expense', amount: '100', accountId: 'acc-1', categoryId: 'cat-1' },
-        quickAddValuesStore: makeMockQuickAddStore({ type: 'expense', amount: '100', accountId: 'acc-1', categoryId: 'cat-1' }),
-        setQuickAddValues: jest.fn(),
-        getAccountName: jest.fn(() => 'Cash'),
-        getAccountBalance: jest.fn(() => '$1000.00'),
-        getCategoryInfo: jest.fn(() => ({ name: 'Food', icon: 'food' })),
-        getCategoryName: jest.fn(() => 'Food'),
-        filteredCategories: [],
-        resetForm: jest.fn(),
-        clearDate: jest.fn(),
-      });
-
-      useAccountsData.mockReturnValue({
-        accounts: [{ id: 'acc-1', currency: 'USD' }],
-        visibleAccounts: [{ id: 'acc-1', currency: 'USD' }],
-        loading: false,
-      });
-      useOperationsData.mockReturnValue({
-        operations: [], loading: false, loadingMore: false, hasMoreOperations: false,
-      });
-      useOperationsActions.mockReturnValue({
-        deleteOperation: jest.fn(),
-        addOperation: mockAddOperation,
-        validateOperation: jest.fn(() => null),
-        loadMoreOperations: jest.fn(),
-        jumpToDate: jest.fn(),
-      });
-
-      const { getByTestId } = await render(<OperationsScreen />);
-      // handleQuickAdd is reached through the picker's auto-add shortcut (the
-      // quick-add form itself is a mocked list header and not rendered here).
-      await act(async () => {
-        await getByTestId('picker-modal').props.onAutoAddWithCategory('cat-1');
-      });
-
-      expect(mockAddOperation).toHaveBeenCalledWith(
-        expect.objectContaining({ latitude: '40.1', longitude: '44.2' }),
-      );
-    });
-
-    it('quick-adds without coordinates when no fix is available', async () => {
-      const OperationsScreen = require('../../app/screens/OperationsScreen').default;
-      const { useOperationsData } = require('../../app/contexts/OperationsDataContext');
-      const { useOperationsActions } = require('../../app/contexts/OperationsActionsContext');
-      const { useAccountsData } = require('../../app/contexts/AccountsDataContext');
-      const useQuickAddForm = require('../../app/hooks/useQuickAddForm');
-      const useQuickAddLocation = require('../../app/hooks/useQuickAddLocation');
-      const useOperationPicker = require('../../app/hooks/useOperationPicker');
-
-      useOperationPicker.mockReturnValue({
-        pickerState: { visible: true, type: 'category', data: [] },
-        categoryNavigation: { currentFolderId: null, breadcrumb: [] },
-        openPicker: jest.fn(),
-        closePicker: jest.fn(),
-        navigateIntoFolder: jest.fn(),
-        navigateBack: jest.fn(),
-      });
-
-      useQuickAddLocation.mockReturnValue({
-        getLocation: jest.fn(() => null),
-        prime: jest.fn(),
       });
 
       const mockAddOperation = jest.fn(() => Promise.resolve({ id: 'new-op' }));
@@ -3849,7 +3771,7 @@ describe('OperationsScreen', () => {
       const OperationsScreen = require('../../app/screens/OperationsScreen').default;
       mockSuggestionsHook();
       const { useDisplaySettings } = require('../../app/contexts/DisplaySettingsContext');
-      useDisplaySettings.mockReturnValue({ attachLocation: false, showQuickAddPanel: true });
+      useDisplaySettings.mockReturnValue({ showQuickAddPanel: true });
       const restoreSearch = withSearchClosed();
       const tracker = trackSharedValues();
       const handlers = [];
@@ -3873,7 +3795,7 @@ describe('OperationsScreen', () => {
         tracker.restore();
         restoreSearch();
         require('../../app/contexts/DisplaySettingsContext').useDisplaySettings
-          .mockReturnValue({ attachLocation: false });
+          .mockReturnValue({});
       }
     });
 
@@ -3957,7 +3879,7 @@ describe('OperationsScreen', () => {
       try {
         // No deck and the panel setting off: nothing holds the block open.
         const { useDisplaySettings } = require('../../app/contexts/DisplaySettingsContext');
-        useDisplaySettings.mockReturnValue({ attachLocation: false, showQuickAddPanel: false });
+        useDisplaySettings.mockReturnValue({ showQuickAddPanel: false });
 
         await render(<OperationsScreen />);
         const clip = tracker.clip();
@@ -3973,7 +3895,7 @@ describe('OperationsScreen', () => {
         tracker.restore();
         restoreSearch();
         require('../../app/contexts/DisplaySettingsContext').useDisplaySettings
-          .mockReturnValue({ attachLocation: false });
+          .mockReturnValue({});
       }
     });
 
@@ -4239,7 +4161,7 @@ describe('OperationsScreen', () => {
       const { useDisplaySettings } = require('../../app/contexts/DisplaySettingsContext');
       // The form's own block, pinned open: a deck would collapse it, and a
       // collapsed block's zero is the truth rather than a transient pass.
-      useDisplaySettings.mockReturnValue({ attachLocation: false, showQuickAddPanel: true });
+      useDisplaySettings.mockReturnValue({ showQuickAddPanel: true });
       mockSuggestionsHook();
       const restoreSearch = withSearchClosed();
       const logs = jest.spyOn(console, 'log').mockImplementation(() => {});
@@ -4274,7 +4196,7 @@ describe('OperationsScreen', () => {
         logs.mockRestore();
         restoreSearch();
         useSearch.mockReturnValue({ registerSearchHandler: jest.fn(), openSearch: jest.fn() });
-        useDisplaySettings.mockReturnValue({ attachLocation: false });
+        useDisplaySettings.mockReturnValue({});
       }
     });
   });
@@ -4301,7 +4223,7 @@ describe('OperationsScreen', () => {
     });
 
     const setPanelSetting = (showQuickAddPanel) => {
-      useDisplaySettings.mockReturnValue({ attachLocation: false, showQuickAddPanel });
+      useDisplaySettings.mockReturnValue({ showQuickAddPanel });
       // An earlier test in this file may have left search open, which collapses
       // the panel and hides the button regardless of the setting, or left a
       // prefixing `t` behind, which would show up in the button's label.
@@ -4311,7 +4233,7 @@ describe('OperationsScreen', () => {
 
     afterEach(() => {
       // mockReturnValue survives clearAllMocks, so hand the shared mocks back.
-      useDisplaySettings.mockReturnValue({ attachLocation: false });
+      useDisplaySettings.mockReturnValue({});
       useSearch.mockReturnValue({ registerSearchHandler: jest.fn(), openSearch: jest.fn() });
       useLocalization.mockReturnValue({ t: (key) => key, language: 'en' });
       require('../../app/hooks/usePendingOperationSuggestions').default.mockReturnValue({

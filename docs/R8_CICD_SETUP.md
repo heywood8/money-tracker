@@ -354,7 +354,7 @@ PR CI runs lint and unit tests only, neither of which builds a minified APK, and
 behaviour of a minified binary. Trigger the **Emulator Screenshots** workflow,
 which prebuilds with `APP_VARIANT=production` and runs the app on an emulator,
 then walk the app on a real device. Exercise every native-module boundary:
-SQLite, notifications, file system, location, Google Sign-In, the heatmap.
+SQLite, notifications, file system, Google Sign-In, the home-screen widgets.
 
 ### What does not apply to Penny
 
@@ -363,8 +363,8 @@ The same Play announcement carries requirements Penny already clears:
 - **Memory (anonymous RSS + swap).** Thresholds start at 2 GB foreground on a
   4 GB device. Penny is nowhere near.
 - **Bitmap memory.** Thresholds are 200 MB (background) and 400 MB (cached).
-  Penny's only bitmaps are OpenStreetMap tiles in the operations heatmap, orders
-  of magnitude below that.
+  Penny draws its charts as vectors and holds no large bitmaps, orders of
+  magnitude below that.
 - **Restore Credentials API (April 2027).** Applies to apps with user sign-in.
   Penny has no account of its own; its only sign-in is optional Google
   authentication for the Sheets export, and its data moves between devices

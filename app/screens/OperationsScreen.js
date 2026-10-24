@@ -39,7 +39,6 @@ import { hasOperation, evaluateExpression } from '../utils/calculatorUtils';
 import useMultiCurrencyTransfer from '../hooks/useMultiCurrencyTransfer';
 import useOperationPicker from '../hooks/useOperationPicker';
 import useQuickAddForm from '../hooks/useQuickAddForm';
-import useQuickAddLocation from '../hooks/useQuickAddLocation';
 import usePendingOperationSuggestions from '../hooks/usePendingOperationSuggestions';
 import useOnForeground from '../hooks/useOnForeground';
 import { useSearch } from '../contexts/SearchContext';
@@ -149,8 +148,6 @@ const OperationsScreen = () => {
   // Display preferences. Read defensively: the context has no default value, so
   // a missing provider (e.g. in unit tests) yields undefined.
   const displaySettings = useDisplaySettings();
-  // Opt-in geolocation for quick-add.
-  const attachLocation = !!(displaySettings && displaySettings.attachLocation);
   // Whether the quick-add panel is pinned open at the top of the list. Only an
   // explicit `false` collapses it, so an absent provider keeps the historical
   // always-open behaviour.
@@ -412,13 +409,6 @@ const OperationsScreen = () => {
     foreignRateSource,
     foreignExchangeRate,
   } = useQuickAddForm(visibleAccounts, accounts, categories, t);
-
-  // Best-effort, non-blocking location capture primed as the user starts entering
-  // an operation; attached at save time (issue #1091).
-  const { getLocation: getQuickAddLocation, prime: primeQuickAddLocation } = useQuickAddLocation(attachLocation);
-  // Tracks whether the amount field is currently empty, so a fix is primed exactly
-  // on the empty → non-empty edge (start of entry) rather than on every keystroke.
-  const amountWasEmptyRef = useRef(true);
 
   const {
     pickerState,
@@ -1212,15 +1202,6 @@ const OperationsScreen = () => {
     // Strip operationCurrency — not a DB field
     delete operationData.operationCurrency;
 
-    // Attach the current best-effort location when the feature is enabled. The fix
-    // was primed as the user began entering; whatever is ready now is used (possibly
-    // none), and it never blocks saving.
-    const capturedLocation = getQuickAddLocation();
-    if (capturedLocation && capturedLocation.latitude != null && capturedLocation.longitude != null) {
-      operationData.latitude = capturedLocation.latitude;
-      operationData.longitude = capturedLocation.longitude;
-    }
-
     const error = validateOperation(operationData, t);
     if (error) {
       // Prefer the lightweight inline flash over a blocking dialog for the common
@@ -1259,8 +1240,6 @@ const OperationsScreen = () => {
       // holds now is the next entry, typed while this save ran.
       if (!capturedValues) {
         resetForm();
-        // The amount is cleared; the next entry starts fresh and re-primes location.
-        amountWasEmptyRef.current = true;
       }
 
       // The summoned form has done its job — fold it away. A no-op when the
@@ -1288,7 +1267,7 @@ const OperationsScreen = () => {
       // Errors from addOperation are already shown via dialog.
       // Errors from getDistinctLabels are non-critical — suggestion row simply won't appear.
     }
-  }, [quickAddValuesStore, sourceAccount, validateOperation, addOperation, t, showDialog, accounts, resetForm, lastEditedField, getQuickAddLocation, showUndo]);
+  }, [quickAddValuesStore, sourceAccount, validateOperation, addOperation, t, showDialog, accounts, resetForm, lastEditedField, showUndo]);
 
   // A second tap on Add while the first save is still pending used to book the same
   // operation twice — the DB write is async, and a cross-currency entry awaits a live
@@ -1476,16 +1455,9 @@ const OperationsScreen = () => {
   }, []);
 
   const handleAmountChange = useCallback((text) => {
-    // Kick off a best-effort location fix the moment the user starts entering an
-    // amount (empty → non-empty), so it is usually ready — without ever blocking —
-    // by the time they tap add.
-    if (amountWasEmptyRef.current && text) {
-      primeQuickAddLocation();
-    }
-    amountWasEmptyRef.current = !text;
     setQuickAddValues(v => ({ ...v, amount: text }));
     setLastEditedField('amount');
-  }, [primeQuickAddLocation]);
+  }, []);
 
   // Handlers for picker modal selections
   const handleSelectAccount = useCallback((id) => {

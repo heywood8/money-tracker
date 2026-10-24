@@ -69,7 +69,6 @@ describe('PreferencesDB', () => {
         'UPDATE_LAST_PROMPTED_VERSION',
         'UPDATE_SKIP_UNTIL',
         'HIDE_BALANCES',
-        'ATTACH_LOCATION',
         'SHOW_ACCOUNTS_TAB',
         'SHOW_BUDGET_TAB',
         'SHOW_QUICKADD_PANEL',

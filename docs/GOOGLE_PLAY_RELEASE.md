@@ -202,11 +202,10 @@ hand in Play Console so you can see exactly what Play objects to. After that,
 Play will also want, independently of anything in this repo:
 
 - a store listing (title, description, screenshots, feature graphic)
-- a **Data safety** form, which must cover the location data the
-  attach-location-to-operations feature collects
+- a **Data safety** form (Penny collects no location: the app declares no
+  location permission)
 - a publicly hosted privacy policy URL (the text lives in
   `docs/PRIVACY_POLICY.md`)
-- a **location permissions** declaration for `ACCESS_FINE_LOCATION`
 - a declaration for the `NotificationListenerService` that
   `plugins/withNotificationListener.js` registers — Play reviews notification
   access closely and it is a common rejection reason

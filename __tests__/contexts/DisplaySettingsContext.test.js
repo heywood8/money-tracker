@@ -137,9 +137,9 @@ describe('DisplaySettingsContext', () => {
     });
   });
 
-  describe('attachLocation (issue #1091)', () => {
-    it('defaults attachLocation=false', async () => {
-      PreferencesDB.getPreference.mockResolvedValue('false');
+  describe('attachLocation (removed)', () => {
+    it('no longer exposes the attach-location setting', async () => {
+      PreferencesDB.getPreference.mockResolvedValue('true');
 
       const { result } = await renderHook(() => useDisplaySettings(), { wrapper });
 
@@ -147,55 +147,9 @@ describe('DisplaySettingsContext', () => {
         expect(PreferencesDB.getPreference).toHaveBeenCalled();
       });
 
-      expect(result.current.attachLocation).toBe(false);
-    });
-
-    it('reads stored attachLocation="true" on mount', async () => {
-      PreferencesDB.getPreference.mockImplementation((key) =>
-        Promise.resolve(key === 'attach_location' ? 'true' : 'false'),
-      );
-
-      const { result } = await renderHook(() => useDisplaySettings(), { wrapper });
-
-      await waitFor(() => {
-        expect(result.current.attachLocation).toBe(true);
-      });
-      // hideBalances stays independent.
-      expect(result.current.hideBalances).toBe(false);
-    });
-
-    it('setAttachLocation(true) persists "true"', async () => {
-      const { result } = await renderHook(() => useDisplaySettings(), { wrapper });
-
-      await waitFor(() => {
-        expect(PreferencesDB.getPreference).toHaveBeenCalled();
-      });
-
-      await act(async () => {
-        await result.current.setAttachLocation(true);
-      });
-
-      expect(result.current.attachLocation).toBe(true);
-      expect(PreferencesDB.setPreference).toHaveBeenCalledWith('attach_location', 'true');
-    });
-
-    it('setAttachLocation(false) persists "false"', async () => {
-      PreferencesDB.getPreference.mockImplementation((key) =>
-        Promise.resolve(key === 'attach_location' ? 'true' : 'false'),
-      );
-
-      const { result } = await renderHook(() => useDisplaySettings(), { wrapper });
-
-      await waitFor(() => {
-        expect(result.current.attachLocation).toBe(true);
-      });
-
-      await act(async () => {
-        await result.current.setAttachLocation(false);
-      });
-
-      expect(result.current.attachLocation).toBe(false);
-      expect(PreferencesDB.setPreference).toHaveBeenCalledWith('attach_location', 'false');
+      expect(result.current).not.toHaveProperty('attachLocation');
+      expect(result.current).not.toHaveProperty('setAttachLocation');
+      expect(PreferencesDB.getPreference).not.toHaveBeenCalledWith('attach_location', expect.anything());
     });
   });
 

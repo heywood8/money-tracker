@@ -75,7 +75,6 @@ const mockChart = (key) => {
 // has no reason to mock.
 jest.mock('../../app/components/graphs/BalanceHistoryCard', () => () => null);
 jest.mock('../../app/components/graphs/TrendsCard', () => () => null);
-jest.mock('../../app/components/graphs/OperationsHeatmapCard', () => () => null);
 
 jest.mock('../../app/components/graphs/ExpensePieChart', () => mockChart('expense'));
 jest.mock('../../app/components/graphs/IncomePieChart', () => mockChart('income'));

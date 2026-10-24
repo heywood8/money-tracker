@@ -10,7 +10,6 @@ export const PREF_KEYS = {
   UPDATE_LAST_PROMPTED_VERSION: 'update_last_prompted_version',
   UPDATE_SKIP_UNTIL: 'update_skip_until',
   HIDE_BALANCES: 'hide_balances',
-  ATTACH_LOCATION: 'attach_location',
   // Global toggle: show a dedicated Accounts tab in the bottom navigation.
   SHOW_ACCOUNTS_TAB: 'show_accounts_tab',
   // Global toggle: show the Budget tab in the bottom navigation. Defaults on

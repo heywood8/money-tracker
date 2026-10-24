@@ -439,7 +439,7 @@ describe('SettingsScreen', () => {
       expect(mockSetSubPanelActive).toHaveBeenCalledWith(true);
     });
 
-    it('opens the privacy subpanel with the balance and location toggles', async () => {
+    it('opens the privacy subpanel with the hide-balances toggle', async () => {
       const { getByTestId, queryByTestId } = await render(
         <SettingsScreen setSubPanelActive={mockSetSubPanelActive} />,
       );
@@ -451,7 +451,7 @@ describe('SettingsScreen', () => {
       });
 
       expect(getByTestId('settings-hide-balances-row')).toBeTruthy();
-      expect(getByTestId('settings-location-row')).toBeTruthy();
+      expect(queryByTestId('settings-location-row')).toBeNull();
     });
 
     it('renders language row', async () => {
