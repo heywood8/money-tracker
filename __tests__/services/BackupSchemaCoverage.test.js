@@ -98,11 +98,17 @@ const TABLES_NOT_BACKED_UP = new Set([
  * predating the bridge restores with the Accounts tab defaulted off until the
  * user toggles it back on.
  *
+ * `operations.latitude` / `operations.longitude` are the same kind of dead
+ * weight: the location feature that wrote them is gone, the clearStoredLocations
+ * repair nulled every value, and nothing reads them. A backup that still carries
+ * them restores without them.
+ *
  * Note this exclusion is CSV-only: the JSON export is a `SELECT *` and has no
  * column list to fall out of sync with.
  */
 const COLUMNS_NOT_IN_CSV = {
   accounts: ['show_in_main_menu'],
+  operations: ['latitude', 'longitude'],
 };
 
 /**
@@ -111,10 +117,11 @@ const COLUMNS_NOT_IN_CSV = {
  * `operations.id` and `accounts_balance_history.id` are autoincrement surrogate
  * keys: the restore lets SQLite mint fresh ones and remaps the references,
  * which is what lets a backup carrying UUID account ids import at all.
- * `accounts.show_in_main_menu` is the legacy column described above.
+ * `accounts.show_in_main_menu` and `operations.latitude` / `longitude` are the
+ * legacy columns described above.
  */
 const RESTORE_INSERT_OMISSIONS = {
-  operations: ['id'],
+  operations: ['id', 'latitude', 'longitude'],
   accounts_balance_history: ['id'],
   accounts: ['show_in_main_menu'],
 };

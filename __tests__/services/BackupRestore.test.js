@@ -838,10 +838,12 @@ describe('BackupRestore', () => {
     });
   });
 
-  describe('Location columns round-trip (issue #1091)', () => {
-    const makeDbInstance = () => {
+  describe('Legacy location columns', () => {
+    // The location feature is gone; a backup that still carries coordinates
+    // restores without them, and no export writes them.
+    it('drops latitude/longitude from a backup that has them', async () => {
       let insertCount = 0;
-      return {
+      const dbInstance = {
         runAsync: jest.fn().mockImplementation(() => {
           insertCount++;
           return Promise.resolve({ lastInsertRowId: insertCount });
@@ -851,15 +853,6 @@ describe('BackupRestore', () => {
           { id: 'shadow-adjustment-income' },
         ]),
       };
-    };
-
-    const opInsert = (dbInstance) =>
-      dbInstance.runAsync.mock.calls.find(
-        (c) => typeof c[0] === 'string' && c[0].includes('INSERT INTO operations'),
-      );
-
-    it('restores latitude/longitude from a backup that has them', async () => {
-      const dbInstance = makeDbInstance();
       mockDb.executeTransaction.mockImplementation(async (cb) => { await cb(dbInstance); });
 
       await BackupRestore.restoreBackup({
@@ -874,37 +867,14 @@ describe('BackupRestore', () => {
         },
       });
 
-      const call = opInsert(dbInstance);
-      expect(call[0]).toContain('latitude, longitude');
-      expect(call[1]).toEqual(expect.arrayContaining(['40.5', '44.5']));
+      const call = dbInstance.runAsync.mock.calls.find(
+        (c) => typeof c[0] === 'string' && c[0].includes('INSERT INTO operations'),
+      );
+      expect(call[0]).not.toContain('latitude');
+      expect(call[1]).not.toContain('40.5');
     });
 
-    it('tolerates older backups without latitude/longitude (treats them as null)', async () => {
-      const dbInstance = makeDbInstance();
-      mockDb.executeTransaction.mockImplementation(async (cb) => { await cb(dbInstance); });
-
-      // mockOperations[0] has no latitude/longitude keys (legacy backup).
-      await BackupRestore.restoreBackup({
-        version: 1,
-        timestamp: '2024-01-01T00:00:00.000Z',
-        platform: 'native',
-        data: {
-          accounts: mockAccounts,
-          categories: mockCategories,
-          operations: mockOperations,
-          app_metadata: mockMetadata,
-        },
-      });
-
-      const call = opInsert(dbInstance);
-      expect(call).toBeTruthy();
-      const params = call[1];
-      // Column list ends with latitude, longitude → last two params default to null.
-      expect(params[params.length - 2]).toBeNull();
-      expect(params[params.length - 1]).toBeNull();
-    });
-
-    it('includes latitude/longitude columns in CSV export', async () => {
+    it('leaves latitude/longitude out of the CSV export', async () => {
       mockDb.queryAll.mockImplementation((query) => {
         if (query.includes('operations')) {
           return Promise.resolve([{ ...mockOperations[0], latitude: '40.5', longitude: '44.5' }]);
@@ -917,10 +887,8 @@ describe('BackupRestore', () => {
       await BackupRestore.exportBackup('csv');
 
       const written = mockFileSystem.writeAsStringAsync.mock.calls[0][1];
-      // The operations CSV header lists the new columns, and the row carries values.
-      expect(written).toContain('latitude,longitude');
-      expect(written).toContain('40.5');
-      expect(written).toContain('44.5');
+      expect(written).not.toContain('latitude');
+      expect(written).not.toContain('40.5');
     });
   });
 
@@ -2980,7 +2948,7 @@ line-cat,plan-1,Groceries,400.00,"${NON_ASCII_COMMENT}",cat-1,,0`;
       expect(cleared).toHaveLength(1);
     });
 
-    it('keeps soft-delete state and locations through a CSV round trip (#1695)', async () => {
+    it('keeps soft-delete state through a CSV round trip (#1695)', async () => {
       const { dbInstance } = await restoreCSV(backupWith({
         accounts: [{
           ...account, deleted_at: '2025-03-01T00:00:00.000Z', card_mask: '1234',
@@ -2989,17 +2957,12 @@ line-cat,plan-1,Groceries,400.00,"${NON_ASCII_COMMENT}",cat-1,,0`;
         operations: [{
           id: 1, type: 'expense', amount: '10.00', account_id: 1, category_id: 'cat-1',
           to_account_id: null, date: '2024-01-01', created_at: '2024-01-01T00:00:00.000Z',
-          latitude: 41.7, longitude: 44.8,
         }],
       }));
 
       const accountInsert = insertsInto(dbInstance, 'accounts')[0];
       expect(insertedValue(accountInsert, 'deleted_at')).toBe('2025-03-01T00:00:00.000Z');
       expect(insertedValue(accountInsert, 'card_mask')).toBe('1234');
-
-      const opInsert = insertsInto(dbInstance, 'operations')[0];
-      expect(insertedValue(opInsert, 'latitude')).toBe('41.7');
-      expect(insertedValue(opInsert, 'longitude')).toBe('44.8');
     });
   });
 });

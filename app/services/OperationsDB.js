@@ -68,8 +68,6 @@ const mapOperationFields = (dbOperation) => {
     destinationAmount: dbOperation.destination_amount,
     sourceCurrency: dbOperation.source_currency,
     destinationCurrency: dbOperation.destination_currency,
-    latitude: dbOperation.latitude,
-    longitude: dbOperation.longitude,
     // Exposed as a boolean for the form/toggle. Stored as 0/1 (nullable) — the
     // integer column coerces any legacy string value, so !! is safe here.
     excludeFromAvg: !!dbOperation.exclude_from_avg,
@@ -601,25 +599,20 @@ export const createOperationInTx = async (db, operation) => {
     source_currency: operation.sourceCurrency || null,
     destination_currency: operation.destinationCurrency || null,
     // 1 when the operation is excluded from the spending average / burndown
-    // forecast; 0 (counted) by default. Listed before latitude/longitude so those
-    // stay the last two columns/params.
+    // forecast; 0 (counted) by default.
     exclude_from_avg: operation.excludeFromAvg ? 1 : 0,
     // 1 when the operation is hidden from every chart; 0 (shown) by default.
     exclude_from_charts: operation.excludeFromCharts ? 1 : 0,
-    // ?? (not ||) so a valid 0.0 coordinate (equator / prime meridian) survives.
-    latitude: operation.latitude ?? null,
-    longitude: operation.longitude ?? null,
   };
 
   const result = await db.runAsync(
-    'INSERT INTO operations (type, amount, account_id, category_id, to_account_id, date, created_at, description, exchange_rate, destination_amount, source_currency, destination_currency, exclude_from_avg, exclude_from_charts, latitude, longitude) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)',
+    'INSERT INTO operations (type, amount, account_id, category_id, to_account_id, date, created_at, description, exchange_rate, destination_amount, source_currency, destination_currency, exclude_from_avg, exclude_from_charts) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)',
     [
       operationData.type, operationData.amount, operationData.account_id,
       operationData.category_id, operationData.to_account_id, operationData.date,
       operationData.created_at, operationData.description, operationData.exchange_rate,
       operationData.destination_amount, operationData.source_currency, operationData.destination_currency,
       operationData.exclude_from_avg, operationData.exclude_from_charts,
-      operationData.latitude, operationData.longitude,
     ],
   );
 
@@ -750,14 +743,6 @@ export const updateOperation = async (id, updates) => {
       if (updates.destinationCurrency !== undefined) {
         fields.push('destination_currency = ?');
         values.push(updates.destinationCurrency || null);
-      }
-      if (updates.latitude !== undefined) {
-        fields.push('latitude = ?');
-        values.push(updates.latitude ?? null); // ?? keeps a valid 0.0 coordinate
-      }
-      if (updates.longitude !== undefined) {
-        fields.push('longitude = ?');
-        values.push(updates.longitude ?? null);
       }
       if (updates.excludeFromAvg !== undefined) {
         fields.push('exclude_from_avg = ?');
@@ -907,8 +892,6 @@ export const splitOperation = async (id, updates, newOperationData) => {
       if (updates.destinationAmount !== undefined) { fields.push('destination_amount = ?'); vals.push(updates.destinationAmount || null); }
       if (updates.sourceCurrency !== undefined) { fields.push('source_currency = ?'); vals.push(updates.sourceCurrency || null); }
       if (updates.destinationCurrency !== undefined) { fields.push('destination_currency = ?'); vals.push(updates.destinationCurrency || null); }
-      if (updates.latitude !== undefined) { fields.push('latitude = ?'); vals.push(updates.latitude ?? null); }
-      if (updates.longitude !== undefined) { fields.push('longitude = ?'); vals.push(updates.longitude ?? null); }
 
       if (fields.length > 0) {
         vals.push(id);
@@ -920,8 +903,7 @@ export const splitOperation = async (id, updates, newOperationData) => {
         [id],
       );
 
-      // Step 3: insert new (split) operation. The sibling inherits the parent's
-      // coordinates (same place) unless the caller explicitly supplies its own.
+      // Step 3: insert new (split) operation.
       const newRow = {
         type: newOperationData.type,
         amount: newOperationData.amount,
@@ -945,22 +927,15 @@ export const splitOperation = async (id, updates, newOperationData) => {
         exclude_from_charts: newOperationData.excludeFromCharts !== undefined
           ? (newOperationData.excludeFromCharts ? 1 : 0)
           : (oldOperation.exclude_from_charts ? 1 : 0),
-        latitude: newOperationData.latitude !== undefined
-          ? (newOperationData.latitude ?? null)
-          : (oldOperation.latitude ?? null),
-        longitude: newOperationData.longitude !== undefined
-          ? (newOperationData.longitude ?? null)
-          : (oldOperation.longitude ?? null),
       };
 
       const result = await db.runAsync(
-        'INSERT INTO operations (type, amount, account_id, category_id, to_account_id, date, created_at, description, exchange_rate, destination_amount, source_currency, destination_currency, exclude_from_avg, exclude_from_charts, latitude, longitude) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)',
+        'INSERT INTO operations (type, amount, account_id, category_id, to_account_id, date, created_at, description, exchange_rate, destination_amount, source_currency, destination_currency, exclude_from_avg, exclude_from_charts) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)',
         [
           newRow.type, newRow.amount, newRow.account_id, newRow.category_id,
           newRow.to_account_id, newRow.date, newRow.created_at, newRow.description,
           newRow.exchange_rate, newRow.destination_amount, newRow.source_currency, newRow.destination_currency,
           newRow.exclude_from_avg, newRow.exclude_from_charts,
-          newRow.latitude, newRow.longitude,
         ],
       );
 
@@ -2541,9 +2516,8 @@ export const getDistinctDescriptions = async (limit = 100, categoryId = null, am
 };
 
 /**
- * Aggregate raw {description, cnt, category_id?} rows into a ranked label list.
- * Single source of truth for the label-ranking rules shared by getDistinctLabels
- * and getLabelsNearLocation: parse labels out of each description, drop hidden /
+ * Aggregate raw {description, cnt, category_id?} rows into a ranked label list,
+ * for getDistinctLabels: parse labels out of each description, drop hidden /
  * system labels (imported Account:/Category:/... metadata + the [MoneyOK] marker),
  * sum per-label frequency, then order by — when a categoryId is given —
  * in-category first → frequency desc → locale-aware label compare.
@@ -2614,120 +2588,5 @@ export const getDistinctLabels = async (limit = 50, categoryId = null) => {
   } catch (error) {
     console.error('Failed to get distinct labels:', error);
     throw error;
-  }
-};
-
-/**
- * Most-frequent labels used on past operations within a ~radiusMeters bounding
- * box of (lat, lng) — "proximity recall". Mirrors getDistinctLabels' shape: a
- * single bounded SELECT grouped by description, then per-label frequency
- * aggregation in JS with hidden/system labels excluded.
- *
- * The query is a square bounding box (no haversine refine, no distance
- * weighting) — simple and well within usable accuracy at a ~150 m radius.
- * Rows with null coordinates are skipped by the IS NOT NULL filter and never
- * poison the result. Never throws: any failure resolves to [] so a save or the
- * suggestion strip is never blocked.
- *
- * @param {number|string} lat - Latitude in decimal degrees
- * @param {number|string} lng - Longitude in decimal degrees
- * @param {Object} [opts]
- * @param {number} [opts.radiusMeters=150] - Half-size of the bounding box in metres
- * @param {number} [opts.limit=8] - Maximum number of labels to return
- * @returns {Promise<string[]>} Labels ranked by frequency, de-duplicated, hidden labels excluded
- */
-export const getLabelsNearLocation = async (lat, lng, { radiusMeters = 150, limit = 8 } = {}) => {
-  try {
-    const latNum = parseFloat(lat);
-    const lngNum = parseFloat(lng);
-    if (!isFinite(latNum) || !isFinite(lngNum)) return [];
-
-    // Convert the metre radius to lat/lng deltas. 1° latitude ≈ 111320 m anywhere;
-    // 1° longitude shrinks by cos(latitude). Floor |cos| so a fix near the poles
-    // can't blow the longitude delta up to infinity.
-    const dLat = radiusMeters / 111320;
-    const cosLat = Math.cos((latNum * Math.PI) / 180);
-    const dLng = radiusMeters / (111320 * Math.max(Math.abs(cosLat), 1e-6));
-
-    const minLat = latNum - dLat;
-    const maxLat = latNum + dLat;
-    const minLng = lngNum - dLng;
-    const maxLng = lngNum + dLng;
-
-    // Bounding-box filter. Coordinates are stored as text, so CAST to REAL for a
-    // numeric (not lexicographic) range comparison; this also means a text index
-    // can't serve the range, which is why none exists (see migration 0009). The
-    // scan window is capped like getDistinctLabels so modal open stays fast even
-    // with a large history.
-    const SCAN_GROUP_LIMIT = 2000;
-    const rows = await queryAll(
-      `SELECT description, COUNT(*) AS cnt
-       FROM operations
-       WHERE latitude IS NOT NULL
-         AND longitude IS NOT NULL
-         AND CAST(latitude AS REAL) BETWEEN ? AND ?
-         AND CAST(longitude AS REAL) BETWEEN ? AND ?
-         AND description IS NOT NULL AND description != ''
-       GROUP BY description
-       ORDER BY cnt DESC
-       LIMIT ${SCAN_GROUP_LIMIT}`,
-      [minLat, maxLat, minLng, maxLng],
-    );
-
-    // Rank by frequency (no category dimension here) using the shared aggregator,
-    // so the hidden-label rules and tie-break stay single-sourced with getDistinctLabels.
-    return aggregateLabelRows(rows, { limit });
-  } catch (error) {
-    console.error('Failed to get labels near location:', error);
-    return [];
-  }
-};
-
-/**
- * Coordinates of every operation that has a location, for the heatmap.
- * Optionally bounded to a date range; pass no dates for "all time".
- *
- * Carries the chart-visibility predicate like every other analytic query — an
- * operation hidden from the charts must not reappear as a heatmap blob.
- * Coordinates are stored as text (see migration 0009), so CAST to REAL and
- * drop anything non-finite rather than let a corrupt row poison the render.
- * Never throws: the heatmap degrades to an empty state on failure.
- *
- * @param {string|null} [startDate] - YYYY-MM-DD inclusive lower bound
- * @param {string|null} [endDate] - YYYY-MM-DD inclusive upper bound
- * @returns {Promise<Array<{latitude: number, longitude: number}>>}
- */
-export const getOperationCoordinates = async (startDate = null, endDate = null) => {
-  try {
-    const where = [
-      'latitude IS NOT NULL',
-      'longitude IS NOT NULL',
-      chartVisibleSql('operations'),
-    ];
-    const params = [];
-    if (startDate) {
-      where.push('date >= ?');
-      params.push(startDate);
-    }
-    if (endDate) {
-      where.push('date <= ?');
-      params.push(endDate);
-    }
-    const rows = await queryAll(
-      `SELECT CAST(latitude AS REAL) AS latitude,
-              CAST(longitude AS REAL) AS longitude
-       FROM operations
-       WHERE ${where.join(' AND ')}`,
-      params,
-    );
-    // Number.isFinite, not the coercing global — a null must not slip through
-    // as 0 and paint a phantom blob at the equator.
-    return (rows || []).filter(
-      (row) => Number.isFinite(row.latitude) && Number.isFinite(row.longitude) &&
-        Math.abs(row.latitude) <= 90 && Math.abs(row.longitude) <= 180,
-    );
-  } catch (error) {
-    console.error('Failed to get operation coordinates:', error);
-    return [];
   }
 };

@@ -26,8 +26,6 @@ const mapPendingFields = (row) => {
     categoryId: row.category_id,
     packageName: row.package_name,
     raw: row.raw,
-    latitude: row.latitude,
-    longitude: row.longitude,
     // Rows written before migration 0027 carry no column at all — read as false.
     forceAdded: row.force_added === 1 || row.force_added === true,
     createdAt: row.created_at,
@@ -37,8 +35,7 @@ const mapPendingFields = (row) => {
 /**
  * Insert a pending notification from a parsed descriptor + suggestions.
  * @param {Object} item - { kind, type, amount, currency, cardMask, merchant,
- *   country, date, time, accountId, categoryId, packageName, raw, latitude,
- *   longitude, forceAdded }
+ *   country, date, time, accountId, categoryId, packageName, raw, forceAdded }
  * @returns {Promise<Object>} the stored pending item
  */
 export const addPendingNotification = async (item) => {
@@ -60,9 +57,6 @@ export const addPendingNotification = async (item) => {
       category_id: item.categoryId || null,
       package_name: item.packageName || null,
       raw: item.raw || null,
-      // ?? (not ||) so a valid 0.0 coordinate (equator / prime meridian) survives.
-      latitude: item.latitude ?? null,
-      longitude: item.longitude ?? null,
       // The user explicitly asked for this item (a re-add from the recent feed),
       // so duplicate reconciliation must leave it in the queue.
       force_added: item.forceAdded ? 1 : 0,
@@ -70,12 +64,12 @@ export const addPendingNotification = async (item) => {
     };
     await executeQuery(
       `INSERT INTO pending_notifications
-        (id, kind, type, amount, currency, card_mask, merchant, country, date, time, account_id, category_id, package_name, raw, latitude, longitude, force_added, created_at)
-       VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
+        (id, kind, type, amount, currency, card_mask, merchant, country, date, time, account_id, category_id, package_name, raw, force_added, created_at)
+       VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
       [
         row.id, row.kind, row.type, row.amount, row.currency, row.card_mask,
         row.merchant, row.country, row.date, row.time, row.account_id,
-        row.category_id, row.package_name, row.raw, row.latitude, row.longitude,
+        row.category_id, row.package_name, row.raw,
         row.force_added, row.created_at,
       ],
     );

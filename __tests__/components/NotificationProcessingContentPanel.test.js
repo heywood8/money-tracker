@@ -465,10 +465,10 @@ describe('NotificationProcessingContentPanel', () => {
     });
   });
 
-  // Regression: enabling automatic geotagging made the save await an up-to-8s
-  // location fix. The card must collapse into an async "Adding…" state and drop
-  // its Save button so a slow fix can't be double-tapped into duplicate operations.
-  describe('async save (location capture)', () => {
+  // Regression: a slow save (it once awaited an up-to-8s location fix) could be
+  // double-tapped into duplicate operations. The card must collapse into an async
+  // "Adding…" state and drop its Save button while the save runs.
+  describe('async save', () => {
     it('collapses the card into an "Adding…" row and drops the Save button while saving', async () => {
       // Hang the resolve so the card stays mid-save and we can observe the
       // collapsed state (and the absence of a second Save affordance).

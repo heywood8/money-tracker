@@ -26,7 +26,6 @@ import * as PendingNotificationsDB from '../PendingNotificationsDB';
 import * as DismissedNotificationsDB from '../DismissedNotificationsDB';
 import { serializeLabels, sanitizeLabel, normalizeMerchantLabel } from '../../utils/labelUtils';
 import { appEvents, EVENTS } from '../eventEmitter';
-import { captureLocationIfEnabled, isAttachLocationEnabled, operationLocationFields } from '../operationLocation';
 import { parseBankNotification, kindRequiresCategory } from './parseBankNotification';
 import { ensureCustomTemplatesLoaded } from './customTemplates';
 import { resolveNotification } from './resolveNotification';
@@ -42,46 +41,6 @@ import { localDateOf, todayLocalDate } from '../../utils/dateUtils';
 // rewriting the day's log file, evicting the 500-entry ring within the hour, and
 // burying the one slow run somebody actually opened the log to find.
 const IDLE_PASS_LOG_MS = 3000;
-
-/**
- * A per-run location provider. Captures the device location at most once (lazily,
- * only when an operation is actually created) and reuses it for every operation
- * booked in the same run, so a batch of notifications shares one best-effort fix
- * instead of hammering GPS. Returns { latitude, longitude } or null; the feature
- * being off / permission missing / a failed fix all resolve to null so location
- * capture never blocks booking a notification (issue #1091).
- * @returns {() => Promise<{latitude: string, longitude: string}|null>}
- */
-const makeLocationProvider = () => {
-  let cached; // undefined until the first attempt
-  return async () => {
-    if (cached === undefined) {
-      cached = await captureLocationIfEnabled();
-    }
-    return cached;
-  };
-};
-
-/**
- * Location to stamp on an operation booked from a pending notification. Prefers
- * the fix captured when the notification was ingested (near the shop) so resolving
- * the item later — e.g. after coming home — doesn't record the current (wrong)
- * place. Falls back to a live capture for rows that carry no stored fix (queued
- * before this feature, or ingested with the toggle off).
- *
- * Gated on the current opt-in either way: resolving a pending row creates a NEW
- * operation, and the toggle governs new operations, so a user who has since opted
- * out gets no location — not even the stored one.
- * @param {{ latitude?: *, longitude?: * }} pending
- * @returns {Promise<{ latitude: string, longitude: string }|null>}
- */
-const resolvePendingLocation = async (pending) => {
-  if (pending && pending.latitude != null && pending.longitude != null) {
-    if (!(await isAttachLocationEnabled())) return null;
-    return { latitude: pending.latitude, longitude: pending.longitude };
-  }
-  return captureLocationIfEnabled();
-};
 
 // Cap on remembered signatures. The native side keeps a rolling window of 50
 // notifications, and saveSignatures always keeps the signature of every one of
@@ -422,14 +381,12 @@ const recordCreated = (summary, record) => {
  * @param {string} date - resolved ISO date (never null)
  * @param {string[]} allowedPackages - trusted-source allowlist
  * @param {{ created: number, pending: number }} summary
- * @param {() => Promise<Object|null>} [getLocation] - best-effort location provider
- *   for auto-created operations; omitted callers book without coordinates.
  * @param {{ checkDuplicate?: boolean }} [options] - when checkDuplicate is false,
  *   book even if a matching operation already exists (explicit re-add); a row
  *   queued under that flag is marked force-added so the reconciliation pass
  *   doesn't delete it against the very duplicate the re-add chose to ignore.
  */
-const bookExpenseOrQueue = async (descriptor, resolution, date, allowedPackages, summary, getLocation, options = {}) => {
+const bookExpenseOrQueue = async (descriptor, resolution, date, allowedPackages, summary, options = {}) => {
   // Skip a charge the user has already recorded by hand: neither auto-create nor
   // queue a duplicate. Claim the matched operation so a sibling notification in
   // this run pairs with a different one. Counted as skipped; the caller still
@@ -502,7 +459,6 @@ const bookExpenseOrQueue = async (descriptor, resolution, date, allowedPackages,
     // the raw merchant for the operation's label. Otherwise the raw shop name is
     // tidied from ALL CAPS to first-capital ("GURMAN" -> "Gurman").
     const label = resolution.labelOverride || normalizeMerchantLabel(descriptor.merchant);
-    const location = getLocation ? await getLocation() : null;
     const created = await OperationsDB.createOperation({
       type: descriptor.type,
       ...currencyFields,
@@ -510,7 +466,6 @@ const bookExpenseOrQueue = async (descriptor, resolution, date, allowedPackages,
       categoryId: resolution.categoryId,
       date,
       description: label ? serializeLabels([label]) : null,
-      ...operationLocationFields(location),
     });
     // Claim the new operation so a later duplicate notification in this run pairs
     // with a different existing operation rather than re-matching this one.
@@ -543,10 +498,6 @@ const bookExpenseOrQueue = async (descriptor, resolution, date, allowedPackages,
       }
     }
   } else {
-    // Capture the location NOW (at ingestion, near the shop) and store it on the
-    // pending row, so resolving the item later — e.g. after coming home — stamps
-    // the operation with where the purchase happened, not the current location.
-    const location = getLocation ? await getLocation() : null;
     await PendingNotificationsDB.addPendingNotification({
       ...descriptor,
       date,
@@ -562,7 +513,6 @@ const bookExpenseOrQueue = async (descriptor, resolution, date, allowedPackages,
       // An explicit re-add skipped the duplicate check on the way in; mark the
       // row so the reconciliation pass doesn't delete it on the way out.
       forceAdded: options.checkDuplicate === false,
-      ...operationLocationFields(location),
     });
     summary.pending += 1;
   }
@@ -580,14 +530,12 @@ const bookExpenseOrQueue = async (descriptor, resolution, date, allowedPackages,
  * @param {string} date - resolved ISO date (never null)
  * @param {string[]} allowedPackages - trusted-source allowlist
  * @param {{ created: number, pending: number }} summary
- * @param {() => Promise<Object|null>} [getLocation] - best-effort location provider
- *   for auto-created transfers; omitted callers book without coordinates.
  * @param {{ checkDuplicate?: boolean }} [options] - when checkDuplicate is false,
  *   book even if a matching operation already exists (explicit re-add); a row
  *   queued under that flag is marked force-added so the reconciliation pass
  *   doesn't delete it against the very duplicate the re-add chose to ignore.
  */
-const bookTransferOrQueue = async (descriptor, resolution, date, allowedPackages, summary, getLocation, options = {}) => {
+const bookTransferOrQueue = async (descriptor, resolution, date, allowedPackages, summary, options = {}) => {
   // Skip an ATM withdrawal the user has already recorded by hand, mirroring the
   // expense/income path (matched on the source account, date, amount, and type).
   const duplicate = await findExistingOperation(descriptor, resolution, date, options);
@@ -631,7 +579,6 @@ const bookTransferOrQueue = async (descriptor, resolution, date, allowedPackages
         ),
       };
     }
-    const location = getLocation ? await getLocation() : null;
     const created = await OperationsDB.createOperation({
       type: 'transfer',
       ...transferFields,
@@ -641,7 +588,6 @@ const bookTransferOrQueue = async (descriptor, resolution, date, allowedPackages
       description: descriptor.merchant
         ? serializeLabels([normalizeMerchantLabel(descriptor.merchant)])
         : null,
-      ...operationLocationFields(location),
     });
     if (options.claimedOpIds && created && created.id != null) options.claimedOpIds.add(created.id);
     await rememberBookedOperation(created && created.id, [descriptor.merchant]);
@@ -660,9 +606,6 @@ const bookTransferOrQueue = async (descriptor, resolution, date, allowedPackages
       date,
     });
   } else {
-    // Capture the location NOW (at ingestion, near the ATM) and store it on the
-    // pending row, mirroring the expense/income queue path.
-    const location = getLocation ? await getLocation() : null;
     await PendingNotificationsDB.addPendingNotification({
       ...descriptor,
       date,
@@ -671,7 +614,6 @@ const bookTransferOrQueue = async (descriptor, resolution, date, allowedPackages
       categoryId: null,
       // See bookExpenseOrQueue: an explicit re-add must survive reconciliation.
       forceAdded: options.checkDuplicate === false,
-      ...operationLocationFields(location),
     });
     summary.pending += 1;
   }
@@ -775,9 +717,6 @@ const runProcess = async () => {
   const newlySeen = [];
   trace.mark('signatures');
 
-  // One best-effort location fix, shared by every operation auto-created this run.
-  const getLocation = makeLocationProvider();
-
   // Operations paired with a notification this run (matched-as-duplicate or
   // freshly auto-created), so a second identical charge in the same batch pairs
   // with a different operation instead of being absorbed by the first.
@@ -837,9 +776,9 @@ const runProcess = async () => {
         // accounts, so they resolve a *target* account (a bound "cash" account)
         // instead of a category. Everything else books as expense/income.
         if (descriptor.isTransfer) {
-          await bookTransferOrQueue(descriptor, resolution, date, allowedPackages, summary, getLocation, bookOptions);
+          await bookTransferOrQueue(descriptor, resolution, date, allowedPackages, summary, bookOptions);
         } else {
-          await bookExpenseOrQueue(descriptor, resolution, date, allowedPackages, summary, getLocation, bookOptions);
+          await bookExpenseOrQueue(descriptor, resolution, date, allowedPackages, summary, bookOptions);
         }
       });
 
@@ -966,10 +905,6 @@ export const resolvePendingNotification = async (pendingId, choices = {}) => {
     };
   }
 
-  // Prefer the fix captured at ingestion (near the shop); fall back to a live,
-  // opt-in-gated capture only when the pending row carries no stored coordinates.
-  const location = await resolvePendingLocation(pending);
-
   const operation = await OperationsDB.createOperation({
     type: pending.type,
     ...currencyFields,
@@ -978,7 +913,6 @@ export const resolvePendingNotification = async (pendingId, choices = {}) => {
     // operations.date is NOT NULL — fall back to the row's creation date / today.
     date: pending.date || localDateOf(pending.createdAt) || todayLocalDate(),
     description: label ? serializeLabels([label]) : null,
-    ...operationLocationFields(location),
   });
   await rememberBookedOperation(operation && operation.id, [label, pending.merchant]);
 
@@ -1158,10 +1092,6 @@ const resolvePendingTransfer = async (pending, choices = {}) => {
   const typedLabel = sanitizeLabel(choices.labelOverride);
   const label = typedLabel || normalizeMerchantLabel(pending.merchant);
 
-  // Prefer the fix captured at ingestion (near the ATM); fall back to a live,
-  // opt-in-gated capture only when the pending row carries no stored coordinates.
-  const location = await resolvePendingLocation(pending);
-
   const operation = await OperationsDB.createOperation({
     type: 'transfer',
     ...transferFields,
@@ -1170,7 +1100,6 @@ const resolvePendingTransfer = async (pending, choices = {}) => {
     // operations.date is NOT NULL — fall back to the row's creation date / today.
     date: pending.date || localDateOf(pending.createdAt) || todayLocalDate(),
     description: label ? serializeLabels([label]) : null,
-    ...operationLocationFields(location),
   });
   await rememberBookedOperation(operation && operation.id, [label, pending.merchant]);
 
@@ -1250,16 +1179,15 @@ export const reAddNotification = async (notification) => {
   // The user explicitly asked to re-add this, so treat its own source as trusted
   // for this booking regardless of the learn-on-trust allowlist.
   const trustedAllowlist = descriptor.packageName ? [descriptor.packageName] : [];
-  const getLocation = makeLocationProvider();
 
   // The user explicitly asked to re-add this notification, so book it even if a
   // matching operation already exists (they may be intentionally recording a
   // second identical charge, or re-adding one they deleted).
   const options = { checkDuplicate: false };
   if (descriptor.isTransfer) {
-    await bookTransferOrQueue(descriptor, resolution, date, trustedAllowlist, summary, getLocation, options);
+    await bookTransferOrQueue(descriptor, resolution, date, trustedAllowlist, summary, options);
   } else {
-    await bookExpenseOrQueue(descriptor, resolution, date, trustedAllowlist, summary, getLocation, options);
+    await bookExpenseOrQueue(descriptor, resolution, date, trustedAllowlist, summary, options);
   }
 
   if (summary.created > 0 || summary.pending > 0) {

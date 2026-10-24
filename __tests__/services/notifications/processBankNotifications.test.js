@@ -55,19 +55,6 @@ jest.mock('../../../app/services/PreferencesDB', () => ({
 }));
 import * as PreferencesDB from '../../../app/services/PreferencesDB';
 
-// Location capture is preference-gated; mock it so we can drive "fix available"
-// vs "feature off / no fix" directly. operationLocationFields stays the real pure
-// function so the merge-into-createOperation behavior is exercised.
-jest.mock('../../../app/services/operationLocation', () => ({
-  captureLocationIfEnabled: jest.fn(),
-  isAttachLocationEnabled: jest.fn(),
-  operationLocationFields: (loc) =>
-    loc && loc.latitude != null && loc.longitude != null
-      ? { latitude: loc.latitude, longitude: loc.longitude }
-      : {},
-}));
-import * as OperationLocation from '../../../app/services/operationLocation';
-
 // Use the real currency math but stub the live-rate fetch so conversions are
 // deterministic and never hit the network.
 jest.mock('../../../app/services/currency', () => {
@@ -140,11 +127,6 @@ describe('processBankNotifications', () => {
     PreferencesDB.getNumberPreference.mockResolvedValue(null);
     PreferencesDB.setPreference.mockResolvedValue();
     Currency.fetchLiveExchangeRate.mockResolvedValue({ rate: null, source: 'none' });
-    // Location feature off by default — no coordinates attached.
-    OperationLocation.captureLocationIfEnabled.mockResolvedValue(null);
-    // Opt-in on by default so the resolve path can reuse a stored fix; the tests
-    // that exercise the off case override this explicitly.
-    OperationLocation.isAttachLocationEnabled.mockResolvedValue(true);
     // Nothing rejected by default.
     DismissedNotificationsDB.loadDismissedFingerprints.mockResolvedValue(new Set());
     DismissedNotificationsDB.rememberDismissedNotification.mockResolvedValue('fp');
@@ -238,23 +220,10 @@ describe('processBankNotifications', () => {
     );
   });
 
-  describe('location capture', () => {
-    it('attaches the captured location to an auto-created operation when enabled', async () => {
-      OperationLocation.captureLocationIfEnabled.mockResolvedValue({ latitude: '40.1', longitude: '44.2' });
-      NotificationAccess.getRecentNotifications.mockResolvedValue([PURCHASE]);
-      AccountsDB.getAccountByCardMask.mockResolvedValue({ id: 7, currency: 'AMD' });
-      NotificationRulesDB.getMerchantRule.mockResolvedValue({ categoryId: 'cat-food', labelOverride: 'Groceries' });
-      PreferencesDB.getJsonPreference.mockImplementation((key) => prefs([], [PKG])(key));
-
-      await pipeline.processBankNotifications();
-
-      expect(OperationsDB.createOperation).toHaveBeenCalledWith(
-        expect.objectContaining({ latitude: '40.1', longitude: '44.2' }),
-      );
-    });
-
-    it('books an auto-created operation without coordinates when capture yields none', async () => {
-      OperationLocation.captureLocationIfEnabled.mockResolvedValue(null);
+  // The location feature is gone: nothing booked or queued carries coordinates,
+  // and a pending row written while it existed does not hand its fix on.
+  describe('no location', () => {
+    it('books an auto-created operation without coordinates', async () => {
       NotificationAccess.getRecentNotifications.mockResolvedValue([PURCHASE]);
       AccountsDB.getAccountByCardMask.mockResolvedValue({ id: 7, currency: 'AMD' });
       NotificationRulesDB.getMerchantRule.mockResolvedValue({ categoryId: 'cat-food', labelOverride: 'Groceries' });
@@ -267,45 +236,7 @@ describe('processBankNotifications', () => {
       expect(arg).not.toHaveProperty('longitude');
     });
 
-    it('captures at most one fix per run even across multiple auto-created operations', async () => {
-      OperationLocation.captureLocationIfEnabled.mockResolvedValue({ latitude: '40.1', longitude: '44.2' });
-      const SECOND = { ...PURCHASE, text: PURCHASE.text.replace('NAREK MEHRABYAN', 'SECOND SHOP'), postTime: PURCHASE.postTime + 1000 };
-      NotificationAccess.getRecentNotifications.mockResolvedValue([PURCHASE, SECOND]);
-      AccountsDB.getAccountByCardMask.mockResolvedValue({ id: 7, currency: 'AMD' });
-      NotificationRulesDB.getMerchantRule.mockResolvedValue({ categoryId: 'cat-food', labelOverride: 'Groceries' });
-      PreferencesDB.getJsonPreference.mockImplementation((key) => prefs([], [PKG])(key));
-
-      const summary = await pipeline.processBankNotifications();
-
-      expect(summary.created).toBe(2);
-      expect(OperationLocation.captureLocationIfEnabled).toHaveBeenCalledTimes(1);
-      expect(OperationsDB.createOperation).toHaveBeenNthCalledWith(1,
-        expect.objectContaining({ latitude: '40.1', longitude: '44.2' }));
-      expect(OperationsDB.createOperation).toHaveBeenNthCalledWith(2,
-        expect.objectContaining({ latitude: '40.1', longitude: '44.2' }));
-    });
-
-    it('stores the ingestion-time location on a queued notification', async () => {
-      // Untrusted source → the notification is queued, not booked. The location is
-      // still captured now (near the shop) and stored on the pending row so it is
-      // reused when the user resolves it later.
-      OperationLocation.captureLocationIfEnabled.mockResolvedValue({ latitude: '40.1', longitude: '44.2' });
-      NotificationAccess.getRecentNotifications.mockResolvedValue([PURCHASE]);
-      AccountsDB.getAccountByCardMask.mockResolvedValue({ id: 7, currency: 'AMD' });
-      NotificationRulesDB.getMerchantRule.mockResolvedValue({ categoryId: 'cat-food' });
-      PreferencesDB.getJsonPreference.mockImplementation((key) => prefs([], [])(key));
-
-      const summary = await pipeline.processBankNotifications();
-
-      expect(summary).toMatchObject({ created: 0, pending: 1, skipped: 0 });
-      expect(OperationsDB.createOperation).not.toHaveBeenCalled();
-      expect(PendingNotificationsDB.addPendingNotification).toHaveBeenCalledWith(
-        expect.objectContaining({ latitude: '40.1', longitude: '44.2' }),
-      );
-    });
-
-    it('queues a notification without coordinates when the feature is off', async () => {
-      OperationLocation.captureLocationIfEnabled.mockResolvedValue(null);
+    it('queues a notification without coordinates', async () => {
       NotificationAccess.getRecentNotifications.mockResolvedValue([PURCHASE]);
       AccountsDB.getAccountByCardMask.mockResolvedValue({ id: 7, currency: 'AMD' });
       NotificationRulesDB.getMerchantRule.mockResolvedValue({ categoryId: 'cat-food' });
@@ -318,31 +249,7 @@ describe('processBankNotifications', () => {
       expect(arg).not.toHaveProperty('longitude');
     });
 
-    it('reuses the stored ingestion location when resolving a pending notification', async () => {
-      // The live capture would return the (wrong) current location; the stored fix
-      // from ingestion must win so a purchase reviewed at home keeps the shop's place.
-      OperationLocation.captureLocationIfEnabled.mockResolvedValue({ latitude: '55.7', longitude: '37.6' });
-      PendingNotificationsDB.getPendingNotificationById.mockResolvedValue({
-        id: 'p1', type: 'expense', amount: '3900.00', currency: 'AMD',
-        cardMask: '4083***7027', merchant: 'NAREK MEHRABYAN', date: '2026-06-28',
-        accountId: null, categoryId: null, packageName: PKG,
-        latitude: '40.1', longitude: '44.2',
-        createdAt: '2026-06-28T10:15:00.000Z',
-      });
-
-      await pipeline.resolvePendingNotification('p1', { accountId: 7, categoryId: 'cat-food' });
-
-      expect(OperationLocation.captureLocationIfEnabled).not.toHaveBeenCalled();
-      expect(OperationsDB.createOperation).toHaveBeenCalledWith(
-        expect.objectContaining({ latitude: '40.1', longitude: '44.2' }),
-      );
-    });
-
-    it('does not attach a stored location when the feature has since been turned off', async () => {
-      // Coords were captured at the shop while opted in, but the user has since
-      // opted out. Resolving creates a NEW operation, which the toggle governs, so
-      // nothing is attached — not even the stored fix.
-      OperationLocation.isAttachLocationEnabled.mockResolvedValue(false);
+    it('does not carry a legacy stored location onto the resolved operation', async () => {
       PendingNotificationsDB.getPendingNotificationById.mockResolvedValue({
         id: 'p1', type: 'expense', amount: '3900.00', currency: 'AMD',
         cardMask: '4083***7027', merchant: 'NAREK MEHRABYAN', date: '2026-06-28',
@@ -356,23 +263,6 @@ describe('processBankNotifications', () => {
       const arg = OperationsDB.createOperation.mock.calls[0][0];
       expect(arg).not.toHaveProperty('latitude');
       expect(arg).not.toHaveProperty('longitude');
-    });
-
-    it('falls back to a live capture when a pending notification carries no stored location', async () => {
-      OperationLocation.captureLocationIfEnabled.mockResolvedValue({ latitude: '1.5', longitude: '2.5' });
-      PendingNotificationsDB.getPendingNotificationById.mockResolvedValue({
-        id: 'p1', type: 'expense', amount: '3900.00', currency: 'AMD',
-        cardMask: '4083***7027', merchant: 'NAREK MEHRABYAN', date: '2026-06-28',
-        accountId: null, categoryId: null, packageName: PKG,
-        latitude: null, longitude: null,
-        createdAt: '2026-06-28T10:15:00.000Z',
-      });
-
-      await pipeline.resolvePendingNotification('p1', { accountId: 7, categoryId: 'cat-food' });
-
-      expect(OperationsDB.createOperation).toHaveBeenCalledWith(
-        expect.objectContaining({ latitude: '1.5', longitude: '2.5' }),
-      );
     });
   });
 

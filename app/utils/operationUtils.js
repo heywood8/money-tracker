@@ -27,9 +27,7 @@
  * exclude-from-charts flags — so the duplicate reproduces the original's balance
  * impact and its analytic visibility exactly. Only
  * the date is re-stamped to `dateString`. Volatile per-event context is dropped
- * on purpose: the row id / createdAt (a new row is inserted) and latitude/
- * longitude (a repeat happens here-and-now, so the original's coordinates would
- * be misleading).
+ * on purpose: the row id / createdAt (a new row is inserted).
  *
  * @param {Object} operation - Source operation (camelCase, as read from OperationsDB)
  * @param {string} dateString - Target date in YYYY-MM-DD (local) form

@@ -484,14 +484,15 @@ describe('GoogleSheetsService', () => {
         // a failure after it can no longer leave the two mixed.
         const { data } = JSON.parse(callsTo('values:batchUpdate')[0][1].body);
         const accounts = data.find(d => d.range === 'Accounts!A1');
-        // A header plus one row, then blank rows down to the tab's 1000.
+        // A header plus one row, then blank rows down to the tab's 1000, every
+        // row as wide as the tab's 26 columns.
         expect(accounts.values).toHaveLength(1000);
         expect(accounts.values[1][1]).toBe('Cash');
-        expect(accounts.values[2]).toEqual(Array(12).fill(''));
-        expect(accounts.values[999]).toEqual(Array(12).fill(''));
+        expect(accounts.values[2]).toEqual(Array(26).fill(''));
+        expect(accounts.values[999]).toEqual(Array(26).fill(''));
         const history = data.find(d => d.range === 'Balance History!A1');
         expect(history.values).toHaveLength(1000);
-        expect(history.values[1]).toEqual(['', '', '', '']);
+        expect(history.values[1]).toEqual(Array(26).fill(''));
 
         // Nothing is cleared in a call of its own any more.
         expect(callsTo('values:batchClear')).toHaveLength(0);
@@ -514,6 +515,36 @@ describe('GoogleSheetsService', () => {
           'connect:in_progress', 'connect:completed',
           'write:in_progress', 'write:completed',
         ]);
+      });
+
+      // The Operations tab lost its latitude/longitude columns, so an export
+      // over one written before that is narrower than the tab. The old tail
+      // columns must be blanked in the write itself: left to the best-effort
+      // trim, a failed trim left a stale `created_at` header in column U that
+      // the import read over the real one in column S.
+      it('blanks the columns a wider previous export left, inside the write', async () => {
+        getPreference.mockResolvedValue('sheet-id');
+        mockFetch.mockResolvedValue({ ok: true, json: async () => ({}) });
+        const oldOperationsGrid = { rowCount: 3, columnCount: 21 };
+        mockFetch.mockResolvedValueOnce({
+          ok: true,
+          json: async () => ({
+            sheets: mockMetadata.sheets.map(sheet => (sheet.properties.title === 'Operations'
+              ? { properties: { ...sheet.properties, gridProperties: oldOperationsGrid } }
+              : sheet)),
+          }),
+        });
+
+        await exportToSheets('access-token', mockBackup);
+
+        const { data } = JSON.parse(callsTo('values:batchUpdate')[0][1].body);
+        const operations = data.find(d => d.range === 'Operations!A1');
+        const header = operations.values[0];
+        expect(header).toHaveLength(21);
+        expect(header).not.toContain('latitude');
+        expect(header.filter(h => h === 'created_at')).toHaveLength(1);
+        expect(header.slice(-2)).toEqual(['', '']);
+        expect(operations.values[2]).toEqual(Array(21).fill(''));
       });
 
       it('sends no clear and no blank rows into a spreadsheet created in this run', async () => {
@@ -1593,15 +1624,13 @@ describe('GoogleSheetsService', () => {
       });
     });
 
-    it('keeps the exclusion flags, locations, original balance and created_at of operations', async () => {
+    it('keeps the exclusion flags, original balance and created_at of operations', async () => {
       const imported = await roundTrip();
 
       expect(imported.data.operations[0]).toMatchObject({
         description: 'Lunch',
         exclude_from_avg: 1,
         exclude_from_charts: 1,
-        latitude: 41.7151,
-        longitude: 44.8271,
         original_balance: '450',
         created_at: '2024-01-15T09:00:00.000Z',
       });
@@ -1609,13 +1638,20 @@ describe('GoogleSheetsService', () => {
         description: 'Coffee',
         exclude_from_avg: 0,
         exclude_from_charts: 0,
-        latitude: null,
-        longitude: null,
         original_balance: null,
         // Same day as the first: created_at is the only thing that keeps their
         // order, and re-stamping it with `now` scrambled it.
         created_at: '2024-01-15T10:00:00.000Z',
       });
+    });
+
+    it('drops the legacy location columns on the way out', async () => {
+      const operationsSheet = buildSheetsData(backup).find(sheet => sheet.range === 'Operations!A1');
+      expect(operationsSheet.values[0]).not.toContain('latitude');
+      expect(operationsSheet.values.flat()).not.toContain(41.7151);
+
+      const imported = await roundTrip();
+      expect(imported.data.operations[0]).not.toHaveProperty('latitude');
     });
 
     it("keeps a category's created_at, which is what its colour is derived from", async () => {
@@ -1666,8 +1702,6 @@ describe('GoogleSheetsService', () => {
         description: 'Lunch',
         exclude_from_avg: 0,
         exclude_from_charts: 0,
-        latitude: null,
-        longitude: null,
         original_balance: null,
       });
     });

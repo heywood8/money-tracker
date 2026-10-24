@@ -7,10 +7,6 @@ const DisplaySettingsContext = createContext();
 
 export const DisplaySettingsProvider = ({ children }) => {
   const [hideBalances, setHideBalancesState] = useState(false);
-  // Opt-in toggle for attaching the device's geolocation to new operations.
-  // Defaults off — with no user action the app behaves exactly as before
-  // (no permission prompt, no capture). See issue #1091.
-  const [attachLocation, setAttachLocationState] = useState(false);
   // Global toggle: when on, a dedicated Accounts tab is shown in the bottom
   // navigation. Defaults off — accounts remain reachable from Settings.
   const [showAccountsTab, setShowAccountsTabState] = useState(false);
@@ -26,9 +22,6 @@ export const DisplaySettingsProvider = ({ children }) => {
   useEffect(() => {
     getPreference(PREF_KEYS.HIDE_BALANCES, 'false').then(stored => {
       setHideBalancesState(stored === 'true');
-    });
-    getPreference(PREF_KEYS.ATTACH_LOCATION, 'false').then(stored => {
-      setAttachLocationState(stored === 'true');
     });
     // Use null as the "never set" sentinel so we can tell a genuine stored value
     // apart from an upgrade with no preference yet.
@@ -57,11 +50,6 @@ export const DisplaySettingsProvider = ({ children }) => {
     await setPreference(PREF_KEYS.HIDE_BALANCES, value ? 'true' : 'false');
   }, []);
 
-  const setAttachLocation = useCallback(async (value) => {
-    setAttachLocationState(value);
-    await setPreference(PREF_KEYS.ATTACH_LOCATION, value ? 'true' : 'false');
-  }, []);
-
   const setShowAccountsTab = useCallback(async (value) => {
     setShowAccountsTabState(value);
     await setPreference(PREF_KEYS.SHOW_ACCOUNTS_TAB, value ? 'true' : 'false');
@@ -78,8 +66,8 @@ export const DisplaySettingsProvider = ({ children }) => {
   }, []);
 
   const ctxValue = useMemo(
-    () => ({ hideBalances, setHideBalances, attachLocation, setAttachLocation, showAccountsTab, setShowAccountsTab, showBudgetTab, setShowBudgetTab, showQuickAddPanel, setShowQuickAddPanel }),
-    [hideBalances, setHideBalances, attachLocation, setAttachLocation, showAccountsTab, setShowAccountsTab, showBudgetTab, setShowBudgetTab, showQuickAddPanel, setShowQuickAddPanel],
+    () => ({ hideBalances, setHideBalances, showAccountsTab, setShowAccountsTab, showBudgetTab, setShowBudgetTab, showQuickAddPanel, setShowQuickAddPanel }),
+    [hideBalances, setHideBalances, showAccountsTab, setShowAccountsTab, showBudgetTab, setShowBudgetTab, showQuickAddPanel, setShowQuickAddPanel],
   );
 
   return (

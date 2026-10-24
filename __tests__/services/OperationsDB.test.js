@@ -164,8 +164,10 @@ describe('OperationsDB Service', () => {
     });
   });
 
-  describe('Location columns (issue #1091)', () => {
-    it('maps latitude/longitude to camelCase on read', async () => {
+  describe('Operation row columns', () => {
+    // The location feature is gone; the columns stay only as migration 0009's
+    // marker. A row still carrying a value must not resurface it.
+    it('does not expose the legacy latitude/longitude columns on read', async () => {
       queryFirst.mockResolvedValue({
         id: 1,
         type: 'expense',
@@ -179,26 +181,8 @@ describe('OperationsDB Service', () => {
       });
 
       const result = await OperationsDB.getOperationById(1);
-      expect(result.latitude).toBe('40.5');
-      expect(result.longitude).toBe('44.5');
-    });
-
-    it('maps null coordinates to null (legacy rows)', async () => {
-      queryFirst.mockResolvedValue({
-        id: 2,
-        type: 'expense',
-        amount: '100',
-        account_id: 'acc1',
-        category_id: 'cat1',
-        date: '2025-12-05',
-        created_at: '2025-12-05T10:00:00Z',
-        latitude: null,
-        longitude: null,
-      });
-
-      const result = await OperationsDB.getOperationById(2);
-      expect(result.latitude).toBeNull();
-      expect(result.longitude).toBeNull();
+      expect(result).not.toHaveProperty('latitude');
+      expect(result).not.toHaveProperty('longitude');
     });
 
     it('maps exclude_from_avg to an excludeFromAvg boolean on read', async () => {
@@ -243,7 +227,7 @@ describe('OperationsDB Service', () => {
       expect(result.excludeFromAvg).toBe(false);
     });
 
-    it('persists latitude/longitude in the INSERT on create', async () => {
+    it('never writes the legacy location columns on create', async () => {
       mockDb.getFirstAsync.mockResolvedValue({ balance: '1000' });
 
       await OperationsDB.createOperation({
@@ -252,59 +236,16 @@ describe('OperationsDB Service', () => {
         accountId: 'acc1',
         categoryId: 'cat1',
         date: '2025-12-05',
-        description: 'Coffee',
         latitude: '40.5',
         longitude: '44.5',
       });
 
-      expect(mockDb.runAsync).toHaveBeenCalledWith(
-        expect.stringMatching(/INSERT INTO operations.*latitude, longitude/s),
-        expect.arrayContaining(['40.5', '44.5']),
-      );
-    });
-
-    it('writes null coordinates when none are supplied', async () => {
-      mockDb.getFirstAsync.mockResolvedValue({ balance: '1000' });
-
-      await OperationsDB.createOperation({
-        type: 'expense',
-        amount: '100',
-        accountId: 'acc1',
-        categoryId: 'cat1',
-        date: '2025-12-05',
-      });
-
       const insertCall = mockDb.runAsync.mock.calls.find(
         (c) => typeof c[0] === 'string' && c[0].includes('INSERT INTO operations'),
       );
-      expect(insertCall).toBeTruthy();
-      // The INSERT column list ends with latitude, longitude → last two params are null.
-      const params = insertCall[1];
-      expect(params[params.length - 2]).toBeNull();
-      expect(params[params.length - 1]).toBeNull();
-    });
-
-    it('preserves a valid 0 coordinate on create (uses ?? not ||)', async () => {
-      mockDb.getFirstAsync.mockResolvedValue({ balance: '1000' });
-
-      // Latitude/longitude 0.0 (equator / prime meridian) is a valid fix and must
-      // not be coerced to null.
-      await OperationsDB.createOperation({
-        type: 'expense',
-        amount: '100',
-        accountId: 'acc1',
-        categoryId: 'cat1',
-        date: '2025-12-05',
-        latitude: 0,
-        longitude: 0,
-      });
-
-      const insertCall = mockDb.runAsync.mock.calls.find(
-        (c) => typeof c[0] === 'string' && c[0].includes('INSERT INTO operations'),
-      );
-      const params = insertCall[1];
-      expect(params[params.length - 2]).toBe(0);
-      expect(params[params.length - 1]).toBe(0);
+      expect(insertCall[0]).not.toContain('latitude');
+      expect(insertCall[0]).not.toContain('longitude');
+      expect(insertCall[1]).not.toContain('40.5');
     });
 
     it('persists exclude_from_avg = 1 in the INSERT when the operation is flagged', async () => {
@@ -323,10 +264,10 @@ describe('OperationsDB Service', () => {
         (c) => typeof c[0] === 'string' && c[0].includes('INSERT INTO operations'),
       );
       expect(insertCall[0]).toContain('exclude_from_avg');
-      // Column list ends with exclude_from_avg, exclude_from_charts, latitude,
-      // longitude → the flag is the fourth param from the end.
+      // Column list ends with exclude_from_avg, exclude_from_charts → the flag
+      // is the second param from the end.
       const params = insertCall[1];
-      expect(params[params.length - 4]).toBe(1);
+      expect(params[params.length - 2]).toBe(1);
     });
 
     it('defaults exclude_from_avg to 0 when the flag is not supplied', async () => {
@@ -344,7 +285,7 @@ describe('OperationsDB Service', () => {
         (c) => typeof c[0] === 'string' && c[0].includes('INSERT INTO operations'),
       );
       const params = insertCall[1];
-      expect(params[params.length - 4]).toBe(0);
+      expect(params[params.length - 2]).toBe(0);
     });
 
     it('maps exclude_from_charts to an excludeFromCharts boolean on read', async () => {
@@ -391,24 +332,23 @@ describe('OperationsDB Service', () => {
         (c) => typeof c[0] === 'string' && c[0].includes('INSERT INTO operations'),
       );
       expect(insertCall[0]).toContain('exclude_from_charts');
-      // Third param from the end (latitude/longitude stay last).
+      // The last param.
       const params = insertCall[1];
-      expect(params[params.length - 3]).toBe(1);
+      expect(params[params.length - 1]).toBe(1);
     });
 
-    it('updates latitude/longitude when provided', async () => {
+    it('ignores latitude/longitude on update', async () => {
       mockDb.getFirstAsync
         .mockResolvedValueOnce({ id: 1, type: 'expense', amount: '100', account_id: 'acc1', date: '2025-12-05' })
         .mockResolvedValue({ balance: '1000' });
 
-      await OperationsDB.updateOperation(1, { latitude: '12.0', longitude: '34.0' });
+      await OperationsDB.updateOperation(1, { description: 'x', latitude: '12.0', longitude: '34.0' });
 
       const updateCall = mockDb.runAsync.mock.calls.find(
         (c) => typeof c[0] === 'string' && c[0].includes('UPDATE operations SET'),
       );
-      expect(updateCall[0]).toContain('latitude = ?');
-      expect(updateCall[0]).toContain('longitude = ?');
-      expect(updateCall[1]).toEqual(expect.arrayContaining(['12.0', '34.0']));
+      expect(updateCall[0]).not.toContain('latitude');
+      expect(updateCall[0]).not.toContain('longitude');
     });
   });
 

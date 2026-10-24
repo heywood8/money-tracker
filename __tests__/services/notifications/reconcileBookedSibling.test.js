@@ -47,11 +47,6 @@ jest.mock('../../../app/services/PreferencesDB', () => {
     setJsonPreference: jest.fn(async (key, value) => { store.set(key, JSON.stringify(value)); }),
   };
 });
-jest.mock('../../../app/services/operationLocation', () => ({
-  captureLocationIfEnabled: jest.fn(async () => null),
-  isAttachLocationEnabled: jest.fn(async () => false),
-  operationLocationFields: () => ({}),
-}));
 jest.mock('../../../app/services/currency', () => {
   const actual = jest.requireActual('../../../app/services/currency');
   return { ...actual, fetchLiveExchangeRate: jest.fn(async () => ({ rate: null })) };

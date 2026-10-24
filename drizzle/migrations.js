@@ -33,7 +33,7 @@ import m0028 from './0028_plan_line_labels.js';
 import m0029 from './0029_dismissed_notifications.js';
 import m0030 from './0030_operations_transfer_indexes.js';
 import m0031 from './0031_merchant_rule_skip_category.js';
-import { normalizeOperationDates, renameMotorcycleIcon } from './dataRepairs.js';
+import { normalizeOperationDates, renameMotorcycleIcon, clearStoredLocations } from './dataRepairs.js';
 
 export default {
   journal,
@@ -79,6 +79,7 @@ export default {
     // install has, so it runs once (see drizzle/dataRepairs.js).
     normalizeOperationDates,
     renameMotorcycleIcon,
+    clearStoredLocations,
   },
   // Explicit tag mapping for post-migration handlers to avoid fragile substring matching
   postMigrationTags: {
@@ -87,6 +88,7 @@ export default {
     m0020: '0020_plan_line_templates',
     normalizeOperationDates: '0030_operations_transfer_indexes',
     renameMotorcycleIcon: '0030_operations_transfer_indexes',
+    clearStoredLocations: '0030_operations_transfer_indexes',
   },
 };
   

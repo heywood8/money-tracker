@@ -94,12 +94,20 @@ Financial transactions (expenses, income, transfers):
   source_currency: TEXT,
   destination_currency: TEXT,
   original_balance: TEXT,        // balance before a balance-adjustment op (0006)
-  latitude: TEXT,                // optional capture location (0009)
-  longitude: TEXT,
+  latitude: TEXT,                // legacy, unused, always NULL (0009)
+  longitude: TEXT,               // legacy, unused, always NULL (0009)
   exclude_from_avg: INTEGER DEFAULT 0,    // 1 = out of the daily average / forecast only (0013)
   exclude_from_charts: INTEGER DEFAULT 0  // 1 = out of every chart (0023)
 }
 ```
+
+`latitude` / `longitude` held the device location an operation was saved at,
+for the operations heatmap and nearby label suggestions. Both features were
+removed, and the one-off `clearStoredLocations` repair (`drizzle/dataRepairs.js`)
+nulled every stored value, along with `pending_notifications.latitude` /
+`longitude` (0017). The columns stay because they are migrations 0009 and 0017's
+markers in `detectAppliedMigrations`; the app neither reads nor writes them, and
+CSV / Sheets exports leave them out.
 
 **Indexes**: `date`, `account_id`, `category_id`, `type`, `to_account_id` (0030),
 `(account_id, date)` (0030)

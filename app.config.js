@@ -105,11 +105,6 @@ module.exports = {
         // disallowed, and merely declaring it triggers a Play Console review
         // form the app cannot satisfy.
         ...(IS_PLAY ? [] : ['android.permission.REQUEST_INSTALL_PACKAGES']),
-        // Foreground-only location for the opt-in "attach location to operations"
-        // feature. COARSE is enough for ~150 m proximity recall; FINE refines the
-        // fix when the user grants precise location. No background location.
-        'android.permission.ACCESS_COARSE_LOCATION',
-        'android.permission.ACCESS_FINE_LOCATION',
       ],
     },
     extra: {
@@ -155,8 +150,6 @@ module.exports = {
       'expo-sqlite',
       '@react-native-google-signin/google-signin',
       '@react-native-community/datetimepicker',
-      // Foreground-only location. No "always"/background permission strings.
-      ['expo-location', { locationAlwaysAndWhenInUsePermission: false }],
       [
         'expo-build-properties',
         {

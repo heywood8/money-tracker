@@ -62,20 +62,17 @@ describe('PendingNotificationsDB', () => {
       expect(result.cardMask).toBeNull();
       expect(result.merchant).toBeNull();
       expect(result.accountId).toBeNull();
-      expect(result.latitude).toBeNull();
-      expect(result.longitude).toBeNull();
     });
 
-    it('persists the ingestion-time coordinates', async () => {
+    it('never writes the legacy location columns', async () => {
       const result = await PendingNotificationsDB.addPendingNotification({
         kind: 'PURCHASE', type: 'expense', amount: '10', currency: 'AMD',
         latitude: '40.1', longitude: '44.2',
       });
-      expect(mockDb.executeQuery).toHaveBeenCalledWith(
-        expect.stringContaining('latitude, longitude'),
-        expect.arrayContaining(['40.1', '44.2']),
-      );
-      expect(result).toMatchObject({ latitude: '40.1', longitude: '44.2' });
+      const [sql, params] = mockDb.executeQuery.mock.calls[0];
+      expect(sql).not.toContain('latitude');
+      expect(params).not.toContain('40.1');
+      expect(result).not.toHaveProperty('latitude');
     });
 
     it('defaults force_added to 0 for a pipeline-queued item', async () => {
@@ -98,14 +95,6 @@ describe('PendingNotificationsDB', () => {
         expect.arrayContaining([1]),
       );
       expect(result.forceAdded).toBe(true);
-    });
-
-    it('preserves a 0.0 coordinate (does not coerce to null)', async () => {
-      const result = await PendingNotificationsDB.addPendingNotification({
-        kind: 'PURCHASE', type: 'expense', amount: '10', currency: 'AMD',
-        latitude: '0.0', longitude: '0.0',
-      });
-      expect(result).toMatchObject({ latitude: '0.0', longitude: '0.0' });
     });
   });
 

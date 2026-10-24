@@ -89,11 +89,10 @@ export const operations = sqliteTable('operations', {
   sourceCurrency: text('source_currency'),
   destinationCurrency: text('destination_currency'),
   originalBalance: text('original_balance'),
-  // Optional device geolocation captured at save time (decimal degrees, stored as
-  // string per the codebase's "numbers as strings" convention; parseFloat at use).
-  // Nullable — only populated when the user opts in to attaching location. No index:
-  // the proximity query compares CAST(... AS REAL), which a text index can't serve,
-  // and getLabelsNearLocation already scans like getDistinctLabels.
+  // Legacy, unused (migration 0009): the device location once attached to an
+  // operation. The feature is gone and the clearStoredLocations repair nulled
+  // every value; the columns stay because they are migration 0009's marker.
+  // Neither read nor written by the app.
   latitude: text('latitude'),
   longitude: text('longitude'),
   // When 1, this operation is left out of the daily spending average and the
@@ -289,9 +288,8 @@ export const pendingNotifications = sqliteTable('pending_notifications', {
   categoryId: text('category_id').references(() => categories.id, { onDelete: 'set null' }),
   packageName: text('package_name'),
   raw: text('raw'),
-  // Location captured at ingestion time (near the shop), reused when the item is
-  // resolved so a notification reviewed later isn't stamped with the wrong place.
-  // Both nullable — only populated when the attach-location opt-in was on.
+  // Legacy, unused (migration 0017): the location once captured at ingestion.
+  // Kept as the migration's marker, always NULL; see operations.latitude.
   latitude: text('latitude'),
   longitude: text('longitude'),
   // 1 when the user explicitly re-added this notification from the recent feed.

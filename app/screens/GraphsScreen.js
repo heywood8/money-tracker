@@ -26,7 +26,6 @@ import BalanceHistoryCard from '../components/graphs/BalanceHistoryCard';
 import CategoryBackChip from '../components/graphs/CategoryBackChip';
 import { chartTransition, CHART_DROP } from '../components/graphs/chartTransitions';
 import TrendsCard from '../components/graphs/TrendsCard';
-import OperationsHeatmapCard from '../components/graphs/OperationsHeatmapCard';
 import ExchangeRateCard from '../components/graphs/ExchangeRateCard';
 import ExpenseSummaryCard from '../components/graphs/ExpenseSummaryCard';
 import IncomeSummaryCard from '../components/graphs/IncomeSummaryCard';
@@ -352,9 +351,7 @@ const GraphsScreen = () => {
     return items;
   }, [accounts, netWorthAvailable, selectedCurrency, t, hideBalances]);
 
-  // Human-readable name of the selected period. It is both the header's title
-  // and the scope named by surfaces further down (the heatmap header), so there
-  // is one string and one place it is built.
+  // Human-readable name of the selected period, the header's title.
   const selectedPeriodLabel = useMemo(() => (
     isFullYearKey(selectedPeriod)
       ? `${t('full_year')} ${selectedYear}`
@@ -838,16 +835,6 @@ const GraphsScreen = () => {
               onSeriesChange={setTrendSeries}
               categories={categories}
               convertAllCurrencies={convertAllCurrencies}
-            />
-
-            {/* Operations location heatmap — an inert row until tapped; the
-                fullscreen map (and its DB/tile loading) mounts only on open. */}
-            <OperationsHeatmapCard
-              colors={colors}
-              t={t}
-              selectedYear={selectedYear}
-              selectedMonth={selectedMonth}
-              periodLabel={selectedPeriodLabel}
             />
 
             {/* Exchange rates. Not scoped by the period header: each chart picks
