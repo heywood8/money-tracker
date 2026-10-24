@@ -1,5 +1,12 @@
 # Changelog
 
+## [0.303.0](https://github.com/heywood8/money-tracker/compare/penny-v0.302.0...penny-v0.303.0) (2026-10-24)
+
+
+### Features
+
+* **geo:** remove operations heatmap and location tagging ([#1878](https://github.com/heywood8/money-tracker/issues/1878)) ([7eeb35a](https://github.com/heywood8/money-tracker/commit/7eeb35ac6ab3b85a143edc047a1e4f3317eeda84))
+
 ## [0.302.0](https://github.com/heywood8/money-tracker/compare/penny-v0.301.0...penny-v0.302.0) (2026-10-24)
 
 
