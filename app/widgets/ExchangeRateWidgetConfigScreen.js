@@ -8,15 +8,20 @@ import { loadRateCharts, rateChartTitle } from '../services/ExchangeRateCharts';
 import { RANGE_LABEL_KEYS } from '../services/ExchangeRateHistory';
 import { resolveLanguage, translate } from '../services/notifications/notificationStrings';
 import EmptyState from '../components/EmptyState';
-import { getWidgetChart, setWidgetChart } from './exchangeRateWidgetStore';
+import { getWidgetChart, getWidgetCharts, setWidgetChart, setWidgetCharts } from './exchangeRateWidgetStore';
 import { refreshExchangeRateWidgets, renderExchangeRateWidget } from './exchangeRateWidgetRender';
+import { EXCHANGE_RATE_PAIR_WIDGET } from './widgetConstants';
 import { BUTTON, BUTTON_TEXT, MODAL_TITLE } from '../styles/componentStyles';
-import { BORDER_RADIUS, FONT_SIZE, FONT_WEIGHT, HEIGHTS, HORIZONTAL_PADDING, SPACING } from '../styles/designTokens';
+import {
+  BORDER_RADIUS, FONT_SIZE, FONT_WEIGHT, HEIGHTS, HORIZONTAL_PADDING, ICON_SIZE, SPACING,
+} from '../styles/designTokens';
 
 /**
- * What Android opens when the exchange-rate widget is placed on the home
+ * What Android opens when an exchange-rate widget is placed on the home
  * screen (and when it is reconfigured from a long press): which of the charts
- * set up in Settings → Graphs this widget shows.
+ * set up in Settings → Graphs the widget shows. The one-rate widget takes the
+ * chart tapped; the two-rate widget numbers two taps 1 and 2 (left and right)
+ * and takes them on Done.
  *
  * It is its own React root, launched by the widget library in a separate
  * activity, so none of App's providers are above it. It brings the two theme
@@ -29,6 +34,9 @@ import { BORDER_RADIUS, FONT_SIZE, FONT_WEIGHT, HEIGHTS, HORIZONTAL_PADDING, SPA
 // this screen up (and tempting a back press that would remove the widget).
 const RENDER_WAIT_MS = 4000;
 
+// How many charts the two-rate widget shows.
+const PAIR_SIZE = 2;
+
 // The draw, or null if it fails or outlasts `ms`.
 const drawWithin = (promise, ms) => {
   let timer;
@@ -36,7 +44,7 @@ const drawWithin = (promise, ms) => {
   return Promise.race([promise.catch(() => null), timeout]).finally(() => clearTimeout(timer));
 };
 
-const ChartRow = memo(({ chart, selected, saving, disabled, onSelect, colors, t }) => {
+const ChartRow = memo(({ chart, selected, order, saving, disabled, onSelect, colors, t }) => {
   const handlePress = useCallback(() => { onSelect(chart); }, [chart, onSelect]);
   return (
     <Pressable
@@ -56,6 +64,11 @@ const ChartRow = memo(({ chart, selected, saving, disabled, onSelect, colors, t 
           {`${t('rate_chart_default_range')}: ${t(RANGE_LABEL_KEYS[chart.range])}`}
         </Text>
       </View>
+      {order > 0 && (
+        <View style={[styles.order, { backgroundColor: colors.primaryFill }]} testID={`widget-config-order-${chart.id}`}>
+          <Text style={[styles.orderText, { color: colors.onPrimaryFill }]}>{order}</Text>
+        </View>
+      )}
       {saving && <ActivityIndicator size="small" color={colors.primary} />}
     </Pressable>
   );
@@ -74,6 +87,7 @@ ChartRow.propTypes = {
   colors: PropTypes.object.isRequired,
   disabled: PropTypes.bool,
   onSelect: PropTypes.func.isRequired,
+  order: PropTypes.number,
   saving: PropTypes.bool,
   selected: PropTypes.bool,
   t: PropTypes.func.isRequired,
@@ -84,24 +98,41 @@ function ConfigContent({ widgetInfo, renderWidget, setResult }) {
   const [language, setLanguage] = useState('en');
   const [charts, setCharts] = useState(null);
   const [currentId, setCurrentId] = useState(null);
+  // The two-rate widget's picks, in order.
+  const [pickedIds, setPickedIds] = useState([]);
   const [savingId, setSavingId] = useState(null);
   const t = useCallback((key) => translate(language, key), [language]);
   const busy = savingId !== null;
+  const pair = widgetInfo.widgetName === EXCHANGE_RATE_PAIR_WIDGET;
 
   useEffect(() => {
     let cancelled = false;
     Promise.all([
       resolveLanguage(),
       loadRateCharts().catch(() => []),
-      getWidgetChart(widgetInfo.widgetId).catch(() => null),
+      pair
+        ? getWidgetCharts(widgetInfo.widgetId).catch(() => [])
+        : getWidgetChart(widgetInfo.widgetId).catch(() => null),
     ]).then(([lang, list, stored]) => {
       if (cancelled) return;
       setLanguage(lang);
       setCharts(list);
-      setCurrentId(stored?.id ?? null);
+      if (pair) {
+        // A chart the widget shows that was since deleted in Settings is
+        // still drawn from its saved copy; it is listed after the others, so
+        // Done keeps it rather than quietly dropping it.
+        const kept = stored.filter((chart) => chart && !list.some((c) => c.id === chart.id));
+        setCharts([...list, ...kept]);
+        // What it shows now, or for a new widget the first two charts, so
+        // Done alone places the same pair the widget would draw anyway.
+        const own = stored.filter(Boolean).map((chart) => chart.id);
+        setPickedIds(own.length ? own : list.slice(0, PAIR_SIZE).map((chart) => chart.id));
+      } else {
+        setCurrentId(stored?.id ?? null);
+      }
     });
     return () => { cancelled = true; };
-  }, [widgetInfo.widgetId]);
+  }, [widgetInfo.widgetId, pair]);
 
   // The launcher takes exactly one answer. A second one (a double tap, or a
   // cancel landing while a pick is still being drawn) could remove a widget the
@@ -129,12 +160,13 @@ function ConfigContent({ widgetInfo, renderWidget, setResult }) {
     return () => subscription.remove();
   }, [cancel]);
 
-  const finish = useCallback(async (chart) => {
+  // Saves (unless there is nothing to save), draws and answers the launcher.
+  const complete = useCallback(async (savingKey, save) => {
     if (busyRef.current || settledRef.current) return;
     busyRef.current = true;
-    setSavingId(chart ? chart.id : 'empty');
+    setSavingId(savingKey);
     try {
-      if (chart) await setWidgetChart(widgetInfo.widgetId, chart);
+      if (save) await save();
     } catch (error) {
       console.warn('[widgets] Could not save the widget\'s chart:', error?.message);
     }
@@ -147,11 +179,32 @@ function ConfigContent({ widgetInfo, renderWidget, setResult }) {
     settle('ok');
   }, [widgetInfo, renderWidget, settle]);
 
+  const finish = useCallback((chart) => {
+    complete(chart ? chart.id : 'empty', chart ? () => setWidgetChart(widgetInfo.widgetId, chart) : null);
+  }, [complete, widgetInfo.widgetId]);
+
+  // A tap picks the next slot, a second tap on a pick drops it, and a third
+  // chart replaces the right-hand one rather than being ignored.
+  const togglePick = useCallback((chart) => {
+    if (busyRef.current) return;
+    setPickedIds((ids) => {
+      if (ids.includes(chart.id)) return ids.filter((id) => id !== chart.id);
+      return ids.length < PAIR_SIZE ? [...ids, chart.id] : [...ids.slice(0, PAIR_SIZE - 1), chart.id];
+    });
+  }, []);
+
+  const handlePairDone = useCallback(() => {
+    const picked = pickedIds.map((id) => (charts || []).find((chart) => chart.id === id)).filter(Boolean);
+    complete('pair', () => setWidgetCharts(widgetInfo.widgetId, picked));
+  }, [complete, pickedIds, charts, widgetInfo.widgetId]);
+
   const handleAddAnyway = useCallback(() => { finish(null); }, [finish]);
 
   return (
     <SafeAreaView style={[styles.container, { backgroundColor: colors.background }]}>
-      <Text style={[styles.title, { color: colors.text }]}>{t('widget_config_title')}</Text>
+      <Text style={[styles.title, { color: colors.text }]}>
+        {t(pair ? 'widget_pair_config_title' : 'widget_config_title')}
+      </Text>
 
       {charts === null ? (
         <ActivityIndicator color={colors.primary} style={styles.loading} />
@@ -175,15 +228,34 @@ function ConfigContent({ widgetInfo, renderWidget, setResult }) {
             <ChartRow
               key={chart.id}
               chart={chart}
-              selected={chart.id === currentId}
+              selected={pair ? pickedIds.includes(chart.id) : chart.id === currentId}
+              order={pair ? pickedIds.indexOf(chart.id) + 1 : 0}
               saving={savingId === chart.id}
               disabled={busy}
-              onSelect={finish}
+              onSelect={pair ? togglePick : finish}
               colors={colors}
               t={t}
             />
           ))}
         </ScrollView>
+      )}
+
+      {pair && charts !== null && charts.length > 0 && (
+        <Pressable
+          onPress={handlePairDone}
+          disabled={busy || pickedIds.length === 0}
+          style={[
+            styles.button,
+            { backgroundColor: pickedIds.length === 0 ? colors.border : colors.primaryFill },
+          ]}
+          accessibilityRole="button"
+          accessibilityState={{ disabled: busy || pickedIds.length === 0 }}
+          testID="widget-config-done"
+        >
+          {savingId === 'pair'
+            ? <ActivityIndicator size="small" color={colors.onPrimaryFill} />
+            : <Text style={[styles.buttonText, { color: colors.onPrimaryFill }]}>{t('done')}</Text>}
+        </Pressable>
       )}
 
       <Pressable
@@ -252,6 +324,18 @@ const styles = StyleSheet.create({
   },
   loading: {
     flex: 1,
+  },
+  order: {
+    alignItems: 'center',
+    borderRadius: BORDER_RADIUS.pill,
+    height: ICON_SIZE.md,
+    justifyContent: 'center',
+    marginLeft: SPACING.sm,
+    width: ICON_SIZE.md,
+  },
+  orderText: {
+    fontSize: FONT_SIZE.sm,
+    fontWeight: FONT_WEIGHT.semibold,
   },
   row: {
     alignItems: 'center',

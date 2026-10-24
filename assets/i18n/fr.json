@@ -795,5 +795,11 @@
   "widget_add_anyway": "Ajouter quand même",
   "widget_add_to_home": "Ajouter le widget à l’écran d’accueil",
   "widget_add_hint": "Affiche un taux et sa variation sur l’écran d’accueil",
-  "widget_pin_unsupported": "Votre lanceur ne peut pas l’ajouter d’ici : appui long sur l’écran d’accueil → Widgets → Penny"
+  "widget_pin_unsupported": "Votre lanceur ne peut pas l’ajouter d’ici : appui long sur l’écran d’accueil → Widgets → Penny",
+  "widget_pair_label": "Deux taux de change",
+  "widget_pair_description": "Deux de vos paires de devises côte à côte, sur toute une rangée",
+  "widget_pair_config_title": "Quels deux taux le widget doit-il afficher ? Touchez-les dans l’ordre : gauche, puis droite",
+  "widget_pair_add_to_home": "Ajouter le widget à deux taux",
+  "widget_pair_add_hint": "Deux taux côte à côte sur toute une rangée de l’écran d’accueil",
+  "widget_refresh": "Actualiser les taux"
 }

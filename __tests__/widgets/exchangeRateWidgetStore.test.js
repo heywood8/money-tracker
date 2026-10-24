@@ -1,9 +1,12 @@
 import * as FileSystem from 'expo-file-system/legacy';
 import {
   getWidgetChart,
+  getWidgetCharts,
   setWidgetChart,
+  setWidgetCharts,
   forgetWidget,
   resolveWidgetChart,
+  resolveWidgetCharts,
   WIDGET_STORE_PATH,
 } from '../../app/widgets/exchangeRateWidgetStore';
 
@@ -37,6 +40,27 @@ describe('exchangeRateWidgetStore', () => {
     await expect(getWidgetChart(7)).resolves.toEqual(USD_RUB);
     await expect(getWidgetChart(9)).resolves.toEqual(AMD_RUB);
     expect(JSON.parse(disk[WIDGET_STORE_PATH])).toEqual({ 7: USD_RUB, 9: AMD_RUB });
+  });
+
+  it('remembers a two-rate widget’s charts in order, beside one-rate widgets', async () => {
+    await setWidgetChart(7, USD_RUB);
+    await setWidgetCharts(8, [AMD_RUB, USD_RUB]);
+
+    await expect(getWidgetCharts(8)).resolves.toEqual([AMD_RUB, USD_RUB]);
+    await expect(getWidgetChart(7)).resolves.toEqual(USD_RUB);
+    expect(JSON.parse(disk[WIDGET_STORE_PATH])).toEqual({ 7: USD_RUB, 8: [AMD_RUB, USD_RUB] });
+  });
+
+  it('answers no charts for a two-rate widget never set up, and keeps an empty slot', async () => {
+    await expect(getWidgetCharts(8)).resolves.toEqual([]);
+    await setWidgetCharts(8, [AMD_RUB]);
+    await expect(getWidgetCharts(8)).resolves.toEqual([AMD_RUB]);
+  });
+
+  it('forgets a removed two-rate widget', async () => {
+    await setWidgetCharts(8, [AMD_RUB, USD_RUB]);
+    await forgetWidget(8);
+    await expect(getWidgetCharts(8)).resolves.toEqual([]);
   });
 
   it('answers null for a widget with no chart of its own', async () => {
@@ -86,6 +110,26 @@ describe('exchangeRateWidgetStore', () => {
 
     it('has nothing to draw with no charts and no saved one', () => {
       expect(resolveWidgetChart([], null)).toBeNull();
+    });
+  });
+
+  describe('resolveWidgetCharts', () => {
+    const CHARTS = [USD_RUB, AMD_RUB, { ...USD_RUB, id: 'c', range: 'year' }];
+
+    it('falls back to the first two charts for a widget never set up', () => {
+      expect(resolveWidgetCharts(CHARTS, [])).toEqual([USD_RUB, AMD_RUB]);
+      expect(resolveWidgetCharts([USD_RUB], [])).toEqual([USD_RUB, null]);
+      expect(resolveWidgetCharts([], [])).toEqual([null, null]);
+    });
+
+    it('draws the live version of each saved chart, or the saved copy if it was deleted', () => {
+      const edited = { ...AMD_RUB, amount: 10 };
+      expect(resolveWidgetCharts([USD_RUB, edited], [AMD_RUB, { ...AMD_RUB, id: 'gone' }]))
+        .toEqual([edited, { ...AMD_RUB, id: 'gone' }]);
+    });
+
+    it('leaves a slot empty that was saved empty', () => {
+      expect(resolveWidgetCharts(CHARTS, [AMD_RUB])).toEqual([AMD_RUB, null]);
     });
   });
 });

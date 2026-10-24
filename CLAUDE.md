@@ -82,7 +82,7 @@ The app follows a feature-based organization under the `app/` directory:
   - Monitoring: `sentry.js` - Privacy-protective crash/error reporting (Sentry)
 
 - **widgets/** - Android home-screen widgets (react-native-android-widget)
-  - `ExchangeRateWidget.js` (the widget's layout, built from the library's primitives), `exchangeRateWidgetRender.js` (data + render + `refreshExchangeRateWidgets`), `widgetTaskHandler.js` (launcher entry point, registered in `index.js`)
+  - `ExchangeRateWidget.js` (both widgets' layouts, built from the library's primitives: `ExchangeRateWidget`, one rate, and `ExchangeRatePairWidget`, two side by side for a full row), `exchangeRateWidgetRender.js` (data + render + `refreshExchangeRateWidgets`), `widgetTaskHandler.js` (launcher entry point, registered in `index.js`)
   - `ExchangeRateWidgetConfigScreen.js` (pick the chart when the widget is placed), `exchangeRateWidgetStore.js` (widgetId → chart, a file of its own, not in backups), `useExchangeRateWidgetSync.js` (redraws on chart changes, restores and backgrounding; mounted in `SimpleTabs`), `widgetConstants.js`
 
 - **db/** (1 file) - Database schema
@@ -364,13 +364,13 @@ const closeSubPanel = useCallback(() => {
 
 ### Home-Screen Widgets
 
-The exchange-rate widget is built with `react-native-android-widget` (configured in `app.config.js`, `WIDGETS`). Things that are easy to get wrong:
+There are two exchange-rate widgets, built with `react-native-android-widget` (configured in `app.config.js`, `WIDGETS`): `ExchangeRate` (one rate, 3×2) and `ExchangeRatePair` (two rates in one card, 5×2, a plain gap between the halves). Both share the store, the task handler, the setup screen (which asks for one chart or two by `widgetName`) and the per-rate layout (`ratePanel`): text padded, the line and its fill running to the card's edges and bottom with the SVG rounding its own bottom corners. Things that are easy to get wrong:
 
 - **Widget components are plain functions, not React components.** The library builds the RemoteViews tree by calling them directly: no hooks, no context, no state. They read palettes from `ThemeColorsContext`'s exported `lightTheme`/`darkTheme` and text through `translate(language, key)` (`notificationStrings.js`), and return `{ light, dark }` variants.
 - **The task handler runs headless** (app closed) for WIDGET_ADDED/UPDATE/RESIZED/DELETED, like the background bank task. It reads the same services the app does (`ExchangeRateHistory`, `ExchangeRateCharts`); every read must degrade to an "empty"/"error" widget rather than throw.
-- **A tap opens `com.heywood8.monkeep://graphs`**, which `SimpleTabs` routes to the Graphs tab. Taps never reach the task handler.
-- **The widget name (`ExchangeRate`) must never change**: the launcher keys placed widgets by it.
-- **Picker label and description are localized** by `plugins/withWidgetStrings.js` from `assets/i18n` (`widget_rate_label`, `widget_rate_description`). It must stay *before* the library in `plugins` (Expo runs earlier plugins' mods last), because it strips the library's `translatable="false"` from the description; a translated untranslatable string fails release builds (lint `ExtraTranslation`).
+- **A tap opens `com.heywood8.monkeep://graphs`**, which `SimpleTabs` routes to the Graphs tab, except on the "↻ 14:05" fetch time: that area's `clickAction` is `REFRESH_RATES`, which reaches the task handler as `WIDGET_CLICK`; it redraws at once from the cache ("↻ …"), then with `force: true`, then refreshes the other widgets.
+- **The widget names (`ExchangeRate`, `ExchangeRatePair`) must never change**: the launcher keys placed widgets by them.
+- **Picker label and description are localized** by `plugins/withWidgetStrings.js` from `assets/i18n` (`widget_rate_label`/`widget_rate_description`, `widget_pair_label`/`widget_pair_description`; `WIDGET_STRINGS` in the plugin). It must stay *before* the library in `plugins` (Expo runs earlier plugins' mods last), because it strips the library's `translatable="false"` from the description; a translated untranslatable string fails release builds (lint `ExtraTranslation`).
 - **Native changes need a new APK/AAB**: OTA updates cannot add or change a widget, and widgets do not run in Expo Go.
 
 ### Category Selection

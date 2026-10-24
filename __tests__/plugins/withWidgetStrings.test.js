@@ -34,7 +34,14 @@ jest.mock('fs', () => {
 
 const path = require('path');
 const withWidgetStrings = require('../../plugins/withWidgetStrings');
-const { LABEL_STRING, DESCRIPTION_STRING, escapeAndroidString, allowDescriptionTranslations } = withWidgetStrings;
+const {
+  LABEL_STRING,
+  DESCRIPTION_STRING,
+  PAIR_LABEL_STRING,
+  PAIR_DESCRIPTION_STRING,
+  escapeAndroidString,
+  allowDescriptionTranslations,
+} = withWidgetStrings;
 const en = require('../../assets/i18n/en.json');
 const ru = require('../../assets/i18n/ru.json');
 const appConfig = require('../../app.config').expo;
@@ -45,9 +52,12 @@ describe('withWidgetStrings', () => {
     withWidgetStrings({});
   });
 
-  it('puts the English label in the default strings', () => {
+  it('puts both widgets’ English labels in the default strings', () => {
     const result = stringsCb({ modResults: {} });
-    expect(result.modResults.items).toEqual([{ $: { name: LABEL_STRING }, _: en.widget_rate_label }]);
+    expect(result.modResults.items).toEqual([
+      { $: { name: LABEL_STRING }, _: en.widget_rate_label },
+      { $: { name: PAIR_LABEL_STRING }, _: en.widget_pair_label },
+    ]);
   });
 
   it('writes the label and description for every other app language', async () => {
@@ -61,6 +71,8 @@ describe('withWidgetStrings', () => {
     const russian = files['android/app/src/main/res/values-ru/widget_strings.xml'];
     expect(russian).toContain(`<string name="${LABEL_STRING}">${ru.widget_rate_label}</string>`);
     expect(russian).toContain(`<string name="${DESCRIPTION_STRING}">${escapeAndroidString(ru.widget_rate_description)}</string>`);
+    expect(russian).toContain(`<string name="${PAIR_LABEL_STRING}">${ru.widget_pair_label}</string>`);
+    expect(russian).toContain(`<string name="${PAIR_DESCRIPTION_STRING}">${escapeAndroidString(ru.widget_pair_description)}</string>`);
   });
 
   it('lets the library’s English description be translated, unescaping it for Expo’s writer', () => {
@@ -71,6 +83,7 @@ describe('withWidgetStrings', () => {
         string: [
           { $: { name: DESCRIPTION_STRING, translatable: 'false' }, _: "today\\'s rate" },
           { $: { name: 'other', translatable: 'false' }, _: "keep\\'s" },
+          { $: { name: PAIR_DESCRIPTION_STRING, translatable: 'false' }, _: 'two rates' },
         ],
       },
     };
@@ -79,6 +92,7 @@ describe('withWidgetStrings', () => {
 
     expect(result.resources.string[0]).toEqual({ $: { name: DESCRIPTION_STRING }, _: "today's rate" });
     expect(result.resources.string[1]).toEqual({ $: { name: 'other', translatable: 'false' }, _: "keep\\'s" });
+    expect(result.resources.string[2]).toEqual({ $: { name: PAIR_DESCRIPTION_STRING }, _: 'two rates' });
   });
 
   it('runs its strings mod after the library’s, so the description is there to fix', () => {
@@ -98,6 +112,10 @@ describe('withWidgetStrings', () => {
     // The library names the description resource after the widget.
     expect(DESCRIPTION_STRING).toBe(`widget_${widget.name.toLowerCase()}_description`);
     expect(widget.description).toBe(en.widget_rate_description);
+    const pair = options.widgets[1];
+    expect(pair.label).toBe(`@string/${PAIR_LABEL_STRING}`);
+    expect(PAIR_DESCRIPTION_STRING).toBe(`widget_${pair.name.toLowerCase()}_description`);
+    expect(pair.description).toBe(en.widget_pair_description);
     expect(appConfig.plugins).toContain('./plugins/withWidgetStrings.js');
   });
 });

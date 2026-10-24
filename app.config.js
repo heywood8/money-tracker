@@ -52,6 +52,22 @@ const WIDGETS = {
       // press → reconfigure opens it again later.
       widgetFeatures: 'reconfigurable',
     },
+    {
+      // Two rates side by side, for a full row: on a home screen five icons
+      // wide, one rate widget plus another leaves a 2 + 3 split or a gap.
+      name: 'ExchangeRatePair',
+      label: '@string/widget_exchange_rate_pair_label',
+      description: require('./assets/i18n/en.json').widget_pair_description,
+      // Each half needs about what the one-rate widget does at its smallest.
+      minWidth: '250dp',
+      minHeight: '110dp',
+      targetCellWidth: 5,
+      targetCellHeight: 2,
+      resizeMode: 'horizontal|vertical',
+      previewImage: './assets/widget-preview/exchange-rate-pair.png',
+      updatePeriodMillis: 60 * 60 * 1000,
+      widgetFeatures: 'reconfigurable',
+    },
   ],
 };
 

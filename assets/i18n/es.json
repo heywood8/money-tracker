@@ -795,5 +795,11 @@
   "widget_add_anyway": "Añadir de todos modos",
   "widget_add_to_home": "Añadir widget a la pantalla de inicio",
   "widget_add_hint": "Muestra un tipo y su cambio en la pantalla de inicio",
-  "widget_pin_unsupported": "Tu launcher no puede añadirlo desde aquí: mantén pulsada la pantalla de inicio → Widgets → Penny"
+  "widget_pin_unsupported": "Tu launcher no puede añadirlo desde aquí: mantén pulsada la pantalla de inicio → Widgets → Penny",
+  "widget_pair_label": "Dos tipos de cambio",
+  "widget_pair_description": "Dos de tus pares de divisas uno al lado del otro, para una fila completa",
+  "widget_pair_config_title": "¿Qué dos tipos debe mostrar el widget? Tócalos en orden: izquierda y luego derecha",
+  "widget_pair_add_to_home": "Añadir widget de dos tipos",
+  "widget_pair_add_hint": "Dos tipos uno al lado del otro en toda una fila de la pantalla de inicio",
+  "widget_refresh": "Actualizar tipos"
 }

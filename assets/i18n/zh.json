@@ -795,5 +795,11 @@
   "widget_add_anyway": "仍然添加",
   "widget_add_to_home": "添加小组件到主屏幕",
   "widget_add_hint": "在主屏幕上显示汇率及其涨跌",
-  "widget_pin_unsupported": "您的桌面启动器无法从这里添加：长按主屏幕 → 小组件 → Penny"
+  "widget_pin_unsupported": "您的桌面启动器无法从这里添加：长按主屏幕 → 小组件 → Penny",
+  "widget_pair_label": "两个汇率",
+  "widget_pair_description": "并排显示两组货币对，占满一整行",
+  "widget_pair_config_title": "小组件显示哪两个汇率？按顺序点选：先左后右",
+  "widget_pair_add_to_home": "添加双汇率小组件",
+  "widget_pair_add_hint": "在主屏幕上整行并排显示两个汇率",
+  "widget_refresh": "刷新汇率"
 }

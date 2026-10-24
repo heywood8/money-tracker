@@ -795,5 +795,11 @@
   "widget_add_anyway": "Add anyway",
   "widget_add_to_home": "Add widget to home screen",
   "widget_add_hint": "Shows a rate and its change on the home screen",
-  "widget_pin_unsupported": "Your launcher can’t add it from here: long-press the home screen → Widgets → Penny"
+  "widget_pin_unsupported": "Your launcher can’t add it from here: long-press the home screen → Widgets → Penny",
+  "widget_pair_label": "Two exchange rates",
+  "widget_pair_description": "Two of your currency pairs side by side, for a full row",
+  "widget_pair_config_title": "Which two rates should the widget show? Tap them in order: left, then right",
+  "widget_pair_add_to_home": "Add two-rate widget",
+  "widget_pair_add_hint": "Two rates side by side across a full row of the home screen",
+  "widget_refresh": "Refresh rates"
 }
