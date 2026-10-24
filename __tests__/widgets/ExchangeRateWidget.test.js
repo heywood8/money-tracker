@@ -215,7 +215,7 @@ describe('ExchangeRateWidget', () => {
       <ExchangeRatePairWidget models={models.map((m) => ({ language: 'en', ...m }))} theme={theme} width={width} height={height} />,
     );
 
-    it('draws two rates side by side in one card, a plain gap between', () => {
+    it('draws two rates side by side in one card, a hairline between them', () => {
       const tree = renderPair([
         { status: 'ready', chart: CHART, points: POINTS },
         { status: 'ready', chart: AMD, points: AMD_POINTS },
@@ -223,11 +223,12 @@ describe('ExchangeRateWidget', () => {
 
       expect(tree.props.orientation).toBe('HORIZONTAL');
       expect(tree.props.backgroundColor).toBe(lightTheme.colors.surface);
-      // Two halves and nothing else: no divider line.
-      const [first, second] = tree.children;
-      expect(tree.children).toHaveLength(2);
-      expect(first.props.width).toBe(184);
-      expect(second.props.margin).toMatchObject({ left: 12 });
+      const [first, divider, second] = tree.children;
+      expect(tree.children).toHaveLength(3);
+      // No gap: the halves meet the line on either side.
+      expect(first.props.width).toBe(189.5);
+      expect(second.props.margin).toBeUndefined();
+      expect(divider.props).toMatchObject({ width: 1, backgroundColor: lightTheme.colors.border });
       expect(textsOf(first)).toContain('₽81.55');
       expect(textsOf(second)).toContain('֏4.470');
       expect(tree.props.clickActionData).toEqual({ uri: GRAPHS_DEEP_LINK });
@@ -240,11 +241,11 @@ describe('ExchangeRateWidget', () => {
       ]);
       const [left, right] = nodesOf(tree, 'SvgWidget').map((node) => node.props.svgString);
 
-      // (380 - 12) / 2 wide each.
-      expect(left).toContain('width="184"');
-      expect(left).toContain('A0 0 0 0 1 184 96');
+      // (380 - 1) / 2 wide each, rounded to whole dp in the SVG.
+      expect(left).toContain('width="190"');
+      expect(left).toContain('A0 0 0 0 1 190 96');
       expect(left).toContain('A28 28 0 0 1 0 68');
-      expect(right).toContain('A28 28 0 0 1 156 96');
+      expect(right).toContain('A28 28 0 0 1 162 96');
       expect(right).toContain('A0 0 0 0 1 0 96');
     });
 
@@ -254,7 +255,7 @@ describe('ExchangeRateWidget', () => {
         { status: 'empty' },
       ]);
 
-      expect(textsOf(tree.children[1])).toEqual(['Add an exchange rate chart in Settings → Graphs']);
+      expect(textsOf(tree.children[2])).toEqual(['Add an exchange rate chart in Settings → Graphs']);
       expect(nodesOf(tree.children[0], 'SvgWidget')).toHaveLength(1);
     });
 
