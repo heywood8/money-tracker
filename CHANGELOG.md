@@ -1,5 +1,12 @@
 # Changelog
 
+## [0.303.1](https://github.com/heywood8/money-tracker/compare/penny-v0.303.0...penny-v0.303.1) (2026-10-25)
+
+
+### Bug Fixes
+
+* **widgets:** divide the two-rate widget with a line, not a gap ([#1880](https://github.com/heywood8/money-tracker/issues/1880)) ([3746669](https://github.com/heywood8/money-tracker/commit/374666989da8926b051bb140c2916ffea7055507))
+
 ## [0.303.0](https://github.com/heywood8/money-tracker/compare/penny-v0.302.0...penny-v0.303.0) (2026-10-24)
 
 
