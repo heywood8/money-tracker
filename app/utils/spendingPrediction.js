@@ -90,7 +90,7 @@ export const computeSpendingPrediction = ({
   // the totals on hand still belong to the period the user just left, and a
   // forecast built from them would be another month's spending.
   if (!Number.isFinite(recentExpenses) || !(recentDays > 0)) return null;
-  const dailyAverage = recentExpenses / recentDays;
+  const dailyAverage = dailySpendingRate(recentExpenses, recentDays);
 
   if (monthToDateExpenses === 0 && dailyAverage === 0) return null;
 
@@ -105,4 +105,39 @@ export const computeSpendingPrediction = ({
     daysInMonth,
     percentElapsed: (daysElapsed / daysInMonth) * 100,
   };
+};
+
+/**
+ * The trailing window's spending as a daily rate: the rate every month-end
+ * forecast runs at. Zero when there is no window to divide by or no readable
+ * total, so a forecast built on it stays put rather than turning into NaN.
+ *
+ * @param {number} recentExpenses - spent over the trailing window
+ * @param {number} recentDays - the window's length (spendingWindowDays)
+ * @returns {number}
+ */
+export const dailySpendingRate = (recentExpenses, recentDays) => (
+  Number.isFinite(recentExpenses) && recentDays > 0 ? recentExpenses / recentDays : 0
+);
+
+/**
+ * Where a balance lands on the month's last day if spending holds at
+ * `dailyAverage`: the end point of the balance chart's forecast line, and the
+ * figure the home-screen forecast widget prints for each account. One function
+ * for both, so the widget and the chart cannot drift apart.
+ *
+ * Spending only: income and transfers are not projected. Today is spent
+ * already (the balance holds it), so the days left start tomorrow, and on the
+ * month's last day the forecast is the balance itself.
+ *
+ * @param {object} params
+ * @param {number} params.balance - the balance now
+ * @param {number} params.dailyAverage - the spending rate (dailySpendingRate)
+ * @param {Date} [params.now]
+ * @returns {{forecast: number, daysLeft: number}}
+ */
+export const forecastMonthEndBalance = ({ balance, dailyAverage, now = new Date() }) => {
+  const daysInMonth = new Date(now.getFullYear(), now.getMonth() + 1, 0).getDate();
+  const daysLeft = daysInMonth - now.getDate();
+  return { forecast: balance - dailyAverage * daysLeft, daysLeft };
 };

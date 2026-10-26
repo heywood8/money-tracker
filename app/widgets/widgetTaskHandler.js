@@ -1,6 +1,8 @@
 import { forgetWidget } from './exchangeRateWidgetStore';
 import { refreshExchangeRateWidgets, renderExchangeRateWidget } from './exchangeRateWidgetRender';
-import { EXCHANGE_RATE_WIDGETS, REFRESH_RATES_ACTION } from './widgetConstants';
+import { forgetForecastWidget } from './balanceForecastWidgetStore';
+import { renderBalanceForecastWidget } from './balanceForecastWidgetRender';
+import { BALANCE_FORECAST_WIDGET, EXCHANGE_RATE_WIDGETS, REFRESH_RATES_ACTION } from './widgetConstants';
 
 // The library stops a headless widget task after 30 s. A refresh tapped on a
 // slow network waits this long for fresh rates, leaving room to draw the saved
@@ -21,13 +23,18 @@ const within = (promise, ms) => {
  * placed, resized or due its periodic update, and when one is removed. It is
  * registered at bundle load from index.js, alongside the background tasks.
  *
- * A tap on the widget opens the Graphs tab through a deep link (OPEN_URI),
+ * A tap on a widget opens the Graphs tab through a deep link (OPEN_URI),
  * which the library hands to Android without a round trip to JS. The one tap
  * that does arrive is "↻ 14:05" (REFRESH_RATES_ACTION): fresh rates, now.
  *
  * @param {import('react-native-android-widget').WidgetTaskHandlerProps} props
  */
-export async function widgetTaskHandler({ widgetInfo, widgetAction, clickAction, renderWidget }) {
+export async function widgetTaskHandler(props) {
+  const { widgetInfo, widgetAction, clickAction, renderWidget } = props;
+  if (widgetInfo.widgetName === BALANCE_FORECAST_WIDGET) {
+    await balanceForecastTask(props);
+    return;
+  }
   if (!EXCHANGE_RATE_WIDGETS.includes(widgetInfo.widgetName)) return;
 
   switch (widgetAction) {
@@ -50,6 +57,27 @@ export async function widgetTaskHandler({ widgetInfo, widgetAction, clickAction,
   }
   case 'WIDGET_DELETED':
     await forgetWidget(widgetInfo.widgetId).catch(() => {});
+    break;
+  default:
+    break;
+  }
+}
+
+/**
+ * The forecast widget's share of the task. Its figures are all on the phone,
+ * so there is nothing to refresh on a tap: every tap is the deep link.
+ *
+ * @param {import('react-native-android-widget').WidgetTaskHandlerProps} props
+ */
+async function balanceForecastTask({ widgetInfo, widgetAction, renderWidget }) {
+  switch (widgetAction) {
+  case 'WIDGET_ADDED':
+  case 'WIDGET_UPDATE':
+  case 'WIDGET_RESIZED':
+    renderWidget(await renderBalanceForecastWidget(widgetInfo));
+    break;
+  case 'WIDGET_DELETED':
+    await forgetForecastWidget(widgetInfo.widgetId).catch(() => {});
     break;
   default:
     break;

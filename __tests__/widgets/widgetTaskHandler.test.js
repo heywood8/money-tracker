@@ -1,21 +1,29 @@
 import { widgetTaskHandler } from '../../app/widgets/widgetTaskHandler';
 import { refreshExchangeRateWidgets, renderExchangeRateWidget } from '../../app/widgets/exchangeRateWidgetRender';
 import { forgetWidget } from '../../app/widgets/exchangeRateWidgetStore';
+import { renderBalanceForecastWidget } from '../../app/widgets/balanceForecastWidgetRender';
+import { forgetForecastWidget } from '../../app/widgets/balanceForecastWidgetStore';
 
 jest.mock('../../app/widgets/exchangeRateWidgetRender', () => ({
   renderExchangeRateWidget: jest.fn(),
   refreshExchangeRateWidgets: jest.fn(),
 }));
 jest.mock('../../app/widgets/exchangeRateWidgetStore', () => ({ forgetWidget: jest.fn() }));
+jest.mock('../../app/widgets/balanceForecastWidgetRender', () => ({ renderBalanceForecastWidget: jest.fn() }));
+jest.mock('../../app/widgets/balanceForecastWidgetStore', () => ({ forgetForecastWidget: jest.fn() }));
 
 const widgetInfo = { widgetName: 'ExchangeRate', widgetId: 7, width: 250, height: 180 };
 const RENDERED = { light: 'light-tree', dark: 'dark-tree' };
+const FORECAST = { light: 'forecast-light', dark: 'forecast-dark' };
+const forecastInfo = { widgetName: 'BalanceForecast', widgetId: 11, width: 300, height: 180 };
 
 describe('widgetTaskHandler', () => {
   beforeEach(() => {
     jest.clearAllMocks();
     renderExchangeRateWidget.mockResolvedValue(RENDERED);
     forgetWidget.mockResolvedValue(undefined);
+    renderBalanceForecastWidget.mockResolvedValue(FORECAST);
+    forgetForecastWidget.mockResolvedValue(undefined);
   });
 
   it.each(['WIDGET_ADDED', 'WIDGET_UPDATE', 'WIDGET_RESIZED'])('draws the widget on %s', async (widgetAction) => {
@@ -93,5 +101,37 @@ describe('widgetTaskHandler', () => {
     await widgetTaskHandler({ widgetInfo: { ...widgetInfo, widgetName: 'Other' }, widgetAction: 'WIDGET_ADDED', renderWidget });
     expect(renderExchangeRateWidget).not.toHaveBeenCalled();
     expect(renderWidget).not.toHaveBeenCalled();
+  });
+
+  describe('balance-forecast widget', () => {
+    it.each(['WIDGET_ADDED', 'WIDGET_UPDATE', 'WIDGET_RESIZED'])('draws it on %s', async (widgetAction) => {
+      const renderWidget = jest.fn();
+
+      await widgetTaskHandler({ widgetInfo: forecastInfo, widgetAction, renderWidget });
+
+      expect(renderBalanceForecastWidget).toHaveBeenCalledWith(forecastInfo);
+      expect(renderExchangeRateWidget).not.toHaveBeenCalled();
+      expect(renderWidget).toHaveBeenCalledWith(FORECAST);
+    });
+
+    it('forgets it from its own store when removed', async () => {
+      await widgetTaskHandler({ widgetInfo: forecastInfo, widgetAction: 'WIDGET_DELETED', renderWidget: jest.fn() });
+
+      expect(forgetForecastWidget).toHaveBeenCalledWith(11);
+      expect(forgetWidget).not.toHaveBeenCalled();
+    });
+
+    it('does not fail the task when its store cannot be written', async () => {
+      forgetForecastWidget.mockRejectedValue(new Error('io'));
+      await expect(widgetTaskHandler({ widgetInfo: forecastInfo, widgetAction: 'WIDGET_DELETED', renderWidget: jest.fn() }))
+        .resolves.toBeUndefined();
+    });
+
+    it('has nothing to refresh on a tap', async () => {
+      const renderWidget = jest.fn();
+      await widgetTaskHandler({ widgetInfo: forecastInfo, widgetAction: 'WIDGET_CLICK', clickAction: 'REFRESH_RATES', renderWidget });
+      expect(renderWidget).not.toHaveBeenCalled();
+      expect(refreshExchangeRateWidgets).not.toHaveBeenCalled();
+    });
   });
 });

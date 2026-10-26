@@ -791,5 +791,16 @@
   "widget_pair_config_title": "Ո՞ր երկու փոխարժեքը ցույց տա վիջեթը։ Հպեք հերթով՝ ձախը, հետո աջը",
   "widget_pair_add_to_home": "Ավելացնել երկու փոխարժեքով վիջեթ",
   "widget_pair_add_hint": "Երկու փոխարժեք կողք կողքի՝ գլխավոր էկրանի ամբողջ տողով",
-  "widget_refresh": "Թարմացնել փոխարժեքները"
+  "widget_refresh": "Թարմացնել փոխարժեքները",
+  "widget_forecast_label": "Մնացորդի կանխատեսում",
+  "widget_forecast_description": "Որքան կմնա ձեր յուրաքանչյուր հաշվում ամսվա վերջին՝ ներկայիս ծախսերի տեմպով",
+  "widget_forecast_config_title": "Ո՞ր հաշիվների համար ցույց տա կանխատեսումը վիջեթը",
+  "widget_forecast_config_hint": "Յուրաքանչյուր հաշվի համար՝ որքան կմնա ամսվա վերջին, եթե ծախսեք վերջին 30 օրվա պես",
+  "widget_forecast_until": "Կանխատեսում՝ {date}",
+  "widget_forecast_now": "հիմա {amount}",
+  "widget_forecast_per_day": "{amount}/օր",
+  "widget_forecast_empty": "Ցուցադրելու հաշիվներ չկան․ ավելացրեք հաշիվ Penny-ում կամ վերակարգավորեք վիջեթը",
+  "widget_forecast_load_failed": "Չհաջողվեց բեռնել հաշիվները",
+  "widget_forecast_add_to_home": "Ավելացնել մնացորդի կանխատեսման վիջեթ",
+  "widget_forecast_add_hint": "Յուրաքանչյուր հաշվի մնացորդը ամսվա վերջին՝ ներկայիս ծախսերի տեմպով"
 }

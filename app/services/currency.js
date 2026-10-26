@@ -208,12 +208,13 @@ export const getCurrencySymbol = (currencyCode) => (
 export const formatMoney = (amount, currencyCode = 'USD', options = {}) => {
   const { language, compact = false, symbol = true } = options;
   const decimal = toDecimal(amount);
+  const decimals = getDecimalPlaces(currencyCode);
   // The sign leads, before the symbol: `${symbol}${signed}` yields "$-12.34".
-  const sign = decimal.isNegative() && !decimal.isZero() ? '-' : '';
+  // It is read off the amount as printed, so a sliver that rounds away (-0.3
+  // in a whole-unit currency) prints "₽0", not "-₽0".
+  const sign = decimal.isNegative() && !decimal.toDecimalPlaces(decimals).isZero() ? '-' : '';
   const prefix = symbol ? getCurrencySymbol(currencyCode) : '';
   const magnitude = decimal.abs();
-
-  const decimals = getDecimalPlaces(currencyCode);
 
   // Compact only where compacting says something. Below the smallest unit there
   // is no magnitude to shorten, and rounding "500.50" to "501" would drop the

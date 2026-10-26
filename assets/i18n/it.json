@@ -791,5 +791,16 @@
   "widget_pair_config_title": "Quali due tassi deve mostrare il widget? Toccali in ordine: sinistra, poi destra",
   "widget_pair_add_to_home": "Aggiungi widget con due tassi",
   "widget_pair_add_hint": "Due tassi affiancati su un’intera riga della schermata Home",
-  "widget_refresh": "Aggiorna i tassi"
+  "widget_refresh": "Aggiorna i tassi",
+  "widget_forecast_label": "Previsione saldo",
+  "widget_forecast_description": "Quanto resterà su ciascun conto a fine mese al ritmo di spesa attuale",
+  "widget_forecast_config_title": "Per quali conti deve fare la previsione il widget?",
+  "widget_forecast_config_hint": "Per ciascuno, quanto resterà a fine mese se si continua a spendere come negli ultimi 30 giorni",
+  "widget_forecast_until": "Previsione al {date}",
+  "widget_forecast_now": "ora {amount}",
+  "widget_forecast_per_day": "{amount}/giorno",
+  "widget_forecast_empty": "Nessun conto da mostrare: aggiungine uno in Penny o riconfigura il widget",
+  "widget_forecast_load_failed": "Impossibile caricare i conti",
+  "widget_forecast_add_to_home": "Aggiungi widget previsione saldo",
+  "widget_forecast_add_hint": "Il saldo di ogni conto a fine mese al ritmo di spesa attuale"
 }

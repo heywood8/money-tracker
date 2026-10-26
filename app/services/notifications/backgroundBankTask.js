@@ -38,6 +38,7 @@ import { getAddedAlertCopy, getPendingAlertCopy, isSingleItemAlert } from './not
 import { collectPendingAlertDetails } from './pendingAlertItems';
 import { collectAddedAlertDetails } from './addedAlertItems';
 import { isAppInForeground } from './appForeground';
+import { refreshBalanceForecastWidgets } from '../../widgets/balanceForecastWidgetRender';
 
 /** Task identifier, also used as the WorkManager unique work name. */
 export const BACKGROUND_BANK_TASK = 'penny-background-bank-notifications';
@@ -205,7 +206,13 @@ export const runBackgroundBankCheck = async () => {
 // scheduler can back off rather than treating the run as successful.
 TaskManager.defineTask(BACKGROUND_BANK_TASK, async () => {
   try {
-    await runBackgroundBankCheck();
+    const { created } = await runBackgroundBankCheck();
+    // A booking moves a balance, and with the app closed nothing else would
+    // tell the home screen's forecast widgets until the launcher's next hourly
+    // update. After the alerts, so they are not held up by it; awaited, so the
+    // draws land before the task ends. Never throws, and costs nothing with no
+    // such widget placed.
+    if (created > 0) await refreshBalanceForecastWidgets();
     return BackgroundTask.BackgroundTaskResult.Success;
   } catch (error) {
     console.warn('[backgroundBankTask] run failed:', error);

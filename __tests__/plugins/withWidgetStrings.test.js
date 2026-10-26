@@ -39,6 +39,8 @@ const {
   DESCRIPTION_STRING,
   PAIR_LABEL_STRING,
   PAIR_DESCRIPTION_STRING,
+  FORECAST_LABEL_STRING,
+  FORECAST_DESCRIPTION_STRING,
   escapeAndroidString,
   allowDescriptionTranslations,
 } = withWidgetStrings;
@@ -52,11 +54,12 @@ describe('withWidgetStrings', () => {
     withWidgetStrings({});
   });
 
-  it('puts both widgets’ English labels in the default strings', () => {
+  it('puts every widget’s English label in the default strings', () => {
     const result = stringsCb({ modResults: {} });
     expect(result.modResults.items).toEqual([
       { $: { name: LABEL_STRING }, _: en.widget_rate_label },
       { $: { name: PAIR_LABEL_STRING }, _: en.widget_pair_label },
+      { $: { name: FORECAST_LABEL_STRING }, _: en.widget_forecast_label },
     ]);
   });
 
@@ -73,6 +76,8 @@ describe('withWidgetStrings', () => {
     expect(russian).toContain(`<string name="${DESCRIPTION_STRING}">${escapeAndroidString(ru.widget_rate_description)}</string>`);
     expect(russian).toContain(`<string name="${PAIR_LABEL_STRING}">${ru.widget_pair_label}</string>`);
     expect(russian).toContain(`<string name="${PAIR_DESCRIPTION_STRING}">${escapeAndroidString(ru.widget_pair_description)}</string>`);
+    expect(russian).toContain(`<string name="${FORECAST_LABEL_STRING}">${ru.widget_forecast_label}</string>`);
+    expect(russian).toContain(`<string name="${FORECAST_DESCRIPTION_STRING}">${escapeAndroidString(ru.widget_forecast_description)}</string>`);
   });
 
   it('lets the library’s English description be translated, unescaping it for Expo’s writer', () => {
@@ -84,6 +89,7 @@ describe('withWidgetStrings', () => {
           { $: { name: DESCRIPTION_STRING, translatable: 'false' }, _: "today\\'s rate" },
           { $: { name: 'other', translatable: 'false' }, _: "keep\\'s" },
           { $: { name: PAIR_DESCRIPTION_STRING, translatable: 'false' }, _: 'two rates' },
+          { $: { name: FORECAST_DESCRIPTION_STRING, translatable: 'false' }, _: "each account\\'s balance" },
         ],
       },
     };
@@ -93,11 +99,20 @@ describe('withWidgetStrings', () => {
     expect(result.resources.string[0]).toEqual({ $: { name: DESCRIPTION_STRING }, _: "today's rate" });
     expect(result.resources.string[1]).toEqual({ $: { name: 'other', translatable: 'false' }, _: "keep\\'s" });
     expect(result.resources.string[2]).toEqual({ $: { name: PAIR_DESCRIPTION_STRING }, _: 'two rates' });
+    expect(result.resources.string[3]).toEqual({ $: { name: FORECAST_DESCRIPTION_STRING }, _: "each account's balance" });
   });
 
   it('runs its strings mod after the library’s, so the description is there to fix', () => {
     const plugins = appConfig.plugins.map((plugin) => (Array.isArray(plugin) ? plugin[0] : plugin));
     expect(plugins.indexOf('./plugins/withWidgetStrings.js')).toBeLessThan(plugins.indexOf('react-native-android-widget'));
+  });
+
+  it('gives every widget a preview image that exists', () => {
+    const fs = jest.requireActual('fs');
+    const [, options] = appConfig.plugins.find((plugin) => Array.isArray(plugin) && plugin[0] === 'react-native-android-widget');
+    options.widgets.forEach((widget) => {
+      expect(fs.existsSync(path.join(__dirname, '..', '..', widget.previewImage))).toBe(true);
+    });
   });
 
   it('escapes what aapt would read as markup', () => {
@@ -116,6 +131,11 @@ describe('withWidgetStrings', () => {
     expect(pair.label).toBe(`@string/${PAIR_LABEL_STRING}`);
     expect(PAIR_DESCRIPTION_STRING).toBe(`widget_${pair.name.toLowerCase()}_description`);
     expect(pair.description).toBe(en.widget_pair_description);
+    const forecast = options.widgets[2];
+    expect(forecast.name).toBe('BalanceForecast');
+    expect(forecast.label).toBe(`@string/${FORECAST_LABEL_STRING}`);
+    expect(FORECAST_DESCRIPTION_STRING).toBe(`widget_${forecast.name.toLowerCase()}_description`);
+    expect(forecast.description).toBe(en.widget_forecast_description);
     expect(appConfig.plugins).toContain('./plugins/withWidgetStrings.js');
   });
 });

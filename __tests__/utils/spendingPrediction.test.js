@@ -3,6 +3,8 @@ import {
   spendingWindowStart,
   spendingWindowDays,
   computeSpendingPrediction,
+  forecastMonthEndBalance,
+  dailySpendingRate,
 } from '../../app/utils/spendingPrediction';
 
 describe('spendingPrediction', () => {
@@ -151,6 +153,55 @@ describe('spendingPrediction', () => {
         selectedMonth,
         now: new Date(2026, 9, 22),
       })).toBeNull();
+    });
+  });
+
+  describe('dailySpendingRate', () => {
+    it('spreads the window’s spending over its days', () => {
+      expect(dailySpendingRate(3000, 30)).toBe(100);
+      // A week-old account: 700 over 7 days is 100 a day, not 700 / 30.
+      expect(dailySpendingRate(700, 7)).toBe(100);
+    });
+
+    it.each([
+      ['no window', 500, 0],
+      ['an unknown window', 500, null],
+      ['an unreadable total', NaN, 30],
+    ])('is zero with %s', (_label, recentExpenses, recentDays) => {
+      expect(dailySpendingRate(recentExpenses, recentDays)).toBe(0);
+    });
+  });
+
+  describe('forecastMonthEndBalance', () => {
+    it('carries the daily rate over the days left after today', () => {
+      // 26 October: 5 days left (27th to 31st).
+      expect(forecastMonthEndBalance({ balance: 1000, dailyAverage: 100, now: new Date(2026, 9, 26, 15) }))
+        .toEqual({ forecast: 500, daysLeft: 5 });
+    });
+
+    it('runs at the rate the Graphs prediction reports', () => {
+      const now = new Date(2026, 9, 10);
+      const prediction = computeSpendingPrediction({
+        monthToDateExpenses: 400, recentExpenses: 1500, recentDays: 30, selectedYear: 2026, selectedMonth: 9, now,
+      });
+      expect(prediction.dailyAverage).toBe(dailySpendingRate(1500, 30));
+      const { forecast } = forecastMonthEndBalance({ balance: 2000, dailyAverage: prediction.dailyAverage, now });
+      expect(forecast).toBeCloseTo(2000 - 50 * (31 - 10));
+    });
+
+    it('is the balance itself on the month’s last day', () => {
+      expect(forecastMonthEndBalance({ balance: 1234.5, dailyAverage: 30, now: new Date(2026, 1, 28) }))
+        .toEqual({ forecast: 1234.5, daysLeft: 0 });
+    });
+
+    it('goes below zero when the rate outruns the balance', () => {
+      const { forecast } = forecastMonthEndBalance({ balance: 100, dailyAverage: 20, now: new Date(2026, 3, 20) });
+      expect(forecast).toBe(100 - 20 * 10);
+    });
+
+    it('stays at the balance with no spending', () => {
+      expect(forecastMonthEndBalance({ balance: 50, dailyAverage: 0, now: new Date(2026, 9, 1) }))
+        .toEqual({ forecast: 50, daysLeft: 30 });
     });
   });
 });

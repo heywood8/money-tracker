@@ -25,6 +25,7 @@ import { useDisplaySettings } from '../../contexts/DisplaySettingsContext';
 import { getJsonPreference, setJsonPreference, PREF_KEYS } from '../../services/PreferencesDB';
 import { isNetWorthSelection } from '../../services/BalanceHistorySource';
 import { balanceLineColors } from '../../styles/chartPalette';
+import { forecastMonthEndBalance } from '../../utils/spendingPrediction';
 import BalanceHistoryCalendarView from './BalanceHistoryCalendarView';
 import {
   getMonthAbbreviations,
@@ -357,8 +358,10 @@ export const computeBalanceChart = ({
   let forecastDailyAvg = null;
   const hasForecastData = spendingPrediction && isCurrentMonth;
   if (hasForecastData && actualCurrent !== undefined) {
-    const daysRemaining = spendingPrediction.daysInMonth - now.getDate();
-    forecastEnd = actualCurrent - (spendingPrediction.dailyAverage * daysRemaining);
+    // The same end point the home-screen forecast widget prints.
+    forecastEnd = forecastMonthEndBalance({
+      balance: actualCurrent, dailyAverage: spendingPrediction.dailyAverage, now,
+    }).forecast;
     forecastDailyAvg = -spendingPrediction.dailyAverage;
   }
 

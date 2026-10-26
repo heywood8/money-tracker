@@ -791,5 +791,16 @@
   "widget_pair_config_title": "¿Qué dos tipos debe mostrar el widget? Tócalos en orden: izquierda y luego derecha",
   "widget_pair_add_to_home": "Añadir widget de dos tipos",
   "widget_pair_add_hint": "Dos tipos uno al lado del otro en toda una fila de la pantalla de inicio",
-  "widget_refresh": "Actualizar tipos"
+  "widget_refresh": "Actualizar tipos",
+  "widget_forecast_label": "Previsión de saldo",
+  "widget_forecast_description": "Cuánto quedará en cada cuenta a fin de mes al ritmo de gasto actual",
+  "widget_forecast_config_title": "¿Para qué cuentas debe hacer la previsión el widget?",
+  "widget_forecast_config_hint": "Para cada una, cuánto quedará a fin de mes si se sigue gastando como en los últimos 30 días",
+  "widget_forecast_until": "Previsión al {date}",
+  "widget_forecast_now": "ahora {amount}",
+  "widget_forecast_per_day": "{amount}/día",
+  "widget_forecast_empty": "No hay cuentas que mostrar: añade una en Penny o vuelve a configurar el widget",
+  "widget_forecast_load_failed": "No se pudieron cargar las cuentas",
+  "widget_forecast_add_to_home": "Añadir widget de previsión de saldo",
+  "widget_forecast_add_hint": "El saldo de cada cuenta a fin de mes al ritmo de gasto actual"
 }

@@ -791,5 +791,16 @@
   "widget_pair_config_title": "小组件显示哪两个汇率？按顺序点选：先左后右",
   "widget_pair_add_to_home": "添加双汇率小组件",
   "widget_pair_add_hint": "在主屏幕上整行并排显示两个汇率",
-  "widget_refresh": "刷新汇率"
+  "widget_refresh": "刷新汇率",
+  "widget_forecast_label": "余额预测",
+  "widget_forecast_description": "按当前支出速度，各账户到月底还剩多少",
+  "widget_forecast_config_title": "小组件要预测哪些账户？",
+  "widget_forecast_config_hint": "按过去 30 天的支出速度，显示每个账户到月底还剩多少",
+  "widget_forecast_until": "预测至 {date}",
+  "widget_forecast_now": "当前 {amount}",
+  "widget_forecast_per_day": "{amount}/天",
+  "widget_forecast_empty": "没有可显示的账户：请在 Penny 中添加账户，或重新设置小组件",
+  "widget_forecast_load_failed": "无法加载账户",
+  "widget_forecast_add_to_home": "添加余额预测小组件",
+  "widget_forecast_add_hint": "按当前支出速度，各账户到月底的余额"
 }

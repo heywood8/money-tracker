@@ -26,6 +26,8 @@ const LABEL_STRING = 'widget_exchange_rate_label';
 const DESCRIPTION_STRING = 'widget_exchangerate_description';
 const PAIR_LABEL_STRING = 'widget_exchange_rate_pair_label';
 const PAIR_DESCRIPTION_STRING = 'widget_exchangeratepair_description';
+const FORECAST_LABEL_STRING = 'widget_balance_forecast_label';
+const FORECAST_DESCRIPTION_STRING = 'widget_balanceforecast_description';
 
 // Resource name → the assets/i18n key its text comes from.
 const WIDGET_STRINGS = [
@@ -33,9 +35,11 @@ const WIDGET_STRINGS = [
   [DESCRIPTION_STRING, 'widget_rate_description'],
   [PAIR_LABEL_STRING, 'widget_pair_label'],
   [PAIR_DESCRIPTION_STRING, 'widget_pair_description'],
+  [FORECAST_LABEL_STRING, 'widget_forecast_label'],
+  [FORECAST_DESCRIPTION_STRING, 'widget_forecast_description'],
 ];
-const LABEL_STRINGS = [LABEL_STRING, PAIR_LABEL_STRING];
-const DESCRIPTION_STRINGS = [DESCRIPTION_STRING, PAIR_DESCRIPTION_STRING];
+const LABEL_STRINGS = [LABEL_STRING, PAIR_LABEL_STRING, FORECAST_LABEL_STRING];
+const DESCRIPTION_STRINGS = [DESCRIPTION_STRING, PAIR_DESCRIPTION_STRING, FORECAST_DESCRIPTION_STRING];
 // One file of our own per locale, so nothing else's values-<lang>/strings.xml
 // is read or overwritten.
 const STRINGS_FILE = 'widget_strings.xml';
@@ -148,6 +152,8 @@ module.exports.LABEL_STRING = LABEL_STRING;
 module.exports.DESCRIPTION_STRING = DESCRIPTION_STRING;
 module.exports.PAIR_LABEL_STRING = PAIR_LABEL_STRING;
 module.exports.PAIR_DESCRIPTION_STRING = PAIR_DESCRIPTION_STRING;
+module.exports.FORECAST_LABEL_STRING = FORECAST_LABEL_STRING;
+module.exports.FORECAST_DESCRIPTION_STRING = FORECAST_DESCRIPTION_STRING;
 module.exports.escapeAndroidString = escapeAndroidString;
 module.exports.localeStringsXml = localeStringsXml;
 module.exports.allowDescriptionTranslations = allowDescriptionTranslations;

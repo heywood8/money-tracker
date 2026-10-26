@@ -11,7 +11,9 @@ import { DEFAULT_RATE_RANGE, RANGE_LABEL_KEYS } from '../../services/ExchangeRat
 import EmptyState from '../EmptyState';
 import RateChartEditor from './RateChartEditor';
 import { SettingsNavRow, SETTINGS_LIST_CONTENT } from './SettingsRows';
-import { EXCHANGE_RATE_PAIR_WIDGET, EXCHANGE_RATE_WIDGET } from '../../widgets/widgetConstants';
+import {
+  BALANCE_FORECAST_WIDGET, EXCHANGE_RATE_PAIR_WIDGET, EXCHANGE_RATE_WIDGET,
+} from '../../widgets/widgetConstants';
 import { SECTION_LABEL } from '../../styles/componentStyles';
 import { FONT_SIZE, HORIZONTAL_PADDING, SPACING } from '../../styles/designTokens';
 
@@ -56,7 +58,8 @@ export const defaultNewChart = (currencies, charts) => {
 /**
  * Settings → Graphs: what the Graphs tab draws beyond the user's own money.
  * Today that is the exchange-rate charts — a list of them, and the editor a
- * row or the add button pushes as a step.
+ * row or the add button pushes as a step — and, below them, the home-screen
+ * widget carrying the balance chart's month-end forecast out of the app.
  *
  * The draft lives here rather than in the editor, the way the notification
  * panel holds its template draft: the list unmounts as the editor opens.
@@ -139,6 +142,7 @@ export default function GraphsPanel({ step, onPushStep, onPopStep, onRegisterBac
   }, []);
   const handlePinWidget = useCallback(() => pinWidget(EXCHANGE_RATE_WIDGET), [pinWidget]);
   const handlePinPairWidget = useCallback(() => pinWidget(EXCHANGE_RATE_PAIR_WIDGET), [pinWidget]);
+  const handlePinForecastWidget = useCallback(() => pinWidget(BALANCE_FORECAST_WIDGET), [pinWidget]);
 
   if (step === 'rateEditor' && draft) {
     return (
@@ -192,7 +196,8 @@ export default function GraphsPanel({ step, onPushStep, onPopStep, onRegisterBac
       />
 
       {/* Whether a launcher can pin from an app is the launcher's, not the
-          widget's: one refusal changes both rows' hints. */}
+          widget's: one refusal changes every pin row's hint, the forecast
+          widget's below included. */}
       {charts.length > 0 && (
         <>
           <SettingsNavRow
@@ -213,6 +218,23 @@ export default function GraphsPanel({ step, onPushStep, onPopStep, onRegisterBac
       )}
 
       <Text style={[styles.note, { color: colors.mutedText }]}>{t('rate_source_note')}</Text>
+
+      {/* The widget leaves archived accounts out, so only an active one is
+          something to forecast. */}
+      {accounts?.some((account) => !account.hidden) && (
+        <>
+          <Text style={[styles.sectionLabel, styles.sectionGap, { color: colors.mutedText }]}>
+            {t('widget_forecast_label')}
+          </Text>
+          <SettingsNavRow
+            icon="wallet-outline"
+            label={t('widget_forecast_add_to_home')}
+            hint={pinUnsupported ? t('widget_pin_unsupported') : t('widget_forecast_add_hint')}
+            onPress={handlePinForecastWidget}
+            testID="forecast-widget-pin"
+          />
+        </>
+      )}
     </ScrollView>
   );
 }
@@ -233,6 +255,9 @@ const styles = StyleSheet.create({
     fontSize: FONT_SIZE.sm,
     paddingHorizontal: HORIZONTAL_PADDING,
     paddingTop: SPACING.md,
+  },
+  sectionGap: {
+    marginTop: SPACING.lg,
   },
   sectionLabel: {
     ...SECTION_LABEL,

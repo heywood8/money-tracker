@@ -12,6 +12,9 @@ export const EXCHANGE_RATE_WIDGET = 'ExchangeRate';
 export const EXCHANGE_RATE_PAIR_WIDGET = 'ExchangeRatePair';
 // Every widget that draws exchange rates, for the code that serves them all.
 export const EXCHANGE_RATE_WIDGETS = [EXCHANGE_RATE_WIDGET, EXCHANGE_RATE_PAIR_WIDGET];
+// The month-end balance forecast for the accounts the user picked, under the
+// same rule.
+export const BALANCE_FORECAST_WIDGET = 'BalanceForecast';
 
 // The click action of the "↻ 14:05" on a widget: fetch fresh rates now. Unlike
 // a tap anywhere else, it reaches the task handler (WIDGET_CLICK).

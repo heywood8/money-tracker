@@ -185,6 +185,14 @@ describe('Currency Service', () => {
       expect(Currency.formatMoney('-1500', 'USD', { language: 'en', compact: true })).toBe('-$1.5K');
     });
 
+    it('drops the sign of a negative that rounds to zero', async () => {
+      // AMD keeps no minor units: -0.3 prints as zero, and a "-֏0" says nothing.
+      expect(Currency.formatMoney(-0.3, 'AMD', { language: 'en' })).toBe('֏0');
+      expect(Currency.formatMoney('-0.004', 'USD', { language: 'en' })).toBe('$0.00');
+      // Half rounds away from zero, so this one is still a cent below it.
+      expect(Currency.formatMoney('-0.005', 'USD', { language: 'en' })).toBe('-$0.01');
+    });
+
     it('compacts aggregates, negatives included', async () => {
       expect(Currency.formatMoney('1240000', 'USD', { language: 'en', compact: true })).toBe('$1.24M');
       // Below the smallest compact unit there is no magnitude to shorten, and

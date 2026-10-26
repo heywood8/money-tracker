@@ -1,6 +1,6 @@
-import React, { memo, useCallback, useEffect, useRef, useState } from 'react';
+import React, { memo, useCallback, useEffect, useState } from 'react';
 import PropTypes from 'prop-types';
-import { View, Text, StyleSheet, Pressable, ScrollView, ActivityIndicator, BackHandler } from 'react-native';
+import { View, Text, StyleSheet, Pressable, ScrollView, ActivityIndicator } from 'react-native';
 import { SafeAreaProvider, SafeAreaView } from 'react-native-safe-area-context';
 import { ThemeConfigProvider } from '../contexts/ThemeConfigContext';
 import { ThemeColorsProvider, useThemeColors } from '../contexts/ThemeColorsContext';
@@ -10,6 +10,7 @@ import { resolveLanguage, translate } from '../services/notifications/notificati
 import EmptyState from '../components/EmptyState';
 import { getWidgetChart, getWidgetCharts, setWidgetChart, setWidgetCharts } from './exchangeRateWidgetStore';
 import { refreshExchangeRateWidgets, renderExchangeRateWidget } from './exchangeRateWidgetRender';
+import useWidgetConfigAnswer from './useWidgetConfigAnswer';
 import { EXCHANGE_RATE_PAIR_WIDGET } from './widgetConstants';
 import { BUTTON, BUTTON_TEXT, MODAL_TITLE } from '../styles/componentStyles';
 import {
@@ -28,21 +29,8 @@ import {
  * providers it needs and reads the app's language the way the headless code
  * does, rather than mounting the whole app shell for a one-question screen.
  */
-// How long the screen waits to draw the widget before handing back to the
-// launcher. The rates are usually saved already and the draw is instant; on a
-// slow network the widget is finished in the background instead of holding
-// this screen up (and tempting a back press that would remove the widget).
-const RENDER_WAIT_MS = 4000;
-
 // How many charts the two-rate widget shows.
 const PAIR_SIZE = 2;
-
-// The draw, or null if it fails or outlasts `ms`.
-const drawWithin = (promise, ms) => {
-  let timer;
-  const timeout = new Promise((resolve) => { timer = setTimeout(() => resolve(null), ms); });
-  return Promise.race([promise.catch(() => null), timeout]).finally(() => clearTimeout(timer));
-};
 
 const ChartRow = memo(({ chart, selected, order, saving, disabled, onSelect, colors, t }) => {
   const handlePress = useCallback(() => { onSelect(chart); }, [chart, onSelect]);
@@ -100,8 +88,15 @@ function ConfigContent({ widgetInfo, renderWidget, setResult }) {
   const [currentId, setCurrentId] = useState(null);
   // The two-rate widget's picks, in order.
   const [pickedIds, setPickedIds] = useState([]);
-  const [savingId, setSavingId] = useState(null);
   const t = useCallback((key) => translate(language, key), [language]);
+  // Answers the launcher once, from a pick, Done or a cancel (back included).
+  const { complete, cancel, savingKey: savingId, busyRef } = useWidgetConfigAnswer({
+    widgetInfo,
+    renderWidget,
+    setResult,
+    draw: renderExchangeRateWidget,
+    redrawLater: refreshExchangeRateWidgets,
+  });
   const busy = savingId !== null;
   const pair = widgetInfo.widgetName === EXCHANGE_RATE_PAIR_WIDGET;
 
@@ -134,51 +129,6 @@ function ConfigContent({ widgetInfo, renderWidget, setResult }) {
     return () => { cancelled = true; };
   }, [widgetInfo.widgetId, pair]);
 
-  // The launcher takes exactly one answer. A second one (a double tap, or a
-  // cancel landing while a pick is still being drawn) could remove a widget the
-  // user had just set up, so everything after the first is dropped.
-  const settledRef = useRef(false);
-  const busyRef = useRef(false);
-  const settle = useCallback((result) => {
-    if (settledRef.current) return;
-    settledRef.current = true;
-    setResult(result);
-  }, [setResult]);
-
-  const cancel = useCallback(() => {
-    if (!busyRef.current) settle('cancel');
-  }, [settle]);
-
-  // Hardware back is the cancel, as everywhere else in the app. A widget that
-  // was just placed is then taken off the home screen again by the launcher.
-  // While a pick is being saved, back is swallowed rather than undoing it.
-  useEffect(() => {
-    const subscription = BackHandler.addEventListener('hardwareBackPress', () => {
-      cancel();
-      return true;
-    });
-    return () => subscription.remove();
-  }, [cancel]);
-
-  // Saves (unless there is nothing to save), draws and answers the launcher.
-  const complete = useCallback(async (savingKey, save) => {
-    if (busyRef.current || settledRef.current) return;
-    busyRef.current = true;
-    setSavingId(savingKey);
-    try {
-      if (save) await save();
-    } catch (error) {
-      console.warn('[widgets] Could not save the widget\'s chart:', error?.message);
-    }
-    const rendered = await drawWithin(renderExchangeRateWidget(widgetInfo), RENDER_WAIT_MS);
-    if (rendered) {
-      renderWidget(rendered);
-    } else {
-      refreshExchangeRateWidgets();
-    }
-    settle('ok');
-  }, [widgetInfo, renderWidget, settle]);
-
   const finish = useCallback((chart) => {
     complete(chart ? chart.id : 'empty', chart ? () => setWidgetChart(widgetInfo.widgetId, chart) : null);
   }, [complete, widgetInfo.widgetId]);
@@ -191,7 +141,7 @@ function ConfigContent({ widgetInfo, renderWidget, setResult }) {
       if (ids.includes(chart.id)) return ids.filter((id) => id !== chart.id);
       return ids.length < PAIR_SIZE ? [...ids, chart.id] : [...ids.slice(0, PAIR_SIZE - 1), chart.id];
     });
-  }, []);
+  }, [busyRef]);
 
   const handlePairDone = useCallback(() => {
     const picked = pickedIds.map((id) => (charts || []).find((chart) => chart.id === id)).filter(Boolean);
