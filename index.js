@@ -14,7 +14,7 @@ import './app/services/notifications/acknowledgeTask';
 // configuration screen as its own React root, so both register at bundle load.
 import { registerWidgetConfigurationScreen, registerWidgetTaskHandler } from 'react-native-android-widget';
 import { widgetTaskHandler } from './app/widgets/widgetTaskHandler';
-import ExchangeRateWidgetConfigScreen from './app/widgets/ExchangeRateWidgetConfigScreen';
+import WidgetConfigScreen from './app/widgets/WidgetConfigScreen';
 
 import App from './App';
 
@@ -23,4 +23,4 @@ import App from './App';
 // the environment is set up appropriately
 registerRootComponent(App);
 registerWidgetTaskHandler(widgetTaskHandler);
-registerWidgetConfigurationScreen(ExchangeRateWidgetConfigScreen);
+registerWidgetConfigurationScreen(WidgetConfigScreen);

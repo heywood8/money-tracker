@@ -791,5 +791,16 @@
   "widget_pair_config_title": "Какие два курса показывать? Нажмите по порядку: левый, затем правый",
   "widget_pair_add_to_home": "Добавить виджет с двумя курсами",
   "widget_pair_add_hint": "Два курса рядом во всю ширину рабочего стола",
-  "widget_refresh": "Обновить курсы"
+  "widget_refresh": "Обновить курсы",
+  "widget_forecast_label": "Прогноз остатка",
+  "widget_forecast_description": "Сколько останется на каждом счёте к концу месяца при текущих тратах",
+  "widget_forecast_config_title": "Для каких счетов показывать прогноз?",
+  "widget_forecast_config_hint": "Для каждого счёта: сколько на нём останется к концу месяца, если тратить так же, как за последние 30 дней",
+  "widget_forecast_until": "Прогноз на {date}",
+  "widget_forecast_now": "сейчас {amount}",
+  "widget_forecast_per_day": "{amount}/день",
+  "widget_forecast_empty": "Нет счетов для прогноза: добавьте счёт в Penny или настройте виджет заново",
+  "widget_forecast_load_failed": "Не удалось загрузить счета",
+  "widget_forecast_add_to_home": "Добавить виджет прогноза остатка",
+  "widget_forecast_add_hint": "Остаток на каждом счёте к концу месяца при текущих тратах"
 }

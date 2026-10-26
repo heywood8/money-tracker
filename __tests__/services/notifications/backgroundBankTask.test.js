@@ -19,6 +19,7 @@ import { collectAddedAlertDetails } from '../../../app/services/notifications/ad
 import { isAppInForeground } from '../../../app/services/notifications/appForeground';
 import { getPendingCount } from '../../../app/services/PendingNotificationsDB';
 import * as PreferencesDB from '../../../app/services/PreferencesDB';
+import { refreshBalanceForecastWidgets } from '../../../app/widgets/balanceForecastWidgetRender';
 
 jest.mock('../../../app/services/notifications/processBankNotifications', () => ({
   isBankNotificationsEnabled: jest.fn(),
@@ -45,6 +46,9 @@ jest.mock('../../../app/services/notifications/addedAlertItems', () => ({
 }));
 jest.mock('../../../app/services/notifications/appForeground', () => ({
   isAppInForeground: jest.fn(),
+}));
+jest.mock('../../../app/widgets/balanceForecastWidgetRender', () => ({
+  refreshBalanceForecastWidgets: jest.fn(),
 }));
 jest.mock('../../../app/services/PendingNotificationsDB', () => ({
   getPendingCount: jest.fn(),
@@ -289,6 +293,55 @@ describe('backgroundBankTask', () => {
       await backgroundBankTask.runBackgroundBankCheck();
 
       expect(localNotifications.areNotificationsGranted).not.toHaveBeenCalled();
+    });
+  });
+
+  describe('task executor — balance-forecast widgets', () => {
+    it('redraws them after the run books operations, once its alerts are posted', async () => {
+      enableBothGates();
+      const order = [];
+      localNotifications.presentAddedOperationsAlert.mockImplementation(async () => { order.push('receipt'); });
+      refreshBalanceForecastWidgets.mockImplementation(async () => { order.push('widgets'); });
+      processMod.processBankNotifications.mockResolvedValue({ created: 2, pending: 0, skipped: 0, createdItems: [] });
+
+      await expect(taskExecutor()).resolves.toBe(BackgroundTask.BackgroundTaskResult.Success);
+
+      expect(order).toEqual(['receipt', 'widgets']);
+    });
+
+    it('waits for the draws before the task ends', async () => {
+      enableBothGates();
+      let drawn;
+      refreshBalanceForecastWidgets.mockReturnValue(new Promise((resolve) => { drawn = resolve; }));
+      processMod.processBankNotifications.mockResolvedValue({ created: 1, pending: 0, skipped: 0, createdItems: [] });
+
+      let finished = false;
+      const task = taskExecutor().then(() => { finished = true; });
+      await new Promise((resolve) => setImmediate(resolve));
+      expect(finished).toBe(false);
+
+      drawn();
+      await task;
+      expect(finished).toBe(true);
+    });
+
+    it('redraws them even when it may not post the receipt', async () => {
+      enableBothGates();
+      localNotifications.areNotificationsGranted.mockResolvedValue(false);
+      processMod.processBankNotifications.mockResolvedValue({ created: 1, pending: 0, skipped: 0, createdItems: [] });
+
+      await taskExecutor();
+
+      expect(refreshBalanceForecastWidgets).toHaveBeenCalledTimes(1);
+    });
+
+    it('leaves them alone when nothing was booked', async () => {
+      enableBothGates();
+      processMod.processBankNotifications.mockResolvedValue({ created: 0, pending: 1, skipped: 0 });
+
+      await taskExecutor();
+
+      expect(refreshBalanceForecastWidgets).not.toHaveBeenCalled();
     });
   });
 

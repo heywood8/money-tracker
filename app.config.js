@@ -68,6 +68,26 @@ const WIDGETS = {
       updatePeriodMillis: 60 * 60 * 1000,
       widgetFeatures: 'reconfigurable',
     },
+    {
+      // What each picked account will hold at the end of the month at its
+      // current spending rate. The accounts scroll, so two cells tall is
+      // enough for any number of them.
+      name: 'BalanceForecast',
+      label: '@string/widget_balance_forecast_label',
+      description: require('./assets/i18n/en.json').widget_forecast_description,
+      // An account's name and its forecast on one line need about three cells.
+      minWidth: '180dp',
+      minHeight: '110dp',
+      targetCellWidth: 4,
+      targetCellHeight: 2,
+      resizeMode: 'horizontal|vertical',
+      previewImage: './assets/widget-preview/balance-forecast.png',
+      // The app redraws it whenever it leaves the foreground and after a
+      // background booking; the hourly update carries it over midnight, when
+      // a day fewer is left to spend.
+      updatePeriodMillis: 60 * 60 * 1000,
+      widgetFeatures: 'reconfigurable',
+    },
   ],
 };
 

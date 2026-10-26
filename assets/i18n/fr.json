@@ -791,5 +791,16 @@
   "widget_pair_config_title": "Quels deux taux le widget doit-il afficher ? Touchez-les dans l’ordre : gauche, puis droite",
   "widget_pair_add_to_home": "Ajouter le widget à deux taux",
   "widget_pair_add_hint": "Deux taux côte à côte sur toute une rangée de l’écran d’accueil",
-  "widget_refresh": "Actualiser les taux"
+  "widget_refresh": "Actualiser les taux",
+  "widget_forecast_label": "Prévision de solde",
+  "widget_forecast_description": "Ce qu’il restera sur chacun de vos comptes en fin de mois au rythme de dépenses actuel",
+  "widget_forecast_config_title": "Pour quels comptes le widget doit-il faire une prévision ?",
+  "widget_forecast_config_hint": "Pour chacun, ce qu’il restera en fin de mois si les dépenses continuent comme sur les 30 derniers jours",
+  "widget_forecast_until": "Prévision au {date}",
+  "widget_forecast_now": "actuel {amount}",
+  "widget_forecast_per_day": "{amount}/jour",
+  "widget_forecast_empty": "Aucun compte à afficher : ajoutez-en un dans Penny ou reconfigurez le widget",
+  "widget_forecast_load_failed": "Impossible de charger vos comptes",
+  "widget_forecast_add_to_home": "Ajouter le widget de prévision de solde",
+  "widget_forecast_add_hint": "Le solde de chaque compte en fin de mois au rythme de dépenses actuel"
 }

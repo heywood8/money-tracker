@@ -249,8 +249,10 @@ describe('GraphsPanel', () => {
 
       await fireEvent.press(screen.getByTestId('rate-widget-pin'));
 
-      // Under both rows: a launcher that cannot pin one cannot pin the other.
-      await waitFor(() => expect(screen.getAllByText('widget_pin_unsupported')).toHaveLength(2));
+      // Under every row: a launcher that cannot pin one widget cannot pin the
+      // others (the two rate widgets and the forecast one; mockAccounts has
+      // accounts here).
+      await waitFor(() => expect(screen.getAllByText('widget_pin_unsupported')).toHaveLength(3));
     });
 
     it('treats a failed pin request like an unsupported launcher', async () => {
@@ -262,8 +264,31 @@ describe('GraphsPanel', () => {
 
       await fireEvent.press(screen.getByTestId('rate-widget-pin'));
 
-      await waitFor(() => expect(screen.getAllByText('widget_pin_unsupported')).toHaveLength(2));
+      await waitFor(() => expect(screen.getAllByText('widget_pin_unsupported')).toHaveLength(3));
       console.warn.mockRestore();
+    });
+  });
+
+  describe('balance-forecast widget', () => {
+    it('offers it once there are accounts, with or without rate charts', async () => {
+      requestPinWidget.mockResolvedValue(true);
+      await render(<Host />);
+      await waitFor(() => expect(screen.getByTestId('forecast-widget-pin')).toBeTruthy());
+      expect(screen.getByText('widget_forecast_add_hint')).toBeTruthy();
+
+      await fireEvent.press(screen.getByTestId('forecast-widget-pin'));
+
+      expect(requestPinWidget).toHaveBeenCalledWith({ widgetName: 'BalanceForecast' });
+    });
+
+    it.each([
+      ['no accounts', []],
+      ['only archived accounts', [{ id: 1, currency: 'RUB', hidden: 1 }]],
+    ])('is not offered with %s to forecast', async (_label, list) => {
+      mockAccounts.list = list;
+      await render(<Host />);
+      await waitFor(() => expect(loadRateCharts).toHaveBeenCalled());
+      expect(screen.queryByTestId('forecast-widget-pin')).toBeNull();
     });
   });
 

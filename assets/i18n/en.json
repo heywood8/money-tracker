@@ -791,5 +791,16 @@
   "widget_pair_config_title": "Which two rates should the widget show? Tap them in order: left, then right",
   "widget_pair_add_to_home": "Add two-rate widget",
   "widget_pair_add_hint": "Two rates side by side across a full row of the home screen",
-  "widget_refresh": "Refresh rates"
+  "widget_refresh": "Refresh rates",
+  "widget_forecast_label": "Balance forecast",
+  "widget_forecast_description": "What each of your accounts will hold at month end at the current spending rate",
+  "widget_forecast_config_title": "Which accounts should the widget forecast?",
+  "widget_forecast_config_hint": "Each shows what it will hold at the end of the month if it keeps spending as it has over the last 30 days",
+  "widget_forecast_until": "Forecast to {date}",
+  "widget_forecast_now": "now {amount}",
+  "widget_forecast_per_day": "{amount}/day",
+  "widget_forecast_empty": "No accounts to show: add one in Penny, or reconfigure the widget",
+  "widget_forecast_load_failed": "Could not load your accounts",
+  "widget_forecast_add_to_home": "Add balance forecast widget",
+  "widget_forecast_add_hint": "Each account’s balance at month end at its current spending rate"
 }

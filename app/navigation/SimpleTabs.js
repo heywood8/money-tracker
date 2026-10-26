@@ -39,6 +39,7 @@ import BudgetScreen from '../screens/BudgetScreen';
 import { useThemeColors } from '../contexts/ThemeColorsContext';
 import { isGraphsDeepLink } from '../widgets/widgetConstants';
 import useExchangeRateWidgetSync from '../widgets/useExchangeRateWidgetSync';
+import useBalanceForecastWidgetSync from '../widgets/useBalanceForecastWidgetSync';
 import { useLocalization } from '../contexts/LocalizationContext';
 import { useDisplaySettings } from '../contexts/DisplaySettingsContext';
 import { useSetActiveTab } from '../contexts/TabFocusContext';
@@ -547,9 +548,10 @@ export default function SimpleTabs() {
     };
   }, []);
 
-  // The home-screen widgets draw the same rates; the navigator lives for the
-  // whole session, so it is what keeps them in step.
+  // The home-screen widgets draw the same rates and balances; the navigator
+  // lives for the whole session, so it is what keeps them in step.
   useExchangeRateWidgetSync();
+  useBalanceForecastWidgetSync();
 
   // A tapped "transactions to review" notification routes here: jump to the
   // Operations tab. OperationsScreen listens for the same event and surfaces the
