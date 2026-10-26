@@ -1,6 +1,7 @@
 import * as FileSystem from 'expo-file-system/legacy';
 import { fetchRates, pairProviders, RateSourceError } from './frankfurter';
 import { fetchLiveExchangeRate, fetchRateSource } from './currency';
+import { fetchMarketRate, peekMarketRate } from './marketRate';
 
 /**
  * Exchange-rate history for the rate charts on the Graphs tab.
@@ -468,6 +469,62 @@ export const fetchRateHistory = (from, to, range, { now = new Date(), force = fa
     }
     return { points, stale: failed !== undefined, checkedAt: lastChecked(entry, range) };
   });
+};
+
+/**
+ * A series with the market rate now as its latest point: dated today, in place
+ * of today's fixing when there is one, after the last fixing otherwise. The
+ * day range keeps two points: the last fixing and now.
+ *
+ * @param {Array<{date: string, rate: number}>} points - Oldest first, not empty
+ * @param {number} rate - The market rate, in the series' direction
+ * @param {string} today - YYYY-MM-DD
+ * @param {string} range
+ * @returns {Array<{date: string, rate: number}>}
+ */
+export const withLivePoint = (points, rate, today, range) => {
+  // Dated today or later: a bank can fix tomorrow's rate today.
+  const next = [...points.filter((point) => point.date < today), { date: today, rate }];
+  return range === 'day' ? next.slice(-2) : next;
+};
+
+/**
+ * What a rate chart draws: the central banks' history (fetchRateHistory) up
+ * to the market rate now (marketRate.js), the figure people swap at. The
+ * market point is left out when Google cannot be reached or sits too far from
+ * the latest fixing, and the chart ends on that fixing as before.
+ *
+ * Takes fetchRateHistory's options; `cacheOnly` uses only a quote already
+ * fetched. When the market point is drawn, `checkedAt` is when it was fetched;
+ * `stale` still says whether the history behind it is the saved copy.
+ *
+ * @param {string} from
+ * @param {string} to
+ * @param {string} range
+ * @param {Object} [options]
+ * @returns {Promise<{points: Array<{date: string, rate: number}>, stale: boolean,
+ *   checkedAt: number|null, live: boolean}>}
+ * @throws {RateSourceError} As fetchRateHistory: only when there is no history at all
+ */
+export const fetchRateSeries = async (from, to, range, options = {}) => {
+  const now = options.now || new Date();
+  const history = await fetchRateHistory(from, to, range, { ...options, now });
+  const reference = history.points[history.points.length - 1].rate;
+  let market = null;
+  try {
+    market = options.cacheOnly
+      ? peekMarketRate(from, to, { reference })
+      : await fetchMarketRate(from, to, { reference, force: options.force });
+  } catch {
+    market = null;
+  }
+  if (!market) return { ...history, live: false };
+  return {
+    points: withLivePoint(history.points, market.rate, toIsoDate(now), range),
+    stale: history.stale,
+    checkedAt: market.at,
+    live: true,
+  };
 };
 
 /**

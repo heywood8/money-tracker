@@ -1,4 +1,5 @@
 import { fetchLiveExchangeRate, fetchRateSource, clearExchangeRateCache } from '../../app/services/currency';
+import { fetchMarketRate } from '../../app/services/marketRate';
 
 // We need to mock the exchange-rates.json import used by getExchangeRate
 jest.mock('../../assets/exchange-rates.json', () => ({
@@ -174,6 +175,40 @@ describe('fetchLiveExchangeRate', () => {
 
       expect(await fetchLiveExchangeRate('USD', 'RUB')).toEqual({ rate: '81.52', source: 'live' });
       expect(global.fetch).toHaveBeenCalledTimes(2);
+    });
+  });
+
+  describe('market rate', () => {
+    it('answers with the market rate, checked against the central banks', async () => {
+      global.fetch.mockResolvedValueOnce(usdTable({ RUB: 80.81, AMD: 361.24 }));
+      fetchMarketRate.mockResolvedValueOnce({ rate: 4.4682892989, at: 1 });
+
+      expect(await fetchLiveExchangeRate('RUB', 'AMD')).toEqual({ rate: '4.468289299', source: 'live' });
+      // Asked alongside the banks, not after them.
+      expect(fetchMarketRate).toHaveBeenCalledWith('RUB', 'AMD');
+    });
+
+    it('drops a market quote more than 3% from the banks’ rate', async () => {
+      // Regression guard: Google's weekend RUB → AMD read 4.04 against 4.35.
+      global.fetch.mockResolvedValueOnce(usdTable({ RUB: 81.13, AMD: 352.9 }));
+      fetchMarketRate.mockResolvedValueOnce({ rate: 4.0433, at: 1 });
+
+      expect(Number((await fetchLiveExchangeRate('RUB', 'AMD')).rate)).toBeCloseTo(352.9 / 81.13, 8);
+    });
+
+    it('keeps the central banks’ rate when there is no usable market quote', async () => {
+      global.fetch.mockResolvedValueOnce(usdTable({ EUR: 0.93 }));
+      fetchMarketRate.mockResolvedValueOnce(null);
+
+      expect(await fetchLiveExchangeRate('USD', 'EUR')).toEqual({ rate: '0.93', source: 'live' });
+    });
+
+    it('does not use a market quote it cannot check against the banks', async () => {
+      // The offline table is too old to tell a weekend's bad quote from a real one.
+      global.fetch.mockRejectedValue(new Error('Network error'));
+      fetchMarketRate.mockResolvedValueOnce({ rate: 4.47, at: 1 });
+
+      expect(await fetchLiveExchangeRate('RUB', 'AMD')).toEqual({ rate: '4.35', source: 'offline' });
     });
   });
 

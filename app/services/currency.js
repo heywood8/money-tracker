@@ -13,6 +13,7 @@ import exchangeRatesData from '../../assets/exchange-rates.json';
 import currenciesData from '../../assets/currencies.json';
 import { SLOW_PHASE_MS } from './perfTrace';
 import { fetchRates, pairProviders } from './frankfurter';
+import { fetchMarketRate, isNearReference } from './marketRate';
 
 // Configure Decimal.js for financial calculations
 Decimal.set({
@@ -943,28 +944,16 @@ const crossRate = (rates, fromCurrency, toCurrency) => {
 };
 
 /**
- * Fetch a live exchange rate between two currencies.
- * Reads the pair's live table (Frankfurter), then falls back to offline rates.
+ * The central banks' rate for a pair (see fetchLiveExchangeRate), or the
+ * offline table's.
  *
  * A pair with a currency in HOME_PROVIDERS is read off its home banks' table,
  * and off the blend when that table does not quote one side of it, or quotes an
  * absurd figure. When the home table cannot be fetched, a blend table already
  * cached still answers, but none is fetched: the network is down for both, and
  * a second timeout would only delay the offline answer.
- *
- * @param {string} fromCurrency - Source currency code (e.g., 'USD')
- * @param {string} toCurrency - Destination currency code (e.g., 'EUR')
- * @returns {Promise<{rate: string|null, source: 'live'|'offline'|'none'}>}
  */
-export const fetchLiveExchangeRate = async (fromCurrency, toCurrency) => {
-  if (!fromCurrency || !toCurrency) {
-    return { rate: null, source: 'none' };
-  }
-
-  if (fromCurrency === toCurrency) {
-    return { rate: '1.0', source: 'live' };
-  }
-
+const fetchCentralBankRate = async (fromCurrency, toCurrency) => {
   const fromCode = fromCurrency.toUpperCase();
   const toCode = toCurrency.toUpperCase();
   const homeProviders = pairProviders(fromCode, toCode);
@@ -1011,6 +1000,42 @@ export const fetchLiveExchangeRate = async (fromCurrency, toCurrency) => {
   }
 
   return { rate: null, source: 'none' };
+};
+
+/**
+ * Fetch a live exchange rate between two currencies.
+ *
+ * The market rate as Google shows it (marketRate.js), which is what people
+ * swapping currency between themselves agree on, checked against the central
+ * banks' live rate (Frankfurter) and used only within a few percent of it.
+ * Without a usable market quote, the central banks' rate, then the offline table.
+ *
+ * @param {string} fromCurrency - Source currency code (e.g., 'USD')
+ * @param {string} toCurrency - Destination currency code (e.g., 'EUR')
+ * @returns {Promise<{rate: string|null, source: 'live'|'offline'|'none'}>}
+ */
+export const fetchLiveExchangeRate = async (fromCurrency, toCurrency) => {
+  if (!fromCurrency || !toCurrency) {
+    return { rate: null, source: 'none' };
+  }
+  if (fromCurrency === toCurrency) {
+    return { rate: '1.0', source: 'live' };
+  }
+
+  const fromCode = fromCurrency.toUpperCase();
+  const toCode = toCurrency.toUpperCase();
+  // Both at once: a slow network costs one wait, not two in a row.
+  const [central, market] = await Promise.all([
+    fetchCentralBankRate(fromCurrency, toCurrency),
+    fetchMarketRate(fromCode, toCode).catch(() => null),
+  ]);
+  // Used only beside the banks' live figure: the offline table is too old to
+  // tell a weekend's bad quote from a real one.
+  if (market && central.source === 'live' && isNearReference(market.rate, Number(central.rate))) {
+    // Ten significant digits, as crossRate gives: more than the quote carries.
+    return { rate: new Decimal(market.rate).toSignificantDigits(10).toFixed(), source: 'live' };
+  }
+  return central;
 };
 
 /**
