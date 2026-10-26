@@ -1,5 +1,12 @@
 # Changelog
 
+## [0.306.0](https://github.com/heywood8/money-tracker/compare/penny-v0.305.0...penny-v0.306.0) (2026-10-26)
+
+
+### Features
+
+* **rates:** take the rate now from google finance ([#1886](https://github.com/heywood8/money-tracker/issues/1886)) ([ccdba9d](https://github.com/heywood8/money-tracker/commit/ccdba9d86193bacdbaf990bf18a8d616ef6905bf))
+
 ## [0.305.0](https://github.com/heywood8/money-tracker/compare/penny-v0.304.0...penny-v0.305.0) (2026-10-26)
 
 
