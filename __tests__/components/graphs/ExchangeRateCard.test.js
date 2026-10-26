@@ -2,12 +2,12 @@ import React from 'react';
 import { render, fireEvent, waitFor, screen } from '@testing-library/react-native';
 import ExchangeRateCard, { xTickIndices } from '../../../app/components/graphs/ExchangeRateCard';
 import { formatRateDate, formatAxisDate } from '../../../app/services/ExchangeRateHistory';
-import { fetchRateHistory } from '../../../app/services/ExchangeRateHistory';
+import { fetchRateSeries } from '../../../app/services/ExchangeRateHistory';
 import { TabFocusProvider } from '../../../app/contexts/TabFocusContext';
 
 jest.mock('../../../app/services/ExchangeRateHistory', () => ({
   ...jest.requireActual('../../../app/services/ExchangeRateHistory'),
-  fetchRateHistory: jest.fn(),
+  fetchRateSeries: jest.fn(),
 }));
 
 const colors = {
@@ -54,16 +54,16 @@ const renderCard = async (props = {}) => render(
 describe('ExchangeRateCard', () => {
   beforeEach(() => {
     jest.clearAllMocks();
-    fetchRateHistory.mockResolvedValue(series([['2026-09-23', 80], ['2026-10-23', 81.55]]));
+    fetchRateSeries.mockResolvedValue(series([['2026-09-23', 80], ['2026-10-23', 81.55]]));
   });
 
   it('loads the chart on its default range and shows the latest rate and its move', async () => {
     let resolve;
-    fetchRateHistory.mockReturnValueOnce(new Promise((r) => { resolve = r; }));
+    fetchRateSeries.mockReturnValueOnce(new Promise((r) => { resolve = r; }));
     await renderCard();
 
     expect(screen.getByTestId('exchange-rate-loading')).toBeTruthy();
-    expect(fetchRateHistory).toHaveBeenCalledWith('USD', 'RUB', 'month');
+    expect(fetchRateSeries).toHaveBeenCalledWith('USD', 'RUB', 'month');
 
     resolve(series([['2026-09-23', 80], ['2026-10-23', 81.55]]));
     await waitFor(() => expect(screen.getByTestId('exchange-rate-value')).toHaveTextContent('₽81.55'));
@@ -74,7 +74,7 @@ describe('ExchangeRateCard', () => {
   });
 
   it('prices the configured amount', async () => {
-    fetchRateHistory.mockResolvedValue(series([['2026-10-22', 0.2259], ['2026-10-23', 0.2246]]));
+    fetchRateSeries.mockResolvedValue(series([['2026-10-22', 0.2259], ['2026-10-23', 0.2246]]));
 
     await renderCard({ chart: { id: 'c2', from: 'AMD', to: 'RUB', amount: 100, range: 'day' } });
 
@@ -82,11 +82,11 @@ describe('ExchangeRateCard', () => {
     expect(screen.getByText('100 AMD → RUB')).toBeTruthy();
     expect(screen.getByText('-0.13 (-0.58%)')).toBeTruthy();
     expect(changeColorOf('-0.13 (-0.58%)')).toBe(colors.overspend);
-    expect(fetchRateHistory).toHaveBeenCalledWith('AMD', 'RUB', 'day');
+    expect(fetchRateSeries).toHaveBeenCalledWith('AMD', 'RUB', 'day');
   });
 
   it('leaves a rate that did not move in the muted colour', async () => {
-    fetchRateHistory.mockResolvedValue(series([['2026-10-22', 81.55], ['2026-10-23', 81.55]]));
+    fetchRateSeries.mockResolvedValue(series([['2026-10-22', 81.55], ['2026-10-23', 81.55]]));
 
     await renderCard();
 
@@ -96,7 +96,7 @@ describe('ExchangeRateCard', () => {
 
   it('treats a move too small to print as no move', async () => {
     // Two fixings a digit apart past the two decimals the rate is shown to.
-    fetchRateHistory.mockResolvedValue(series([['2026-10-22', 81.55], ['2026-10-23', 81.551]]));
+    fetchRateSeries.mockResolvedValue(series([['2026-10-22', 81.55], ['2026-10-23', 81.551]]));
 
     await renderCard();
 
@@ -108,25 +108,25 @@ describe('ExchangeRateCard', () => {
     await renderCard();
     await waitFor(() => expect(screen.getByTestId('exchange-rate-value')).toHaveTextContent('₽81.55'));
 
-    fetchRateHistory.mockResolvedValueOnce(series([['2025-10-23', 95], ['2026-10-23', 81.55]]));
+    fetchRateSeries.mockResolvedValueOnce(series([['2025-10-23', 95], ['2026-10-23', 81.55]]));
     await fireEvent.press(screen.getByTestId('exchange-rate-range-year'));
 
-    expect(fetchRateHistory).toHaveBeenLastCalledWith('USD', 'RUB', 'year');
+    expect(fetchRateSeries).toHaveBeenLastCalledWith('USD', 'RUB', 'year');
     await waitFor(() => expect(screen.getByText('-13.45 (-14.16%)')).toBeTruthy());
     expect(screen.getByTestId('exchange-rate-range-year').props.accessibilityState).toEqual({ selected: true });
   });
 
   it('follows a new default range from Settings', async () => {
     const { rerender } = await renderCard();
-    await waitFor(() => expect(fetchRateHistory).toHaveBeenCalledTimes(1));
+    await waitFor(() => expect(fetchRateSeries).toHaveBeenCalledTimes(1));
 
     await rerender(<ExchangeRateCard chart={{ ...chart, range: 'week' }} colors={colors} t={t} language="en" />);
 
-    await waitFor(() => expect(fetchRateHistory).toHaveBeenLastCalledWith('USD', 'RUB', 'week'));
+    await waitFor(() => expect(fetchRateSeries).toHaveBeenLastCalledWith('USD', 'RUB', 'week'));
   });
 
   it('marks a series served from the saved copy while offline', async () => {
-    fetchRateHistory.mockResolvedValue({ ...series([['2026-10-23', 81.55]]), stale: true });
+    fetchRateSeries.mockResolvedValue({ ...series([['2026-10-23', 81.55]]), stale: true });
 
     await renderCard();
 
@@ -134,7 +134,7 @@ describe('ExchangeRateCard', () => {
   });
 
   it('offers a retry when nothing could be loaded', async () => {
-    fetchRateHistory.mockRejectedValueOnce(Object.assign(new Error('offline'), { code: 'network' }));
+    fetchRateSeries.mockRejectedValueOnce(Object.assign(new Error('offline'), { code: 'network' }));
 
     await renderCard();
 
@@ -142,11 +142,11 @@ describe('ExchangeRateCard', () => {
     await fireEvent.press(screen.getByTestId('exchange-rate-retry'));
 
     await waitFor(() => expect(screen.getByTestId('exchange-rate-value')).toHaveTextContent('₽81.55'));
-    expect(fetchRateHistory).toHaveBeenCalledTimes(2);
+    expect(fetchRateSeries).toHaveBeenCalledTimes(2);
   });
 
   it('says when the source has no rates for the pair', async () => {
-    fetchRateHistory.mockRejectedValueOnce(Object.assign(new Error('422'), { code: 'unsupported' }));
+    fetchRateSeries.mockRejectedValueOnce(Object.assign(new Error('422'), { code: 'unsupported' }));
 
     await renderCard();
 
@@ -161,7 +161,7 @@ describe('ExchangeRateCard', () => {
     );
 
     // The app opens on Operations; the Graphs tab is mounted but hidden.
-    expect(fetchRateHistory).not.toHaveBeenCalled();
+    expect(fetchRateSeries).not.toHaveBeenCalled();
   });
 
   describe('helpers', () => {

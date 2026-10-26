@@ -1,7 +1,7 @@
 import React from 'react';
 import { requestWidgetUpdate } from 'react-native-android-widget';
 import { loadRateCharts } from '../services/ExchangeRateCharts';
-import { fetchRateHistory } from '../services/ExchangeRateHistory';
+import { fetchRateSeries } from '../services/ExchangeRateHistory';
 import { resolveLanguage } from '../services/notifications/notificationStrings';
 import {
   getWidgetChart,
@@ -18,13 +18,13 @@ const sameChart = (a, b) => (a === b) || (
 );
 
 // One chart's model: its rates, or why there are none. `options` go to
-// fetchRateHistory (force, cacheOnly); `refreshing` marks a redraw made while
+// fetchRateSeries (force, cacheOnly); `refreshing` marks a redraw made while
 // a tapped refresh runs, which shows "↻ …" however far the read got;
 // `preferCache` reads what is saved and only goes to the network when nothing
 // is (Android may have cleared the cache directory).
 const loadRateModel = async (chart, language, { refreshing = false, preferCache = false, ...options } = {}) => {
   if (!chart) return { status: 'empty', language };
-  const read = (readOptions) => fetchRateHistory(chart.from, chart.to, chart.range, readOptions);
+  const read = (readOptions) => fetchRateSeries(chart.from, chart.to, chart.range, readOptions);
   try {
     const { points, stale, checkedAt } = preferCache
       ? await read({ ...options, cacheOnly: true }).catch(() => read(options))

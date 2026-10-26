@@ -10,7 +10,7 @@ import {
   RANGE_LABEL_KEYS,
   RATE_RANGES,
   axisDecimals,
-  fetchRateHistory,
+  fetchRateSeries,
   formatAxisDate,
   formatRateChange,
   rateChangeColor,
@@ -177,7 +177,7 @@ const ExchangeRateCard = ({ chart, colors, t, language }) => {
   useEffect(() => {
     if (!focused) return undefined;
     let cancelled = false;
-    fetchRateHistory(from, to, range)
+    fetchRateSeries(from, to, range)
       .then(({ points, stale }) => {
         if (!cancelled) setResult({ key: requestKey, points, stale, error: null });
       })

@@ -219,6 +219,17 @@ jest.mock('./app/contexts/ThemeConfigContext', () => {
   };
 });
 
+// The live market quote (Google Finance) is a second network request behind
+// every rate lookup. Tests that mock fetch for the central banks' answers would
+// see it take their mocked responses, so it answers "no quote" unless a test
+// opts in with jest.requireActual (see __tests__/services/marketRate.test.js).
+jest.mock('./app/services/marketRate', () => ({
+  ...jest.requireActual('./app/services/marketRate'),
+  fetchMarketRate: jest.fn(async () => null),
+  peekMarketRate: jest.fn(() => null),
+  clearMarketRateCache: jest.fn(),
+}));
+
 jest.mock('./app/contexts/ThemeColorsContext', () => {
   const React = require('react');
   const PropTypes = require('prop-types');

@@ -6,8 +6,11 @@
 
 import * as FileSystem from 'expo-file-system/legacy';
 import { fetchRateSource } from '../../app/services/currency';
+import { fetchMarketRate, peekMarketRate } from '../../app/services/marketRate';
 import {
   fetchRateHistory,
+  fetchRateSeries,
+  withLivePoint,
   clearRateHistoryCache,
   rangeStart,
   resolveRequestDirection,
@@ -567,6 +570,79 @@ describe('ExchangeRateHistory', () => {
 
       expect(lastWrite().daily.from).toBe(toIsoDate(new Date(2025, 11, 1)));
       expect(lastWrite().daily.rows.map(([date]) => date)).toEqual(['2026-10-23', '2026-12-01']);
+    });
+  });
+
+  describe('fetchRateSeries', () => {
+    const FRIDAY = [['2026-10-22', 4.431], ['2026-10-23', 4.4703]];
+    const MONDAY = new Date(2026, 9, 26, 14, 0, 0);
+
+    beforeEach(() => {
+      Date.now.mockReturnValue(MONDAY.getTime());
+      global.fetch.mockResolvedValue(rowsResponse('RUB', 'AMD', FRIDAY));
+      mockLiveRates['RUB|AMD'] = '4.47';
+    });
+
+    afterEach(() => {
+      delete mockLiveRates['RUB|AMD'];
+    });
+
+    it('ends the line on the market rate now, after the last fixing', async () => {
+      // The weekend: the banks' last fixing is Friday's, the market moved on.
+      fetchMarketRate.mockResolvedValueOnce({ rate: 4.4683, at: 111 });
+
+      const series = await fetchRateSeries('RUB', 'AMD', 'week', { now: MONDAY });
+
+      expect(series.points.slice(-2)).toEqual([{ date: '2026-10-23', rate: 4.4703 }, { date: '2026-10-26', rate: 4.4683 }]);
+      expect(series).toMatchObject({ live: true, stale: false, checkedAt: 111 });
+      expect(fetchMarketRate).toHaveBeenCalledWith('RUB', 'AMD', { reference: 4.4703, force: undefined });
+    });
+
+    it('ends on the last fixing when there is no usable market quote', async () => {
+      fetchMarketRate.mockResolvedValueOnce(null);
+
+      const series = await fetchRateSeries('RUB', 'AMD', 'week', { now: MONDAY });
+
+      expect(series.points[series.points.length - 1]).toEqual({ date: '2026-10-23', rate: 4.4703 });
+      expect(series.live).toBe(false);
+    });
+
+    it('still says the history is the saved copy when only Google answered', async () => {
+      await fetchRateHistory('RUB', 'AMD', 'week', { now: MONDAY });
+      Date.now.mockReturnValue(MONDAY.getTime() + HISTORY_REFRESH_MS + 1);
+      global.fetch.mockRejectedValue(new Error('offline'));
+      fetchMarketRate.mockResolvedValueOnce({ rate: 4.4683, at: 111 });
+
+      const series = await fetchRateSeries('RUB', 'AMD', 'week', { now: MONDAY });
+
+      expect(series).toMatchObject({ live: true, stale: true });
+    });
+
+    it('reads only a quote already fetched when asked for the cache alone', async () => {
+      await fetchRateHistory('RUB', 'AMD', 'week', { now: MONDAY });
+      peekMarketRate.mockReturnValueOnce({ rate: 4.46, at: 5 });
+
+      const series = await fetchRateSeries('RUB', 'AMD', 'week', { now: MONDAY, cacheOnly: true });
+
+      expect(series.points[series.points.length - 1]).toEqual({ date: '2026-10-26', rate: 4.46 });
+      expect(fetchMarketRate).not.toHaveBeenCalled();
+    });
+  });
+
+  describe('withLivePoint', () => {
+    const points = [{ date: '2026-10-22', rate: 1 }, { date: '2026-10-23', rate: 2 }];
+
+    it('adds today after the last fixing', () => {
+      expect(withLivePoint(points, 3, '2026-10-26', 'month')).toEqual([...points, { date: '2026-10-26', rate: 3 }]);
+    });
+
+    it('takes the place of today’s fixing, and of one dated ahead', () => {
+      expect(withLivePoint(points, 3, '2026-10-23', 'month')).toEqual([points[0], { date: '2026-10-23', rate: 3 }]);
+      expect(withLivePoint(points, 3, '2026-10-22', 'month')).toEqual([{ date: '2026-10-22', rate: 3 }]);
+    });
+
+    it('keeps the day range to the last fixing and now', () => {
+      expect(withLivePoint(points, 3, '2026-10-26', 'day')).toEqual([points[1], { date: '2026-10-26', rate: 3 }]);
     });
   });
 

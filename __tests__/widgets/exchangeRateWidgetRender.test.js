@@ -6,7 +6,7 @@ import {
   refreshExchangeRateWidgets,
 } from '../../app/widgets/exchangeRateWidgetRender';
 import { loadRateCharts } from '../../app/services/ExchangeRateCharts';
-import { fetchRateHistory } from '../../app/services/ExchangeRateHistory';
+import { fetchRateSeries } from '../../app/services/ExchangeRateHistory';
 import { resolveLanguage } from '../../app/services/notifications/notificationStrings';
 import { getWidgetChart, getWidgetCharts } from '../../app/widgets/exchangeRateWidgetStore';
 import { EXCHANGE_RATE_PAIR_WIDGET, EXCHANGE_RATE_WIDGET } from '../../app/widgets/widgetConstants';
@@ -18,7 +18,7 @@ jest.mock('react-native-android-widget', () => ({
 jest.mock('../../app/services/ExchangeRateCharts', () => ({ loadRateCharts: jest.fn() }));
 jest.mock('../../app/services/ExchangeRateHistory', () => ({
   ...jest.requireActual('../../app/services/ExchangeRateHistory'),
-  fetchRateHistory: jest.fn(),
+  fetchRateSeries: jest.fn(),
 }));
 jest.mock('../../app/services/notifications/notificationStrings', () => ({
   ...jest.requireActual('../../app/services/notifications/notificationStrings'),
@@ -42,7 +42,7 @@ describe('exchangeRateWidgetRender', () => {
     getWidgetChart.mockResolvedValue(null);
     getWidgetCharts.mockResolvedValue([]);
     resolveLanguage.mockResolvedValue('ru');
-    fetchRateHistory.mockResolvedValue({ points: POINTS, stale: false, checkedAt: 1000 });
+    fetchRateSeries.mockResolvedValue({ points: POINTS, stale: false, checkedAt: 1000 });
   });
 
   describe('loadExchangeRateWidgetModel', () => {
@@ -52,7 +52,7 @@ describe('exchangeRateWidgetRender', () => {
       await expect(loadExchangeRateWidgetModel(7)).resolves.toEqual({
         status: 'ready', chart: AMD_RUB, points: POINTS, stale: false, checkedAt: 1000, refreshing: false, language: 'ru',
       });
-      expect(fetchRateHistory).toHaveBeenCalledWith('AMD', 'RUB', 'week', {});
+      expect(fetchRateSeries).toHaveBeenCalledWith('AMD', 'RUB', 'week', {});
       expect(getWidgetChart).toHaveBeenCalledWith(7);
     });
 
@@ -64,11 +64,11 @@ describe('exchangeRateWidgetRender', () => {
     it('is empty with no charts at all', async () => {
       loadRateCharts.mockResolvedValue([]);
       await expect(loadExchangeRateWidgetModel(7)).resolves.toEqual({ status: 'empty', language: 'ru' });
-      expect(fetchRateHistory).not.toHaveBeenCalled();
+      expect(fetchRateSeries).not.toHaveBeenCalled();
     });
 
     it('reports an error rather than throwing when the rates cannot be had', async () => {
-      fetchRateHistory.mockRejectedValue(Object.assign(new Error('offline'), { code: 'network' }));
+      fetchRateSeries.mockRejectedValue(Object.assign(new Error('offline'), { code: 'network' }));
       await expect(loadExchangeRateWidgetModel(7)).resolves.toEqual({ status: 'error', chart: USD_RUB, refreshing: false, language: 'ru' });
     });
 
@@ -80,7 +80,7 @@ describe('exchangeRateWidgetRender', () => {
       const model = await loadExchangeRateWidgetModel(7);
 
       expect(model.chart).toEqual(AMD_RUB);
-      expect(fetchRateHistory).toHaveBeenLastCalledWith('AMD', 'RUB', 'week', {});
+      expect(fetchRateSeries).toHaveBeenLastCalledWith('AMD', 'RUB', 'week', {});
     });
 
     it('re-reads the choice only once', async () => {
@@ -104,10 +104,10 @@ describe('exchangeRateWidgetRender', () => {
 
     it('passes a forced or cache-only read through, and marks a refresh in progress', async () => {
       await loadExchangeRateWidgetModel(7, { force: true });
-      expect(fetchRateHistory).toHaveBeenLastCalledWith('USD', 'RUB', 'month', { force: true });
+      expect(fetchRateSeries).toHaveBeenLastCalledWith('USD', 'RUB', 'month', { force: true });
 
       const model = await loadExchangeRateWidgetModel(7, { cacheOnly: true, refreshing: true });
-      expect(fetchRateHistory).toHaveBeenLastCalledWith('USD', 'RUB', 'month', { cacheOnly: true });
+      expect(fetchRateSeries).toHaveBeenLastCalledWith('USD', 'RUB', 'month', { cacheOnly: true });
       expect(model.refreshing).toBe(true);
     });
   });
@@ -116,17 +116,17 @@ describe('exchangeRateWidgetRender', () => {
     it('reads the saved rates without the network when there are some', async () => {
       const model = await loadExchangeRateWidgetModel(7, { preferCache: true });
 
-      expect(fetchRateHistory).toHaveBeenCalledTimes(1);
-      expect(fetchRateHistory).toHaveBeenCalledWith('USD', 'RUB', 'month', { cacheOnly: true });
+      expect(fetchRateSeries).toHaveBeenCalledTimes(1);
+      expect(fetchRateSeries).toHaveBeenCalledWith('USD', 'RUB', 'month', { cacheOnly: true });
       expect(model.status).toBe('ready');
     });
 
     it('goes to the network when nothing is saved, rather than showing an error', async () => {
-      fetchRateHistory.mockRejectedValueOnce(Object.assign(new Error('nothing saved'), { code: 'empty' }));
+      fetchRateSeries.mockRejectedValueOnce(Object.assign(new Error('nothing saved'), { code: 'empty' }));
 
       const model = await loadExchangeRateWidgetModel(7, { preferCache: true });
 
-      expect(fetchRateHistory).toHaveBeenLastCalledWith('USD', 'RUB', 'month', {});
+      expect(fetchRateSeries).toHaveBeenLastCalledWith('USD', 'RUB', 'month', {});
       expect(model.status).toBe('ready');
     });
   });
