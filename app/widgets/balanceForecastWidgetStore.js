@@ -1,15 +1,20 @@
 import * as FileSystem from 'expo-file-system/legacy';
+import { normalizeColumns } from './widgetConstants';
+
+export { normalizeColumns };
 
 /**
- * Which accounts each balance-forecast widget shows.
+ * Which accounts each balance-forecast widget shows, and which of its columns.
  *
  * A file of its own beside the exchange-rate widgets' one, for the same reason:
  * widget ids belong to this phone's launcher, so they stay out of app_metadata
  * and out of backups. Account ids are kept as strings, the form they come back
  * in from every round trip (JSON, CSV, Sheets), and compared as such.
  *
- * Shape: { [widgetId]: { accountIds: [id, ...] | null } }, null (or no entry)
- * meaning every account, those opened later included.
+ * Shape: { [widgetId]: { accountIds: [id, ...] | null, columns: [key, ...] } }.
+ * accountIds null (or no entry) means every account, those opened later
+ * included; columns are FORECAST_COLUMNS keys, every column when absent (as
+ * for a widget set up before there was a choice).
  */
 
 export const FORECAST_STORE_DIR = `${FileSystem.documentDirectory}widgets/`;
@@ -33,27 +38,36 @@ const writeAll = async (configs) => {
 };
 
 /**
- * The accounts a widget was set up with, in the order picked; null when it
- * shows every account (set up that way, or never set up).
+ * A widget's settings: the accounts it was set up with, in the order picked
+ * (null when it shows every account, set up that way or never set up), and
+ * its columns.
  *
  * @param {number} widgetId
- * @returns {Promise<string[]|null>}
+ * @returns {Promise<{accountIds: string[]|null, columns: string[]}>}
  */
-export const getWidgetAccountIds = async (widgetId) => {
+export const getWidgetConfig = async (widgetId) => {
   const configs = await readAll();
-  const ids = configs[String(widgetId)]?.accountIds;
-  return Array.isArray(ids) ? ids.map(String) : null;
+  const saved = configs[String(widgetId)] || {};
+  return {
+    accountIds: Array.isArray(saved.accountIds) ? saved.accountIds.map(String) : null,
+    columns: normalizeColumns(saved.columns),
+  };
 };
 
 /**
- * Bind a widget to its accounts, or with null to every account.
+ * Save a widget's settings.
  *
  * @param {number} widgetId
- * @param {Array<string|number>|null} accountIds
+ * @param {Object} config
+ * @param {Array<string|number>|null} config.accountIds - null: every account
+ * @param {string[]} [config.columns] - every column when absent
  */
-export const setWidgetAccountIds = async (widgetId, accountIds) => {
+export const setWidgetConfig = async (widgetId, { accountIds, columns }) => {
   const configs = await readAll();
-  configs[String(widgetId)] = { accountIds: accountIds ? accountIds.map(String) : null };
+  configs[String(widgetId)] = {
+    accountIds: accountIds ? accountIds.map(String) : null,
+    columns: normalizeColumns(columns),
+  };
   await writeAll(configs);
 };
 

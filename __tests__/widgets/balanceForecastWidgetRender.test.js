@@ -9,7 +9,7 @@ import { getAllAccounts } from '../../app/services/AccountsDB';
 import { getFirstOperationDate, getTotalExpenses } from '../../app/services/OperationsDB';
 import { getPreference } from '../../app/services/PreferencesDB';
 import { resolveLanguage } from '../../app/services/notifications/notificationStrings';
-import { getWidgetAccountIds } from '../../app/widgets/balanceForecastWidgetStore';
+import { getWidgetConfig } from '../../app/widgets/balanceForecastWidgetStore';
 
 jest.mock('react-native-android-widget', () => ({
   ...jest.requireActual('react-native-android-widget'),
@@ -31,13 +31,16 @@ jest.mock('../../app/services/notifications/notificationStrings', () => ({
 }));
 jest.mock('../../app/widgets/balanceForecastWidgetStore', () => ({
   ...jest.requireActual('../../app/widgets/balanceForecastWidgetStore'),
-  getWidgetAccountIds: jest.fn(),
+  getWidgetConfig: jest.fn(),
 }));
 jest.mock('../../app/contexts/ThemeColorsContext', () => jest.requireActual('../../app/contexts/ThemeColorsContext'));
 
 const CARD = { id: 1, name: 'Card', currency: 'USD', balance: '1000.50', hidden: 0 };
 const CASH = { id: 2, name: 'Cash', currency: 'EUR', balance: '300', hidden: 0 };
 const OLD = { id: 3, name: 'Old', currency: 'USD', balance: '10', hidden: 1 };
+const ALL_COLUMNS = ['balance', 'daily', 'forecast'];
+// The widget's settings, every column unless given.
+const config = (accountIds, columns = ALL_COLUMNS) => ({ accountIds, columns });
 // 26 October 2026, mid-afternoon: five days left after today.
 const NOW = new Date(2026, 9, 26, 15);
 
@@ -45,7 +48,7 @@ describe('balanceForecastWidgetRender', () => {
   beforeEach(() => {
     jest.clearAllMocks();
     getAllAccounts.mockResolvedValue([CARD, CASH, OLD]);
-    getWidgetAccountIds.mockResolvedValue(null);
+    getWidgetConfig.mockResolvedValue(config(null));
     resolveLanguage.mockResolvedValue('ru');
     getPreference.mockResolvedValue('false');
     // 3000 spent over a full 30-day window: 100 a day.
@@ -62,6 +65,7 @@ describe('balanceForecastWidgetRender', () => {
         language: 'ru',
         hideBalances: false,
         monthEnd: '2026-10-31',
+        columns: ALL_COLUMNS,
         rows: [
           { id: '1', name: 'Card', currency: 'USD', balance: 1000.5, forecast: 500.5, dailyAverage: 100 },
           { id: '2', name: 'Cash', currency: 'EUR', balance: 300, forecast: -200, dailyAverage: 100 },
@@ -80,7 +84,7 @@ describe('balanceForecastWidgetRender', () => {
     it('spreads a young account’s spending over the days it has existed', async () => {
       // First operation ten days ago, today included: 3000 / 10.
       getFirstOperationDate.mockResolvedValue('2026-10-17');
-      getWidgetAccountIds.mockResolvedValue(['1']);
+      getWidgetConfig.mockResolvedValue(config(['1']));
 
       const model = await loadBalanceForecastModel(7, { now: NOW });
 
@@ -88,10 +92,24 @@ describe('balanceForecastWidgetRender', () => {
     });
 
     it('shows only the widget’s own accounts', async () => {
-      getWidgetAccountIds.mockResolvedValue(['2']);
+      getWidgetConfig.mockResolvedValue(config(['2']));
       const model = await loadBalanceForecastModel(7, { now: NOW });
       expect(model.rows.map((row) => row.id)).toEqual(['2']);
-      expect(getWidgetAccountIds).toHaveBeenCalledWith(7);
+      expect(getWidgetConfig).toHaveBeenCalledWith(7);
+    });
+
+    it('passes on the widget’s columns', async () => {
+      getWidgetConfig.mockResolvedValue(config(null, ['forecast']));
+      const model = await loadBalanceForecastModel(7, { now: NOW });
+      expect(model.columns).toEqual(['forecast']);
+    });
+
+    it('draws the columns picked while it was loading, without reading the forecasts again', async () => {
+      getWidgetConfig.mockResolvedValueOnce(config(null)).mockResolvedValue(config(null, ['daily']));
+      const model = await loadBalanceForecastModel(7, { now: NOW });
+      expect(model.columns).toEqual(['daily']);
+      // Two accounts, read once each.
+      expect(getTotalExpenses).toHaveBeenCalledTimes(2);
     });
 
     it('passes on the setting to hide balances', async () => {
@@ -102,7 +120,7 @@ describe('balanceForecastWidgetRender', () => {
     });
 
     it('is empty with no accounts to show', async () => {
-      getWidgetAccountIds.mockResolvedValue(['3']);
+      getWidgetConfig.mockResolvedValue(config(['3']));
       await expect(loadBalanceForecastModel(7, { now: NOW })).resolves.toEqual({ status: 'empty', language: 'ru' });
       expect(getTotalExpenses).not.toHaveBeenCalled();
     });
@@ -125,19 +143,20 @@ describe('balanceForecastWidgetRender', () => {
     });
 
     it('degrades unreadable picks and preferences to the defaults', async () => {
-      getWidgetAccountIds.mockRejectedValue(new Error('io'));
+      getWidgetConfig.mockRejectedValue(new Error('io'));
       getPreference.mockRejectedValue(new Error('io'));
 
       const model = await loadBalanceForecastModel(7, { now: NOW });
 
       expect(model.rows).toHaveLength(2);
+      expect(model.columns).toEqual(ALL_COLUMNS);
       expect(model.hideBalances).toBe(false);
     });
 
     it('draws the accounts picked while it was loading, not the ones it started with', async () => {
       // The launcher's first update of a new widget can run alongside its
       // configuration screen: it read no picks, then the user saved some.
-      getWidgetAccountIds.mockResolvedValueOnce(null).mockResolvedValue(['2']);
+      getWidgetConfig.mockResolvedValueOnce(config(null)).mockResolvedValue(config(['2']));
 
       const model = await loadBalanceForecastModel(7, { now: NOW });
 
@@ -145,9 +164,9 @@ describe('balanceForecastWidgetRender', () => {
     });
 
     it('reads the picks only twice when they have not changed', async () => {
-      getWidgetAccountIds.mockResolvedValue(['1', '2']);
+      getWidgetConfig.mockResolvedValue(config(['1', '2']));
       await loadBalanceForecastModel(7, { now: NOW });
-      expect(getWidgetAccountIds).toHaveBeenCalledTimes(2);
+      expect(getWidgetConfig).toHaveBeenCalledTimes(2);
     });
   });
 
@@ -159,6 +178,15 @@ describe('balanceForecastWidgetRender', () => {
       expect(rendered.light.props).toMatchObject({ theme: 'light', width: 300, height: 180 });
       expect(rendered.dark.props).toMatchObject({ theme: 'dark', width: 300, height: 180 });
       expect(rendered.light.props.model.rows).toHaveLength(2);
+    });
+
+    it('passes on the system font scale', async () => {
+      const rendered = await renderBalanceForecastWidget(
+        { widgetId: 7, width: 300, height: 180, screenInfo: { fontScale: 1.3 } },
+        { now: NOW },
+      );
+      expect(rendered.light.props.fontScale).toBe(1.3);
+      expect(rendered.dark.props.fontScale).toBe(1.3);
     });
   });
 
