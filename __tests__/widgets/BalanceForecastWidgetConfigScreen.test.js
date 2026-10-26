@@ -4,7 +4,7 @@ import { render, fireEvent, waitFor, screen, act } from '@testing-library/react-
 import BalanceForecastWidgetConfigScreen from '../../app/widgets/BalanceForecastWidgetConfigScreen';
 import { getAllAccounts } from '../../app/services/AccountsDB';
 import { resolveLanguage } from '../../app/services/notifications/notificationStrings';
-import { getWidgetAccountIds, setWidgetAccountIds } from '../../app/widgets/balanceForecastWidgetStore';
+import { getWidgetConfig, setWidgetConfig } from '../../app/widgets/balanceForecastWidgetStore';
 import { renderBalanceForecastWidget, refreshBalanceForecastWidgets } from '../../app/widgets/balanceForecastWidgetRender';
 
 const mockDisplay = { hideBalances: false };
@@ -16,8 +16,8 @@ jest.mock('../../app/services/notifications/notificationStrings', () => ({
 }));
 jest.mock('../../app/widgets/balanceForecastWidgetStore', () => ({
   ...jest.requireActual('../../app/widgets/balanceForecastWidgetStore'),
-  getWidgetAccountIds: jest.fn(),
-  setWidgetAccountIds: jest.fn(),
+  getWidgetConfig: jest.fn(),
+  setWidgetConfig: jest.fn(),
 }));
 jest.mock('../../app/widgets/balanceForecastWidgetRender', () => ({
   renderBalanceForecastWidget: jest.fn(),
@@ -33,6 +33,7 @@ jest.mock('../../app/contexts/DisplaySettingsContext', () => ({
 const CARD = { id: 1, name: 'Card', currency: 'USD', balance: '100', hidden: 0 };
 const CASH = { id: 2, name: 'Cash', currency: 'USD', balance: '50', hidden: 0 };
 const OLD = { id: 3, name: 'Old account', currency: 'USD', balance: '0', hidden: 1 };
+const ALL_COLUMNS = ['balance', 'daily', 'forecast'];
 const widgetInfo = { widgetName: 'BalanceForecast', widgetId: 7, width: 300, height: 180 };
 const RENDERED = { light: 'l', dark: 'd' };
 
@@ -50,8 +51,8 @@ describe('BalanceForecastWidgetConfigScreen', () => {
     mockDisplay.hideBalances = false;
     getAllAccounts.mockResolvedValue([CARD, CASH, OLD]);
     resolveLanguage.mockResolvedValue('en');
-    getWidgetAccountIds.mockResolvedValue(null);
-    setWidgetAccountIds.mockResolvedValue(undefined);
+    getWidgetConfig.mockResolvedValue({ accountIds: null, columns: ALL_COLUMNS });
+    setWidgetConfig.mockResolvedValue(undefined);
     renderBalanceForecastWidget.mockResolvedValue(RENDERED);
   });
 
@@ -59,14 +60,14 @@ describe('BalanceForecastWidgetConfigScreen', () => {
     await setup();
 
     await waitFor(() => expect(screen.getByTestId('widget-forecast-account-1')).toBeTruthy());
-    expect(screen.getByText('Which accounts should the widget forecast?')).toBeTruthy();
+    expect(screen.getByText('What should the widget show?')).toBeTruthy();
     expect(screen.queryByText('Old account')).toBeNull();
     expect(checked(1)).toBe(true);
     expect(checked(2)).toBe(true);
   });
 
   it('marks the accounts a configured widget shows', async () => {
-    getWidgetAccountIds.mockResolvedValue(['2']);
+    getWidgetConfig.mockResolvedValue({ accountIds: ['2'], columns: ALL_COLUMNS });
     await setup();
 
     await waitFor(() => expect(screen.getByTestId('widget-forecast-account-2')).toBeTruthy());
@@ -83,7 +84,7 @@ describe('BalanceForecastWidgetConfigScreen', () => {
     await fireEvent.press(screen.getByTestId('widget-forecast-done'));
 
     await waitFor(() => expect(setResult).toHaveBeenCalledWith('ok'));
-    expect(setWidgetAccountIds).toHaveBeenCalledWith(7, ['2']);
+    expect(setWidgetConfig).toHaveBeenCalledWith(7, { accountIds: ['2'], columns: ALL_COLUMNS });
     expect(renderBalanceForecastWidget).toHaveBeenCalledWith(widgetInfo);
     expect(renderWidget).toHaveBeenCalledWith(RENDERED);
   });
@@ -95,11 +96,64 @@ describe('BalanceForecastWidgetConfigScreen', () => {
     await fireEvent.press(screen.getByTestId('widget-forecast-done'));
 
     await waitFor(() => expect(setResult).toHaveBeenCalledWith('ok'));
-    expect(setWidgetAccountIds).toHaveBeenCalledWith(7, null);
+    expect(setWidgetConfig).toHaveBeenCalledWith(7, { accountIds: null, columns: ALL_COLUMNS });
+  });
+
+  describe('columns', () => {
+    const columnChecked = (column) => screen.getByTestId(`widget-forecast-column-${column}`)
+      .props.accessibilityState.checked;
+
+    it('offers the three columns, all picked for a new widget', async () => {
+      await setup();
+      await waitFor(() => expect(screen.getByTestId('widget-forecast-column-balance')).toBeTruthy());
+
+      expect(screen.getByText('Columns')).toBeTruthy();
+      expect(screen.getByText('Balance now')).toBeTruthy();
+      expect(screen.getByText('Spending per day')).toBeTruthy();
+      expect(screen.getByText('Balance forecast')).toBeTruthy();
+      ALL_COLUMNS.forEach((column) => expect(columnChecked(column)).toBe(true));
+    });
+
+    it('marks the columns a configured widget shows', async () => {
+      getWidgetConfig.mockResolvedValue({ accountIds: null, columns: ['forecast'] });
+      await setup();
+      await waitFor(() => expect(screen.getByTestId('widget-forecast-column-forecast')).toBeTruthy());
+
+      expect(columnChecked('balance')).toBe(false);
+      expect(columnChecked('daily')).toBe(false);
+      expect(columnChecked('forecast')).toBe(true);
+    });
+
+    it('saves the columns picked, in the table’s order', async () => {
+      getWidgetConfig.mockResolvedValue({ accountIds: null, columns: ['forecast'] });
+      const { setResult } = await setup();
+      await waitFor(() => expect(screen.getByTestId('widget-forecast-column-balance')).toBeTruthy());
+
+      await fireEvent.press(screen.getByTestId('widget-forecast-column-daily'));
+      await fireEvent.press(screen.getByTestId('widget-forecast-column-balance'));
+      await fireEvent.press(screen.getByTestId('widget-forecast-done'));
+
+      await waitFor(() => expect(setResult).toHaveBeenCalledWith('ok'));
+      expect(setWidgetConfig).toHaveBeenCalledWith(7, { accountIds: null, columns: ALL_COLUMNS });
+    });
+
+    it('drops a column on a second tap, but never the last one', async () => {
+      const { setResult } = await setup();
+      await waitFor(() => expect(screen.getByTestId('widget-forecast-column-balance')).toBeTruthy());
+
+      await fireEvent.press(screen.getByTestId('widget-forecast-column-balance'));
+      await fireEvent.press(screen.getByTestId('widget-forecast-column-daily'));
+      await fireEvent.press(screen.getByTestId('widget-forecast-column-forecast'));
+      expect(columnChecked('forecast')).toBe(true);
+
+      await fireEvent.press(screen.getByTestId('widget-forecast-done'));
+      await waitFor(() => expect(setResult).toHaveBeenCalledWith('ok'));
+      expect(setWidgetConfig).toHaveBeenCalledWith(7, { accountIds: null, columns: ['forecast'] });
+    });
   });
 
   it('will not finish with nothing picked', async () => {
-    getWidgetAccountIds.mockResolvedValue(['1']);
+    getWidgetConfig.mockResolvedValue({ accountIds: ['1'], columns: ALL_COLUMNS });
     const { setResult } = await setup();
     await waitFor(() => expect(screen.getByTestId('widget-forecast-account-1')).toBeTruthy());
 
@@ -124,7 +178,7 @@ describe('BalanceForecastWidgetConfigScreen', () => {
 
   it('still finishes when the picks cannot be saved', async () => {
     jest.spyOn(console, 'warn').mockImplementation(() => {});
-    setWidgetAccountIds.mockRejectedValue(new Error('io'));
+    setWidgetConfig.mockRejectedValue(new Error('io'));
     const { setResult } = await setup();
     await waitFor(() => expect(screen.getByTestId('widget-forecast-done')).toBeTruthy());
 
@@ -158,7 +212,7 @@ describe('BalanceForecastWidgetConfigScreen', () => {
 
     await waitFor(() => expect(setResult).toHaveBeenCalledWith('ok'));
     // Every account: the first one opened shows up on it.
-    expect(setWidgetAccountIds).toHaveBeenCalledWith(7, null);
+    expect(setWidgetConfig).toHaveBeenCalledWith(7, { accountIds: null, columns: ALL_COLUMNS });
   });
 
   it('treats unreadable accounts as none', async () => {
@@ -174,7 +228,7 @@ describe('BalanceForecastWidgetConfigScreen', () => {
     await fireEvent.press(screen.getByTestId('widget-forecast-cancel'));
 
     expect(setResult).toHaveBeenCalledWith('cancel');
-    expect(setWidgetAccountIds).not.toHaveBeenCalled();
+    expect(setWidgetConfig).not.toHaveBeenCalled();
   });
 
   it('cancels on hardware back, swallowing the key', async () => {
@@ -194,7 +248,7 @@ describe('BalanceForecastWidgetConfigScreen', () => {
     resolveLanguage.mockResolvedValue('ru');
     await setup();
 
-    await waitFor(() => expect(screen.getByText('Для каких счетов показывать прогноз?')).toBeTruthy());
+    await waitFor(() => expect(screen.getByText('Что показывать в виджете?')).toBeTruthy());
     expect(screen.getByText('Отмена')).toBeTruthy();
   });
 

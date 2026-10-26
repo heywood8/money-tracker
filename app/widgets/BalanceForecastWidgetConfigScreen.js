@@ -1,4 +1,4 @@
-import React, { useCallback, useEffect, useState } from 'react';
+import React, { useCallback, useEffect, useMemo, useState } from 'react';
 import PropTypes from 'prop-types';
 import { View, Text, StyleSheet, Pressable, ScrollView, ActivityIndicator } from 'react-native';
 import { SafeAreaProvider, SafeAreaView } from 'react-native-safe-area-context';
@@ -8,20 +8,26 @@ import { DisplaySettingsProvider } from '../contexts/DisplaySettingsContext';
 import { getAllAccounts } from '../services/AccountsDB';
 import { resolveLanguage, translate } from '../services/notifications/notificationStrings';
 import AccountGridSelector from '../components/AccountGridSelector';
+import ChoiceChipRow from '../components/ChoiceChipRow';
 import EmptyState from '../components/EmptyState';
-import { getWidgetAccountIds, resolveForecastAccounts, setWidgetAccountIds } from './balanceForecastWidgetStore';
+import {
+  getWidgetConfig, normalizeColumns, resolveForecastAccounts, setWidgetConfig,
+} from './balanceForecastWidgetStore';
 import { refreshBalanceForecastWidgets, renderBalanceForecastWidget } from './balanceForecastWidgetRender';
 import useWidgetConfigAnswer from './useWidgetConfigAnswer';
-import { BUTTON, BUTTON_TEXT, MODAL_TITLE } from '../styles/componentStyles';
+import { FORECAST_COLUMNS } from './widgetConstants';
+import { BUTTON, BUTTON_TEXT, MODAL_TITLE, SECTION_LABEL } from '../styles/componentStyles';
 import { FONT_SIZE, HORIZONTAL_PADDING, SPACING } from '../styles/designTokens';
 
 /**
  * What Android opens when a balance-forecast widget is placed on the home
- * screen (and when it is reconfigured from a long press): which accounts the
- * widget forecasts. Taps toggle accounts in the app's account grid; Done saves
- * them and draws the widget. Every account picked (as for a new widget, where
- * all start picked) is saved as "every account", so one opened later joins
- * the widget instead of being left off a list it never had the chance to be on.
+ * screen (and when it is reconfigured from a long press): which columns the
+ * widget's table has and which accounts it forecasts. Taps toggle columns in a
+ * chip row and accounts in the app's account grid; Done saves them and draws
+ * the widget. Every account picked (as for a new widget, where all start
+ * picked) is saved as "every account", so one opened later joins the widget
+ * instead of being left off a list it never had the chance to be on. One
+ * column always stays picked: a table of names alone says nothing.
  *
  * Like the exchange-rate widgets' screen it is its own React root with none of
  * App's providers above it, so it brings the few it needs: the theme, and the
@@ -32,6 +38,7 @@ function ConfigContent({ widgetInfo, renderWidget, setResult }) {
   const [language, setLanguage] = useState('en');
   const [accounts, setAccounts] = useState(null);
   const [pickedIds, setPickedIds] = useState([]);
+  const [columns, setColumns] = useState(FORECAST_COLUMNS);
   const t = useCallback((key) => translate(language, key), [language]);
   // Answers the launcher once, from Done or a cancel (back included).
   const { complete, cancel, savingKey, busyRef } = useWidgetConfigAnswer({
@@ -48,23 +55,38 @@ function ConfigContent({ widgetInfo, renderWidget, setResult }) {
     Promise.all([
       resolveLanguage(),
       getAllAccounts().catch(() => []),
-      getWidgetAccountIds(widgetInfo.widgetId).catch(() => null),
+      getWidgetConfig(widgetInfo.widgetId).catch(() => ({ accountIds: null, columns: normalizeColumns(null) })),
     ]).then(([lang, all, stored]) => {
       if (cancelled) return;
       const active = (all || []).filter((account) => !account.hidden);
       setLanguage(lang);
       setAccounts(active);
-      // What the widget shows now, or for a new widget every account, so Done
-      // alone places what the widget would draw anyway.
-      setPickedIds(resolveForecastAccounts(active, stored).map((account) => String(account.id)));
+      // What the widget shows now, or for a new widget every account and
+      // column, so Done alone places what the widget would draw anyway.
+      setPickedIds(resolveForecastAccounts(active, stored.accountIds).map((account) => String(account.id)));
+      setColumns(stored.columns);
     });
     return () => { cancelled = true; };
   }, [widgetInfo.widgetId]);
 
-  // Saves the picks (null: every account) and draws the widget.
+  // Saves the picks (accounts null: every account) and draws the widget.
   const save = useCallback((ids) => {
-    complete('done', () => setWidgetAccountIds(widgetInfo.widgetId, ids));
-  }, [complete, widgetInfo.widgetId]);
+    complete('done', () => setWidgetConfig(widgetInfo.widgetId, { accountIds: ids, columns }));
+  }, [complete, widgetInfo.widgetId, columns]);
+
+  // Toggles a column, keeping the table's order; the last one stays.
+  const toggleColumn = useCallback((column) => {
+    if (busyRef.current) return;
+    setColumns((current) => {
+      if (!current.includes(column)) return FORECAST_COLUMNS.filter((key) => key === column || current.includes(key));
+      return current.length > 1 ? current.filter((key) => key !== column) : current;
+    });
+  }, [busyRef]);
+  const columnOptions = useMemo(() => [
+    { value: 'balance', label: t('widget_forecast_col_now_long') },
+    { value: 'daily', label: t('widget_forecast_col_daily_long') },
+    { value: 'forecast', label: t('widget_forecast_col_forecast_long') },
+  ], [t]);
 
   const togglePick = useCallback((accountId) => {
     if (busyRef.current) return;
@@ -106,6 +128,16 @@ function ConfigContent({ widgetInfo, renderWidget, setResult }) {
         <>
           <Text style={[styles.hint, { color: colors.mutedText }]}>{t('widget_forecast_config_hint')}</Text>
           <ScrollView contentContainerStyle={styles.list}>
+            <Text style={[styles.sectionLabel, { color: colors.mutedText }]}>{t('widget_forecast_columns')}</Text>
+            <ChoiceChipRow
+              options={columnOptions}
+              selectedValues={columns}
+              onSelect={toggleColumn}
+              colors={colors}
+              testIDPrefix="widget-forecast-column"
+              style={styles.columns}
+            />
+            <Text style={[styles.sectionLabel, { color: colors.mutedText }]}>{t('accounts')}</Text>
             <AccountGridSelector
               accounts={accounts}
               selectedAccountIds={pickedIds}
@@ -184,6 +216,9 @@ const styles = StyleSheet.create({
     ...BUTTON,
     marginBottom: SPACING.sm,
   },
+  columns: {
+    marginBottom: SPACING.lg,
+  },
   container: {
     flex: 1,
     paddingHorizontal: HORIZONTAL_PADDING,
@@ -201,6 +236,10 @@ const styles = StyleSheet.create({
   },
   loading: {
     flex: 1,
+  },
+  sectionLabel: {
+    ...SECTION_LABEL,
+    marginBottom: SPACING.sm,
   },
   title: {
     ...MODAL_TITLE,

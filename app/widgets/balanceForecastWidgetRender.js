@@ -8,12 +8,12 @@ import { formatLocalDate } from '../utils/dateUtils';
 import {
   dailySpendingRate, forecastMonthEndBalance, spendingWindowDays, spendingWindowStart,
 } from '../utils/spendingPrediction';
-import { getWidgetAccountIds, resolveForecastAccounts } from './balanceForecastWidgetStore';
+import { getWidgetConfig, normalizeColumns, resolveForecastAccounts } from './balanceForecastWidgetStore';
 import { BalanceForecastWidget } from './BalanceForecastWidget';
 import { BALANCE_FORECAST_WIDGET } from './widgetConstants';
 
-const sameIds = (a, b) => (a === b) || (
-  !!a && !!b && a.length === b.length && a.every((id, i) => id === b[i])
+const sameList = (a, b) => (a === b) || (
+  !!a && !!b && a.length === b.length && a.every((item, i) => item === b[i])
 );
 
 /**
@@ -51,49 +51,58 @@ const forecastRow = async (account, now) => {
 
 /**
  * Everything the forecast widget needs to draw: its accounts' balances and
- * forecasts, the month's last day, the app's language and whether balances are
- * hidden.
+ * forecasts, the columns it shows, the month's last day, the app's language and
+ * whether balances are hidden.
  *
  * Runs headless (the launcher asks for updates with the app closed), so every
  * read degrades instead of throwing: no accounts reads as "empty", an
  * unreadable database as "error". A widget that fails to render keeps showing
  * whatever it last drew, which is worse than saying what is wrong.
  *
- * The accounts can be picked while this loads: on some launchers the first
- * update of a new widget runs alongside its configuration screen. Whichever
- * draw lands last wins, so a stale one re-reads the picks once and draws those.
+ * The accounts and columns can be picked while this loads: on some launchers
+ * the first update of a new widget runs alongside its configuration screen.
+ * Whichever draw lands last wins, so a stale one re-reads the settings once and
+ * draws those.
  *
  * @param {number} widgetId
  * @param {Object} [options]
  * @param {Date} [options.now]
- * @param {boolean} [options.recheck=true] - Re-read the widget's picks after loading
+ * @param {boolean} [options.recheck=true] - Re-read the widget's settings after loading
  * @returns {Promise<{status: 'ready'|'error'|'empty', language: string, hideBalances?: boolean,
- *   monthEnd?: string, rows?: Array<Object>}>}
+ *   monthEnd?: string, columns?: string[], rows?: Array<Object>}>}
  */
 export const loadBalanceForecastModel = async (widgetId, { now = new Date(), recheck = true } = {}) => {
-  const readPicks = () => getWidgetAccountIds(widgetId).catch(() => null);
-  const [language, hideBalances, picked] = await Promise.all([
+  const readConfig = () => getWidgetConfig(widgetId)
+    .catch(() => ({ accountIds: null, columns: normalizeColumns(null) }));
+  const [language, hideBalances, config] = await Promise.all([
     resolveLanguage(),
     getPreference(PREF_KEYS.HIDE_BALANCES, 'false').then((value) => value === 'true').catch(() => false),
-    readPicks(),
+    readConfig(),
   ]);
   let accounts;
   try {
-    accounts = resolveForecastAccounts(await getAllAccounts(), picked);
+    accounts = resolveForecastAccounts(await getAllAccounts(), config.accountIds);
   } catch {
     return { status: 'error', language };
   }
   if (accounts.length === 0) return { status: 'empty', language };
 
   const rows = await Promise.all(accounts.map((account) => forecastRow(account, now)));
-  if (recheck && !sameIds(await readPicks(), picked)) {
-    return loadBalanceForecastModel(widgetId, { now, recheck: false });
+  let { columns } = config;
+  if (recheck) {
+    const latest = await readConfig();
+    if (!sameList(latest.accountIds, config.accountIds)) {
+      return loadBalanceForecastModel(widgetId, { now, recheck: false });
+    }
+    // Only the columns changed: the forecasts already read still hold.
+    ({ columns } = latest);
   }
   return {
     status: 'ready',
     language,
     hideBalances,
     monthEnd: formatLocalDate(new Date(now.getFullYear(), now.getMonth() + 1, 0)),
+    columns,
     rows,
   };
 };
@@ -108,7 +117,7 @@ export const loadBalanceForecastModel = async (widgetId, { now = new Date(), rec
  */
 export const renderBalanceForecastWidget = async (widgetInfo, options) => {
   const model = await loadBalanceForecastModel(widgetInfo.widgetId, options);
-  const size = { width: widgetInfo.width, height: widgetInfo.height };
+  const size = { width: widgetInfo.width, height: widgetInfo.height, fontScale: widgetInfo.screenInfo?.fontScale };
   return {
     light: <BalanceForecastWidget model={model} {...size} theme="light" />,
     dark: <BalanceForecastWidget model={model} {...size} theme="dark" />,

@@ -47,4 +47,31 @@ describe('ChoiceChipRow', () => {
     expect(getByTestId('amount-1').props.accessibilityLabel).toBe('1');
     expect(getByTestId('amount-100').props.accessibilityLabel).toBe('per hundred');
   });
+
+  describe('multi-select', () => {
+    it('marks every chosen chip as a checked checkbox', async () => {
+      const { getByTestId } = await setup({ selected: undefined, selectedValues: [1, 100] });
+      ['amount-1', 'amount-100'].forEach((id) => {
+        expect(getByTestId(id).props.accessibilityRole).toBe('checkbox');
+        expect(getByTestId(id).props.accessibilityState).toEqual({ checked: true });
+        expect(within(getByTestId(id)).getByTestId('icon-check')).toBeTruthy();
+      });
+    });
+
+    it('leaves the others unchecked and reports every tap', async () => {
+      const onSelect = jest.fn();
+      const { getByTestId } = await setup({ selectedValues: [100], onSelect });
+
+      expect(getByTestId('amount-1').props.accessibilityState).toEqual({ checked: false });
+      await fireEvent.press(getByTestId('amount-100'));
+      await fireEvent.press(getByTestId('amount-1'));
+
+      expect(onSelect.mock.calls).toEqual([[100], [1]]);
+    });
+
+    it('takes precedence over a single selection', async () => {
+      const { getByTestId } = await setup({ selected: 1, selectedValues: [] });
+      expect(getByTestId('amount-1').props.accessibilityState).toEqual({ checked: false });
+    });
+  });
 });

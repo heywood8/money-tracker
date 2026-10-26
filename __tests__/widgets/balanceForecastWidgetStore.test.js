@@ -1,7 +1,8 @@
 import * as FileSystem from 'expo-file-system/legacy';
 import {
-  getWidgetAccountIds,
-  setWidgetAccountIds,
+  getWidgetConfig,
+  setWidgetConfig,
+  normalizeColumns,
   forgetForecastWidget,
   resolveForecastAccounts,
   FORECAST_STORE_PATH,
@@ -33,52 +34,73 @@ describe('balanceForecastWidgetStore', () => {
     FileSystem.makeDirectoryAsync.mockResolvedValue(undefined);
   });
 
-  it('remembers which accounts each widget shows, as strings', async () => {
-    await setWidgetAccountIds(7, [1, 4]);
-    await setWidgetAccountIds(9, ['2']);
+  const ALL_COLUMNS = ['balance', 'daily', 'forecast'];
 
-    await expect(getWidgetAccountIds(7)).resolves.toEqual(['1', '4']);
-    await expect(getWidgetAccountIds(9)).resolves.toEqual(['2']);
+  it('remembers each widget’s accounts, as strings, and its columns', async () => {
+    await setWidgetConfig(7, { accountIds: [1, 4], columns: ['forecast', 'balance'] });
+    await setWidgetConfig(9, { accountIds: ['2'], columns: ['daily'] });
+
+    await expect(getWidgetConfig(7)).resolves.toEqual({ accountIds: ['1', '4'], columns: ['balance', 'forecast'] });
+    await expect(getWidgetConfig(9)).resolves.toEqual({ accountIds: ['2'], columns: ['daily'] });
   });
 
   it('keeps a file of its own, apart from the exchange-rate widgets', async () => {
-    await setWidgetAccountIds(7, [1]);
+    await setWidgetConfig(7, { accountIds: [1], columns: ALL_COLUMNS });
 
     expect(FORECAST_STORE_PATH).not.toBe(WIDGET_STORE_PATH);
     expect(Object.keys(disk)).toEqual([FORECAST_STORE_PATH]);
-    expect(JSON.parse(disk[FORECAST_STORE_PATH])).toEqual({ 7: { accountIds: ['1'] } });
+    expect(JSON.parse(disk[FORECAST_STORE_PATH])).toEqual({ 7: { accountIds: ['1'], columns: ALL_COLUMNS } });
   });
 
   it('remembers a widget set to every account', async () => {
-    await setWidgetAccountIds(7, [1]);
-    await setWidgetAccountIds(7, null);
+    await setWidgetConfig(7, { accountIds: [1] });
+    await setWidgetConfig(7, { accountIds: null, columns: ['forecast'] });
 
-    await expect(getWidgetAccountIds(7)).resolves.toBeNull();
-    expect(JSON.parse(disk[FORECAST_STORE_PATH])).toEqual({ 7: { accountIds: null } });
+    await expect(getWidgetConfig(7)).resolves.toEqual({ accountIds: null, columns: ['forecast'] });
   });
 
-  it('has nothing for a widget never configured', async () => {
-    await expect(getWidgetAccountIds(7)).resolves.toBeNull();
+  it('shows every account and column on a widget never configured', async () => {
+    await expect(getWidgetConfig(7)).resolves.toEqual({ accountIds: null, columns: ALL_COLUMNS });
+  });
+
+  it('gives a widget saved before there were columns every column', async () => {
+    disk[FORECAST_STORE_PATH] = JSON.stringify({ 7: { accountIds: ['1'] } });
+    await expect(getWidgetConfig(7)).resolves.toEqual({ accountIds: ['1'], columns: ALL_COLUMNS });
   });
 
   it('reads an unreadable file as empty', async () => {
     disk[FORECAST_STORE_PATH] = '{not json';
-    await expect(getWidgetAccountIds(7)).resolves.toBeNull();
+    await expect(getWidgetConfig(7)).resolves.toEqual({ accountIds: null, columns: ALL_COLUMNS });
   });
 
   it('forgets a removed widget and leaves the others', async () => {
-    await setWidgetAccountIds(7, [1]);
-    await setWidgetAccountIds(9, [2]);
+    await setWidgetConfig(7, { accountIds: [1] });
+    await setWidgetConfig(9, { accountIds: [2] });
 
     await forgetForecastWidget(7);
 
-    await expect(getWidgetAccountIds(7)).resolves.toBeNull();
-    await expect(getWidgetAccountIds(9)).resolves.toEqual(['2']);
+    await expect(getWidgetConfig(7)).resolves.toEqual({ accountIds: null, columns: ALL_COLUMNS });
+    await expect(getWidgetConfig(9)).resolves.toEqual({ accountIds: ['2'], columns: ALL_COLUMNS });
   });
 
   it('does not write when forgetting a widget it never knew', async () => {
     await forgetForecastWidget(7);
     expect(FileSystem.writeAsStringAsync).not.toHaveBeenCalled();
+  });
+
+  describe('normalizeColumns', () => {
+    it('keeps the known columns, once each, in the table’s order', () => {
+      expect(normalizeColumns(['forecast', 'bogus', 'balance', 'forecast'])).toEqual(['balance', 'forecast']);
+    });
+
+    it.each([
+      ['nothing', undefined],
+      ['an empty list', []],
+      ['only unknown keys', ['bogus']],
+      ['not a list', 'forecast'],
+    ])('gives every column for %s', (_label, columns) => {
+      expect(normalizeColumns(columns)).toEqual(ALL_COLUMNS);
+    });
   });
 
   describe('resolveForecastAccounts', () => {

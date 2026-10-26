@@ -15,6 +15,24 @@ export const EXCHANGE_RATE_WIDGETS = [EXCHANGE_RATE_WIDGET, EXCHANGE_RATE_PAIR_W
 // The month-end balance forecast for the accounts the user picked, under the
 // same rule.
 export const BALANCE_FORECAST_WIDGET = 'BalanceForecast';
+// The forecast widget's table columns, in the order they are drawn: the
+// balance now, the daily spending rate behind the forecast, the forecast. The
+// user picks which of them a widget shows; these keys are what its store keeps.
+export const FORECAST_COLUMNS = ['balance', 'daily', 'forecast'];
+
+/**
+ * The forecast columns to draw, in table order: the known ones among
+ * `columns`, or every column when that leaves none (a table of names alone
+ * says nothing). The one reading of a widget's saved columns, for the store,
+ * the setup screen and the layout alike.
+ *
+ * @param {*} columns
+ * @returns {string[]}
+ */
+export const normalizeColumns = (columns) => {
+  const picked = Array.isArray(columns) ? FORECAST_COLUMNS.filter((column) => columns.includes(column)) : [];
+  return picked.length ? picked : [...FORECAST_COLUMNS];
+};
 
 // The click action of the "↻ 14:05" on a widget: fetch fresh rates now. Unlike
 // a tap anywhere else, it reaches the task handler (WIDGET_CLICK).
