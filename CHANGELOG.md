@@ -1,5 +1,12 @@
 # Changelog
 
+## [0.304.0](https://github.com/heywood8/money-tracker/compare/penny-v0.303.1...penny-v0.304.0) (2026-10-26)
+
+
+### Features
+
+* **widgets:** add month-end balance forecast widget ([#1882](https://github.com/heywood8/money-tracker/issues/1882)) ([1f068fc](https://github.com/heywood8/money-tracker/commit/1f068fcc14d73cdc2c18e2dd9e95e0f357607142))
+
 ## [0.303.1](https://github.com/heywood8/money-tracker/compare/penny-v0.303.0...penny-v0.303.1) (2026-10-25)
 
 
