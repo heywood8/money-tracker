@@ -1,5 +1,12 @@
 # Changelog
 
+## [0.305.0](https://github.com/heywood8/money-tracker/compare/penny-v0.304.0...penny-v0.305.0) (2026-10-26)
+
+
+### Features
+
+* **widgets:** show the balance forecast as a table with chosen columns ([#1884](https://github.com/heywood8/money-tracker/issues/1884)) ([6a23578](https://github.com/heywood8/money-tracker/commit/6a235785b537bb11bbd1bab3c12bbd6cb68e039d))
+
 ## [0.304.0](https://github.com/heywood8/money-tracker/compare/penny-v0.303.1...penny-v0.304.0) (2026-10-26)
 
 
