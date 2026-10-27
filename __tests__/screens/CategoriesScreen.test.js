@@ -694,6 +694,40 @@ describe('CategoriesScreen', () => {
   });
 
   describe('Regression Tests', () => {
+    // The cell width sat in the StyleSheet, computed from the window at module
+    // load, which can be the landscape width (see SimpleTabs' pageWidth).
+    it('sizes grid cells from the window width at render, three to a row', async () => {
+      const { Dimensions, StyleSheet } = require('react-native');
+      // Loaded at one window width, rendered at another: the bug's sequence.
+      const CategoriesScreen = require('../../app/screens/CategoriesScreen').default;
+      const realGet = Dimensions.get;
+      const spy = jest.spyOn(Dimensions, 'get').mockImplementation((dim) => (
+        dim === 'window' ? { width: 360, height: 780, scale: 3, fontScale: 1 } : realGet(dim)
+      ));
+      try {
+        const { useCategories } = require('../../app/contexts/CategoriesContext');
+        const { useLocalization } = require('../../app/contexts/LocalizationContext');
+        useLocalization.mockReturnValue({ t: (key) => key, language: 'en' });
+        useCategories.mockReturnValue({
+          categories: [{ id: 'c1', name: 'Groceries', type: 'entry', icon: 'cart', category_type: 'expense' }],
+          loading: false,
+          getChildren: jest.fn(() => []),
+          addCategory: jest.fn(),
+          updateCategory: jest.fn(),
+          deleteCategory: jest.fn(),
+          validateCategory: jest.fn(() => null),
+        });
+
+        const { getByLabelText } = await render(<CategoriesScreen />);
+
+        // 360 less the grid's padding (2 × 8) and three cells' margins (6 × 4), split three ways.
+        const cell = StyleSheet.flatten(getByLabelText('Groceries category').props.style);
+        expect(cell.width).toBeCloseTo((360 - 16 - 24) / 3);
+      } finally {
+        spy.mockRestore();
+      }
+    });
+
     it('handles re-rendering without errors', async () => {
       const CategoriesScreen = require('../../app/screens/CategoriesScreen').default;
 

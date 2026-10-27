@@ -6,7 +6,7 @@
 
 import React from 'react';
 import { render, fireEvent, waitFor, act } from '@testing-library/react-native';
-import { Linking } from 'react-native';
+import { Dimensions, Linking, StyleSheet } from 'react-native';
 import SimpleTabs from '../../app/navigation/SimpleTabs';
 
 // Mock ThemeColorsContext
@@ -255,7 +255,9 @@ jest.mock('react-native-reanimated', () => {
   return {
     __esModule: true,
     default: Animated,
-    useSharedValue: (initialValue) => ({ value: initialValue }),
+    // Kept across renders like the real hook, so a test can read where an
+    // effect or a tab press left the strip.
+    useSharedValue: (initialValue) => React.useRef({ value: initialValue }).current,
     useAnimatedStyle: (callback) => {
       try {
         return callback() || {};
@@ -694,6 +696,99 @@ describe('SimpleTabs Component Rendering', () => {
         },
       });
     }
+  });
+
+  describe('page width', () => {
+    // Regression: the page width was read once, at module load. The bundle also
+    // loads headless (a widget update, the bank task), and with the phone held
+    // sideways then, `Dimensions` gave the landscape width. Every page of the
+    // strip stayed that wide in portrait, cutting off the right half of each
+    // screen until the process died. The viewport's own layout now decides.
+    let dimensionsSpy;
+    beforeEach(() => {
+      const realGet = Dimensions.get;
+      dimensionsSpy = jest.spyOn(Dimensions, 'get').mockImplementation((dim) => (
+        dim === 'window' ? { width: 900, height: 412, scale: 2.625, fontScale: 1 } : realGet(dim)
+      ));
+    });
+    afterEach(() => dimensionsSpy.mockRestore());
+
+    const layoutViewport = (getByTestId, width) => act(() => {
+      fireEvent(getByTestId('tab-pages-viewport'), 'layout', {
+        nativeEvent: { layout: { width, height: 800, x: 0, y: 0 } },
+      });
+    });
+    const animatedWidths = (getAllByTestId) => getAllByTestId('animated-view')
+      .map((view) => StyleSheet.flatten(view.props.style).width);
+
+    it('sizes every page from the measured viewport, not the window', async () => {
+      const { getByTestId, getAllByTestId } = await render(<SimpleTabs />);
+
+      await layoutViewport(getByTestId, 412);
+
+      // Operations, Graphs, Budget, Settings: four pages of 412 on a strip of 4 × 412.
+      const widths = animatedWidths(getAllByTestId);
+      expect(widths.filter((w) => w === 412)).toHaveLength(4);
+      expect(widths).toContain(412 * 4);
+      expect(widths).not.toContain(900);
+    });
+
+    it('keeps the last real width when the viewport reports zero', async () => {
+      const { getByTestId, getAllByTestId } = await render(<SimpleTabs />);
+
+      await layoutViewport(getByTestId, 412);
+      await layoutViewport(getByTestId, 0);
+
+      expect(animatedWidths(getAllByTestId)).toContain(412 * 4);
+    });
+
+    // The strip is the animated view as wide as all four pages together.
+    const stripOffset = (getAllByTestId, pageWidth) => {
+      const strip = getAllByTestId('animated-view')
+        .map((view) => StyleSheet.flatten(view.props.style))
+        .find((style) => style.width === pageWidth * 4);
+      return strip.transform[0].translateX;
+    };
+
+    it('lands every tab switch on a multiple of the measured width', async () => {
+      const { getByTestId, getAllByTestId } = await render(<SimpleTabs />);
+      await layoutViewport(getByTestId, 412);
+
+      // Adjacent: Operations → Graphs.
+      await fireEvent.press(getByTestId('tab-Graphs'));
+      expect(stripOffset(getAllByTestId, 412)).toBe(-412);
+
+      // Non-adjacent: Graphs → Settings. Held in flight, the strip springs one
+      // page on and Settings is pulled one page back to meet it.
+      global.__mockSpringPending = true;
+      try {
+        await fireEvent.press(getByTestId('tab-Settings'));
+      } finally {
+        delete global.__mockSpringPending;
+      }
+      expect(stripOffset(getAllByTestId, 412)).toBe(-2 * 412);
+      const settingsPage = StyleSheet.flatten(getByTestId('settings-screen').parent.props.style);
+      expect(settingsPage.transform[0].translateX).toBe(-412);
+    });
+
+    it('re-anchors the strip on the current tab when the width changes', async () => {
+      const { getByTestId, getAllByTestId, rerender } = await render(<SimpleTabs />);
+      await fireEvent.press(getByTestId('tab-Graphs'));
+      expect(stripOffset(getAllByTestId, 900)).toBe(-900);
+
+      await layoutViewport(getByTestId, 412);
+      await rerender(<SimpleTabs />);
+
+      expect(stripOffset(getAllByTestId, 412)).toBe(-412);
+    });
+
+    it('ignores a sub-pixel layout difference from the window width', async () => {
+      const { getByTestId, getAllByTestId } = await render(<SimpleTabs />);
+
+      await layoutViewport(getByTestId, 899.99997);
+
+      expect(animatedWidths(getAllByTestId)).toContain(900 * 4);
+    });
   });
 
   it('renders TabButton for each tab with correct props', async () => {

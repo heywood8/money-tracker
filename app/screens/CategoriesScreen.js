@@ -10,6 +10,7 @@ import {
   Easing,
   Pressable,
   ScrollView,
+  useWindowDimensions,
   Keyboard,
 } from 'react-native';
 import { Text, TouchableRipple, TextInput as PaperTextInput } from 'react-native-paper';
@@ -71,6 +72,12 @@ const CategoriesScreen = ({ onBackStateChange }) => {
   const listAnim = useRef(new Animated.Value(0)).current;
   const formAnim = useRef(new Animated.Value(0)).current;
   const pickerSlideAnim = useRef(new Animated.Value(Dimensions.get('window').width)).current;
+
+  // Three cells to a grid row. Read per render, not in the StyleSheet: a width
+  // taken at module load is whatever the window was when the bundle loaded,
+  // which can be the landscape width (see SimpleTabs' pageWidth).
+  const { width: windowWidth } = useWindowDimensions();
+  const gridCellWidth = (windowWidth - SPACING.sm * 2 - SPACING.xs * 2 * 3) / 3;
 
   // Interpolations for list layer
   const listTranslateX = listAnim.interpolate({ inputRange: [0, 1], outputRange: [0, -50] });
@@ -329,7 +336,7 @@ const CategoriesScreen = ({ onBackStateChange }) => {
 
     return (
       <TouchableOpacity
-        style={[styles.gridCell, { backgroundColor: iconColor + '22', borderColor: colors.border }]}
+        style={[styles.gridCell, { width: gridCellWidth, backgroundColor: iconColor + '22', borderColor: colors.border }]}
         onPress={() => handleGridCellPress(category)}
         onLongPress={() => handleCategoryLongPress(category)}
         activeOpacity={0.7}
@@ -347,7 +354,7 @@ const CategoriesScreen = ({ onBackStateChange }) => {
         )}
       </TouchableOpacity>
     );
-  }, [colors, t, getChildren, handleGridCellPress, handleCategoryLongPress]);
+  }, [colors, t, getChildren, handleGridCellPress, handleCategoryLongPress, gridCellWidth]);
 
   // Report internal back capability to an embedding parent (the Settings subpanel)
   // so a swipe / hardware-back pops one level here (picker → form → subcategory
@@ -784,7 +791,6 @@ const styles = StyleSheet.create({
     margin: SPACING.xs,
     padding: SPACING.md,
     position: 'relative',
-    width: (Dimensions.get('window').width - SPACING.sm * 2 - SPACING.xs * 2 * 3) / 3,
   },
   gridCellName: {
     fontSize: FONT_SIZE.sm,
