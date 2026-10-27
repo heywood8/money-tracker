@@ -7,7 +7,12 @@ import {
   forgetWidget,
   resolveWidgetChart,
   resolveWidgetCharts,
+  applyWidgetWindow,
+  getWidgetWindow,
+  setWidgetWindow,
+  stepWidgetWindow,
   WIDGET_STORE_PATH,
+  WIDGET_WINDOWS_PATH,
 } from '../../app/widgets/exchangeRateWidgetStore';
 
 jest.mock('expo-file-system/legacy', () => ({
@@ -85,6 +90,82 @@ describe('exchangeRateWidgetStore', () => {
   it('ignores a chart it could not draw', async () => {
     await setWidgetChart(7, { id: 'x', from: 'USD', to: 'USD' });
     expect(FileSystem.writeAsStringAsync).not.toHaveBeenCalled();
+  });
+
+  describe('the window', () => {
+    it('remembers the window a widget was switched to, in a file of its own', async () => {
+      await setWidgetChart(7, USD_RUB);
+      await setWidgetWindow(7, 'year');
+
+      await expect(getWidgetWindow(7)).resolves.toBe('year');
+      await expect(getWidgetWindow(9)).resolves.toBeNull();
+      expect(JSON.parse(disk[WIDGET_WINDOWS_PATH])).toEqual({ 7: 'year' });
+      // The chart is left as it was set up.
+      await expect(getWidgetChart(7)).resolves.toEqual(USD_RUB);
+    });
+
+    it('ignores a window that is not a range', async () => {
+      await setWidgetWindow(7, 'decade');
+      expect(FileSystem.writeAsStringAsync).not.toHaveBeenCalled();
+      disk[WIDGET_WINDOWS_PATH] = JSON.stringify({ 7: 'decade' });
+      await expect(getWidgetWindow(7)).resolves.toBeNull();
+    });
+
+    it('forgets a removed widget’s window with its chart', async () => {
+      await setWidgetChart(7, USD_RUB);
+      await setWidgetWindow(7, 'day');
+      await setWidgetWindow(9, 'week');
+
+      await forgetWidget(7);
+
+      expect(JSON.parse(disk[WIDGET_STORE_PATH])).toEqual({});
+      expect(JSON.parse(disk[WIDGET_WINDOWS_PATH])).toEqual({ 9: 'week' });
+    });
+
+    it('steps from the fallback range, then from the window saved', async () => {
+      await expect(stepWidgetWindow(7, 'month', 1)).resolves.toBe('year');
+      await expect(stepWidgetWindow(7, 'month', 1)).resolves.toBe('all');
+      await expect(getWidgetWindow(7)).resolves.toBe('all');
+    });
+
+    it('stops at either end, writing nothing, unless it wraps', async () => {
+      await expect(stepWidgetWindow(7, 'all', 1)).resolves.toBeNull();
+      await expect(stepWidgetWindow(7, 'day', -1)).resolves.toBeNull();
+      expect(FileSystem.writeAsStringAsync).not.toHaveBeenCalled();
+
+      await expect(stepWidgetWindow(7, 'all', 1, { wrap: true })).resolves.toBe('day');
+      await expect(stepWidgetWindow(7, 'all', -1, { wrap: true })).resolves.toBe('all');
+    });
+
+    it('makes every step of taps in quick succession, and keeps other widgets’ windows', async () => {
+      await Promise.all([
+        stepWidgetWindow(7, 'day', 1),
+        stepWidgetWindow(7, 'day', 1),
+        stepWidgetWindow(9, 'month', -1),
+      ]);
+
+      expect(JSON.parse(disk[WIDGET_WINDOWS_PATH])).toEqual({ 7: 'month', 9: 'week' });
+    });
+
+    it('drops the window when the widget is set up again, so it shows the chart just picked', async () => {
+      await setWidgetWindow(7, 'day');
+      await setWidgetWindow(8, 'year');
+
+      await setWidgetChart(7, AMD_RUB);
+      await setWidgetCharts(8, [USD_RUB, AMD_RUB]);
+
+      await expect(getWidgetWindow(7)).resolves.toBeNull();
+      await expect(getWidgetWindow(8)).resolves.toBeNull();
+    });
+
+    it('draws every chart over the window, else over the first chart’s range', () => {
+      expect(applyWidgetWindow([USD_RUB, AMD_RUB], 'day')).toEqual([
+        { ...USD_RUB, range: 'day' }, { ...AMD_RUB, range: 'day' },
+      ]);
+      expect(applyWidgetWindow([null, AMD_RUB], null)).toEqual([null, AMD_RUB]);
+      expect(applyWidgetWindow([USD_RUB, AMD_RUB], null)[1].range).toBe('month');
+      expect(applyWidgetWindow([null, null], 'day')).toEqual([null, null]);
+    });
   });
 
   it('reads an unreadable file as no widgets', async () => {

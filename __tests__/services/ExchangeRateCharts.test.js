@@ -3,6 +3,7 @@ import {
   normalizeRateCharts,
   reverseRateChart,
   rateChartTitle,
+  googleRateSearchUrl,
   loadRateCharts,
   saveRateCharts,
   upsertRateChart,
@@ -68,6 +69,13 @@ describe('ExchangeRateCharts', () => {
   it('reverseRateChart swaps the currencies and keeps the rest', () => {
     expect(reverseRateChart({ id: 'a', from: 'USD', to: 'RUB', amount: 10, range: 'day' }))
       .toEqual({ id: 'a', from: 'RUB', to: 'USD', amount: 10, range: 'day' });
+  });
+
+  it('googleRateSearchUrl asks Google for the chart’s pair, priced per its amount', () => {
+    expect(googleRateSearchUrl({ amount: 1, from: 'RUB', to: 'AMD' }))
+      .toBe('https://www.google.com/search?q=1%20rub%20to%20amd');
+    expect(googleRateSearchUrl({ amount: 100, from: 'AMD', to: 'RUB' }))
+      .toBe('https://www.google.com/search?q=100%20amd%20to%20rub');
   });
 
   it('rateChartTitle names a chart the way every screen shows it', () => {

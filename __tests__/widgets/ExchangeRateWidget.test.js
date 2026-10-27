@@ -60,7 +60,7 @@ describe('ExchangeRateWidget', () => {
     it('prints the pair, the rate, its move and the date', () => {
       const tree = render({ status: 'ready', chart: CHART, points: POINTS, stale: false });
 
-      expect(textsOf(tree)).toEqual(['1 USD → RUB', 'Oct 23', '₽81.55', '▼ -2.74 (-3.25%)']);
+      expect(textsOf(tree)).toEqual(['1 USD → RUB', 'Oct 23', '₽81.55', '▼ -2.74 (-3.25%)', '‹', 'Month', '›']);
     });
 
     it('prices the configured amount', () => {
@@ -71,14 +71,15 @@ describe('ExchangeRateWidget', () => {
         stale: false,
       });
 
-      expect(textsOf(tree)).toEqual(['100 AMD → RUB', 'Oct 23', '₽22.72', '▲ +0.13 (+0.58%)']);
+      expect(textsOf(tree)).toEqual(['100 AMD → RUB', 'Oct 23', '₽22.72', '▲ +0.13 (+0.58%)', '‹', 'Month', '›']);
     });
 
     it('says when the rates are the saved copy', () => {
       const tree = render({ status: 'ready', chart: CHART, points: POINTS, stale: true });
 
-      // On the change's row, pinned right, where a long title cannot push it out.
-      expect(textsOf(tree)).toEqual(['1 USD → RUB', 'Oct 23', '₽81.55', '▼ -2.74 (-3.25%)', 'offline']);
+      // In the date's place, pinned right of the title, where a long title cannot push it out.
+      expect(textsOf(tree).slice(0, 2)).toEqual(['1 USD → RUB', 'offline']);
+      expect(textsOf(tree)).not.toContain('Oct 23');
     });
 
     it('draws the line when the widget is tall enough, and not when it is not', () => {
@@ -128,6 +129,54 @@ describe('ExchangeRateWidget', () => {
         .toBe('↻ …');
     });
 
+    it('shows the window beside the move, its arrows stepping it', () => {
+      const tree = render({ status: 'ready', chart: { ...CHART, range: 'week' }, points: POINTS });
+      const label = textNode(tree, 'Week');
+      const [shorter, , longer] = parentOf(tree, label).children;
+
+      // On the move's row: the move is over this window.
+      const row = parentOf(tree, parentOf(tree, label));
+      expect(textsOf(row)[0]).toBe('▼ -2.74 (-3.25%)');
+      expect(shorter.props).toMatchObject({
+        clickAction: 'RATE_WINDOW', clickActionData: { step: -1 }, accessibilityLabel: 'Shorter period',
+      });
+      expect(longer.props).toMatchObject({
+        clickAction: 'RATE_WINDOW', clickActionData: { step: 1 }, accessibilityLabel: 'Longer period',
+      });
+      expect(shorter.children[0].props.color).toBe(lightTheme.colors.primary);
+    });
+
+    it('draws the arrow at either end of the ranges faint, still taking the tap', () => {
+      const day = render({ status: 'ready', chart: { ...CHART, range: 'day' }, points: POINTS });
+      const all = render({ status: 'ready', chart: { ...CHART, range: 'all' }, points: POINTS }, { theme: 'dark' });
+      const [dayShorter, , dayLonger] = parentOf(day, textNode(day, 'Day')).children;
+      const [allShorter, , allLonger] = parentOf(all, textNode(all, 'All')).children;
+
+      expect(dayShorter.children[0].props.color).toBe(lightTheme.colors.border);
+      expect(dayLonger.children[0].props.color).toBe(lightTheme.colors.primary);
+      expect(allShorter.children[0].props.color).toBe(darkTheme.colors.primary);
+      expect(allLonger.children[0].props.color).toBe(darkTheme.colors.border);
+      // So it does not fall through to opening the app.
+      expect(dayShorter.props.clickAction).toBe('RATE_WINDOW');
+    });
+
+    it('folds the window to its label on a widget too narrow for both arrows, a tap stepping it round', () => {
+      const tree = render({ status: 'ready', chart: CHART, points: POINTS }, { width: 160 });
+      const label = textNode(tree, 'Month');
+      const tap = parentOf(tree, label);
+
+      expect(textsOf(tap)).toEqual(['Month', '›']);
+      expect(textsOf(tree)).not.toContain('‹');
+      expect(tap.props).toMatchObject({
+        clickAction: 'RATE_WINDOW', clickActionData: { step: 1, wrap: true }, accessibilityLabel: 'Change period',
+      });
+    });
+
+    it('names the window in the app’s language', () => {
+      const tree = render({ status: 'ready', chart: { ...CHART, range: 'year' }, points: POINTS, language: 'ru' });
+      expect(textNode(tree, 'Год')).toBeDefined();
+    });
+
     it('leaves the fetch time out when there is none', () => {
       expect(textNode(render({ status: 'ready', chart: CHART, points: POINTS }), '↻')).toBeUndefined();
     });
@@ -140,8 +189,8 @@ describe('ExchangeRateWidget', () => {
       expect(tree.props.paddingLeft ?? 0).toBe(0);
       expect(line.props.svgString).toContain('width="250"');
       // Down to the bottom edge: 180 less the padding and text above it.
-      expect(line.props.svgString).toContain('height="96"');
-      expect(line.props.svgString).toContain('A28 28 0 0 1 222 96');
+      expect(line.props.svgString).toContain('height="88"');
+      expect(line.props.svgString).toContain('A28 28 0 0 1 222 88');
       expect(line.props.svgString).toContain('clip-path="url(#c)"');
     });
 
@@ -186,15 +235,23 @@ describe('ExchangeRateWidget', () => {
   it('names the pair and the failure when nothing could be loaded', () => {
     const tree = render({ status: 'error', chart: CHART });
 
-    expect(textsOf(tree)).toEqual(['1 USD → RUB\nCould not load rates ↻']);
+    expect(textsOf(tree)[0]).toBe('1 USD → RUB\nCould not load rates ↻');
     expect(tree.props.accessibilityLabel).toBe('1 USD → RUB: Could not load rates');
+  });
+
+  it('keeps the window under the failure, so a window that would not load can be left', () => {
+    const tree = render({ status: 'error', chart: { ...CHART, range: 'all' } });
+    const [shorter] = parentOf(tree, textNode(tree, 'All')).children;
+
+    expect(textsOf(tree).slice(1)).toEqual(['‹', 'All', '›']);
+    expect(shorter.props).toMatchObject({ clickAction: 'RATE_WINDOW', clickActionData: { step: -1 } });
   });
 
   it('offers a refresh by tap when nothing could be loaded, and shows it running', () => {
     const tree = render({ status: 'error', chart: CHART });
     expect(parentOf(tree, textNode(tree, '1 USD')).props.clickAction).toBe('REFRESH_RATES');
 
-    expect(textsOf(render({ status: 'error', chart: CHART, refreshing: true }))).toEqual(['1 USD → RUB\n↻ …']);
+    expect(textsOf(render({ status: 'error', chart: CHART, refreshing: true }))[0]).toBe('1 USD → RUB\n↻ …');
   });
 
   it('keeps the setup prompt a plain link to the app', () => {
@@ -283,10 +340,12 @@ describe('ExchangeRateWidget', () => {
       // Neither half carries its own.
       expect(textsOf(halves).filter((text) => text.startsWith('↻') || text.startsWith('Oct'))).toEqual([]);
       // The older of the two, so neither rate looks fresher than it is.
-      const [date, fetched] = textsOf(middle);
+      const [, window, , date, fetched] = textsOf(middle);
       expect(date).toBe('Oct 22');
       expect(fetched).toMatch(/^↻ 0?2:05|^↻ 14:05/);
-      expect(textsOf(middle)).toHaveLength(2);
+      // The window on top, level with the pairs' names; one for both halves.
+      expect(window).toBe('Month');
+      expect(textsOf(middle)).toHaveLength(5);
       const area = parentOf(tree, textNode(middle, '↻'));
       expect(area.props.clickAction).toBe('REFRESH_RATES');
       expect(area.props.accessibilityLabel).toBe('Refresh rates');
@@ -298,7 +357,8 @@ describe('ExchangeRateWidget', () => {
         { status: 'ready', chart: AMD, points: AMD_POINTS, checkedAt: Date.now() },
       ]);
 
-      expect(textsOf(layersOf(tree)[1])).toEqual(['Oct 23', '↻ …', 'offline']);
+      // In the date's place: the one signal the figures are old gets the room.
+      expect(textsOf(layersOf(tree)[1]).slice(3)).toEqual(['offline', '↻ …']);
       expect(textsOf(layersOf(tree)[0])).not.toContain('offline');
     });
 
@@ -308,19 +368,29 @@ describe('ExchangeRateWidget', () => {
         { status: 'ready', chart: AMD, points: AMD_POINTS },
       ]);
 
-      expect(textsOf(layersOf(tree)[1])).toEqual(['Oct 23']);
+      expect(textsOf(layersOf(tree)[1])).toEqual(['‹', 'Month', '›', 'Oct 23']);
     });
 
-    it('leaves the middle and the hairline out when neither rate could be loaded', () => {
+    it('leaves only the window in the middle, and no hairline, when neither rate could be loaded', () => {
       const tree = renderPair([
         { status: 'error', chart: CHART },
         { status: 'error', chart: AMD },
       ]);
-      const layers = layersOf(tree);
+      const [halves, middle] = layersOf(tree);
 
-      expect(layers).toHaveLength(1);
-      expect(layers[0].children[1].children ?? []).toHaveLength(0);
-      expect(textsOf(tree)).toEqual(['1 USD → RUB\nCould not load rates ↻', '1 RUB → AMD\nCould not load rates ↻']);
+      expect(halves.children[1].children ?? []).toHaveLength(0);
+      expect(textsOf(halves)).toEqual(['1 USD → RUB\nCould not load rates ↻', '1 RUB → AMD\nCould not load rates ↻']);
+      // The window may be what would not load: it stays, to step back.
+      expect(textsOf(middle)).toEqual(['‹', 'Month', '›']);
+    });
+
+    it('keeps the names clear of the window’s overhang, still centred', () => {
+      const tree = renderPair([
+        { status: 'ready', chart: CHART, points: POINTS },
+        { status: 'ready', chart: AMD, points: AMD_POINTS },
+      ]);
+
+      expect(textNode(tree, '1 USD').props.padding).toMatchObject({ left: 8, right: 8 });
     });
 
     it('rounds each half’s line only at the card’s outer corner', () => {
@@ -348,7 +418,7 @@ describe('ExchangeRateWidget', () => {
       expect(textsOf(halves.children[2])).toEqual(['Add an exchange rate chart in Settings → Graphs']);
       expect(nodesOf(halves.children[0], 'SvgWidget')).toHaveLength(1);
       // The middle still dates the one rate shown.
-      expect(textsOf(middle)).toEqual(['Oct 23']);
+      expect(textsOf(middle)).toEqual(['‹', 'Month', '›', 'Oct 23']);
       // No hairline beside a half with no line to part.
       expect(halves.children[1].children ?? []).toHaveLength(0);
     });

@@ -1,5 +1,6 @@
 import React from 'react';
 import { render, fireEvent, waitFor, screen } from '@testing-library/react-native';
+import { Linking } from 'react-native';
 import ExchangeRateCard, { xTickIndices } from '../../../app/components/graphs/ExchangeRateCard';
 import { formatRateDate, formatAxisDate } from '../../../app/services/ExchangeRateHistory';
 import { fetchRateSeries } from '../../../app/services/ExchangeRateHistory';
@@ -102,6 +103,19 @@ describe('ExchangeRateCard', () => {
 
     await waitFor(() => expect(screen.getByText('0.00 (0.00%)')).toBeTruthy());
     expect(changeColorOf('0.00 (0.00%)')).toBe(colors.mutedText);
+  });
+
+  it('opens the pair on Google from beside the title', async () => {
+    const openURL = jest.spyOn(Linking, 'openURL').mockResolvedValue(true);
+    await renderCard({ chart: { ...chart, from: 'RUB', to: 'AMD' } });
+
+    const link = screen.getByTestId('exchange-rate-google');
+    expect(link.props.accessibilityRole).toBe('link');
+    expect(link.props.accessibilityLabel).toBe('rate_open_google');
+    fireEvent.press(link);
+
+    expect(openURL).toHaveBeenCalledWith('https://www.google.com/search?q=1%20rub%20to%20amd');
+    openURL.mockRestore();
   });
 
   it('switches range from the chip row', async () => {

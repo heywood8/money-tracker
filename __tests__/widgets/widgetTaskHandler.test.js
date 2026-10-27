@@ -1,5 +1,9 @@
 import { widgetTaskHandler } from '../../app/widgets/widgetTaskHandler';
-import { refreshExchangeRateWidgets, renderExchangeRateWidget } from '../../app/widgets/exchangeRateWidgetRender';
+import {
+  refreshExchangeRateWidgets,
+  renderExchangeRateWidget,
+  stepExchangeRateWidgetWindow,
+} from '../../app/widgets/exchangeRateWidgetRender';
 import { forgetWidget } from '../../app/widgets/exchangeRateWidgetStore';
 import { renderBalanceForecastWidget } from '../../app/widgets/balanceForecastWidgetRender';
 import { forgetForecastWidget } from '../../app/widgets/balanceForecastWidgetStore';
@@ -7,6 +11,7 @@ import { forgetForecastWidget } from '../../app/widgets/balanceForecastWidgetSto
 jest.mock('../../app/widgets/exchangeRateWidgetRender', () => ({
   renderExchangeRateWidget: jest.fn(),
   refreshExchangeRateWidgets: jest.fn(),
+  stepExchangeRateWidgetWindow: jest.fn(),
 }));
 jest.mock('../../app/widgets/exchangeRateWidgetStore', () => ({ forgetWidget: jest.fn() }));
 jest.mock('../../app/widgets/balanceForecastWidgetRender', () => ({ renderBalanceForecastWidget: jest.fn() }));
@@ -53,6 +58,69 @@ describe('widgetTaskHandler', () => {
   it('leaves other clicks to the deep link', async () => {
     const renderWidget = jest.fn();
     await widgetTaskHandler({ widgetInfo, widgetAction: 'WIDGET_CLICK', clickAction: 'X', renderWidget });
+    expect(renderWidget).not.toHaveBeenCalled();
+  });
+
+  it('steps the window on a tap of its arrows: saved rates at once, then topped up', async () => {
+    const renderWidget = jest.fn();
+    stepExchangeRateWidgetWindow.mockResolvedValue('year');
+    renderExchangeRateWidget.mockResolvedValueOnce('saved').mockResolvedValueOnce('topped-up');
+
+    await widgetTaskHandler({
+      widgetInfo, widgetAction: 'WIDGET_CLICK', clickAction: 'RATE_WINDOW', clickActionData: { step: 1 }, renderWidget,
+    });
+
+    expect(stepExchangeRateWidgetWindow).toHaveBeenCalledWith(widgetInfo, 1, { wrap: false });
+    // "↻ …" at once, over whatever of the new window is saved.
+    expect(renderExchangeRateWidget).toHaveBeenNthCalledWith(1, widgetInfo, { cacheOnly: true, refreshing: true });
+    expect(renderExchangeRateWidget).toHaveBeenNthCalledWith(2, widgetInfo);
+    expect(renderWidget.mock.calls.map(([tree]) => tree)).toEqual(['saved', 'topped-up']);
+    // Only this widget's window changed: the others are left alone.
+    expect(refreshExchangeRateWidgets).not.toHaveBeenCalled();
+  });
+
+  it('passes a narrow widget’s wrapping step on', async () => {
+    stepExchangeRateWidgetWindow.mockResolvedValue('day');
+
+    await widgetTaskHandler({
+      widgetInfo,
+      widgetAction: 'WIDGET_CLICK',
+      clickAction: 'RATE_WINDOW',
+      clickActionData: { step: 1, wrap: true },
+      renderWidget: jest.fn(),
+    });
+
+    expect(stepExchangeRateWidgetWindow).toHaveBeenCalledWith(widgetInfo, 1, { wrap: true });
+  });
+
+  it('draws the saved window when the network is too slow for the task', async () => {
+    jest.useFakeTimers();
+    const renderWidget = jest.fn();
+    stepExchangeRateWidgetWindow.mockResolvedValue('all');
+    renderExchangeRateWidget
+      .mockResolvedValueOnce('loading')
+      .mockReturnValueOnce(new Promise(() => {}))
+      .mockResolvedValueOnce('saved');
+
+    const task = widgetTaskHandler({
+      widgetInfo, widgetAction: 'WIDGET_CLICK', clickAction: 'RATE_WINDOW', clickActionData: { step: 1 }, renderWidget,
+    });
+    await jest.advanceTimersByTimeAsync(20000);
+    await task;
+    jest.useRealTimers();
+
+    expect(renderWidget.mock.calls.map(([tree]) => tree)).toEqual(['loading', 'saved']);
+    expect(renderExchangeRateWidget).toHaveBeenLastCalledWith(widgetInfo, { cacheOnly: true });
+  });
+
+  it('draws nothing when an arrow at the end of the ranges is tapped', async () => {
+    const renderWidget = jest.fn();
+    stepExchangeRateWidgetWindow.mockResolvedValue(null);
+
+    await widgetTaskHandler({
+      widgetInfo, widgetAction: 'WIDGET_CLICK', clickAction: 'RATE_WINDOW', clickActionData: { step: -1 }, renderWidget,
+    });
+
     expect(renderWidget).not.toHaveBeenCalled();
   });
 

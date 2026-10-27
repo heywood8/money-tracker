@@ -9,6 +9,8 @@ import { FlexWidget, OverlapWidget, SvgWidget, TextWidget } from 'react-native-a
 import { lightTheme, darkTheme } from '../contexts/ThemeColorsContext';
 import { getCurrencySymbol } from '../services/currency';
 import {
+  RANGE_LABEL_KEYS,
+  RATE_RANGES,
   formatAxisDate,
   formatCheckedAt,
   formatRateChange,
@@ -21,11 +23,12 @@ import {
 import { rateChartTitle } from '../services/ExchangeRateCharts';
 import { translate } from '../services/notifications/notificationStrings';
 import { BORDER_RADIUS, FONT_SIZE, SPACING } from '../styles/designTokens';
-import { GRAPHS_DEEP_LINK, REFRESH_RATES_ACTION } from './widgetConstants';
+import { GRAPHS_DEEP_LINK, RATE_WINDOW_ACTION, REFRESH_RATES_ACTION } from './widgetConstants';
 
 /**
  * The exchange-rate home-screen widget: one pair's current rate, its move over
- * the chart's range and, when the widget is tall enough, the line behind it.
+ * the window shown ("‹ Month ›", its arrows switching it) and, when the widget
+ * is tall enough, the line behind it.
  *
  * Widgets are drawn by the launcher from Android RemoteViews, not by React
  * Native, so this is built from the widget library's primitives. The line is
@@ -77,6 +80,29 @@ const REFRESH_TAP_STYLE = {
   paddingBottom: SPACING.sm,
 };
 const SMALL_TEXT = { fontSize: FONT_SIZE.sm };
+
+// The window, "‹ Month ›": the label at a fixed width, so the arrows stay put
+// as it changes, and each arrow a tap area of its own.
+const WINDOW_ARROW_WIDTH = 18;
+const WINDOW_LABEL_WIDTH = 44;
+const WINDOW_STYLE = { flexDirection: 'row', alignItems: 'center' };
+const WINDOW_ARROW_STYLE = { width: WINDOW_ARROW_WIDTH, alignItems: 'center' };
+const WINDOW_ARROW_TEXT = { fontSize: FONT_SIZE.lg, fontWeight: 'bold' };
+const WINDOW_LABEL_TEXT = {
+  ...SMALL_TEXT,
+  width: WINDOW_LABEL_WIDTH,
+  textAlign: 'center',
+  adjustsFontSizeToFit: true,
+};
+// What the arrows add to the height of the move's row, which carries them in
+// the one-rate widget.
+const WINDOW_ROW_EXTRA = SPACING.sm;
+// The room the move keeps beside the window on the one-rate widget. Narrower
+// than that and the window is the label alone, a tap stepping it round.
+const MIN_MOVE_WIDTH = 100;
+// Under a message (a window that would not load), the window stays to step back.
+const MESSAGE_FILL_STYLE = { flex: 1, width: 'match_parent', justifyContent: 'center' };
+const WINDOW_FOOTER_STYLE = { width: 'match_parent', flexDirection: 'row', justifyContent: 'center' };
 const MESSAGE_TEXT = { fontSize: FONT_SIZE.md };
 const VALUE_TEXT = { fontSize: VALUE_FONT_SIZE, fontWeight: 'bold' };
 
@@ -84,10 +110,19 @@ const VALUE_TEXT = { fontSize: VALUE_FONT_SIZE, fontWeight: 'bold' };
 // own half, and between them, once for both, the date and "↻ 14:05". A
 // hairline parts the two lines below; the text above shares the card unparted.
 const DIVIDER_WIDTH = 1;
-// The middle column holding the shared date and fetch time. Each half keeps
-// half its width clear on both sides, so its text is centred over its own line
-// and never runs under the middle column.
+// The middle column: the window level with the pairs' names, the date with the
+// rates, "↻ 14:05" with their moves. Each half keeps half of MIDDLE_WIDTH clear
+// on both sides, so its text is centred over its own line and never runs under
+// the date or the fetch time. The window is wider, but sits beside the names,
+// the halves' shortest text, so the moves (their longest) keep the room.
 const MIDDLE_WIDTH = 64;
+const WINDOW_WIDTH = WINDOW_ARROW_WIDTH * 2 + WINDOW_LABEL_WIDTH;
+// The names keep clear of the window's overhang past MIDDLE_WIDTH, on both
+// sides so they stay centred.
+const TITLE_INSET_STYLE = {
+  paddingLeft: (WINDOW_WIDTH - MIDDLE_WIDTH) / 2,
+  paddingRight: (WINDOW_WIDTH - MIDDLE_WIDTH) / 2,
+};
 // What a half's text keeps before its outer padding gives way, the text
 // shifting off-centre a little rather than the rate being cut: about "₽81.55"
 // at the value's size, or "▼ -2.74 (-3.25%)" at the move's.
@@ -102,21 +137,24 @@ const DIVIDER_STYLE = {
   justifyContent: 'flex-end',
 };
 const MIDDLE_ROW_STYLE = { width: 'match_parent', flexDirection: 'row', justifyContent: 'center' };
+// Raised by what the arrows add to a line, so the window's label sits level
+// with the names beside it.
 const MIDDLE_STYLE = {
-  width: MIDDLE_WIDTH,
+  width: WINDOW_WIDTH,
   flexDirection: 'column',
   alignItems: 'center',
-  paddingTop: PADDING,
+  paddingTop: PADDING - SPACING.xs,
 };
+// Pushed down to the moves' line, and padded below for a thumb.
 const MIDDLE_TAP_STYLE = {
-  width: 'match_parent',
+  width: MIDDLE_WIDTH,
   alignItems: 'center',
   paddingTop: SPACING.sm,
-  paddingBottom: SPACING.sm,
+  paddingBottom: SPACING.xs,
 };
 const CENTERED_TEXT = { width: 'match_parent', textAlign: 'center' };
 // Shrunk rather than cut where a language's word is wider than the column.
-const MIDDLE_TEXT = { ...CENTERED_TEXT, adjustsFontSizeToFit: true };
+const MIDDLE_TEXT = { width: MIDDLE_WIDTH, textAlign: 'center', adjustsFontSizeToFit: true };
 const HALF_MESSAGE_STYLE = { ...PANEL_STYLE, justifyContent: 'center', alignItems: 'center' };
 
 /**
@@ -299,7 +337,7 @@ const viewOf = (model) => {
 };
 
 // The line's height in a box `height` dp tall: what the text leaves.
-const sparkHeightOf = (height) => height - PADDING - HEADER_HEIGHT - SPACING.xs;
+const sparkHeightOf = (height, extra = 0) => height - PADDING - HEADER_HEIGHT - extra - SPACING.xs;
 const hasRoomForLine = (sparkHeight) => sparkHeight - LINE_BOTTOM_INSET >= MIN_SPARKLINE_HEIGHT;
 
 // Short: the time today, the date before that. The rate's own date sits beside
@@ -308,6 +346,63 @@ const hasRoomForLine = (sparkHeight) => sparkHeight - LINE_BOTTOM_INSET >= MIN_S
 const fetchedText = (refreshing, checkedAt, language) => (refreshing
   ? '↻ …'
   : checkedAt ? `↻ ${formatCheckedAt(checkedAt, language)}` : null);
+
+/**
+ * The window a widget shows and the arrows switching it: "‹ Month ›". An arrow
+ * at the end of the ranges is drawn faint; its tap is a no-op rather than a
+ * fall-through to the Graphs tab. `compact`, for a widget too narrow for both
+ * arrows: "Month ›", one tap area stepping on and round from the longest.
+ *
+ * @param {string} range - One of RATE_RANGES
+ * @param {string} language
+ * @param {Object} colors
+ * @param {Object} [options]
+ * @param {boolean} [options.compact]
+ * @returns {JSX.Element}
+ */
+const windowSelector = (range, language, colors, { compact = false } = {}) => {
+  const index = RATE_RANGES.indexOf(range);
+  const label = (
+    <TextWidget
+      text={translate(language, RANGE_LABEL_KEYS[range] ?? RANGE_LABEL_KEYS.month)}
+      maxLines={1}
+      truncate="END"
+      style={{ ...WINDOW_LABEL_TEXT, color: colors.mutedText }}
+    />
+  );
+  if (compact) {
+    return (
+      <FlexWidget
+        clickAction={RATE_WINDOW_ACTION}
+        clickActionData={{ step: 1, wrap: true }}
+        accessibilityLabel={translate(language, 'widget_window_next')}
+        style={WINDOW_STYLE}
+      >
+        {label}
+        <FlexWidget style={WINDOW_ARROW_STYLE}>
+          <TextWidget text="›" style={{ ...WINDOW_ARROW_TEXT, color: colors.primary }} />
+        </FlexWidget>
+      </FlexWidget>
+    );
+  }
+  const arrow = (glyph, step, enabled, labelKey) => (
+    <FlexWidget
+      clickAction={RATE_WINDOW_ACTION}
+      clickActionData={{ step }}
+      accessibilityLabel={translate(language, labelKey)}
+      style={WINDOW_ARROW_STYLE}
+    >
+      <TextWidget text={glyph} style={{ ...WINDOW_ARROW_TEXT, color: enabled ? colors.primary : colors.border }} />
+    </FlexWidget>
+  );
+  return (
+    <FlexWidget style={WINDOW_STYLE}>
+      {arrow('‹', -1, index > 0, 'widget_window_shorter')}
+      {label}
+      {arrow('›', 1, index < RATE_RANGES.length - 1, 'widget_window_longer')}
+    </FlexWidget>
+  );
+};
 
 /**
  * One rate in a box `width` × `height` dp: the pair and date, the rate, its
@@ -327,15 +422,15 @@ const fetchedText = (refreshing, checkedAt, language) => (refreshing
  * @param {number} box.radiusRight
  * @param {Object} [box.style] - Extra layout for the box
  * @param {boolean} [box.centered] - The two-rate widget's half: the pair, the
- *   rate and its move centred, and no date, fetch time or offline marker (the
- *   middle column shows them once for both)
+ *   rate and its move centred, and no date, fetch time, offline marker or
+ *   window (the middle column shows them once for both)
  * @param {string} [key]
  * @returns {JSX.Element}
  */
 const ratePanel = (model, figures, colors, box, key) => {
   const { language } = model;
   const mutedText = { ...SMALL_TEXT, color: colors.mutedText };
-  const sparkHeight = sparkHeightOf(box.height);
+  const sparkHeight = sparkHeightOf(box.height, box.centered ? 0 : WINDOW_ROW_EXTRA);
   const sparkline = hasRoomForLine(sparkHeight) && box.width > 0
     ? buildSparklineSvg(
       model.points.map((point) => point.rate * model.chart.amount),
@@ -359,7 +454,12 @@ const ratePanel = (model, figures, colors, box, key) => {
   const changeText = { ...SMALL_TEXT, color: rateChangeColor(figures.delta, colors) };
   const rows = box.centered ? (
     <FlexWidget style={textStyle}>
-      <TextWidget text={figures.title} maxLines={1} truncate="END" style={{ ...mutedText, ...CENTERED_TEXT }} />
+      <TextWidget
+        text={figures.title}
+        maxLines={1}
+        truncate="END"
+        style={{ ...mutedText, ...CENTERED_TEXT, ...TITLE_INSET_STYLE }}
+      />
       <TextWidget
         text={figures.value}
         maxLines={1}
@@ -374,16 +474,21 @@ const ratePanel = (model, figures, colors, box, key) => {
       />
     </FlexWidget>
   ) : (
-    // Each row pins a short text right of one that gives way: the date beside
-    // the title, the fetch time beside the rate (the row with room to spare),
-    // the offline marker beside the move. A narrow widget truncates the title or
-    // the move, never what says how old the figures are.
+    // Each row pins a short text right of one that gives way: the date (or,
+    // read from the cache after a failed fetch, "offline") beside the title, the fetch time beside the rate (the
+    // row with room to spare), the window beside the move it is the move over.
+    // A narrow widget truncates the title or the move, never what says how old
+    // the figures are or over what.
     <FlexWidget style={textStyle}>
       <FlexWidget style={ROW_STYLE}>
         <FlexWidget style={ROW_GROW_STYLE}>
           <TextWidget text={figures.title} maxLines={1} truncate="END" style={mutedText} />
         </FlexWidget>
-        <TextWidget text={figures.date} maxLines={1} style={{ ...mutedText, ...ROW_END_STYLE }} />
+        <TextWidget
+          text={model.stale ? translate(language, 'rate_offline') : figures.date}
+          maxLines={1}
+          style={{ ...mutedText, ...ROW_END_STYLE }}
+        />
       </FlexWidget>
       <FlexWidget style={ROW_STYLE}>
         <FlexWidget style={ROW_GROW_STYLE}>
@@ -408,13 +513,9 @@ const ratePanel = (model, figures, colors, box, key) => {
         <FlexWidget style={ROW_GROW_STYLE}>
           <TextWidget text={`${figures.arrow} ${figures.change}`} maxLines={1} truncate="END" style={changeText} />
         </FlexWidget>
-        {model.stale && (
-          <TextWidget
-            text={translate(language, 'rate_offline')}
-            maxLines={1}
-            style={{ ...mutedText, ...ROW_END_STYLE }}
-          />
-        )}
+        {windowSelector(model.chart.range, language, colors, {
+          compact: box.width - box.padLeft - box.padRight < MIN_MOVE_WIDTH + WINDOW_WIDTH,
+        })}
       </FlexWidget>
     </FlexWidget>
   );
@@ -438,6 +539,17 @@ const ratePanel = (model, figures, colors, box, key) => {
 export function ExchangeRateWidget({ model, theme, width, height }) {
   const colors = (theme === 'dark' ? darkTheme : lightTheme).colors;
   const view = viewOf(model);
+  if (!view.figures && model.chart) {
+    // The window may be what would not load: it stays, to step back from.
+    return (
+      <Root colors={colors} label={view.label}>
+        <MessageBox colors={colors} text={view.message} retry={view.retry} style={MESSAGE_FILL_STYLE} />
+        <FlexWidget style={WINDOW_FOOTER_STYLE}>
+          {windowSelector(model.chart.range, model.language, colors, { compact: width - PADDING * 2 < WINDOW_WIDTH })}
+        </FlexWidget>
+      </Root>
+    );
+  }
   if (!view.figures) {
     return <Message colors={colors} label={view.label} text={view.message} retry={view.retry} />;
   }
@@ -461,6 +573,7 @@ const MODEL_SHAPE = PropTypes.shape({
     from: PropTypes.string,
     to: PropTypes.string,
     amount: PropTypes.number,
+    range: PropTypes.string,
   }),
   points: PropTypes.arrayOf(PropTypes.shape({
     date: PropTypes.string,
@@ -540,9 +653,10 @@ export function ExchangeRatePairWidget({ models, theme, width, height }) {
     }, side);
   };
 
-  // What the middle says for both: the older of the two rates' dates and
-  // fetch times, so neither half looks fresher than it is, and "offline" if
-  // either was read from the cache after a failed fetch.
+  // What the middle says for both: the window both halves are drawn over, the
+  // older of the two rates' dates and fetch times, so neither half looks
+  // fresher than it is, and in the date's place "offline" if either was read
+  // from the cache after a failed fetch.
   // A fetch time only when every rate shown has one: one unknown is no basis
   // for calling both fresh.
   const shown = models.filter((model, i) => views[i].figures);
@@ -551,9 +665,11 @@ export function ExchangeRatePairWidget({ models, theme, width, height }) {
   const checkedAts = shown.map((model) => model.checkedAt);
   const fetched = fetchedText(
     shown.some((model) => model.refreshing),
-    checkedAts.every(Boolean) ? Math.min(...checkedAts) : null,
+    checkedAts.length > 0 && checkedAts.every(Boolean) ? Math.min(...checkedAts) : null,
     language,
   );
+  // The window stays when neither half loaded: it may be what would not load.
+  const window = models.find((model) => model.chart)?.chart.range;
   const mutedText = { ...SMALL_TEXT, color: colors.mutedText };
   const sparkHeight = sparkHeightOf(height);
 
@@ -569,15 +685,20 @@ export function ExchangeRatePairWidget({ models, theme, width, height }) {
           </FlexWidget>
           {half(models[1], views[1], 'second')}
         </FlexWidget>
-        {oldest && (
+        {window && (
           <FlexWidget style={MIDDLE_ROW_STYLE}>
             <FlexWidget style={MIDDLE_STYLE}>
-              <TextWidget
-                text={views[models.indexOf(oldest)].figures.date}
-                maxLines={1}
-                truncate="END"
-                style={{ ...mutedText, ...MIDDLE_TEXT }}
-              />
+              {windowSelector(window, language, colors)}
+              {oldest && (
+                <TextWidget
+                  text={shown.some((model) => model.stale)
+                    ? translate(language, 'rate_offline')
+                    : views[models.indexOf(oldest)].figures.date}
+                  maxLines={1}
+                  truncate="END"
+                  style={{ ...mutedText, ...MIDDLE_TEXT }}
+                />
+              )}
               {fetched && (
                 <FlexWidget
                   clickAction={REFRESH_RATES_ACTION}
@@ -591,14 +712,6 @@ export function ExchangeRatePairWidget({ models, theme, width, height }) {
                     style={{ ...mutedText, ...MIDDLE_TEXT }}
                   />
                 </FlexWidget>
-              )}
-              {shown.some((model) => model.stale) && (
-                <TextWidget
-                  text={translate(language, 'rate_offline')}
-                  maxLines={1}
-                  truncate="END"
-                  style={{ ...mutedText, ...MIDDLE_TEXT }}
-                />
               )}
             </FlexWidget>
           </FlexWidget>

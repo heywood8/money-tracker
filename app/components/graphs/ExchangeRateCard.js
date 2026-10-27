@@ -1,5 +1,5 @@
 import React, { useCallback, useEffect, useMemo, useState } from 'react';
-import { View, Text, StyleSheet, ActivityIndicator, Pressable } from 'react-native';
+import { View, Text, StyleSheet, ActivityIndicator, Pressable, Linking } from 'react-native';
 import PropTypes from 'prop-types';
 import { CartesianChart, Line, Area, useChartPressState } from 'victory-native';
 import { matchFont, LinearGradient, Circle, vec } from '@shopify/react-native-skia';
@@ -20,12 +20,12 @@ import {
   rateDecimals,
   summarizeRateSeries,
 } from '../../services/ExchangeRateHistory';
-import { rateChartTitle } from '../../services/ExchangeRateCharts';
+import { googleRateSearchUrl, rateChartTitle } from '../../services/ExchangeRateCharts';
 import { useTabFocused } from '../../contexts/TabFocusContext';
 import useOnForeground from '../../hooks/useOnForeground';
 import { withAlpha } from '../../utils/colorUtils';
 import { BUTTON_COMPACT, BUTTON_TEXT, CARD_SURFACE, SECTION_LABEL } from '../../styles/componentStyles';
-import { BORDER_RADIUS, FONT_SIZE, FONT_WEIGHT, HEIGHTS, SPACING } from '../../styles/designTokens';
+import { BORDER_RADIUS, FONT_SIZE, FONT_WEIGHT, HEIGHTS, ICON_SIZE, SPACING } from '../../styles/designTokens';
 
 const CHART_HEIGHT = 160;
 const AXIS_FONT_SIZE = FONT_SIZE.xs;
@@ -211,6 +211,10 @@ const ExchangeRateCard = ({ chart, colors, t, language }) => {
 
   const handleScrub = useCallback((index) => setScrubIndex(index), []);
   const handleRetry = useCallback(() => reload(), [reload]);
+  // The pair on Google, to check the line against the rate people swap at.
+  const handleOpenGoogle = useCallback(() => {
+    Linking.openURL(googleRateSearchUrl({ amount, from, to })).catch(() => {});
+  }, [amount, from, to]);
 
   // The header reads the point under the finger while scrubbing, the latest
   // one otherwise; the change is always against the start of the range.
@@ -245,7 +249,18 @@ const ExchangeRateCard = ({ chart, colors, t, language }) => {
       style={[styles.card, { backgroundColor: colors.surface, borderColor: colors.border }]}
       testID={`exchange-rate-card-${chart.id}`}
     >
-      <Text style={[styles.title, { color: colors.mutedText }]} numberOfLines={1}>{title}</Text>
+      <View style={styles.titleRow}>
+        <Text style={[styles.title, { color: colors.mutedText }]} numberOfLines={1}>{title}</Text>
+        <Pressable
+          onPress={handleOpenGoogle}
+          hitSlop={SPACING.md}
+          accessibilityRole="link"
+          accessibilityLabel={t('rate_open_google')}
+          testID="exchange-rate-google"
+        >
+          <Icon name="google" size={ICON_SIZE.xs} color={colors.mutedText} />
+        </Pressable>
+      </View>
 
       <View style={styles.valueRow}>
         <Text
@@ -413,6 +428,13 @@ const styles = StyleSheet.create({
   retryText: BUTTON_TEXT,
   title: {
     ...SECTION_LABEL,
+    flexShrink: 1,
+  },
+  titleRow: {
+    alignItems: 'center',
+    flexDirection: 'row',
+    gap: SPACING.sm,
+    justifyContent: 'space-between',
     marginBottom: SPACING.xs,
   },
   value: {

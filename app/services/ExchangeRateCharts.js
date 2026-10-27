@@ -80,6 +80,17 @@ export const reverseRateChart = (chart) => ({ ...chart, from: chart.to, to: char
 export const rateChartTitle = ({ amount, from, to }) => `${amount} ${from} → ${to}`;
 
 /**
+ * Google's own answer for a chart's pair, "1 rub to amd": the converter and
+ * day chart people check a swap against, a tap away from the app's line.
+ *
+ * @param {{amount: number, from: string, to: string}} chart
+ * @returns {string}
+ */
+export const googleRateSearchUrl = ({ amount, from, to }) => (
+  `https://www.google.com/search?q=${encodeURIComponent(`${amount} ${from} to ${to}`.toLowerCase())}`
+);
+
+/**
  * The stored list.
  *
  * Reads the row itself rather than through getJsonPreference, whose error path

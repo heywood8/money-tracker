@@ -4,11 +4,17 @@ import {
   loadExchangeRateWidgetModel,
   renderExchangeRateWidget,
   refreshExchangeRateWidgets,
+  stepExchangeRateWidgetWindow,
 } from '../../app/widgets/exchangeRateWidgetRender';
 import { loadRateCharts } from '../../app/services/ExchangeRateCharts';
 import { fetchRateSeries } from '../../app/services/ExchangeRateHistory';
 import { resolveLanguage } from '../../app/services/notifications/notificationStrings';
-import { getWidgetChart, getWidgetCharts } from '../../app/widgets/exchangeRateWidgetStore';
+import {
+  getWidgetChart,
+  getWidgetCharts,
+  getWidgetWindow,
+  stepWidgetWindow,
+} from '../../app/widgets/exchangeRateWidgetStore';
 import { EXCHANGE_RATE_PAIR_WIDGET, EXCHANGE_RATE_WIDGET } from '../../app/widgets/widgetConstants';
 
 jest.mock('react-native-android-widget', () => ({
@@ -28,6 +34,8 @@ jest.mock('../../app/widgets/exchangeRateWidgetStore', () => ({
   ...jest.requireActual('../../app/widgets/exchangeRateWidgetStore'),
   getWidgetChart: jest.fn(),
   getWidgetCharts: jest.fn(),
+  getWidgetWindow: jest.fn(),
+  stepWidgetWindow: jest.fn(),
 }));
 jest.mock('../../app/contexts/ThemeColorsContext', () => jest.requireActual('../../app/contexts/ThemeColorsContext'));
 
@@ -41,6 +49,8 @@ describe('exchangeRateWidgetRender', () => {
     loadRateCharts.mockResolvedValue([USD_RUB, AMD_RUB]);
     getWidgetChart.mockResolvedValue(null);
     getWidgetCharts.mockResolvedValue([]);
+    getWidgetWindow.mockResolvedValue(null);
+    stepWidgetWindow.mockResolvedValue('year');
     resolveLanguage.mockResolvedValue('ru');
     fetchRateSeries.mockResolvedValue({ points: POINTS, stale: false, checkedAt: 1000 });
   });
@@ -131,20 +141,70 @@ describe('exchangeRateWidgetRender', () => {
     });
   });
 
+  describe('the window', () => {
+    it('draws the one-rate widget over the window it was switched to', async () => {
+      getWidgetWindow.mockResolvedValue('day');
+
+      const model = await loadExchangeRateWidgetModel(7);
+
+      expect(model.chart).toEqual({ ...USD_RUB, range: 'day' });
+      expect(fetchRateSeries).toHaveBeenCalledWith('USD', 'RUB', 'day', {});
+    });
+
+    it('falls back to the chart’s own range when the window cannot be read', async () => {
+      getWidgetWindow.mockRejectedValue(new Error('unreadable'));
+
+      const model = await loadExchangeRateWidgetModel(7);
+
+      expect(model.chart).toEqual(USD_RUB);
+    });
+
+    it('steps a widget’s window from its chart’s own range, the window itself left to the store', async () => {
+      getWidgetChart.mockResolvedValue(AMD_RUB);
+      const widget = { widgetName: EXCHANGE_RATE_WIDGET, widgetId: 7 };
+
+      await expect(stepExchangeRateWidgetWindow(widget, 1)).resolves.toBe('year');
+      // The fallback is the chart's range, not a window already applied to it.
+      expect(stepWidgetWindow).toHaveBeenLastCalledWith(7, 'week', 1, { wrap: false });
+      expect(getWidgetWindow).not.toHaveBeenCalled();
+    });
+
+    it('steps the two-rate widget from its first chart, and passes a wrap on', async () => {
+      getWidgetCharts.mockResolvedValue([null, AMD_RUB]);
+      stepWidgetWindow.mockResolvedValue(null);
+
+      await expect(stepExchangeRateWidgetWindow({ widgetName: EXCHANGE_RATE_PAIR_WIDGET, widgetId: 8 }, -1, { wrap: true }))
+        .resolves.toBeNull();
+      expect(stepWidgetWindow).toHaveBeenLastCalledWith(8, 'week', -1, { wrap: true });
+    });
+  });
+
   describe('loadExchangeRatePairModels', () => {
-    it('loads the widget’s own two charts, in its order', async () => {
+    it('loads the widget’s own two charts, in its order, both over the first one’s range', async () => {
       getWidgetCharts.mockResolvedValue([AMD_RUB, USD_RUB]);
 
       const models = await loadExchangeRatePairModels(7);
 
-      expect(models.map((model) => model.chart)).toEqual([AMD_RUB, USD_RUB]);
+      // One window for the widget: the middle shows one, both halves follow it.
+      expect(models.map((model) => model.chart)).toEqual([AMD_RUB, { ...USD_RUB, range: 'week' }]);
       expect(models.every((model) => model.status === 'ready')).toBe(true);
       expect(getWidgetCharts).toHaveBeenCalledWith(7);
     });
 
     it('shows the first two charts on a widget never configured', async () => {
       const models = await loadExchangeRatePairModels(7);
-      expect(models.map((model) => model.chart)).toEqual([USD_RUB, AMD_RUB]);
+      expect(models.map((model) => model.chart)).toEqual([USD_RUB, { ...AMD_RUB, range: 'month' }]);
+    });
+
+    it('draws both halves over the window the widget was switched to', async () => {
+      getWidgetWindow.mockResolvedValue('year');
+
+      const models = await loadExchangeRatePairModels(7);
+
+      expect(models.map((model) => model.chart.range)).toEqual(['year', 'year']);
+      expect(fetchRateSeries).toHaveBeenCalledWith('USD', 'RUB', 'year', {});
+      expect(fetchRateSeries).toHaveBeenCalledWith('AMD', 'RUB', 'year', {});
+      expect(getWidgetWindow).toHaveBeenCalledWith(7);
     });
 
     it('leaves the second half empty when there is only one chart', async () => {
