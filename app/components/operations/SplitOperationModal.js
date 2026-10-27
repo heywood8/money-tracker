@@ -23,8 +23,6 @@ import useKeyboardOffset from '../../hooks/useKeyboardOffset';
 import * as Currency from '../../services/currency';
 import { BUTTON, BUTTON_TEXT, MODAL_TITLE } from '../../styles/componentStyles';
 
-const SCREEN_WIDTH = Dimensions.get('window').width;
-
 /**
  * SplitOperationModal Component
  *
@@ -153,10 +151,11 @@ export default function SplitOperationModal({
   // Empty handler for preventing event propagation
   const handleStopPropagation = useCallback(() => {}, []);
 
-  // Subpanel slides in from the right; the overlay opacity fades it in.
+  // Subpanel slides in from the right; the overlay opacity fades it in. The
+  // width is read per render: at module load it can be the landscape width.
   const pickerTranslateX = pickerAnim.interpolate({
     inputRange: [0, 1],
-    outputRange: [SCREEN_WIDTH, 0],
+    outputRange: [Dimensions.get('window').width, 0],
   });
 
   return (

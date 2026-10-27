@@ -51,8 +51,6 @@ import { appEvents, EVENTS } from '../services/eventEmitter';
 import { BORDER_RADIUS } from '../styles/designTokens';
 import { withAlpha } from '../utils/colorUtils';
 
-const { width: SCREEN_WIDTH } = Dimensions.get('window');
-
 const TAB_ICONS = {
   Operations: 'swap-horizontal',
   Accounts: 'wallet-outline',
@@ -265,7 +263,17 @@ export default function SimpleTabs() {
   const { isDownloading, downloadProgress, downloadPhase } = useUpdateDownload();
   const [active, setActive] = React.useState('Operations');
   const [subPanelActive, setSubPanelActive] = React.useState(false);
-  const [tabBarWidth, setTabBarWidth] = React.useState(SCREEN_WIDTH);
+  // The width of one page of the strip: the viewport the screens slide through.
+  // It is measured from that viewport, never read once at module load. The
+  // bundle also loads headless (a widget update, the bank-notification task),
+  // and with the phone held sideways at that moment `Dimensions` reports the
+  // landscape width. The portrait-locked app then opens into the same JS
+  // runtime, so a module-level constant kept every page about twice the
+  // screen's width for the rest of the process: the right half of each screen
+  // (balances, the add button) sat past the edge, and rotating could not fix
+  // it. The window width is only the first frame's guess; onLayout replaces it.
+  const [pageWidth, setPageWidth] = React.useState(() => Dimensions.get('window').width);
+  const [tabBarWidth, setTabBarWidth] = React.useState(pageWidth);
 
   // Cold-start optimization: only the active Operations screen is real on the
   // first commit; the background tab slots render lightweight placeholders so
@@ -330,7 +338,10 @@ export default function SimpleTabs() {
   const translateX = useSharedValue(0);
   const activeIndex = useSharedValue(0);
   const startTranslateX = useSharedValue(0);
-  const tabBarWidthShared = useSharedValue(SCREEN_WIDTH);
+  const tabBarWidthShared = useSharedValue(pageWidth);
+  // pageWidth for the worklets (swipe, spring completions), which cannot read
+  // React state. Written only by the snap effect below, never during render.
+  const pageWidthShared = useSharedValue(pageWidth);
   // Dedicated pill position — animated independently so it works for swipe,
   // adjacent, and non-adjacent transitions.
   const pillPosition = useSharedValue(0);
@@ -388,7 +399,7 @@ export default function SimpleTabs() {
     pillPosition.value = withSpring(newIndex, TAB_SPRING);
 
     if (distance === 1) {
-      translateX.value = withSpring(-newIndex * SCREEN_WIDTH, TAB_SPRING);
+      translateX.value = withSpring(-newIndex * pageWidth, TAB_SPRING);
     } else {
       // ---- Non-adjacent tab ----
       // Reposition the target screen to sit immediately adjacent to the source
@@ -398,7 +409,7 @@ export default function SimpleTabs() {
       // zeroed simultaneously, both on the worklet thread — no visual jump.
       const direction = newIndex > oldIndex ? 1 : -1;
       // How far to shift the target so it appears one screen width past the source.
-      const adjacentOffset = (oldIndex + direction - newIndex) * SCREEN_WIDTH;
+      const adjacentOffset = (oldIndex + direction - newIndex) * pageWidth;
       const adjSharedValues = [screenAdjust0, screenAdjust1, screenAdjust2, screenAdjust3, screenAdjust4];
       const opacityValues = [screenOpacity0, screenOpacity1, screenOpacity2, screenOpacity3, screenOpacity4];
       const targetAdjust = adjSharedValues[newIndex];
@@ -416,7 +427,7 @@ export default function SimpleTabs() {
       }
 
       targetAdjust.value = adjacentOffset; // instant reposition on worklet thread
-      translateX.value = withSpring(-(oldIndex + direction) * SCREEN_WIDTH, TAB_SPRING, (finished) => {
+      translateX.value = withSpring(-(oldIndex + direction) * pageWidth, TAB_SPRING, (finished) => {
         'worklet';
         // Superseded: something else owns the strip now and has already put the
         // offsets, opacities and guard where they belong.
@@ -430,7 +441,7 @@ export default function SimpleTabs() {
         // the one a tapped "transactions to review" notification asks for, and
         // the intermediate screens stayed at opacity 0. Only the strip position
         // is skipped on an interruption: whoever cut in owns it now.
-        if (finished) translateX.value = -newIndex * SCREEN_WIDTH;
+        if (finished) translateX.value = -newIndex * pageWidthShared.value;
         targetAdjust.value = 0;
         opacityValues[0].value = 1;
         opacityValues[1].value = 1;
@@ -450,24 +461,26 @@ export default function SimpleTabs() {
   }, [TABS, active, activeIndex, translateX, pillPosition, isTransitioningShared, transitionSeq,
     screenAdjust0, screenAdjust1, screenAdjust2, screenAdjust3, screenAdjust4,
     screenOpacity0, screenOpacity1, screenOpacity2, screenOpacity3, screenOpacity4,
-    clearTransitioningRef]);
+    clearTransitioningRef, pageWidth, pageWidthShared]);
 
   // When the Accounts or Budget tab is toggled on/off the tab set changes size
-  // and indices shift, so snap the strip/pill to the current tab's new index.
+  // and indices shift, and when the page width changes every resting position
+  // moves, so snap the strip/pill to the current tab's position.
   // useLayoutEffect (not useEffect) runs before paint, so the strip is
-  // repositioned in the same commit the tab set changes — otherwise a
+  // repositioned in the same commit the tab set or width changes — otherwise a
   // wrong/blank screen flashes for one frame. If the active tab was removed
   // (e.g. Budget hidden while on it), fall back to Operations.
   React.useLayoutEffect(() => {
     const idx = TABS.findIndex(tab => tab.key === active);
     const safeIdx = idx === -1 ? 0 : idx;
     if (idx === -1) setActive(TABS[0].key);
+    pageWidthShared.value = pageWidth;
     activeIndex.value = safeIdx;
     pillPosition.value = safeIdx;
-    translateX.value = -safeIdx * SCREEN_WIDTH;
-    // Intentionally only re-run when the tab set is toggled — depending on
+    translateX.value = -safeIdx * pageWidth;
+    // Intentionally only re-run when the tab set or width changes — depending on
     // `active` would re-snap the strip mid-animation on every tab switch.
-  }, [showAccountsTab, showBudgetTab]);
+  }, [showAccountsTab, showBudgetTab, pageWidth]);
 
   // Land on a tab with no animation and no guard, undoing anything a
   // half-finished transition left behind (a repositioned target screen, hidden
@@ -483,7 +496,7 @@ export default function SimpleTabs() {
     isTransitioningRef.current = false;
     activeIndex.value = idx;
     pillPosition.value = idx;
-    translateX.value = -idx * SCREEN_WIDTH;
+    translateX.value = -idx * pageWidth;
     [screenAdjust0, screenAdjust1, screenAdjust2, screenAdjust3, screenAdjust4]
       .forEach((value) => { value.value = 0; });
     [screenOpacity0, screenOpacity1, screenOpacity2, screenOpacity3, screenOpacity4]
@@ -492,7 +505,8 @@ export default function SimpleTabs() {
     return true;
   }, [TABS, activeIndex, translateX, pillPosition, isTransitioningShared, transitionSeq,
     screenAdjust0, screenAdjust1, screenAdjust2, screenAdjust3, screenAdjust4,
-    screenOpacity0, screenOpacity1, screenOpacity2, screenOpacity3, screenOpacity4]);
+    screenOpacity0, screenOpacity1, screenOpacity2, screenOpacity3, screenOpacity4,
+    pageWidth]);
 
   // Both notification deep links land on the Operations tab, and neither may be
   // turned away by the transition guard: that guard exists to keep two *user*
@@ -617,7 +631,8 @@ export default function SimpleTabs() {
         if (isTransitioningShared.value) return;
         const newTranslateX = startTranslateX.value + event.translationX;
         const maxTranslateX = 0;
-        const minTranslateX = -(TABS.length - 1) * SCREEN_WIDTH;
+        const width = pageWidthShared.value;
+        const minTranslateX = -(TABS.length - 1) * width;
         // Past the first / last tab the strip keeps following the finger with
         // progressive resistance rather than freezing against the clamp — a hard
         // stop at the edge reads as a broken touch, resistance reads as "this is
@@ -626,14 +641,14 @@ export default function SimpleTabs() {
           newTranslateX,
           minTranslateX,
           maxTranslateX,
-          SCREEN_WIDTH,
+          width,
         );
         // The pill has no rubber-band zone of its own (there is no tab slot past
         // either end to slide into), so keep it pinned to the real index range
         // while the strip overshoots.
         pillPosition.value = Math.min(
           TABS.length - 1,
-          Math.max(0, -translateX.value / SCREEN_WIDTH),
+          Math.max(0, -translateX.value / width),
         );
       })
       .onEnd((event) => {
@@ -658,13 +673,14 @@ export default function SimpleTabs() {
         // indices (it moves opposite to the strip), so the two stay in step.
         // newIndex === currentIndex when the swipe fell short (or ran into a rubber-
         // banded edge), so the same two springs cover both "commit" and "snap back".
+        const width = pageWidthShared.value;
         activeIndex.value = newIndex;
         pillPosition.value = withSpring(newIndex, {
           ...TAB_SPRING,
-          velocity: -velocityX / SCREEN_WIDTH,
+          velocity: -velocityX / width,
         });
         translateX.value = withSpring(
-          -newIndex * SCREEN_WIDTH,
+          -newIndex * width,
           { ...TAB_SPRING, velocity: velocityX },
           (isFinished) => {
             if (isFinished && newIndex !== currentIndex) {
@@ -673,11 +689,22 @@ export default function SimpleTabs() {
           },
         );
       });
-  }, [translateX, activeIndex, startTranslateX, TABS, setActive, subPanelActive, pillPosition, isTransitioningShared]);
+  }, [translateX, activeIndex, startTranslateX, TABS, setActive, subPanelActive, pillPosition, isTransitioningShared,
+    pageWidthShared]);
 
   const animatedStyle = useAnimatedStyle(() => ({
     transform: [{ translateX: translateX.value }],
   }));
+
+  // A zero width is a viewport not laid out yet, not a real page size. A
+  // sub-pixel difference is not a resize either: layout reports a float32
+  // (411.42856 at density 2.625) against the window's double (411.42857), and
+  // taking it would re-render every launch and re-snap a strip that a widget
+  // deep link may already be sliding.
+  const handleContentLayout = useCallback((event) => {
+    const { width } = event.nativeEvent.layout;
+    setPageWidth((prev) => (width > 0 && Math.abs(width - prev) >= 0.5 ? width : prev));
+  }, []);
 
   const handleTabBarLayout = useCallback((event) => {
     const { width } = event.nativeEvent.layout;
@@ -761,13 +788,13 @@ export default function SimpleTabs() {
     return (
       <>
         {orderedScreens.map((item, i) => (
-          <Animated.View key={item.key} style={[styles.screen, positionStyles[i]]}>
+          <Animated.View key={item.key} style={[styles.screen, { width: pageWidth }, positionStyles[i]]}>
             {item.el}
           </Animated.View>
         ))}
       </>
     );
-  }, [orderedScreens,
+  }, [orderedScreens, pageWidth,
     screenAdjustedStyle0, screenAdjustedStyle1, screenAdjustedStyle2,
     screenAdjustedStyle3, screenAdjustedStyle4]);
 
@@ -782,9 +809,9 @@ export default function SimpleTabs() {
   return (
     <SafeAreaView style={[styles.container, { backgroundColor: colors.background }]} edges={['top', 'left', 'right']}>
       <Header />
-      <View style={styles.content}>
+      <View style={styles.content} onLayout={handleContentLayout} testID="tab-pages-viewport">
         <GestureDetector gesture={panGesture}>
-          <Animated.View style={[styles.screensContainer, { width: SCREEN_WIDTH * TABS.length }, animatedStyle]}>
+          <Animated.View style={[styles.screensContainer, { width: pageWidth * TABS.length }, animatedStyle]}>
             {/* Expose the swipe Pan gesture so nested horizontal scrollables
                 (e.g. label-suggestion chips) can take priority over screen
                 swipes via blocksExternalGesture. */}
@@ -893,9 +920,9 @@ const styles = StyleSheet.create({
     position: 'absolute',
     right: 0,
   },
+  // Both widths are set inline from the measured pageWidth.
   screen: {
     height: '100%',
-    width: SCREEN_WIDTH,
   },
   screenPlaceholder: {
     flex: 1,
@@ -903,8 +930,6 @@ const styles = StyleSheet.create({
   screensContainer: {
     flex: 1,
     flexDirection: 'row',
-    // Base width; overridden inline to SCREEN_WIDTH * TABS.length (3 to 5 tabs).
-    width: SCREEN_WIDTH * 5,
   },
   tab: {
     flex: 1,
