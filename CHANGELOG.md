@@ -1,5 +1,17 @@
 # Changelog
 
+## [0.307.0](https://github.com/heywood8/money-tracker/compare/penny-v0.306.0...penny-v0.307.0) (2026-10-27)
+
+
+### Features
+
+* **widgets:** share date and refresh in the two-rate widget's middle ([#1888](https://github.com/heywood8/money-tracker/issues/1888)) ([02cc603](https://github.com/heywood8/money-tracker/commit/02cc603a0ed79b345bf1c2dbac0f72435fa6d06f))
+
+
+### Bug Fixes
+
+* **tabs:** measure page width instead of reading it at bundle load ([#1889](https://github.com/heywood8/money-tracker/issues/1889)) ([8dfe620](https://github.com/heywood8/money-tracker/commit/8dfe62079dd0fb92718355a1df8ee716b320aa8e))
+
 ## [0.306.0](https://github.com/heywood8/money-tracker/compare/penny-v0.305.0...penny-v0.306.0) (2026-10-26)
 
 
