@@ -5,7 +5,7 @@
 
 import React from 'react';
 import PropTypes from 'prop-types';
-import { FlexWidget, SvgWidget, TextWidget } from 'react-native-android-widget';
+import { FlexWidget, OverlapWidget, SvgWidget, TextWidget } from 'react-native-android-widget';
 import { lightTheme, darkTheme } from '../contexts/ThemeColorsContext';
 import { getCurrencySymbol } from '../services/currency';
 import {
@@ -80,12 +80,44 @@ const SMALL_TEXT = { fontSize: FONT_SIZE.sm };
 const MESSAGE_TEXT = { fontSize: FONT_SIZE.md };
 const VALUE_TEXT = { fontSize: VALUE_FONT_SIZE, fontWeight: 'bold' };
 
-// The two-rate widget: one card holding two halves that meet at a hairline
-// running the card's full height, the fills on either side touching it.
+// The two-rate widget: one card holding two halves, each rate centred in its
+// own half, and between them, once for both, the date and "↻ 14:05". A
+// hairline parts the two lines below; the text above shares the card unparted.
 const DIVIDER_WIDTH = 1;
-const PAIR_ROOT_STYLE = { flexDirection: 'row', padding: 0 };
-const DIVIDER_STYLE = { width: DIVIDER_WIDTH, height: 'match_parent' };
-const HALF_MESSAGE_STYLE = { ...PANEL_STYLE, justifyContent: 'center', paddingLeft: PADDING, paddingRight: PADDING };
+// The middle column holding the shared date and fetch time. Each half keeps
+// half its width clear on both sides, so its text is centred over its own line
+// and never runs under the middle column.
+const MIDDLE_WIDTH = 64;
+// What a half's text keeps before its outer padding gives way, the text
+// shifting off-centre a little rather than the rate being cut: about "₽81.55"
+// at the value's size, or "▼ -2.74 (-3.25%)" at the move's.
+const MIN_HALF_TEXT_WIDTH = 100;
+const PAIR_STACK_STYLE = { width: 'match_parent', height: 'match_parent' };
+const PAIR_ROW_STYLE = { width: 'match_parent', height: 'match_parent', flexDirection: 'row' };
+const PAIR_PANEL_STYLE = { justifyContent: 'space-between' };
+const DIVIDER_STYLE = {
+  width: DIVIDER_WIDTH,
+  height: 'match_parent',
+  flexDirection: 'column',
+  justifyContent: 'flex-end',
+};
+const MIDDLE_ROW_STYLE = { width: 'match_parent', flexDirection: 'row', justifyContent: 'center' };
+const MIDDLE_STYLE = {
+  width: MIDDLE_WIDTH,
+  flexDirection: 'column',
+  alignItems: 'center',
+  paddingTop: PADDING,
+};
+const MIDDLE_TAP_STYLE = {
+  width: 'match_parent',
+  alignItems: 'center',
+  paddingTop: SPACING.sm,
+  paddingBottom: SPACING.sm,
+};
+const CENTERED_TEXT = { width: 'match_parent', textAlign: 'center' };
+// Shrunk rather than cut where a language's word is wider than the column.
+const MIDDLE_TEXT = { ...CENTERED_TEXT, adjustsFontSizeToFit: true };
+const HALF_MESSAGE_STYLE = { ...PANEL_STYLE, justifyContent: 'center', alignItems: 'center' };
 
 /**
  * Evenly thinned values, first and last kept.
@@ -206,13 +238,13 @@ Root.propTypes = {
 // A short message centred in a box of its own: the whole widget, or one half.
 // `retry` makes the box the refresh button: a widget with no rates to show is
 // where fetching again by hand is wanted most.
-const MessageBox = ({ colors, text, style, retry }) => (
+const MessageBox = ({ colors, text, style, retry, textAlign }) => (
   <FlexWidget style={style} {...(retry ? { clickAction: REFRESH_RATES_ACTION } : null)}>
     <TextWidget
       text={text}
       maxLines={3}
       truncate="END"
-      style={{ ...MESSAGE_TEXT, color: colors.mutedText }}
+      style={{ ...MESSAGE_TEXT, color: colors.mutedText, ...(textAlign ? { textAlign } : null) }}
     />
   </FlexWidget>
 );
@@ -222,6 +254,7 @@ MessageBox.propTypes = {
   retry: PropTypes.bool,
   style: PropTypes.object.isRequired,
   text: PropTypes.string.isRequired,
+  textAlign: PropTypes.oneOf(['center']),
 };
 
 const Message = ({ colors, label, text, retry }) => (
@@ -265,6 +298,17 @@ const viewOf = (model) => {
   };
 };
 
+// The line's height in a box `height` dp tall: what the text leaves.
+const sparkHeightOf = (height) => height - PADDING - HEADER_HEIGHT - SPACING.xs;
+const hasRoomForLine = (sparkHeight) => sparkHeight - LINE_BOTTOM_INSET >= MIN_SPARKLINE_HEIGHT;
+
+// Short: the time today, the date before that. The rate's own date sits beside
+// it; this says how fresh the copy on screen is. Tapping it fetches fresh
+// rates; "…" while that runs.
+const fetchedText = (refreshing, checkedAt, language) => (refreshing
+  ? '↻ …'
+  : checkedAt ? `↻ ${formatCheckedAt(checkedAt, language)}` : null);
+
 /**
  * One rate in a box `width` × `height` dp: the pair and date, the rate, its
  * move and when it was fetched, padded, and under them, when there is room,
@@ -281,15 +325,18 @@ const viewOf = (model) => {
  * @param {number} box.padRight
  * @param {number} box.radiusLeft - The widget's corner under the box, if any
  * @param {number} box.radiusRight
- * @param {Object} [box.style] - Extra layout for the box (a margin)
+ * @param {Object} [box.style] - Extra layout for the box
+ * @param {boolean} [box.centered] - The two-rate widget's half: the pair, the
+ *   rate and its move centred, and no date, fetch time or offline marker (the
+ *   middle column shows them once for both)
  * @param {string} [key]
  * @returns {JSX.Element}
  */
 const ratePanel = (model, figures, colors, box, key) => {
   const { language } = model;
   const mutedText = { ...SMALL_TEXT, color: colors.mutedText };
-  const sparkHeight = box.height - PADDING - HEADER_HEIGHT - SPACING.xs;
-  const sparkline = sparkHeight - LINE_BOTTOM_INSET >= MIN_SPARKLINE_HEIGHT && box.width > 0
+  const sparkHeight = sparkHeightOf(box.height);
+  const sparkline = hasRoomForLine(sparkHeight) && box.width > 0
     ? buildSparklineSvg(
       model.points.map((point) => point.rate * model.chart.amount),
       box.width,
@@ -307,63 +354,74 @@ const ratePanel = (model, figures, colors, box, key) => {
     paddingRight: box.padRight,
     paddingBottom: sparkline ? SPACING.xs : PADDING,
   };
-  // Short: the time today, the date before that. The rate's own date sits on
-  // the title row; this says how fresh the copy on screen is.
-  // Tapping it fetches fresh rates; "…" while that runs.
-  const fetched = model.refreshing
-    ? '↻ …'
-    : model.checkedAt ? `↻ ${formatCheckedAt(model.checkedAt, language)}` : null;
+  const fetched = box.centered ? null : fetchedText(model.refreshing, model.checkedAt, language);
 
-  // Each row pins a short text right of one that gives way: the date beside
-  // the title, the fetch time beside the rate (the row with room to spare),
-  // the offline marker beside the move. A narrow widget truncates the title or
-  // the move, never what says how old the figures are.
+  const changeText = { ...SMALL_TEXT, color: rateChangeColor(figures.delta, colors) };
+  const rows = box.centered ? (
+    <FlexWidget style={textStyle}>
+      <TextWidget text={figures.title} maxLines={1} truncate="END" style={{ ...mutedText, ...CENTERED_TEXT }} />
+      <TextWidget
+        text={figures.value}
+        maxLines={1}
+        truncate="END"
+        style={{ ...VALUE_TEXT, ...CENTERED_TEXT, color: colors.text }}
+      />
+      <TextWidget
+        text={`${figures.arrow} ${figures.change}`}
+        maxLines={1}
+        truncate="END"
+        style={{ ...changeText, ...CENTERED_TEXT }}
+      />
+    </FlexWidget>
+  ) : (
+    // Each row pins a short text right of one that gives way: the date beside
+    // the title, the fetch time beside the rate (the row with room to spare),
+    // the offline marker beside the move. A narrow widget truncates the title or
+    // the move, never what says how old the figures are.
+    <FlexWidget style={textStyle}>
+      <FlexWidget style={ROW_STYLE}>
+        <FlexWidget style={ROW_GROW_STYLE}>
+          <TextWidget text={figures.title} maxLines={1} truncate="END" style={mutedText} />
+        </FlexWidget>
+        <TextWidget text={figures.date} maxLines={1} style={{ ...mutedText, ...ROW_END_STYLE }} />
+      </FlexWidget>
+      <FlexWidget style={ROW_STYLE}>
+        <FlexWidget style={ROW_GROW_STYLE}>
+          <TextWidget
+            text={figures.value}
+            maxLines={1}
+            truncate="END"
+            style={{ ...VALUE_TEXT, color: colors.text }}
+          />
+        </FlexWidget>
+        {fetched && (
+          <FlexWidget
+            clickAction={REFRESH_RATES_ACTION}
+            accessibilityLabel={translate(language, 'widget_refresh')}
+            style={REFRESH_TAP_STYLE}
+          >
+            <TextWidget text={fetched} maxLines={1} style={mutedText} />
+          </FlexWidget>
+        )}
+      </FlexWidget>
+      <FlexWidget style={ROW_STYLE}>
+        <FlexWidget style={ROW_GROW_STYLE}>
+          <TextWidget text={`${figures.arrow} ${figures.change}`} maxLines={1} truncate="END" style={changeText} />
+        </FlexWidget>
+        {model.stale && (
+          <TextWidget
+            text={translate(language, 'rate_offline')}
+            maxLines={1}
+            style={{ ...mutedText, ...ROW_END_STYLE }}
+          />
+        )}
+      </FlexWidget>
+    </FlexWidget>
+  );
+
   return (
     <FlexWidget key={key} style={{ ...PANEL_STYLE, ...box.style, width: box.width }}>
-      <FlexWidget style={textStyle}>
-        <FlexWidget style={ROW_STYLE}>
-          <FlexWidget style={ROW_GROW_STYLE}>
-            <TextWidget text={figures.title} maxLines={1} truncate="END" style={mutedText} />
-          </FlexWidget>
-          <TextWidget text={figures.date} maxLines={1} style={{ ...mutedText, ...ROW_END_STYLE }} />
-        </FlexWidget>
-        <FlexWidget style={ROW_STYLE}>
-          <FlexWidget style={ROW_GROW_STYLE}>
-            <TextWidget
-              text={figures.value}
-              maxLines={1}
-              truncate="END"
-              style={{ ...VALUE_TEXT, color: colors.text }}
-            />
-          </FlexWidget>
-          {fetched && (
-            <FlexWidget
-              clickAction={REFRESH_RATES_ACTION}
-              accessibilityLabel={translate(language, 'widget_refresh')}
-              style={REFRESH_TAP_STYLE}
-            >
-              <TextWidget text={fetched} maxLines={1} style={mutedText} />
-            </FlexWidget>
-          )}
-        </FlexWidget>
-        <FlexWidget style={ROW_STYLE}>
-          <FlexWidget style={ROW_GROW_STYLE}>
-            <TextWidget
-              text={`${figures.arrow} ${figures.change}`}
-              maxLines={1}
-              truncate="END"
-              style={{ ...SMALL_TEXT, color: rateChangeColor(figures.delta, colors) }}
-            />
-          </FlexWidget>
-          {model.stale && (
-            <TextWidget
-              text={translate(language, 'rate_offline')}
-              maxLines={1}
-              style={{ ...mutedText, ...ROW_END_STYLE }}
-            />
-          )}
-        </FlexWidget>
-      </FlexWidget>
+      {rows}
       {sparkline && <SvgWidget svg={sparkline} style={{ width: box.width, height: sparkHeight }} />}
     </FlexWidget>
   );
@@ -425,9 +483,9 @@ ExchangeRateWidget.propTypes = {
 /**
  * Two rates side by side, for a row of the home screen the one-rate widget
  * would leave half empty: five cells wide is too much for one rate and splits
- * unevenly into two widgets. One card, each half laid out like the one-rate
- * widget at half the width, its line running to the card's outer edge and
- * bottom and up to a hairline between the halves.
+ * unevenly into two widgets. One card: each half holds a rate centred over its
+ * line, the lines running to the card's outer edges and bottom and up to a
+ * hairline between them, and the date and fetch time sit once in the middle.
  *
  * @param {Object} props
  * @param {Array<Object>} props.models - Two models, as the one-rate widget takes
@@ -443,8 +501,13 @@ export function ExchangeRatePairWidget({ models, theme, width, height }) {
     return <Message colors={colors} label={text} text={text} />;
   }
 
+  const { language } = models[0];
   const views = models.map(viewOf);
   const halfWidth = (width - DIVIDER_WIDTH) / 2;
+  // The inner side always clears the middle column; the outer side matches it
+  // (the text centred over its line) while the half is wide enough.
+  const innerPad = MIDDLE_WIDTH / 2;
+  const outerPad = Math.min(innerPad, Math.max(PADDING, halfWidth - innerPad - MIN_HALF_TEXT_WIDTH));
   const half = (model, view, side) => {
     const first = side === 'first';
     if (!view.figures) {
@@ -454,26 +517,93 @@ export function ExchangeRatePairWidget({ models, theme, width, height }) {
           colors={colors}
           text={view.message}
           retry={view.retry}
-          style={{ ...HALF_MESSAGE_STYLE, width: halfWidth }}
+          textAlign="center"
+          style={{
+            ...HALF_MESSAGE_STYLE,
+            width: halfWidth,
+            paddingLeft: first ? outerPad : innerPad,
+            paddingRight: first ? innerPad : outerPad,
+          }}
         />
       );
     }
     return ratePanel(model, view.figures, colors, {
       width: halfWidth,
       height,
-      padLeft: PADDING,
-      padRight: PADDING,
+      padLeft: first ? outerPad : innerPad,
+      padRight: first ? innerPad : outerPad,
       // Rounded only at the card's own corner; square where it meets the line.
       radiusLeft: first ? CORNER_RADIUS : 0,
       radiusRight: first ? 0 : CORNER_RADIUS,
+      centered: true,
+      style: PAIR_PANEL_STYLE,
     }, side);
   };
 
+  // What the middle says for both: the older of the two rates' dates and
+  // fetch times, so neither half looks fresher than it is, and "offline" if
+  // either was read from the cache after a failed fetch.
+  // A fetch time only when every rate shown has one: one unknown is no basis
+  // for calling both fresh.
+  const shown = models.filter((model, i) => views[i].figures);
+  const lastDate = (model) => model.points[model.points.length - 1].date;
+  const oldest = shown.reduce((found, model) => (!found || lastDate(model) < lastDate(found) ? model : found), null);
+  const checkedAts = shown.map((model) => model.checkedAt);
+  const fetched = fetchedText(
+    shown.some((model) => model.refreshing),
+    checkedAts.every(Boolean) ? Math.min(...checkedAts) : null,
+    language,
+  );
+  const mutedText = { ...SMALL_TEXT, color: colors.mutedText };
+  const sparkHeight = sparkHeightOf(height);
+
   return (
-    <Root colors={colors} label={views.map((view) => view.label).join('; ')} style={PAIR_ROOT_STYLE}>
-      {half(models[0], views[0], 'first')}
-      <FlexWidget style={{ ...DIVIDER_STYLE, backgroundColor: colors.border }} />
-      {half(models[1], views[1], 'second')}
+    <Root colors={colors} label={views.map((view) => view.label).join('; ')} style={BLEED_ROOT_STYLE}>
+      <OverlapWidget style={PAIR_STACK_STYLE}>
+        <FlexWidget style={PAIR_ROW_STYLE}>
+          {half(models[0], views[0], 'first')}
+          <FlexWidget style={DIVIDER_STYLE}>
+            {shown.length === models.length && hasRoomForLine(sparkHeight) && (
+              <FlexWidget style={{ width: DIVIDER_WIDTH, height: sparkHeight, backgroundColor: colors.border }} />
+            )}
+          </FlexWidget>
+          {half(models[1], views[1], 'second')}
+        </FlexWidget>
+        {oldest && (
+          <FlexWidget style={MIDDLE_ROW_STYLE}>
+            <FlexWidget style={MIDDLE_STYLE}>
+              <TextWidget
+                text={views[models.indexOf(oldest)].figures.date}
+                maxLines={1}
+                truncate="END"
+                style={{ ...mutedText, ...MIDDLE_TEXT }}
+              />
+              {fetched && (
+                <FlexWidget
+                  clickAction={REFRESH_RATES_ACTION}
+                  accessibilityLabel={translate(language, 'widget_refresh')}
+                  style={MIDDLE_TAP_STYLE}
+                >
+                  <TextWidget
+                    text={fetched}
+                    maxLines={1}
+                    truncate="END"
+                    style={{ ...mutedText, ...MIDDLE_TEXT }}
+                  />
+                </FlexWidget>
+              )}
+              {shown.some((model) => model.stale) && (
+                <TextWidget
+                  text={translate(language, 'rate_offline')}
+                  maxLines={1}
+                  truncate="END"
+                  style={{ ...mutedText, ...MIDDLE_TEXT }}
+                />
+              )}
+            </FlexWidget>
+          </FlexWidget>
+        )}
+      </OverlapWidget>
     </Root>
   );
 }
