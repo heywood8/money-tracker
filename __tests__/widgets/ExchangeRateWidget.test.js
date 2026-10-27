@@ -215,23 +215,112 @@ describe('ExchangeRateWidget', () => {
       <ExchangeRatePairWidget models={models.map((m) => ({ language: 'en', ...m }))} theme={theme} width={width} height={height} />,
     );
 
-    it('draws two rates side by side in one card, a hairline between them', () => {
+    // Root > stack of [the two halves, the middle column over them].
+    const layersOf = (tree) => tree.children[0].children;
+
+    it('draws two rates side by side in one card, a hairline between their lines', () => {
       const tree = renderPair([
         { status: 'ready', chart: CHART, points: POINTS },
         { status: 'ready', chart: AMD, points: AMD_POINTS },
       ]);
 
-      expect(tree.props.orientation).toBe('HORIZONTAL');
       expect(tree.props.backgroundColor).toBe(lightTheme.colors.surface);
-      const [first, divider, second] = tree.children;
-      expect(tree.children).toHaveLength(3);
+      const [halves] = layersOf(tree);
+      expect(halves.props.orientation).toBe('HORIZONTAL');
+      const [first, divider, second] = halves.children;
+      expect(halves.children).toHaveLength(3);
       // No gap: the halves meet the line on either side.
       expect(first.props.width).toBe(189.5);
       expect(second.props.margin).toBeUndefined();
-      expect(divider.props).toMatchObject({ width: 1, backgroundColor: lightTheme.colors.border });
+      // The hairline runs beside the lines only, not up through the text.
+      const [line] = divider.children;
+      expect(line.props).toMatchObject({ width: 1, height: 96, backgroundColor: lightTheme.colors.border });
       expect(textsOf(first)).toContain('₽81.55');
       expect(textsOf(second)).toContain('֏4.470');
       expect(tree.props.clickActionData).toEqual({ uri: GRAPHS_DEEP_LINK });
+    });
+
+    it('centres each rate in its half, clear of the middle column', () => {
+      const tree = renderPair([
+        { status: 'ready', chart: CHART, points: POINTS },
+        { status: 'ready', chart: AMD, points: AMD_POINTS },
+      ]);
+      const [first] = layersOf(tree)[0].children;
+
+      expect(textsOf(first)).toEqual(['1 USD → RUB', '₽81.55', '▼ -2.74 (-3.25%)']);
+      nodesOf(first, 'TextWidget').forEach((node) => expect(node.props.textAlign).toBe('center'));
+      // Equal padding on both sides, so the text centres over the half's line.
+      const text = parentOf(tree, textNode(first, '1 USD'));
+      expect(text.props.padding).toMatchObject({ left: 32, right: 32 });
+    });
+
+    it('gives up the outer padding before the rate on a narrow widget', () => {
+      const tree = renderPair([
+        { status: 'ready', chart: CHART, points: POINTS },
+        { status: 'ready', chart: AMD, points: AMD_POINTS },
+      ], { width: 250 });
+      const [first, , second] = layersOf(tree)[0].children;
+
+      // (250 - 1) / 2 = 124.5 wide: the inner side still clears the middle.
+      expect(parentOf(tree, textNode(first, '1 USD')).props.padding).toMatchObject({ left: 12, right: 32 });
+      expect(parentOf(tree, textNode(second, '1 RUB')).props.padding).toMatchObject({ left: 32, right: 12 });
+    });
+
+    it('shows the date and fetch time once, in the middle', () => {
+      const today = new Date();
+      today.setHours(14, 5, 0, 0);
+      const tree = renderPair([
+        { status: 'ready', chart: CHART, points: POINTS, checkedAt: today.getTime() + 60 * 60 * 1000 },
+        {
+          status: 'ready',
+          chart: AMD,
+          points: [AMD_POINTS[0], { date: '2026-10-22', rate: 4.47 }],
+          checkedAt: today.getTime(),
+        },
+      ]);
+      const [halves, middle] = layersOf(tree);
+
+      // Neither half carries its own.
+      expect(textsOf(halves).filter((text) => text.startsWith('↻') || text.startsWith('Oct'))).toEqual([]);
+      // The older of the two, so neither rate looks fresher than it is.
+      const [date, fetched] = textsOf(middle);
+      expect(date).toBe('Oct 22');
+      expect(fetched).toMatch(/^↻ 0?2:05|^↻ 14:05/);
+      expect(textsOf(middle)).toHaveLength(2);
+      const area = parentOf(tree, textNode(middle, '↻'));
+      expect(area.props.clickAction).toBe('REFRESH_RATES');
+      expect(area.props.accessibilityLabel).toBe('Refresh rates');
+    });
+
+    it('marks the middle offline when either rate came from the cache, and "…" while refreshing', () => {
+      const tree = renderPair([
+        { status: 'ready', chart: CHART, points: POINTS, stale: true, refreshing: true },
+        { status: 'ready', chart: AMD, points: AMD_POINTS, checkedAt: Date.now() },
+      ]);
+
+      expect(textsOf(layersOf(tree)[1])).toEqual(['Oct 23', '↻ …', 'offline']);
+      expect(textsOf(layersOf(tree)[0])).not.toContain('offline');
+    });
+
+    it('leaves the fetch time out unless both rates have one', () => {
+      const tree = renderPair([
+        { status: 'ready', chart: CHART, points: POINTS, checkedAt: Date.now() },
+        { status: 'ready', chart: AMD, points: AMD_POINTS },
+      ]);
+
+      expect(textsOf(layersOf(tree)[1])).toEqual(['Oct 23']);
+    });
+
+    it('leaves the middle and the hairline out when neither rate could be loaded', () => {
+      const tree = renderPair([
+        { status: 'error', chart: CHART },
+        { status: 'error', chart: AMD },
+      ]);
+      const layers = layersOf(tree);
+
+      expect(layers).toHaveLength(1);
+      expect(layers[0].children[1].children ?? []).toHaveLength(0);
+      expect(textsOf(tree)).toEqual(['1 USD → RUB\nCould not load rates ↻', '1 RUB → AMD\nCould not load rates ↻']);
     });
 
     it('rounds each half’s line only at the card’s outer corner', () => {
@@ -255,8 +344,13 @@ describe('ExchangeRateWidget', () => {
         { status: 'empty' },
       ]);
 
-      expect(textsOf(tree.children[2])).toEqual(['Add an exchange rate chart in Settings → Graphs']);
-      expect(nodesOf(tree.children[0], 'SvgWidget')).toHaveLength(1);
+      const [halves, middle] = layersOf(tree);
+      expect(textsOf(halves.children[2])).toEqual(['Add an exchange rate chart in Settings → Graphs']);
+      expect(nodesOf(halves.children[0], 'SvgWidget')).toHaveLength(1);
+      // The middle still dates the one rate shown.
+      expect(textsOf(middle)).toEqual(['Oct 23']);
+      // No hairline beside a half with no line to part.
+      expect(halves.children[1].children ?? []).toHaveLength(0);
     });
 
     it('shows one prompt across the widget when nothing is set up', () => {
