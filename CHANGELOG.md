@@ -1,5 +1,12 @@
 # Changelog
 
+## [0.308.1](https://github.com/heywood8/money-tracker/compare/penny-v0.308.0...penny-v0.308.1) (2026-10-28)
+
+
+### Bug Fixes
+
+* **widgets:** give the window arrows and refresh thumb-sized tap areas ([#1893](https://github.com/heywood8/money-tracker/issues/1893)) ([3974226](https://github.com/heywood8/money-tracker/commit/3974226b5653c7f10c7cfcbbc0e3e3e4e917db2b))
+
 ## [0.308.0](https://github.com/heywood8/money-tracker/compare/penny-v0.307.0...penny-v0.308.0) (2026-10-28)
 
 
