@@ -37,6 +37,9 @@ export const normalizeColumns = (columns) => {
 // The click action of the "↻ 14:05" on a widget: fetch fresh rates now. Unlike
 // a tap anywhere else, it reaches the task handler (WIDGET_CLICK).
 export const REFRESH_RATES_ACTION = 'REFRESH_RATES';
+// The click action of the arrows either side of a widget's window ("‹ Month ›"):
+// a shorter or longer range, by `step` (-1 or 1) in its clickActionData.
+export const RATE_WINDOW_ACTION = 'RATE_WINDOW';
 
 // Where a tap on the widget goes: the Graphs tab, where the full chart is.
 // The scheme is app.config.js's `scheme`.

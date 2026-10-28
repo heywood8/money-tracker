@@ -1,13 +1,16 @@
 import React from 'react';
 import { requestWidgetUpdate } from 'react-native-android-widget';
 import { loadRateCharts } from '../services/ExchangeRateCharts';
-import { fetchRateSeries } from '../services/ExchangeRateHistory';
+import { DEFAULT_RATE_RANGE, fetchRateSeries } from '../services/ExchangeRateHistory';
 import { resolveLanguage } from '../services/notifications/notificationStrings';
 import {
+  applyWidgetWindow,
   getWidgetChart,
   getWidgetCharts,
+  getWidgetWindow,
   resolveWidgetChart,
   resolveWidgetCharts,
+  stepWidgetWindow,
 } from './exchangeRateWidgetStore';
 import { ExchangeRatePairWidget, ExchangeRateWidget } from './ExchangeRateWidget';
 import { EXCHANGE_RATE_PAIR_WIDGET, EXCHANGE_RATE_WIDGETS } from './widgetConstants';
@@ -65,13 +68,24 @@ const loadModels = async (widgetId, readPicks, { recheck = true, ...options }) =
   return models;
 };
 
-const readOnePick = async (charts, widgetId) => [
+// The charts a widget was set up with, each at its own range.
+const readOneChart = async (charts, widgetId) => [
   resolveWidgetChart(charts, await getWidgetChart(widgetId).catch(() => null)),
 ];
-
-const readTwoPicks = async (charts, widgetId) => (
+const readTwoCharts = async (charts, widgetId) => (
   resolveWidgetCharts(charts, await getWidgetCharts(widgetId).catch(() => []))
 );
+
+// The same, drawn over the window the widget was switched to, if it was.
+const overWindow = (readCharts) => async (charts, widgetId) => {
+  const [picked, window] = await Promise.all([
+    readCharts(charts, widgetId),
+    getWidgetWindow(widgetId).catch(() => null),
+  ]);
+  return applyWidgetWindow(picked, window);
+};
+const readOnePick = overWindow(readOneChart);
+const readTwoPicks = overWindow(readTwoCharts);
 
 /**
  * Everything the one-rate widget needs to draw, read the way the Graphs tab
@@ -102,6 +116,27 @@ export const loadExchangeRateWidgetModel = async (widgetId, options = {}) => (
 export const loadExchangeRatePairModels = (widgetId, options = {}) => (
   loadModels(widgetId, readTwoPicks, options)
 );
+
+/**
+ * Move a widget's window one range shorter (`step` -1) or longer (1), as its
+ * arrows do, stopping at the shortest and longest; with `wrap`, as the label
+ * of a widget too narrow for arrows does, round from the longest to the
+ * shortest. Saved for that widget only: the chart's own range, which the
+ * Graphs tab opens on, stays as it is.
+ *
+ * @param {{widgetName: string, widgetId: number}} widgetInfo
+ * @param {number} step
+ * @param {Object} [options]
+ * @param {boolean} [options.wrap]
+ * @returns {Promise<string|null>} The window now shown, or null when it was
+ *   already at that end and nothing changed
+ */
+export const stepExchangeRateWidgetWindow = async (widgetInfo, step, { wrap = false } = {}) => {
+  const charts = await loadRateCharts().catch(() => []);
+  const readCharts = widgetInfo.widgetName === EXCHANGE_RATE_PAIR_WIDGET ? readTwoCharts : readOneChart;
+  const picked = await readCharts(charts, widgetInfo.widgetId);
+  return stepWidgetWindow(widgetInfo.widgetId, picked.find(Boolean)?.range ?? DEFAULT_RATE_RANGE, step, { wrap });
+};
 
 /**
  * A widget in both system themes; the launcher shows the one that matches.
