@@ -71,10 +71,9 @@ const CENTERED_STYLE = { height: 'match_parent', width: 'match_parent', justifyC
 const ROW_STYLE = { width: 'match_parent', flexDirection: 'row', alignItems: 'center' };
 const ROW_GROW_STYLE = { flex: 1 };
 const ROW_END_STYLE = { marginLeft: SPACING.xs };
-// The tap area around "↻ 14:05": wider and taller than the text, so a thumb
-// finds it, and growing leftwards into the rate's row rather than past the
-// card's padding.
-const REFRESH_TAP_STYLE = {
+// Room around "↻ 14:05" on the rate's row: it sets that row's height, which
+// the refresh zone is measured against (textRowsHeight).
+const REFRESH_TEXT_STYLE = {
   paddingLeft: SPACING.lg,
   paddingTop: SPACING.sm,
   paddingBottom: SPACING.sm,
@@ -82,7 +81,7 @@ const REFRESH_TAP_STYLE = {
 const SMALL_TEXT = { fontSize: FONT_SIZE.sm };
 
 // The window, "‹ Month ›": the label at a fixed width, so the arrows stay put
-// as it changes, and each arrow a tap area of its own.
+// as it changes.
 const WINDOW_ARROW_WIDTH = 18;
 const WINDOW_LABEL_WIDTH = 44;
 const WINDOW_STYLE = { flexDirection: 'row', alignItems: 'center' };
@@ -104,6 +103,34 @@ const MIN_MOVE_WIDTH = 100;
 const MESSAGE_FILL_STYLE = { flex: 1, width: 'match_parent', justifyContent: 'center' };
 const WINDOW_FOOTER_STYLE = { width: 'match_parent', flexDirection: 'row', justifyContent: 'center' };
 const MESSAGE_TEXT = { fontSize: FONT_SIZE.md };
+
+// Where a thumb lands. The widget is drawn as one picture and each tappable
+// box becomes a transparent area over it, so the boxes that take the taps are
+// laid in a layer of their own (OverlapWidget) over the figures, as large as a
+// thumb needs, while the figures keep their compact layout. Text is set in sp
+// and grows with the system font size, so the zones grow with it (fontScale);
+// their sizes come from the lines they cover, at font scale 1:
+const SMALL_LINE_HEIGHT = 16; // a line of SMALL_TEXT
+const VALUE_LINE_HEIGHT = 29; // the rate, VALUE_FONT_SIZE bold
+const WINDOW_LINE_HEIGHT = 24; // the window's arrows, WINDOW_ARROW_TEXT
+// The title's row and the rate's (as tall as the rate or the padded fetch time).
+const textRowsHeight = (scale) => SMALL_LINE_HEIGHT * scale
+  + Math.max(VALUE_LINE_HEIGHT * scale, SMALL_LINE_HEIGHT * scale + SPACING.sm * 2);
+// On the one-rate widget: the card's top right corner, over the date and
+// "↻ 14:05", refreshes, at most this wide and never more than this share of
+// the card, so a narrow widget's rate still opens the app.
+const REFRESH_ZONE_WIDTH = 96;
+const MAX_ZONE_SHARE = 0.4;
+// Each half of the window steps it: half the label, the arrow and the card's
+// padding beyond it, reaching this far into the line's top.
+const WINDOW_ZONE_WIDTH = WINDOW_LABEL_WIDTH / 2 + WINDOW_ARROW_WIDTH + PADDING;
+const WINDOW_ZONE_REACH = SPACING.lg + SPACING.xs;
+const ZONES_STYLE = { width: 'match_parent', height: 'match_parent', flexDirection: 'column' };
+const ZONE_ROW_STYLE = { width: 'match_parent', flexDirection: 'row', justifyContent: 'flex-end' };
+const ZONE_FILL_STYLE = { flex: 1 };
+// Past this the text no longer fits the card and is clipped; the zones stop growing too.
+const MAX_FONT_SCALE = 2;
+const PAIR_ZONE_ROW_STYLE = { width: 'match_parent', flexDirection: 'row', justifyContent: 'center' };
 const VALUE_TEXT = { fontSize: VALUE_FONT_SIZE, fontWeight: 'bold' };
 
 // The two-rate widget: one card holding two halves, each rate centred in its
@@ -117,6 +144,11 @@ const DIVIDER_WIDTH = 1;
 // the halves' shortest text, so the moves (their longest) keep the room.
 const MIDDLE_WIDTH = 64;
 const WINDOW_WIDTH = WINDOW_ARROW_WIDTH * 2 + WINDOW_LABEL_WIDTH;
+// On the two-rate widget: either side of the middle's top, an arrow, to just
+// past the window's own width (the names keep clear of that); under them, over the date and "↻ 14:05", the refresh, a
+// little past the middle's clearance.
+const PAIR_WINDOW_ZONE_WIDTH = WINDOW_WIDTH / 2 + SPACING.xs;
+const PAIR_REFRESH_ZONE_WIDTH = MIDDLE_WIDTH + SPACING.lg;
 // The names keep clear of the window's overhang past MIDDLE_WIDTH, on both
 // sides so they stay centred.
 const TITLE_INSET_STYLE = {
@@ -145,8 +177,8 @@ const MIDDLE_STYLE = {
   alignItems: 'center',
   paddingTop: PADDING - SPACING.xs,
 };
-// Pushed down to the moves' line, and padded below for a thumb.
-const MIDDLE_TAP_STYLE = {
+// Pushed down to the moves' line.
+const MIDDLE_FETCHED_STYLE = {
   width: MIDDLE_WIDTH,
   alignItems: 'center',
   paddingTop: SPACING.sm,
@@ -348,10 +380,10 @@ const fetchedText = (refreshing, checkedAt, language) => (refreshing
   : checkedAt ? `↻ ${formatCheckedAt(checkedAt, language)}` : null);
 
 /**
- * The window a widget shows and the arrows switching it: "‹ Month ›". An arrow
- * at the end of the ranges is drawn faint; its tap is a no-op rather than a
- * fall-through to the Graphs tab. `compact`, for a widget too narrow for both
- * arrows: "Month ›", one tap area stepping on and round from the longest.
+ * The window a widget shows, "‹ Month ›", as drawn: the taps are taken by the
+ * zones laid over it (windowZones), larger than the glyphs. An arrow at the
+ * end of the ranges is drawn faint. `compact`, for a widget too narrow for
+ * both arrows: "Month ›".
  *
  * @param {string} range - One of RATE_RANGES
  * @param {string} language
@@ -362,6 +394,11 @@ const fetchedText = (refreshing, checkedAt, language) => (refreshing
  */
 const windowSelector = (range, language, colors, { compact = false } = {}) => {
   const index = RATE_RANGES.indexOf(range);
+  const glyph = (text, enabled) => (
+    <FlexWidget style={WINDOW_ARROW_STYLE}>
+      <TextWidget text={text} style={{ ...WINDOW_ARROW_TEXT, color: enabled ? colors.primary : colors.border }} />
+    </FlexWidget>
+  );
   const label = (
     <TextWidget
       text={translate(language, RANGE_LABEL_KEYS[range] ?? RANGE_LABEL_KEYS.month)}
@@ -370,39 +407,43 @@ const windowSelector = (range, language, colors, { compact = false } = {}) => {
       style={{ ...WINDOW_LABEL_TEXT, color: colors.mutedText }}
     />
   );
-  if (compact) {
-    return (
-      <FlexWidget
-        clickAction={RATE_WINDOW_ACTION}
-        clickActionData={{ step: 1, wrap: true }}
-        accessibilityLabel={translate(language, 'widget_window_next')}
-        style={WINDOW_STYLE}
-      >
-        {label}
-        <FlexWidget style={WINDOW_ARROW_STYLE}>
-          <TextWidget text="›" style={{ ...WINDOW_ARROW_TEXT, color: colors.primary }} />
-        </FlexWidget>
-      </FlexWidget>
-    );
-  }
-  const arrow = (glyph, step, enabled, labelKey) => (
-    <FlexWidget
-      clickAction={RATE_WINDOW_ACTION}
-      clickActionData={{ step }}
-      accessibilityLabel={translate(language, labelKey)}
-      style={WINDOW_ARROW_STYLE}
-    >
-      <TextWidget text={glyph} style={{ ...WINDOW_ARROW_TEXT, color: enabled ? colors.primary : colors.border }} />
-    </FlexWidget>
-  );
   return (
     <FlexWidget style={WINDOW_STYLE}>
-      {arrow('‹', -1, index > 0, 'widget_window_shorter')}
+      {!compact && glyph('‹', index > 0)}
       {label}
-      {arrow('›', 1, index < RATE_RANGES.length - 1, 'widget_window_longer')}
+      {glyph('›', compact || index < RATE_RANGES.length - 1)}
     </FlexWidget>
   );
 };
+
+// One transparent box taking taps over what is drawn beneath it.
+const tapZone = (key, width, height, clickAction, label, clickActionData) => (
+  <FlexWidget
+    key={key}
+    clickAction={clickAction}
+    {...(clickActionData ? { clickActionData } : null)}
+    accessibilityLabel={label}
+    style={{ width, height }}
+  />
+);
+
+/**
+ * The boxes stepping a window: the shorter and longer halves, `width` × `height`
+ * each, or for a compact window one box stepping round. An arrow at either end
+ * still takes the tap, so it does not fall through to opening the app.
+ *
+ * @param {string} language
+ * @param {Object} size - { width, height } of each half
+ * @param {boolean} [compact]
+ * @returns {JSX.Element[]}
+ */
+const windowZones = (language, { width, height }, compact = false) => (compact
+  ? [tapZone('window', width * 2, height, RATE_WINDOW_ACTION, translate(language, 'widget_window_next'),
+    { step: 1, wrap: true })]
+  : [
+    tapZone('shorter', width, height, RATE_WINDOW_ACTION, translate(language, 'widget_window_shorter'), { step: -1 }),
+    tapZone('longer', width, height, RATE_WINDOW_ACTION, translate(language, 'widget_window_longer'), { step: 1 }),
+  ]);
 
 /**
  * One rate in a box `width` × `height` dp: the pair and date, the rate, its
@@ -421,6 +462,8 @@ const windowSelector = (range, language, colors, { compact = false } = {}) => {
  * @param {number} box.radiusLeft - The widget's corner under the box, if any
  * @param {number} box.radiusRight
  * @param {Object} [box.style] - Extra layout for the box
+ * @param {boolean} [box.compactWindow] - The window as its label alone
+ * @param {string|null} [box.fetched] - "↻ 14:05" (fetchedText), drawn beside the rate
  * @param {boolean} [box.centered] - The two-rate widget's half: the pair, the
  *   rate and its move centred, and no date, fetch time, offline marker or
  *   window (the middle column shows them once for both)
@@ -449,7 +492,7 @@ const ratePanel = (model, figures, colors, box, key) => {
     paddingRight: box.padRight,
     paddingBottom: sparkline ? SPACING.xs : PADDING,
   };
-  const fetched = box.centered ? null : fetchedText(model.refreshing, model.checkedAt, language);
+  const { fetched } = box;
 
   const changeText = { ...SMALL_TEXT, color: rateChangeColor(figures.delta, colors) };
   const rows = box.centered ? (
@@ -500,11 +543,7 @@ const ratePanel = (model, figures, colors, box, key) => {
           />
         </FlexWidget>
         {fetched && (
-          <FlexWidget
-            clickAction={REFRESH_RATES_ACTION}
-            accessibilityLabel={translate(language, 'widget_refresh')}
-            style={REFRESH_TAP_STYLE}
-          >
+          <FlexWidget style={REFRESH_TEXT_STYLE}>
             <TextWidget text={fetched} maxLines={1} style={mutedText} />
           </FlexWidget>
         )}
@@ -513,9 +552,7 @@ const ratePanel = (model, figures, colors, box, key) => {
         <FlexWidget style={ROW_GROW_STYLE}>
           <TextWidget text={`${figures.arrow} ${figures.change}`} maxLines={1} truncate="END" style={changeText} />
         </FlexWidget>
-        {windowSelector(model.chart.range, language, colors, {
-          compact: box.width - box.padLeft - box.padRight < MIN_MOVE_WIDTH + WINDOW_WIDTH,
-        })}
+        {windowSelector(model.chart.range, language, colors, { compact: box.compactWindow })}
       </FlexWidget>
     </FlexWidget>
   );
@@ -535,34 +572,72 @@ const ratePanel = (model, figures, colors, box, key) => {
  * @param {'light'|'dark'} props.theme
  * @param {number} props.width - Widget width in dp
  * @param {number} props.height - Widget height in dp
+ * @param {number} [props.fontScale=1] - The system font scale, which the text
+ *   follows and the tap zones over it with it
  */
-export function ExchangeRateWidget({ model, theme, width, height }) {
+export function ExchangeRateWidget({ model, theme, width, height, fontScale = 1 }) {
   const colors = (theme === 'dark' ? darkTheme : lightTheme).colors;
   const view = viewOf(model);
+  const { language } = model;
+  const scale = Math.min(MAX_FONT_SCALE, Math.max(1, fontScale || 1));
+  const windowZoneSize = { width: WINDOW_ZONE_WIDTH, height: WINDOW_LINE_HEIGHT * scale + WINDOW_ZONE_REACH };
   if (!view.figures && model.chart) {
-    // The window may be what would not load: it stays, to step back from.
+    // The window may be what would not load: it stays, to step back from,
+    // its zones over the footer as on a loaded widget.
+    const compact = width - PADDING * 2 < WINDOW_WIDTH;
     return (
       <Root colors={colors} label={view.label}>
-        <MessageBox colors={colors} text={view.message} retry={view.retry} style={MESSAGE_FILL_STYLE} />
-        <FlexWidget style={WINDOW_FOOTER_STYLE}>
-          {windowSelector(model.chart.range, model.language, colors, { compact: width - PADDING * 2 < WINDOW_WIDTH })}
-        </FlexWidget>
+        <OverlapWidget style={PAIR_STACK_STYLE}>
+          <FlexWidget style={PANEL_STYLE}>
+            <MessageBox colors={colors} text={view.message} retry={view.retry} style={MESSAGE_FILL_STYLE} />
+            <FlexWidget style={WINDOW_FOOTER_STYLE}>
+              {windowSelector(model.chart.range, language, colors, { compact })}
+            </FlexWidget>
+          </FlexWidget>
+          <FlexWidget style={ZONES_STYLE}>
+            <FlexWidget style={ZONE_FILL_STYLE} />
+            <FlexWidget style={PAIR_ZONE_ROW_STYLE}>
+              {windowZones(language, windowZoneSize, compact)}
+            </FlexWidget>
+          </FlexWidget>
+        </OverlapWidget>
       </Root>
     );
   }
   if (!view.figures) {
     return <Message colors={colors} label={view.label} text={view.message} retry={view.retry} />;
   }
+  const compact = width - PADDING * 2 < MIN_MOVE_WIDTH + WINDOW_WIDTH;
+  const fetched = fetchedText(model.refreshing, model.checkedAt, language);
+  const refreshHeight = PADDING + textRowsHeight(scale);
+  // Never so wide on a narrow widget that the rate and its move stop opening the app.
+  const zoneWidth = (preferred) => Math.min(preferred, width * MAX_ZONE_SHARE);
   return (
     <Root colors={colors} label={view.label} style={BLEED_ROOT_STYLE}>
-      {ratePanel(model, view.figures, colors, {
-        width,
-        height,
-        padLeft: PADDING,
-        padRight: PADDING,
-        radiusLeft: CORNER_RADIUS,
-        radiusRight: CORNER_RADIUS,
-      })}
+      <OverlapWidget style={PAIR_STACK_STYLE}>
+        {ratePanel(model, view.figures, colors, {
+          width,
+          height,
+          padLeft: PADDING,
+          padRight: PADDING,
+          radiusLeft: CORNER_RADIUS,
+          radiusRight: CORNER_RADIUS,
+          compactWindow: compact,
+          fetched,
+        })}
+        <FlexWidget style={ZONES_STYLE}>
+          <FlexWidget style={{ ...ZONE_ROW_STYLE, height: refreshHeight }}>
+            {fetched && tapZone('refresh', zoneWidth(REFRESH_ZONE_WIDTH), refreshHeight, REFRESH_RATES_ACTION,
+              translate(language, 'widget_refresh'))}
+          </FlexWidget>
+          <FlexWidget style={ZONE_ROW_STYLE}>
+            {windowZones(language, {
+              ...windowZoneSize,
+              width: compact ? zoneWidth(WINDOW_ZONE_WIDTH * 2) / 2 : WINDOW_ZONE_WIDTH,
+            }, compact)}
+          </FlexWidget>
+        </FlexWidget>
+      </OverlapWidget>
     </Root>
   );
 }
@@ -586,6 +661,7 @@ const MODEL_SHAPE = PropTypes.shape({
 });
 
 ExchangeRateWidget.propTypes = {
+  fontScale: PropTypes.number,
   height: PropTypes.number.isRequired,
   model: MODEL_SHAPE.isRequired,
   theme: PropTypes.oneOf(['light', 'dark']).isRequired,
@@ -602,11 +678,12 @@ ExchangeRateWidget.propTypes = {
  *
  * @param {Object} props
  * @param {Array<Object>} props.models - Two models, as the one-rate widget takes
+ * @param {number} [props.fontScale=1] - As the one-rate widget's
  * @param {'light'|'dark'} props.theme
  * @param {number} props.width - Widget width in dp
  * @param {number} props.height - Widget height in dp
  */
-export function ExchangeRatePairWidget({ models, theme, width, height }) {
+export function ExchangeRatePairWidget({ models, theme, width, height, fontScale = 1 }) {
   const colors = (theme === 'dark' ? darkTheme : lightTheme).colors;
   // Nothing set up at all: one prompt across the whole widget, not two.
   if (models.every((model) => model.status === 'empty')) {
@@ -672,6 +749,7 @@ export function ExchangeRatePairWidget({ models, theme, width, height }) {
   const window = models.find((model) => model.chart)?.chart.range;
   const mutedText = { ...SMALL_TEXT, color: colors.mutedText };
   const sparkHeight = sparkHeightOf(height);
+  const scale = Math.min(MAX_FONT_SCALE, Math.max(1, fontScale || 1));
 
   return (
     <Root colors={colors} label={views.map((view) => view.label).join('; ')} style={BLEED_ROOT_STYLE}>
@@ -700,11 +778,7 @@ export function ExchangeRatePairWidget({ models, theme, width, height }) {
                 />
               )}
               {fetched && (
-                <FlexWidget
-                  clickAction={REFRESH_RATES_ACTION}
-                  accessibilityLabel={translate(language, 'widget_refresh')}
-                  style={MIDDLE_TAP_STYLE}
-                >
+                <FlexWidget style={MIDDLE_FETCHED_STYLE}>
                   <TextWidget
                     text={fetched}
                     maxLines={1}
@@ -716,12 +790,24 @@ export function ExchangeRatePairWidget({ models, theme, width, height }) {
             </FlexWidget>
           </FlexWidget>
         )}
+        {window && (
+          <FlexWidget style={ZONES_STYLE}>
+            <FlexWidget style={PAIR_ZONE_ROW_STYLE}>
+              {windowZones(language, { width: PAIR_WINDOW_ZONE_WIDTH, height: PADDING + WINDOW_LINE_HEIGHT * scale })}
+            </FlexWidget>
+            <FlexWidget style={PAIR_ZONE_ROW_STYLE}>
+              {fetched && tapZone('refresh', PAIR_REFRESH_ZONE_WIDTH, (SMALL_LINE_HEIGHT * 2) * scale + SPACING.lg,
+                REFRESH_RATES_ACTION, translate(language, 'widget_refresh'))}
+            </FlexWidget>
+          </FlexWidget>
+        )}
       </OverlapWidget>
     </Root>
   );
 }
 
 ExchangeRatePairWidget.propTypes = {
+  fontScale: PropTypes.number,
   height: PropTypes.number.isRequired,
   models: PropTypes.arrayOf(MODEL_SHAPE.isRequired).isRequired,
   theme: PropTypes.oneOf(['light', 'dark']).isRequired,
