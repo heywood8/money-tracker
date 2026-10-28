@@ -48,6 +48,15 @@ const parentOf = (tree, target) => {
   }
   return null;
 };
+// The boxes taking taps other than the card's own deep link.
+const allNodes = (tree, found = []) => {
+  found.push(tree);
+  (tree.children || []).forEach((child) => allNodes(child, found));
+  return found;
+};
+const zonesOf = (tree) => allNodes(tree)
+  .filter((node) => ['REFRESH_RATES', 'RATE_WINDOW'].includes(node.props?.clickAction));
+const zoneSize = (zone) => [zone.props.width, zone.props.height];
 const textNode = (tree, start) => nodesOf(tree, 'TextWidget').find((node) => node.props.text.startsWith(start));
 
 // The colour a text is drawn in, found by the start of its text. The builder
@@ -119,31 +128,35 @@ describe('ExchangeRateWidget', () => {
       expect(row.children[0].children[0].props.text).toBe('₽81.55');
     });
 
-    it('makes the fetch time a refresh button, and says when one is running', () => {
+    it('makes the card’s top right corner, over the date and fetch time, a refresh button', () => {
       const tree = render({ status: 'ready', chart: CHART, points: POINTS, checkedAt: Date.now() });
-      const area = parentOf(tree, textNode(tree, '↻'));
+      const [refresh] = zonesOf(tree).filter((zone) => zone.props.clickAction === 'REFRESH_RATES');
 
-      expect(area.props.clickAction).toBe('REFRESH_RATES');
-      expect(area.props.accessibilityLabel).toBe('Refresh rates');
+      // Drawn over the figures, not around the text: a thumb's size, to the card's edge.
+      expect(refresh.props.accessibilityLabel).toBe('Refresh rates');
+      expect(zoneSize(refresh)).toEqual([96, 60]);
+      expect(refresh.children ?? []).toHaveLength(0);
+      expect(parentOf(tree, textNode(tree, '↻')).props.clickAction).toBeUndefined();
       expect(textNode(render({ status: 'ready', chart: CHART, points: POINTS, refreshing: true }), '↻').props.text)
         .toBe('↻ …');
     });
 
-    it('shows the window beside the move, its arrows stepping it', () => {
+    it('shows the window beside the move, each half of it a thumb-sized step', () => {
       const tree = render({ status: 'ready', chart: { ...CHART, range: 'week' }, points: POINTS });
       const label = textNode(tree, 'Week');
-      const [shorter, , longer] = parentOf(tree, label).children;
+      const [shorterGlyph] = parentOf(tree, label).children;
 
       // On the move's row: the move is over this window.
       const row = parentOf(tree, parentOf(tree, label));
       expect(textsOf(row)[0]).toBe('▼ -2.74 (-3.25%)');
-      expect(shorter.props).toMatchObject({
-        clickAction: 'RATE_WINDOW', clickActionData: { step: -1 }, accessibilityLabel: 'Shorter period',
-      });
-      expect(longer.props).toMatchObject({
-        clickAction: 'RATE_WINDOW', clickActionData: { step: 1 }, accessibilityLabel: 'Longer period',
-      });
-      expect(shorter.children[0].props.color).toBe(lightTheme.colors.primary);
+      expect(shorterGlyph.children[0].props.color).toBe(lightTheme.colors.primary);
+      // The glyphs are drawn only; the zones over them take the taps.
+      const [shorter, longer] = zonesOf(tree).filter((zone) => zone.props.clickAction === 'RATE_WINDOW');
+      expect(shorter.props).toMatchObject({ clickActionData: { step: -1 }, accessibilityLabel: 'Shorter period' });
+      expect(longer.props).toMatchObject({ clickActionData: { step: 1 }, accessibilityLabel: 'Longer period' });
+      // Half the label, the arrow and the card's padding each; reaching into the line's top.
+      expect(zoneSize(shorter)).toEqual([52, 44]);
+      expect(zoneSize(longer)).toEqual([52, 44]);
     });
 
     it('draws the arrow at either end of the ranges faint, still taking the tap', () => {
@@ -157,19 +170,41 @@ describe('ExchangeRateWidget', () => {
       expect(allShorter.children[0].props.color).toBe(darkTheme.colors.primary);
       expect(allLonger.children[0].props.color).toBe(darkTheme.colors.border);
       // So it does not fall through to opening the app.
-      expect(dayShorter.props.clickAction).toBe('RATE_WINDOW');
+      expect(zonesOf(day).find((zone) => zone.props.clickActionData?.step === -1)).toBeDefined();
     });
 
     it('folds the window to its label on a widget too narrow for both arrows, a tap stepping it round', () => {
       const tree = render({ status: 'ready', chart: CHART, points: POINTS }, { width: 160 });
       const label = textNode(tree, 'Month');
-      const tap = parentOf(tree, label);
 
-      expect(textsOf(tap)).toEqual(['Month', '›']);
+      expect(textsOf(parentOf(tree, label))).toEqual(['Month', '›']);
       expect(textsOf(tree)).not.toContain('‹');
-      expect(tap.props).toMatchObject({
-        clickAction: 'RATE_WINDOW', clickActionData: { step: 1, wrap: true }, accessibilityLabel: 'Change period',
+      const windowZones = zonesOf(tree).filter((zone) => zone.props.clickAction === 'RATE_WINDOW');
+      expect(windowZones).toHaveLength(1);
+      expect(windowZones[0].props).toMatchObject({
+        clickActionData: { step: 1, wrap: true }, accessibilityLabel: 'Change period', height: 44,
       });
+      // No more than 40% of the card, so the rate and its move still open the app.
+      expect(windowZones[0].props.width).toBe(64);
+      const [refresh] = zonesOf(tree).filter((zone) => zone.props.clickAction === 'REFRESH_RATES');
+      expect(refresh).toBeUndefined();
+    });
+
+    it('grows the zones with the system font size, as the text they cover grows', () => {
+      const scaled = buildWidgetTree(
+        <ExchangeRateWidget
+          model={{ language: 'en', status: 'ready', chart: CHART, points: POINTS, checkedAt: Date.now() }}
+          theme="light"
+          width={250}
+          height={180}
+          fontScale={1.5}
+        />,
+      );
+      const [refresh, shorter] = zonesOf(scaled);
+
+      // 12 + 16×1.5 + max(29×1.5, 16×1.5 + 16) = 79.5; 24×1.5 + 20 = 56.
+      expect(zoneSize(refresh)).toEqual([96, 79.5]);
+      expect(zoneSize(shorter)).toEqual([52, 56]);
     });
 
     it('names the window in the app’s language', () => {
@@ -244,7 +279,19 @@ describe('ExchangeRateWidget', () => {
     const [shorter] = parentOf(tree, textNode(tree, 'All')).children;
 
     expect(textsOf(tree).slice(1)).toEqual(['‹', 'All', '›']);
-    expect(shorter.props).toMatchObject({ clickAction: 'RATE_WINDOW', clickActionData: { step: -1 } });
+    expect(shorter.children[0].props.color).toBe(lightTheme.colors.primary);
+    // The zones over the footer take the taps, as on a loaded widget.
+    const [shorterZone, longerZone] = zonesOf(tree).filter((zone) => zone.props.clickAction === 'RATE_WINDOW');
+    expect(shorterZone.props).toMatchObject({ clickAction: 'RATE_WINDOW', clickActionData: { step: -1 }, width: 52, height: 44 });
+    expect(longerZone.props).toMatchObject({ clickActionData: { step: 1 } });
+  });
+
+  it('folds the window under a failure to one tap on a narrow widget', () => {
+    const tree = render({ status: 'error', chart: CHART }, { width: 100 });
+    const [tap] = zonesOf(tree).filter((zone) => zone.props.clickAction === 'RATE_WINDOW');
+
+    expect(textsOf(tree).slice(1)).toEqual(['Month', '›']);
+    expect(tap.props).toMatchObject({ clickActionData: { step: 1, wrap: true }, accessibilityLabel: 'Change period' });
   });
 
   it('offers a refresh by tap when nothing could be loaded, and shows it running', () => {
@@ -346,9 +393,18 @@ describe('ExchangeRateWidget', () => {
       // The window on top, level with the pairs' names; one for both halves.
       expect(window).toBe('Month');
       expect(textsOf(middle)).toHaveLength(5);
-      const area = parentOf(tree, textNode(middle, '↻'));
-      expect(area.props.clickAction).toBe('REFRESH_RATES');
-      expect(area.props.accessibilityLabel).toBe('Refresh rates');
+      // Taps go to a layer of their own over the middle: an arrow either side
+      // of its top, the refresh over the date and fetch time.
+      const [zones] = layersOf(tree).slice(2);
+      const [shorter, longer, refresh] = zonesOf(zones);
+      // Out to just past the window's width, clear of the names' inset.
+      expect(shorter.props).toMatchObject({ clickActionData: { step: -1 }, width: 44, height: 36 });
+      expect(longer.props).toMatchObject({ clickActionData: { step: 1 }, width: 44, height: 36 });
+      // A little past the middle's clearance, so the halves' figures still open the app.
+      expect(refresh.props).toMatchObject({
+        clickAction: 'REFRESH_RATES', accessibilityLabel: 'Refresh rates', width: 80, height: 48,
+      });
+      expect(zonesOf(middle)).toHaveLength(0);
     });
 
     it('marks the middle offline when either rate came from the cache, and "…" while refreshing', () => {
@@ -369,6 +425,8 @@ describe('ExchangeRateWidget', () => {
       ]);
 
       expect(textsOf(layersOf(tree)[1])).toEqual(['‹', 'Month', '›', 'Oct 23']);
+      // Nothing to refresh-tap over: only the arrows take taps.
+      expect(zonesOf(tree).map((zone) => zone.props.clickAction)).toEqual(['RATE_WINDOW', 'RATE_WINDOW']);
     });
 
     it('leaves only the window in the middle, and no hairline, when neither rate could be loaded', () => {

@@ -1,4 +1,5 @@
 import React from 'react';
+import { PixelRatio } from 'react-native';
 import { requestWidgetUpdate } from 'react-native-android-widget';
 import { loadRateCharts } from '../services/ExchangeRateCharts';
 import { DEFAULT_RATE_RANGE, fetchRateSeries } from '../services/ExchangeRateHistory';
@@ -138,6 +139,14 @@ export const stepExchangeRateWidgetWindow = async (widgetInfo, step, { wrap = fa
   return stepWidgetWindow(widgetInfo.widgetId, picked.find(Boolean)?.range ?? DEFAULT_RATE_RANGE, step, { wrap });
 };
 
+const readFontScale = () => {
+  try {
+    return PixelRatio.getFontScale();
+  } catch {
+    return 1;
+  }
+};
+
 /**
  * A widget in both system themes; the launcher shows the one that matches.
  * Serves both exchange-rate widgets, told apart by `widgetName`.
@@ -147,7 +156,8 @@ export const stepExchangeRateWidgetWindow = async (widgetInfo, step, { wrap = fa
  * @returns {Promise<{light: JSX.Element, dark: JSX.Element}>}
  */
 export const renderExchangeRateWidget = async (widgetInfo, options = {}) => {
-  const size = { width: widgetInfo.width, height: widgetInfo.height };
+  // The text follows the system font size, and the tap zones over it with it.
+  const size = { width: widgetInfo.width, height: widgetInfo.height, fontScale: readFontScale() };
   if (widgetInfo.widgetName === EXCHANGE_RATE_PAIR_WIDGET) {
     const models = await loadExchangeRatePairModels(widgetInfo.widgetId, options);
     return {
