@@ -1,5 +1,12 @@
 # Changelog
 
+## [0.308.0](https://github.com/heywood8/money-tracker/compare/penny-v0.307.0...penny-v0.308.0) (2026-10-28)
+
+
+### Features
+
+* **widgets:** switch the rate window from the widget, link rates to google ([#1891](https://github.com/heywood8/money-tracker/issues/1891)) ([6b10ab5](https://github.com/heywood8/money-tracker/commit/6b10ab54289cf978ce93f997dd67b3064221b9a4))
+
 ## [0.307.0](https://github.com/heywood8/money-tracker/compare/penny-v0.306.0...penny-v0.307.0) (2026-10-27)
 
 
