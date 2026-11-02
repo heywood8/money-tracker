@@ -1,17 +1,27 @@
 diff --git a/android/src/main/java/com/reactnativeandroidwidget/RNWidget.java b/android/src/main/java/com/reactnativeandroidwidget/RNWidget.java
-index a4d0115e0f54775cf50a53d4959b723b9a249807..7777375f7b9aa006610c940a2e622d0d5bd43b8e 100644
+index a4d0115e0f54775cf50a53d4959b723b9a249807..17b4a230f32945ed317e9be6f616557998121699 100644
 --- a/android/src/main/java/com/reactnativeandroidwidget/RNWidget.java
 +++ b/android/src/main/java/com/reactnativeandroidwidget/RNWidget.java
-@@ -73,6 +73,8 @@ public class RNWidget {
+@@ -64,7 +64,6 @@ public class RNWidget {
+         ReadableMap dark = config.getMap("dark");
+ 
+         ReadableMap configClone = Arguments.makeNativeMap(light.toHashMap());
+-        RemoteViews remoteWidgetView = new RemoteViews(appContext.getPackageName(), R.layout.rn_widget);
+ 
+         WidgetWithViews widgetWithViews = WidgetFactory.buildWidgetFromRoot(
+             appContext,
+@@ -73,6 +72,10 @@ public class RNWidget {
              RNWidgetUtil.getWidgetHeight(appContext, widgetId)
          );
  
-+        // Penny patch: rolling texts leave the bitmap for live slots laid over it.
++        // Penny patch: rolling texts leave the bitmap for live slots laid over it,
++        // which only the layout of a widget that rolls has.
 +        RollingText.Capture rolling = RollingText.captureLight(widgetWithViews);
++        RemoteViews remoteWidgetView = new RemoteViews(appContext.getPackageName(), RollingText.layoutFor(rolling));
          Bitmap bitmap = drawViewToBitmap(widgetWithViews.getRootView());
          Uri bitmapUri = saveBitmapToDisk(widgetId, "light", bitmap);
          remoteWidgetView.setImageViewUri(R.id.rn_widget_image_light, bitmapUri);
-@@ -91,6 +93,7 @@ public class RNWidget {
+@@ -91,6 +94,7 @@ public class RNWidget {
                  RNWidgetUtil.getWidgetHeight(appContext, widgetId)
              );
  
@@ -19,7 +29,7 @@ index a4d0115e0f54775cf50a53d4959b723b9a249807..7777375f7b9aa006610c940a2e622d0d
              Bitmap darkBitmap = drawViewToBitmap(darkWidgetWithViews.getRootView());
              Uri darkBitmapUri = saveBitmapToDisk(widgetId, "dark", darkBitmap);
              remoteWidgetView.setImageViewUri(R.id.rn_widget_image_dark, darkBitmapUri);
-@@ -118,8 +121,8 @@ public class RNWidget {
+@@ -118,8 +122,8 @@ public class RNWidget {
          }
          addCollectionViews(widgetId, remoteWidgetView, widgetWithViews, lightImageNames, darkImageNames);
  
@@ -103,10 +113,10 @@ index 0000000000000000000000000000000000000000..2da3de16ab8682f28ad9c6270b8ed4bc
 +}
 diff --git a/android/src/main/java/com/reactnativeandroidwidget/RollingText.java b/android/src/main/java/com/reactnativeandroidwidget/RollingText.java
 new file mode 100644
-index 0000000000000000000000000000000000000000..e0e01bfaf9c66a0cd14f34482953083c7bf2f26d
+index 0000000000000000000000000000000000000000..2b3b9de89c631160269eb30161395d195fd90c39
 --- /dev/null
 +++ b/android/src/main/java/com/reactnativeandroidwidget/RollingText.java
-@@ -0,0 +1,575 @@
+@@ -0,0 +1,672 @@
 +package com.reactnativeandroidwidget;
 +
 +import android.appwidget.AppWidgetManager;
@@ -118,10 +128,13 @@ index 0000000000000000000000000000000000000000..e0e01bfaf9c66a0cd14f34482953083c
 +import android.os.Build;
 +import android.os.Handler;
 +import android.os.Looper;
++import android.os.PowerManager;
 +import android.text.Layout;
++import android.util.Log;
 +import android.util.TypedValue;
 +import android.view.View;
 +import android.view.ViewGroup;
++import android.view.ViewParent;
 +import android.widget.RemoteViews;
 +import android.widget.TextView;
 +
@@ -134,6 +147,7 @@ index 0000000000000000000000000000000000000000..e0e01bfaf9c66a0cd14f34482953083c
 +import java.math.BigInteger;
 +import java.util.ArrayDeque;
 +import java.util.ArrayList;
++import java.util.Arrays;
 +import java.util.HashMap;
 +import java.util.List;
 +import java.util.Map;
@@ -146,8 +160,9 @@ index 0000000000000000000000000000000000000000..e0e01bfaf9c66a0cd14f34482953083c
 + * TextWidget given `rollingGroup` (0 or 1) is therefore left out of the bitmap
 + * (drawn transparent, so the layout around it is unchanged) and shown instead
 + * in live views laid over it, res/layout/rn_widget_rolling.xml: one
-+ * ViewFlipper per character, placed at that character's own x, holding two
-+ * TextViews. When the text changes to one of the same shape (digits where
++ * ViewFlipper per character, placed at that character's own x and with its
++ * baseline on the drawn text's, holding two TextViews. Only a widget that
++ * rolls is sent the layout holding them (rn_widget_rolling_host.xml). When the text changes to one of the same shape (digits where
 + * digits were, every other character the same), the widget is sent a frame per
 + * step, 4,459 → 4,460 → … → 4,465, and in each the slots whose digit changes
 + * flip to their hidden TextView, which the launcher animates: on a rise the old
@@ -160,11 +175,15 @@ index 0000000000000000000000000000000000000000..e0e01bfaf9c66a0cd14f34482953083c
 + * a flipper animates whenever it is told which child to show, even the one it
 + * shows, so the settled frame sent after the last roll names none.
 + *
++ * With the screen off nobody sees a roll, and a process killed before its
++ * steps ran would leave the old figure up: the new one is shown at once.
++ *
 + * Android 12 (API 31) and up: the slots are placed with setViewLayoutMargin and
 + * coloured per night mode with setColorInt. Older versions keep the text in
 + * the bitmap.
 + */
 +final class RollingText {
++    private static final String TAG = "RollingText";
 +    private static final String PREFS = "rn_widget_rolling";
 +    /** At most this many steps: a bigger move skips values, as a counter read at speed. */
 +    private static final int MAX_STEPS = 8;
@@ -194,16 +213,16 @@ index 0000000000000000000000000000000000000000..e0e01bfaf9c66a0cd14f34482953083c
 +        final String key;
 +        final String text;
 +        final int[] slotLeft;
-+        final int top;
++        final int[] slotTop;
 +        final float textSizePx;
 +        final int lightColor;
 +        int darkColor;
 +
-+        Group(@Nullable String key, String text, int[] slotLeft, int top, float textSizePx, int color) {
++        Group(@Nullable String key, String text, int[] slotLeft, int[] slotTop, float textSizePx, int color) {
 +            this.key = key;
 +            this.text = text;
 +            this.slotLeft = slotLeft;
-+            this.top = top;
++            this.slotTop = slotTop;
 +            this.textSizePx = textSizePx;
 +            this.lightColor = color;
 +            this.darkColor = color;
@@ -257,7 +276,14 @@ index 0000000000000000000000000000000000000000..e0e01bfaf9c66a0cd14f34482953083c
 +            if (group < 0 || group >= RollingIds.GROUPS || capture.groups[group] != null) {
 +                continue;
 +            }
-+            Group measured = measure((ViewGroup) root, rolling.getKey(), rolling.getView());
++            Group measured;
++            try {
++                measured = measure((ViewGroup) root, rolling.getKey(), rolling.getView());
++            } catch (RuntimeException e) {
++                // Whatever a device makes of the measuring, the rate is drawn: in the bitmap.
++                Log.w(TAG, "Could not measure a rolling text; it stays in the bitmap", e);
++                measured = null;
++            }
 +            if (measured == null) {
 +                continue;
 +            }
@@ -279,10 +305,15 @@ index 0000000000000000000000000000000000000000..e0e01bfaf9c66a0cd14f34482953083c
 +        }
 +    }
 +
++    /** The layout for a widget's frames: the one with the slots only when something rolls. */
++    static int layoutFor(Capture capture) {
++        return isEmpty(capture) ? R.layout.rn_widget : R.layout.rn_widget_rolling_host;
++    }
++
 +    /**
 +     * Where each character of a one-line text sits in the widget, or null when
-+     * the slots could not show it as drawn: wrapped, cut, too long, or not in
-+     * the slots' face.
++     * the slots could not show it as drawn: wrapped, cut short or clipped, too
++     * long, or not in the slots' face.
 +     */
 +    @Nullable
 +    @RequiresApi(Build.VERSION_CODES.S)
@@ -312,12 +343,67 @@ index 0000000000000000000000000000000000000000..e0e01bfaf9c66a0cd14f34482953083c
 +        view.getDrawingRect(bounds);
 +        root.offsetDescendantRectToMyCoords(view, bounds);
 +        float left = bounds.left + view.getTotalPaddingLeft();
++        int top = bounds.top + view.getTotalPaddingTop();
++
++        // The bitmap clips the text to every box around it; the slots, laid over
++        // the whole widget, would not. A text cut off there stays there.
++        Rect line = new Rect(
++            (int) Math.ceil(left + layout.getLineLeft(0)),
++            top + layout.getLineTop(0),
++            (int) Math.floor(left + layout.getLineRight(0)),
++            top + layout.getLineBottom(0));
++        if (!insideEveryBox(root, view, line)) {
++            return null;
++        }
++
++        // Each slot is a line of its own, so a character from a taller fallback
++        // font (֏) gives its slot a lower baseline than a digit's: every slot is
++        // placed by its baseline, all on the drawn line's.
++        float baseline = top + layout.getLineBaseline(0);
++        TextView probe = slotProbe(view.getContext(), view.getTextSize());
 +        int[] slotLeft = new int[text.length()];
++        int[] slotTop = new int[text.length()];
 +        for (int i = 0; i < text.length(); i++) {
 +            slotLeft[i] = Math.round(left + layout.getPrimaryHorizontal(i));
++            probe.setText(String.valueOf(text.charAt(i)));
++            probe.measure(View.MeasureSpec.UNSPECIFIED, View.MeasureSpec.UNSPECIFIED);
++            slotTop[i] = Math.round(baseline - probe.getBaseline());
 +        }
-+        int top = bounds.top + view.getTotalPaddingTop() + layout.getLineTop(0);
-+        return new Group(key, text, slotLeft, top, view.getTextSize(), view.getCurrentTextColor());
++        return new Group(key, text, slotLeft, slotTop, view.getTextSize(), view.getCurrentTextColor());
++    }
++
++    // A TextView set up as a slot's (scripts/rollingWidgetResources.js: textView).
++    private static TextView slotProbe(Context context, float textSizePx) {
++        TextView probe = new TextView(context);
++        // Measured as a slot is laid out (wrap_content); a TextView with no
++        // layout params cannot be measured at all.
++        probe.setLayoutParams(new ViewGroup.LayoutParams(
++            ViewGroup.LayoutParams.WRAP_CONTENT, ViewGroup.LayoutParams.WRAP_CONTENT));
++        probe.setTypeface(Typeface.create("sans-serif", Typeface.BOLD));
++        probe.setIncludeFontPadding(true);
++        probe.setLetterSpacing(0f);
++        probe.setAllCaps(false);
++        probe.setMaxLines(1);
++        probe.setTextSize(TypedValue.COMPLEX_UNIT_PX, textSizePx);
++        return probe;
++    }
++
++    private static boolean insideEveryBox(ViewGroup root, View view, Rect line) {
++        Rect box = new Rect();
++        for (ViewParent parent = view.getParent(); parent instanceof View; parent = parent.getParent()) {
++            View ancestor = (View) parent;
++            ancestor.getDrawingRect(box);
++            if (ancestor != root) {
++                root.offsetDescendantRectToMyCoords(ancestor, box);
++            }
++            if (!box.contains(line)) {
++                return false;
++            }
++            if (ancestor == root) {
++                break;
++            }
++        }
++        return true;
 +    }
 +
 +    /**
@@ -333,10 +419,15 @@ index 0000000000000000000000000000000000000000..e0e01bfaf9c66a0cd14f34482953083c
 +            return;
 +        }
 +        synchronized (RollingText.class) {
-+            if (isEmpty(capture) && STATES.get(widgetId) == null) {
-+                // A widget that has never rolled (or a text the slots cannot show):
-+                // the library's frame, with the slots hidden in case they showed.
-+                hideAll(base);
++            SharedPreferences prefs = prefs(appContext);
++            if (isEmpty(capture)) {
++                // Nothing rolls: the library's own layout and frame. Any steps
++                // still due stop with the state; the saved texts stay, to roll
++                // from when a rate is back.
++                STATES.remove(widgetId);
++                if (prefs.getBoolean(hostKey(widgetId), false)) {
++                    prefs.edit().putBoolean(hostKey(widgetId), false).apply();
++                }
 +                manager.updateAppWidget(widgetId, base);
 +                return;
 +            }
@@ -347,8 +438,12 @@ index 0000000000000000000000000000000000000000..e0e01bfaf9c66a0cd14f34482953083c
 +            }
 +            state.base = base;
 +
-+            SharedPreferences prefs = prefs(appContext);
 +            SharedPreferences.Editor editor = prefs.edit();
++            // A launcher meeting the slots' layout anew inflates it: every slot
++            // shows its first child, whatever was saved.
++            boolean freshSlots = !prefs.getBoolean(hostKey(widgetId), false);
++            editor.putBoolean(hostKey(widgetId), true);
++            boolean seen = isScreenOn(appContext);
 +            boolean stepping = false;
 +            for (int g = 0; g < RollingIds.GROUPS; g++) {
 +                Group layout = capture.groups[g];
@@ -359,6 +454,11 @@ index 0000000000000000000000000000000000000000..e0e01bfaf9c66a0cd14f34482953083c
 +                    continue;
 +                }
 +                GroupState group = state.groups[g] != null ? state.groups[g] : load(prefs, widgetId, g);
++                if (freshSlots) {
++                    for (int[] visible : group.visible) {
++                        Arrays.fill(visible, 0);
++                    }
++                }
 +                group.layout = layout;
 +                if (!Objects.equals(layout.key, group.key)) {
 +                    // Another pair or amount in this place: a new figure, not a move.
@@ -371,7 +471,7 @@ index 0000000000000000000000000000000000000000..e0e01bfaf9c66a0cd14f34482953083c
 +                } else if (!layout.text.equals(group.target)) {
 +                    String from = group.shown != null ? group.shown : group.target;
 +                    group.steps.clear();
-+                    if (from != null && sameShape(from, layout.text)) {
++                    if (seen && from != null && sameShape(from, layout.text)) {
 +                        group.rise = compareDigits(layout.text, from) > 0;
 +                        group.steps.addAll(steps(from, layout.text));
 +                        group.shown = from;
@@ -405,11 +505,9 @@ index 0000000000000000000000000000000000000000..e0e01bfaf9c66a0cd14f34482953083c
 +        return true;
 +    }
 +
-+    private static void hideAll(RemoteViews views) {
-+        for (int g = 0; g < RollingIds.GROUPS; g++) {
-+            views.setViewVisibility(RollingIds.CONTAINERS[g][RollingIds.RISE], View.GONE);
-+            views.setViewVisibility(RollingIds.CONTAINERS[g][RollingIds.FALL], View.GONE);
-+        }
++    private static boolean isScreenOn(Context context) {
++        PowerManager power = context.getSystemService(PowerManager.class);
++        return power == null || power.isInteractive();
 +    }
 +
 +    /** Forgets a removed widget. */
@@ -417,6 +515,7 @@ index 0000000000000000000000000000000000000000..e0e01bfaf9c66a0cd14f34482953083c
 +        synchronized (RollingText.class) {
 +            STATES.remove(widgetId);
 +            SharedPreferences.Editor editor = prefs(context.getApplicationContext()).edit();
++            editor.remove(hostKey(widgetId));
 +            for (int g = 0; g < RollingIds.GROUPS; g++) {
 +                editor.remove(keyKey(widgetId, g));
 +                editor.remove(targetKey(widgetId, g));
@@ -463,6 +562,7 @@ index 0000000000000000000000000000000000000000..e0e01bfaf9c66a0cd14f34482953083c
 +                return;
 +            }
 +            state.ticking = false;
++            saveVisible(context, state);
 +            final int settled = ++state.generation;
 +            handler().postDelayed(() -> settle(context, widgetId, settled), SETTLE_DELAY_MS);
 +        }
@@ -497,7 +597,6 @@ index 0000000000000000000000000000000000000000..e0e01bfaf9c66a0cd14f34482953083c
 +    private static void send(Context context, WidgetState state, boolean step) {
 +        // A copy: the library's frame is the base of every step until its next draw.
 +        RemoteViews views = new RemoteViews(state.base);
-+        SharedPreferences.Editor editor = null;
 +        for (int g = 0; g < RollingIds.GROUPS; g++) {
 +            GroupState group = state.groups[g];
 +            if (group == null) {
@@ -509,18 +608,22 @@ index 0000000000000000000000000000000000000000..e0e01bfaf9c66a0cd14f34482953083c
 +            String next = step && !group.steps.isEmpty() ? group.steps.poll() : group.shown;
 +            setGroup(views, g, group, next);
 +            group.shown = next;
-+            if (step) {
-+                if (editor == null) {
-+                    editor = prefs(context).edit();
-+                }
-+                int dir = group.rise ? RollingIds.RISE : RollingIds.FALL;
-+                editor.putString(visibleKey(state.widgetId, g, dir), encode(group.visible[dir]));
-+            }
-+        }
-+        if (editor != null) {
-+            editor.apply();
 +        }
 +        AppWidgetManager.getInstance(context).updateAppWidget(state.widgetId, views);
++    }
++
++    // Which child each slot shows, for a roll after the process is gone.
++    private static void saveVisible(Context context, WidgetState state) {
++        SharedPreferences.Editor editor = prefs(context).edit();
++        for (int g = 0; g < RollingIds.GROUPS; g++) {
++            GroupState group = state.groups[g];
++            if (group == null) {
++                continue;
++            }
++            editor.putString(visibleKey(state.widgetId, g, RollingIds.RISE), encode(group.visible[RollingIds.RISE]));
++            editor.putString(visibleKey(state.widgetId, g, RollingIds.FALL), encode(group.visible[RollingIds.FALL]));
++        }
++        editor.apply();
 +    }
 +
 +    @RequiresApi(Build.VERSION_CODES.S)
@@ -540,7 +643,7 @@ index 0000000000000000000000000000000000000000..e0e01bfaf9c66a0cd14f34482953083c
 +            int[] children = {RollingIds.CHILD_A[g][dir][i], RollingIds.CHILD_B[g][dir][i]};
 +            views.setViewVisibility(flipper, View.VISIBLE);
 +            views.setViewLayoutMargin(flipper, RemoteViews.MARGIN_LEFT, layout.slotLeft[i], TypedValue.COMPLEX_UNIT_PX);
-+            views.setViewLayoutMargin(flipper, RemoteViews.MARGIN_TOP, layout.top, TypedValue.COMPLEX_UNIT_PX);
++            views.setViewLayoutMargin(flipper, RemoteViews.MARGIN_TOP, layout.slotTop[i], TypedValue.COMPLEX_UNIT_PX);
 +            for (int child : children) {
 +                views.setTextViewTextSize(child, TypedValue.COMPLEX_UNIT_PX, layout.textSizePx);
 +                views.setColorInt(child, "setTextColor", layout.lightColor, layout.darkColor);
@@ -668,6 +771,10 @@ index 0000000000000000000000000000000000000000..e0e01bfaf9c66a0cd14f34482953083c
 +
 +    private static SharedPreferences prefs(Context context) {
 +        return context.getSharedPreferences(PREFS, Context.MODE_PRIVATE);
++    }
++
++    private static String hostKey(int widgetId) {
++        return "host:" + widgetId;
 +    }
 +
 +    private static String keyKey(int widgetId, int g) {
@@ -875,31 +982,18 @@ index 0000000000000000000000000000000000000000..5cf0dfd044ead02dd78afb47ce2ef1b8
 +    android:fromYDelta="0%"
 +    android:toYDelta="100%"
 +    android:interpolator="@android:anim/decelerate_interpolator" />
-diff --git a/android/src/main/res/layout/rn_widget.xml b/android/src/main/res/layout/rn_widget.xml
-index 870d18b36ff15ed69ab14632e6bee54f3a9e2920..b83899500cfef597df491bf0247caeaca3a176e3 100644
---- a/android/src/main/res/layout/rn_widget.xml
-+++ b/android/src/main/res/layout/rn_widget.xml
-@@ -19,6 +19,9 @@
-         android:scaleType="matrix"
-         android:visibility="gone" />
- 
-+    <!-- Penny patch: rolling digits laid over the bitmap (RollingText.java). -->
-+    <include layout="@layout/rn_widget_rolling" />
-+
-     <FrameLayout
-         android:id="@+id/rn_widget_clickable_container"
-         android:layout_width="match_parent"
 diff --git a/android/src/main/res/layout/rn_widget_rolling.xml b/android/src/main/res/layout/rn_widget_rolling.xml
 new file mode 100644
-index 0000000000000000000000000000000000000000..1cf7ce5c65d35292c7945e455397332fe9bb9162
+index 0000000000000000000000000000000000000000..681237751a2659c8aa227f3893d6b4e21658d9d4
 --- /dev/null
 +++ b/android/src/main/res/layout/rn_widget_rolling.xml
-@@ -0,0 +1,2014 @@
+@@ -0,0 +1,1887 @@
 +<?xml version="1.0" encoding="utf-8"?>
 +<!-- Penny patch: generated by scripts/rollingWidgetResources.js; do not edit by hand. -->
 +<FrameLayout xmlns:android="http://schemas.android.com/apk/res/android"
 +    android:layout_width="match_parent"
-+    android:layout_height="match_parent">
++    android:layout_height="match_parent"
++    android:importantForAccessibility="noHideDescendants">
 +    <FrameLayout
 +        android:id="@+id/rn_rolling_g0_rise"
 +        android:layout_width="match_parent"
@@ -917,7 +1011,6 @@ index 0000000000000000000000000000000000000000..1cf7ce5c65d35292c7945e455397332f
 +                android:id="@+id/rn_rolling_g0_rise_s0_a"
 +                android:layout_width="wrap_content"
 +                android:layout_height="wrap_content"
-+                android:elegantTextHeight="false"
 +                android:fontFamily="sans-serif"
 +                android:includeFontPadding="true"
 +                android:letterSpacing="0"
@@ -928,7 +1021,6 @@ index 0000000000000000000000000000000000000000..1cf7ce5c65d35292c7945e455397332f
 +                android:id="@+id/rn_rolling_g0_rise_s0_b"
 +                android:layout_width="wrap_content"
 +                android:layout_height="wrap_content"
-+                android:elegantTextHeight="false"
 +                android:fontFamily="sans-serif"
 +                android:includeFontPadding="true"
 +                android:letterSpacing="0"
@@ -948,7 +1040,6 @@ index 0000000000000000000000000000000000000000..1cf7ce5c65d35292c7945e455397332f
 +                android:id="@+id/rn_rolling_g0_rise_s1_a"
 +                android:layout_width="wrap_content"
 +                android:layout_height="wrap_content"
-+                android:elegantTextHeight="false"
 +                android:fontFamily="sans-serif"
 +                android:includeFontPadding="true"
 +                android:letterSpacing="0"
@@ -959,7 +1050,6 @@ index 0000000000000000000000000000000000000000..1cf7ce5c65d35292c7945e455397332f
 +                android:id="@+id/rn_rolling_g0_rise_s1_b"
 +                android:layout_width="wrap_content"
 +                android:layout_height="wrap_content"
-+                android:elegantTextHeight="false"
 +                android:fontFamily="sans-serif"
 +                android:includeFontPadding="true"
 +                android:letterSpacing="0"
@@ -979,7 +1069,6 @@ index 0000000000000000000000000000000000000000..1cf7ce5c65d35292c7945e455397332f
 +                android:id="@+id/rn_rolling_g0_rise_s2_a"
 +                android:layout_width="wrap_content"
 +                android:layout_height="wrap_content"
-+                android:elegantTextHeight="false"
 +                android:fontFamily="sans-serif"
 +                android:includeFontPadding="true"
 +                android:letterSpacing="0"
@@ -990,7 +1079,6 @@ index 0000000000000000000000000000000000000000..1cf7ce5c65d35292c7945e455397332f
 +                android:id="@+id/rn_rolling_g0_rise_s2_b"
 +                android:layout_width="wrap_content"
 +                android:layout_height="wrap_content"
-+                android:elegantTextHeight="false"
 +                android:fontFamily="sans-serif"
 +                android:includeFontPadding="true"
 +                android:letterSpacing="0"
@@ -1010,7 +1098,6 @@ index 0000000000000000000000000000000000000000..1cf7ce5c65d35292c7945e455397332f
 +                android:id="@+id/rn_rolling_g0_rise_s3_a"
 +                android:layout_width="wrap_content"
 +                android:layout_height="wrap_content"
-+                android:elegantTextHeight="false"
 +                android:fontFamily="sans-serif"
 +                android:includeFontPadding="true"
 +                android:letterSpacing="0"
@@ -1021,7 +1108,6 @@ index 0000000000000000000000000000000000000000..1cf7ce5c65d35292c7945e455397332f
 +                android:id="@+id/rn_rolling_g0_rise_s3_b"
 +                android:layout_width="wrap_content"
 +                android:layout_height="wrap_content"
-+                android:elegantTextHeight="false"
 +                android:fontFamily="sans-serif"
 +                android:includeFontPadding="true"
 +                android:letterSpacing="0"
@@ -1041,7 +1127,6 @@ index 0000000000000000000000000000000000000000..1cf7ce5c65d35292c7945e455397332f
 +                android:id="@+id/rn_rolling_g0_rise_s4_a"
 +                android:layout_width="wrap_content"
 +                android:layout_height="wrap_content"
-+                android:elegantTextHeight="false"
 +                android:fontFamily="sans-serif"
 +                android:includeFontPadding="true"
 +                android:letterSpacing="0"
@@ -1052,7 +1137,6 @@ index 0000000000000000000000000000000000000000..1cf7ce5c65d35292c7945e455397332f
 +                android:id="@+id/rn_rolling_g0_rise_s4_b"
 +                android:layout_width="wrap_content"
 +                android:layout_height="wrap_content"
-+                android:elegantTextHeight="false"
 +                android:fontFamily="sans-serif"
 +                android:includeFontPadding="true"
 +                android:letterSpacing="0"
@@ -1072,7 +1156,6 @@ index 0000000000000000000000000000000000000000..1cf7ce5c65d35292c7945e455397332f
 +                android:id="@+id/rn_rolling_g0_rise_s5_a"
 +                android:layout_width="wrap_content"
 +                android:layout_height="wrap_content"
-+                android:elegantTextHeight="false"
 +                android:fontFamily="sans-serif"
 +                android:includeFontPadding="true"
 +                android:letterSpacing="0"
@@ -1083,7 +1166,6 @@ index 0000000000000000000000000000000000000000..1cf7ce5c65d35292c7945e455397332f
 +                android:id="@+id/rn_rolling_g0_rise_s5_b"
 +                android:layout_width="wrap_content"
 +                android:layout_height="wrap_content"
-+                android:elegantTextHeight="false"
 +                android:fontFamily="sans-serif"
 +                android:includeFontPadding="true"
 +                android:letterSpacing="0"
@@ -1103,7 +1185,6 @@ index 0000000000000000000000000000000000000000..1cf7ce5c65d35292c7945e455397332f
 +                android:id="@+id/rn_rolling_g0_rise_s6_a"
 +                android:layout_width="wrap_content"
 +                android:layout_height="wrap_content"
-+                android:elegantTextHeight="false"
 +                android:fontFamily="sans-serif"
 +                android:includeFontPadding="true"
 +                android:letterSpacing="0"
@@ -1114,7 +1195,6 @@ index 0000000000000000000000000000000000000000..1cf7ce5c65d35292c7945e455397332f
 +                android:id="@+id/rn_rolling_g0_rise_s6_b"
 +                android:layout_width="wrap_content"
 +                android:layout_height="wrap_content"
-+                android:elegantTextHeight="false"
 +                android:fontFamily="sans-serif"
 +                android:includeFontPadding="true"
 +                android:letterSpacing="0"
@@ -1134,7 +1214,6 @@ index 0000000000000000000000000000000000000000..1cf7ce5c65d35292c7945e455397332f
 +                android:id="@+id/rn_rolling_g0_rise_s7_a"
 +                android:layout_width="wrap_content"
 +                android:layout_height="wrap_content"
-+                android:elegantTextHeight="false"
 +                android:fontFamily="sans-serif"
 +                android:includeFontPadding="true"
 +                android:letterSpacing="0"
@@ -1145,7 +1224,6 @@ index 0000000000000000000000000000000000000000..1cf7ce5c65d35292c7945e455397332f
 +                android:id="@+id/rn_rolling_g0_rise_s7_b"
 +                android:layout_width="wrap_content"
 +                android:layout_height="wrap_content"
-+                android:elegantTextHeight="false"
 +                android:fontFamily="sans-serif"
 +                android:includeFontPadding="true"
 +                android:letterSpacing="0"
@@ -1165,7 +1243,6 @@ index 0000000000000000000000000000000000000000..1cf7ce5c65d35292c7945e455397332f
 +                android:id="@+id/rn_rolling_g0_rise_s8_a"
 +                android:layout_width="wrap_content"
 +                android:layout_height="wrap_content"
-+                android:elegantTextHeight="false"
 +                android:fontFamily="sans-serif"
 +                android:includeFontPadding="true"
 +                android:letterSpacing="0"
@@ -1176,7 +1253,6 @@ index 0000000000000000000000000000000000000000..1cf7ce5c65d35292c7945e455397332f
 +                android:id="@+id/rn_rolling_g0_rise_s8_b"
 +                android:layout_width="wrap_content"
 +                android:layout_height="wrap_content"
-+                android:elegantTextHeight="false"
 +                android:fontFamily="sans-serif"
 +                android:includeFontPadding="true"
 +                android:letterSpacing="0"
@@ -1196,7 +1272,6 @@ index 0000000000000000000000000000000000000000..1cf7ce5c65d35292c7945e455397332f
 +                android:id="@+id/rn_rolling_g0_rise_s9_a"
 +                android:layout_width="wrap_content"
 +                android:layout_height="wrap_content"
-+                android:elegantTextHeight="false"
 +                android:fontFamily="sans-serif"
 +                android:includeFontPadding="true"
 +                android:letterSpacing="0"
@@ -1207,7 +1282,6 @@ index 0000000000000000000000000000000000000000..1cf7ce5c65d35292c7945e455397332f
 +                android:id="@+id/rn_rolling_g0_rise_s9_b"
 +                android:layout_width="wrap_content"
 +                android:layout_height="wrap_content"
-+                android:elegantTextHeight="false"
 +                android:fontFamily="sans-serif"
 +                android:includeFontPadding="true"
 +                android:letterSpacing="0"
@@ -1227,7 +1301,6 @@ index 0000000000000000000000000000000000000000..1cf7ce5c65d35292c7945e455397332f
 +                android:id="@+id/rn_rolling_g0_rise_s10_a"
 +                android:layout_width="wrap_content"
 +                android:layout_height="wrap_content"
-+                android:elegantTextHeight="false"
 +                android:fontFamily="sans-serif"
 +                android:includeFontPadding="true"
 +                android:letterSpacing="0"
@@ -1238,7 +1311,6 @@ index 0000000000000000000000000000000000000000..1cf7ce5c65d35292c7945e455397332f
 +                android:id="@+id/rn_rolling_g0_rise_s10_b"
 +                android:layout_width="wrap_content"
 +                android:layout_height="wrap_content"
-+                android:elegantTextHeight="false"
 +                android:fontFamily="sans-serif"
 +                android:includeFontPadding="true"
 +                android:letterSpacing="0"
@@ -1258,7 +1330,6 @@ index 0000000000000000000000000000000000000000..1cf7ce5c65d35292c7945e455397332f
 +                android:id="@+id/rn_rolling_g0_rise_s11_a"
 +                android:layout_width="wrap_content"
 +                android:layout_height="wrap_content"
-+                android:elegantTextHeight="false"
 +                android:fontFamily="sans-serif"
 +                android:includeFontPadding="true"
 +                android:letterSpacing="0"
@@ -1269,7 +1340,6 @@ index 0000000000000000000000000000000000000000..1cf7ce5c65d35292c7945e455397332f
 +                android:id="@+id/rn_rolling_g0_rise_s11_b"
 +                android:layout_width="wrap_content"
 +                android:layout_height="wrap_content"
-+                android:elegantTextHeight="false"
 +                android:fontFamily="sans-serif"
 +                android:includeFontPadding="true"
 +                android:letterSpacing="0"
@@ -1289,7 +1359,6 @@ index 0000000000000000000000000000000000000000..1cf7ce5c65d35292c7945e455397332f
 +                android:id="@+id/rn_rolling_g0_rise_s12_a"
 +                android:layout_width="wrap_content"
 +                android:layout_height="wrap_content"
-+                android:elegantTextHeight="false"
 +                android:fontFamily="sans-serif"
 +                android:includeFontPadding="true"
 +                android:letterSpacing="0"
@@ -1300,7 +1369,6 @@ index 0000000000000000000000000000000000000000..1cf7ce5c65d35292c7945e455397332f
 +                android:id="@+id/rn_rolling_g0_rise_s12_b"
 +                android:layout_width="wrap_content"
 +                android:layout_height="wrap_content"
-+                android:elegantTextHeight="false"
 +                android:fontFamily="sans-serif"
 +                android:includeFontPadding="true"
 +                android:letterSpacing="0"
@@ -1320,7 +1388,6 @@ index 0000000000000000000000000000000000000000..1cf7ce5c65d35292c7945e455397332f
 +                android:id="@+id/rn_rolling_g0_rise_s13_a"
 +                android:layout_width="wrap_content"
 +                android:layout_height="wrap_content"
-+                android:elegantTextHeight="false"
 +                android:fontFamily="sans-serif"
 +                android:includeFontPadding="true"
 +                android:letterSpacing="0"
@@ -1331,7 +1398,6 @@ index 0000000000000000000000000000000000000000..1cf7ce5c65d35292c7945e455397332f
 +                android:id="@+id/rn_rolling_g0_rise_s13_b"
 +                android:layout_width="wrap_content"
 +                android:layout_height="wrap_content"
-+                android:elegantTextHeight="false"
 +                android:fontFamily="sans-serif"
 +                android:includeFontPadding="true"
 +                android:letterSpacing="0"
@@ -1351,7 +1417,6 @@ index 0000000000000000000000000000000000000000..1cf7ce5c65d35292c7945e455397332f
 +                android:id="@+id/rn_rolling_g0_rise_s14_a"
 +                android:layout_width="wrap_content"
 +                android:layout_height="wrap_content"
-+                android:elegantTextHeight="false"
 +                android:fontFamily="sans-serif"
 +                android:includeFontPadding="true"
 +                android:letterSpacing="0"
@@ -1362,7 +1427,6 @@ index 0000000000000000000000000000000000000000..1cf7ce5c65d35292c7945e455397332f
 +                android:id="@+id/rn_rolling_g0_rise_s14_b"
 +                android:layout_width="wrap_content"
 +                android:layout_height="wrap_content"
-+                android:elegantTextHeight="false"
 +                android:fontFamily="sans-serif"
 +                android:includeFontPadding="true"
 +                android:letterSpacing="0"
@@ -1382,7 +1446,6 @@ index 0000000000000000000000000000000000000000..1cf7ce5c65d35292c7945e455397332f
 +                android:id="@+id/rn_rolling_g0_rise_s15_a"
 +                android:layout_width="wrap_content"
 +                android:layout_height="wrap_content"
-+                android:elegantTextHeight="false"
 +                android:fontFamily="sans-serif"
 +                android:includeFontPadding="true"
 +                android:letterSpacing="0"
@@ -1393,7 +1456,6 @@ index 0000000000000000000000000000000000000000..1cf7ce5c65d35292c7945e455397332f
 +                android:id="@+id/rn_rolling_g0_rise_s15_b"
 +                android:layout_width="wrap_content"
 +                android:layout_height="wrap_content"
-+                android:elegantTextHeight="false"
 +                android:fontFamily="sans-serif"
 +                android:includeFontPadding="true"
 +                android:letterSpacing="0"
@@ -1419,7 +1481,6 @@ index 0000000000000000000000000000000000000000..1cf7ce5c65d35292c7945e455397332f
 +                android:id="@+id/rn_rolling_g0_fall_s0_a"
 +                android:layout_width="wrap_content"
 +                android:layout_height="wrap_content"
-+                android:elegantTextHeight="false"
 +                android:fontFamily="sans-serif"
 +                android:includeFontPadding="true"
 +                android:letterSpacing="0"
@@ -1430,7 +1491,6 @@ index 0000000000000000000000000000000000000000..1cf7ce5c65d35292c7945e455397332f
 +                android:id="@+id/rn_rolling_g0_fall_s0_b"
 +                android:layout_width="wrap_content"
 +                android:layout_height="wrap_content"
-+                android:elegantTextHeight="false"
 +                android:fontFamily="sans-serif"
 +                android:includeFontPadding="true"
 +                android:letterSpacing="0"
@@ -1450,7 +1510,6 @@ index 0000000000000000000000000000000000000000..1cf7ce5c65d35292c7945e455397332f
 +                android:id="@+id/rn_rolling_g0_fall_s1_a"
 +                android:layout_width="wrap_content"
 +                android:layout_height="wrap_content"
-+                android:elegantTextHeight="false"
 +                android:fontFamily="sans-serif"
 +                android:includeFontPadding="true"
 +                android:letterSpacing="0"
@@ -1461,7 +1520,6 @@ index 0000000000000000000000000000000000000000..1cf7ce5c65d35292c7945e455397332f
 +                android:id="@+id/rn_rolling_g0_fall_s1_b"
 +                android:layout_width="wrap_content"
 +                android:layout_height="wrap_content"
-+                android:elegantTextHeight="false"
 +                android:fontFamily="sans-serif"
 +                android:includeFontPadding="true"
 +                android:letterSpacing="0"
@@ -1481,7 +1539,6 @@ index 0000000000000000000000000000000000000000..1cf7ce5c65d35292c7945e455397332f
 +                android:id="@+id/rn_rolling_g0_fall_s2_a"
 +                android:layout_width="wrap_content"
 +                android:layout_height="wrap_content"
-+                android:elegantTextHeight="false"
 +                android:fontFamily="sans-serif"
 +                android:includeFontPadding="true"
 +                android:letterSpacing="0"
@@ -1492,7 +1549,6 @@ index 0000000000000000000000000000000000000000..1cf7ce5c65d35292c7945e455397332f
 +                android:id="@+id/rn_rolling_g0_fall_s2_b"
 +                android:layout_width="wrap_content"
 +                android:layout_height="wrap_content"
-+                android:elegantTextHeight="false"
 +                android:fontFamily="sans-serif"
 +                android:includeFontPadding="true"
 +                android:letterSpacing="0"
@@ -1512,7 +1568,6 @@ index 0000000000000000000000000000000000000000..1cf7ce5c65d35292c7945e455397332f
 +                android:id="@+id/rn_rolling_g0_fall_s3_a"
 +                android:layout_width="wrap_content"
 +                android:layout_height="wrap_content"
-+                android:elegantTextHeight="false"
 +                android:fontFamily="sans-serif"
 +                android:includeFontPadding="true"
 +                android:letterSpacing="0"
@@ -1523,7 +1578,6 @@ index 0000000000000000000000000000000000000000..1cf7ce5c65d35292c7945e455397332f
 +                android:id="@+id/rn_rolling_g0_fall_s3_b"
 +                android:layout_width="wrap_content"
 +                android:layout_height="wrap_content"
-+                android:elegantTextHeight="false"
 +                android:fontFamily="sans-serif"
 +                android:includeFontPadding="true"
 +                android:letterSpacing="0"
@@ -1543,7 +1597,6 @@ index 0000000000000000000000000000000000000000..1cf7ce5c65d35292c7945e455397332f
 +                android:id="@+id/rn_rolling_g0_fall_s4_a"
 +                android:layout_width="wrap_content"
 +                android:layout_height="wrap_content"
-+                android:elegantTextHeight="false"
 +                android:fontFamily="sans-serif"
 +                android:includeFontPadding="true"
 +                android:letterSpacing="0"
@@ -1554,7 +1607,6 @@ index 0000000000000000000000000000000000000000..1cf7ce5c65d35292c7945e455397332f
 +                android:id="@+id/rn_rolling_g0_fall_s4_b"
 +                android:layout_width="wrap_content"
 +                android:layout_height="wrap_content"
-+                android:elegantTextHeight="false"
 +                android:fontFamily="sans-serif"
 +                android:includeFontPadding="true"
 +                android:letterSpacing="0"
@@ -1574,7 +1626,6 @@ index 0000000000000000000000000000000000000000..1cf7ce5c65d35292c7945e455397332f
 +                android:id="@+id/rn_rolling_g0_fall_s5_a"
 +                android:layout_width="wrap_content"
 +                android:layout_height="wrap_content"
-+                android:elegantTextHeight="false"
 +                android:fontFamily="sans-serif"
 +                android:includeFontPadding="true"
 +                android:letterSpacing="0"
@@ -1585,7 +1636,6 @@ index 0000000000000000000000000000000000000000..1cf7ce5c65d35292c7945e455397332f
 +                android:id="@+id/rn_rolling_g0_fall_s5_b"
 +                android:layout_width="wrap_content"
 +                android:layout_height="wrap_content"
-+                android:elegantTextHeight="false"
 +                android:fontFamily="sans-serif"
 +                android:includeFontPadding="true"
 +                android:letterSpacing="0"
@@ -1605,7 +1655,6 @@ index 0000000000000000000000000000000000000000..1cf7ce5c65d35292c7945e455397332f
 +                android:id="@+id/rn_rolling_g0_fall_s6_a"
 +                android:layout_width="wrap_content"
 +                android:layout_height="wrap_content"
-+                android:elegantTextHeight="false"
 +                android:fontFamily="sans-serif"
 +                android:includeFontPadding="true"
 +                android:letterSpacing="0"
@@ -1616,7 +1665,6 @@ index 0000000000000000000000000000000000000000..1cf7ce5c65d35292c7945e455397332f
 +                android:id="@+id/rn_rolling_g0_fall_s6_b"
 +                android:layout_width="wrap_content"
 +                android:layout_height="wrap_content"
-+                android:elegantTextHeight="false"
 +                android:fontFamily="sans-serif"
 +                android:includeFontPadding="true"
 +                android:letterSpacing="0"
@@ -1636,7 +1684,6 @@ index 0000000000000000000000000000000000000000..1cf7ce5c65d35292c7945e455397332f
 +                android:id="@+id/rn_rolling_g0_fall_s7_a"
 +                android:layout_width="wrap_content"
 +                android:layout_height="wrap_content"
-+                android:elegantTextHeight="false"
 +                android:fontFamily="sans-serif"
 +                android:includeFontPadding="true"
 +                android:letterSpacing="0"
@@ -1647,7 +1694,6 @@ index 0000000000000000000000000000000000000000..1cf7ce5c65d35292c7945e455397332f
 +                android:id="@+id/rn_rolling_g0_fall_s7_b"
 +                android:layout_width="wrap_content"
 +                android:layout_height="wrap_content"
-+                android:elegantTextHeight="false"
 +                android:fontFamily="sans-serif"
 +                android:includeFontPadding="true"
 +                android:letterSpacing="0"
@@ -1667,7 +1713,6 @@ index 0000000000000000000000000000000000000000..1cf7ce5c65d35292c7945e455397332f
 +                android:id="@+id/rn_rolling_g0_fall_s8_a"
 +                android:layout_width="wrap_content"
 +                android:layout_height="wrap_content"
-+                android:elegantTextHeight="false"
 +                android:fontFamily="sans-serif"
 +                android:includeFontPadding="true"
 +                android:letterSpacing="0"
@@ -1678,7 +1723,6 @@ index 0000000000000000000000000000000000000000..1cf7ce5c65d35292c7945e455397332f
 +                android:id="@+id/rn_rolling_g0_fall_s8_b"
 +                android:layout_width="wrap_content"
 +                android:layout_height="wrap_content"
-+                android:elegantTextHeight="false"
 +                android:fontFamily="sans-serif"
 +                android:includeFontPadding="true"
 +                android:letterSpacing="0"
@@ -1698,7 +1742,6 @@ index 0000000000000000000000000000000000000000..1cf7ce5c65d35292c7945e455397332f
 +                android:id="@+id/rn_rolling_g0_fall_s9_a"
 +                android:layout_width="wrap_content"
 +                android:layout_height="wrap_content"
-+                android:elegantTextHeight="false"
 +                android:fontFamily="sans-serif"
 +                android:includeFontPadding="true"
 +                android:letterSpacing="0"
@@ -1709,7 +1752,6 @@ index 0000000000000000000000000000000000000000..1cf7ce5c65d35292c7945e455397332f
 +                android:id="@+id/rn_rolling_g0_fall_s9_b"
 +                android:layout_width="wrap_content"
 +                android:layout_height="wrap_content"
-+                android:elegantTextHeight="false"
 +                android:fontFamily="sans-serif"
 +                android:includeFontPadding="true"
 +                android:letterSpacing="0"
@@ -1729,7 +1771,6 @@ index 0000000000000000000000000000000000000000..1cf7ce5c65d35292c7945e455397332f
 +                android:id="@+id/rn_rolling_g0_fall_s10_a"
 +                android:layout_width="wrap_content"
 +                android:layout_height="wrap_content"
-+                android:elegantTextHeight="false"
 +                android:fontFamily="sans-serif"
 +                android:includeFontPadding="true"
 +                android:letterSpacing="0"
@@ -1740,7 +1781,6 @@ index 0000000000000000000000000000000000000000..1cf7ce5c65d35292c7945e455397332f
 +                android:id="@+id/rn_rolling_g0_fall_s10_b"
 +                android:layout_width="wrap_content"
 +                android:layout_height="wrap_content"
-+                android:elegantTextHeight="false"
 +                android:fontFamily="sans-serif"
 +                android:includeFontPadding="true"
 +                android:letterSpacing="0"
@@ -1760,7 +1800,6 @@ index 0000000000000000000000000000000000000000..1cf7ce5c65d35292c7945e455397332f
 +                android:id="@+id/rn_rolling_g0_fall_s11_a"
 +                android:layout_width="wrap_content"
 +                android:layout_height="wrap_content"
-+                android:elegantTextHeight="false"
 +                android:fontFamily="sans-serif"
 +                android:includeFontPadding="true"
 +                android:letterSpacing="0"
@@ -1771,7 +1810,6 @@ index 0000000000000000000000000000000000000000..1cf7ce5c65d35292c7945e455397332f
 +                android:id="@+id/rn_rolling_g0_fall_s11_b"
 +                android:layout_width="wrap_content"
 +                android:layout_height="wrap_content"
-+                android:elegantTextHeight="false"
 +                android:fontFamily="sans-serif"
 +                android:includeFontPadding="true"
 +                android:letterSpacing="0"
@@ -1791,7 +1829,6 @@ index 0000000000000000000000000000000000000000..1cf7ce5c65d35292c7945e455397332f
 +                android:id="@+id/rn_rolling_g0_fall_s12_a"
 +                android:layout_width="wrap_content"
 +                android:layout_height="wrap_content"
-+                android:elegantTextHeight="false"
 +                android:fontFamily="sans-serif"
 +                android:includeFontPadding="true"
 +                android:letterSpacing="0"
@@ -1802,7 +1839,6 @@ index 0000000000000000000000000000000000000000..1cf7ce5c65d35292c7945e455397332f
 +                android:id="@+id/rn_rolling_g0_fall_s12_b"
 +                android:layout_width="wrap_content"
 +                android:layout_height="wrap_content"
-+                android:elegantTextHeight="false"
 +                android:fontFamily="sans-serif"
 +                android:includeFontPadding="true"
 +                android:letterSpacing="0"
@@ -1822,7 +1858,6 @@ index 0000000000000000000000000000000000000000..1cf7ce5c65d35292c7945e455397332f
 +                android:id="@+id/rn_rolling_g0_fall_s13_a"
 +                android:layout_width="wrap_content"
 +                android:layout_height="wrap_content"
-+                android:elegantTextHeight="false"
 +                android:fontFamily="sans-serif"
 +                android:includeFontPadding="true"
 +                android:letterSpacing="0"
@@ -1833,7 +1868,6 @@ index 0000000000000000000000000000000000000000..1cf7ce5c65d35292c7945e455397332f
 +                android:id="@+id/rn_rolling_g0_fall_s13_b"
 +                android:layout_width="wrap_content"
 +                android:layout_height="wrap_content"
-+                android:elegantTextHeight="false"
 +                android:fontFamily="sans-serif"
 +                android:includeFontPadding="true"
 +                android:letterSpacing="0"
@@ -1853,7 +1887,6 @@ index 0000000000000000000000000000000000000000..1cf7ce5c65d35292c7945e455397332f
 +                android:id="@+id/rn_rolling_g0_fall_s14_a"
 +                android:layout_width="wrap_content"
 +                android:layout_height="wrap_content"
-+                android:elegantTextHeight="false"
 +                android:fontFamily="sans-serif"
 +                android:includeFontPadding="true"
 +                android:letterSpacing="0"
@@ -1864,7 +1897,6 @@ index 0000000000000000000000000000000000000000..1cf7ce5c65d35292c7945e455397332f
 +                android:id="@+id/rn_rolling_g0_fall_s14_b"
 +                android:layout_width="wrap_content"
 +                android:layout_height="wrap_content"
-+                android:elegantTextHeight="false"
 +                android:fontFamily="sans-serif"
 +                android:includeFontPadding="true"
 +                android:letterSpacing="0"
@@ -1884,7 +1916,6 @@ index 0000000000000000000000000000000000000000..1cf7ce5c65d35292c7945e455397332f
 +                android:id="@+id/rn_rolling_g0_fall_s15_a"
 +                android:layout_width="wrap_content"
 +                android:layout_height="wrap_content"
-+                android:elegantTextHeight="false"
 +                android:fontFamily="sans-serif"
 +                android:includeFontPadding="true"
 +                android:letterSpacing="0"
@@ -1895,7 +1926,6 @@ index 0000000000000000000000000000000000000000..1cf7ce5c65d35292c7945e455397332f
 +                android:id="@+id/rn_rolling_g0_fall_s15_b"
 +                android:layout_width="wrap_content"
 +                android:layout_height="wrap_content"
-+                android:elegantTextHeight="false"
 +                android:fontFamily="sans-serif"
 +                android:includeFontPadding="true"
 +                android:letterSpacing="0"
@@ -1921,7 +1951,6 @@ index 0000000000000000000000000000000000000000..1cf7ce5c65d35292c7945e455397332f
 +                android:id="@+id/rn_rolling_g1_rise_s0_a"
 +                android:layout_width="wrap_content"
 +                android:layout_height="wrap_content"
-+                android:elegantTextHeight="false"
 +                android:fontFamily="sans-serif"
 +                android:includeFontPadding="true"
 +                android:letterSpacing="0"
@@ -1932,7 +1961,6 @@ index 0000000000000000000000000000000000000000..1cf7ce5c65d35292c7945e455397332f
 +                android:id="@+id/rn_rolling_g1_rise_s0_b"
 +                android:layout_width="wrap_content"
 +                android:layout_height="wrap_content"
-+                android:elegantTextHeight="false"
 +                android:fontFamily="sans-serif"
 +                android:includeFontPadding="true"
 +                android:letterSpacing="0"
@@ -1952,7 +1980,6 @@ index 0000000000000000000000000000000000000000..1cf7ce5c65d35292c7945e455397332f
 +                android:id="@+id/rn_rolling_g1_rise_s1_a"
 +                android:layout_width="wrap_content"
 +                android:layout_height="wrap_content"
-+                android:elegantTextHeight="false"
 +                android:fontFamily="sans-serif"
 +                android:includeFontPadding="true"
 +                android:letterSpacing="0"
@@ -1963,7 +1990,6 @@ index 0000000000000000000000000000000000000000..1cf7ce5c65d35292c7945e455397332f
 +                android:id="@+id/rn_rolling_g1_rise_s1_b"
 +                android:layout_width="wrap_content"
 +                android:layout_height="wrap_content"
-+                android:elegantTextHeight="false"
 +                android:fontFamily="sans-serif"
 +                android:includeFontPadding="true"
 +                android:letterSpacing="0"
@@ -1983,7 +2009,6 @@ index 0000000000000000000000000000000000000000..1cf7ce5c65d35292c7945e455397332f
 +                android:id="@+id/rn_rolling_g1_rise_s2_a"
 +                android:layout_width="wrap_content"
 +                android:layout_height="wrap_content"
-+                android:elegantTextHeight="false"
 +                android:fontFamily="sans-serif"
 +                android:includeFontPadding="true"
 +                android:letterSpacing="0"
@@ -1994,7 +2019,6 @@ index 0000000000000000000000000000000000000000..1cf7ce5c65d35292c7945e455397332f
 +                android:id="@+id/rn_rolling_g1_rise_s2_b"
 +                android:layout_width="wrap_content"
 +                android:layout_height="wrap_content"
-+                android:elegantTextHeight="false"
 +                android:fontFamily="sans-serif"
 +                android:includeFontPadding="true"
 +                android:letterSpacing="0"
@@ -2014,7 +2038,6 @@ index 0000000000000000000000000000000000000000..1cf7ce5c65d35292c7945e455397332f
 +                android:id="@+id/rn_rolling_g1_rise_s3_a"
 +                android:layout_width="wrap_content"
 +                android:layout_height="wrap_content"
-+                android:elegantTextHeight="false"
 +                android:fontFamily="sans-serif"
 +                android:includeFontPadding="true"
 +                android:letterSpacing="0"
@@ -2025,7 +2048,6 @@ index 0000000000000000000000000000000000000000..1cf7ce5c65d35292c7945e455397332f
 +                android:id="@+id/rn_rolling_g1_rise_s3_b"
 +                android:layout_width="wrap_content"
 +                android:layout_height="wrap_content"
-+                android:elegantTextHeight="false"
 +                android:fontFamily="sans-serif"
 +                android:includeFontPadding="true"
 +                android:letterSpacing="0"
@@ -2045,7 +2067,6 @@ index 0000000000000000000000000000000000000000..1cf7ce5c65d35292c7945e455397332f
 +                android:id="@+id/rn_rolling_g1_rise_s4_a"
 +                android:layout_width="wrap_content"
 +                android:layout_height="wrap_content"
-+                android:elegantTextHeight="false"
 +                android:fontFamily="sans-serif"
 +                android:includeFontPadding="true"
 +                android:letterSpacing="0"
@@ -2056,7 +2077,6 @@ index 0000000000000000000000000000000000000000..1cf7ce5c65d35292c7945e455397332f
 +                android:id="@+id/rn_rolling_g1_rise_s4_b"
 +                android:layout_width="wrap_content"
 +                android:layout_height="wrap_content"
-+                android:elegantTextHeight="false"
 +                android:fontFamily="sans-serif"
 +                android:includeFontPadding="true"
 +                android:letterSpacing="0"
@@ -2076,7 +2096,6 @@ index 0000000000000000000000000000000000000000..1cf7ce5c65d35292c7945e455397332f
 +                android:id="@+id/rn_rolling_g1_rise_s5_a"
 +                android:layout_width="wrap_content"
 +                android:layout_height="wrap_content"
-+                android:elegantTextHeight="false"
 +                android:fontFamily="sans-serif"
 +                android:includeFontPadding="true"
 +                android:letterSpacing="0"
@@ -2087,7 +2106,6 @@ index 0000000000000000000000000000000000000000..1cf7ce5c65d35292c7945e455397332f
 +                android:id="@+id/rn_rolling_g1_rise_s5_b"
 +                android:layout_width="wrap_content"
 +                android:layout_height="wrap_content"
-+                android:elegantTextHeight="false"
 +                android:fontFamily="sans-serif"
 +                android:includeFontPadding="true"
 +                android:letterSpacing="0"
@@ -2107,7 +2125,6 @@ index 0000000000000000000000000000000000000000..1cf7ce5c65d35292c7945e455397332f
 +                android:id="@+id/rn_rolling_g1_rise_s6_a"
 +                android:layout_width="wrap_content"
 +                android:layout_height="wrap_content"
-+                android:elegantTextHeight="false"
 +                android:fontFamily="sans-serif"
 +                android:includeFontPadding="true"
 +                android:letterSpacing="0"
@@ -2118,7 +2135,6 @@ index 0000000000000000000000000000000000000000..1cf7ce5c65d35292c7945e455397332f
 +                android:id="@+id/rn_rolling_g1_rise_s6_b"
 +                android:layout_width="wrap_content"
 +                android:layout_height="wrap_content"
-+                android:elegantTextHeight="false"
 +                android:fontFamily="sans-serif"
 +                android:includeFontPadding="true"
 +                android:letterSpacing="0"
@@ -2138,7 +2154,6 @@ index 0000000000000000000000000000000000000000..1cf7ce5c65d35292c7945e455397332f
 +                android:id="@+id/rn_rolling_g1_rise_s7_a"
 +                android:layout_width="wrap_content"
 +                android:layout_height="wrap_content"
-+                android:elegantTextHeight="false"
 +                android:fontFamily="sans-serif"
 +                android:includeFontPadding="true"
 +                android:letterSpacing="0"
@@ -2149,7 +2164,6 @@ index 0000000000000000000000000000000000000000..1cf7ce5c65d35292c7945e455397332f
 +                android:id="@+id/rn_rolling_g1_rise_s7_b"
 +                android:layout_width="wrap_content"
 +                android:layout_height="wrap_content"
-+                android:elegantTextHeight="false"
 +                android:fontFamily="sans-serif"
 +                android:includeFontPadding="true"
 +                android:letterSpacing="0"
@@ -2169,7 +2183,6 @@ index 0000000000000000000000000000000000000000..1cf7ce5c65d35292c7945e455397332f
 +                android:id="@+id/rn_rolling_g1_rise_s8_a"
 +                android:layout_width="wrap_content"
 +                android:layout_height="wrap_content"
-+                android:elegantTextHeight="false"
 +                android:fontFamily="sans-serif"
 +                android:includeFontPadding="true"
 +                android:letterSpacing="0"
@@ -2180,7 +2193,6 @@ index 0000000000000000000000000000000000000000..1cf7ce5c65d35292c7945e455397332f
 +                android:id="@+id/rn_rolling_g1_rise_s8_b"
 +                android:layout_width="wrap_content"
 +                android:layout_height="wrap_content"
-+                android:elegantTextHeight="false"
 +                android:fontFamily="sans-serif"
 +                android:includeFontPadding="true"
 +                android:letterSpacing="0"
@@ -2200,7 +2212,6 @@ index 0000000000000000000000000000000000000000..1cf7ce5c65d35292c7945e455397332f
 +                android:id="@+id/rn_rolling_g1_rise_s9_a"
 +                android:layout_width="wrap_content"
 +                android:layout_height="wrap_content"
-+                android:elegantTextHeight="false"
 +                android:fontFamily="sans-serif"
 +                android:includeFontPadding="true"
 +                android:letterSpacing="0"
@@ -2211,7 +2222,6 @@ index 0000000000000000000000000000000000000000..1cf7ce5c65d35292c7945e455397332f
 +                android:id="@+id/rn_rolling_g1_rise_s9_b"
 +                android:layout_width="wrap_content"
 +                android:layout_height="wrap_content"
-+                android:elegantTextHeight="false"
 +                android:fontFamily="sans-serif"
 +                android:includeFontPadding="true"
 +                android:letterSpacing="0"
@@ -2231,7 +2241,6 @@ index 0000000000000000000000000000000000000000..1cf7ce5c65d35292c7945e455397332f
 +                android:id="@+id/rn_rolling_g1_rise_s10_a"
 +                android:layout_width="wrap_content"
 +                android:layout_height="wrap_content"
-+                android:elegantTextHeight="false"
 +                android:fontFamily="sans-serif"
 +                android:includeFontPadding="true"
 +                android:letterSpacing="0"
@@ -2242,7 +2251,6 @@ index 0000000000000000000000000000000000000000..1cf7ce5c65d35292c7945e455397332f
 +                android:id="@+id/rn_rolling_g1_rise_s10_b"
 +                android:layout_width="wrap_content"
 +                android:layout_height="wrap_content"
-+                android:elegantTextHeight="false"
 +                android:fontFamily="sans-serif"
 +                android:includeFontPadding="true"
 +                android:letterSpacing="0"
@@ -2262,7 +2270,6 @@ index 0000000000000000000000000000000000000000..1cf7ce5c65d35292c7945e455397332f
 +                android:id="@+id/rn_rolling_g1_rise_s11_a"
 +                android:layout_width="wrap_content"
 +                android:layout_height="wrap_content"
-+                android:elegantTextHeight="false"
 +                android:fontFamily="sans-serif"
 +                android:includeFontPadding="true"
 +                android:letterSpacing="0"
@@ -2273,7 +2280,6 @@ index 0000000000000000000000000000000000000000..1cf7ce5c65d35292c7945e455397332f
 +                android:id="@+id/rn_rolling_g1_rise_s11_b"
 +                android:layout_width="wrap_content"
 +                android:layout_height="wrap_content"
-+                android:elegantTextHeight="false"
 +                android:fontFamily="sans-serif"
 +                android:includeFontPadding="true"
 +                android:letterSpacing="0"
@@ -2293,7 +2299,6 @@ index 0000000000000000000000000000000000000000..1cf7ce5c65d35292c7945e455397332f
 +                android:id="@+id/rn_rolling_g1_rise_s12_a"
 +                android:layout_width="wrap_content"
 +                android:layout_height="wrap_content"
-+                android:elegantTextHeight="false"
 +                android:fontFamily="sans-serif"
 +                android:includeFontPadding="true"
 +                android:letterSpacing="0"
@@ -2304,7 +2309,6 @@ index 0000000000000000000000000000000000000000..1cf7ce5c65d35292c7945e455397332f
 +                android:id="@+id/rn_rolling_g1_rise_s12_b"
 +                android:layout_width="wrap_content"
 +                android:layout_height="wrap_content"
-+                android:elegantTextHeight="false"
 +                android:fontFamily="sans-serif"
 +                android:includeFontPadding="true"
 +                android:letterSpacing="0"
@@ -2324,7 +2328,6 @@ index 0000000000000000000000000000000000000000..1cf7ce5c65d35292c7945e455397332f
 +                android:id="@+id/rn_rolling_g1_rise_s13_a"
 +                android:layout_width="wrap_content"
 +                android:layout_height="wrap_content"
-+                android:elegantTextHeight="false"
 +                android:fontFamily="sans-serif"
 +                android:includeFontPadding="true"
 +                android:letterSpacing="0"
@@ -2335,7 +2338,6 @@ index 0000000000000000000000000000000000000000..1cf7ce5c65d35292c7945e455397332f
 +                android:id="@+id/rn_rolling_g1_rise_s13_b"
 +                android:layout_width="wrap_content"
 +                android:layout_height="wrap_content"
-+                android:elegantTextHeight="false"
 +                android:fontFamily="sans-serif"
 +                android:includeFontPadding="true"
 +                android:letterSpacing="0"
@@ -2355,7 +2357,6 @@ index 0000000000000000000000000000000000000000..1cf7ce5c65d35292c7945e455397332f
 +                android:id="@+id/rn_rolling_g1_rise_s14_a"
 +                android:layout_width="wrap_content"
 +                android:layout_height="wrap_content"
-+                android:elegantTextHeight="false"
 +                android:fontFamily="sans-serif"
 +                android:includeFontPadding="true"
 +                android:letterSpacing="0"
@@ -2366,7 +2367,6 @@ index 0000000000000000000000000000000000000000..1cf7ce5c65d35292c7945e455397332f
 +                android:id="@+id/rn_rolling_g1_rise_s14_b"
 +                android:layout_width="wrap_content"
 +                android:layout_height="wrap_content"
-+                android:elegantTextHeight="false"
 +                android:fontFamily="sans-serif"
 +                android:includeFontPadding="true"
 +                android:letterSpacing="0"
@@ -2386,7 +2386,6 @@ index 0000000000000000000000000000000000000000..1cf7ce5c65d35292c7945e455397332f
 +                android:id="@+id/rn_rolling_g1_rise_s15_a"
 +                android:layout_width="wrap_content"
 +                android:layout_height="wrap_content"
-+                android:elegantTextHeight="false"
 +                android:fontFamily="sans-serif"
 +                android:includeFontPadding="true"
 +                android:letterSpacing="0"
@@ -2397,7 +2396,6 @@ index 0000000000000000000000000000000000000000..1cf7ce5c65d35292c7945e455397332f
 +                android:id="@+id/rn_rolling_g1_rise_s15_b"
 +                android:layout_width="wrap_content"
 +                android:layout_height="wrap_content"
-+                android:elegantTextHeight="false"
 +                android:fontFamily="sans-serif"
 +                android:includeFontPadding="true"
 +                android:letterSpacing="0"
@@ -2423,7 +2421,6 @@ index 0000000000000000000000000000000000000000..1cf7ce5c65d35292c7945e455397332f
 +                android:id="@+id/rn_rolling_g1_fall_s0_a"
 +                android:layout_width="wrap_content"
 +                android:layout_height="wrap_content"
-+                android:elegantTextHeight="false"
 +                android:fontFamily="sans-serif"
 +                android:includeFontPadding="true"
 +                android:letterSpacing="0"
@@ -2434,7 +2431,6 @@ index 0000000000000000000000000000000000000000..1cf7ce5c65d35292c7945e455397332f
 +                android:id="@+id/rn_rolling_g1_fall_s0_b"
 +                android:layout_width="wrap_content"
 +                android:layout_height="wrap_content"
-+                android:elegantTextHeight="false"
 +                android:fontFamily="sans-serif"
 +                android:includeFontPadding="true"
 +                android:letterSpacing="0"
@@ -2454,7 +2450,6 @@ index 0000000000000000000000000000000000000000..1cf7ce5c65d35292c7945e455397332f
 +                android:id="@+id/rn_rolling_g1_fall_s1_a"
 +                android:layout_width="wrap_content"
 +                android:layout_height="wrap_content"
-+                android:elegantTextHeight="false"
 +                android:fontFamily="sans-serif"
 +                android:includeFontPadding="true"
 +                android:letterSpacing="0"
@@ -2465,7 +2460,6 @@ index 0000000000000000000000000000000000000000..1cf7ce5c65d35292c7945e455397332f
 +                android:id="@+id/rn_rolling_g1_fall_s1_b"
 +                android:layout_width="wrap_content"
 +                android:layout_height="wrap_content"
-+                android:elegantTextHeight="false"
 +                android:fontFamily="sans-serif"
 +                android:includeFontPadding="true"
 +                android:letterSpacing="0"
@@ -2485,7 +2479,6 @@ index 0000000000000000000000000000000000000000..1cf7ce5c65d35292c7945e455397332f
 +                android:id="@+id/rn_rolling_g1_fall_s2_a"
 +                android:layout_width="wrap_content"
 +                android:layout_height="wrap_content"
-+                android:elegantTextHeight="false"
 +                android:fontFamily="sans-serif"
 +                android:includeFontPadding="true"
 +                android:letterSpacing="0"
@@ -2496,7 +2489,6 @@ index 0000000000000000000000000000000000000000..1cf7ce5c65d35292c7945e455397332f
 +                android:id="@+id/rn_rolling_g1_fall_s2_b"
 +                android:layout_width="wrap_content"
 +                android:layout_height="wrap_content"
-+                android:elegantTextHeight="false"
 +                android:fontFamily="sans-serif"
 +                android:includeFontPadding="true"
 +                android:letterSpacing="0"
@@ -2516,7 +2508,6 @@ index 0000000000000000000000000000000000000000..1cf7ce5c65d35292c7945e455397332f
 +                android:id="@+id/rn_rolling_g1_fall_s3_a"
 +                android:layout_width="wrap_content"
 +                android:layout_height="wrap_content"
-+                android:elegantTextHeight="false"
 +                android:fontFamily="sans-serif"
 +                android:includeFontPadding="true"
 +                android:letterSpacing="0"
@@ -2527,7 +2518,6 @@ index 0000000000000000000000000000000000000000..1cf7ce5c65d35292c7945e455397332f
 +                android:id="@+id/rn_rolling_g1_fall_s3_b"
 +                android:layout_width="wrap_content"
 +                android:layout_height="wrap_content"
-+                android:elegantTextHeight="false"
 +                android:fontFamily="sans-serif"
 +                android:includeFontPadding="true"
 +                android:letterSpacing="0"
@@ -2547,7 +2537,6 @@ index 0000000000000000000000000000000000000000..1cf7ce5c65d35292c7945e455397332f
 +                android:id="@+id/rn_rolling_g1_fall_s4_a"
 +                android:layout_width="wrap_content"
 +                android:layout_height="wrap_content"
-+                android:elegantTextHeight="false"
 +                android:fontFamily="sans-serif"
 +                android:includeFontPadding="true"
 +                android:letterSpacing="0"
@@ -2558,7 +2547,6 @@ index 0000000000000000000000000000000000000000..1cf7ce5c65d35292c7945e455397332f
 +                android:id="@+id/rn_rolling_g1_fall_s4_b"
 +                android:layout_width="wrap_content"
 +                android:layout_height="wrap_content"
-+                android:elegantTextHeight="false"
 +                android:fontFamily="sans-serif"
 +                android:includeFontPadding="true"
 +                android:letterSpacing="0"
@@ -2578,7 +2566,6 @@ index 0000000000000000000000000000000000000000..1cf7ce5c65d35292c7945e455397332f
 +                android:id="@+id/rn_rolling_g1_fall_s5_a"
 +                android:layout_width="wrap_content"
 +                android:layout_height="wrap_content"
-+                android:elegantTextHeight="false"
 +                android:fontFamily="sans-serif"
 +                android:includeFontPadding="true"
 +                android:letterSpacing="0"
@@ -2589,7 +2576,6 @@ index 0000000000000000000000000000000000000000..1cf7ce5c65d35292c7945e455397332f
 +                android:id="@+id/rn_rolling_g1_fall_s5_b"
 +                android:layout_width="wrap_content"
 +                android:layout_height="wrap_content"
-+                android:elegantTextHeight="false"
 +                android:fontFamily="sans-serif"
 +                android:includeFontPadding="true"
 +                android:letterSpacing="0"
@@ -2609,7 +2595,6 @@ index 0000000000000000000000000000000000000000..1cf7ce5c65d35292c7945e455397332f
 +                android:id="@+id/rn_rolling_g1_fall_s6_a"
 +                android:layout_width="wrap_content"
 +                android:layout_height="wrap_content"
-+                android:elegantTextHeight="false"
 +                android:fontFamily="sans-serif"
 +                android:includeFontPadding="true"
 +                android:letterSpacing="0"
@@ -2620,7 +2605,6 @@ index 0000000000000000000000000000000000000000..1cf7ce5c65d35292c7945e455397332f
 +                android:id="@+id/rn_rolling_g1_fall_s6_b"
 +                android:layout_width="wrap_content"
 +                android:layout_height="wrap_content"
-+                android:elegantTextHeight="false"
 +                android:fontFamily="sans-serif"
 +                android:includeFontPadding="true"
 +                android:letterSpacing="0"
@@ -2640,7 +2624,6 @@ index 0000000000000000000000000000000000000000..1cf7ce5c65d35292c7945e455397332f
 +                android:id="@+id/rn_rolling_g1_fall_s7_a"
 +                android:layout_width="wrap_content"
 +                android:layout_height="wrap_content"
-+                android:elegantTextHeight="false"
 +                android:fontFamily="sans-serif"
 +                android:includeFontPadding="true"
 +                android:letterSpacing="0"
@@ -2651,7 +2634,6 @@ index 0000000000000000000000000000000000000000..1cf7ce5c65d35292c7945e455397332f
 +                android:id="@+id/rn_rolling_g1_fall_s7_b"
 +                android:layout_width="wrap_content"
 +                android:layout_height="wrap_content"
-+                android:elegantTextHeight="false"
 +                android:fontFamily="sans-serif"
 +                android:includeFontPadding="true"
 +                android:letterSpacing="0"
@@ -2671,7 +2653,6 @@ index 0000000000000000000000000000000000000000..1cf7ce5c65d35292c7945e455397332f
 +                android:id="@+id/rn_rolling_g1_fall_s8_a"
 +                android:layout_width="wrap_content"
 +                android:layout_height="wrap_content"
-+                android:elegantTextHeight="false"
 +                android:fontFamily="sans-serif"
 +                android:includeFontPadding="true"
 +                android:letterSpacing="0"
@@ -2682,7 +2663,6 @@ index 0000000000000000000000000000000000000000..1cf7ce5c65d35292c7945e455397332f
 +                android:id="@+id/rn_rolling_g1_fall_s8_b"
 +                android:layout_width="wrap_content"
 +                android:layout_height="wrap_content"
-+                android:elegantTextHeight="false"
 +                android:fontFamily="sans-serif"
 +                android:includeFontPadding="true"
 +                android:letterSpacing="0"
@@ -2702,7 +2682,6 @@ index 0000000000000000000000000000000000000000..1cf7ce5c65d35292c7945e455397332f
 +                android:id="@+id/rn_rolling_g1_fall_s9_a"
 +                android:layout_width="wrap_content"
 +                android:layout_height="wrap_content"
-+                android:elegantTextHeight="false"
 +                android:fontFamily="sans-serif"
 +                android:includeFontPadding="true"
 +                android:letterSpacing="0"
@@ -2713,7 +2692,6 @@ index 0000000000000000000000000000000000000000..1cf7ce5c65d35292c7945e455397332f
 +                android:id="@+id/rn_rolling_g1_fall_s9_b"
 +                android:layout_width="wrap_content"
 +                android:layout_height="wrap_content"
-+                android:elegantTextHeight="false"
 +                android:fontFamily="sans-serif"
 +                android:includeFontPadding="true"
 +                android:letterSpacing="0"
@@ -2733,7 +2711,6 @@ index 0000000000000000000000000000000000000000..1cf7ce5c65d35292c7945e455397332f
 +                android:id="@+id/rn_rolling_g1_fall_s10_a"
 +                android:layout_width="wrap_content"
 +                android:layout_height="wrap_content"
-+                android:elegantTextHeight="false"
 +                android:fontFamily="sans-serif"
 +                android:includeFontPadding="true"
 +                android:letterSpacing="0"
@@ -2744,7 +2721,6 @@ index 0000000000000000000000000000000000000000..1cf7ce5c65d35292c7945e455397332f
 +                android:id="@+id/rn_rolling_g1_fall_s10_b"
 +                android:layout_width="wrap_content"
 +                android:layout_height="wrap_content"
-+                android:elegantTextHeight="false"
 +                android:fontFamily="sans-serif"
 +                android:includeFontPadding="true"
 +                android:letterSpacing="0"
@@ -2764,7 +2740,6 @@ index 0000000000000000000000000000000000000000..1cf7ce5c65d35292c7945e455397332f
 +                android:id="@+id/rn_rolling_g1_fall_s11_a"
 +                android:layout_width="wrap_content"
 +                android:layout_height="wrap_content"
-+                android:elegantTextHeight="false"
 +                android:fontFamily="sans-serif"
 +                android:includeFontPadding="true"
 +                android:letterSpacing="0"
@@ -2775,7 +2750,6 @@ index 0000000000000000000000000000000000000000..1cf7ce5c65d35292c7945e455397332f
 +                android:id="@+id/rn_rolling_g1_fall_s11_b"
 +                android:layout_width="wrap_content"
 +                android:layout_height="wrap_content"
-+                android:elegantTextHeight="false"
 +                android:fontFamily="sans-serif"
 +                android:includeFontPadding="true"
 +                android:letterSpacing="0"
@@ -2795,7 +2769,6 @@ index 0000000000000000000000000000000000000000..1cf7ce5c65d35292c7945e455397332f
 +                android:id="@+id/rn_rolling_g1_fall_s12_a"
 +                android:layout_width="wrap_content"
 +                android:layout_height="wrap_content"
-+                android:elegantTextHeight="false"
 +                android:fontFamily="sans-serif"
 +                android:includeFontPadding="true"
 +                android:letterSpacing="0"
@@ -2806,7 +2779,6 @@ index 0000000000000000000000000000000000000000..1cf7ce5c65d35292c7945e455397332f
 +                android:id="@+id/rn_rolling_g1_fall_s12_b"
 +                android:layout_width="wrap_content"
 +                android:layout_height="wrap_content"
-+                android:elegantTextHeight="false"
 +                android:fontFamily="sans-serif"
 +                android:includeFontPadding="true"
 +                android:letterSpacing="0"
@@ -2826,7 +2798,6 @@ index 0000000000000000000000000000000000000000..1cf7ce5c65d35292c7945e455397332f
 +                android:id="@+id/rn_rolling_g1_fall_s13_a"
 +                android:layout_width="wrap_content"
 +                android:layout_height="wrap_content"
-+                android:elegantTextHeight="false"
 +                android:fontFamily="sans-serif"
 +                android:includeFontPadding="true"
 +                android:letterSpacing="0"
@@ -2837,7 +2808,6 @@ index 0000000000000000000000000000000000000000..1cf7ce5c65d35292c7945e455397332f
 +                android:id="@+id/rn_rolling_g1_fall_s13_b"
 +                android:layout_width="wrap_content"
 +                android:layout_height="wrap_content"
-+                android:elegantTextHeight="false"
 +                android:fontFamily="sans-serif"
 +                android:includeFontPadding="true"
 +                android:letterSpacing="0"
@@ -2857,7 +2827,6 @@ index 0000000000000000000000000000000000000000..1cf7ce5c65d35292c7945e455397332f
 +                android:id="@+id/rn_rolling_g1_fall_s14_a"
 +                android:layout_width="wrap_content"
 +                android:layout_height="wrap_content"
-+                android:elegantTextHeight="false"
 +                android:fontFamily="sans-serif"
 +                android:includeFontPadding="true"
 +                android:letterSpacing="0"
@@ -2868,7 +2837,6 @@ index 0000000000000000000000000000000000000000..1cf7ce5c65d35292c7945e455397332f
 +                android:id="@+id/rn_rolling_g1_fall_s14_b"
 +                android:layout_width="wrap_content"
 +                android:layout_height="wrap_content"
-+                android:elegantTextHeight="false"
 +                android:fontFamily="sans-serif"
 +                android:includeFontPadding="true"
 +                android:letterSpacing="0"
@@ -2888,7 +2856,6 @@ index 0000000000000000000000000000000000000000..1cf7ce5c65d35292c7945e455397332f
 +                android:id="@+id/rn_rolling_g1_fall_s15_a"
 +                android:layout_width="wrap_content"
 +                android:layout_height="wrap_content"
-+                android:elegantTextHeight="false"
 +                android:fontFamily="sans-serif"
 +                android:includeFontPadding="true"
 +                android:letterSpacing="0"
@@ -2899,7 +2866,6 @@ index 0000000000000000000000000000000000000000..1cf7ce5c65d35292c7945e455397332f
 +                android:id="@+id/rn_rolling_g1_fall_s15_b"
 +                android:layout_width="wrap_content"
 +                android:layout_height="wrap_content"
-+                android:elegantTextHeight="false"
 +                android:fontFamily="sans-serif"
 +                android:includeFontPadding="true"
 +                android:letterSpacing="0"
@@ -2909,17 +2875,87 @@ index 0000000000000000000000000000000000000000..1cf7ce5c65d35292c7945e455397332f
 +        </ViewFlipper>
 +    </FrameLayout>
 +</FrameLayout>
-diff --git a/android/src/main/res/layout-night/rn_widget.xml b/android/src/main/res/layout-night/rn_widget.xml
-index e00a8c15199ed304f9d7080f995278c7544f6965..04695db4bc2dd8a6fe3ed7ac82bdab42673ea133 100644
---- a/android/src/main/res/layout-night/rn_widget.xml
-+++ b/android/src/main/res/layout-night/rn_widget.xml
-@@ -19,6 +19,9 @@
-         android:scaleType="matrix"
-         android:visibility="visible" />
- 
-+    <!-- Penny patch: rolling digits laid over the bitmap (RollingText.java). -->
+diff --git a/android/src/main/res/layout/rn_widget_rolling_host.xml b/android/src/main/res/layout/rn_widget_rolling_host.xml
+new file mode 100644
+index 0000000000000000000000000000000000000000..06debb954c13647c916e74759ebb706a486df7d6
+--- /dev/null
++++ b/android/src/main/res/layout/rn_widget_rolling_host.xml
+@@ -0,0 +1,36 @@
++<?xml version="1.0" encoding="utf-8"?>
++<!-- Penny patch: generated by scripts/rollingWidgetResources.js; do not edit by hand. -->
++<FrameLayout xmlns:android="http://schemas.android.com/apk/res/android"
++    android:id="@android:id/background"
++    android:layout_width="match_parent"
++    android:layout_height="match_parent">
++
++    <ImageView
++        android:id="@+id/rn_widget_image_light"
++        android:layout_width="match_parent"
++        android:layout_height="match_parent"
++        android:background="@android:color/transparent"
++        android:scaleType="matrix"
++        android:visibility="visible" />
++
++    <ImageView
++        android:id="@+id/rn_widget_image_dark"
++        android:layout_width="match_parent"
++        android:layout_height="match_parent"
++        android:background="@android:color/transparent"
++        android:scaleType="matrix"
++        android:visibility="gone" />
++
++    <!-- Penny patch: the rolling slots, over the bitmaps and under the tap areas. -->
 +    <include layout="@layout/rn_widget_rolling" />
 +
-     <FrameLayout
-         android:id="@+id/rn_widget_clickable_container"
-         android:layout_width="match_parent"
++    <FrameLayout
++        android:id="@+id/rn_widget_clickable_container"
++        android:layout_width="match_parent"
++        android:layout_height="match_parent" />
++
++    <FrameLayout
++        android:id="@+id/rn_widget_collection_container"
++        android:layout_width="match_parent"
++        android:layout_height="match_parent" />
++</FrameLayout>
+diff --git a/android/src/main/res/layout-night/rn_widget_rolling_host.xml b/android/src/main/res/layout-night/rn_widget_rolling_host.xml
+new file mode 100644
+index 0000000000000000000000000000000000000000..08916fab833508ed7a34ee3c1d7b23983c9ef0d7
+--- /dev/null
++++ b/android/src/main/res/layout-night/rn_widget_rolling_host.xml
+@@ -0,0 +1,36 @@
++<?xml version="1.0" encoding="utf-8"?>
++<!-- Penny patch: generated by scripts/rollingWidgetResources.js; do not edit by hand. -->
++<FrameLayout xmlns:android="http://schemas.android.com/apk/res/android"
++    android:id="@android:id/background"
++    android:layout_width="match_parent"
++    android:layout_height="match_parent">
++
++    <ImageView
++        android:id="@+id/rn_widget_image_light"
++        android:layout_width="match_parent"
++        android:layout_height="match_parent"
++        android:background="@android:color/transparent"
++        android:scaleType="matrix"
++        android:visibility="gone" />
++
++    <ImageView
++        android:id="@+id/rn_widget_image_dark"
++        android:layout_width="match_parent"
++        android:layout_height="match_parent"
++        android:background="@android:color/transparent"
++        android:scaleType="matrix"
++        android:visibility="visible" />
++
++    <!-- Penny patch: the rolling slots, over the bitmaps and under the tap areas. -->
++    <include layout="@layout/rn_widget_rolling" />
++
++    <FrameLayout
++        android:id="@+id/rn_widget_clickable_container"
++        android:layout_width="match_parent"
++        android:layout_height="match_parent" />
++
++    <FrameLayout
++        android:id="@+id/rn_widget_collection_container"
++        android:layout_width="match_parent"
++        android:layout_height="match_parent" />
++</FrameLayout>

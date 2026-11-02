@@ -41,7 +41,12 @@ describe('RollingTextWidget', () => {
     });
   });
 
-  it('allows the pair widget its two rates', () => {
+  it('has as many groups as the native patch has slots for', () => {
+    // The generator of the patch's layout and ids (RollingIds.GROUPS).
+    const { GROUPS } = require('../../scripts/rollingWidgetResources');
+
+    expect(ROLLING_GROUPS).toBe(GROUPS);
+    // The pair widget's two rates.
     expect(ROLLING_GROUPS).toBe(2);
   });
 });

@@ -6,8 +6,11 @@
  * The widget library draws a widget as one bitmap, which cannot move. The
  * patch takes a rate (a TextWidget given `rollingGroup`) out of the bitmap and
  * shows it in live views laid over it: one ViewFlipper per character, two
- * TextViews each, whose in/out animations the launcher runs. RemoteViews can
- * only target views by id, so every slot has ids of its own:
+ * TextViews each, whose in/out animations the launcher runs. Only a widget
+ * that rolls gets them: rn_widget_rolling_host.xml is the library's own
+ * rn_widget.xml (day and night) with the slots added, so the other widgets,
+ * and every widget below Android 12, inflate none. RemoteViews can only
+ * target views by id, so every slot has ids of its own:
  *
  *   rn_rolling_g{group}_{rise|fall}           a group's container
  *   rn_rolling_g{group}_{rise|fall}_s{slot}   a character's flipper
@@ -53,12 +56,13 @@ const ANIMS = {
 
 // The face the library gives a bold TextWidget with no font family
 // (Typeface.DEFAULT at weight 700), named outright so a launcher theme's text
-// appearance cannot swap it.
+// appearance cannot swap it. RollingText.slotProbe measures a TextView set up
+// the same way, to put each slot's baseline on the drawn text's: keep the two
+// in step.
 const textView = (id) => `            <TextView
                 android:id="@+id/${id}"
                 android:layout_width="wrap_content"
                 android:layout_height="wrap_content"
-                android:elegantTextHeight="false"
                 android:fontFamily="sans-serif"
                 android:includeFontPadding="true"
                 android:letterSpacing="0"
@@ -93,9 +97,12 @@ const container = (group, dir) => `    <FrameLayout
 ${Array.from({ length: SLOTS }, (_, index) => slot(group, dir, index)).join('\n')}
     </FrameLayout>`;
 
+// Hidden from accessibility: the widget's label already says the rate, and
+// TalkBack would otherwise read it a character at a time.
 const layout = () => `${header}<FrameLayout xmlns:android="http://schemas.android.com/apk/res/android"
     android:layout_width="match_parent"
-    android:layout_height="match_parent">
+    android:layout_height="match_parent"
+    android:importantForAccessibility="noHideDescendants">
 ${Array.from({ length: GROUPS }, (_, group) => DIRECTIONS.map((dir) => container(group, dir)).join('\n')).join('\n')}
 </FrameLayout>
 `;
@@ -132,6 +139,18 @@ ${Array.from({ length: GROUPS }, (_, group) => `        {${DIRECTIONS.map((dir) 
 }
 `;
 
+// The library's rn_widget.xml with the slots over its bitmaps, under the tap areas.
+const CLICKABLE_ANCHOR = '    <FrameLayout\n        android:id="@+id/rn_widget_clickable_container"';
+const host = (variant) => {
+  const source = fs.readFileSync(path.join(LIB, 'res', variant, 'rn_widget.xml'), 'utf8').replace(/\r\n/g, '\n');
+  if (!source.includes(CLICKABLE_ANCHOR) || source.includes('rn_widget_rolling')) {
+    throw new Error(`res/${variant}/rn_widget.xml is not the library's own; restore it before generating`);
+  }
+  const include = '    <!-- Penny patch: the rolling slots, over the bitmaps and under the tap areas. -->\n'
+    + '    <include layout="@layout/rn_widget_rolling" />\n\n';
+  return header + source.replace(/^<\?xml[^>]*>\n/, '').replace(CLICKABLE_ANCHOR, include + CLICKABLE_ANCHOR);
+};
+
 const write = (relative, content) => {
   const file = path.join(LIB, relative);
   fs.mkdirSync(path.dirname(file), { recursive: true });
@@ -142,6 +161,8 @@ const write = (relative, content) => {
 if (require.main === module) {
   Object.entries(ANIMS).forEach(([name, content]) => write(`res/anim/${name}.xml`, content));
   write('res/layout/rn_widget_rolling.xml', layout());
+  write('res/layout/rn_widget_rolling_host.xml', host('layout'));
+  write('res/layout-night/rn_widget_rolling_host.xml', host('layout-night'));
   write('java/com/reactnativeandroidwidget/RollingIds.java', java());
 }
 
