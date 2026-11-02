@@ -1,5 +1,12 @@
 # Changelog
 
+## [0.309.0](https://github.com/heywood8/money-tracker/compare/penny-v0.308.1...penny-v0.309.0) (2026-11-02)
+
+
+### Features
+
+* **graphs:** roll the rate card's digits when the rate moves ([#1895](https://github.com/heywood8/money-tracker/issues/1895)) ([b982907](https://github.com/heywood8/money-tracker/commit/b9829079f4eb2712d6c8939d6970912d209ecf7d))
+
 ## [0.308.1](https://github.com/heywood8/money-tracker/compare/penny-v0.308.0...penny-v0.308.1) (2026-10-28)
 
 
