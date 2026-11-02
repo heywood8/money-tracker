@@ -24,6 +24,7 @@ import { rateChartTitle } from '../services/ExchangeRateCharts';
 import { translate } from '../services/notifications/notificationStrings';
 import { BORDER_RADIUS, FONT_SIZE, SPACING } from '../styles/designTokens';
 import { GRAPHS_DEEP_LINK, RATE_WINDOW_ACTION, REFRESH_RATES_ACTION } from './widgetConstants';
+import { RollingTextWidget } from './RollingTextWidget';
 
 /**
  * The exchange-rate home-screen widget: one pair's current rate, its move over
@@ -131,6 +132,8 @@ const ZONE_FILL_STYLE = { flex: 1 };
 // Past this the text no longer fits the card and is clipped; the zones stop growing too.
 const MAX_FONT_SCALE = 2;
 const PAIR_ZONE_ROW_STYLE = { width: 'match_parent', flexDirection: 'row', justifyContent: 'center' };
+// Bold: the face the rate's rolling digits are drawn in (RollingTextWidget);
+// a rate in another weight stays in the bitmap and does not roll.
 const VALUE_TEXT = { fontSize: VALUE_FONT_SIZE, fontWeight: 'bold' };
 
 // The two-rate widget: one card holding two halves, each rate centred in its
@@ -467,11 +470,16 @@ const windowZones = (language, { width, height }, compact = false) => (compact
  * @param {boolean} [box.centered] - The two-rate widget's half: the pair, the
  *   rate and its move centred, and no date, fetch time, offline marker or
  *   window (the middle column shows them once for both)
- * @param {string} [key]
+ * @param {string} [key] - The pair's half ('first' | 'second'); none on the one-rate widget
  * @returns {JSX.Element}
  */
 const ratePanel = (model, figures, colors, box, key) => {
   const { language } = model;
+  // The rate's digits roll when it changes (RollingTextWidget), each half of
+  // the pair in a group of its own, kept from draw to draw. Another pair or
+  // amount in that place is another rate, shown at once rather than rolled to.
+  const rollingGroup = key === 'second' ? 1 : 0;
+  const rollingKey = `${model.chart.amount} ${model.chart.from}>${model.chart.to}`;
   const mutedText = { ...SMALL_TEXT, color: colors.mutedText };
   const sparkHeight = sparkHeightOf(box.height, box.centered ? 0 : WINDOW_ROW_EXTRA);
   const sparkline = hasRoomForLine(sparkHeight) && box.width > 0
@@ -503,8 +511,10 @@ const ratePanel = (model, figures, colors, box, key) => {
         truncate="END"
         style={{ ...mutedText, ...CENTERED_TEXT, ...TITLE_INSET_STYLE }}
       />
-      <TextWidget
+      <RollingTextWidget
         text={figures.value}
+        rollingGroup={rollingGroup}
+        rollingKey={rollingKey}
         maxLines={1}
         truncate="END"
         style={{ ...VALUE_TEXT, ...CENTERED_TEXT, color: colors.text }}
@@ -535,8 +545,10 @@ const ratePanel = (model, figures, colors, box, key) => {
       </FlexWidget>
       <FlexWidget style={ROW_STYLE}>
         <FlexWidget style={ROW_GROW_STYLE}>
-          <TextWidget
+          <RollingTextWidget
             text={figures.value}
+            rollingGroup={rollingGroup}
+            rollingKey={rollingKey}
             maxLines={1}
             truncate="END"
             style={{ ...VALUE_TEXT, color: colors.text }}
