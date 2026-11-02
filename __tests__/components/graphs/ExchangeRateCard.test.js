@@ -1,6 +1,8 @@
 import React from 'react';
-import { render, fireEvent, waitFor, screen } from '@testing-library/react-native';
-import { Linking } from 'react-native';
+import { act, render, fireEvent, waitFor, screen } from '@testing-library/react-native';
+import { AppState, Linking } from 'react-native';
+import { useAnimatedReaction } from 'react-native-reanimated';
+import { NumberFlow } from 'number-flow-react-native';
 import ExchangeRateCard, { xTickIndices } from '../../../app/components/graphs/ExchangeRateCard';
 import { formatRateDate, formatAxisDate } from '../../../app/services/ExchangeRateHistory';
 import { fetchRateSeries } from '../../../app/services/ExchangeRateHistory';
@@ -176,6 +178,120 @@ describe('ExchangeRateCard', () => {
 
     // The app opens on Operations; the Graphs tab is mounted but hidden.
     expect(fetchRateSeries).not.toHaveBeenCalled();
+  });
+
+  describe('Rolling headline', () => {
+    const originalState = AppState.currentState;
+    let appStateChange;
+    let scrubbed;
+
+    // The props the headline's wheels were last drawn with.
+    const lastFlow = () => NumberFlow.mock.calls.at(-1)[0];
+
+    // The chart's scrub reaction, as Reanimated would run it on the UI thread:
+    // the index under the finger, or null once it lifts, after the last one.
+    const scrubTo = (index) => act(() => {
+      const react = useAnimatedReaction.mock.calls.at(-1)[1];
+      react(index, scrubbed);
+      scrubbed = index;
+    });
+
+    // A return to the foreground, which reloads the rates.
+    const returnToApp = () => act(() => {
+      appStateChange('background');
+      appStateChange('active');
+    });
+
+    beforeEach(() => {
+      scrubbed = null;
+      AppState.currentState = 'active';
+      jest.spyOn(AppState, 'addEventListener').mockImplementation((event, callback) => {
+        if (event === 'change') appStateChange = callback;
+        return { remove: jest.fn() };
+      });
+    });
+
+    afterEach(() => {
+      AppState.addEventListener.mockRestore();
+      AppState.currentState = originalState;
+    });
+
+    it('rolls the digits through the rates between when fresh rates arrive', async () => {
+      await renderCard();
+      await waitFor(() => expect(screen.getByTestId('exchange-rate-value')).toHaveTextContent('₽81.55'));
+
+      fetchRateSeries.mockResolvedValue(series([['2026-09-23', 80], ['2026-10-23', 81.9]]));
+      await returnToApp();
+
+      await waitFor(() => expect(screen.getByTestId('exchange-rate-value')).toHaveTextContent('₽81.90'));
+      expect(lastFlow()).toEqual(expect.objectContaining({
+        value: 81.9,
+        prefix: '₽',
+        locales: 'en',
+        format: { minimumFractionDigits: 2, maximumFractionDigits: 2 },
+        animated: true,
+        continuous: true,
+      }));
+    });
+
+    it('hands the wheels the rate rounded to the digits it shows', async () => {
+      fetchRateSeries.mockResolvedValue(series([['2026-09-23', 4.3], ['2026-10-23', 4.45949]]));
+
+      await renderCard({ chart: { ...chart, from: 'RUB', to: 'AMD' } });
+
+      await waitFor(() => expect(screen.getByTestId('exchange-rate-value')).toHaveTextContent('֏4.459'));
+      // Not 4.45949: a refresh to 4.4591 would otherwise roll down to the same digits.
+      expect(lastFlow().value).toBe(4.459);
+    });
+
+    it('follows a scrubbing finger without rolling, and springs back the same way', async () => {
+      await renderCard();
+      await waitFor(() => expect(screen.getByTestId('exchange-rate-value')).toHaveTextContent('₽81.55'));
+      expect(lastFlow()).toEqual(expect.objectContaining({ animated: true, continuous: true }));
+
+      await scrubTo(0);
+      expect(screen.getByTestId('exchange-rate-value')).toHaveTextContent('₽80.00');
+      expect(lastFlow()).toEqual(expect.objectContaining({ value: 80, animated: false, continuous: false }));
+
+      await scrubTo(null);
+      expect(screen.getByTestId('exchange-rate-value')).toHaveTextContent('₽81.55');
+      expect(lastFlow()).toEqual(expect.objectContaining({ value: 81.55, animated: false }));
+
+      // The next fresh rates roll again.
+      fetchRateSeries.mockResolvedValue(series([['2026-09-23', 80], ['2026-10-23', 81.2]]));
+      await returnToApp();
+
+      await waitFor(() => expect(screen.getByTestId('exchange-rate-value')).toHaveTextContent('₽81.20'));
+      expect(lastFlow().animated).toBe(true);
+    });
+
+    it('does not roll under a finger when fresh rates land mid-scrub', async () => {
+      await renderCard();
+      await waitFor(() => expect(screen.getByTestId('exchange-rate-value')).toHaveTextContent('₽81.55'));
+      await scrubTo(0);
+
+      // The topped-up series moves the point under the finger.
+      fetchRateSeries.mockResolvedValue(series([['2026-09-23', 79.5], ['2026-10-23', 81.9]]));
+      await returnToApp();
+
+      await waitFor(() => expect(screen.getByTestId('exchange-rate-value')).toHaveTextContent('₽79.50'));
+      expect(lastFlow()).toEqual(expect.objectContaining({ value: 79.5, animated: false }));
+    });
+
+    it('takes the wheels down while another range loads', async () => {
+      await renderCard();
+      await waitFor(() => expect(screen.getByTestId('exchange-rate-value')).toHaveTextContent('₽81.55'));
+
+      let resolve;
+      fetchRateSeries.mockReturnValueOnce(new Promise((r) => { resolve = r; }));
+      await fireEvent.press(screen.getByTestId('exchange-rate-range-year'));
+
+      // The previous range's rate is not left standing to roll from.
+      expect(screen.getByTestId('exchange-rate-value')).not.toHaveTextContent('₽');
+
+      await act(async () => resolve(series([['2025-10-23', 95], ['2026-10-23', 81.2]])));
+      expect(screen.getByTestId('exchange-rate-value')).toHaveTextContent('₽81.20');
+    });
   });
 
   describe('helpers', () => {

@@ -19,6 +19,8 @@ import {
   summarizeRateSeries,
   rateDecimals,
   formatRateValue,
+  rateNumberFormat,
+  roundRate,
   formatRateChange,
   formatCheckedAt,
   rateChangeColor,
@@ -798,6 +800,16 @@ describe('ExchangeRateHistory', () => {
       expect(formatRateValue(0.0122612, 'en')).toBe('0.01226');
       expect(formatRateValue(-0.26, 'en', 2)).toBe('-0.26');
       expect(formatRateValue(NaN, 'en')).toBe('—');
+    });
+
+    it('rounds and formats as the rolling headline does, trailing zeros kept', () => {
+      expect(roundRate(4.45949, 3)).toBe(4.459);
+      expect(roundRate(81.9, 2)).toBe(81.9);
+      expect(rateNumberFormat(3)).toEqual({ minimumFractionDigits: 3, maximumFractionDigits: 3 });
+      // The headline hands Intl the rounded number and these options.
+      expect(new Intl.NumberFormat('en', rateNumberFormat(2)).format(roundRate(81.9, 2)))
+        .toBe(formatRateValue(81.9, 'en', 2));
+      expect(formatRateValue(1234.5, 'en', 2)).toBe('1,234.50');
     });
   });
 });

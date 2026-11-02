@@ -578,6 +578,7 @@ If tests fail, DO NOT push. Fix the failures first.
 - **expo-sqlite**: Mocked with spy functions for DB operations
 - **react-native APIs**: Mock Appearance, DateTimePicker, etc. in `jest.setup.js`
 - **Third-party libraries**: Mock chart-kit, SVG, gesture-handler in setup file
+- **number-flow-react-native** (the Graphs rate card's rolling headline): mocked in `jest.setup.js` as plain text formatted the way the library formats it; `NumberFlow` is a `jest.fn`, so a test reads the props it was last given (`animated`, `continuous`)
 - **Database services**: Mock in integration tests to control DB behavior
 - **UUIDs**: Mock `react-native-uuid` for predictable test IDs
 
