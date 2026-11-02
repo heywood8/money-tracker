@@ -42,6 +42,7 @@
     "expo-sqlite": "~56.0.5",
     "expo-task-manager": "~56.0.20",
     "expo-updates": "~56.0.19",
+    "number-flow-react-native": "0.5.1",
     "prop-types": "^15.8.1",
     "react": "19.2.3",
     "react-native": "0.85.3",

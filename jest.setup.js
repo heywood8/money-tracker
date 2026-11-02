@@ -935,6 +935,20 @@ jest.mock('react-native-draggable-flatlist', () => {
   };
 });
 
+// Mock number-flow-react-native. Its digits roll on Reanimated wheels, which
+// the Reanimated mock below cannot drive, so under Jest a NumberFlow is the
+// text it settles on (formatted as the library formats it). A jest.fn, so a
+// test can read the props it was last given (`animated`, `continuous`).
+jest.mock('number-flow-react-native', () => {
+  const React = require('react');
+  const { Text } = require('react-native');
+  const NumberFlow = jest.fn(({ value, format, locales, prefix = '', suffix = '', style }) => {
+    const text = `${prefix}${new Intl.NumberFormat(locales, format).format(value)}${suffix}`;
+    return React.createElement(Text, { style, accessibilityLabel: text }, text);
+  });
+  return { __esModule: true, NumberFlow };
+});
+
 // Mock react-native-worklets
 jest.mock('react-native-worklets', () => ({
   useSharedValue: jest.fn((value) => ({ value })),

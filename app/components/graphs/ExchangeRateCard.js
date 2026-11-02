@@ -1,9 +1,10 @@
-import React, { useCallback, useEffect, useMemo, useState } from 'react';
+import React, { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import { View, Text, StyleSheet, ActivityIndicator, Pressable, Linking } from 'react-native';
 import PropTypes from 'prop-types';
 import { CartesianChart, Line, Area, useChartPressState } from 'victory-native';
 import { matchFont, LinearGradient, Circle, vec } from '@shopify/react-native-skia';
 import { runOnJS, useAnimatedReaction } from 'react-native-reanimated';
+import { NumberFlow } from 'number-flow-react-native';
 import Icon from '@expo/vector-icons/MaterialCommunityIcons';
 import { getCurrencySymbol } from '../../services/currency';
 import {
@@ -18,6 +19,8 @@ import {
   formatRateDate,
   formatRateValue,
   rateDecimals,
+  rateNumberFormat,
+  roundRate,
   summarizeRateSeries,
 } from '../../services/ExchangeRateHistory';
 import { googleRateSearchUrl, rateChartTitle } from '../../services/ExchangeRateCharts';
@@ -166,6 +169,14 @@ const ExchangeRateCard = ({ chart, colors, t, language }) => {
   const [result, setResult] = useState({ key: null, points: [], stale: false, error: null });
   const [reloadKey, setReloadKey] = useState(0);
   const [scrubIndex, setScrubIndex] = useState(null);
+  // The headline rolls its digits when the rate itself moves: fresh rates on a
+  // return to the app or the tab, a new amount from Settings. Under a finger it
+  // changes with every point crossed, and jumps back to the latest when the
+  // finger lifts; both are drawn at once, so the render that sees the lift
+  // still counts as scrubbing.
+  const scrubbingRef = useRef(false);
+  const rollDigits = scrubIndex == null && !scrubbingRef.current;
+  useEffect(() => { scrubbingRef.current = scrubIndex != null; }, [scrubIndex]);
 
   // The tab stays mounted all session, so the rates are only asked for while
   // it is on screen; coming back reads the saved copy and tops it up if it is
@@ -242,6 +253,11 @@ const ExchangeRateCard = ({ chart, colors, t, language }) => {
   const changeText = formatRateChange(change, changePercent, language, decimals);
   const symbol = getCurrencySymbol(to);
   const valueText = shownValue != null ? `${symbol}${formatRateValue(shownValue, language, decimals)}` : '';
+  // valueText's own format and rounding, so the direction the digits roll in
+  // follows the digits shown rather than a fraction they do not print.
+  const valueFormat = useMemo(() => rateNumberFormat(decimals), [decimals]);
+  // One flat object: NumberFlow reads the style's keys, not a style array.
+  const valueStyle = useMemo(() => StyleSheet.flatten([styles.value, { color: colors.text }]), [colors.text]);
   const title = rateChartTitle(chart);
 
   return (
@@ -263,13 +279,24 @@ const ExchangeRateCard = ({ chart, colors, t, language }) => {
       </View>
 
       <View style={styles.valueRow}>
-        <Text
-          style={[styles.value, { color: colors.text }]}
-          numberOfLines={1}
-          testID="exchange-rate-value"
-        >
-          {loading ? ' ' : valueText}
-        </Text>
+        <View style={styles.valueBox} testID="exchange-rate-value">
+          {loading || shownValue == null ? (
+            <Text style={valueStyle}> </Text>
+          ) : (
+            // Each digit on its own wheel: a rise rolls them up, a fall down,
+            // and `continuous` spins the digits below a changed one through a
+            // full turn, so 4.459 → 4.559 reads as passing every rate between.
+            <NumberFlow
+              value={roundRate(shownValue, decimals)}
+              locales={language || undefined}
+              format={valueFormat}
+              prefix={symbol}
+              style={valueStyle}
+              animated={rollDigits}
+              continuous={rollDigits}
+            />
+          )}
+        </View>
         {summary && (
           <View style={styles.changeRow} testID="exchange-rate-change">
             <Icon name={changeIcon} size={14} color={changeColor} />
@@ -437,15 +464,24 @@ const styles = StyleSheet.create({
     justifyContent: 'space-between',
     marginBottom: SPACING.xs,
   },
+  // No letterSpacing: NumberFlow lays each glyph out at its measured width,
+  // which does not include it.
   value: {
-    flexShrink: 1,
     fontSize: VALUE_FONT_SIZE,
     fontWeight: FONT_WEIGHT.bold,
-    letterSpacing: -0.4,
   },
+  // The digits cannot be ellipsized, so they keep their width.
+  valueBox: {
+    flexShrink: 0,
+  },
+  // Centred, not on the baseline: NumberFlow's wheels are absolutely placed,
+  // so its box offers no baseline, and the move would sit at its bottom.
+  // Wrapping: a rate too wide to leave the move room (1000 USD → IDR at a
+  // large system font) puts the move on a line of its own under it.
   valueRow: {
-    alignItems: 'baseline',
+    alignItems: 'center',
     flexDirection: 'row',
+    flexWrap: 'wrap',
     gap: SPACING.sm,
     justifyContent: 'space-between',
   },

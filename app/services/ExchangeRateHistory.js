@@ -587,6 +587,29 @@ export const axisDecimals = (min, max) => {
 };
 
 /**
+ * A rate rounded to the decimals it is shown to, as formatRateValue rounds it
+ * (toFixed), so the number and the text printed for it agree.
+ *
+ * @param {number} value
+ * @param {number} decimals
+ * @returns {number}
+ */
+export const roundRate = (value, decimals) => Number(value.toFixed(decimals));
+
+/**
+ * Intl.NumberFormat options for a rate shown to `decimals` places, trailing
+ * zeros kept. Shared by formatRateValue and the Graphs card's rolling
+ * headline, so the two print a rate the same way.
+ *
+ * @param {number} decimals
+ * @returns {Intl.NumberFormatOptions}
+ */
+export const rateNumberFormat = (decimals) => ({
+  minimumFractionDigits: decimals,
+  maximumFractionDigits: decimals,
+});
+
+/**
  * Format a rate for display in the app's language.
  *
  * @param {number} value
@@ -597,14 +620,10 @@ export const axisDecimals = (min, max) => {
  */
 export const formatRateValue = (value, language, decimals = rateDecimals(value)) => {
   if (!Number.isFinite(value)) return '—';
-  const fixed = value.toFixed(decimals);
   try {
-    return Number(fixed).toLocaleString(language || undefined, {
-      minimumFractionDigits: decimals,
-      maximumFractionDigits: decimals,
-    });
+    return roundRate(value, decimals).toLocaleString(language || undefined, rateNumberFormat(decimals));
   } catch {
-    return fixed;
+    return value.toFixed(decimals);
   }
 };
 
