@@ -72,6 +72,17 @@ describe('ExchangeRateWidget', () => {
       expect(textsOf(tree)).toEqual(['1 USD → RUB', 'Oct 23', '₽81.55', '▼ -2.74 (-3.25%)', '‹', 'Month', '›']);
     });
 
+    it('rolls the rate: its text in rolling group 0, bold', () => {
+      const tree = render({ status: 'ready', chart: CHART, points: POINTS, stale: false });
+
+      const rate = textNode(tree, '₽81.55');
+      expect(rate.type).toBe('TextWidget');
+      // Keyed by the pair and amount: another chart in its place is not a move.
+      expect(rate.props).toMatchObject({ rollingGroup: 0, rollingKey: '1 USD>RUB', fontWeight: 'bold', maxLines: 1 });
+      // Nothing else on the card rolls.
+      expect(nodesOf(tree, 'TextWidget').filter((node) => 'rollingGroup' in node.props)).toEqual([rate]);
+    });
+
     it('prices the configured amount', () => {
       const tree = render({
         status: 'ready',
@@ -342,6 +353,30 @@ describe('ExchangeRateWidget', () => {
       expect(textsOf(first)).toContain('₽81.55');
       expect(textsOf(second)).toContain('֏4.470');
       expect(tree.props.clickActionData).toEqual({ uri: GRAPHS_DEEP_LINK });
+    });
+
+    it('rolls each half\'s rate in a group of its own', () => {
+      const tree = renderPair([
+        { status: 'ready', chart: CHART, points: POINTS },
+        { status: 'ready', chart: AMD, points: AMD_POINTS },
+      ]);
+
+      const rolling = nodesOf(tree, 'TextWidget').filter((node) => 'rollingGroup' in node.props);
+      expect(rolling.map((node) => [node.props.text, node.props.rollingGroup, node.props.rollingKey])).toEqual([
+        ['₽81.55', 0, '1 USD>RUB'],
+        ['֏4.470', 1, '1 RUB>AMD'],
+      ]);
+    });
+
+    it('keeps the second half in group 1 when the first has no rate', () => {
+      const tree = renderPair([
+        { status: 'error', chart: CHART },
+        { status: 'ready', chart: AMD, points: AMD_POINTS },
+      ]);
+
+      const rolling = nodesOf(tree, 'TextWidget').filter((node) => 'rollingGroup' in node.props);
+      // Its group is what remembers its last rate, so it may not shift to 0.
+      expect(rolling.map((node) => [node.props.text, node.props.rollingGroup])).toEqual([['֏4.470', 1]]);
     });
 
     it('centres each rate in its half, clear of the middle column', () => {
