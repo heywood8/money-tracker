@@ -1,5 +1,12 @@
 # Changelog
 
+## [0.310.0](https://github.com/heywood8/money-tracker/compare/penny-v0.309.0...penny-v0.310.0) (2026-11-03)
+
+
+### Features
+
+* **widgets:** roll the rate's digits on the exchange-rate widgets ([#1897](https://github.com/heywood8/money-tracker/issues/1897)) ([47c6576](https://github.com/heywood8/money-tracker/commit/47c65765c4cf99d3ce599b249579303a21e46fc5))
+
 ## [0.309.0](https://github.com/heywood8/money-tracker/compare/penny-v0.308.1...penny-v0.309.0) (2026-11-02)
 
 
