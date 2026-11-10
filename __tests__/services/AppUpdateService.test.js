@@ -38,11 +38,22 @@ jest.mock('expo-intent-launcher', () => ({
   startActivityAsync: jest.fn(),
 }));
 
+// The session installer has its own tests (silentInstaller.test.js); here it is a switch. Off by
+// default, which is every device the system installer handles: Android 11 and older, a build
+// without the native module, a user who has not yet allowed Penny to install apps.
+const mockCanInstallSilently = jest.fn(() => false);
+const mockInstallSilently = jest.fn();
+jest.mock('../../app/services/silentInstaller', () => ({
+  canInstallSilently: (...args) => mockCanInstallSilently(...args),
+  installSilently: (...args) => mockInstallSilently(...args),
+}));
+
 const FileSystem = require('expo-file-system/legacy');
 
 describe('AppUpdateService', () => {
   beforeEach(() => {
     jest.clearAllMocks();
+    mockCanInstallSilently.mockReturnValue(false);
     // The ETag cache lives at module scope; clear it so one test's cached listing
     // cannot answer another test's request with a 304.
     resetEtagCache();
@@ -1435,10 +1446,89 @@ describe('AppUpdateService', () => {
           null,
           { checksumUrl: CHECKSUM_URL, fetchImpl },
         ),
-      ).resolves.toBeUndefined();
+      ).resolves.toMatchObject({ installDeferred: false });
 
       expect(FileSystem.deleteAsync).not.toHaveBeenCalled();
       expect(IntentLauncher.startActivityAsync).toHaveBeenCalled();
+    });
+
+    // A silent install closes Penny. Started the moment a background download finished, it
+    // would take the app away from under whatever the user was doing, so the caller asks first.
+    describe('an install that would skip the confirmation screen', () => {
+      const APK_URI = 'file:///cache/penny-v1.0.0.apk';
+
+      beforeEach(() => {
+        jest.spyOn(console, 'log').mockImplementation(() => {});
+        mockDownload(APK_URI);
+        mockCanInstallSilently.mockReturnValue(true);
+        mockInstallSilently.mockResolvedValue({ status: 'pending' });
+      });
+
+      it('is left to the caller when the caller asks to defer it', async () => {
+        const result = await downloadAndInstallApk(
+          'https://example.com/penny-v1.0.0.apk',
+          null,
+          { checksumUrl: CHECKSUM_URL, fetchImpl: checksumResponse(FILE_MD5), deferSilentInstall: true },
+        );
+
+        expect(result).toEqual({ localUri: APK_URI, installDeferred: true });
+        expect(mockInstallSilently).not.toHaveBeenCalled();
+        expect(IntentLauncher.startActivityAsync).not.toHaveBeenCalled();
+      });
+
+      it('still verifies the download, but leaves the backup to the install', async () => {
+        // The snapshot belongs to the moment of the install. After "Later" that can be days away,
+        // and a snapshot from download time would miss everything entered since.
+        const onPhaseChange = jest.fn();
+
+        await downloadAndInstallApk(
+          'https://example.com/penny-v1.0.0.apk',
+          null,
+          { checksumUrl: CHECKSUM_URL, fetchImpl: checksumResponse(FILE_MD5), deferSilentInstall: true, onPhaseChange },
+        );
+
+        expect(onPhaseChange).toHaveBeenCalledWith('verifying');
+        expect(onPhaseChange).not.toHaveBeenCalledWith('backing_up');
+      });
+
+      it('still discards a download that fails its checksum', async () => {
+        FileSystem.deleteAsync.mockResolvedValue();
+
+        await expect(downloadAndInstallApk(
+          'https://example.com/penny-v1.0.0.apk',
+          null,
+          { checksumUrl: CHECKSUM_URL, fetchImpl: checksumResponse(OTHER_MD5), deferSilentInstall: true },
+        )).rejects.toMatchObject({ code: UPDATE_ERROR.CHECKSUM_MISMATCH });
+        expect(mockInstallSilently).not.toHaveBeenCalled();
+      });
+
+      it('installs at once when the caller does not ask to defer', async () => {
+        const result = await downloadAndInstallApk(
+          'https://example.com/penny-v1.0.0.apk',
+          null,
+          { checksumUrl: CHECKSUM_URL, fetchImpl: checksumResponse(FILE_MD5) },
+        );
+
+        expect(result).toEqual({ localUri: APK_URI, installDeferred: false });
+        expect(mockInstallSilently).toHaveBeenCalledWith(APK_URI);
+        expect(IntentLauncher.startActivityAsync).not.toHaveBeenCalled();
+      });
+    });
+
+    it('opens the system installer straight away, even when asked to defer, if the install cannot be silent', async () => {
+      // That screen asks the user itself, so there is nothing for the caller to ask first.
+      jest.spyOn(console, 'log').mockImplementation(() => {});
+      mockDownload();
+
+      const result = await downloadAndInstallApk(
+        'https://example.com/penny-v1.0.0.apk',
+        null,
+        { checksumUrl: CHECKSUM_URL, fetchImpl: checksumResponse(FILE_MD5), deferSilentInstall: true },
+      );
+
+      expect(result).toEqual({ localUri: 'file:///cache/penny-v1.0.0.apk', installDeferred: false });
+      expect(IntentLauncher.startActivityAsync).toHaveBeenCalled();
+      expect(mockInstallSilently).not.toHaveBeenCalled();
     });
 
     it('deletes the file and throws when checksum does not match', async () => {
@@ -2007,6 +2097,56 @@ describe('AppUpdateService', () => {
       FileSystem.getContentUriAsync.mockRejectedValue(new Error('file not found'));
 
       await expect(installApk(APK)).rejects.toMatchObject({ code: UPDATE_ERROR.INSTALL_FAILED });
+    });
+
+    describe('where Android allows an update without its confirmation screen', () => {
+      beforeEach(() => {
+        mockCanInstallSilently.mockReturnValue(true);
+      });
+
+      it('installs through a session and never opens the system installer', async () => {
+        mockInstallSilently.mockResolvedValue({ status: 'pending_user_action', sessionId: 3 });
+
+        await expect(launchApkInstaller(APK))
+          .resolves.toEqual({ resultDelivered: true, silent: true, status: 'pending_user_action' });
+        expect(mockInstallSilently).toHaveBeenCalledWith(APK);
+        expect(IntentLauncher.startActivityAsync).not.toHaveBeenCalled();
+        expect(FileSystem.getContentUriAsync).not.toHaveBeenCalled();
+      });
+
+      it('reports no result when Android said nothing in time', async () => {
+        mockInstallSilently.mockResolvedValue({ status: 'pending' });
+
+        await expect(launchApkInstaller(APK))
+          .resolves.toEqual({ resultDelivered: false, silent: true, status: 'pending' });
+      });
+
+      it('passes a refusal on with the code that explains it', async () => {
+        mockInstallSilently.mockRejectedValue(
+          Object.assign(new Error('Android refused the update (conflict)'), { code: UPDATE_ERROR.INSTALL_REJECTED }),
+        );
+
+        await expect(launchApkInstaller(APK)).rejects.toMatchObject({ code: UPDATE_ERROR.INSTALL_REJECTED });
+        expect(IntentLauncher.startActivityAsync).not.toHaveBeenCalled();
+      });
+
+      it('takes the decision a caller already made instead of asking again', async () => {
+        mockCanInstallSilently.mockReturnValue(false);
+        mockInstallSilently.mockResolvedValue({ status: 'pending' });
+
+        await launchApkInstaller(APK, { silent: true });
+
+        expect(mockCanInstallSilently).not.toHaveBeenCalled();
+        expect(mockInstallSilently).toHaveBeenCalledWith(APK);
+        expect(IntentLauncher.startActivityAsync).not.toHaveBeenCalled();
+      });
+
+      it('still reports a cached APK that is gone before trying', async () => {
+        FileSystem.getInfoAsync.mockResolvedValue({ exists: false });
+
+        await expect(installApk(APK)).rejects.toMatchObject({ code: UPDATE_ERROR.FILE_MISSING });
+        expect(mockInstallSilently).not.toHaveBeenCalled();
+      });
     });
   });
 });

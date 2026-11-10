@@ -124,7 +124,15 @@ module.exports = {
         // installer. Declared only there — on Play it is both unnecessary and
         // disallowed, and merely declaring it triggers a Play Console review
         // form the app cannot satisfy.
-        ...(IS_PLAY ? [] : ['android.permission.REQUEST_INSTALL_PACKAGES']),
+        //
+        // UPDATE_PACKAGES_WITHOUT_USER_ACTION goes with it: on Android 12+ it
+        // lets Penny install its own update with no confirmation screen
+        // (modules/penny-installer). Play forbids self-updating, so it too is
+        // GitHub-only.
+        ...(IS_PLAY ? [] : [
+          'android.permission.REQUEST_INSTALL_PACKAGES',
+          'android.permission.UPDATE_PACKAGES_WITHOUT_USER_ACTION',
+        ]),
       ],
     },
     extra: {

@@ -1,6 +1,8 @@
 import * as FileSystem from 'expo-file-system/legacy';
 import * as IntentLauncher from 'expo-intent-launcher';
-import { UPDATE_ERROR } from '../utils/updateErrors';
+import { UPDATE_ERROR, createUpdateError as updateError } from '../utils/updateErrors';
+import { settleWithin } from '../utils/settleWithin';
+import { canInstallSilently, installSilently } from './silentInstaller';
 
 const APP_VERSION = require('../../package.json').version;
 
@@ -850,13 +852,6 @@ export const fetchExpectedChecksum = async (checksumUrl, apkFilename, fetchImpl 
 // the reason it failed; the codes themselves live with their messages in utils/updateErrors.
 export { UPDATE_ERROR };
 
-const updateError = (code, message, cause = null) => {
-  const error = new Error(message);
-  error.code = code;
-  if (cause) error.cause = cause;
-  return error;
-};
-
 // expo-intent-launcher permits a single in-flight activity and rejects a second launch until the
 // first one's result arrives. Its ActivityAlreadyStartedException carries the code; the message is
 // matched too so a reworded (or re-wrapped) rejection still gets the remedy that actually helps.
@@ -876,21 +871,6 @@ const INSTALLER_RETRY_DELAY_MS = 500;
 
 const wait = (ms) => new Promise((resolve) => setTimeout(resolve, ms));
 
-// Awaits a promise but gives up after timeoutMs. Every outcome becomes a value, so a rejection
-// that lands after the timeout cannot surface as an unhandled rejection; the timer is cleared
-// either way so a launch that answered at once leaves nothing pending behind it.
-const settleWithin = (promise, timeoutMs) => {
-  let timer = null;
-  const timedOut = new Promise((resolve) => {
-    timer = setTimeout(() => resolve({ status: 'pending' }), timeoutMs);
-  });
-  const settled = promise.then(
-    () => ({ status: 'resolved' }),
-    (error) => ({ status: 'rejected', error }),
-  );
-  return Promise.race([settled, timedOut]).finally(() => clearTimeout(timer));
-};
-
 // Hands the APK to Android's package installer.
 //
 // Two things about that handoff went wrong in the field (report of 2026-09-12, where every update
@@ -906,7 +886,12 @@ const settleWithin = (promise, timeoutMs) => {
 //      task, since we start it from our own activity, so the flag is gone.
 //   2. Nothing may depend on that result arriving at all. The race below counts "no result yet"
 //      as a successful launch, which is what it is.
-export const launchApkInstaller = async (localUri, { timeoutMs = INSTALLER_RESULT_TIMEOUT_MS } = {}) => {
+// `silent` is the caller's decision when it already made one (canInstallSilently), so a single
+// tap is not judged twice with answers that could differ in between.
+export const launchApkInstaller = async (localUri, {
+  timeoutMs = INSTALLER_RESULT_TIMEOUT_MS,
+  silent = canInstallSilently(),
+} = {}) => {
   // A build listed in the panel can be gone by the time it is tapped — the cache is the OS's to
   // reclaim, and our own cleanup prunes it. That needs its own verdict: telling the user to
   // "install it again from the downloaded builds" when there is nothing left to install sends
@@ -914,6 +899,16 @@ export const launchApkInstaller = async (localUri, { timeoutMs = INSTALLER_RESUL
   const info = await FileSystem.getInfoAsync(localUri).catch(() => null);
   if (info && (!info.exists || info.size === 0)) {
     throw updateError(UPDATE_ERROR.FILE_MISSING, `APK is no longer on disk: ${localUri}`);
+  }
+
+  // Where Android lets Penny update itself without its confirmation screen, do that. Everything
+  // below is the system installer, which stays the route on Android 11 and older, on a build
+  // without the native module, and until the user has allowed Penny to install apps (that
+  // screen is the one that asks for it).
+  if (silent) {
+    const { status } = await installSilently(localUri);
+    console.log(`[AppUpdate] silent install for ${localUri}: ${status}`);
+    return { resultDelivered: status !== 'pending', silent: true, status };
   }
 
   let contentUri;
@@ -961,9 +956,50 @@ export const launchApkInstaller = async (localUri, { timeoutMs = INSTALLER_RESUL
 };
 
 // The name the UI installs by; the launch mechanics live in launchApkInstaller.
-export const installApk = (localUri) => launchApkInstaller(localUri);
+export const installApk = (localUri, options) => launchApkInstaller(localUri, options);
 
-export const downloadAndInstallApk = async (downloadUrl, onProgress, { checksumUrl = null, fetchImpl = fetch, onPhaseChange = null } = {}) => {
+// A snapshot of the data taken just before an update installs, kept under documents as
+// pre_update_<timestamp>.json (the newest three). Never throws: a backup that fails is logged
+// and the install goes ahead, as it always has.
+export const backupBeforeUpdate = async () => {
+  try {
+    const { createBackup } = await import('./BackupRestore');
+    const snapshot = await createBackup();
+    const snapshotTimestamp = new Date().toISOString().replace(/[:.]/g, '-').slice(0, -5);
+    const snapshotUri = `${FileSystem.documentDirectory}pre_update_${snapshotTimestamp}.json`;
+    await FileSystem.writeAsStringAsync(snapshotUri, JSON.stringify(snapshot, null, 2));
+    console.log('[AppUpdate] Pre-update backup saved:', snapshotUri);
+
+    try {
+      const allFiles = await FileSystem.readDirectoryAsync(FileSystem.documentDirectory);
+      const snapshots = allFiles
+        .filter((name) => name.startsWith('pre_update_') && name.endsWith('.json'))
+        .sort();
+      const excess = snapshots.slice(0, Math.max(0, snapshots.length - 3));
+      for (const name of excess) {
+        await FileSystem.deleteAsync(`${FileSystem.documentDirectory}${name}`, { idempotent: true });
+        console.log('[AppUpdate] Deleted old pre-update snapshot:', name);
+      }
+    } catch (cleanupError) {
+      console.warn('[AppUpdate] Failed to clean up old pre-update snapshots:', cleanupError);
+    }
+  } catch (backupError) {
+    console.warn('[AppUpdate] Pre-update backup failed; proceeding with install:', backupError.message);
+  }
+};
+
+// Downloads, verifies and backs up, then installs. With deferSilentInstall, an install that would
+// skip Android's confirmation screen (and the backup before it) is left to the caller instead
+// ({ installDeferred: true }):
+// with no screen in the way it would close Penny the moment a background download finished,
+// in the middle of whatever the user was doing. The system installer's screen is a question of
+// its own, so that route still installs straight away.
+export const downloadAndInstallApk = async (downloadUrl, onProgress, {
+  checksumUrl = null,
+  fetchImpl = fetch,
+  onPhaseChange = null,
+  deferSilentInstall = false,
+} = {}) => {
   const raw = (downloadUrl.split('/').pop().split('?')[0]) || null;
   const filename = sanitizeFilename(raw);
   const localUri = `${FileSystem.cacheDirectory}${filename}`;
@@ -1056,33 +1092,19 @@ export const downloadAndInstallApk = async (downloadUrl, onProgress, { checksumU
     }
   }
 
-  try {
-    onPhaseChange?.('backing_up');
-    const { createBackup } = await import('./BackupRestore');
-    const snapshot = await createBackup();
-    const snapshotTimestamp = new Date().toISOString().replace(/[:.]/g, '-').slice(0, -5);
-    const snapshotUri = `${FileSystem.documentDirectory}pre_update_${snapshotTimestamp}.json`;
-    await FileSystem.writeAsStringAsync(snapshotUri, JSON.stringify(snapshot, null, 2));
-    console.log('[AppUpdate] Pre-update backup saved:', snapshotUri);
-
-    try {
-      const allFiles = await FileSystem.readDirectoryAsync(FileSystem.documentDirectory);
-      const snapshots = allFiles
-        .filter((name) => name.startsWith('pre_update_') && name.endsWith('.json'))
-        .sort();
-      const excess = snapshots.slice(0, Math.max(0, snapshots.length - 3));
-      for (const name of excess) {
-        await FileSystem.deleteAsync(`${FileSystem.documentDirectory}${name}`, { idempotent: true });
-        console.log('[AppUpdate] Deleted old pre-update snapshot:', name);
-      }
-    } catch (cleanupError) {
-      console.warn('[AppUpdate] Failed to clean up old pre-update snapshots:', cleanupError);
-    }
-  } catch (backupError) {
-    console.warn('[AppUpdate] Pre-update backup failed; proceeding with install:', backupError.message);
+  const silent = canInstallSilently();
+  if (deferSilentInstall && silent) {
+    // The backup waits too: it belongs to the moment of the install, which may be days away if
+    // the user picks "Later", and an older snapshot would miss everything entered since.
+    await cleanupOldApks();
+    console.log('[AppUpdate] update ready; installing waits for the user to tap Install');
+    return { localUri: result.uri, installDeferred: true };
   }
 
+  onPhaseChange?.('backing_up');
+  await backupBeforeUpdate();
   await cleanupOldApks();
 
-  await launchApkInstaller(result.uri);
+  await launchApkInstaller(result.uri, { silent });
+  return { localUri: result.uri, installDeferred: false };
 };

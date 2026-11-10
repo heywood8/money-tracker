@@ -94,7 +94,10 @@ react-native-debugger.json
 *.iml
 *.hprof
 .env.local
+# The generated native project. Local Expo modules keep their own android/ sources, which
+# must be committed: prebuild links them, it does not generate them.
 android/
+!modules/*/android/
 
 # Local files
 local/

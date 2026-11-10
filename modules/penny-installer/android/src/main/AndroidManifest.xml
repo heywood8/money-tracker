@@ -1,0 +1,27 @@
+<manifest xmlns:android="http://schemas.android.com/apk/res/android">
+  <!--
+    No permissions here on purpose. REQUEST_INSTALL_PACKAGES and
+    UPDATE_PACKAGES_WITHOUT_USER_ACTION are declared in app.config.js, for the
+    GitHub build only: the Play build must not declare either, and a library
+    manifest would merge them into every build.
+  -->
+  <application>
+    <!--
+      Where Android reports how an install session ended. Not exported: only the
+      PendingIntent this module hands to PackageInstaller can reach it, so nobody
+      else can make Penny start the intent it carries.
+
+      taskAffinity="" keeps it out of Penny's own task. After a self-update it is
+      the first thing to run in the new process, and it starts Penny from there:
+      sharing the task would leave Penny in a task rooted in an activity that is
+      excluded from recents.
+    -->
+    <activity
+      android:name="expo.modules.pennyinstaller.InstallResultActivity"
+      android:exported="false"
+      android:excludeFromRecents="true"
+      android:noHistory="true"
+      android:taskAffinity=""
+      android:theme="@style/PennyInstallerResultTheme" />
+  </application>
+</manifest>

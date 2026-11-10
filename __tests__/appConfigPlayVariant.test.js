@@ -24,6 +24,9 @@ const loadConfig = (env) => {
 };
 
 const INSTALL_PERMISSION = 'android.permission.REQUEST_INSTALL_PACKAGES';
+// Lets the GitHub build install its own update with no confirmation screen
+// (modules/penny-installer). Self-updating is exactly what Play forbids.
+const SILENT_UPDATE_PERMISSION = 'android.permission.UPDATE_PACKAGES_WITHOUT_USER_ACTION';
 
 describe('app.config.js distribution variants', () => {
   describe('the Play build', () => {
@@ -31,6 +34,10 @@ describe('app.config.js distribution variants', () => {
 
     it('does not declare the self-install permission', () => {
       expect(config.android.permissions).not.toContain(INSTALL_PERMISSION);
+    });
+
+    it('does not declare the silent self-update permission', () => {
+      expect(config.android.permissions).not.toContain(SILENT_UPDATE_PERMISSION);
     });
 
     it('marks the binary as a Play build', () => {
@@ -51,6 +58,10 @@ describe('app.config.js distribution variants', () => {
 
     it('declares the self-install permission the in-app updater needs', () => {
       expect(config.android.permissions).toContain(INSTALL_PERMISSION);
+    });
+
+    it('declares the permission that lets the updater skip the confirmation screen', () => {
+      expect(config.android.permissions).toContain(SILENT_UPDATE_PERMISSION);
     });
 
     it('marks the binary as a GitHub build', () => {
