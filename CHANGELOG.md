@@ -1,5 +1,12 @@
 # Changelog
 
+## [0.311.0](https://github.com/heywood8/money-tracker/compare/penny-v0.310.0...penny-v0.311.0) (2026-11-10)
+
+
+### Features
+
+* **updates:** install github updates without the confirmation screen ([#1900](https://github.com/heywood8/money-tracker/issues/1900)) ([e7399c1](https://github.com/heywood8/money-tracker/commit/e7399c15749f7956db27aa28947d10ee91a383d2))
+
 ## [0.310.0](https://github.com/heywood8/money-tracker/compare/penny-v0.309.0...penny-v0.310.0) (2026-11-03)
 
 
