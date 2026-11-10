@@ -198,7 +198,8 @@ const NotificationBindingStack = memo(function NotificationBindingStack({
                 minHeight={minCardHeight}
                 maxHeight={maxCardHeight}
                 onChoiceChange={(patch) => onChoiceChange(item.id, patch)}
-                onSave={() => onSave(item)}
+                // The card passes overrides only for a label still being typed at Save.
+                onSave={(overrides) => (overrides ? onSave(item, overrides) : onSave(item))}
                 onDismiss={() => onDismiss(item)}
               />
             </DeckSlot>

@@ -33,6 +33,7 @@ import m0028 from './0028_plan_line_labels.js';
 import m0029 from './0029_dismissed_notifications.js';
 import m0030 from './0030_operations_transfer_indexes.js';
 import m0031 from './0031_merchant_rule_skip_category.js';
+import m0032 from './0032_merchant_rule_secondary_labels.js';
 import { normalizeOperationDates, renameMotorcycleIcon, clearStoredLocations } from './dataRepairs.js';
 
 export default {
@@ -70,6 +71,7 @@ export default {
     m0029,
     m0030,
     m0031,
+    m0032,
   },
   postMigrationHandlers: {
     m0003: m0003PostMigration,

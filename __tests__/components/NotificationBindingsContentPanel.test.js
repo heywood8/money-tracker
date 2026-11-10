@@ -1,5 +1,5 @@
 import React from 'react';
-import { render, fireEvent, waitFor } from '@testing-library/react-native';
+import { render, fireEvent, waitFor, within, act } from '@testing-library/react-native';
 import NotificationBindingsContentPanel from '../../app/components/NotificationBindingsContentPanel';
 import * as NotificationRulesDB from '../../app/services/NotificationRulesDB';
 import * as AccountsDB from '../../app/services/AccountsDB';
@@ -46,6 +46,11 @@ jest.mock('../../app/contexts/CategoriesContext', () => ({
 jest.mock('../../app/services/NotificationRulesDB');
 jest.mock('../../app/services/AccountsDB');
 jest.mock('../../app/services/notifications/processBankNotifications');
+// The secondary-label editors' suggestions, kept off the DB.
+jest.mock('../../app/hooks/useLabelSuggestions', () => ({
+  __esModule: true,
+  default: jest.fn(() => []),
+}));
 
 const CARD_ACCOUNT = { id: 1, name: 'Checking', currency: 'AMD', cardMask: '4083***7027' };
 const CASH_ACCOUNT = { id: 2, name: 'Cash', currency: 'AMD', cardMask: null };
@@ -73,6 +78,9 @@ describe('NotificationBindingsContentPanel', () => {
     NotificationRulesDB.upsertMerchantRule.mockResolvedValue();
     NotificationRulesDB.upsertMerchantLabel.mockResolvedValue();
     NotificationRulesDB.upsertMerchantSkipCategory.mockResolvedValue();
+    NotificationRulesDB.upsertMerchantSecondaryLabels.mockResolvedValue();
+    NotificationRulesDB.clearMerchantRuleSecondaryLabels.mockResolvedValue();
+    NotificationRulesDB.clearMerchantRuleLabels.mockResolvedValue();
     AccountsDB.addAccountCardMask.mockResolvedValue();
     AccountsDB.removeAccountCardMask.mockResolvedValue();
     pipeline.resolveAtmTargetAccount.mockResolvedValue({ id: 2, name: 'Cash', currency: 'AMD' });
@@ -224,7 +232,7 @@ describe('NotificationBindingsContentPanel', () => {
     });
   });
 
-  it('removes a name binding via clearMerchantRuleLabel', async () => {
+  it('removes a name binding, with its secondary labels, via clearMerchantRuleLabels', async () => {
     mockAccounts = [CASH_ACCOUNT];
     NotificationRulesDB.getAllMerchantRules.mockResolvedValue([LABEL_RULE]);
     pipeline.resolveAtmTargetAccount.mockResolvedValue(null);
@@ -233,7 +241,98 @@ describe('NotificationBindingsContentPanel', () => {
     await waitFor(() => expect(getByText('GROCERY')).toBeTruthy());
     fireEvent.press(getAllByLabelText('notification_bindings_remove')[0]);
     fireEvent.press(await waitFor(() => getByLabelText('delete')));
-    await waitFor(() => expect(NotificationRulesDB.clearMerchantRuleLabel).toHaveBeenCalledWith('r2'));
+    await waitFor(() => expect(NotificationRulesDB.clearMerchantRuleLabels).toHaveBeenCalledWith('r2'));
+    expect(NotificationRulesDB.clearMerchantRuleLabel).not.toHaveBeenCalled();
+  });
+
+  describe('secondary labels on a name binding', () => {
+    const TAGGED_RULE = { ...LABEL_RULE, secondaryLabels: ['Food', 'Weekly'] };
+    const TAGS_ONLY_RULE = {
+      id: 'r4', merchant: 'N. DORVANYAN', packageName: 'am.bank', categoryId: null,
+      labelOverride: null, secondaryLabels: ['Rent'],
+    };
+    const editorOf = (utils, id) => utils.getByTestId(`binding-secondary-labels-${id}`);
+
+    it('shows a binding’s secondary labels as chips under its name', async () => {
+      NotificationRulesDB.getAllMerchantRules.mockResolvedValue([TAGGED_RULE]);
+      const utils = await render(<NotificationBindingsContentPanel />);
+      await waitFor(() => expect(utils.getByText('GROCERY')).toBeTruthy());
+      const editor = within(editorOf(utils, 'r2'));
+      expect(editor.getByText('Food')).toBeTruthy();
+      expect(editor.getByText('Weekly')).toBeTruthy();
+    });
+
+    it('lists a binding that has secondary labels but no name', async () => {
+      NotificationRulesDB.getAllMerchantRules.mockResolvedValue([TAGS_ONLY_RULE]);
+      const utils = await render(<NotificationBindingsContentPanel />);
+      await waitFor(() => expect(utils.getByText('N. DORVANYAN')).toBeTruthy());
+      expect(within(editorOf(utils, 'r4')).getByText('Rent')).toBeTruthy();
+    });
+
+    it('saves an added label at once', async () => {
+      NotificationRulesDB.getAllMerchantRules.mockResolvedValue([TAGGED_RULE]);
+      const utils = await render(<NotificationBindingsContentPanel />);
+      await waitFor(() => expect(utils.getByText('GROCERY')).toBeTruthy());
+      const input = within(editorOf(utils, 'r2')).getByTestId('label-input-field');
+      await fireEvent.changeText(input, 'Family,');
+      await waitFor(() => expect(NotificationRulesDB.upsertMerchantSecondaryLabels).toHaveBeenCalledWith(
+        'GROCERY', ['Food', 'Weekly', 'Family'], null,
+      ));
+    });
+
+    it('writes quick edits in order and reloads only once they have all landed', async () => {
+      NotificationRulesDB.getAllMerchantRules.mockResolvedValue([TAGGED_RULE]);
+      const utils = await render(<NotificationBindingsContentPanel />);
+      await waitFor(() => expect(utils.getByText('GROCERY')).toBeTruthy());
+      const reloadsAtMount = NotificationRulesDB.getAllMerchantRules.mock.calls.length;
+
+      let releaseFirst;
+      NotificationRulesDB.upsertMerchantSecondaryLabels.mockImplementationOnce(
+        () => new Promise((resolve) => { releaseFirst = resolve; }),
+      );
+      const input = within(editorOf(utils, 'r2')).getByTestId('label-input-field');
+      await fireEvent.changeText(input, 'Family,');
+      await fireEvent.changeText(input, 'Kids,');
+      // Both chips are up while the first write is still pending, and nothing
+      // has reloaded over them.
+      expect(within(editorOf(utils, 'r2')).getByText('Kids')).toBeTruthy();
+      expect(NotificationRulesDB.getAllMerchantRules).toHaveBeenCalledTimes(reloadsAtMount);
+
+      await act(async () => { releaseFirst(); });
+      await waitFor(() => expect(NotificationRulesDB.upsertMerchantSecondaryLabels).toHaveBeenCalledTimes(2));
+      expect(NotificationRulesDB.upsertMerchantSecondaryLabels).toHaveBeenLastCalledWith(
+        'GROCERY', ['Food', 'Weekly', 'Family', 'Kids'], null,
+      );
+      await waitFor(() => expect(NotificationRulesDB.getAllMerchantRules).toHaveBeenCalledTimes(reloadsAtMount + 1));
+    });
+
+    it('clears the column when the last label is removed', async () => {
+      NotificationRulesDB.getAllMerchantRules.mockResolvedValue([TAGS_ONLY_RULE]);
+      const utils = await render(<NotificationBindingsContentPanel />);
+      await waitFor(() => expect(utils.getByText('N. DORVANYAN')).toBeTruthy());
+      await fireEvent.press(within(editorOf(utils, 'r4')).getByTestId('label-remove-Rent'));
+      await waitFor(() => expect(NotificationRulesDB.clearMerchantRuleSecondaryLabels).toHaveBeenCalledWith('r4'));
+      expect(NotificationRulesDB.upsertMerchantSecondaryLabels).not.toHaveBeenCalled();
+    });
+
+    it('keeps the secondary labels when only the name is blanked and saved', async () => {
+      NotificationRulesDB.getAllMerchantRules.mockResolvedValue([TAGGED_RULE]);
+      const utils = await render(<NotificationBindingsContentPanel />);
+      await waitFor(() => expect(utils.getByText('GROCERY')).toBeTruthy());
+      await fireEvent.changeText(utils.getByDisplayValue('Grocery Co'), '');
+      await fireEvent.press(utils.getByLabelText('save'));
+      await waitFor(() => expect(NotificationRulesDB.clearMerchantRuleLabel).toHaveBeenCalledWith('r2'));
+      expect(NotificationRulesDB.clearMerchantRuleLabels).not.toHaveBeenCalled();
+    });
+
+    it('finds a binding by one of its secondary labels', async () => {
+      NotificationRulesDB.getAllMerchantRules.mockResolvedValue([CATEGORY_RULE, TAGGED_RULE]);
+      const utils = await render(<NotificationBindingsContentPanel />);
+      await waitFor(() => expect(utils.getByText('GROCERY')).toBeTruthy());
+      await fireEvent.changeText(utils.getByPlaceholderText('search'), 'week');
+      await waitFor(() => expect(utils.queryByText('COFFEE HOUSE')).toBeNull());
+      expect(utils.getByText('GROCERY')).toBeTruthy();
+    });
   });
 
   it('binds a card by hand from the add-card editor', async () => {

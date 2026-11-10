@@ -43,13 +43,16 @@ const TRANSFER = {
 };
 
 // The full choices the hook seeds for EXPENSE/TRANSFER with no learned label.
-// labelDirty is false until the user actually types a custom name.
+// labelDirty is false until the user actually types a custom name, and
+// secondaryLabelsDirty until they edit the secondary labels.
 const EXPENSE_CHOICE = {
   accountId: 1, categoryId: 'c1', toAccountId: null, labelOverride: '', labelDirty: false,
+  secondaryLabels: '', secondaryLabelsDirty: false,
   skipCategoryBinding: false, skipCategoryLocked: false,
 };
 const TRANSFER_CHOICE = {
   accountId: 1, categoryId: null, toAccountId: 2, labelOverride: '', labelDirty: false,
+  secondaryLabels: '', secondaryLabelsDirty: false,
   skipCategoryBinding: false, skipCategoryLocked: false,
 };
 // The resolve payload for an untouched card: the label is omitted (not authoritative)
@@ -559,6 +562,71 @@ describe('usePendingOperationSuggestions', () => {
       expect(pipeline.resolvePendingNotification).toHaveBeenCalledWith('p1', {
         ...EXPENSE_RESOLVE, skipCategoryBinding: true,
       });
+    });
+  });
+
+  describe('secondary labels', () => {
+    it('seeds them from the merchant rule, serialized for the label editor', async () => {
+      NotificationRulesDB.getMerchantRule.mockResolvedValue({ labelOverride: 'Sas', secondaryLabels: ['Groceries', 'Weekly'] });
+      const { result } = await renderHook(() => usePendingOperationSuggestions());
+      await waitFor(() => expect(result.current.choices.p1?.secondaryLabels).toBe('Groceries | Weekly'));
+      expect(result.current.choices.p1.secondaryLabelsDirty).toBe(false);
+    });
+
+    it('refreshes an unedited set when a sibling changes it, and keeps an edited one', async () => {
+      NotificationRulesDB.getMerchantRule.mockResolvedValue({ secondaryLabels: ['Groceries'] });
+      const { result } = await renderHook(() => usePendingOperationSuggestions());
+      await waitFor(() => expect(result.current.choices.p1?.secondaryLabels).toBe('Groceries'));
+
+      NotificationRulesDB.getMerchantRule.mockResolvedValue({ secondaryLabels: ['Food'] });
+      await act(async () => { appEvents.emit(EVENTS.RELOAD_ALL); });
+      await waitFor(() => expect(result.current.choices.p1.secondaryLabels).toBe('Food'));
+
+      await act(async () => { result.current.setChoice('p1', { secondaryLabels: '' }); });
+      NotificationRulesDB.getMerchantRule.mockResolvedValue({ secondaryLabels: ['Other'] });
+      await act(async () => { appEvents.emit(EVENTS.RELOAD_ALL); });
+      await waitFor(() => expect(NotificationRulesDB.getMerchantRule).toHaveBeenCalledTimes(3));
+      expect(result.current.choices.p1.secondaryLabels).toBe('');
+      expect(result.current.choices.p1.secondaryLabelsDirty).toBe(true);
+    });
+
+    it('does not send a seeded set', async () => {
+      NotificationRulesDB.getMerchantRule.mockResolvedValue({ secondaryLabels: ['Groceries'] });
+      const { result } = await renderHook(() => usePendingOperationSuggestions());
+      await waitFor(() => expect(result.current.choices.p1?.secondaryLabels).toBe('Groceries'));
+
+      PendingNotificationsDB.getPendingNotifications.mockResolvedValue([]);
+      await act(async () => { await result.current.accept(EXPENSE); });
+      expect(pipeline.resolvePendingNotification).toHaveBeenCalledWith('p1', EXPENSE_RESOLVE);
+    });
+
+    it('sends an edited set, an emptied one included', async () => {
+      const { result } = await renderHook(() => usePendingOperationSuggestions());
+      await waitFor(() => expect(result.current.choices.p1).toEqual(EXPENSE_CHOICE));
+
+      await act(async () => { result.current.setChoice('p1', { secondaryLabels: 'Rent' }); });
+      PendingNotificationsDB.getPendingNotifications.mockResolvedValue([]);
+      await act(async () => { await result.current.accept(EXPENSE); });
+      expect(pipeline.resolvePendingNotification).toHaveBeenCalledWith('p1', {
+        ...EXPENSE_RESOLVE, secondaryLabels: 'Rent',
+      });
+    });
+
+    it('takes a set flushed at Save from the overrides, before state catches up', async () => {
+      const onOptimisticAdd = jest.fn(() => 'tmp-1');
+      const { result } = await renderHook(() => usePendingOperationSuggestions({ onOptimisticAdd }));
+      await waitFor(() => expect(result.current.choices.p1).toEqual(EXPENSE_CHOICE));
+
+      PendingNotificationsDB.getPendingNotifications.mockResolvedValue([]);
+      await act(async () => { await result.current.accept(EXPENSE, { secondaryLabels: 'Groceries | Weekly' }); });
+      expect(pipeline.resolvePendingNotification).toHaveBeenCalledWith('p1', {
+        ...EXPENSE_RESOLVE, secondaryLabels: 'Groceries | Weekly',
+      });
+      // The placeholder row is drawn from the same merged choice.
+      expect(onOptimisticAdd).toHaveBeenCalledWith(
+        EXPENSE,
+        expect.objectContaining({ secondaryLabels: 'Groceries | Weekly', secondaryLabelsDirty: true }),
+      );
     });
   });
 

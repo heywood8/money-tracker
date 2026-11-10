@@ -24,7 +24,9 @@ import * as Currency from '../currency';
 import * as NotificationRulesDB from '../NotificationRulesDB';
 import * as PendingNotificationsDB from '../PendingNotificationsDB';
 import * as DismissedNotificationsDB from '../DismissedNotificationsDB';
-import { serializeLabels, sanitizeLabel, normalizeMerchantLabel } from '../../utils/labelUtils';
+import {
+  serializeLabels, sanitizeLabel, normalizeMerchantLabel, serializeSanitizedLabels, prependPrimaryLabel,
+} from '../../utils/labelUtils';
 import { appEvents, EVENTS } from '../eventEmitter';
 import { parseBankNotification, kindRequiresCategory } from './parseBankNotification';
 import { ensureCustomTemplatesLoaded } from './customTemplates';
@@ -457,7 +459,8 @@ const bookExpenseOrQueue = async (descriptor, resolution, date, allowedPackages,
 
     // A learned label override (e.g. "ECOSENSE BYUZAND" -> "Ecosense") wins over
     // the raw merchant for the operation's label. Otherwise the raw shop name is
-    // tidied from ALL CAPS to first-capital ("GURMAN" -> "Gurman").
+    // tidied from ALL CAPS to first-capital ("GURMAN" -> "Gurman"). The name is
+    // the primary label; the merchant's secondary labels follow it.
     const label = resolution.labelOverride || normalizeMerchantLabel(descriptor.merchant);
     const created = await OperationsDB.createOperation({
       type: descriptor.type,
@@ -465,7 +468,7 @@ const bookExpenseOrQueue = async (descriptor, resolution, date, allowedPackages,
       accountId: resolution.accountId,
       categoryId: resolution.categoryId,
       date,
-      description: label ? serializeLabels([label]) : null,
+      description: prependPrimaryLabel(label, resolution.secondaryLabels) || null,
     });
     // Claim the new operation so a later duplicate notification in this run pairs
     // with a different existing operation rather than re-matching this one.
@@ -831,10 +834,13 @@ const runProcess = async () => {
  *
  * @param {string} pendingId
  * @param {Object} choices - { accountId, categoryId, labelOverride?,
- *   skipCategoryBinding?, learnCardMask?, learnMerchant?, learnAccountBinding?,
- *   learnSource? }.
+ *   secondaryLabels?, skipCategoryBinding?, learnCardMask?, learnMerchant?,
+ *   learnAccountBinding?, learnSource? }.
  *   `labelOverride` omitted keeps any learned name; a string (blank included) is
  *   authoritative, and a blank one clears a learned name.
+ *   `secondaryLabels` (the labels booked after the name, serialized or an array)
+ *   works the same way: omitted keeps the learned ones, given (empty included) it
+ *   is booked and learned for the merchant.
  *   `skipCategoryBinding: true` books the chosen category for this operation only
  *   and marks the merchant "don't bind to category" from now on.
  * @returns {Promise<Object|null>} the created operation, or null if not found
@@ -869,6 +875,27 @@ export const resolvePendingNotification = async (pendingId, choices = {}) => {
   // Fall back to the raw shop name, tidied from ALL CAPS to first-capital
   // ("GURMAN" -> "Gurman"), when neither a typed nor a learned label is present.
   const label = chosenLabel || normalizeMerchantLabel(pending.merchant);
+
+  // The secondary labels booked after the name, resolved the way the name is: a
+  // set the review UI sends is authoritative, an omitted one falls back to the
+  // merchant's learned set. Compared serialized, so a change of order or case is
+  // a change. A failed lookup reads as unknown (null) rather than as "none", so it
+  // never turns into a write that wipes the learned set.
+  const hasSecondaryChoice =
+    typeof choices.secondaryLabels === 'string' || Array.isArray(choices.secondaryLabels);
+  const typedSecondary = hasSecondaryChoice ? serializeSanitizedLabels(choices.secondaryLabels) : '';
+  let learnedSecondary = '';
+  if (pending.merchant) {
+    try {
+      learnedSecondary = serializeLabels(
+        (await NotificationRulesDB.getSecondaryLabelsForMerchant(pending.merchant, pending.packageName)) || [],
+      );
+    } catch (error) {
+      console.error('[resolvePendingNotification] Failed to read merchant secondary labels:', error);
+      learnedSecondary = null;
+    }
+  }
+  const chosenSecondary = hasSecondaryChoice ? typedSecondary : (learnedSecondary || '');
 
   // Fetch the chosen account once: its currency drives conversion and its
   // rounding setting is applied to the booked amount below.
@@ -912,7 +939,7 @@ export const resolvePendingNotification = async (pendingId, choices = {}) => {
     categoryId: categoryId || null,
     // operations.date is NOT NULL — fall back to the row's creation date / today.
     date: pending.date || localDateOf(pending.createdAt) || todayLocalDate(),
-    description: label ? serializeLabels([label]) : null,
+    description: prependPrimaryLabel(label, chosenSecondary) || null,
   });
   await rememberBookedOperation(operation && operation.id, [label, pending.merchant]);
 
@@ -1001,6 +1028,24 @@ export const resolvePendingNotification = async (pendingId, choices = {}) => {
       );
     } catch (error) {
       console.error('[resolvePendingNotification] Failed to learn merchant rule:', error);
+    }
+  }
+
+  // Learn the secondary labels when the review UI changed them. Like the name they
+  // are learned for every kind (C2C and "don't bind" merchants included: with no
+  // category, labels are what tells their operations apart). This runs after the
+  // category learn on purpose: that write names a source bound for the first time
+  // (`labelIfNew`) only when it creates the rule, so a rule created here first
+  // would leave a new merchant without the name it was booked under.
+  if (hasSecondaryChoice && pending.merchant && typedSecondary !== learnedSecondary) {
+    try {
+      await NotificationRulesDB.upsertMerchantSecondaryLabels(
+        pending.merchant,
+        typedSecondary,
+        pending.packageName,
+      );
+    } catch (error) {
+      console.error('[resolvePendingNotification] Failed to learn merchant secondary labels:', error);
     }
   }
 

@@ -186,6 +186,7 @@ export const plannedOperations = sqliteTable('planned_operations', {
  * (e.g. "ECOSENSE BYUZAND" -> "Ecosense"). When set, operations created from
  * future notifications for this merchant carry the override as their label
  * instead of the raw shop name. Nullable — most rules only learn a category.
+ * `secondaryLabels` are further labels booked after that name (migration 0032).
  */
 export const notificationMerchantRules = sqliteTable('notification_merchant_rules', {
   id: text('id').primaryKey(),
@@ -204,6 +205,12 @@ export const notificationMerchantRules = sqliteTable('notification_merchant_rule
   // learns or auto-applies a category, so each notification waits for a manual
   // pick. Mutually exclusive with categoryId (setting one clears the other).
   skipCategory: integer('skip_category').default(0),
+  // Extra labels the merchant's operations carry after its name (label_override,
+  // the primary label), stored like an operation's description: " | "-joined
+  // (labelUtils.serializeLabels). Nullable — NULL means none. Learned for every
+  // kind, like the name, so a merchant with no category binding (skip_category,
+  // C2C) can still be told apart by its labels.
+  secondaryLabels: text('secondary_labels'),
   createdAt: text('created_at').notNull(),
   updatedAt: text('updated_at').notNull(),
 }, (table) => ({

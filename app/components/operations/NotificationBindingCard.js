@@ -1,4 +1,4 @@
-import React, { useMemo } from 'react';
+import React, { useCallback, useMemo, useRef } from 'react';
 import PropTypes from 'prop-types';
 import {
   View,
@@ -10,14 +10,16 @@ import {
 import Ionicons from '@expo/vector-icons/Ionicons';
 import SimplePicker from '../SimplePicker';
 import FormInput from '../FormInput';
+import LabelInput from './LabelInput';
 import CategoryGridSelector from '../CategoryGridSelector';
 import SkipCategoryBindingToggle from '../SkipCategoryBindingToggle';
 import useTopCategoryIds from '../../hooks/useTopCategoryIds';
 import useSourceCategoryIds from '../../hooks/useSourceCategoryIds';
+import useLabelSuggestions from '../../hooks/useLabelSuggestions';
 import { canSaveSuggestion } from '../../hooks/usePendingOperationSuggestions';
 import { kindRequiresCategory } from '../../services/notifications/parseBankNotification';
 import { getCategoryDisplayName } from '../../utils/categoryUtils';
-import { normalizeMerchantLabel } from '../../utils/labelUtils';
+import { normalizeMerchantLabel, hasLabel } from '../../utils/labelUtils';
 import * as Currency from '../../services/currency';
 import { BORDER_RADIUS, FONT_SIZE, SPACING } from '../../styles/designTokens';
 import { BUTTON_COMPACT, BUTTON_TEXT, SECTION_LABEL } from '../../styles/componentStyles';
@@ -35,9 +37,11 @@ const formatSuggestionDate = (isoDate) => {
 /**
  * Full inline binding panel for one pending bank notification — the front card
  * of the deck stacked over the quick-add form. Replicates the review card from
- * Settings → Notification processing: custom-name input, account picker, then a
- * category grid (expense/income) or a target-account picker (ATM transfers),
- * with Dismiss/Save actions pinned to the card's bottom edge.
+ * Settings → Notification processing: custom-name input (the primary label),
+ * secondary labels (expense/income only: a transfer has no merchant binding to
+ * keep them on), account picker, then a category grid (expense/income) or a
+ * target-account picker (ATM transfers), with Dismiss/Save actions pinned to the
+ * card's bottom edge.
  *
  * The card sizes to its content between two bounds: `minHeight` (the quick-add
  * form's height, so the list does not jump when the form comes back) and
@@ -84,6 +88,28 @@ const NotificationBindingCard = ({
       : accountTopCategoryIds),
     [skipChecked, sourceCategoryIds, accountTopCategoryIds],
   );
+
+  // Secondary labels: the labels booked after the name, learned for the merchant
+  // like the name is. Suggestions are labels already in use (ranked by the
+  // chosen category), minus the name itself, which is booked first anyway.
+  const secondaryLabelsRef = useRef(null);
+  const primaryLabel = (choice.labelOverride ?? '').trim() || normalizeMerchantLabel(item.merchant) || '';
+  const rawLabelSuggestions = useLabelSuggestions(choice.categoryId || null, !isTransfer);
+  const labelSuggestions = useMemo(
+    () => rawLabelSuggestions.filter((label) => !hasLabel([primaryLabel], label)),
+    [rawLabelSuggestions, primaryLabel],
+  );
+  // Save commits a label still being typed: tapping Save neither blurs the field
+  // nor waits for the state update the commit fires, so the flushed set rides on
+  // the save itself whenever it differs from what the choice holds.
+  const handleSave = useCallback(() => {
+    const flushed = secondaryLabelsRef.current ? secondaryLabelsRef.current.flush() : null;
+    if (flushed != null && flushed !== (choice.secondaryLabels ?? '')) {
+      onSave({ secondaryLabels: flushed });
+    } else {
+      onSave();
+    }
+  }, [choice.secondaryLabels, onSave]);
 
   const accountItems = useMemo(
     () => accounts.map((a) => ({ label: a.name, subLabel: a.currency, value: a.id })),
@@ -170,6 +196,21 @@ const NotificationBindingCard = ({
           placeholder={normalizeMerchantLabel(item.merchant) || ''}
           style={styles.nameInput}
         />
+
+        {!isTransfer && (
+          <LabelInput
+            ref={secondaryLabelsRef}
+            value={choice.secondaryLabels ?? ''}
+            onChangeText={(v) => onChoiceChange({ secondaryLabels: v })}
+            suggestions={labelSuggestions}
+            placeholder={t('bank_notifications_secondary_labels') || 'Secondary labels'}
+            colors={colors}
+            t={t}
+            containerStyle={styles.secondaryLabels}
+            suggestionsStyle={styles.secondaryLabelSuggestions}
+            testID="binding-card-secondary-labels"
+          />
+        )}
 
         {isTransfer && (
           <Text style={[styles.fieldLabel, { color: colors.mutedText }]}>
@@ -267,7 +308,7 @@ const NotificationBindingCard = ({
           </Text>
         </TouchableOpacity>
         <TouchableOpacity
-          onPress={onSave}
+          onPress={handleSave}
           disabled={!canSave}
           style={[
             styles.actionButton,
@@ -389,6 +430,13 @@ const styles = StyleSheet.create({
   pickerWrap: {
     borderRadius: BORDER_RADIUS.sm,
     borderWidth: StyleSheet.hairlineWidth,
+  },
+  secondaryLabelSuggestions: {
+    marginBottom: 0,
+  },
+  secondaryLabels: {
+    marginBottom: 0,
+    marginTop: SPACING.sm,
   },
   selectedCategoryRow: {
     alignItems: 'center',

@@ -21,6 +21,7 @@ import { useAccountsData } from '../contexts/AccountsDataContext';
 import { useCategories } from '../contexts/CategoriesContext';
 import SimplePicker from './SimplePicker';
 import FormInput from './FormInput';
+import LabelInput from './operations/LabelInput';
 import CategoryGridSelector from './CategoryGridSelector';
 import SkipCategoryBindingToggle from './SkipCategoryBindingToggle';
 import { getCategoryDisplayName } from '../utils/categoryUtils';
@@ -50,7 +51,8 @@ import {
   followSkipCategory,
 } from '../services/notifications/skipCategoryChoice';
 import { getRecentNotifications } from '../services/NotificationAccess';
-import { normalizeMerchantLabel } from '../utils/labelUtils';
+import { normalizeMerchantLabel, serializeLabels, hasLabel } from '../utils/labelUtils';
+import useLabelSuggestions from '../hooks/useLabelSuggestions';
 import * as Currency from '../services/currency';
 import { startTrace } from '../services/perfTrace';
 import { BUTTON_COMPACT, BUTTON_TEXT, CARD_SURFACE, SECTION_LABEL } from '../styles/componentStyles';
@@ -106,9 +108,13 @@ export default function NotificationProcessingContentPanel({ active = true, onCr
   const [recent, setRecent] = useState([]);
   const [hidden, setHidden] = useState([]);
   // Per-item chosen { accountId, categoryId, toAccountId, labelOverride,
-  // skipCategoryBinding, skipCategoryLocked } keyed by pending id. `toAccountId` is
-  // only used by transfer items (ATM withdrawals); `skipCategoryLocked` mirrors a
-  // merchant already flagged "don't bind to category" (its box stays ticked).
+  // secondaryLabels, secondaryLabelsDirty, skipCategoryBinding, skipCategoryLocked }
+  // keyed by pending id. `toAccountId` is only used by transfer items (ATM
+  // withdrawals); `skipCategoryLocked` mirrors a merchant already flagged "don't
+  // bind to category" (its box stays ticked). `secondaryLabels` is held
+  // serialized (the label editor's contract); `secondaryLabelsDirty` marks a set
+  // the user edited, the only kind a save sends, so a seed that failed to load
+  // can never be saved over the merchant's learned set.
   const [choices, setChoices] = useState({});
   // Per-recent-card re-add feedback: key -> 'loading' | 'created' | 'pending'.
   const [reAddState, setReAddState] = useState({});
@@ -116,6 +122,9 @@ export default function NotificationProcessingContentPanel({ active = true, onCr
   // A card mid-save collapses into a compact "Adding…" row and drops its action
   // buttons, so a slow save can't be double-tapped into duplicate operations.
   const [savingIds, setSavingIds] = useState({});
+  // Each review card's secondary-label editor, by pending id, so Save can commit
+  // a label still being typed (see handleSave).
+  const secondaryLabelRefs = useRef({});
   // Mirror of `choices` so reloadPending can read the latest values without
   // taking `choices` as a dependency (which would re-create it on every keystroke).
   const choicesRef = useRef(choices);
@@ -162,9 +171,17 @@ export default function NotificationProcessingContentPanel({ active = true, onCr
     const ruleSeeds = items.map((item, i) => {
       const rule = rules[i];
       if (rule === undefined) {
-        return { label: null, skipCategory: prevChoices[item.id]?.skipCategoryLocked ?? false };
+        return {
+          label: null,
+          secondary: null,
+          skipCategory: prevChoices[item.id]?.skipCategoryLocked ?? false,
+        };
       }
-      return { label: rule?.labelOverride || null, skipCategory: !!rule?.skipCategory };
+      return {
+        label: rule?.labelOverride || null,
+        secondary: serializeLabels(rule?.secondaryLabels || []),
+        skipCategory: !!rule?.skipCategory,
+      };
     });
     if (!mountedRef.current) return;
     setPending(items);
@@ -173,6 +190,8 @@ export default function NotificationProcessingContentPanel({ active = true, onCr
       const next = { ...prev };
       items.forEach((item, i) => {
         const learned = ruleSeeds[i].label ?? '';
+        // null when the lookup failed: the card keeps what it shows.
+        const learnedSecondary = ruleSeeds[i].secondary;
         const skipLocked = ruleSeeds[i].skipCategory;
         if (!next[item.id]) {
           next[item.id] = {
@@ -181,6 +200,8 @@ export default function NotificationProcessingContentPanel({ active = true, onCr
             // Transfer (ATM) items pre-fill the target with the bound cash account.
             toAccountId: item.type === 'transfer' ? atmId : null,
             labelOverride: learned,
+            secondaryLabels: learnedSecondary ?? '',
+            secondaryLabelsDirty: false,
             ...seedSkipCategory(skipLocked),
           };
           return;
@@ -189,6 +210,15 @@ export default function NotificationProcessingContentPanel({ active = true, onCr
           // A sibling save just learned this shop's name — surface it on a
           // still-blank card without clobbering a value the user is editing.
           next[item.id] = { ...next[item.id], labelOverride: learned };
+        }
+        // Secondary labels a sibling save (or the Bindings tab) just changed reach
+        // a card the user has not edited them on.
+        if (
+          learnedSecondary != null
+          && !next[item.id].secondaryLabelsDirty
+          && learnedSecondary !== (next[item.id].secondaryLabels ?? '')
+        ) {
+          next[item.id] = { ...next[item.id], secondaryLabels: learnedSecondary };
         }
         // Follow the merchant's "don't bind" flag if it changed under the card
         // (a sibling's save, or the Bindings tab lifting it).
@@ -302,8 +332,17 @@ export default function NotificationProcessingContentPanel({ active = true, onCr
   }, [active, runSilentRefresh]);
 
   const setChoice = useCallback((id, patch) => {
-    setChoices((prev) => ({ ...prev, [id]: { ...prev[id], ...patch } }));
+    setChoices((prev) => {
+      const merged = { ...prev[id], ...patch };
+      if ('secondaryLabels' in patch) merged.secondaryLabelsDirty = true;
+      return { ...prev, [id]: merged };
+    });
   }, []);
+
+  // Labels already in use, for the secondary-label editors' autocomplete. Read
+  // only while a card that shows the editor (anything but a transfer) is queued.
+  const hasLabelEditor = pending.some((item) => item.type !== 'transfer');
+  const labelSuggestions = useLabelSuggestions(null, hasLabelEditor);
 
   // Drop save flags for cards that have left the queue (saved or dismissed) so the
   // map only ever tracks cards still on screen.
@@ -323,7 +362,15 @@ export default function NotificationProcessingContentPanel({ active = true, onCr
   }, [pending]);
 
   const handleSave = useCallback(async (item) => {
-    const choice = choices[item.id] || {};
+    // Commit a secondary label still being typed: tapping Save neither blurs the
+    // field nor waits for the state update the commit fires, so the flushed set
+    // is merged into this save directly.
+    const editor = secondaryLabelRefs.current[item.id];
+    const flushed = editor ? editor.flush() : null;
+    const stored = choices[item.id] || {};
+    const choice = flushed != null && flushed !== (stored.secondaryLabels ?? '')
+      ? { ...stored, secondaryLabels: flushed, secondaryLabelsDirty: true }
+      : stored;
     if (choice.accountId == null) return;
     // Transfers (ATM withdrawals) need a target account and no category.
     if (item.type === 'transfer' && (choice.toAccountId == null || choice.toAccountId === choice.accountId)) {
@@ -347,6 +394,9 @@ export default function NotificationProcessingContentPanel({ active = true, onCr
         // Send the field verbatim (string, possibly blank) so resolve treats it as
         // authoritative — a cleared field reverts to the raw shop name.
         labelOverride: choice.labelOverride ?? '',
+        // Only an edited set is sent (and learned); otherwise resolve books the
+        // merchant's learned secondary labels.
+        ...(choice.secondaryLabelsDirty ? { secondaryLabels: choice.secondaryLabels ?? '' } : {}),
         skipCategoryBinding: !!choice.skipCategoryBinding,
       });
       // The pending row is deleted now; reloading drops the collapsed card from
@@ -590,6 +640,37 @@ export default function NotificationProcessingContentPanel({ active = true, onCr
                   : (t('bank_notifications_custom_label_help')
                     || 'Used as the label for this and future transactions from this shop')}
               </Text>
+
+              {!isTransfer && (
+                <>
+                  <Text style={[styles.fieldLabel, { color: colors.mutedText }]}>
+                    {(t('bank_notifications_secondary_labels') || 'Secondary labels').toUpperCase()}
+                  </Text>
+                  <LabelInput
+                    ref={(editor) => {
+                      if (editor) secondaryLabelRefs.current[item.id] = editor;
+                      else delete secondaryLabelRefs.current[item.id];
+                    }}
+                    value={choice.secondaryLabels ?? ''}
+                    onChangeText={(v) => setChoice(item.id, { secondaryLabels: v })}
+                    // The name is booked first anyway; offering it again is noise.
+                    suggestions={labelSuggestions.filter((label) => !hasLabel(
+                      [(choice.labelOverride ?? '').trim() || normalizeMerchantLabel(item.merchant) || ''],
+                      label,
+                    ))}
+                    placeholder={t('add_label_placeholder') || 'Add a label…'}
+                    colors={colors}
+                    t={t}
+                    containerStyle={styles.secondaryLabels}
+                    suggestionsStyle={styles.secondaryLabelSuggestions}
+                    testID={`pending-secondary-labels-${item.id}`}
+                  />
+                  <Text style={[styles.helpText, { color: colors.mutedText }]}>
+                    {t('bank_notifications_secondary_labels_help')
+                      || 'Added after the name to this and future transactions from this shop'}
+                  </Text>
+                </>
+              )}
 
               <Text style={[styles.fieldLabel, { color: colors.mutedText }]}>
                 {(isTransfer
@@ -867,6 +948,12 @@ const styles = StyleSheet.create({
   },
   scroll: {
     flex: 1,
+  },
+  secondaryLabelSuggestions: {
+    marginBottom: 0,
+  },
+  secondaryLabels: {
+    marginBottom: 0,
   },
   sectionTitle: {
     ...SECTION_LABEL,
