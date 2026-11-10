@@ -88,6 +88,9 @@ The app follows a feature-based organization under the `app/` directory:
   - `WidgetConfigScreen.js` - the one configuration screen registered in `index.js`; hands each widget its own screen by `widgetName`. `useWidgetConfigAnswer.js` - the launcher answer every screen shares
   - `RollingTextWidget.js` - the rate's text, whose digits roll when it changes (see "Rolling digits" under Home-Screen Widgets)
 
+- **modules/** (repo root, not under `app/`) - Local Expo modules, autolinked from `./modules` at prebuild
+  - `penny-installer/` - the silent self-updater (Kotlin): installs a downloaded Penny APK through a `PackageInstaller` session with no confirmation screen. See "Silent self-update" under Build Configuration
+
 - **db/** (1 file) - Database schema
   - `schema.js` - Drizzle ORM schema (tables: accounts, categories, operations, budgets, budgetPlans, budgetPlanLines, budgetPlanLineCategories, budgetPlanLineAccounts, budgetPlanLineLabels, budgetPlanLineGroups, plannedOperations, balanceHistory, appMetadata; `budgets` and `plannedOperations` are legacy/append-only since Budgets v3 — see docs/DATABASE.md)
 
@@ -259,6 +262,15 @@ installs an APK must go through `supportsInAppUpdates()` first. The update *chec
 still runs on Play builds - only the action changes, to opening the Play listing.
 
 See `docs/GOOGLE_PLAY_RELEASE.md` for the full setup and release procedure.
+
+**Silent self-update (GitHub build, Android 12+):**
+
+The system installer (an `ACTION_VIEW` intent) always shows "Do you want to update this app?". A `PackageInstaller` session can skip it when every condition of `SessionParams#setRequireUserAction` holds: `USER_ACTION_NOT_REQUIRED`, the app declares `UPDATE_PACKAGES_WITHOUT_USER_ACTION` (in `app.config.js`, GitHub build only, next to `REQUEST_INSTALL_PACKAGES`), the user has allowed Penny to install apps, the app updates itself, and the APK targets a recent enough API. `modules/penny-installer` does that; `app/services/silentInstaller.js` reads it; `AppUpdateService.launchApkInstaller` uses it whenever `canInstallSilently()` and falls back to the system installer otherwise (Android 11 and older, an OTA bundle on a binary without the module, "Install unknown apps" not granted yet: that screen is the one that asks for it).
+
+- **Installing only ever starts from a tap.** With no screen in the way, an install closes Penny, so `downloadAndInstallApk` hands a silent install back (`deferSilentInstall`, `{ installDeferred: true }`) and `UpdateDownloadContext` asks "Update ready… Install / Later". Everything installs through `installDownloaded`, which decides `silent` once per tap and passes it down, takes the pre-update backup at the tap on either route (`backupBeforeUpdate`; a deferred download took none, and after "Later" a download-time snapshot could be days old), shows "Backing up…" then "Installing…" (silent only: the system installer is its own screen), refuses a second install or download with `UPDATE_IN_PROGRESS` rather than ignoring it, explains failures in its own dialog, and does nothing on a Play build. The update panel closes from `onStarted`, the same hand-off to the settings row as a download.
+- **The status arrives at `InstallResultActivity`** (not exported, `taskAffinity=""`, finishes in `onCreate`): `STATUS_PENDING_USER_ACTION` starts Android's confirmation after all, `STATUS_SUCCESS` arrives in the new process and reopens Penny (best effort: Android 14+ may refuse a background start), a failure is named (`conflict` → signed with another key, `incompatible` → older build or wrong device, `blocked`, `storage`, `invalid` → the APK is deleted). The first status settles the `install` promise; later ones (how Android's own confirmation ended) are `onInstallStatus` events, and a status that never comes resolves as `pending` after 2 minutes, with anything Android says afterwards still reported. Both reach `onLateInstallFailure`, which the context shows. The native side refuses a second session while one is alive, Android's own confirmation still open included (`ERR_INSTALL_IN_PROGRESS`); one that never reports is forgotten after 3 minutes, just past the JS wait.
+- **`setPackageSource` is deliberately not called**: Android 13+ applies restricted settings to apps whose source is a downloaded/local file, and the bank-notification listener is one of them.
+- **The first update after this shipped still asks**: the installed build uses the old route. Native changes need a new APK, and the native code has no test in this repo (no `android/` project); it was checked by compiling against `android.jar` (API 36) and a Robolectric suite run outside it (status routing, confirmation fallback, session params, validation).
 
 **Local Builds on CI:**
 

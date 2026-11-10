@@ -62,13 +62,17 @@ const TAB_ICONS = {
 const PROGRESS_RADIUS = 9;
 const PROGRESS_CIRCUMFERENCE = 2 * Math.PI * PROGRESS_RADIUS;
 
+// Phases with no percentage to show: the icon spins instead of filling.
+const INDETERMINATE_PHASES = new Set(['verifying', 'installing']);
+
 // Circular material progress indicator that replaces the Settings cog icon
-// while an update is downloading or being verified.
+// while an update is downloading, being verified or being installed.
 const UpdateProgressIcon = memo(({ phase, progress, color }) => {
   const spinValue = useSharedValue(0);
+  const indeterminate = INDETERMINATE_PHASES.has(phase);
 
   useEffect(() => {
-    if (phase === 'verifying') {
+    if (indeterminate) {
       spinValue.value = withRepeat(
         withTiming(1, { duration: 1000, easing: Easing.linear }),
         -1,
@@ -79,7 +83,7 @@ const UpdateProgressIcon = memo(({ phase, progress, color }) => {
       spinValue.value = 0;
     }
     return () => cancelAnimation(spinValue);
-  }, [phase, spinValue]);
+  }, [indeterminate, spinValue]);
 
   const spinStyle = useAnimatedStyle(() => ({
     transform: [{ rotate: `${spinValue.value * 360 - 90}deg` }],
@@ -87,7 +91,7 @@ const UpdateProgressIcon = memo(({ phase, progress, color }) => {
 
   const strokeOffset = PROGRESS_CIRCUMFERENCE * (1 - (progress ?? 0));
 
-  if (phase === 'verifying') {
+  if (indeterminate) {
     return (
       <Animated.View style={spinStyle}>
         <Svg width={22} height={22} viewBox="0 0 22 22">

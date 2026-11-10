@@ -8,6 +8,23 @@ export const UPDATE_ERROR = {
   INSTALL_FAILED: 'install_failed',
   INSTALLER_BUSY: 'installer_busy',
   FILE_MISSING: 'file_missing',
+  // The silent installer (app/services/silentInstaller.js) reaches Android itself, so it hears
+  // why an install was refused, which the system installer only ever told the user.
+  INSTALL_REJECTED: 'install_rejected',
+  INSTALL_INCOMPATIBLE: 'install_incompatible',
+  INSTALL_BLOCKED: 'install_blocked',
+  INSUFFICIENT_STORAGE: 'insufficient_storage',
+  INSTALL_ERROR: 'install_error',
+  // A second download or install while one is still running.
+  UPDATE_IN_PROGRESS: 'update_in_progress',
+};
+
+// An Error carrying one of the codes above, which is what describeUpdateError reads.
+export const createUpdateError = (code, message, cause = null) => {
+  const error = new Error(message);
+  error.code = code;
+  if (cause) error.cause = cause;
+  return error;
 };
 
 // What to tell the user for each of those. Reporting a failed install as a failed download sent
@@ -35,6 +52,32 @@ const UPDATE_ERROR_MESSAGES = {
   [UPDATE_ERROR.INCOMPLETE_DOWNLOAD]: [
     'update_download_incomplete',
     'The download was incomplete and the file was deleted. Please try again.',
+  ],
+  // STATUS_FAILURE_CONFLICT: mostly INSTALL_FAILED_UPDATE_INCOMPATIBLE, another signing key.
+  [UPDATE_ERROR.INSTALL_REJECTED]: [
+    'update_install_rejected',
+    'Android refused this update: it conflicts with the installed app, usually because it is signed with a different key.',
+  ],
+  // STATUS_FAILURE_INCOMPATIBLE: a downgrade, another CPU architecture, a too-new minSdk.
+  [UPDATE_ERROR.INSTALL_INCOMPATIBLE]: [
+    'update_install_incompatible',
+    'Android refused this update: it is older than the installed version or not built for this device.',
+  ],
+  [UPDATE_ERROR.INSTALL_BLOCKED]: [
+    'update_install_blocked',
+    'Android blocked the installation. Check Google Play Protect and try again.',
+  ],
+  [UPDATE_ERROR.INSUFFICIENT_STORAGE]: [
+    'update_install_storage',
+    'Not enough free space to install the update. Free up some storage and try again.',
+  ],
+  [UPDATE_ERROR.INSTALL_ERROR]: [
+    'update_install_error',
+    'Android could not install the update. Please try again.',
+  ],
+  [UPDATE_ERROR.UPDATE_IN_PROGRESS]: [
+    'update_in_progress',
+    'An update is already being downloaded or installed. Wait for it to finish, then try again.',
   ],
 };
 

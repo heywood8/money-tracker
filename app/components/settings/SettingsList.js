@@ -39,7 +39,9 @@ export default function SettingsList({ onOpenPanel }) {
           ? (t('update_phase_verifying') || 'Verifying APK…')
           : downloadPhase === 'backing_up'
             ? (t('update_phase_backing_up') || 'Backing up…')
-            : `${Math.round((downloadProgress ?? 0) * 100)}%`}
+            : downloadPhase === 'installing'
+              ? (t('update_phase_installing') || 'Installing…')
+              : `${Math.round((downloadProgress ?? 0) * 100)}%`}
       </Text>
       <ActivityIndicator size={16} color={colors.primary} style={styles.updateRowSpinner} />
     </View>

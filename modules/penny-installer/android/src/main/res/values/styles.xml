@@ -1,0 +1,9 @@
+<?xml version="1.0" encoding="utf-8"?>
+<resources>
+  <!-- The install-result activity draws nothing: it reads the status and finishes in onCreate. -->
+  <style name="PennyInstallerResultTheme" parent="@android:style/Theme.Translucent.NoTitleBar">
+    <item name="android:windowBackground">@android:color/transparent</item>
+    <item name="android:backgroundDimEnabled">false</item>
+    <item name="android:windowAnimationStyle">@null</item>
+  </style>
+</resources>

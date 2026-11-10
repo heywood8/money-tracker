@@ -8,7 +8,6 @@ import {
   checkForAppUpdate,
   deleteDownloadedApk,
   listDownloadedApks,
-  installApk,
   verifyCachedApk,
 } from '../../services/AppUpdateService';
 import { describeUpdateError } from '../../utils/updateErrors';
@@ -35,7 +34,7 @@ const BUILD_PROGRESS_POLL_MS = 30000;
 export default function UpdatePanel({ onRegisterTitle, onDone, bottomInset }) {
   const { t } = useLocalization();
   const { showDialog } = useDialog();
-  const { startDownload } = useUpdateDownload();
+  const { startDownload, installDownloaded } = useUpdateDownload();
 
   const [updateResult, setUpdateResult] = useState(null);
   const [isChecking, setIsChecking] = useState(false);
@@ -60,23 +59,12 @@ export default function UpdatePanel({ onRegisterTitle, onDone, bottomInset }) {
     setDownloadedApks(apks);
   }, []);
 
+  // The install continues app-wide like a download (handleUpdate): the settings row says
+  // "Backing up…", then "Installing…" or the system installer opens, so the panel has nothing
+  // left to show. A failure is explained by the context's own dialog.
   const handleInstallApk = useCallback(async (uri) => {
-    try {
-      await installApk(uri);
-    } catch (error) {
-      console.error('Failed to install APK:', error);
-      showDialog(
-        t('error') || 'Error',
-        describeUpdateError(
-          error,
-          t,
-          'update_install_failed',
-          'The update was downloaded, but Android would not open the installer.',
-        ),
-        [{ text: t('ok') || 'OK' }],
-      );
-    }
-  }, [showDialog, t]);
+    await installDownloaded(uri, { onStarted: onDone });
+  }, [installDownloaded, onDone]);
 
   const runUpdateCheck = useCallback(async ({ silent = false } = {}) => {
     // A silent re-check (used by the build-progress poller) keeps the current panel content

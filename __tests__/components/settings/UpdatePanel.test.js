@@ -40,8 +40,17 @@ jest.mock('../../../app/contexts/LocalizationContext', () => ({
 jest.mock('../../../app/contexts/DialogContext', () => ({
   useDialog: () => ({ showDialog: mockShowDialog }),
 }));
+// installDownloaded stands in for the context's: it says whether the install is silent, runs it
+// and hands a failure to the caller's onError, which is where this panel's wording comes from.
+const mockCanInstallSilently = jest.fn(() => false);
 jest.mock('../../../app/contexts/UpdateDownloadContext', () => ({
-  useUpdateDownload: () => ({ startDownload: mockStartDownload }),
+  useUpdateDownload: () => ({
+    startDownload: mockStartDownload,
+    installDownloaded: (uri, { onError, onStarted } = {}) => {
+      onStarted?.({ silent: mockCanInstallSilently() });
+      return mockInstallApk(uri).catch((e) => onError?.(e));
+    },
+  }),
 }));
 jest.mock('../../../app/services/AppUpdateService', () => ({
   checkForAppUpdate: (...a) => mockCheckForAppUpdate(...a),
@@ -329,29 +338,29 @@ describe('UpdatePanel', () => {
     });
   });
 
-  it('explains an APK that could no longer be installed', async () => {
-    mockInstallApk.mockImplementation(() => Promise.reject(new Error('file gone')));
-    const consoleError = jest.spyOn(console, 'error').mockImplementation(() => {});
-    await setup();
+  // An install continues app-wide, like a download: the settings row reports it ("Backing up…",
+  // then "Installing…" or the system installer), and the context explains a failure itself.
+  it.each([true, false])('hands the install to the context and closes once it starts (silent: %s)', async (silent) => {
+    mockCanInstallSilently.mockReturnValue(silent);
+    const order = [];
+    const onDone = jest.fn(() => order.push('done'));
+    mockInstallApk.mockImplementation(() => { order.push('install'); return Promise.resolve(); });
+    await setup({ onDone });
     await waitFor(() => expect(lastContentProps).not.toBeNull());
 
     await act(async () => {
-      await lastContentProps.onInstallApk('file:///gone.apk');
+      await lastContentProps.onInstallApk('file:///cache/penny-1.1.0.apk');
     });
 
-    expect(mockShowDialog).toHaveBeenCalledWith(
-      'error',
-      'update_install_failed',
-      expect.anything(),
-    );
-    consoleError.mockRestore();
+    expect(mockInstallApk).toHaveBeenCalledWith('file:///cache/penny-1.1.0.apk');
+    expect(order).toEqual(['done', 'install']);
+    mockCanInstallSilently.mockReturnValue(false);
   });
 
-  it('tells the user to close a stale install prompt when the launcher is still busy', async () => {
+  it('leaves explaining a failed install to the context', async () => {
     mockInstallApk.mockImplementation(() => Promise.reject(
       Object.assign(new Error('still pending'), { code: 'installer_busy' }),
     ));
-    const consoleError = jest.spyOn(console, 'error').mockImplementation(() => {});
     await setup();
     await waitFor(() => expect(lastContentProps).not.toBeNull());
 
@@ -359,11 +368,6 @@ describe('UpdatePanel', () => {
       await lastContentProps.onInstallApk('file:///cache/penny-1.1.0.apk');
     });
 
-    expect(mockShowDialog).toHaveBeenCalledWith(
-      'error',
-      'update_installer_busy',
-      expect.anything(),
-    );
-    consoleError.mockRestore();
+    expect(mockShowDialog).not.toHaveBeenCalled();
   });
 });
