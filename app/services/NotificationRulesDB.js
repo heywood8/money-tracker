@@ -1,6 +1,6 @@
 import uuid from 'react-native-uuid';
 import { executeQuery, queryAll, queryFirst } from './db';
-import { sanitizeLabel } from '../utils/labelUtils';
+import { sanitizeLabel, parseLabels, serializeSanitizedLabels } from '../utils/labelUtils';
 
 /**
  * Merchant -> category rules for bank-notification processing.
@@ -23,6 +23,9 @@ export const normalizeMerchant = (merchant) =>
 const isSkipCategoryRow = (row) =>
   !!row && (row.skip_category === 1 || row.skip_category === true || row.skip_category === '1');
 
+// Rows written before migration 0032 carry no column at all; NULL and '' mean none.
+const hasSecondaryLabels = (row) => !!row && parseLabels(row.secondary_labels).length > 0;
+
 const mapRuleFields = (row) => {
   if (!row) return null;
   return {
@@ -31,6 +34,9 @@ const mapRuleFields = (row) => {
     packageName: row.package_name,
     categoryId: row.category_id,
     labelOverride: row.label_override ?? null,
+    // Labels booked after the name (migration 0032). Always an array: rows that
+    // predate the column, and rules without any, read as [].
+    secondaryLabels: parseLabels(row.secondary_labels),
     // "Don't bind to category": the merchant never learns or auto-applies one.
     // Rows written before migration 0031 carry no column at all — read as false.
     skipCategory: isSkipCategoryRow(row),
@@ -100,6 +106,18 @@ export const getLabelForMerchant = async (merchant, packageName = null) => {
 };
 
 /**
+ * Resolve the secondary labels bound to a merchant ([] when none).
+ *
+ * @param {string} merchant
+ * @param {string|null} packageName
+ * @returns {Promise<string[]>}
+ */
+export const getSecondaryLabelsForMerchant = async (merchant, packageName = null) => {
+  const rule = await getMerchantRule(merchant, packageName);
+  return rule && Array.isArray(rule.secondaryLabels) ? rule.secondaryLabels : [];
+};
+
+/**
  * Find-or-create the (merchant, packageName) rule row and set the given columns.
  *
  * Shared by the category- and label-learning upserts so the NULL-matching
@@ -158,14 +176,15 @@ const upsertRuleRow = async (key, packageName, columns, insertOnlyColumns = {}, 
     category_id: null,
     label_override: null,
     skip_category: 0,
+    secondary_labels: null,
     ...insertOnlyColumns,
     ...columns,
     created_at: now,
     updated_at: now,
   };
   await executeQuery(
-    'INSERT INTO notification_merchant_rules (id, merchant, package_name, category_id, label_override, skip_category, created_at, updated_at) VALUES (?, ?, ?, ?, ?, ?, ?, ?)',
-    [row.id, row.merchant, row.package_name, row.category_id, row.label_override, row.skip_category, row.created_at, row.updated_at],
+    'INSERT INTO notification_merchant_rules (id, merchant, package_name, category_id, label_override, skip_category, secondary_labels, created_at, updated_at) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)',
+    [row.id, row.merchant, row.package_name, row.category_id, row.label_override, row.skip_category, row.secondary_labels, row.created_at, row.updated_at],
   );
   return mapRuleFields(row);
 };
@@ -277,6 +296,34 @@ export const upsertMerchantLabel = async (merchant, labelOverride, packageName =
 };
 
 /**
+ * Set (or clear) the secondary labels for a merchant: the labels its operations
+ * carry after the name ("Ecosense" + "Groceries").
+ *
+ * Upserts on the (merchant, packageName) pair, touching only this column, so the
+ * name, a learned category and the "don't bind" mark on the same row are kept.
+ * Like the name, secondary labels can exist without a category: they are learned
+ * for every kind, C2C and "don't bind" merchants included, which is where they
+ * matter most, since those never carry a category of their own. An empty set
+ * clears them.
+ *
+ * @param {string} merchant
+ * @param {string|string[]} labels - serialized (" | "-joined) or an array
+ * @param {string|null} packageName
+ * @returns {Promise<Object|null>} the stored rule, or null if merchant is empty
+ */
+export const upsertMerchantSecondaryLabels = async (merchant, labels, packageName = null) => {
+  const key = normalizeMerchant(merchant);
+  if (!key) return null;
+  const value = serializeSanitizedLabels(labels) || null;
+  try {
+    return await upsertRuleRow(key, packageName, { secondary_labels: value });
+  } catch (error) {
+    console.error('Failed to upsert merchant secondary labels:', error);
+    throw error;
+  }
+};
+
+/**
  * All merchant rules, most-recently-matched first (for the rules-management UI).
  *
  * Orders by COALESCE(last_matched_at, updated_at) DESC so a rule whose merchant
@@ -357,8 +404,9 @@ export const clearMerchantRuleCategory = async (id) => {
       [id],
     );
     if (!row) return;
-    // No label (or skip flag) left to keep the row alive — drop it entirely.
-    if (!row.label_override && !isSkipCategoryRow(row)) {
+    // No label, secondary labels or skip flag left to keep the row alive — drop
+    // it entirely.
+    if (!row.label_override && !hasSecondaryLabels(row) && !isSkipCategoryRow(row)) {
       await deleteMerchantRule(id);
       return;
     }
@@ -374,8 +422,9 @@ export const clearMerchantRuleCategory = async (id) => {
 
 /**
  * Remove the display-label override from a rule by id, leaving its learned
- * category intact. When the rule would then hold neither a label nor a category
- * the whole row is deleted. Used by the bindings-management UI.
+ * category and secondary labels intact. When the rule would then hold nothing
+ * (no label, secondary labels, category or skip flag) the whole row is deleted.
+ * Used by the bindings-management UI.
  *
  * @param {string} id
  * @returns {Promise<void>}
@@ -387,8 +436,9 @@ export const clearMerchantRuleLabel = async (id) => {
       [id],
     );
     if (!row) return;
-    // No category (or skip flag) left to keep the row alive — drop it entirely.
-    if (row.category_id == null && !isSkipCategoryRow(row)) {
+    // No category, secondary labels or skip flag left to keep the row alive —
+    // drop it entirely.
+    if (row.category_id == null && !hasSecondaryLabels(row) && !isSkipCategoryRow(row)) {
       await deleteMerchantRule(id);
       return;
     }
@@ -418,7 +468,7 @@ export const clearMerchantRuleSkipCategory = async (id) => {
       [id],
     );
     if (!row) return;
-    if (!row.label_override && row.category_id == null) {
+    if (!row.label_override && row.category_id == null && !hasSecondaryLabels(row)) {
       await deleteMerchantRule(id);
       return;
     }
@@ -428,6 +478,65 @@ export const clearMerchantRuleSkipCategory = async (id) => {
     );
   } catch (error) {
     console.error('Failed to clear merchant rule skip-category flag:', error);
+    throw error;
+  }
+};
+
+/**
+ * Remove the secondary labels from a rule by id, leaving its name, category and
+ * "don't bind" mark intact. When the rule would then hold nothing at all the whole
+ * row is deleted. Used by the bindings-management UI.
+ *
+ * @param {string} id
+ * @returns {Promise<void>}
+ */
+export const clearMerchantRuleSecondaryLabels = async (id) => {
+  try {
+    const row = await queryFirst(
+      'SELECT * FROM notification_merchant_rules WHERE id = ?',
+      [id],
+    );
+    if (!row) return;
+    if (!row.label_override && row.category_id == null && !isSkipCategoryRow(row)) {
+      await deleteMerchantRule(id);
+      return;
+    }
+    await executeQuery(
+      'UPDATE notification_merchant_rules SET secondary_labels = NULL, updated_at = ? WHERE id = ?',
+      [new Date().toISOString(), id],
+    );
+  } catch (error) {
+    console.error('Failed to clear merchant rule secondary labels:', error);
+    throw error;
+  }
+};
+
+/**
+ * Remove a rule's name and its secondary labels together, by id, leaving its
+ * category (or "don't bind" mark) intact: the trash on a name binding in the
+ * bindings UI, where both are edited on one card. When the rule would then hold
+ * nothing the whole row is deleted.
+ *
+ * @param {string} id
+ * @returns {Promise<void>}
+ */
+export const clearMerchantRuleLabels = async (id) => {
+  try {
+    const row = await queryFirst(
+      'SELECT * FROM notification_merchant_rules WHERE id = ?',
+      [id],
+    );
+    if (!row) return;
+    if (row.category_id == null && !isSkipCategoryRow(row)) {
+      await deleteMerchantRule(id);
+      return;
+    }
+    await executeQuery(
+      'UPDATE notification_merchant_rules SET label_override = NULL, secondary_labels = NULL, updated_at = ? WHERE id = ?',
+      [new Date().toISOString(), id],
+    );
+  } catch (error) {
+    console.error('Failed to clear merchant rule labels:', error);
     throw error;
   }
 };

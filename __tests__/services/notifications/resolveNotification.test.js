@@ -188,6 +188,22 @@ describe('resolveNotification', () => {
       expect(NotificationRulesDB.getMerchantRule).toHaveBeenCalledTimes(1);
     });
 
+    it('exposes the merchant’s secondary labels without making them a match', async () => {
+      AccountsDB.getAccountByCardMask.mockResolvedValue({ id: 7, currency: 'AMD' });
+      NotificationRulesDB.getMerchantRule.mockResolvedValue({
+        categoryId: 'cat-food', labelOverride: null, secondaryLabels: ['Weekly'],
+      });
+      const r = await resolver.resolveNotification(descriptor);
+      expect(r.secondaryLabels).toEqual(['Weekly']);
+      expect(r.matchedLabel).toBe(false);
+    });
+
+    it('reports no secondary labels when no rule matched', async () => {
+      NotificationRulesDB.getMerchantRule.mockResolvedValue(null);
+      const r = await resolver.resolveNotification(descriptor);
+      expect(r.secondaryLabels).toEqual([]);
+    });
+
     it('reports fullyMatched when both resolve and currencies agree', async () => {
       AccountsDB.getAccountByCardMask.mockResolvedValue({ id: 7, currency: 'AMD' });
       NotificationRulesDB.getMerchantRule.mockResolvedValue({ categoryId: 'cat-food' });
@@ -197,6 +213,7 @@ describe('resolveNotification', () => {
         accountCurrency: 'AMD',
         categoryId: 'cat-food',
         labelOverride: null,
+        secondaryLabels: [],
         matchedAccount: true,
         matchedCategory: true,
         matchedLabel: false,

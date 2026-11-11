@@ -19,6 +19,8 @@ import {
   isProtectedOperation,
   displayLabel,
   normalizeMerchantLabel,
+  serializeSanitizedLabels,
+  prependPrimaryLabel,
 } from '../../app/utils/labelUtils';
 
 describe('labelUtils', () => {
@@ -464,6 +466,42 @@ describe('labelUtils', () => {
     it('returns an empty string for blank input', () => {
       expect(normalizeMerchantLabel('')).toBe('');
       expect(normalizeMerchantLabel('   ')).toBe('');
+    });
+  });
+
+  describe('serializeSanitizedLabels', () => {
+    it('accepts an array or a serialized string', () => {
+      expect(serializeSanitizedLabels(['Food', 'Weekly'])).toBe('Food | Weekly');
+      expect(serializeSanitizedLabels('Food |Weekly')).toBe('Food | Weekly');
+    });
+
+    it('clamps each label to the new-label length and drops duplicates', () => {
+      const long = 'y'.repeat(MAX_LABEL_LENGTH + 10);
+      expect(serializeSanitizedLabels([long, 'food', 'FOOD', '  '])).toBe(`${'y'.repeat(MAX_LABEL_LENGTH)} | food`);
+    });
+
+    it('returns an empty string for nothing usable', () => {
+      expect(serializeSanitizedLabels(null)).toBe('');
+      expect(serializeSanitizedLabels([])).toBe('');
+      expect(serializeSanitizedLabels('')).toBe('');
+    });
+  });
+
+  describe('prependPrimaryLabel', () => {
+    it('puts the primary label first and the secondary ones after it', () => {
+      expect(prependPrimaryLabel('Ecosense', ['Groceries', 'Weekly'])).toBe('Ecosense | Groceries | Weekly');
+      expect(prependPrimaryLabel('Ecosense', 'Groceries | Weekly')).toBe('Ecosense | Groceries | Weekly');
+    });
+
+    it('does not repeat a secondary label equal to the primary', () => {
+      expect(prependPrimaryLabel('Ecosense', ['ecosense', 'Groceries'])).toBe('Ecosense | Groceries');
+    });
+
+    it('works with either part empty', () => {
+      expect(prependPrimaryLabel('Ecosense', [])).toBe('Ecosense');
+      expect(prependPrimaryLabel('Ecosense', undefined)).toBe('Ecosense');
+      expect(prependPrimaryLabel('', ['Rent'])).toBe('Rent');
+      expect(prependPrimaryLabel(null, null)).toBe('');
     });
   });
 });

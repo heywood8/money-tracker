@@ -38,8 +38,10 @@ const LabelInput = forwardRef(({
   editable = true,
   colors,
   containerStyle,
+  suggestionsStyle,
   onFocus,
   t,
+  testID,
 }, ref) => {
   const labels = useMemo(() => parseLabels(value), [value]);
   const [input, setInput] = useState('');
@@ -162,7 +164,7 @@ const LabelInput = forwardRef(({
   }, [addFromText]);
 
   return (
-    <View style={[styles.container, containerStyle]}>
+    <View style={[styles.container, containerStyle]} testID={testID}>
       <View
         style={[
           styles.field,
@@ -213,7 +215,7 @@ const LabelInput = forwardRef(({
       </View>
 
       <Animated.View
-        style={[styles.chipsWrapper, { opacity: fadeAnim }]}
+        style={[styles.chipsWrapper, suggestionsStyle, { opacity: fadeAnim }]}
         pointerEvents={renderChips ? 'auto' : 'none'}
       >
         {renderChips && (
@@ -255,8 +257,12 @@ LabelInput.propTypes = {
   editable: PropTypes.bool,
   colors: PropTypes.object.isRequired,
   containerStyle: PropTypes.object,
+  // Overrides the suggestion strip's wrapper (its margins), for a host that sits
+  // the editor in a tight layout.
+  suggestionsStyle: PropTypes.object,
   onFocus: PropTypes.func,
   t: PropTypes.func,
+  testID: PropTypes.string,
 };
 
 const styles = StyleSheet.create({

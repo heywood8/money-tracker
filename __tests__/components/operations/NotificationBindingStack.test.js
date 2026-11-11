@@ -7,7 +7,7 @@
 
 import React from 'react';
 import { StyleSheet } from 'react-native';
-import { render, fireEvent } from '@testing-library/react-native';
+import { render, fireEvent, within } from '@testing-library/react-native';
 import NotificationBindingStack, {
   MAX_DECK,
   MIN_CARD_HEIGHT,
@@ -33,6 +33,12 @@ jest.mock('../../../app/hooks/useTopCategoryIds', () => ({
 }));
 
 jest.mock('../../../app/hooks/useSourceCategoryIds', () => ({
+  __esModule: true,
+  default: jest.fn(() => []),
+}));
+
+// The secondary-label editor's suggestions, kept off the DB the same way.
+jest.mock('../../../app/hooks/useLabelSuggestions', () => ({
   __esModule: true,
   default: jest.fn(() => []),
 }));
@@ -233,6 +239,45 @@ describe('NotificationBindingStack', () => {
     const { getByText } = await renderStack({ onSave });
     fireEvent.press(getByText('save'));
     expect(onSave).toHaveBeenCalledWith(EXPENSE);
+  });
+
+  describe('secondary labels', () => {
+    it('shows the seeded secondary labels as chips on an expense card', async () => {
+      const { getByTestId, getByText } = await renderStack({
+        choices: { p1: { accountId: 1, categoryId: 'c1', labelOverride: '', secondaryLabels: 'Groceries | Weekly' } },
+      });
+      expect(getByTestId('binding-card-secondary-labels')).toBeTruthy();
+      expect(getByText('Groceries')).toBeTruthy();
+      expect(getByText('Weekly')).toBeTruthy();
+    });
+
+    it('has no secondary-label field on a transfer (no merchant binding to keep them on)', async () => {
+      const { queryByTestId } = await renderStack({
+        suggestions: [TRANSFER],
+        choices: { p2: { accountId: 1, toAccountId: 2, labelOverride: '' } },
+      });
+      expect(queryByTestId('binding-card-secondary-labels')).toBeNull();
+    });
+
+    it('propagates a committed label as a choice patch', async () => {
+      const onChoiceChange = jest.fn();
+      const { getByTestId } = await renderStack({ onChoiceChange });
+      const input = within(getByTestId('binding-card-secondary-labels')).getByTestId('label-input-field');
+      await fireEvent.changeText(input, 'Groceries,');
+      expect(onChoiceChange).toHaveBeenCalledWith('p1', { secondaryLabels: 'Groceries' });
+    });
+
+    it('commits a label still being typed when Save is tapped', async () => {
+      const onSave = jest.fn();
+      const { getByTestId, getByText } = await renderStack({
+        onSave,
+        choices: { p1: { accountId: 1, categoryId: 'c1', labelOverride: '', secondaryLabels: 'Groceries' } },
+      });
+      const input = within(getByTestId('binding-card-secondary-labels')).getByTestId('label-input-field');
+      await fireEvent.changeText(input, 'Weekly');
+      await fireEvent.press(getByText('save'));
+      expect(onSave).toHaveBeenCalledWith(EXPENSE, { secondaryLabels: 'Groceries | Weekly' });
+    });
   });
 
   it('keeps Save disabled while the choice is invalid (required category missing)', async () => {

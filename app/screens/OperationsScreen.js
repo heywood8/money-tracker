@@ -17,7 +17,9 @@ import { setLastAccessedAccount } from '../services/LastAccount';
 import { appEvents, EVENTS } from '../services/eventEmitter';
 import { formatDate as toDateString } from '../services/BalanceHistoryDB';
 import { getDistinctLabels, getOperationById } from '../services/OperationsDB';
-import { parseLabels, serializeLabels, addLabel, hasLabel, normalizeMerchantLabel } from '../utils/labelUtils';
+import {
+  parseLabels, serializeLabels, addLabel, hasLabel, normalizeMerchantLabel, prependPrimaryLabel,
+} from '../utils/labelUtils';
 import { buildRepeatedOperation } from '../utils/operationUtils';
 import { getDriveBackupStatusLabel } from '../utils/driveBackupStatus';
 import OperationModal from '../modals/OperationModal';
@@ -434,6 +436,11 @@ const OperationsScreen = () => {
     // resolver books for an unnamed merchant, not the raw ALL-CAPS string.
     const label = trimmedLabel || normalizeMerchantLabel(item.merchant) || '';
     const isTransfer = item.type === 'transfer';
+    // The secondary labels follow the name, as the resolver books them (a
+    // transfer has none: it carries no merchant binding).
+    const description = isTransfer
+      ? serializeLabels(label ? [label] : [])
+      : prependPrimaryLabel(label, choice.secondaryLabels);
     const opId = `_pending_notif_${item.id}`;
     addOptimisticOperation({
       id: opId,
@@ -443,7 +450,7 @@ const OperationsScreen = () => {
       categoryId: isTransfer ? null : (choice.categoryId ?? null),
       amount: String(amount),
       date: item.date || (item.createdAt ? item.createdAt.slice(0, 10) : toDateString(new Date())),
-      description: label ? serializeLabels([label]) : null,
+      description: description || null,
     });
     return opId;
   }, [accounts, addOptimisticOperation]);

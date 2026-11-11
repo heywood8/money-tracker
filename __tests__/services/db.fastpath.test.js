@@ -105,7 +105,7 @@ const mockSchemaComplete = (db, storedUserVersion) => {
     if (q.includes('table_info(notification_merchant_rules)')) {
       return Promise.resolve([
         { name: 'label_override', type: 'TEXT' }, { name: 'last_matched_at', type: 'TEXT' },
-        { name: 'skip_category', type: 'INTEGER' },
+        { name: 'skip_category', type: 'INTEGER' }, { name: 'secondary_labels', type: 'TEXT' },
       ]);
     }
     if (q.includes('table_info(pending_notifications)')) {

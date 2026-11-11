@@ -1,5 +1,5 @@
 import React from 'react';
-import { render, fireEvent, waitFor, act } from '@testing-library/react-native';
+import { render, fireEvent, waitFor, act, within } from '@testing-library/react-native';
 import NotificationProcessingContentPanel from '../../app/components/NotificationProcessingContentPanel';
 import * as pipeline from '../../app/services/notifications/processBankNotifications';
 import * as PendingNotificationsDB from '../../app/services/PendingNotificationsDB';
@@ -44,6 +44,11 @@ jest.mock('../../app/services/notifications/duplicateOperations', () => ({
 }));
 jest.mock('../../app/services/PendingNotificationsDB');
 jest.mock('../../app/services/NotificationAccess');
+// The secondary-label editors' suggestions, kept off the DB.
+jest.mock('../../app/hooks/useLabelSuggestions', () => ({
+  __esModule: true,
+  default: jest.fn(() => []),
+}));
 jest.mock('../../app/services/notifications/notificationFilters', () => ({
   getHiddenPackages: jest.fn(),
   registerSeenPackages: jest.fn(),
@@ -179,6 +184,52 @@ describe('NotificationProcessingContentPanel', () => {
           'p1', expect.objectContaining({ skipCategoryBinding: true }),
         ),
       );
+    });
+  });
+
+  describe('secondary labels', () => {
+    afterEach(() => {
+      jest.restoreAllMocks();
+    });
+
+    it('shows the merchant’s learned secondary labels and does not send them back untouched', async () => {
+      jest.spyOn(NotificationRulesDB, 'getMerchantRule').mockResolvedValue({ secondaryLabels: ['Rent', 'Home'] });
+      PendingNotificationsDB.getPendingNotifications.mockResolvedValue([{ ...PENDING, accountId: 1 }]);
+      const { getByText, getByTestId } = await render(<NotificationProcessingContentPanel />);
+      await waitFor(() => expect(getByText('Rent')).toBeTruthy());
+      expect(within(getByTestId('pending-secondary-labels-p1')).getByText('Home')).toBeTruthy();
+
+      await fireEvent.press(getByText('save'));
+      await waitFor(() => expect(pipeline.resolvePendingNotification).toHaveBeenCalled());
+      expect(pipeline.resolvePendingNotification.mock.calls[0][1]).not.toHaveProperty('secondaryLabels');
+    });
+
+    it('sends a label still being typed when Save is tapped', async () => {
+      jest.spyOn(NotificationRulesDB, 'getMerchantRule').mockResolvedValue({ secondaryLabels: ['Rent'] });
+      PendingNotificationsDB.getPendingNotifications.mockResolvedValue([{ ...PENDING, accountId: 1 }]);
+      const { getByText, getByTestId } = await render(<NotificationProcessingContentPanel />);
+      await waitFor(() => expect(getByText('Rent')).toBeTruthy());
+
+      const input = within(getByTestId('pending-secondary-labels-p1')).getByTestId('label-input-field');
+      await fireEvent.changeText(input, 'Utilities');
+      await fireEvent.press(getByText('save'));
+      await waitFor(() =>
+        expect(pipeline.resolvePendingNotification).toHaveBeenCalledWith(
+          'p1', expect.objectContaining({ accountId: 1, secondaryLabels: 'Rent | Utilities' }),
+        ),
+      );
+    });
+
+    it('has no secondary-label field on a transfer card', async () => {
+      const ATM_PENDING = {
+        id: 'p9', kind: 'ATM CASH', type: 'transfer', amount: '50000.00', currency: 'AMD',
+        cardMask: '4083***7027', merchant: 'ATM YEREVAN', date: '2026-06-28',
+        accountId: 1, categoryId: null, packageName: 'am.bank',
+      };
+      PendingNotificationsDB.getPendingNotifications.mockResolvedValue([ATM_PENDING]);
+      const { queryByTestId, getByTestId } = await render(<NotificationProcessingContentPanel />);
+      await waitFor(() => expect(getByTestId('pending-merchant-p9')).toBeTruthy());
+      expect(queryByTestId('pending-secondary-labels-p9')).toBeNull();
     });
   });
 

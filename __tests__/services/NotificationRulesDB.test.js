@@ -496,4 +496,158 @@ describe('NotificationRulesDB', () => {
       expect(mockDb.executeQuery.mock.calls[0][0]).toContain('SET label_override = NULL');
     });
   });
+
+  describe('secondary labels', () => {
+    const DELETE_SQL = 'DELETE FROM notification_merchant_rules WHERE id = ?';
+
+    it('maps secondary_labels onto an array ([] for rows that predate the column)', async () => {
+      mockDb.queryAll.mockResolvedValue([
+        { id: 'r1', merchant: 'A', secondary_labels: 'Groceries | Weekly' },
+        { id: 'r2', merchant: 'B', secondary_labels: null },
+        { id: 'r3', merchant: 'C' },
+        { id: 'r4', merchant: 'D', secondary_labels: '' },
+      ]);
+      const rules = await NotificationRulesDB.getAllMerchantRules();
+      expect(rules.map((r) => r.secondaryLabels)).toEqual([['Groceries', 'Weekly'], [], [], []]);
+    });
+
+    it('writes secondary_labels = NULL on every newly inserted rule', async () => {
+      mockDb.queryFirst.mockResolvedValue(null);
+      await NotificationRulesDB.upsertMerchantRule('SHOP', 'cat-1');
+      const [sql, params] = mockDb.executeQuery.mock.calls[0];
+      // (id, merchant, package_name, category_id, label_override, skip_category, secondary_labels, ...)
+      expect(sql).toContain('label_override, skip_category, secondary_labels, created_at');
+      expect(params[6]).toBeNull();
+      expect(params).toHaveLength(9);
+    });
+
+    it('getSecondaryLabelsForMerchant reads the resolved rule ([] when none)', async () => {
+      mockDb.queryAll.mockResolvedValue([{ id: 'r1', merchant: 'SHOP', secondary_labels: 'Rent' }]);
+      expect(await NotificationRulesDB.getSecondaryLabelsForMerchant('shop')).toEqual(['Rent']);
+      mockDb.queryAll.mockResolvedValue([]);
+      expect(await NotificationRulesDB.getSecondaryLabelsForMerchant('shop')).toEqual([]);
+    });
+
+    describe('upsertMerchantSecondaryLabels', () => {
+      it('returns null for an empty merchant key', async () => {
+        expect(await NotificationRulesDB.upsertMerchantSecondaryLabels('', ['Rent'])).toBeNull();
+        expect(mockDb.executeQuery).not.toHaveBeenCalled();
+      });
+
+      it('inserts a rule holding only the secondary labels for a new merchant', async () => {
+        mockDb.queryFirst.mockResolvedValue(null);
+        const rule = await NotificationRulesDB.upsertMerchantSecondaryLabels('Narek M.', ['Rent', 'Home'], 'am.bank');
+        const [sql, params] = mockDb.executeQuery.mock.calls[0];
+        expect(sql).toContain('INSERT INTO notification_merchant_rules');
+        expect(params.slice(1, 7)).toEqual(['NAREK M.', 'am.bank', null, null, 0, 'Rent | Home']);
+        expect(rule.secondaryLabels).toEqual(['Rent', 'Home']);
+        expect(rule.labelOverride).toBeNull();
+      });
+
+      it('updates only the secondary_labels column of an existing rule', async () => {
+        mockDb.queryFirst.mockResolvedValue({
+          id: 'r1', merchant: 'SHOP', package_name: null, category_id: 'cat-1', label_override: 'Shop', skip_category: 0,
+        });
+        const rule = await NotificationRulesDB.upsertMerchantSecondaryLabels('SHOP', 'Groceries | Weekly');
+        const [sql, params] = mockDb.executeQuery.mock.calls[0];
+        expect(sql).toMatch(/^UPDATE notification_merchant_rules SET secondary_labels = \?, updated_at = \? WHERE id = \?$/);
+        expect(params).toEqual(['Groceries | Weekly', expect.any(String), 'r1']);
+        expect(rule.labelOverride).toBe('Shop');
+        expect(rule.categoryId).toBe('cat-1');
+        expect(rule.secondaryLabels).toEqual(['Groceries', 'Weekly']);
+      });
+
+      it('sanitizes and de-duplicates the labels, and stores an empty set as NULL', async () => {
+        mockDb.queryFirst.mockResolvedValue({ id: 'r1', merchant: 'SHOP', package_name: null });
+        await NotificationRulesDB.upsertMerchantSecondaryLabels('SHOP', ['  Food  ', 'food', 'x'.repeat(80)]);
+        expect(mockDb.executeQuery.mock.calls[0][1][0]).toBe(`Food | ${'x'.repeat(60)}`);
+
+        mockDb.executeQuery.mockClear();
+        await NotificationRulesDB.upsertMerchantSecondaryLabels('SHOP', '');
+        expect(mockDb.executeQuery.mock.calls[0][1][0]).toBeNull();
+      });
+
+      it('leaves a "don’t bind" mark in place', async () => {
+        mockDb.queryFirst.mockResolvedValue({
+          id: 'r1', merchant: 'SHOP', package_name: null, category_id: null, skip_category: 1,
+        });
+        const rule = await NotificationRulesDB.upsertMerchantSecondaryLabels('SHOP', ['Marketplace']);
+        expect(mockDb.executeQuery.mock.calls[0][0]).not.toContain('skip_category');
+        expect(rule.skipCategory).toBe(true);
+      });
+    });
+
+    describe('rows kept alive by secondary labels', () => {
+      it('clearMerchantRuleLabel keeps a row that still has secondary labels', async () => {
+        mockDb.queryFirst.mockResolvedValue({ id: 'r1', category_id: null, label_override: 'Gate', secondary_labels: 'Rent' });
+        await NotificationRulesDB.clearMerchantRuleLabel('r1');
+        expect(mockDb.executeQuery).not.toHaveBeenCalledWith(DELETE_SQL, ['r1']);
+        expect(mockDb.executeQuery.mock.calls[0][0]).toContain('SET label_override = NULL');
+      });
+
+      it('clearMerchantRuleCategory keeps a row that still has secondary labels', async () => {
+        mockDb.queryFirst.mockResolvedValue({ id: 'r1', category_id: 'cat-1', label_override: null, secondary_labels: 'Rent' });
+        await NotificationRulesDB.clearMerchantRuleCategory('r1');
+        expect(mockDb.executeQuery).not.toHaveBeenCalledWith(DELETE_SQL, ['r1']);
+        expect(mockDb.executeQuery.mock.calls[0][0]).toContain('SET category_id = NULL');
+      });
+
+      it('clearMerchantRuleSkipCategory keeps a row that still has secondary labels', async () => {
+        mockDb.queryFirst.mockResolvedValue({ id: 'r1', category_id: null, label_override: null, skip_category: 1, secondary_labels: 'Rent' });
+        await NotificationRulesDB.clearMerchantRuleSkipCategory('r1');
+        expect(mockDb.executeQuery).not.toHaveBeenCalledWith(DELETE_SQL, ['r1']);
+        expect(mockDb.executeQuery.mock.calls[0][0]).toContain('SET skip_category = 0');
+      });
+    });
+
+    describe('clearMerchantRuleSecondaryLabels', () => {
+      it('does nothing when the rule is not found', async () => {
+        mockDb.queryFirst.mockResolvedValue(null);
+        await NotificationRulesDB.clearMerchantRuleSecondaryLabels('missing');
+        expect(mockDb.executeQuery).not.toHaveBeenCalled();
+      });
+
+      it('deletes the whole row when nothing else is bound on it', async () => {
+        mockDb.queryFirst.mockResolvedValue({ id: 'r1', category_id: null, label_override: null, skip_category: 0, secondary_labels: 'Rent' });
+        await NotificationRulesDB.clearMerchantRuleSecondaryLabels('r1');
+        expect(mockDb.executeQuery).toHaveBeenCalledWith(DELETE_SQL, ['r1']);
+      });
+
+      it('clears only the column when a name, category or mark remains', async () => {
+        for (const row of [
+          { id: 'r1', label_override: 'Gate', category_id: null },
+          { id: 'r1', label_override: null, category_id: 'cat-1' },
+          { id: 'r1', label_override: null, category_id: null, skip_category: 1 },
+        ]) {
+          mockDb.executeQuery.mockClear();
+          mockDb.queryFirst.mockResolvedValue({ ...row, secondary_labels: 'Rent' });
+          await NotificationRulesDB.clearMerchantRuleSecondaryLabels('r1');
+          expect(mockDb.executeQuery).toHaveBeenCalledTimes(1);
+          expect(mockDb.executeQuery.mock.calls[0][0]).toContain('SET secondary_labels = NULL');
+        }
+      });
+    });
+
+    describe('clearMerchantRuleLabels', () => {
+      it('deletes the whole row when no category or mark remains', async () => {
+        mockDb.queryFirst.mockResolvedValue({ id: 'r1', category_id: null, label_override: 'Gate', secondary_labels: 'Rent' });
+        await NotificationRulesDB.clearMerchantRuleLabels('r1');
+        expect(mockDb.executeQuery).toHaveBeenCalledWith(DELETE_SQL, ['r1']);
+      });
+
+      it('clears the name and the secondary labels together, keeping the category', async () => {
+        mockDb.queryFirst.mockResolvedValue({ id: 'r1', category_id: 'cat-1', label_override: 'Gate', secondary_labels: 'Rent' });
+        await NotificationRulesDB.clearMerchantRuleLabels('r1');
+        const [sql, params] = mockDb.executeQuery.mock.calls[0];
+        expect(sql).toContain('SET label_override = NULL, secondary_labels = NULL');
+        expect(params[params.length - 1]).toBe('r1');
+      });
+
+      it('keeps a "don’t bind" row alive', async () => {
+        mockDb.queryFirst.mockResolvedValue({ id: 'r1', category_id: null, label_override: 'Gate', skip_category: 1 });
+        await NotificationRulesDB.clearMerchantRuleLabels('r1');
+        expect(mockDb.executeQuery).not.toHaveBeenCalledWith(DELETE_SQL, ['r1']);
+      });
+    });
+  });
 });

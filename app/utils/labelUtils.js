@@ -179,6 +179,33 @@ export const serializeLabels = (labels) => {
 };
 
 /**
+ * Serialise labels that were just typed (or picked) for storage: each one
+ * sanitized like a new label ({@link sanitizeLabel}: delimiter stripped, length
+ * clamped), duplicates dropped case-insensitively, joined like a description.
+ * Accepts the serialized string the label editor works with, or an array.
+ * @param {string|string[]|null|undefined} labels
+ * @returns {string} '' when nothing usable is left
+ */
+export const serializeSanitizedLabels = (labels) => {
+  const list = Array.isArray(labels) ? labels : parseLabels(labels);
+  return serializeLabels(list.map(sanitizeLabel));
+};
+
+/**
+ * The description of an operation booked under a primary label (a merchant's
+ * name) plus secondary ones: the primary first, then the rest, de-duplicated
+ * case-insensitively so a secondary label equal to the primary is not stored
+ * twice. Either part may be empty.
+ * @param {string|null|undefined} primary
+ * @param {string|string[]|null|undefined} secondary - serialized or an array
+ * @returns {string} '' when there is nothing to store
+ */
+export const prependPrimaryLabel = (primary, secondary) => serializeLabels([
+  primary,
+  ...(Array.isArray(secondary) ? secondary : parseLabels(secondary)),
+]);
+
+/**
  * Case-insensitive membership test.
  * @param {string[]} labels
  * @param {string} target
