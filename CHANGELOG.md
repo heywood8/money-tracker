@@ -1,5 +1,12 @@
 # Changelog
 
+## [0.312.0](https://github.com/heywood8/money-tracker/compare/penny-v0.311.0...penny-v0.312.0) (2026-11-11)
+
+
+### Features
+
+* **notifications:** add secondary labels to merchant bindings ([#1902](https://github.com/heywood8/money-tracker/issues/1902)) ([be0199e](https://github.com/heywood8/money-tracker/commit/be0199efdc2773df416f0f54eaa43cb7a7e711b1))
+
 ## [0.311.0](https://github.com/heywood8/money-tracker/compare/penny-v0.310.0...penny-v0.311.0) (2026-11-10)
 
 

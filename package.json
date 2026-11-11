@@ -1,6 +1,6 @@
 {
   "name": "penny",
-  "version": "0.311.0",
+  "version": "0.312.0",
   "main": "index.js",
   "scripts": {
     "start": "expo start",
