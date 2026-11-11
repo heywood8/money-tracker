@@ -192,30 +192,30 @@ describe('NotificationProcessingContentPanel', () => {
       jest.restoreAllMocks();
     });
 
-    it('shows the merchant’s learned secondary labels and does not send them back untouched', async () => {
+    it('starts empty, even for a rule 0.312.0 stored labels on, and sends none untouched', async () => {
       jest.spyOn(NotificationRulesDB, 'getMerchantRule').mockResolvedValue({ secondaryLabels: ['Rent', 'Home'] });
       PendingNotificationsDB.getPendingNotifications.mockResolvedValue([{ ...PENDING, accountId: 1 }]);
-      const { getByText, getByTestId } = await render(<NotificationProcessingContentPanel />);
-      await waitFor(() => expect(getByText('Rent')).toBeTruthy());
-      expect(within(getByTestId('pending-secondary-labels-p1')).getByText('Home')).toBeTruthy();
+      const { getByText, getByTestId, queryByText } = await render(<NotificationProcessingContentPanel />);
+      await waitFor(() => expect(getByTestId('pending-secondary-labels-p1')).toBeTruthy());
+      expect(queryByText('Rent')).toBeNull();
 
       await fireEvent.press(getByText('save'));
       await waitFor(() => expect(pipeline.resolvePendingNotification).toHaveBeenCalled());
       expect(pipeline.resolvePendingNotification.mock.calls[0][1]).not.toHaveProperty('secondaryLabels');
     });
 
-    it('sends a label still being typed when Save is tapped', async () => {
-      jest.spyOn(NotificationRulesDB, 'getMerchantRule').mockResolvedValue({ secondaryLabels: ['Rent'] });
+    it('sends the labels typed for this operation, one still being typed included', async () => {
       PendingNotificationsDB.getPendingNotifications.mockResolvedValue([{ ...PENDING, accountId: 1 }]);
       const { getByText, getByTestId } = await render(<NotificationProcessingContentPanel />);
-      await waitFor(() => expect(getByText('Rent')).toBeTruthy());
+      await waitFor(() => expect(getByTestId('pending-secondary-labels-p1')).toBeTruthy());
 
       const input = within(getByTestId('pending-secondary-labels-p1')).getByTestId('label-input-field');
-      await fireEvent.changeText(input, 'Utilities');
+      await fireEvent.changeText(input, 'Shoes,');
+      await fireEvent.changeText(input, 'Gift');
       await fireEvent.press(getByText('save'));
       await waitFor(() =>
         expect(pipeline.resolvePendingNotification).toHaveBeenCalledWith(
-          'p1', expect.objectContaining({ accountId: 1, secondaryLabels: 'Rent | Utilities' }),
+          'p1', expect.objectContaining({ accountId: 1, secondaryLabels: 'Shoes | Gift' }),
         ),
       );
     });

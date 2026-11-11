@@ -17,7 +17,6 @@ import {
   followSkipCategory,
 } from '../services/notifications/skipCategoryChoice';
 import { appEvents, EVENTS } from '../services/eventEmitter';
-import { serializeLabels } from '../utils/labelUtils';
 import useOnForeground from './useOnForeground';
 
 // Enable LayoutAnimation on the classic Android renderer (a no-op on Fabric, where
@@ -101,14 +100,14 @@ export default function usePendingOperationSuggestions({
   // booking), so the card can show an inline error instead of failing silently.
   const [saveErrors, setSaveErrors] = useState({});
   // Per-item chosen { accountId, categoryId, toAccountId, labelOverride,
-  // labelDirty, secondaryLabels, secondaryLabelsDirty, skipCategoryBinding,
-  // skipCategoryLocked } keyed by pending id — the editable bindings behind the
-  // inline review cards. `labelDirty` marks a label the user has actually typed,
-  // so a best-effort learned-label seed is never mistaken for a deliberate value;
-  // `secondaryLabelsDirty` does the same for the secondary labels (held
-  // serialized, the label editor's own contract). `skipCategoryLocked` mirrors a
-  // merchant already flagged "don't bind to category": the box is then ticked and
-  // cannot be unticked from the card.
+  // labelDirty, secondaryLabels, skipCategoryBinding, skipCategoryLocked } keyed
+  // by pending id — the editable bindings behind the inline review cards.
+  // `labelDirty` marks a label the user has actually typed, so a best-effort
+  // learned-label seed is never mistaken for a deliberate value.
+  // `secondaryLabels` (held serialized, the label editor's own contract) belong
+  // to this operation only: nothing seeds them, and nothing learns them.
+  // `skipCategoryLocked` mirrors a merchant already flagged "don't bind to
+  // category": the box is then ticked and cannot be unticked from the card.
   const [choices, setChoices] = useState({});
   // Mirror of `choices` so reload/accept can read the latest values without
   // depending on `choices` (which would re-create them on every keystroke).
@@ -192,16 +191,12 @@ export default function usePendingOperationSuggestions({
         const rule = rules[i];
         const current = {
           label: existing?.labelOverride ?? '',
-          secondary: existing?.secondaryLabels ?? '',
           skipCategory: existing?.skipCategoryLocked ?? false,
         };
         // No merchant, or the lookup failed: keep the card as it stands.
         if (!item.merchant || rule === undefined) return current;
         return {
           label: existing?.labelDirty ? current.label : (rule?.labelOverride || ''),
-          secondary: existing?.secondaryLabelsDirty
-            ? current.secondary
-            : serializeLabels(rule?.secondaryLabels || []),
           skipCategory: !!rule?.skipCategory,
         };
       });
@@ -240,7 +235,6 @@ export default function usePendingOperationSuggestions({
         const next = { ...prev };
         list.forEach((item, i) => {
           const learned = ruleSeeds[i].label;
-          const learnedSecondary = ruleSeeds[i].secondary;
           const skipLocked = ruleSeeds[i].skipCategory;
           const resolvedAccountId = resolvedAccountIds[i];
           const existing = next[item.id];
@@ -251,8 +245,7 @@ export default function usePendingOperationSuggestions({
               toAccountId: item.type === 'transfer' ? atmId : null,
               labelOverride: learned,
               labelDirty: false,
-              secondaryLabels: learnedSecondary,
-              secondaryLabelsDirty: false,
+              secondaryLabels: '',
               ...seedSkipCategory(skipLocked),
             };
             return;
@@ -274,10 +267,6 @@ export default function usePendingOperationSuggestions({
           // sibling just renamed this shop); never touch a field being edited.
           if (!existing.labelDirty && learned !== existing.labelOverride) {
             updated = { ...updated, labelOverride: learned };
-          }
-          // The same for the secondary labels.
-          if (!existing.secondaryLabelsDirty && learnedSecondary !== (existing.secondaryLabels ?? '')) {
-            updated = { ...updated, secondaryLabels: learnedSecondary };
           }
           // Follow the merchant's "don't bind" flag if it changed under the card
           // (a sibling's save, or Settings lifting it).
@@ -301,7 +290,6 @@ export default function usePendingOperationSuggestions({
       // re-seeds it from the learned merchant label (and a cleared field stays
       // cleared instead of being refilled).
       if ('labelOverride' in patch) merged.labelDirty = true;
-      if ('secondaryLabels' in patch) merged.secondaryLabelsDirty = true;
       return { ...prev, [id]: merged };
     });
     // Editing a card clears its stale save-error banner.
@@ -433,24 +421,19 @@ export default function usePendingOperationSuggestions({
 
   /**
    * Book the suggestion with the bindings the user picked (or the seeded
-   * defaults): account, category, transfer target, custom label, secondary
-   * labels. No-ops while the choice is still invalid — the card's Save button
-   * gates on the same canSaveSuggestion check.
+   * defaults): account, category, transfer target, custom label, plus any
+   * secondary labels for this operation. No-ops while the choice is still
+   * invalid — the card's Save button gates on the same canSaveSuggestion check.
    *
    * `overrides` patches the choice for this save only, read synchronously: the
    * card passes a secondary label still being typed, which it flushed on Save and
    * which the state update it also fired has not yet reached `choicesRef` for.
-   * Overridden fields count as edited.
+   * An overridden name counts as typed, as it would through setChoice.
    */
   const accept = useCallback(async (item, overrides = null) => {
     const stored = choicesRef.current[item.id] || {};
     const choice = overrides
-      ? {
-        ...stored,
-        ...overrides,
-        ...('labelOverride' in overrides ? { labelDirty: true } : {}),
-        ...('secondaryLabels' in overrides ? { secondaryLabelsDirty: true } : {}),
-      }
+      ? { ...stored, ...overrides, ...('labelOverride' in overrides ? { labelDirty: true } : {}) }
       : stored;
     if (!canSaveSuggestion(item, choice)) return;
     if (savingRef.current.has(item.id)) return;
@@ -494,10 +477,10 @@ export default function usePendingOperationSuggestions({
       if (choice.labelDirty) {
         resolveChoices.labelOverride = choice.labelOverride ?? '';
       }
-      // Same rule for the secondary labels: only an edited set is sent (and
-      // learned); otherwise the resolver books the merchant's learned set.
-      if (choice.secondaryLabelsDirty) {
-        resolveChoices.secondaryLabels = choice.secondaryLabels ?? '';
+      // Secondary labels are this operation's alone (never learned), so there is
+      // no learned value to protect: whatever the card holds is booked.
+      if (choice.secondaryLabels) {
+        resolveChoices.secondaryLabels = choice.secondaryLabels;
       }
       if (choice.skipCategoryBinding) {
         resolveChoices.skipCategoryBinding = true;

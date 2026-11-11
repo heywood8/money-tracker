@@ -264,8 +264,9 @@ const isSchemaComplete = async (rawDb) => {
     if (!merchantRuleCols.some(c => c.name === 'skip_category')) return false;
 
     // Check notification_merchant_rules has secondary_labels column (migration
-    // 0032). Same reasoning: an install complete through 0031 would otherwise skip
-    // migrate(), and every rule insert (which names the column) would throw.
+    // 0032). Nothing reads the column any more (see app/db/schema.js), but 0032
+    // is in the journal: an install without it must still run migrate(), or the
+    // schema would not match SCHEMA_VERSION.
     if (!merchantRuleCols.some(c => c.name === 'secondary_labels')) return false;
 
     // Check pending_notifications has BOTH latitude and longitude (migration 0017).
@@ -795,7 +796,8 @@ const detectAppliedMigrations = async (rawDb) => {
       applied.push(31);
     }
 
-    // Migration 0032: Adds notification_merchant_rules.secondary_labels column.
+    // Migration 0032: Adds notification_merchant_rules.secondary_labels column
+    // (unused now, but marking it applied keeps migrate() from re-adding it).
     if (ruleCols.some(c => c.name === 'secondary_labels')) {
       applied.push(32);
     }

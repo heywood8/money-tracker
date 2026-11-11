@@ -11,22 +11,16 @@ import { useCategories } from '../contexts/CategoriesContext';
 import SimplePicker from './SimplePicker';
 import CategoryGridSelector from './CategoryGridSelector';
 import FormInput from './FormInput';
-import LabelInput from './operations/LabelInput';
-import useLabelSuggestions from '../hooks/useLabelSuggestions';
 import { getCategoryDisplayName } from '../utils/categoryUtils';
-import { hasLabel, parseLabels, serializeLabels } from '../utils/labelUtils';
 import { parseCardMasks, cardMaskLast4 } from '../utils/cardMask';
 import { BORDER_RADIUS, FONT_SIZE, HORIZONTAL_PADDING, SPACING } from '../styles/designTokens';
 import {
   getAllMerchantRules,
   clearMerchantRuleCategory,
   clearMerchantRuleLabel,
-  clearMerchantRuleLabels,
-  clearMerchantRuleSecondaryLabels,
   clearMerchantRuleSkipCategory,
   upsertMerchantRule,
   upsertMerchantLabel,
-  upsertMerchantSecondaryLabels,
   upsertMerchantSkipCategory,
 } from '../services/NotificationRulesDB';
 import * as AccountsDB from '../services/AccountsDB';
@@ -55,10 +49,7 @@ import EmptyState from './EmptyState';
  *      it, or pick a category to bind instead). A bound merchant can be switched
  *      to "don't bind" here too, from the top of its unfolded category grid.
  *   3. Name bindings: merchant -> custom-name overrides that relabel a shop's
- *      transactions (e.g. "ECOSENSE BYUZAND" -> "Ecosense"), with the secondary
- *      labels booked after that name ("Groceries"). The name is saved with its
- *      button; a secondary label is saved as soon as its chip is added or
- *      removed. The trash removes both.
+ *      transactions (e.g. "ECOSENSE BYUZAND" -> "Ecosense").
  *
  * Card bindings live on the account rows (AccountsDB); the ATM target is a
  * preference; category and name bindings share the notification_merchant_rules
@@ -251,81 +242,39 @@ export default function NotificationBindingsContentPanel({ active = true, bottom
 
   // ── Name bindings ──
   const labelBindings = useMemo(
-    () => rules.filter((r) => r.labelOverride || (r.secondaryLabels && r.secondaryLabels.length > 0)),
+    () => rules.filter((r) => r.labelOverride),
     [rules],
   );
-  // Labels already in use, for the secondary-label editors' autocomplete.
-  const labelSuggestions = useLabelSuggestions(null, labelBindings.length > 0);
 
-  // Every write to a name binding (its name, its secondary labels, the trash)
-  // goes through one queue, so they land in the order they were made: a label
-  // committed by the blur of a tap on the trash cannot be written after the row
-  // it belongs to was removed (which would bring the binding back). The list is
-  // reloaded once the queue drains, not after each write, so a reload never
-  // replaces chips that are still waiting for their own write.
-  const ruleWriteRef = useRef(Promise.resolve());
-  const pendingRuleWritesRef = useRef(0);
-  const enqueueRuleWrite = useCallback((write) => {
-    pendingRuleWritesRef.current += 1;
-    const run = ruleWriteRef.current
-      .then(write)
-      .catch((error) => {
-        console.warn('[bindings] Failed to save a name binding:', error);
-      })
-      .then(() => {
-        pendingRuleWritesRef.current -= 1;
-        if (pendingRuleWritesRef.current > 0 || !mountedRef.current) return null;
-        return reload();
-      })
-      .catch(() => {});
-    ruleWriteRef.current = run;
-    return run;
-  }, [reload]);
+  const handleSaveLabel = useCallback(async (rule) => {
+    const text = (labelDrafts[rule.id] ?? '').trim();
+    // A cleared field removes the binding rather than storing an empty override.
+    if (!text) {
+      await clearMerchantRuleLabel(rule.id);
+      setLabelDrafts((prev) => {
+        const next = { ...prev };
+        delete next[rule.id];
+        return next;
+      });
+    } else {
+      await upsertMerchantLabel(rule.merchant, text, rule.packageName);
+    }
+    await reload();
+  }, [labelDrafts, reload]);
 
-  const dropLabelDraft = useCallback((id) => {
+  const handleRemoveLabel = useCallback(async (rule) => {
+    await clearMerchantRuleLabel(rule.id);
     setLabelDrafts((prev) => {
-      if (!(id in prev)) return prev;
       const next = { ...prev };
-      delete next[id];
+      delete next[rule.id];
       return next;
     });
-  }, []);
-
-  const handleSaveLabel = useCallback((rule) => {
-    const text = (labelDrafts[rule.id] ?? '').trim();
-    return enqueueRuleWrite(async () => {
-      // A cleared field removes the name rather than storing an empty override;
-      // the binding's secondary labels stay.
-      if (!text) {
-        await clearMerchantRuleLabel(rule.id);
-        dropLabelDraft(rule.id);
-      } else {
-        await upsertMerchantLabel(rule.merchant, text, rule.packageName);
-      }
-    });
-  }, [labelDrafts, enqueueRuleWrite, dropLabelDraft]);
-
-  // The trash on a name binding drops its secondary labels too: both are edited
-  // on the one card, and the card would otherwise outlive its own removal.
-  const handleRemoveLabel = useCallback((rule) => enqueueRuleWrite(async () => {
-    await clearMerchantRuleLabels(rule.id);
-    dropLabelDraft(rule.id);
-  }), [enqueueRuleWrite, dropLabelDraft]);
+    await reload();
+  }, [reload]);
 
   const setLabelDraft = useCallback((id, value) => {
     setLabelDrafts((prev) => ({ ...prev, [id]: value }));
   }, []);
-
-  // Secondary labels are saved on every chip change. The rule is updated in place
-  // at once, so the chips do not wait on the write and the reload behind it.
-  const handleChangeSecondaryLabels = useCallback((rule, value) => {
-    const labels = parseLabels(value);
-    if (serializeLabels(labels) === serializeLabels(rule.secondaryLabels || [])) return;
-    setRules((prev) => prev.map((r) => (r.id === rule.id ? { ...r, secondaryLabels: labels } : r)));
-    enqueueRuleWrite(() => (labels.length > 0
-      ? upsertMerchantSecondaryLabels(rule.merchant, labels, rule.packageName)
-      : clearMerchantRuleSecondaryLabels(rule.id)));
-  }, [enqueueRuleWrite]);
 
   // ── Search ──
   const isSearching = query.trim().length > 0;
@@ -368,7 +317,7 @@ export default function NotificationBindingsContentPanel({ active = true, bottom
   );
   const visibleLabels = useMemo(
     () => (isSearching
-      ? labelBindings.filter((r) => matches(r.merchant, r.labelOverride, ...(r.secondaryLabels || [])))
+      ? labelBindings.filter((r) => matches(r.merchant, r.labelOverride))
       : labelBindings),
     [labelBindings, matches, isSearching],
   );
@@ -731,11 +680,10 @@ export default function NotificationBindingsContentPanel({ active = true, bottom
       {/* ── Name bindings ── */}
       {(!isSearching ? labelBindings.length > 0 : visibleLabels.length > 0) && (
         <>
-          {renderSectionTitle('notification_bindings_labels', 'Names and labels', labelBindings.length)}
+          {renderSectionTitle('notification_bindings_labels', 'Name bindings', labelBindings.length)}
           {!isSearching && (
             <Text style={[styles.sectionHint, { color: colors.mutedText }]}>
-              {t('notification_bindings_labels_hint')
-                || 'Custom names shown instead of the raw shop name, and the labels added after them'}
+              {t('notification_bindings_labels_hint') || 'Custom names shown instead of the raw shop name'}
             </Text>
           )}
 
@@ -781,20 +729,6 @@ export default function NotificationBindingsContentPanel({ active = true, bottom
                     <Text style={styles.saveButtonText}>{t('save') || 'Save'}</Text>
                   </TouchableOpacity>
                 </View>
-                <LabelInput
-                  value={serializeLabels(rule.secondaryLabels || [])}
-                  onChangeText={(v) => handleChangeSecondaryLabels(rule, v)}
-                  // The name is booked first anyway; offering it again is noise.
-                  suggestions={labelSuggestions.filter(
-                    (label) => !hasLabel([rule.labelOverride || ''], label),
-                  )}
-                  placeholder={t('bank_notifications_secondary_labels') || 'Secondary labels'}
-                  colors={colors}
-                  t={t}
-                  containerStyle={styles.secondaryLabels}
-                  suggestionsStyle={styles.secondaryLabelSuggestions}
-                  testID={`binding-secondary-labels-${rule.id}`}
-                />
               </View>
             );
           })}
@@ -933,13 +867,6 @@ const styles = StyleSheet.create({
   },
   searchWrap: {
     marginTop: SPACING.md,
-  },
-  secondaryLabelSuggestions: {
-    marginBottom: 0,
-  },
-  secondaryLabels: {
-    marginBottom: 0,
-    marginTop: SPACING.sm,
   },
   sectionHeaderRow: {
     alignItems: 'center',

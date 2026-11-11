@@ -2815,27 +2815,6 @@ line-cat,plan-1,Groceries,400.00,"${NON_ASCII_COMMENT}",cat-1,,0`;
       expect(insertedValue(byMerchant('Rewe'), 'skip_category')).toBe(0);
     });
 
-    // Migration 0032's secondary labels live on the rule row too; a restore that
-    // drops them books the merchant's next operations under its name alone.
-    it('CSV round trip keeps a rule’s secondary labels, and reads an old backup as having none', async () => {
-      const base = {
-        package_name: 'com.bank', label_override: 'Ecosense', last_matched_at: null,
-        created_at: '2024-01-01T00:00:00.000Z', updated_at: '2024-01-01T00:00:00.000Z',
-      };
-      const tagged = { ...base, id: 'rule-tags', merchant: 'ECOSENSE', category_id: 'cat-1', secondary_labels: 'Groceries | Weekly' };
-      // A backup taken before the column existed carries no such field at all.
-      const legacy = { ...base, id: 'rule-old', merchant: 'Rewe', category_id: 'cat-1' };
-
-      const { dbInstance } = await restoreCSV(backupWith({
-        notification_merchant_rules: [tagged, legacy],
-      }));
-
-      const inserts = insertsInto(dbInstance, 'notification_merchant_rules');
-      const byMerchant = (m) => inserts.find((c) => insertedValue(c, 'merchant') === m);
-      expect(insertedValue(byMerchant('ECOSENSE'), 'secondary_labels')).toBe('Groceries | Weekly');
-      expect(insertedValue(byMerchant('Rewe'), 'secondary_labels')).toBeNull();
-    });
-
     // A live database whose notification tables hold data the backup cannot
     // carry — the "Import from Google Sheets" case.
     const makeDbInstanceWithLiveNotificationData = (rules, templates) => {

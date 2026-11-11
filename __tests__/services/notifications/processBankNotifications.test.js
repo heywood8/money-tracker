@@ -141,11 +141,13 @@ describe('processBankNotifications', () => {
     expect(NotificationAccess.getRecentNotifications).not.toHaveBeenCalled();
   });
 
-  it('auto-creates with the merchant’s secondary labels after its name', async () => {
+  it('auto-creates with the name alone, ignoring labels a 0.312.0 rule still carries', async () => {
     NotificationAccess.getRecentNotifications.mockResolvedValue([PURCHASE]);
     AccountsDB.getAccountByCardMask.mockResolvedValue({ id: 7, currency: 'AMD' });
+    // Secondary labels are never part of a binding; a rule written while they
+    // were must not bring them back onto new operations.
     NotificationRulesDB.getMerchantRule.mockResolvedValue({
-      categoryId: 'cat-food', labelOverride: 'Groceries', secondaryLabels: ['Weekly', 'Family'],
+      categoryId: 'cat-food', labelOverride: 'Groceries', secondaryLabels: ['Weekly'],
     });
     PreferencesDB.getJsonPreference.mockImplementation((key) => prefs([], [PKG])(key));
 
@@ -153,22 +155,8 @@ describe('processBankNotifications', () => {
 
     expect(summary).toMatchObject({ created: 1, pending: 0 });
     expect(OperationsDB.createOperation).toHaveBeenCalledWith(
-      expect.objectContaining({ description: 'Groceries | Weekly | Family' }),
+      expect.objectContaining({ description: 'Groceries' }),
     );
-  });
-
-  it('does not auto-create on secondary labels alone, with no name bound', async () => {
-    NotificationAccess.getRecentNotifications.mockResolvedValue([PURCHASE]);
-    AccountsDB.getAccountByCardMask.mockResolvedValue({ id: 7, currency: 'AMD' });
-    NotificationRulesDB.getMerchantRule.mockResolvedValue({
-      categoryId: 'cat-food', labelOverride: null, secondaryLabels: ['Weekly'],
-    });
-    PreferencesDB.getJsonPreference.mockImplementation((key) => prefs([], [PKG])(key));
-
-    const summary = await pipeline.processBankNotifications();
-
-    expect(summary).toMatchObject({ created: 0, pending: 1 });
-    expect(OperationsDB.createOperation).not.toHaveBeenCalled();
   });
 
   it('auto-creates an operation when fully matched and source is trusted', async () => {
@@ -1091,91 +1079,57 @@ describe('processBankNotifications', () => {
       expect(NotificationRulesDB.upsertMerchantLabel).not.toHaveBeenCalled();
     });
 
-    describe('secondary labels', () => {
+    describe('secondary labels (this operation only)', () => {
       const ecosense = { ...pending, merchant: 'ECOSENSE BYUZAND' };
+      // Every NotificationRulesDB write the resolver could make. Secondary labels
+      // must reach none of them.
+      const ruleWrites = () => [
+        ...NotificationRulesDB.upsertMerchantLabel.mock.calls,
+        ...NotificationRulesDB.upsertMerchantRule.mock.calls,
+        ...NotificationRulesDB.upsertMerchantSkipCategory.mock.calls,
+      ];
+      const mentions = (calls, text) => JSON.stringify(calls).includes(text);
 
-      // clearAllMocks keeps implementations, so the ones set here would leak
-      // into every later test of the file.
-      afterEach(() => {
-        NotificationRulesDB.getSecondaryLabelsForMerchant.mockReset();
-        NotificationRulesDB.upsertMerchantSecondaryLabels.mockReset();
-        NotificationRulesDB.upsertMerchantRule.mockReset();
-      });
-
-      it('books typed secondary labels after the name and learns them', async () => {
+      it('books them after the learned name and learns nothing from them', async () => {
         PendingNotificationsDB.getPendingNotificationById.mockResolvedValue(ecosense);
         NotificationRulesDB.getLabelForMerchant.mockResolvedValue('Ecosense');
-        NotificationRulesDB.getSecondaryLabelsForMerchant.mockResolvedValue([]);
 
         await pipeline.resolvePendingNotification('p1', {
-          accountId: 7, categoryId: 'cat-food', secondaryLabels: 'Groceries | Weekly',
+          accountId: 7, categoryId: 'cat-food', secondaryLabels: 'Shoes | Gift',
         });
 
         expect(OperationsDB.createOperation).toHaveBeenCalledWith(
-          expect.objectContaining({ description: 'Ecosense | Groceries | Weekly' }),
+          expect.objectContaining({ description: 'Ecosense | Shoes | Gift' }),
         );
-        expect(NotificationRulesDB.upsertMerchantSecondaryLabels).toHaveBeenCalledWith(
-          'ECOSENSE BYUZAND', 'Groceries | Weekly', PKG,
-        );
+        expect(NotificationRulesDB.upsertMerchantLabel).not.toHaveBeenCalled();
+        expect(mentions(ruleWrites(), 'Shoes')).toBe(false);
       });
 
-      it('learns them after the category, so a new source still gets its name bound', async () => {
+      it('binds a new source under its name only', async () => {
         PendingNotificationsDB.getPendingNotificationById.mockResolvedValue(pending);
-        const order = [];
-        NotificationRulesDB.upsertMerchantRule.mockImplementation(async () => { order.push('rule'); });
-        NotificationRulesDB.upsertMerchantSecondaryLabels.mockImplementation(async () => { order.push('secondary'); });
 
         await pipeline.resolvePendingNotification('p1', {
           accountId: 7, categoryId: 'cat-food', secondaryLabels: ['Rent'],
         });
 
-        expect(NotificationRulesDB.upsertMerchantRule).toHaveBeenCalledWith(
-          'NAREK MEHRABYAN', 'cat-food', PKG, { labelIfNew: 'Narek Mehrabyan' },
-        );
-        expect(order).toEqual(['rule', 'secondary']);
         expect(OperationsDB.createOperation).toHaveBeenCalledWith(
           expect.objectContaining({ description: 'Narek Mehrabyan | Rent' }),
         );
+        expect(NotificationRulesDB.upsertMerchantRule).toHaveBeenCalledWith(
+          'NAREK MEHRABYAN', 'cat-food', PKG, { labelIfNew: 'Narek Mehrabyan' },
+        );
+        expect(mentions(ruleWrites(), 'Rent')).toBe(false);
       });
 
-      it('books the learned secondary labels when none are sent, writing nothing', async () => {
+      it('books the name alone when none are sent, even if a 0.312.0 rule carries some', async () => {
         PendingNotificationsDB.getPendingNotificationById.mockResolvedValue(ecosense);
         NotificationRulesDB.getLabelForMerchant.mockResolvedValue('Ecosense');
-        NotificationRulesDB.getSecondaryLabelsForMerchant.mockResolvedValue(['Groceries']);
+        NotificationRulesDB.getMerchantRule.mockResolvedValue({ labelOverride: 'Ecosense', secondaryLabels: ['Weekly'] });
 
         await pipeline.resolvePendingNotification('p1', { accountId: 7, categoryId: 'cat-food' });
 
         expect(OperationsDB.createOperation).toHaveBeenCalledWith(
-          expect.objectContaining({ description: 'Ecosense | Groceries' }),
-        );
-        expect(NotificationRulesDB.upsertMerchantSecondaryLabels).not.toHaveBeenCalled();
-      });
-
-      it('does not rewrite an unchanged set', async () => {
-        PendingNotificationsDB.getPendingNotificationById.mockResolvedValue(ecosense);
-        NotificationRulesDB.getSecondaryLabelsForMerchant.mockResolvedValue(['Groceries', 'Weekly']);
-
-        await pipeline.resolvePendingNotification('p1', {
-          accountId: 7, categoryId: 'cat-food', secondaryLabels: 'Groceries | Weekly',
-        });
-
-        expect(NotificationRulesDB.upsertMerchantSecondaryLabels).not.toHaveBeenCalled();
-      });
-
-      it('clears the learned set when an emptied one is sent', async () => {
-        PendingNotificationsDB.getPendingNotificationById.mockResolvedValue(ecosense);
-        NotificationRulesDB.getLabelForMerchant.mockResolvedValue('Ecosense');
-        NotificationRulesDB.getSecondaryLabelsForMerchant.mockResolvedValue(['Groceries']);
-
-        await pipeline.resolvePendingNotification('p1', {
-          accountId: 7, categoryId: 'cat-food', secondaryLabels: '',
-        });
-
-        expect(OperationsDB.createOperation).toHaveBeenCalledWith(
           expect.objectContaining({ description: 'Ecosense' }),
-        );
-        expect(NotificationRulesDB.upsertMerchantSecondaryLabels).toHaveBeenCalledWith(
-          'ECOSENSE BYUZAND', '', PKG,
         );
       });
 
@@ -1192,7 +1146,23 @@ describe('processBankNotifications', () => {
         );
       });
 
-      it('learns them for a kind that never learns a category (C2C)', async () => {
+      it('books them on a "don’t bind to category" save, leaving the binding as it was', async () => {
+        PendingNotificationsDB.getPendingNotificationById.mockResolvedValue(pending);
+
+        await pipeline.resolvePendingNotification('p1', {
+          accountId: 7, categoryId: 'cat-clothes', skipCategoryBinding: true, secondaryLabels: 'Shoes',
+        });
+
+        expect(OperationsDB.createOperation).toHaveBeenCalledWith(
+          expect.objectContaining({ description: 'Narek Mehrabyan | Shoes', categoryId: 'cat-clothes' }),
+        );
+        expect(NotificationRulesDB.upsertMerchantSkipCategory).toHaveBeenCalledWith(
+          'NAREK MEHRABYAN', PKG, { labelIfNew: 'Narek Mehrabyan' },
+        );
+        expect(mentions(ruleWrites(), 'Shoes')).toBe(false);
+      });
+
+      it('books them on a C2C transfer, which learns no rule at all', async () => {
         PendingNotificationsDB.getPendingNotificationById.mockResolvedValue({
           ...pending, kind: 'C2C', merchant: 'N. DORVANYAN',
         });
@@ -1201,48 +1171,10 @@ describe('processBankNotifications', () => {
           accountId: 7, categoryId: 'cat-gifts', secondaryLabels: 'Rent',
         });
 
-        expect(NotificationRulesDB.upsertMerchantRule).not.toHaveBeenCalled();
-        expect(NotificationRulesDB.upsertMerchantSecondaryLabels).toHaveBeenCalledWith(
-          'N. DORVANYAN', 'Rent', PKG,
-        );
-      });
-
-      it('learns them for a "don’t bind to category" save', async () => {
-        PendingNotificationsDB.getPendingNotificationById.mockResolvedValue(pending);
-
-        await pipeline.resolvePendingNotification('p1', {
-          accountId: 7, categoryId: 'cat-food', skipCategoryBinding: true, secondaryLabels: 'Marketplace',
-        });
-
-        expect(NotificationRulesDB.upsertMerchantSkipCategory).toHaveBeenCalled();
-        expect(NotificationRulesDB.upsertMerchantSecondaryLabels).toHaveBeenCalledWith(
-          'NAREK MEHRABYAN', 'Marketplace', PKG,
-        );
-      });
-
-      it('still books when the learned set cannot be read, without wiping it', async () => {
-        PendingNotificationsDB.getPendingNotificationById.mockResolvedValue(ecosense);
-        NotificationRulesDB.getLabelForMerchant.mockResolvedValue('Ecosense');
-        NotificationRulesDB.getSecondaryLabelsForMerchant.mockRejectedValue(new Error('locked'));
-
-        await pipeline.resolvePendingNotification('p1', { accountId: 7, categoryId: 'cat-food' });
-
         expect(OperationsDB.createOperation).toHaveBeenCalledWith(
-          expect.objectContaining({ description: 'Ecosense' }),
+          expect.objectContaining({ description: 'N. Dorvanyan | Rent' }),
         );
-        expect(NotificationRulesDB.upsertMerchantSecondaryLabels).not.toHaveBeenCalled();
-      });
-
-      it('saves the booking even when learning them fails', async () => {
-        PendingNotificationsDB.getPendingNotificationById.mockResolvedValue(ecosense);
-        NotificationRulesDB.upsertMerchantSecondaryLabels.mockRejectedValue(new Error('disk full'));
-
-        const op = await pipeline.resolvePendingNotification('p1', {
-          accountId: 7, categoryId: 'cat-food', secondaryLabels: 'Groceries',
-        });
-
-        expect(op).toEqual({ id: 1 });
-        expect(PendingNotificationsDB.deletePendingNotification).toHaveBeenCalledWith('p1');
+        expect(ruleWrites()).toEqual([]);
       });
     });
 

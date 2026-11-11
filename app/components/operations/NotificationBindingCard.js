@@ -37,9 +37,9 @@ const formatSuggestionDate = (isoDate) => {
 /**
  * Full inline binding panel for one pending bank notification — the front card
  * of the deck stacked over the quick-add form. Replicates the review card from
- * Settings → Notification processing: custom-name input (the primary label),
- * secondary labels (expense/income only: a transfer has no merchant binding to
- * keep them on), account picker, then a category grid (expense/income) or a
+ * Settings → Notification processing: custom-name input (the primary label,
+ * remembered for the merchant), secondary labels for this operation only
+ * (expense/income), account picker, then a category grid (expense/income) or a
  * target-account picker (ATM transfers), with Dismiss/Save actions pinned to the
  * card's bottom edge.
  *
@@ -89,9 +89,10 @@ const NotificationBindingCard = ({
     [skipChecked, sourceCategoryIds, accountTopCategoryIds],
   );
 
-  // Secondary labels: the labels booked after the name, learned for the merchant
-  // like the name is. Suggestions are labels already in use (ranked by the
-  // chosen category), minus the name itself, which is booked first anyway.
+  // Secondary labels: booked after the name on this operation only, never
+  // remembered for the merchant (they describe this purchase, not the shop).
+  // Suggestions are labels already in use (ranked by the chosen category), minus
+  // the name itself, which is booked first anyway.
   const secondaryLabelsRef = useRef(null);
   const primaryLabel = (choice.labelOverride ?? '').trim() || normalizeMerchantLabel(item.merchant) || '';
   const rawLabelSuggestions = useLabelSuggestions(choice.categoryId || null, !isTransfer);

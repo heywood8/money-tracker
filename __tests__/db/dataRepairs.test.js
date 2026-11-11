@@ -1,7 +1,9 @@
 /**
  * One-off repair of operations.date values that carry a timestamp (#773).
  */
-import { normalizeOperationDates, renameMotorcycleIcon, clearStoredLocations } from '../../drizzle/dataRepairs';
+import {
+  normalizeOperationDates, renameMotorcycleIcon, clearStoredLocations, clearSecondaryLabels,
+} from '../../drizzle/dataRepairs';
 
 jest.mock('expo-file-system/legacy', () => ({
   cacheDirectory: 'file:///cache/',
@@ -145,5 +147,43 @@ describe('clearStoredLocations', () => {
     const db = { runAsync: jest.fn(async () => ({ changes: 0 })) };
     await clearStoredLocations(db);
     expect(db.runAsync.mock.calls[3][0]).toContain(`'post_migration_${key}_completed'`);
+  });
+});
+
+// Penny 0.312.0 stored a review card's secondary labels on the merchant rule.
+// They belong to one operation now, so the stored ones are cleared, along with
+// the rules 0.312.0 created for them alone.
+describe('clearSecondaryLabels', () => {
+  it('drops rules that held only secondary labels, empties the column and records completion', async () => {
+    const db = { runAsync: jest.fn(async () => ({ changes: 1 })) };
+
+    await clearSecondaryLabels(db);
+
+    const sql = db.runAsync.mock.calls.map(([statement]) => statement.replace(/\s+/g, ' '));
+    expect(sql[0]).toContain('DELETE FROM notification_merchant_rules WHERE secondary_labels IS NOT NULL');
+    // Anything else the rule binds keeps it alive.
+    expect(sql[0]).toContain("(label_override IS NULL OR label_override = '')");
+    expect(sql[0]).toContain('category_id IS NULL');
+    expect(sql[0]).toContain('(skip_category IS NULL OR skip_category = 0)');
+    expect(sql[1]).toBe('UPDATE notification_merchant_rules SET secondary_labels = NULL WHERE secondary_labels IS NOT NULL');
+    expect(sql[2]).toContain('post_migration_clearSecondaryLabels_completed');
+  });
+
+  it('leaves the completion flag unset when a statement fails, so it is retried', async () => {
+    const db = { runAsync: jest.fn(async () => { throw new Error('locked'); }) };
+    const errorSpy = jest.spyOn(console, 'error').mockImplementation(() => {});
+
+    await clearSecondaryLabels(db);
+
+    expect(db.runAsync).toHaveBeenCalledTimes(1);
+    errorSpy.mockRestore();
+  });
+
+  it('is registered with the migration that added the column', () => {
+    // The setup file stubs the migrations module; this reads the real one.
+    const migrations = jest.requireActual('../../drizzle/migrations').default;
+    expect(migrations.postMigrationHandlers.clearSecondaryLabels).toBe(clearSecondaryLabels);
+    expect(migrations.postMigrationTags.clearSecondaryLabels).toBe('0032_merchant_rule_secondary_labels');
+    expect(migrations.journal.entries.some(entry => entry.tag === '0032_merchant_rule_secondary_labels')).toBe(true);
   });
 });
