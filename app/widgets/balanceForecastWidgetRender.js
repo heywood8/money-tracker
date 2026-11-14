@@ -10,6 +10,7 @@ import {
 } from '../utils/spendingPrediction';
 import { getWidgetConfig, normalizeColumns, resolveForecastAccounts } from './balanceForecastWidgetStore';
 import { BalanceForecastWidget } from './BalanceForecastWidget';
+import { readSystemPalette } from './widgetColors';
 import { BALANCE_FORECAST_WIDGET } from './widgetConstants';
 
 const sameList = (a, b) => (a === b) || (
@@ -109,7 +110,7 @@ export const loadBalanceForecastModel = async (widgetId, { now = new Date(), rec
 
 /**
  * The forecast widget in both system themes; the launcher shows the one that
- * matches.
+ * matches. Both in the system palette where there is one (widgetColors).
  *
  * @param {{widgetId: number, width: number, height: number}} widgetInfo
  * @param {Object} [options] - As loadBalanceForecastModel's
@@ -118,9 +119,10 @@ export const loadBalanceForecastModel = async (widgetId, { now = new Date(), rec
 export const renderBalanceForecastWidget = async (widgetInfo, options) => {
   const model = await loadBalanceForecastModel(widgetInfo.widgetId, options);
   const size = { width: widgetInfo.width, height: widgetInfo.height, fontScale: widgetInfo.screenInfo?.fontScale };
+  const palette = readSystemPalette();
   return {
-    light: <BalanceForecastWidget model={model} {...size} theme="light" />,
-    dark: <BalanceForecastWidget model={model} {...size} theme="dark" />,
+    light: <BalanceForecastWidget model={model} {...size} palette={palette} theme="light" />,
+    dark: <BalanceForecastWidget model={model} {...size} palette={palette} theme="dark" />,
   };
 };
 

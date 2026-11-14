@@ -14,6 +14,7 @@ import {
   stepWidgetWindow,
 } from './exchangeRateWidgetStore';
 import { ExchangeRatePairWidget, ExchangeRateWidget } from './ExchangeRateWidget';
+import { readSystemPalette } from './widgetColors';
 import { EXCHANGE_RATE_PAIR_WIDGET, EXCHANGE_RATE_WIDGETS } from './widgetConstants';
 
 const sameChart = (a, b) => (a === b) || (
@@ -149,6 +150,7 @@ const readFontScale = () => {
 
 /**
  * A widget in both system themes; the launcher shows the one that matches.
+ * Both in the system palette where there is one (widgetColors).
  * Serves both exchange-rate widgets, told apart by `widgetName`.
  *
  * @param {{widgetName: string, widgetId: number, width: number, height: number}} widgetInfo
@@ -160,15 +162,18 @@ export const renderExchangeRateWidget = async (widgetInfo, options = {}) => {
   const size = { width: widgetInfo.width, height: widgetInfo.height, fontScale: readFontScale() };
   if (widgetInfo.widgetName === EXCHANGE_RATE_PAIR_WIDGET) {
     const models = await loadExchangeRatePairModels(widgetInfo.widgetId, options);
+    // Read once the rates are in: a fetch can take a while, the palette is the one of the moment.
+    const palette = readSystemPalette();
     return {
-      light: <ExchangeRatePairWidget models={models} {...size} theme="light" />,
-      dark: <ExchangeRatePairWidget models={models} {...size} theme="dark" />,
+      light: <ExchangeRatePairWidget models={models} {...size} palette={palette} theme="light" />,
+      dark: <ExchangeRatePairWidget models={models} {...size} palette={palette} theme="dark" />,
     };
   }
   const model = await loadExchangeRateWidgetModel(widgetInfo.widgetId, options);
+  const palette = readSystemPalette();
   return {
-    light: <ExchangeRateWidget model={model} {...size} theme="light" />,
-    dark: <ExchangeRateWidget model={model} {...size} theme="dark" />,
+    light: <ExchangeRateWidget model={model} {...size} palette={palette} theme="light" />,
+    dark: <ExchangeRateWidget model={model} {...size} palette={palette} theme="dark" />,
   };
 };
 
