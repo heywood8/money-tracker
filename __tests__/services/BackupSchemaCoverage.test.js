@@ -103,12 +103,19 @@ const TABLES_NOT_BACKED_UP = new Set([
  * repair nulled every value, and nothing reads them. A backup that still carries
  * them restores without them.
  *
+ * `notification_merchant_rules.secondary_labels` (migration 0032) held a review
+ * card's secondary labels as part of the merchant's binding in 0.312.0 only. They
+ * are now booked on the one operation and never learned, so nothing reads the
+ * column; a backup that still carries it restores without it, which is exactly
+ * what the binding means now.
+ *
  * Note this exclusion is CSV-only: the JSON export is a `SELECT *` and has no
  * column list to fall out of sync with.
  */
 const COLUMNS_NOT_IN_CSV = {
   accounts: ['show_in_main_menu'],
   operations: ['latitude', 'longitude'],
+  notification_merchant_rules: ['secondary_labels'],
 };
 
 /**
@@ -117,13 +124,15 @@ const COLUMNS_NOT_IN_CSV = {
  * `operations.id` and `accounts_balance_history.id` are autoincrement surrogate
  * keys: the restore lets SQLite mint fresh ones and remaps the references,
  * which is what lets a backup carrying UUID account ids import at all.
- * `accounts.show_in_main_menu` and `operations.latitude` / `longitude` are the
- * legacy columns described above.
+ * `accounts.show_in_main_menu`, `operations.latitude` / `longitude` and
+ * `notification_merchant_rules.secondary_labels` are the legacy columns
+ * described above.
  */
 const RESTORE_INSERT_OMISSIONS = {
   operations: ['id', 'latitude', 'longitude'],
   accounts_balance_history: ['id'],
   accounts: ['show_in_main_menu'],
+  notification_merchant_rules: ['secondary_labels'],
 };
 
 /**

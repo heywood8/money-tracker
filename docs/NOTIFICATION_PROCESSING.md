@@ -258,23 +258,20 @@ These were chosen up front and drive the architecture:
    a category (C2C, DEBIT ACCOUNT) show the box ticked and locked too, with their
    own explanation.
 
-   **Secondary labels.** A binding's name is its primary label; the review card
-   also takes secondary labels (a chip editor under the name, suggesting labels
-   already in use), stored on the same rule as `secondary_labels` (migration
-   0032, `" | "`-joined like an operation's description). Every operation booked
-   from the merchant, auto-created or saved from review, carries the name first
-   and these after it (`prependPrimaryLabel` in `app/utils/labelUtils.js`, which
-   also drops a secondary label equal to the name). They follow the name's rules:
-   learned for every kind, C2C and "don't bind" merchants included (with no
-   category of their own, labels are what tells those operations apart); a review
-   save sends them only when the card's set was edited, so a seed that failed to
-   load is never saved over the learned set; and they are learned after the
-   category, so a source bound for the first time still gets its suggested name.
-   They play no part in matching: a merchant with labels but no name still waits
-   for review. Transfers (ATM) show no editor, having no merchant binding to keep
-   them on. Settings → Bindings edits them on the name binding's card ("Names and
-   labels"), saving each chip as it is added or removed; that card's trash removes
-   the name and the labels together.
+   **Secondary labels.** A binding's name is its primary label, remembered for
+   the merchant. The review card (expense/income) also takes secondary labels: a
+   chip editor under the name, suggesting labels already in use. They are booked
+   after the name on **that operation only** (`prependPrimaryLabel` in
+   `app/utils/labelUtils.js`, which also drops one equal to the name) and are
+   never learned: they describe the purchase, not the shop, so the merchant's
+   next card starts empty and an auto-created operation carries the name alone.
+   This is what "don't bind to category" merchants (a marketplace, a person) need:
+   each of their notifications is reviewed by hand anyway, and the labels say what
+   that one was. Save commits a label still being typed. Penny 0.312.0 briefly
+   stored them on the rule (`secondary_labels`, migration 0032). Nothing reads
+   that column now: the `clearSecondaryLabels` repair (`drizzle/dataRepairs.js`)
+   empties it once and deletes the rules 0.312.0 created for the labels alone,
+   and backups leave it out.
 
 ## Architecture
 
@@ -370,7 +367,7 @@ Covered by `__tests__/services/notifications/parseBankNotification.test.js`
   | `categoryId`| text FK | → categories.id                         |
   | `labelOverride` | text NULL | the merchant's name, its primary label (0011) |
   | `skipCategory` | integer | 1 = "don't bind to category" (0031)  |
-  | `secondaryLabels` | text NULL | labels booked after the name, `" \| "`-joined (0032) |
+  | `secondaryLabels` | text NULL | unused, always NULL (0032; see `clearSecondaryLabels`) |
   | `createdAt` / `updatedAt` | text | ISO timestamps             |
 - `pending_notifications` — the review queue (parsed descriptor + best-effort
   account/category suggestions).
@@ -751,8 +748,9 @@ createOperation({
   accountId: resolvedAccountId,   // from cardMask
   categoryId: resolvedCategoryId, // from merchant rule, or null
   date: descriptor.date,          // '2026-06-28'
-  // The learned name (or the tidied merchant), then the rule's secondary labels.
-  description: prependPrimaryLabel(name, rule.secondaryLabels),
+  // The learned name (or the tidied merchant). A review save adds the card's
+  // secondary labels after it, for that operation only.
+  description: serializeLabels([name]),
 });
 ```
 

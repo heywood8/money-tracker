@@ -124,3 +124,49 @@ export const clearStoredLocations = async (db) => {
     console.error('Failed to clear stored locations:', error);
   }
 };
+
+/**
+ * Clear the secondary labels Penny 0.312.0 stored on merchant rules.
+ *
+ * 0.312.0 remembered a review card's secondary labels as part of the merchant's
+ * binding (`notification_merchant_rules.secondary_labels`, migration 0032) and
+ * booked them on every later operation from that merchant. They now belong to
+ * the one operation they were typed for and are never part of a binding, so
+ * nothing reads the column; the values are cleared rather than left behind in
+ * the table and in every JSON backup (a `SELECT *`). The column stays (dropping
+ * it would undo 0032, whose marker it is), always NULL from here on.
+ *
+ * A rule 0.312.0 created for the labels alone (a C2C payee, or a purchase saved
+ * with no category) holds nothing else once they are gone. Such a row is deleted:
+ * it is invisible in Settings → Bindings, so it could not be removed by hand, and
+ * while it exists the merchant's first real binding updates it instead of
+ * inserting, which skips the name a new binding learns (`labelIfNew` applies to
+ * an insert only). Only rows that held secondary labels are considered, so no
+ * other rule is touched.
+ *
+ * Idempotent: a second run finds nothing to clear.
+ *
+ * @param {Object} db - expo-sqlite database
+ * @returns {Promise<void>}
+ */
+export const clearSecondaryLabels = async (db) => {
+  try {
+    await db.runAsync(
+      `DELETE FROM notification_merchant_rules
+         WHERE secondary_labels IS NOT NULL
+           AND (label_override IS NULL OR label_override = '')
+           AND category_id IS NULL
+           AND (skip_category IS NULL OR skip_category = 0)`,
+    );
+    await db.runAsync(
+      'UPDATE notification_merchant_rules SET secondary_labels = NULL WHERE secondary_labels IS NOT NULL',
+    );
+    await db.runAsync(
+      "INSERT OR REPLACE INTO app_metadata (key, value, updated_at) VALUES ('post_migration_clearSecondaryLabels_completed', 'true', ?)",
+      [new Date().toISOString()],
+    );
+  } catch (error) {
+    // Not fatal: the flag stays unset and the repair is retried on next launch.
+    console.error('Failed to clear merchant rule secondary labels:', error);
+  }
+};

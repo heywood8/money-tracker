@@ -108,20 +108,6 @@ const labelFromRule = (descriptor, rule) => {
 };
 
 /**
- * The secondary labels bound to the descriptor's merchant, booked after its name.
- * Like the name they apply to every kind: they are how a merchant that never
- * carries a category (C2C, "don't bind") is still told apart.
- *
- * @param {Object} descriptor
- * @param {Object|null} rule - merchant rule row, or null
- * @returns {string[]}
- */
-const secondaryLabelsFromRule = (descriptor, rule) => {
-  if (!descriptor || !descriptor.merchant || !rule || !Array.isArray(rule.secondaryLabels)) return [];
-  return rule.secondaryLabels;
-};
-
-/**
  * Resolve the category id for a descriptor via learned merchant rules.
  *
  * @param {Object} descriptor - parsed notification (needs merchant, packageName)
@@ -162,13 +148,8 @@ export const resolveLabelOverride = async (descriptor) => {
  * with the raw (often bank-truncated) merchant string.
  *
  * @param {Object} descriptor
- * `secondaryLabels` are the merchant's extra labels, booked after the name. They
- * play no part in matching: a merchant with labels but no name still waits for
- * review, where the name is set.
- *
  * @returns {Promise<{ accountId: number|null, accountCurrency: string|null,
- *   accountRounding: number|null, categoryId: string|null, labelOverride: string|null,
- *   secondaryLabels: string[], matchedAccount: boolean,
+ *   accountRounding: number|null, categoryId: string|null, matchedAccount: boolean,
  *   matchedCategory: boolean, matchedLabel: boolean, currencyMatch: boolean,
  *   fullyMatched: boolean }>}
  */
@@ -183,7 +164,6 @@ export const resolveNotification = async (descriptor) => {
   ]);
   const categoryId = categoryFromRule(descriptor, rule);
   const labelOverride = labelFromRule(descriptor, rule);
-  const secondaryLabels = secondaryLabelsFromRule(descriptor, rule);
   const accountId = account ? account.id : null;
   const accountCurrency = account ? account.currency : null;
   // Rounding step for auto-created operations (null/0 = no rounding) and the
@@ -202,7 +182,6 @@ export const resolveNotification = async (descriptor) => {
     accountRoundingMode,
     categoryId,
     labelOverride,
-    secondaryLabels,
     matchedAccount,
     matchedCategory,
     matchedLabel,

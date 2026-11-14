@@ -34,7 +34,9 @@ import m0029 from './0029_dismissed_notifications.js';
 import m0030 from './0030_operations_transfer_indexes.js';
 import m0031 from './0031_merchant_rule_skip_category.js';
 import m0032 from './0032_merchant_rule_secondary_labels.js';
-import { normalizeOperationDates, renameMotorcycleIcon, clearStoredLocations } from './dataRepairs.js';
+import {
+  normalizeOperationDates, renameMotorcycleIcon, clearStoredLocations, clearSecondaryLabels,
+} from './dataRepairs.js';
 
 export default {
   journal,
@@ -82,6 +84,9 @@ export default {
     normalizeOperationDates,
     renameMotorcycleIcon,
     clearStoredLocations,
+    // Keyed to 0032, the migration that added the column it clears, so it runs
+    // only where that column exists.
+    clearSecondaryLabels,
   },
   // Explicit tag mapping for post-migration handlers to avoid fragile substring matching
   postMigrationTags: {
@@ -91,6 +96,7 @@ export default {
     normalizeOperationDates: '0030_operations_transfer_indexes',
     renameMotorcycleIcon: '0030_operations_transfer_indexes',
     clearStoredLocations: '0030_operations_transfer_indexes',
+    clearSecondaryLabels: '0032_merchant_rule_secondary_labels',
   },
 };
   
