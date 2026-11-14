@@ -1,5 +1,12 @@
 # Changelog
 
+## [0.312.1](https://github.com/heywood8/money-tracker/compare/penny-v0.312.0...penny-v0.312.1) (2026-11-14)
+
+
+### Bug Fixes
+
+* **notifications:** keep secondary labels to the reviewed operation ([#1904](https://github.com/heywood8/money-tracker/issues/1904)) ([06c6294](https://github.com/heywood8/money-tracker/commit/06c6294809a03b9cd4b355ca5b90a24f5dc553bf))
+
 ## [0.312.0](https://github.com/heywood8/money-tracker/compare/penny-v0.311.0...penny-v0.312.0) (2026-11-11)
 
 
