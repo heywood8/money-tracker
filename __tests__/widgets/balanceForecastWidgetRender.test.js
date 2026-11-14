@@ -34,6 +34,12 @@ jest.mock('../../app/widgets/balanceForecastWidgetStore', () => ({
   getWidgetConfig: jest.fn(),
 }));
 jest.mock('../../app/contexts/ThemeColorsContext', () => jest.requireActual('../../app/contexts/ThemeColorsContext'));
+// The phone's palette, read natively (modules/penny-system-colors); none unless a test sets it.
+const mockGetPalette = jest.fn(() => null);
+jest.mock('../../modules/penny-system-colors', () => ({
+  __esModule: true,
+  default: { getPalette: (...args) => mockGetPalette(...args) },
+}));
 
 const CARD = { id: 1, name: 'Card', currency: 'USD', balance: '1000.50', hidden: 0 };
 const CASH = { id: 2, name: 'Cash', currency: 'EUR', balance: '300', hidden: 0 };
@@ -47,6 +53,7 @@ const NOW = new Date(2026, 9, 26, 15);
 describe('balanceForecastWidgetRender', () => {
   beforeEach(() => {
     jest.clearAllMocks();
+    mockGetPalette.mockImplementation(() => null);
     getAllAccounts.mockResolvedValue([CARD, CASH, OLD]);
     getWidgetConfig.mockResolvedValue(config(null));
     resolveLanguage.mockResolvedValue('ru');
@@ -178,6 +185,17 @@ describe('balanceForecastWidgetRender', () => {
       expect(rendered.light.props).toMatchObject({ theme: 'light', width: 300, height: 180 });
       expect(rendered.dark.props).toMatchObject({ theme: 'dark', width: 300, height: 180 });
       expect(rendered.light.props.model.rows).toHaveLength(2);
+      expect(rendered.light.props.palette).toBeNull();
+    });
+
+    it('draws both variants in the system palette where there is one', async () => {
+      const palette = { accent1: {}, accent2: {}, accent3: {}, neutral1: {}, neutral2: {} };
+      mockGetPalette.mockReturnValue(palette);
+
+      const rendered = await renderBalanceForecastWidget({ widgetId: 7, width: 300, height: 180 }, { now: NOW });
+
+      expect(rendered.light.props.palette).toBe(palette);
+      expect(rendered.dark.props.palette).toBe(palette);
     });
 
     it('passes on the system font scale', async () => {

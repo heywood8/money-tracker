@@ -6,12 +6,12 @@
 import React from 'react';
 import PropTypes from 'prop-types';
 import { FlexWidget, ListWidget, TextWidget } from 'react-native-android-widget';
-import { lightTheme, darkTheme } from '../contexts/ThemeColorsContext';
 import { formatMoney, getDecimalPlaces } from '../services/currency';
 import { translate } from '../services/notifications/notificationStrings';
 import { parseLocalDay } from '../utils/dateUtils';
 import { BORDER_RADIUS, FONT_SIZE, SPACING } from '../styles/designTokens';
 import { FORECAST_COLUMNS, GRAPHS_DEEP_LINK, normalizeColumns } from './widgetConstants';
+import { widgetColors } from './widgetColors';
 
 /**
  * The balance-forecast home-screen widget: a table of the accounts the user
@@ -278,12 +278,14 @@ const forecastItem = (row, view, table, colors, hideBalances) => {
  * @param {{status: 'ready'|'error'|'empty', language: string, hideBalances?: boolean,
  *   monthEnd?: string, columns?: string[], rows?: Array<Object>}} props.model
  * @param {'light'|'dark'} props.theme
+ * @param {Object|null} [props.palette] - The system palette, which the colours
+ *   follow (widgetColors); none for Penny's own
  * @param {number} props.width - Widget width in dp
  * @param {number} props.height - Widget height in dp, as the launcher reports it
  * @param {number} [props.fontScale=1] - The system font scale (widgetInfo.screenInfo)
  */
-export function BalanceForecastWidget({ model, theme, width, height, fontScale }) {
-  const colors = (theme === 'dark' ? darkTheme : lightTheme).colors;
+export function BalanceForecastWidget({ model, theme, palette, width, height, fontScale }) {
+  const colors = widgetColors(theme, palette);
   const { language } = model;
 
   if (model.status !== 'ready') {
@@ -350,6 +352,7 @@ BalanceForecastWidget.propTypes = {
       dailyAverage: PropTypes.number,
     })),
   }).isRequired,
+  palette: PropTypes.object,
   theme: PropTypes.oneOf(['light', 'dark']).isRequired,
   width: PropTypes.number.isRequired,
   fontScale: PropTypes.number,

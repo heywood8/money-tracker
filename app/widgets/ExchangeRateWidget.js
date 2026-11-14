@@ -6,7 +6,6 @@
 import React from 'react';
 import PropTypes from 'prop-types';
 import { FlexWidget, OverlapWidget, SvgWidget, TextWidget } from 'react-native-android-widget';
-import { lightTheme, darkTheme } from '../contexts/ThemeColorsContext';
 import { getCurrencySymbol } from '../services/currency';
 import {
   RANGE_LABEL_KEYS,
@@ -25,6 +24,7 @@ import { translate } from '../services/notifications/notificationStrings';
 import { BORDER_RADIUS, FONT_SIZE, SPACING } from '../styles/designTokens';
 import { GRAPHS_DEEP_LINK, RATE_WINDOW_ACTION, REFRESH_RATES_ACTION } from './widgetConstants';
 import { RollingTextWidget } from './RollingTextWidget';
+import { widgetColors } from './widgetColors';
 
 /**
  * The exchange-rate home-screen widget: one pair's current rate, its move over
@@ -582,13 +582,15 @@ const ratePanel = (model, figures, colors, box, key) => {
  * @param {{status: 'ready'|'error'|'empty', chart?: Object, points?: Array, stale?: boolean,
  *   checkedAt?: number, refreshing?: boolean, language: string}} props.model
  * @param {'light'|'dark'} props.theme
+ * @param {Object|null} [props.palette] - The system palette, which the colours
+ *   follow (widgetColors); none for Penny's own
  * @param {number} props.width - Widget width in dp
  * @param {number} props.height - Widget height in dp
  * @param {number} [props.fontScale=1] - The system font scale, which the text
  *   follows and the tap zones over it with it
  */
-export function ExchangeRateWidget({ model, theme, width, height, fontScale = 1 }) {
-  const colors = (theme === 'dark' ? darkTheme : lightTheme).colors;
+export function ExchangeRateWidget({ model, theme, palette, width, height, fontScale = 1 }) {
+  const colors = widgetColors(theme, palette);
   const view = viewOf(model);
   const { language } = model;
   const scale = Math.min(MAX_FONT_SCALE, Math.max(1, fontScale || 1));
@@ -676,6 +678,7 @@ ExchangeRateWidget.propTypes = {
   fontScale: PropTypes.number,
   height: PropTypes.number.isRequired,
   model: MODEL_SHAPE.isRequired,
+  palette: PropTypes.object,
   theme: PropTypes.oneOf(['light', 'dark']).isRequired,
   width: PropTypes.number.isRequired,
 };
@@ -691,12 +694,13 @@ ExchangeRateWidget.propTypes = {
  * @param {Object} props
  * @param {Array<Object>} props.models - Two models, as the one-rate widget takes
  * @param {number} [props.fontScale=1] - As the one-rate widget's
+ * @param {Object|null} [props.palette] - As the one-rate widget's
  * @param {'light'|'dark'} props.theme
  * @param {number} props.width - Widget width in dp
  * @param {number} props.height - Widget height in dp
  */
-export function ExchangeRatePairWidget({ models, theme, width, height, fontScale = 1 }) {
-  const colors = (theme === 'dark' ? darkTheme : lightTheme).colors;
+export function ExchangeRatePairWidget({ models, theme, palette, width, height, fontScale = 1 }) {
+  const colors = widgetColors(theme, palette);
   // Nothing set up at all: one prompt across the whole widget, not two.
   if (models.every((model) => model.status === 'empty')) {
     const text = translate(models[0].language, 'widget_rate_empty');
@@ -822,6 +826,7 @@ ExchangeRatePairWidget.propTypes = {
   fontScale: PropTypes.number,
   height: PropTypes.number.isRequired,
   models: PropTypes.arrayOf(MODEL_SHAPE.isRequired).isRequired,
+  palette: PropTypes.object,
   theme: PropTypes.oneOf(['light', 'dark']).isRequired,
   width: PropTypes.number.isRequired,
 };
