@@ -1,5 +1,12 @@
 # Changelog
 
+## [0.313.0](https://github.com/heywood8/money-tracker/compare/penny-v0.312.1...penny-v0.313.0) (2026-11-16)
+
+
+### Features
+
+* **widgets:** draw home-screen widgets in the material you palette ([#1906](https://github.com/heywood8/money-tracker/issues/1906)) ([5bbe46a](https://github.com/heywood8/money-tracker/commit/5bbe46a8959f9e1969d32a06dbdf1e0b87b4876a))
+
 ## [0.312.1](https://github.com/heywood8/money-tracker/compare/penny-v0.312.0...penny-v0.312.1) (2026-11-14)
 
 
