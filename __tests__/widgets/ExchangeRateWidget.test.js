@@ -28,9 +28,23 @@ const POINTS = [
   { date: '2026-10-23', rate: 81.55 },
 ];
 
-const render = (model, { theme = 'light', width = 250, height = 180 } = {}) => buildWidgetTree(
-  <ExchangeRateWidget model={{ language: 'en', ...model }} theme={theme} width={width} height={height} />,
+const render = (model, { theme = 'light', palette, width = 250, height = 180 } = {}) => buildWidgetTree(
+  <ExchangeRateWidget
+    model={{ language: 'en', ...model }}
+    theme={theme}
+    palette={palette}
+    width={width}
+    height={height}
+  />,
 );
+
+// A system palette as modules/penny-system-colors reads it, every shade its own
+// colour: '#' + palette number + the shade, e.g. accent2's 800 is '#020800'.
+const PALETTE = Object.fromEntries(['accent1', 'accent2', 'accent3', 'neutral1', 'neutral2'].map((name, i) => [
+  name,
+  Object.fromEntries([0, 10, 50, 100, 200, 300, 400, 500, 600, 700, 800, 900, 1000]
+    .map((shade) => [String(shade), `#${String(i + 1).padStart(2, '0')}${String(shade).padStart(4, '0')}`])),
+]));
 
 // Every node of a given type, depth first.
 const nodesOf = (tree, type, found = []) => {
@@ -269,6 +283,25 @@ describe('ExchangeRateWidget', () => {
       expect(nodesOf(light, 'SvgWidget')[0].props.svgString).toContain(lightTheme.colors.primary);
       expect(nodesOf(dark, 'SvgWidget')[0].props.svgString).toContain(darkTheme.colors.primary);
     });
+
+    it('follows the system palette where there is one, as the system’s own widgets do', () => {
+      const model = { status: 'ready', chart: CHART, points: POINTS };
+      const light = render(model, { theme: 'light', palette: PALETTE });
+      const dark = render(model, { theme: 'dark', palette: PALETTE });
+
+      // The card in the secondary palette, the rate in the neutral one, the
+      // line and the window's arrows in the accent.
+      expect(light.props.backgroundColor).toBe(PALETTE.accent2['50']);
+      expect(dark.props.backgroundColor).toBe(PALETTE.accent2['800']);
+      expect(colorOf(light, '₽81.55')).toBe(PALETTE.neutral1['900']);
+      expect(colorOf(dark, '₽81.55')).toBe(PALETTE.neutral1['100']);
+      expect(colorOf(dark, '1 USD')).toBe(PALETTE.neutral2['200']);
+      expect(nodesOf(light, 'SvgWidget')[0].props.svgString).toContain(PALETTE.accent1['600']);
+      expect(nodesOf(dark, 'SvgWidget')[0].props.svgString).toContain(PALETTE.accent1['200']);
+      expect(colorOf(dark, '‹')).toBe(PALETTE.accent1['200']);
+      // A fall stays red whatever the wallpaper.
+      expect(colorOf(dark, '▼')).toBe(darkTheme.colors.overspend);
+    });
   });
 
   it('tells the user where to set a chart up when there is none', () => {
@@ -326,8 +359,14 @@ describe('ExchangeRateWidget', () => {
   describe('ExchangeRatePairWidget', () => {
     const AMD = { id: 'c2', from: 'RUB', to: 'AMD', amount: 1, range: 'month' };
     const AMD_POINTS = [{ date: '2026-09-23', rate: 4.32 }, { date: '2026-10-23', rate: 4.47 }];
-    const renderPair = (models, { theme = 'light', width = 380, height = 180 } = {}) => buildWidgetTree(
-      <ExchangeRatePairWidget models={models.map((m) => ({ language: 'en', ...m }))} theme={theme} width={width} height={height} />,
+    const renderPair = (models, { theme = 'light', palette, width = 380, height = 180 } = {}) => buildWidgetTree(
+      <ExchangeRatePairWidget
+        models={models.map((m) => ({ language: 'en', ...m }))}
+        theme={theme}
+        palette={palette}
+        width={width}
+        height={height}
+      />,
     );
 
     // Root > stack of [the two halves, the middle column over them].
@@ -353,6 +392,18 @@ describe('ExchangeRateWidget', () => {
       expect(textsOf(first)).toContain('₽81.55');
       expect(textsOf(second)).toContain('֏4.470');
       expect(tree.props.clickActionData).toEqual({ uri: GRAPHS_DEEP_LINK });
+    });
+
+    it('draws the card and the hairline in the system palette where there is one', () => {
+      const tree = renderPair([
+        { status: 'ready', chart: CHART, points: POINTS },
+        { status: 'ready', chart: AMD, points: AMD_POINTS },
+      ], { theme: 'dark', palette: PALETTE });
+
+      expect(tree.props.backgroundColor).toBe(PALETTE.accent2['800']);
+      const [, divider] = layersOf(tree)[0].children;
+      expect(divider.children[0].props.backgroundColor).toBe(PALETTE.neutral2['700']);
+      expect(colorOf(tree, '֏4.470')).toBe(PALETTE.neutral1['100']);
     });
 
     it('rolls each half\'s rate in a group of its own', () => {

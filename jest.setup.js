@@ -230,6 +230,13 @@ jest.mock('./app/services/marketRate', () => ({
   clearMarketRateCache: jest.fn(),
 }));
 
+// The phone's Material You palette (modules/penny-system-colors) has no native
+// side under Jest, and its index imports `expo`, whose runtime then reaches for
+// globals after a suite has torn down in every suite that imports a widget. No
+// palette: the widgets draw in Penny's own theme. Tests that want one mock the
+// module themselves (see __tests__/widgets/widgetColors.test.js).
+jest.mock('./modules/penny-system-colors', () => ({ __esModule: true, default: null }));
+
 jest.mock('./app/contexts/ThemeColorsContext', () => {
   const React = require('react');
   const PropTypes = require('prop-types');

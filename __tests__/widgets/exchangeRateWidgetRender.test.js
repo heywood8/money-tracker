@@ -38,6 +38,12 @@ jest.mock('../../app/widgets/exchangeRateWidgetStore', () => ({
   stepWidgetWindow: jest.fn(),
 }));
 jest.mock('../../app/contexts/ThemeColorsContext', () => jest.requireActual('../../app/contexts/ThemeColorsContext'));
+// The phone's palette, read natively (modules/penny-system-colors); none unless a test sets it.
+const mockGetPalette = jest.fn(() => null);
+jest.mock('../../modules/penny-system-colors', () => ({
+  __esModule: true,
+  default: { getPalette: (...args) => mockGetPalette(...args) },
+}));
 
 const USD_RUB = { id: 'a', from: 'USD', to: 'RUB', amount: 1, range: 'month' };
 const AMD_RUB = { id: 'b', from: 'AMD', to: 'RUB', amount: 100, range: 'week' };
@@ -46,6 +52,7 @@ const POINTS = [{ date: '2026-10-22', rate: 81.81 }, { date: '2026-10-23', rate:
 describe('exchangeRateWidgetRender', () => {
   beforeEach(() => {
     jest.clearAllMocks();
+    mockGetPalette.mockImplementation(() => null);
     loadRateCharts.mockResolvedValue([USD_RUB, AMD_RUB]);
     getWidgetChart.mockResolvedValue(null);
     getWidgetCharts.mockResolvedValue([]);
@@ -245,6 +252,29 @@ describe('exchangeRateWidgetRender', () => {
     expect(result.light.props).toMatchObject({ theme: 'light', width: 250, height: 180 });
     expect(result.dark.props).toMatchObject({ theme: 'dark', width: 250, height: 180 });
     expect(result.light.props.model.status).toBe('ready');
+    expect(result.light.props.palette).toBeNull();
+  });
+
+  it('draws both variants in the system palette, read once the rates are in', async () => {
+    const palette = { accent1: {}, accent2: {}, accent3: {}, neutral1: {}, neutral2: {} };
+    mockGetPalette.mockImplementation(() => {
+      // The palette of the moment the picture is drawn, not of when the fetch began.
+      expect(fetchRateSeries).toHaveBeenCalled();
+      return palette;
+    });
+
+    const one = await renderExchangeRateWidget({ widgetId: 7, width: 250, height: 180 });
+    getWidgetCharts.mockResolvedValue([USD_RUB, AMD_RUB]);
+    const pair = await renderExchangeRateWidget({
+      widgetName: EXCHANGE_RATE_PAIR_WIDGET, widgetId: 8, width: 380, height: 180,
+    });
+
+    for (const result of [one, pair]) {
+      expect(result.light.props.palette).toBe(palette);
+      expect(result.dark.props.palette).toBe(palette);
+    }
+    // Once per picture: both variants share the one read.
+    expect(mockGetPalette).toHaveBeenCalledTimes(2);
   });
 
   describe('refreshExchangeRateWidgets', () => {

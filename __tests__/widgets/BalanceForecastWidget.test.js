@@ -34,10 +34,11 @@ const READY = {
   rows: [CARD, TRAVEL],
 };
 
-const render = (model, { theme = 'light', width = 300, height = 110, fontScale } = {}) => buildWidgetTree(
+const render = (model, { theme = 'light', palette, width = 300, height = 110, fontScale } = {}) => buildWidgetTree(
   <BalanceForecastWidget
     model={{ language: 'en', ...model }}
     theme={theme}
+    palette={palette}
     width={width}
     height={height}
     fontScale={fontScale}
@@ -162,6 +163,21 @@ describe('BalanceForecastWidget', () => {
       const tree = render(READY, { theme: 'dark' });
       expect(tree.props.backgroundColor).toBe(darkTheme.colors.surface);
       expect(textNode(tree, 'Everyday card').props.color).toBe(darkTheme.colors.text);
+    });
+
+    it('follows the system palette where there is one, a forecast below zero staying red', () => {
+      // As modules/penny-system-colors reads it: '#' + palette number + shade.
+      const palette = Object.fromEntries(['accent1', 'accent2', 'accent3', 'neutral1', 'neutral2'].map((name, i) => [
+        name,
+        Object.fromEntries([0, 10, 50, 100, 200, 300, 400, 500, 600, 700, 800, 900, 1000]
+          .map((shade) => [String(shade), `#${String(i + 1).padStart(2, '0')}${String(shade).padStart(4, '0')}`])),
+      ]));
+      const tree = render(READY, { theme: 'dark', palette });
+      expect(tree.props.backgroundColor).toBe(palette.accent2['800']);
+      expect(textNode(tree, 'Everyday card').props.color).toBe(palette.neutral1['100']);
+      expect(textNode(tree, '-$233.62').props.color).toBe(palette.neutral2['200']);
+      expect(textNode(tree, 'Now').props.color).toBe(palette.neutral2['200']);
+      expect(textNode(tree, '-₽2,300').props.color).toBe(darkTheme.colors.destructive);
     });
 
     it('labels each line for screen readers with its headers', () => {
