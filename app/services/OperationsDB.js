@@ -20,12 +20,45 @@ const normalizeSearchQuery = (text) => normalizeSearchText(text);
 // escaped value must carry LIKE_ESCAPE (a test fails on one that does not).
 const escapeLikePattern = (text) => text.replace(/[\\%_]/g, '\\$&');
 const LIKE_ESCAPE = "ESCAPE '\\'";
+
 import * as Currency from './currency';
 import { formatDate, updateTodayBalance, applyPastBalanceChanges } from './BalanceHistoryDB';
 import * as AccountsDB from './AccountsDB';
 import { sumMoneySql } from './sqlMoney';
 import { formatLocalDate, toOperationDate, parseLocalDay } from '../utils/dateUtils';
 import getDefaultOperations from '../defaults/defaultOperations';
+
+// Characters SQL folds exactly as normalizeSearchText() does: printable ASCII
+// (LOWER) and the Russian alphabet with ё/Ё (the REPLACE chain in
+// buildSearchNormSql). A word made only of these finds every case variant of
+// itself in SQL; a word with anything else (accented Latin, Armenian, a
+// decomposed ё) would match case-sensitively there.
+const SQL_FOLD_SAFE_WORD = /^[\x20-\x7E\u0410-\u044F\u0401\u0451]+$/;
+
+/**
+ * The words a label filter may narrow the SQL scan by.
+ *
+ * Labels are matched exactly in JS (matchesAllLabels, on the parsed list), so
+ * this only has to be a superset of that match and must never drop a row it
+ * would keep. Each word of a label appears verbatim in the stored description
+ * (normalizeLabel only collapses whitespace), so "every word is in it" holds
+ * for every row the JS match keeps, once both sides are folded alike. Words
+ * SQL cannot fold like JS are left to the JS pass alone; a label with none
+ * narrows nothing, which is what every label filter did before.
+ *
+ * @param {string[]} labels
+ * @returns {string[]} folded words, de-duplicated
+ */
+const labelPrefilterWords = (labels) => {
+  if (!Array.isArray(labels)) return [];
+  const words = new Set();
+  for (const label of labels) {
+    for (const word of normalizeLabel(label).split(' ')) {
+      if (word && SQL_FOLD_SAFE_WORD.test(word)) words.add(normalizeSearchQuery(word));
+    }
+  }
+  return [...words];
+};
 
 // Operation types currently supported. Used as the upper bound for the
 // "all types selected → no type filter" optimization.
@@ -304,6 +337,14 @@ const buildFilteredOperationsQuery = (baseCondition, baseParams, filters = {}, o
     const placeholders = filters.categoryIds.map(() => '?').join(',');
     sql += ` AND o.category_id IN (${placeholders})`;
     params.push(...filters.categoryIds);
+  }
+
+  // Narrow a label filter in SQL (see labelPrefilterWords); the exact match
+  // is OperationsDataContext's. Without this a search by one label read the
+  // whole ledger into memory to keep a handful of rows.
+  for (const word of labelPrefilterWords(filters.labels)) {
+    sql += ` AND ${searchNormExpr('o.description')} LIKE ? ${LIKE_ESCAPE}`;
+    params.push(`%${escapeLikePattern(word)}%`);
   }
 
   // Apply amount range filters

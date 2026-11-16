@@ -365,6 +365,16 @@ jest.mock('../../assets/currencies.json', () => ({
   JPY: { symbol: '¥', decimal_digits: 0 },
 }), { virtual: true });
 
+// The long-press menu is stood in for by an element carrying its props, so the
+// "Find by" tests can call the handlers the screen hands it. Its own behaviour
+// is covered in OperationActionMenu.test.js and RowActionMenu.test.js.
+jest.mock('../../app/components/operations/OperationActionMenu', () => {
+  const React = require('react');
+  return function MockOperationActionMenu(props) {
+    return React.createElement('OperationActionMenu', { testID: 'operation-action-menu', ...props });
+  };
+});
+
 describe('OperationsScreen', () => {
   beforeEach(() => {
     jest.clearAllMocks();
@@ -4927,6 +4937,278 @@ describe('OperationsScreen', () => {
       expect(addOptimisticOperation).toHaveBeenCalledWith(
         expect.objectContaining({ description: 'Gurman Bistro' }),
       );
+    });
+  });
+});
+
+// The long-press menu's "Find by" chips, and the card the list shows over a
+// search's results.
+describe('OperationsScreen - find by label or category', () => {
+  const OperationsScreen = require('../../app/screens/OperationsScreen').default;
+  const { useSearch } = require('../../app/contexts/SearchContext');
+  const { useOperationsActions } = require('../../app/contexts/OperationsActionsContext');
+  const { useOperationsData } = require('../../app/contexts/OperationsDataContext');
+  const { useCategories } = require('../../app/contexts/CategoriesContext');
+  const { useAccountsData } = require('../../app/contexts/AccountsDataContext');
+
+  // mockImplementation outlives clearAllMocks, so each shared mock gets its
+  // file-wide default back after every test here.
+  const originals = {
+    search: useSearch.getMockImplementation(),
+    actions: useOperationsActions.getMockImplementation(),
+    data: useOperationsData.getMockImplementation(),
+    categories: useCategories.getMockImplementation(),
+    accounts: useAccountsData.getMockImplementation(),
+  };
+  afterEach(() => {
+    useSearch.mockImplementation(originals.search);
+    useOperationsActions.mockImplementation(originals.actions);
+    useOperationsData.mockImplementation(originals.data);
+    useCategories.mockImplementation(originals.categories);
+    useAccountsData.mockImplementation(originals.accounts);
+  });
+
+  const BLANK = {
+    text: '',
+    types: [],
+    accountIds: [],
+    categoryIds: [],
+    labels: [],
+    dateRange: { startDate: null, endDate: null },
+    amountRange: { min: null, max: null },
+  };
+  const categories = [
+    { id: 'cat-cafe', name: 'Cafe', icon: 'coffee', categoryType: 'expense' },
+    { id: 'cat-food', name: 'Food', icon: 'food', categoryType: 'expense' },
+    { id: 'cat-other', name: 'Other', icon: 'dots-horizontal', parentId: 'cat-food', categoryType: 'expense' },
+  ];
+
+  // `resultsCurrent: false` stands for the moment after a filter change and
+  // before its reload lands: the rows held were loaded for another filter set.
+  const setUp = ({
+    mode = 'closed', searchState = BLANK, operations = [], hasMoreOperations = false, resultsCurrent = true,
+  } = {}) => {
+    const search = {
+      searchMode: mode,
+      filtersExpanded: false,
+      openSearch: jest.fn(),
+      closeSearch: jest.fn(),
+      reopenSearch: jest.fn(),
+      toggleFilters: jest.fn(),
+      setSearchMode: jest.fn(),
+      registerSearchHandler: jest.fn(),
+    };
+    const actions = {
+      loadMoreOperations: jest.fn(),
+      loadInitialOperations: jest.fn(() => Promise.resolve()),
+      addOperation: jest.fn(),
+      updateOperation: jest.fn(),
+      deleteOperation: jest.fn(),
+      updateSearchFilters: jest.fn(),
+      clearAllSearch: jest.fn(),
+      setSearchText: jest.fn(),
+    };
+    const hasActiveSearch = searchState.text !== ''
+      || searchState.labels.length > 0
+      || searchState.categoryIds.length > 0;
+    useSearch.mockImplementation(() => search);
+    useOperationsActions.mockImplementation(() => actions);
+    const activeFilters = { labels: searchState.labels, categoryIds: searchState.categoryIds };
+    const resultsFilters = resultsCurrent ? activeFilters : { stale: true };
+    useOperationsData.mockImplementation(() => ({
+      operations,
+      loading: false,
+      hasMoreOperations,
+      searchState,
+      hasActiveSearch,
+      activeFilters,
+      resultsFilters,
+      getSearchFilterCount: jest.fn(() => 0),
+    }));
+    useCategories.mockImplementation(() => ({ categories }));
+    const accounts = [{ id: 'acc-1', name: 'Card', currency: 'USD' }];
+    useAccountsData.mockImplementation(() => ({ accounts, visibleAccounts: accounts, loading: false }));
+    return { search, actions };
+  };
+
+  const thisMonth = () => {
+    const now = new Date();
+    return `${now.getFullYear()}-${String(now.getMonth() + 1).padStart(2, '0')}-01`;
+  };
+  const coffee = (id, amount) => ({
+    id, type: 'expense', amount, accountId: 'acc-1', categoryId: 'cat-cafe', date: thisMonth(), description: 'coffee',
+  });
+
+  describe('Find by chips', () => {
+    it('hands the menu the categories and both searches', async () => {
+      setUp();
+      const { getByTestId } = await render(<OperationsScreen />);
+      const menu = getByTestId('operation-action-menu');
+      expect(menu.props.categories).toBe(categories);
+      expect(typeof menu.props.onFindByLabel).toBe('function');
+      expect(typeof menu.props.onFindByCategory).toBe('function');
+    });
+
+    it('replaces the whole search with the label and leaves the bar collapsed', async () => {
+      const { search, actions } = setUp();
+      const { getByTestId } = await render(<OperationsScreen />);
+
+      await act(async () => { getByTestId('operation-action-menu').props.onFindByLabel('coffee'); });
+
+      expect(actions.updateSearchFilters).toHaveBeenCalledWith({ ...BLANK, labels: ['coffee'] });
+      expect(search.setSearchMode).toHaveBeenCalledWith('collapsed');
+      // Not opened: an open bar focuses its field, and the keyboard would cover the list.
+      expect(search.openSearch).not.toHaveBeenCalled();
+    });
+
+    it('replaces the whole search with the category', async () => {
+      const { actions } = setUp();
+      const { getByTestId } = await render(<OperationsScreen />);
+
+      await act(async () => { getByTestId('operation-action-menu').props.onFindByCategory('cat-cafe'); });
+
+      expect(actions.updateSearchFilters).toHaveBeenCalledWith({ ...BLANK, categoryIds: ['cat-cafe'] });
+    });
+
+    it('a second label replaces the first rather than narrowing it', async () => {
+      const { actions } = setUp({ searchState: { ...BLANK, labels: ['coffee'], text: 'bean' } });
+      const { getByTestId } = await render(<OperationsScreen />);
+
+      await act(async () => { getByTestId('operation-action-menu').props.onFindByLabel('starbucks'); });
+
+      expect(actions.updateSearchFilters).toHaveBeenCalledWith({ ...BLANK, labels: ['starbucks'] });
+    });
+
+    it('keeps a search the user already has open, open', async () => {
+      const { search } = setUp({ mode: 'open' });
+      const { getByTestId } = await render(<OperationsScreen />);
+
+      await act(async () => { getByTestId('operation-action-menu').props.onFindByLabel('coffee'); });
+
+      expect(search.setSearchMode).not.toHaveBeenCalled();
+    });
+
+    it('takes the list back to the top', async () => {
+      setUp();
+      const { getByTestId } = await render(<OperationsScreen />);
+      mockScrollToOffset.mockClear();
+
+      await act(async () => { getByTestId('operation-action-menu').props.onFindByLabel('coffee'); });
+
+      await waitFor(() => expect(mockScrollToOffset).toHaveBeenCalledWith({ offset: 0, animated: false }));
+    });
+  });
+
+  describe('Search card', () => {
+    it('sits over the results of a label search, with its chart', async () => {
+      setUp({
+        searchState: { ...BLANK, labels: ['coffee'] },
+        operations: [coffee('a', '4.20'), coffee('b', '2.80')],
+      });
+      const { getByTestId } = await render(<OperationsScreen />);
+
+      expect(getByTestId('search-insight-title')).toHaveTextContent('coffee');
+      expect(getByTestId('search-insight-totals')).toHaveTextContent('-$7.00');
+      expect(getByTestId('search-insight-chart')).toBeTruthy();
+    });
+
+    it('names a category search after the category', async () => {
+      setUp({
+        searchState: { ...BLANK, categoryIds: ['cat-cafe'] },
+        operations: [coffee('a', '4.20')],
+      });
+      const { getByTestId } = await render(<OperationsScreen />);
+
+      expect(getByTestId('search-insight-title')).toHaveTextContent('Cafe');
+      expect(getByTestId('search-insight-chart')).toBeTruthy();
+    });
+
+    it('gives any other search the count and totals, without a title or chart', async () => {
+      setUp({ searchState: { ...BLANK, text: 'cof' }, operations: [coffee('a', '4.20')] });
+      const { getByTestId, queryByTestId } = await render(<OperationsScreen />);
+
+      expect(getByTestId('search-insight-count')).toBeTruthy();
+      expect(queryByTestId('search-insight-title')).toBeNull();
+      expect(queryByTestId('search-insight-chart')).toBeNull();
+    });
+
+    it('is not shown without a search', async () => {
+      setUp({ operations: [coffee('a', '4.20')] });
+      const { queryByTestId } = await render(<OperationsScreen />);
+      expect(queryByTestId('search-insight')).toBeNull();
+    });
+
+    it('is not shown over a result set still paging in', async () => {
+      setUp({
+        searchState: { ...BLANK, labels: ['coffee'] },
+        operations: [coffee('a', '4.20')],
+        hasMoreOperations: true,
+      });
+      const { queryByTestId } = await render(<OperationsScreen />);
+      expect(queryByTestId('search-insight')).toBeNull();
+    });
+
+    it('names a category inside a folder with its folder', async () => {
+      setUp({
+        searchState: { ...BLANK, categoryIds: ['cat-other'] },
+        operations: [{ ...coffee('a', '1.00'), categoryId: 'cat-other' }],
+      });
+      const { getByTestId } = await render(<OperationsScreen />);
+      expect(getByTestId('search-insight-title')).toHaveTextContent('Food › Other');
+    });
+
+    it('shows no figures over rows loaded for another search', async () => {
+      setUp({
+        searchState: { ...BLANK, labels: ['coffee'] },
+        operations: [coffee('a', '4.20')],
+        resultsCurrent: false,
+      });
+      const { queryByTestId } = await render(<OperationsScreen />);
+      expect(queryByTestId('search-insight')).toBeNull();
+    });
+
+    it('keeps the last whole answer up while the next one loads, then shows the new one', async () => {
+      setUp({ searchState: { ...BLANK, labels: ['coffee'] }, operations: [coffee('a', '4.20')] });
+      const screen = await render(<OperationsScreen />);
+      expect(screen.getByTestId('search-insight-title')).toHaveTextContent('coffee');
+
+      // The chip for another label was tapped: the old rows are narrowed in
+      // memory while the new search loads.
+      setUp({ searchState: { ...BLANK, labels: ['starbucks'] }, operations: [], resultsCurrent: false });
+      await screen.rerender(<OperationsScreen />);
+      expect(screen.getByTestId('search-insight-title')).toHaveTextContent('coffee');
+      expect(screen.getByTestId('search-insight-totals')).toHaveTextContent('-$4.20');
+
+      setUp({
+        searchState: { ...BLANK, labels: ['starbucks'] },
+        operations: [{ ...coffee('b', '6.00'), description: 'starbucks' }],
+      });
+      await screen.rerender(<OperationsScreen />);
+      await waitFor(() => expect(screen.getByTestId('search-insight-title')).toHaveTextContent('starbucks'));
+      expect(screen.getByTestId('search-insight-totals')).toHaveTextContent('-$6.00');
+    });
+
+    it('goes the moment the search ends', async () => {
+      setUp({ searchState: { ...BLANK, labels: ['coffee'] }, operations: [coffee('a', '4.20')] });
+      const screen = await render(<OperationsScreen />);
+      expect(screen.getByTestId('search-insight')).toBeTruthy();
+
+      setUp({ operations: [coffee('a', '4.20')], resultsCurrent: false });
+      await screen.rerender(<OperationsScreen />);
+      await waitFor(() => expect(screen.queryByTestId('search-insight')).toBeNull());
+    });
+
+    it('ends the search from its ✕', async () => {
+      const { search, actions } = setUp({
+        searchState: { ...BLANK, labels: ['coffee'] },
+        operations: [coffee('a', '4.20')],
+      });
+      const { getByTestId } = await render(<OperationsScreen />);
+
+      fireEvent.press(getByTestId('search-insight-clear'));
+
+      expect(actions.clearAllSearch).toHaveBeenCalledTimes(1);
+      expect(search.closeSearch).toHaveBeenCalledWith(false);
     });
   });
 });

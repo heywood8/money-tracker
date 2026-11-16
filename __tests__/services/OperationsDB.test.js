@@ -4165,3 +4165,68 @@ describe('OperationsDB Service', () => {
     });
   });
 });
+
+// A label filter is matched exactly in JS (OperationsDataContext); SQL narrows
+// the scan by the label's words and must never drop a row the JS match keeps.
+describe('OperationsDB - label filter prefilter', () => {
+  beforeEach(() => {
+    jest.clearAllMocks();
+    isSearchNormAvailable.mockReturnValue(true);
+    queryAll.mockResolvedValue([]);
+  });
+
+  const likesOn = (sql) => (sql.match(/SEARCH_NORM\(o\.description\) LIKE \? ESCAPE '\\'/g) || []).length;
+
+  it('narrows by every word of the label, folded like the text search', async () => {
+    await OperationsDB.getFilteredOperationsAllDates({ labels: ['Кофе  Зёрна'] });
+
+    const [sql, params] = queryAll.mock.calls[0];
+    expect(likesOn(sql)).toBe(2);
+    expect(params).toEqual(['%кофе%', '%зерна%']);
+  });
+
+  it('requires the words of every label (labels combine with AND)', async () => {
+    await OperationsDB.getFilteredOperationsAllDates({ labels: ['coffee', 'Starbucks'] });
+
+    const [sql, params] = queryAll.mock.calls[0];
+    expect(likesOn(sql)).toBe(2);
+    expect(params).toEqual(['%coffee%', '%starbucks%']);
+  });
+
+  it('asks for a repeated word once', async () => {
+    await OperationsDB.getFilteredOperationsAllDates({ labels: ['coffee beans', 'Coffee'] });
+    expect(queryAll.mock.calls[0][1]).toEqual(['%coffee%', '%beans%']);
+  });
+
+  it('matches LIKE wildcards in a label literally', async () => {
+    await OperationsDB.getFilteredOperationsAllDates({ labels: ['50%_off'] });
+    expect(queryAll.mock.calls[0][1]).toEqual(['%50\\%\\_off%']);
+  });
+
+  it('leaves a word SQL cannot fold like JS to the JS pass', async () => {
+    // SQL's LOWER() folds ASCII only, and the REPLACE chain the Russian alphabet:
+    // "Ärzte" stored as "ÄRZTE" would not match "%ärzte%", so it narrows nothing.
+    await OperationsDB.getFilteredOperationsAllDates({ labels: ['Ärzte Berlin', 'Սուրճ'] });
+
+    const [sql, params] = queryAll.mock.calls[0];
+    expect(likesOn(sql)).toBe(1);
+    expect(params).toEqual(['%berlin%']);
+  });
+
+  it('narrows nothing without labels', async () => {
+    await OperationsDB.getFilteredOperationsAllDates({ labels: [] });
+    const [sql, params] = queryAll.mock.calls[0];
+    expect(likesOn(sql)).toBe(0);
+    expect(params).toEqual([]);
+  });
+
+  it('uses the inline fold where SEARCH_NORM is not registered', async () => {
+    isSearchNormAvailable.mockReturnValue(false);
+    await OperationsDB.getFilteredOperationsAllDates({ labels: ['Кофе'] });
+
+    const [sql, params] = queryAll.mock.calls[0];
+    expect(sql).not.toContain('SEARCH_NORM(');
+    expect(sql).toContain('LOWER(o.description)');
+    expect(params).toEqual(['%кофе%']);
+  });
+});

@@ -130,7 +130,7 @@ describe('Operations Filtering Integration', () => {
       });
     });
 
-    it('loads filters from PreferencesDB on mount', async () => {
+    it('does not restore a filter set saved by an older build', async () => {
       const storedFilters = {
         types: ['expense'],
         accountIds: ['acc1'],
@@ -148,12 +148,16 @@ describe('Operations Filtering Integration', () => {
       });
 
       await waitFor(() => {
-        expect(result.current.activeFilters).toEqual(storedFilters);
-        expect(result.current.filtersActive).toBe(true);
+        expect(PreferencesDB.deletePreference).toHaveBeenCalledWith(
+          PreferencesDB.PREF_KEYS.OPERATIONS_FILTERS,
+        );
       });
+      expect(result.current.activeFilters.types).toEqual([]);
+      expect(result.current.activeFilters.accountIds).toEqual([]);
+      expect(result.current.filtersActive).toBe(false);
     });
 
-    it('persists filters to PreferencesDB when updated', async () => {
+    it('does not write filters to PreferencesDB when updated', async () => {
       const { result } = await renderHook(() => useOperations(), {
         wrapper: OperationsProvider,
       });
@@ -172,11 +176,12 @@ describe('Operations Filtering Integration', () => {
       });
 
       await waitFor(() => {
-        expect(PreferencesDB.setJsonPreference).toHaveBeenCalledWith(
-          PreferencesDB.PREF_KEYS.OPERATIONS_FILTERS,
-          newFilters,
-        );
+        expect(result.current.filtersActive).toBe(true);
       });
+      expect(PreferencesDB.setJsonPreference).not.toHaveBeenCalledWith(
+        PreferencesDB.PREF_KEYS.OPERATIONS_FILTERS,
+        expect.anything(),
+      );
     });
 
     it('correctly identifies when filters are active', async () => {
@@ -454,8 +459,10 @@ describe('Operations Filtering Integration', () => {
     });
   });
 
-  describe('Filter Persistence Across Navigation', () => {
-    it('maintains filter state when component unmounts and remounts', async () => {
+  describe('Filters After A Restart', () => {
+    // The provider sits at the app root, so switching tabs never remounts it;
+    // a remount is a fresh launch, and a launch starts with no search.
+    it('starts with no filters when the provider mounts again', async () => {
       const filters = {
         types: ['expense'],
         accountIds: ['acc1'],
@@ -466,7 +473,7 @@ describe('Operations Filtering Integration', () => {
         amountRange: { min: null, max: null },
       };
 
-      // First render
+      // First launch
       const { result, unmount } = await renderHook(() => useOperations(), {
         wrapper: OperationsProvider,
       });
@@ -479,21 +486,21 @@ describe('Operations Filtering Integration', () => {
         expect(result.current.activeFilters).toEqual(filters);
       });
 
-      // Unmount
       await unmount();
 
-      // Mock PreferencesDB to return the filters on next render
+      // Even if an older build left the set in the preferences table
       PreferencesDB.getJsonPreference.mockResolvedValue(filters);
 
-      // Remount
+      // Next launch
       const { result: result2 } = await renderHook(() => useOperations(), {
         wrapper: OperationsProvider,
       });
 
       await waitFor(() => {
-        expect(result2.current.activeFilters).toEqual(filters);
-        expect(result2.current.filtersActive).toBe(true);
+        expect(result2.current.filtersActive).toBe(false);
       });
+      expect(result2.current.activeFilters.searchText).toBe('');
+      expect(result2.current.activeFilters.types).toEqual([]);
     });
   });
 

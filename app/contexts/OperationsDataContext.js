@@ -1,7 +1,7 @@
 import React, { createContext, useContext, useState, useEffect, useCallback, useMemo, useRef } from 'react';
 import PropTypes from 'prop-types';
 import { appEvents, EVENTS } from '../services/eventEmitter';
-import { getJsonPreference, PREF_KEYS } from '../services/PreferencesDB';
+import { deletePreference, PREF_KEYS } from '../services/PreferencesDB';
 import { normalizeSearchText } from '../services/searchNormalize';
 import { matchesAllLabels } from '../utils/labelUtils';
 import { useAccountsData } from './AccountsDataContext';
@@ -63,14 +63,22 @@ export const OperationsDataProvider = ({ children }) => {
   // Legacy filter state tracking (for backwards compatibility)
   const [filtersActive, setFiltersActive] = useState(false);
 
+  // The filter set `operations` was last loaded for (the `activeFilters` object
+  // handed to loadInitialOperations). Changing a filter narrows the rows already
+  // held in memory at once, then reloads; until the reload lands, the list is
+  // the OLD result set seen through the new filter. Anything that sums the list
+  // as "the answer" (the search card) compares this with `activeFilters` by
+  // reference to know the answer is in.
+  const [resultsFilters, setResultsFilters] = useState(null);
+
   // Operation types whose localized label matches the current query, so the SQL
   // search can return them. The label ("transfer", "перевод", ...) lives in the
   // translation files rather than in any column, so SQL cannot find it on its
   // own; the in-memory pass below matches it, but that pass can only narrow the
   // rows SQL returned, never add to them. Resolved here and handed to the query
   // as `searchTypes` at the call site. Deliberately NOT part of `activeFilters`:
-  // that object is persisted verbatim to PreferencesDB, and a derived member
-  // would be written to disk and would fire the persistence effect on its own.
+  // that object is the user's own filter set, compared by reference to decide
+  // when to reload, and a derived member would fire that reload on its own.
   const searchTypes = useMemo(() => {
     const trimmed = searchState.text ? searchState.text.trim() : '';
     if (!trimmed) return [];
@@ -300,41 +308,21 @@ export const OperationsDataProvider = ({ children }) => {
     return count;
   }, [searchState]);
 
-  // Load filters from PreferencesDB on mount
+  // Filters are deliberately NOT restored on launch: a search is a question asked
+  // now, and a list that opens days later still narrowed to "coffee" reads as
+  // missing data. Builds before this change saved the last search under
+  // OPERATIONS_FILTERS; drop that row once so it neither lingers in the
+  // preferences table nor travels into backups. Best effort: a failure here
+  // only leaves an unread row behind.
   useEffect(() => {
-    let mounted = true;
-    const loadFilters = async () => {
+    (async () => {
       try {
-        const filters = await getJsonPreference(PREF_KEYS.OPERATIONS_FILTERS);
-        if (!mounted) return;
-        if (filters) {
-          const normalized = {
-            text: filters.searchText || '',
-            types: filters.types || [],
-            accountIds: filters.accountIds || [],
-            categoryIds: filters.categoryIds || [],
-            labels: filters.labels || [],
-            dateRange: filters.dateRange || { startDate: null, endDate: null },
-            amountRange: filters.amountRange || { min: null, max: null },
-          };
-          setSearchState(normalized);
-          setFiltersActive(hasActiveFilters({
-            types: normalized.types,
-            accountIds: normalized.accountIds,
-            categoryIds: normalized.categoryIds,
-            labels: normalized.labels,
-            searchText: normalized.text,
-            dateRange: normalized.dateRange,
-            amountRange: normalized.amountRange,
-          }));
-        }
-      } catch (error) {
-        if (mounted) console.error('Failed to load filters:', error);
+        await deletePreference(PREF_KEYS.OPERATIONS_FILTERS);
+      } catch {
+        // Nothing reads the row any more; leaving it is harmless.
       }
-    };
-    loadFilters();
-    return () => { mounted = false; };
-  }, [hasActiveFilters]);
+    })();
+  }, []);
 
   // Listen for DATABASE_RESET event to clear operations state
   useEffect(() => {
@@ -362,6 +350,7 @@ export const OperationsDataProvider = ({ children }) => {
     hasNewerOperations,
     activeFilters,
     filtersActive,
+    resultsFilters,
 
     // New search state API
     searchState,
@@ -382,6 +371,7 @@ export const OperationsDataProvider = ({ children }) => {
     _setLoadingMore: setLoadingMore,
     _setLoadingNewer: setLoadingNewer,
     _setFiltersActive: setFiltersActive,
+    _setResultsFilters: setResultsFilters,
     _setSearchState: setSearchState,
     _setSearchText: setSearchText,
     _updateSearchFilters: updateSearchFilters,
@@ -398,6 +388,7 @@ export const OperationsDataProvider = ({ children }) => {
     hasMoreOperations,
     hasNewerOperations,
     filtersActive,
+    resultsFilters,
     searchState,
     searchTypes,
     searchCategoryIds,

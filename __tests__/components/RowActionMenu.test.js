@@ -10,7 +10,7 @@
 import React from 'react';
 import { BackHandler, StyleSheet, Text, View } from 'react-native';
 import { render, fireEvent, waitFor } from '@testing-library/react-native';
-import RowActionMenu from '../../app/components/RowActionMenu';
+import RowActionMenu, { chipSectionMetrics } from '../../app/components/RowActionMenu';
 import {
   OverlayHostProvider,
   OverlayOutlet,
@@ -199,6 +199,107 @@ describe('RowActionMenu', () => {
       await renderMenu({ menu: null, actions: makeActions(2) });
       await waitFor(() => expect(spy).not.toHaveBeenCalled());
       spy.mockRestore();
+    });
+  });
+
+  // An optional line of shortcut chips under the actions (the operations menu's
+  // "Find by" category and labels).
+  describe('Chip row', () => {
+    const makeChipRow = () => ({
+      title: 'Find by',
+      chips: [
+        { key: 'category', label: 'Cafe', icon: 'coffee', onPress: jest.fn() },
+        { key: 'label-coffee', label: 'coffee', icon: 'tag-outline', a11yLabel: 'Find coffee', onPress: jest.fn() },
+      ],
+    });
+
+    it('draws the title and every chip under the actions', async () => {
+      const { getByTestId, getByText } = await renderMenu({
+        menu: makeMenu(), actions: makeActions(2), chipRow: makeChipRow(),
+      });
+      await waitFor(() => expect(getByTestId('row-action-chips')).toBeTruthy());
+      expect(getByText('Find by')).toBeTruthy();
+      // The icon mock prints its glyph name, so the label is matched at the end.
+      expect(getByTestId('row-action-chip-category')).toHaveTextContent(/Cafe$/);
+      expect(getByTestId('row-action-chip-label-coffee')).toHaveTextContent(/coffee$/);
+    });
+
+    it('closes the menu, then runs the chip', async () => {
+      const calls = [];
+      const onClose = jest.fn(() => calls.push('close'));
+      const chipRow = makeChipRow();
+      chipRow.chips[1].onPress.mockImplementation(() => calls.push('chip'));
+      const { getByTestId } = await renderMenu({
+        menu: makeMenu(), actions: makeActions(2), chipRow, onClose,
+      });
+      await waitFor(() => expect(getByTestId('row-action-chip-label-coffee')).toBeTruthy());
+
+      fireEvent.press(getByTestId('row-action-chip-label-coffee'));
+      expect(calls).toEqual(['close', 'chip']);
+    });
+
+    it('names a chip to a screen reader by its full phrase when it has one', async () => {
+      const { getByLabelText } = await renderMenu({
+        menu: makeMenu(), actions: makeActions(2), chipRow: makeChipRow(),
+      });
+      await waitFor(() => expect(getByLabelText('Find coffee')).toBeTruthy());
+      expect(getByLabelText('Cafe')).toBeTruthy();
+    });
+
+    it('does not dismiss the menu when the strip around the chips is tapped', async () => {
+      const onClose = jest.fn();
+      const { getByTestId } = await renderMenu({
+        menu: makeMenu(), actions: makeActions(2), chipRow: makeChipRow(), onClose,
+      });
+      await waitFor(() => expect(getByTestId('row-action-chips')).toBeTruthy());
+      fireEvent.press(getByTestId('row-action-chips'));
+      expect(onClose).not.toHaveBeenCalled();
+    });
+
+    it('makes the bar taller by the chip section, keeping the actions their own height', async () => {
+      const plain = await renderMenu({ menu: makeMenu(), actions: makeActions(4) });
+      const withChips = await renderMenu({ menu: makeMenu(), actions: makeActions(4), chipRow: makeChipRow() });
+      await waitFor(() => expect(withChips.getByTestId('row-action-chips')).toBeTruthy());
+
+      const panelOf = (queries) => queries.getByTestId('row-action-a0').parent.parent;
+      const plainHeight = StyleSheet.flatten(panelOf(plain).props.style).height;
+      const chipsHeight = StyleSheet.flatten(panelOf(withChips).props.style).height;
+      expect(chipsHeight).toBeGreaterThan(plainHeight);
+
+      const actionsRow = withChips.getByTestId('row-action-a0').parent;
+      expect(StyleSheet.flatten(actionsRow.props.style).height).toBe(plainHeight);
+    });
+
+    // The eyebrow and the chip labels are set in sp, so the section is sized
+    // from the system font scale; a fixed height let large text spill out of
+    // the bar or onto the lifted row.
+    it('grows the chip section with the system font size', () => {
+      const normal = chipSectionMetrics(1);
+      const largest = chipSectionMetrics(2);
+      expect(normal.chipHeight).toBe(40);
+      expect(largest.chipHeight).toBeGreaterThan(normal.chipHeight);
+      expect(largest.sectionHeight).toBeGreaterThan(normal.sectionHeight);
+      // Never smaller than the default, never past Android's largest setting.
+      expect(chipSectionMetrics(0.85)).toEqual(normal);
+      expect(chipSectionMetrics(3)).toEqual(largest);
+    });
+
+    it('gives the section room for its eyebrow and chip at any scale', () => {
+      [1, 1.3, 1.5, 2].forEach((scale) => {
+        const { chipHeight, sectionHeight } = chipSectionMetrics(scale);
+        expect(sectionHeight).toBeGreaterThanOrEqual(chipHeight + Math.ceil(14 * scale) + 16);
+      });
+    });
+
+    it.each([
+      ['no chip row', undefined],
+      ['an empty chip row', { title: 'Find by', chips: [] }],
+    ])('draws no chip section for %s', async (_, chipRow) => {
+      const { getByTestId, queryByTestId } = await renderMenu({
+        menu: makeMenu(), actions: makeActions(2), chipRow,
+      });
+      await waitFor(() => expect(getByTestId('row-action-a0')).toBeTruthy());
+      expect(queryByTestId('row-action-chips')).toBeNull();
     });
   });
 });

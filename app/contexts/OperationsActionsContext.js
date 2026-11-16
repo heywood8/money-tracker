@@ -6,7 +6,6 @@ import * as Currency from '../services/currency';
 import { useAccountsActions } from './AccountsActionsContext';
 import { appEvents, EVENTS } from '../services/eventEmitter';
 import { useDialog } from './DialogContext';
-import { setJsonPreference, PREF_KEYS } from '../services/PreferencesDB';
 import { useOperationsData } from './OperationsDataContext';
 import { formatDate as formatLocalDate } from '../services/BalanceHistoryDB';
 
@@ -55,6 +54,7 @@ export const OperationsActionsProvider = ({ children }) => {
     _setLoadingMore,
     _setLoadingNewer,
     _setFiltersActive,
+    _setResultsFilters,
     _setSearchState,
     _setSearchText,
     _updateSearchFilters,
@@ -167,6 +167,8 @@ export const OperationsActionsProvider = ({ children }) => {
       }
 
       _setOperations(operationsData);
+      // Same commit as the rows, so nothing renders them under the wrong set.
+      _setResultsFilters(effectiveFilters);
 
       // Track the oldest and newest dates in the initial load
       if (operationsData.length > 0) {
@@ -201,6 +203,7 @@ export const OperationsActionsProvider = ({ children }) => {
     _setHasNewerOperations,
     _setHasMoreOperations,
     _setDataLoaded,
+    _setResultsFilters,
     withLocalMatches,
   ]);
 
@@ -368,11 +371,11 @@ export const OperationsActionsProvider = ({ children }) => {
     prevStructuralRef.current = activeFilters;
 
     // The locally-resolved matches depend on the language and the category tree,
-    // both loaded asynchronously. A restored query like "Перевод" can therefore
-    // be sent to SQL before the translations arrive, matching nothing; when they
-    // land, `searchTypes` changes and the query has to be reissued. Tracked
-    // separately from `activeFilters` because these are derived and must not be
-    // persisted.
+    // both loaded asynchronously. A query like "Перевод" typed while they load
+    // can therefore be sent to SQL before the translations arrive, matching
+    // nothing; when they land, `searchTypes` changes and the query has to be
+    // reissued. Tracked separately from `activeFilters` because these are
+    // derived, not the user's own filters.
     const localMatchesChanged = prevLocalMatchesKeyRef.current !== localMatchesKey;
     prevLocalMatchesKeyRef.current = localMatchesKey;
 
@@ -389,14 +392,6 @@ export const OperationsActionsProvider = ({ children }) => {
 
     if (filtersChanged || localMatchesChanged) {
       loadInitialOperations(activeFilters, false);
-    }
-
-    // Only the user's own filters are persisted, and only when they changed —
-    // a language load must not rewrite the stored blob.
-    if (filtersChanged) {
-      setJsonPreference(PREF_KEYS.OPERATIONS_FILTERS, activeFilters).catch(err => {
-        console.error('Failed to persist filters:', err);
-      });
     }
   }, [activeFilters, localMatchesKey, loadInitialOperations]);
 
@@ -632,8 +627,8 @@ export const OperationsActionsProvider = ({ children }) => {
       const isActive = _hasActiveFilters(newFilters);
       _setFiltersActive(isActive);
 
-      // Persist filters to PreferencesDB
-      await setJsonPreference(PREF_KEYS.OPERATIONS_FILTERS, newFilters);
+      // Filters live for the session only (see OperationsDataContext), so
+      // nothing is written here.
 
       // Reset to first week when filters change
       await loadInitialOperations(newFilters);

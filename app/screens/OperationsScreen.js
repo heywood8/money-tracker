@@ -36,6 +36,10 @@ import { SUGGESTION_TIMEOUT_MS } from '../components/operations/DescriptionSugge
 import SearchOverlay from '../components/search/SearchOverlay';
 import SearchBar from '../components/search/SearchBar';
 import FilterChipStrip from '../components/search/FilterChipStrip';
+import SearchInsightCard from '../components/operations/SearchInsightCard';
+import { buildSearchInsight } from '../utils/searchInsight';
+import { getCategoryNames } from '../utils/categoryUtils';
+import { displayLabel } from '../utils/labelUtils';
 import * as Currency from '../services/currency';
 import { hasOperation, evaluateExpression } from '../utils/calculatorUtils';
 import useMultiCurrencyTransfer from '../hooks/useMultiCurrencyTransfer';
@@ -78,6 +82,20 @@ const DECK_SETTLE_MS = 600;
 const LAYOUT_LOG_EPSILON = 8;
 const LAYOUT_SETTLE_LOG_MS = 250;
 
+// Every search field at rest. A "Find by" chip from the long-press menu merges
+// its one filter over this, so the search it starts is that one thing alone.
+// Module-level so the arrays keep their identity from one chip to the next: the
+// reload effect compares filters by reference.
+const BLANK_SEARCH = {
+  text: '',
+  types: [],
+  accountIds: [],
+  categoryIds: [],
+  labels: [],
+  dateRange: { startDate: null, endDate: null },
+  amountRange: { min: null, max: null },
+};
+
 // Map a QuickAdd validation failure to the form field that should flash red,
 // so single-field omissions get the same lightweight inline treatment the
 // missing-category case already had (instead of a blocking OK dialog). The
@@ -108,6 +126,8 @@ const OperationsScreen = () => {
     searchState,
     hasActiveSearch,
     getSearchFilterCount,
+    activeFilters,
+    resultsFilters,
   } = useOperationsData();
   const {
     deleteOperation,
@@ -121,6 +141,7 @@ const OperationsScreen = () => {
     jumpToDate,
     setSearchText,
     updateSearchFilters,
+    clearAllSearch,
     loadInitialOperations,
   } = useOperationsActions();
   const { accounts, visibleAccounts, loading: accountsLoading } = useAccountsData();
@@ -207,7 +228,7 @@ const OperationsScreen = () => {
   const quickAddInFlightRef = useRef(null);
   const [quickAddSaving, setQuickAddSaving] = useState(false);
 
-  const { searchMode, filtersExpanded, openSearch, closeSearch, reopenSearch, toggleFilters } = useSearch();
+  const { searchMode, filtersExpanded, openSearch, closeSearch, reopenSearch, toggleFilters, setSearchMode } = useSearch();
   const isSearchOpen = searchMode === 'open';
 
   // The Drive backup reports itself through the resting search pill rather than a
@@ -683,14 +704,17 @@ const OperationsScreen = () => {
   // Declared here (not after the unrelated effects below) because several hooks
   // reference it in their dependency arrays; declaring later would put it in
   // the Temporal Dead Zone when those arrays are evaluated during render.
-  const groupedOperations = useMemo(() => {
-    // Rows whose delete is in flight are dropped here rather than at the list:
-    // the day's spending sums are accumulated in this same pass, so filtering
-    // further down would leave a deleted row's amount in the header total.
-    const visible = hiddenOperationIds.size === 0
+  // Rows whose delete is in flight are dropped before anything is summed rather
+  // than at the list: the day headers and the search card total these rows, and
+  // filtering further down would leave a deleted row's amount in their figures.
+  const visibleOperations = useMemo(() => (
+    hiddenOperationIds.size === 0
       ? operations
-      : operations.filter(operation => !hiddenOperationIds.has(operation.id));
-    const sorted = [...visible].sort((a, b) => new Date(b.date) - new Date(a.date));
+      : operations.filter(operation => !hiddenOperationIds.has(operation.id))
+  ), [operations, hiddenOperationIds]);
+
+  const groupedOperations = useMemo(() => {
+    const sorted = [...visibleOperations].sort((a, b) => new Date(b.date) - new Date(a.date));
     const groups = [];
     let currentGroup = null;
 
@@ -733,7 +757,79 @@ const OperationsScreen = () => {
     });
 
     return groups;
-  }, [operations, accounts, hiddenOperationIds]);
+  }, [visibleOperations, accounts]);
+
+  // What the search is about, when it is about one thing: one label or one
+  // category, which is what the long-press menu's "Find by" chips set. Other
+  // filters may sit beside it; the card's figures cover whatever the list shows.
+  // A category's chart draws its own side (expense or income); a label can be on
+  // either, so its chart draws whichever the results hold more of.
+  const searchSubject = useMemo(() => {
+    const labels = searchState?.labels ?? [];
+    const categoryIds = searchState?.categoryIds ?? [];
+    if (labels.length === 1 && categoryIds.length === 0) {
+      return { name: displayLabel(labels[0]), icon: 'tag-outline', chartType: 'auto' };
+    }
+    if (categoryIds.length === 1 && labels.length === 0) {
+      const category = categories.find(cat => cat.id === categoryIds[0]);
+      if (!category) return null;
+      // With its folder, as the row's subtitle names it: two folders can each
+      // hold an "Other", and the card is the only place saying which is shown.
+      const { categoryName, parentName } = getCategoryNames(category.id, categories, t);
+      return {
+        name: parentName ? `${parentName} › ${categoryName}` : categoryName,
+        icon: category.icon || 'shape-outline',
+        chartType: category.categoryType === 'income' ? 'income' : 'expense',
+      };
+    }
+    return null;
+  }, [searchState?.labels, searchState?.categoryIds, categories, t]);
+
+  const currencyByAccountId = useMemo(
+    () => new Map(accounts.map(account => [account.id, account.currency || 'USD'])),
+    [accounts],
+  );
+
+  // The chart's months end with the current one. Read on every render, so a
+  // screen left open past midnight on the 1st moves its window the next time
+  // anything renders (coming back to the app does).
+  const currentMonthKey = toDateString(new Date()).slice(0, 7);
+
+  // Figures only over the whole, current answer:
+  //  - the rows must be the ones loaded FOR these filters: changing a filter
+  //    first narrows the old rows in memory, and a total over those would be
+  //    the old search's answer under the new search's name;
+  //  - and all of them: a filtered load fetches every match at once
+  //    (hasMoreOperations false); anything still paging (a jump to a date under
+  //    a search) holds part of the answer.
+  const liveSearchInsight = useMemo(() => {
+    if (!hasActiveSearch || operationsLoading || hasMoreOperations) return null;
+    if (resultsFilters !== activeFilters) return null;
+    const [year, month] = currentMonthKey.split('-').map(Number);
+    return {
+      subject: searchSubject,
+      insight: buildSearchInsight(visibleOperations, currencyByAccountId, {
+        chartType: searchSubject ? searchSubject.chartType : null,
+        now: new Date(year, month - 1, 1),
+      }),
+    };
+  }, [hasActiveSearch, operationsLoading, hasMoreOperations, resultsFilters, activeFilters, currentMonthKey, visibleOperations, currencyByAccountId, searchSubject]);
+
+  // While a new answer loads, the card keeps showing the last whole one, title
+  // and all, rather than vanishing: a card that left and came back on every
+  // filter change would bounce the list under the user's thumb. It goes the
+  // moment the search ends.
+  //
+  // Held in a ref, not state: it is derived from this render's inputs alone, so
+  // writing it here is idempotent, and with no setState there is no way for an
+  // input whose identity churns to turn into a render loop.
+  const lastSearchInsightRef = useRef(null);
+  if (!hasActiveSearch) {
+    lastSearchInsightRef.current = null;
+  } else if (liveSearchInsight) {
+    lastSearchInsightRef.current = liveSearchInsight;
+  }
+  const searchInsight = lastSearchInsightRef.current;
 
   // Scroll to date after operations are loaded
   useEffect(() => {
@@ -987,6 +1083,31 @@ const OperationsScreen = () => {
     const op = actionMenu?.operation;
     if (op) handleDeleteOperation(op);
   }, [actionMenu, handleDeleteOperation]);
+
+  // "Find by" chips in the long-press menu. One tap asks one question, so the
+  // chip REPLACES the search rather than narrowing it: a second label replaces
+  // the first, a category replaces a label, and any text or other filter goes.
+  // The search is left collapsed, not opened: opening focuses the text field,
+  // and the keyboard would cover the very list that was just narrowed. The
+  // card at the top of the list (SearchInsightCard) says what is shown and
+  // clears it. A search the user already has open stays open.
+  const runFindBy = useCallback((filters) => {
+    updateSearchFilters({ ...BLANK_SEARCH, ...filters });
+    if (searchMode !== 'open') setSearchMode('collapsed');
+    // The row that was long-pressed may sit far down the old list; the answer
+    // starts at the top.
+    requestAnimationFrame(() => {
+      flatListRef.current?.scrollToOffset({ offset: 0, animated: false });
+    });
+  }, [updateSearchFilters, searchMode, setSearchMode]);
+
+  const handleFindByLabel = useCallback((label) => {
+    runFindBy({ labels: [label] });
+  }, [runFindBy]);
+
+  const handleFindByCategory = useCallback((categoryId) => {
+    runFindBy({ categoryIds: [categoryId] });
+  }, [runFindBy]);
 
   const handleDateSeparatorPress = useCallback((dateString) => {
     // Parse the date and set it as the selected date (T00:00:00 anchors the bare
@@ -1635,6 +1756,43 @@ const OperationsScreen = () => {
     </>
   ), [animatedQuickAddClipStyle, animatedQuickAddSlideStyle, handleQuickAddClipLayout, quickAddCollapsed, deckUp, colors, t, quickAddValuesStore, setQuickAddValues, isMultiCurrencyTransfer, sourceAccount, destinationAccount, lastEditedField, setLastEditedField, setRateSource, visibleAccounts, filteredCategories, topCategoriesForType, getCategoryInfo, getAccountName, getAccountBalance, getCategoryName, openPicker, handleQuickAdd, handleAmountChange, handleExchangeRateChange, handleDestinationAmountChange, handleAutoAddWithCategory, topTransferAccountsForForm, handleAutoAddWithAccount, TYPES, rateSource, handleOperationCurrencyChange, foreignRateSource, foreignExchangeRate, filterPanelHeight, filtersExpanded, quickAddFlash, quickAddSaving, operationSuggestions, hasSuggestions, quickAddHeight, handleQuickAddLayout, handleDeckHostLayout, accounts, categories, suggestionSaveErrors, suggestionChoices, setSuggestionChoice, acceptSuggestion, dismissSuggestion]);
 
+  // The card's ✕ ends the search outright, the way the menu chip started it:
+  // every filter goes and the bar returns to rest.
+  const handleClearSearchInsight = useCallback(() => {
+    clearAllSearch();
+    closeSearch(false);
+  }, [clearAllSearch, closeSearch]);
+
+  const searchInsightCard = useMemo(() => (
+    searchInsight ? (
+      <SearchInsightCard
+        subject={searchInsight.subject}
+        insight={searchInsight.insight}
+        colors={colors}
+        t={t}
+        language={language}
+        onClear={handleClearSearchInsight}
+      />
+    ) : null
+  ), [searchInsight, colors, t, language, handleClearSearchInsight]);
+
+  // The card sits under the quick-add block (and the filter panel's spacer), so
+  // it lands directly above the first result. One shape whether or not the card
+  // is up (it is simply null when not): wrapping the quick-add block only while
+  // the card shows would make React see a different tree each time it came or
+  // went, and remount the form, its clip and its measured heights with it.
+  const listHeaderComponent = useMemo(() => (
+    <>
+      {quickAddFormComponent}
+      {searchInsightCard}
+    </>
+  ), [quickAddFormComponent, searchInsightCard]);
+
+  const getFilterCategoryName = useCallback((categoryId) => {
+    if (!categories.some(category => category.id === categoryId)) return null;
+    return getCategoryNames(categoryId, categories, t).categoryName;
+  }, [categories, t]);
+
   // Auto-scroll to top when filter panel closes, but only if the user is still
   // near the top (hasn't scrolled into past dates). The threshold is filterPanelHeight:
   // if the offset is within the spacer region the user was viewing recent entries.
@@ -1946,7 +2104,7 @@ const OperationsScreen = () => {
         onContentSizeChange={handleContentSizeChange}
         refreshing={pullRefreshing}
         onRefresh={handlePullRefresh}
-        headerComponent={quickAddFormComponent}
+        headerComponent={listHeaderComponent}
         pendingSuggestionId={pendingSuggestionId}
         pendingSuggestions={pendingSuggestions}
         onApplySuggestion={handleApplySuggestion}
@@ -2004,6 +2162,7 @@ const OperationsScreen = () => {
             colors={colors}
             t={t}
             language={language}
+            getCategoryName={getFilterCategoryName}
           />
         )}
       </View>
@@ -2031,11 +2190,14 @@ const OperationsScreen = () => {
         menu={actionMenu}
         colors={colors}
         t={t}
+        categories={categories}
         onClose={closeActionMenu}
         onEdit={handleMenuEdit}
         onRepeat={handleMenuRepeat}
         onToggleCharts={handleMenuToggleCharts}
         onDelete={handleMenuDelete}
+        onFindByCategory={handleFindByCategory}
+        onFindByLabel={handleFindByLabel}
       />
 
       {/* Scroll to Top Button - only show when scrolled down */}
