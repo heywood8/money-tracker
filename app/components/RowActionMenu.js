@@ -1,11 +1,12 @@
 import React, { memo, useCallback, useEffect, useMemo, useRef, useState } from 'react';
-import { BackHandler, View, Text, Pressable, StyleSheet, Animated, Dimensions } from 'react-native';
+import { BackHandler, View, Text, Pressable, ScrollView, StyleSheet, Animated, Dimensions, useWindowDimensions } from 'react-native';
 import PropTypes from 'prop-types';
 import Icon from '@expo/vector-icons/MaterialCommunityIcons';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import ModalBlurOverlay from './ModalBlurOverlay';
 import { OverlayPortal } from '../contexts/OverlayHostContext';
 import { SPACING, BORDER_RADIUS, FONT_SIZE, ICON_SIZE } from '../styles/designTokens';
+import { CHIP, CHIP_TEXT, SECTION_LABEL } from '../styles/componentStyles';
 import { isReduceMotionEnabled } from '../utils/reducedMotion';
 
 // Height of one row of action buttons; a menu with more actions than fit across
@@ -15,6 +16,31 @@ const PANEL_ROW_HEIGHT = 68;
 const GAP = 10;
 // Past four across, the labels stop being readable at a row's width.
 const MAX_PER_ROW = 4;
+// The optional chip row under the actions (see `chipRow`): an eyebrow over one
+// horizontally scrolling line of chips. One line, scrolled rather than wrapped,
+// so its height is known before layout and the bar can still be placed above or
+// below the row in the same pass. A chip is at least 40 dp, which keeps a
+// thumb's target without the row of them towering over the actions.
+const CHIP_MIN_HEIGHT = 40;
+// Line heights of the eyebrow (FONT_SIZE.xs) and a chip's label (FONT_SIZE.sm)
+// at the default font size. Both are set in sp and grow with the system font
+// size, so the section is sized from them rather than fixed.
+const TITLE_LINE_HEIGHT = 14;
+const CHIP_LINE_HEIGHT = 17;
+// Android's largest font size setting.
+const MAX_FONT_SCALE = 2;
+
+/**
+ * The chip section's height and a chip's, for a system font scale.
+ * @param {number} fontScale
+ * @returns {{ chipHeight: number, sectionHeight: number }}
+ */
+export const chipSectionMetrics = (fontScale) => {
+  const scale = Math.min(Math.max(fontScale || 1, 1), MAX_FONT_SCALE);
+  const chipHeight = Math.max(CHIP_MIN_HEIGHT, Math.ceil(CHIP_LINE_HEIGHT * scale) + 2 * SPACING.sm);
+  const sectionHeight = SPACING.sm + Math.ceil(TITLE_LINE_HEIGHT * scale) + SPACING.sm + chipHeight + SPACING.md;
+  return { chipHeight, sectionHeight };
+};
 
 /**
  * How the actions are laid out: at most MAX_PER_ROW across, and when a second row
@@ -67,8 +93,9 @@ const TONES = {
  * expected feel for a context menu, and keeping no internal open/close state avoids
  * setState-in-effect churn).
  */
-function RowActionMenu({ menu, actions, colors, onClose, testIDPrefix }) {
+function RowActionMenu({ menu, actions, chipRow = null, colors, onClose, testIDPrefix }) {
   const insets = useSafeAreaInsets();
+  const { fontScale } = useWindowDimensions();
   const progress = useRef(new Animated.Value(0)).current;
   // Height of the overlay layer itself, not of the screen: the layer is the box the
   // panel is being placed in, so clamping against anything else re-introduces the
@@ -117,7 +144,10 @@ function RowActionMenu({ menu, actions, colors, onClose, testIDPrefix }) {
   }, [isOpen, progress]);
 
   const layout = menu?.layout ?? null;
-  const panelHeight = panelRows(actions.length) * PANEL_ROW_HEIGHT;
+  const hasChips = !!chipRow && chipRow.chips.length > 0;
+  const actionsHeight = panelRows(actions.length) * PANEL_ROW_HEIGHT;
+  const { chipHeight, sectionHeight } = chipSectionMetrics(fontScale);
+  const panelHeight = actionsHeight + (hasChips ? sectionHeight : 0);
 
   // Where the floating icon bar goes. Prefer above the row; fall back to below.
   // Both edges are bounded so the bar never lands under the status bar / notch
@@ -222,7 +252,13 @@ function RowActionMenu({ menu, actions, colors, onClose, testIDPrefix }) {
                 : { left: SPACING.lg, right: SPACING.lg },
             ]}
           >
-            <Pressable style={styles.panelRow} onPress={swallowTap}>
+            {/* Without chips the actions fill the panel, as they always have; with
+                them the actions keep their own rows' height and the chip section
+                takes what is left inside the border. */}
+            <Pressable
+              style={[styles.panelRow, hasChips ? { height: actionsHeight } : styles.fill]}
+              onPress={swallowTap}
+            >
               {actions.map((action) => (
                 <ActionButton
                   key={action.key}
@@ -234,6 +270,35 @@ function RowActionMenu({ menu, actions, colors, onClose, testIDPrefix }) {
                 />
               ))}
             </Pressable>
+            {hasChips && (
+              <Pressable
+                testID={`${testIDPrefix}-chips`}
+                style={[styles.chipSection, { borderTopColor: colors.border }]}
+                onPress={swallowTap}
+              >
+                <Text style={[styles.chipTitle, { color: colors.mutedText }]} numberOfLines={1}>
+                  {chipRow.title}
+                </Text>
+                <ScrollView
+                  horizontal
+                  showsHorizontalScrollIndicator={false}
+                  keyboardShouldPersistTaps="handled"
+                  style={styles.chipScroll}
+                  contentContainerStyle={styles.chipScrollContent}
+                >
+                  {chipRow.chips.map((chip) => (
+                    <ChipButton
+                      key={chip.key}
+                      testID={`${testIDPrefix}-chip-${chip.key}`}
+                      chip={chip}
+                      colors={colors}
+                      height={chipHeight}
+                      onClose={onClose}
+                    />
+                  ))}
+                </ScrollView>
+              </Pressable>
+            )}
           </Animated.View>
         </Pressable>
       </OverlayPortal>
@@ -264,6 +329,51 @@ function ActionButton({ testID, action, colors, width, onClose }) {
     </Pressable>
   );
 }
+
+// A chip in the row under the actions: a shortcut that names something the
+// pressed row carries (a category, a label) rather than a verb on the row.
+// Chosen like an action — the menu closes first, then the chip's onPress runs.
+function ChipButton({ testID, chip, colors, height, onClose }) {
+  const handlePress = () => {
+    onClose();
+    chip.onPress();
+  };
+  return (
+    <Pressable
+      testID={testID}
+      onPress={handlePress}
+      style={({ pressed }) => [
+        styles.chip,
+        { height, backgroundColor: colors.background, borderColor: colors.border },
+        pressed && styles.actionButtonPressed,
+      ]}
+      accessibilityRole="button"
+      accessibilityLabel={chip.a11yLabel || chip.label}
+    >
+      {chip.icon ? <Icon name={chip.icon} size={ICON_SIZE.xs} color={colors.mutedText} /> : null}
+      <Text style={[styles.chipText, { color: colors.text }]} numberOfLines={1}>
+        {chip.label}
+      </Text>
+    </Pressable>
+  );
+}
+
+const chipShape = PropTypes.shape({
+  // Identifies the chip and names its testID under the host's prefix.
+  key: PropTypes.string.isRequired,
+  label: PropTypes.string.isRequired,
+  icon: PropTypes.string,
+  a11yLabel: PropTypes.string,
+  onPress: PropTypes.func.isRequired,
+});
+
+ChipButton.propTypes = {
+  testID: PropTypes.string,
+  chip: chipShape.isRequired,
+  colors: PropTypes.object.isRequired,
+  height: PropTypes.number.isRequired,
+  onClose: PropTypes.func.isRequired,
+};
 
 const actionShape = PropTypes.shape({
   // Identifies the action and names its testID under the host's prefix.
@@ -296,6 +406,13 @@ RowActionMenu.propTypes = {
     row: PropTypes.node,
   }),
   actions: PropTypes.arrayOf(actionShape).isRequired,
+  // Optional line of shortcut chips under the actions, with an eyebrow naming
+  // what they do. Omitted (or empty), the menu is the plain icon bar. Hosts keep
+  // it stable for the memo below, as they do `actions`.
+  chipRow: PropTypes.shape({
+    title: PropTypes.string.isRequired,
+    chips: PropTypes.arrayOf(chipShape).isRequired,
+  }),
   colors: PropTypes.object.isRequired,
   onClose: PropTypes.func.isRequired,
   testIDPrefix: PropTypes.string.isRequired,
@@ -331,6 +448,32 @@ const styles = StyleSheet.create({
     right: 0,
     top: 0,
   },
+  chip: {
+    ...CHIP,
+    paddingVertical: 0,
+  },
+  chipScroll: {
+    flexGrow: 0,
+  },
+  chipScrollContent: {
+    alignItems: 'center',
+    gap: SPACING.sm,
+    paddingHorizontal: SPACING.md,
+  },
+  chipSection: {
+    borderTopWidth: StyleSheet.hairlineWidth,
+    flex: 1,
+    gap: SPACING.sm,
+    justifyContent: 'center',
+  },
+  chipText: {
+    ...CHIP_TEXT,
+    maxWidth: 160,
+  },
+  chipTitle: {
+    ...SECTION_LABEL,
+    paddingHorizontal: SPACING.md,
+  },
   clone: {
     borderRadius: BORDER_RADIUS.md,
     borderWidth: 1,
@@ -357,7 +500,6 @@ const styles = StyleSheet.create({
   },
   panelRow: {
     alignItems: 'center',
-    flex: 1,
     flexDirection: 'row',
     flexWrap: 'wrap',
     justifyContent: 'center',

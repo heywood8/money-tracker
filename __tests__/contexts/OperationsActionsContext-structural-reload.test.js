@@ -10,6 +10,7 @@ import { useOperationsData } from '../../app/contexts/OperationsDataContext';
 import { useOperationsActions } from '../../app/contexts/OperationsActionsContext';
 import { OperationsProvider } from '../../app/contexts/OperationsContext';
 import * as OperationsDB from '../../app/services/OperationsDB';
+import * as PreferencesDB from '../../app/services/PreferencesDB';
 
 jest.mock('../../app/services/OperationsDB');
 jest.mock('../../app/services/PreferencesDB', () => ({
@@ -17,6 +18,7 @@ jest.mock('../../app/services/PreferencesDB', () => ({
   getJsonPreference: jest.fn(() => Promise.resolve(null)),
   setPreference: jest.fn(() => Promise.resolve()),
   getPreference: jest.fn(() => Promise.resolve(null)),
+  deletePreference: jest.fn(() => Promise.resolve()),
   PREF_KEYS: {
     OPERATIONS_FILTERS: 'operations_active_filters',
     LANGUAGE: 'language',
@@ -94,7 +96,6 @@ describe('OperationsActionsContext - structural filter reload detection', () => 
     OperationsDB.getOperationsByWeekOffset.mockResolvedValue([]);
     OperationsDB.getFilteredOperationsAllDates.mockResolvedValue([]);
     OperationsDB.getFilteredOperationsAllDates.mockResolvedValue([]);
-    const PreferencesDB = require('../../app/services/PreferencesDB');
     mockSetJsonPreference = PreferencesDB.setJsonPreference;
   });
 
@@ -330,7 +331,7 @@ describe('OperationsActionsContext - structural filter reload detection', () => 
     });
   });
 
-  describe('setJsonPreference is called for every filter change', () => {
+  describe('filters are kept for the session only', () => {
     it('does NOT call setJsonPreference on initial mount', async () => {
       setupHook();
 
@@ -341,7 +342,7 @@ describe('OperationsActionsContext - structural filter reload detection', () => 
       expect(mockSetJsonPreference).not.toHaveBeenCalled();
     });
 
-    it('calls setJsonPreference when searchText changes', async () => {
+    it('does not write the search text to preferences', async () => {
       const { result } = await setupHook();
 
       await waitFor(() => {
@@ -351,16 +352,12 @@ describe('OperationsActionsContext - structural filter reload detection', () => 
       await act(async () => { result.current.actions.setSearchText('coffee'); });
 
       await waitFor(() => {
-        expect(mockSetJsonPreference).toHaveBeenCalledTimes(1);
+        expect(OperationsDB.getFilteredOperationsAllDates).toHaveBeenCalled();
       });
-
-      expect(mockSetJsonPreference).toHaveBeenCalledWith(
-        'operations_active_filters',
-        expect.objectContaining({ searchText: 'coffee' }),
-      );
+      expect(mockSetJsonPreference).not.toHaveBeenCalled();
     });
 
-    it('calls setJsonPreference when structural filter changes', async () => {
+    it('does not write a structural filter to preferences', async () => {
       const { result } = await setupHook();
 
       await waitFor(() => {
@@ -368,34 +365,30 @@ describe('OperationsActionsContext - structural filter reload detection', () => 
       });
 
       await act(async () => {
-        result.current.actions.updateSearchFilters({ types: ['expense'] });
+        result.current.actions.updateSearchFilters({ labels: ['coffee'] });
       });
 
       await waitFor(() => {
-        expect(mockSetJsonPreference).toHaveBeenCalledTimes(1);
+        expect(OperationsDB.getFilteredOperationsAllDates).toHaveBeenCalled();
       });
-
-      expect(mockSetJsonPreference).toHaveBeenCalledWith(
-        'operations_active_filters',
-        expect.objectContaining({ types: ['expense'] }),
-      );
+      expect(mockSetJsonPreference).not.toHaveBeenCalled();
     });
 
-    it('calls setJsonPreference once per filter change even for text-only changes', async () => {
-      const { result } = await setupHook();
+    it('never reads a saved filter set back on mount', async () => {
+      await setupHook();
 
       await waitFor(() => {
         expect(OperationsDB.getOperationsByWeekOffset).toHaveBeenCalledTimes(1);
       });
 
-      await act(async () => { result.current.actions.setSearchText('a'); });
-      await act(async () => { result.current.actions.setSearchText('ab'); });
-      await act(async () => { result.current.actions.setSearchText('abc'); });
+      expect(PreferencesDB.getJsonPreference).not.toHaveBeenCalledWith('operations_active_filters');
+    });
+
+    it('drops the filter set older builds saved', async () => {
+      await setupHook();
 
       await waitFor(() => {
-        expect(result.current.data.searchState.text).toBe('abc');
-        // Each setSearchText can merge (React may batch), so we check at least 1 call
-        expect(mockSetJsonPreference).toHaveBeenCalled();
+        expect(PreferencesDB.deletePreference).toHaveBeenCalledWith('operations_active_filters');
       });
     });
   });

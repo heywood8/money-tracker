@@ -4,6 +4,7 @@ import Icon from '@expo/vector-icons/MaterialCommunityIcons';
 import PropTypes from 'prop-types';
 import { HORIZONTAL_PADDING } from '../../styles/designTokens';
 import { CHIP, CHIP_TEXT } from '../../styles/componentStyles';
+import { displayLabel } from '../../utils/labelUtils';
 
 const formatDateLabel = (dateRange, language) => {
   const { startDate, endDate } = dateRange;
@@ -30,7 +31,7 @@ const formatAmountLabel = (amountRange) => {
   return null;
 };
 
-const FilterChipStrip = ({ searchState, onClearGroup, colors, t, language }) => {
+const FilterChipStrip = ({ searchState, onClearGroup, colors, t, language, getCategoryName = null }) => {
   const chips = [];
 
   if (searchState.text && searchState.text.trim().length > 0) {
@@ -59,9 +60,19 @@ const FilterChipStrip = ({ searchState, onClearGroup, colors, t, language }) => 
     chips.push({ key: 'accountIds', label: `${t('accounts')}: ${searchState.accountIds.length}` });
   }
 
+  // A single category is named, as a single label is; the name comes from the
+  // host, which holds the category tree (and its translations).
+  if (searchState.categoryIds && searchState.categoryIds.length > 0) {
+    const name = searchState.categoryIds.length === 1 && getCategoryName
+      ? getCategoryName(searchState.categoryIds[0])
+      : null;
+    const label = name || `${t('categories')}: ${searchState.categoryIds.length}`;
+    chips.push({ key: 'categoryIds', label });
+  }
+
   if (searchState.labels && searchState.labels.length > 0) {
     const label = searchState.labels.length === 1
-      ? searchState.labels[0]
+      ? displayLabel(searchState.labels[0])
       : `${t('labels')}: ${searchState.labels.length}`;
     chips.push({ key: 'labels', label });
   }
@@ -118,6 +129,9 @@ FilterChipStrip.propTypes = {
     }).isRequired,
   }).isRequired,
   onClearGroup: PropTypes.func.isRequired,
+  // Resolves a category id to the name to show; without it a category filter
+  // reads as a count.
+  getCategoryName: PropTypes.func,
   colors: PropTypes.shape({
     background: PropTypes.string.isRequired,
     primary: PropTypes.string.isRequired,

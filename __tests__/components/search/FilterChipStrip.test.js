@@ -162,4 +162,64 @@ describe('FilterChipStrip', () => {
     );
     expect(getByTestId('chip-dateRange')).toBeTruthy();
   });
+
+  describe('category and label chips', () => {
+    it('names a single category through the host', async () => {
+      const getCategoryName = jest.fn(() => 'Cafe');
+      const { getByTestId } = await render(
+        <FilterChipStrip
+          {...defaultProps}
+          searchState={{ ...emptySearchState, categoryIds: ['cat-cafe'] }}
+          getCategoryName={getCategoryName}
+        />,
+      );
+      expect(getByTestId('chip-categoryIds')).toHaveTextContent(/^Cafe/);
+      expect(getCategoryName).toHaveBeenCalledWith('cat-cafe');
+    });
+
+    it('counts several categories', async () => {
+      const { getByTestId } = await render(
+        <FilterChipStrip
+          {...defaultProps}
+          searchState={{ ...emptySearchState, categoryIds: ['a', 'b'] }}
+          getCategoryName={() => 'Cafe'}
+        />,
+      );
+      expect(getByTestId('chip-categoryIds')).toHaveTextContent(/^categories: 2/);
+    });
+
+    it('counts a category it cannot name', async () => {
+      const { getByTestId } = await render(
+        <FilterChipStrip
+          {...defaultProps}
+          searchState={{ ...emptySearchState, categoryIds: ['gone'] }}
+          getCategoryName={() => null}
+        />,
+      );
+      expect(getByTestId('chip-categoryIds')).toHaveTextContent(/^categories: 1/);
+    });
+
+    it('clears the category group from its ✕', async () => {
+      const onClearGroup = jest.fn();
+      const { getByTestId } = await render(
+        <FilterChipStrip
+          {...defaultProps}
+          onClearGroup={onClearGroup}
+          searchState={{ ...emptySearchState, categoryIds: ['cat-cafe'] }}
+        />,
+      );
+      fireEvent.press(getByTestId('clear-chip-categoryIds'));
+      expect(onClearGroup).toHaveBeenCalledWith('categoryIds');
+    });
+
+    it('shows a label as the row shows it', async () => {
+      const { getByTestId } = await render(
+        <FilterChipStrip
+          {...defaultProps}
+          searchState={{ ...emptySearchState, labels: ['Note: For glasses'] }}
+        />,
+      );
+      expect(getByTestId('chip-labels')).toHaveTextContent(/^For glasses/);
+    });
+  });
 });

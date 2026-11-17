@@ -132,4 +132,126 @@ describe('OperationActionMenu', () => {
     const clone = getByText('Groceries').parent;
     expect(StyleSheet.flatten(clone.props.style)).toMatchObject({ top: 200, left: 16, width: 320 });
   });
+
+  // "Find by": the operation's category and labels as chips under the actions.
+  describe('Find by chips', () => {
+    const categories = [
+      { id: 'cat-food', name: 'Food', icon: 'food', categoryType: 'expense' },
+      { id: 'cat-cafe', name: 'Cafe', icon: 'coffee', parentId: 'cat-food', categoryType: 'expense' },
+    ];
+    const findProps = () => ({
+      ...baseProps(),
+      categories,
+      onFindByCategory: jest.fn(),
+      onFindByLabel: jest.fn(),
+    });
+
+    it('offers the category first, then each label in the row\'s order', async () => {
+      const { getByTestId, getByText } = await renderMenu({
+        menu: makeMenu({ categoryId: 'cat-cafe', description: 'coffee | starbucks' }),
+        ...findProps(),
+      });
+      await waitFor(() => expect(getByTestId('operation-action-chips')).toBeTruthy());
+      expect(getByText('find_by')).toBeTruthy();
+
+      const keys = ['operation-action-chip-category', 'operation-action-chip-label-coffee', 'operation-action-chip-label-starbucks'];
+      keys.forEach((key) => expect(getByTestId(key)).toBeTruthy());
+      expect(getByTestId('operation-action-chip-category')).toHaveTextContent(/Cafe$/);
+    });
+
+    it('searches by the category it names', async () => {
+      const props = findProps();
+      const { getByTestId } = await renderMenu({ menu: makeMenu({ categoryId: 'cat-cafe' }), ...props });
+      await waitFor(() => expect(getByTestId('operation-action-chip-category')).toBeTruthy());
+
+      fireEvent.press(getByTestId('operation-action-chip-category'));
+      expect(props.onClose).toHaveBeenCalled();
+      expect(props.onFindByCategory).toHaveBeenCalledWith('cat-cafe');
+    });
+
+    it('searches by the label as stored', async () => {
+      const props = findProps();
+      const { getByTestId } = await renderMenu({
+        menu: makeMenu({ categoryId: 'cat-cafe', description: 'coffee | starbucks' }),
+        ...props,
+      });
+      await waitFor(() => expect(getByTestId('operation-action-chip-label-starbucks')).toBeTruthy());
+
+      fireEvent.press(getByTestId('operation-action-chip-label-starbucks'));
+      expect(props.onFindByLabel).toHaveBeenCalledWith('starbucks');
+    });
+
+    it('offers every label, beyond the six the row has room for', async () => {
+      const labels = ['a1', 'a2', 'a3', 'a4', 'a5', 'a6', 'a7', 'a8'];
+      const { getByTestId } = await renderMenu({
+        menu: makeMenu({ categoryId: 'cat-cafe', description: labels.join(' | ') }),
+        ...findProps(),
+      });
+      await waitFor(() => expect(getByTestId('operation-action-chips')).toBeTruthy());
+      labels.forEach((label) => expect(getByTestId(`operation-action-chip-label-${label}`)).toBeTruthy());
+    });
+
+    it('leaves out imported metadata and the balance-adjustment chain', async () => {
+      const { getByTestId, queryByTestId } = await renderMenu({
+        menu: makeMenu({
+          categoryId: 'cat-cafe',
+          description: 'coffee | Account: Card | Balance adjusted from 10 → 20',
+        }),
+        ...findProps(),
+      });
+      await waitFor(() => expect(getByTestId('operation-action-chip-label-coffee')).toBeTruthy());
+      expect(queryByTestId('operation-action-chip-label-Account: Card')).toBeNull();
+      expect(queryByTestId('operation-action-chip-label-Balance adjusted from 10 → 20')).toBeNull();
+    });
+
+    it('offers no category for a transfer', async () => {
+      const { getByTestId, queryByTestId } = await renderMenu({
+        menu: makeMenu({ type: 'transfer', categoryId: 'cat-cafe', description: 'rent' }),
+        ...findProps(),
+      });
+      await waitFor(() => expect(getByTestId('operation-action-chip-label-rent')).toBeTruthy());
+      expect(queryByTestId('operation-action-chip-category')).toBeNull();
+    });
+
+    it('offers no category that no longer resolves', async () => {
+      const { getByTestId, queryByTestId } = await renderMenu({
+        menu: makeMenu({ categoryId: 'deleted', description: 'coffee' }),
+        ...findProps(),
+      });
+      await waitFor(() => expect(getByTestId('operation-action-chip-label-coffee')).toBeTruthy());
+      expect(queryByTestId('operation-action-chip-category')).toBeNull();
+    });
+
+    it('draws no chip row when there is nothing to find by', async () => {
+      const { getByTestId, queryByTestId } = await renderMenu({
+        menu: makeMenu({ type: 'transfer', description: null }),
+        ...findProps(),
+      });
+      await waitFor(() => expect(getByTestId('operation-action-edit')).toBeTruthy());
+      expect(queryByTestId('operation-action-chips')).toBeNull();
+    });
+
+    it('draws no chip row for a host that does not search', async () => {
+      const { getByTestId, queryByTestId } = await renderMenu({
+        menu: makeMenu({ categoryId: 'cat-cafe', description: 'coffee' }),
+        ...baseProps(),
+        categories,
+      });
+      await waitFor(() => expect(getByTestId('operation-action-edit')).toBeTruthy());
+      expect(queryByTestId('operation-action-chips')).toBeNull();
+    });
+
+    it('names each chip to a screen reader by what it finds', async () => {
+      const { getByLabelText } = await renderMenu({
+        menu: makeMenu({ categoryId: 'cat-cafe', description: 'coffee' }),
+        ...findProps(),
+        t: (key) => ({
+          find_by_category_a11y: 'Show every operation in {name}',
+          find_by_label_a11y: 'Show every operation labelled {name}',
+        }[key] || key),
+      });
+      await waitFor(() => expect(getByLabelText('Show every operation in Cafe')).toBeTruthy());
+      expect(getByLabelText('Show every operation labelled coffee')).toBeTruthy();
+    });
+  });
 });

@@ -56,6 +56,7 @@ The app follows a feature-based organization under the `app/` directory:
   - Root: `LoadingView.js`, `ModalBlurOverlay.js`, `ModalHeader.js`
   - **components/operations/**: `OperationsList.js`, `OperationListItem.js`, `OperationFormFields.js`
     - `QuickAddForm.js`, `SplitOperationModal.js`, `PickerModal.js`, `DateSeparator.js`, `DescriptionSuggestionRow.js`
+    - `OperationActionMenu.js` (long-press menu; its "Find by" chips search by the operation's category or one of its labels), `SearchInsightCard.js` (the card over a search's results: count, totals, 6-month bars for a label or category search, figures from `utils/searchInsight.js`)
   - **components/search/**: `SearchBar.js`, `SearchOverlay.js`, `ExpandableFilters.js`, `FilterBadge.js`, `FilterChipStrip.js`
   - **components/graphs/**: `ExpenseSummaryCard.js`, `IncomeSummaryCard.js`, `ExpensePieChart.js`, `IncomePieChart.js`
     - `TrendsCard.js`, `SpendingPredictionCard.js`, `BalanceHistoryCard.js`, `BalanceHistoryModal.js`
@@ -134,6 +135,7 @@ The app uses React Context API for global state, with primary contexts that wrap
 4. **OperationsContext / OperationsDataContext / OperationsActionsContext** (split across 3 files)
    - Manages financial transactions with full CRUD and filtering
    - `SearchContext.js` provides search/filter state across operations
+   - Filters live for the session only: nothing restores a search on launch (the old `OPERATIONS_FILTERS` row is deleted at start-up). Every active filter loads all matches at once, and the label match runs in JS, so the filtered list is the whole result set
 
 5. **Other Contexts**
    - `BudgetsContext.js` - Budget management
