@@ -1,5 +1,12 @@
 # Changelog
 
+## [0.314.0](https://github.com/heywood8/money-tracker/compare/penny-v0.313.0...penny-v0.314.0) (2026-11-17)
+
+
+### Features
+
+* **operations:** find by label or category from the long-press menu ([#1908](https://github.com/heywood8/money-tracker/issues/1908)) ([1ecc014](https://github.com/heywood8/money-tracker/commit/1ecc014fbf72e842aa999fc18135e62c46d6eb2a))
+
 ## [0.313.0](https://github.com/heywood8/money-tracker/compare/penny-v0.312.1...penny-v0.313.0) (2026-11-16)
 
 
