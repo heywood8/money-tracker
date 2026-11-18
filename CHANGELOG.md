@@ -1,5 +1,12 @@
 # Changelog
 
+## [0.314.1](https://github.com/heywood8/money-tracker/compare/penny-v0.314.0...penny-v0.314.1) (2026-11-18)
+
+
+### Miscellaneous Chores
+
+* **deps:** bump actions/setup-java from 6.0.1 to 6.2.0 ([#1899](https://github.com/heywood8/money-tracker/issues/1899)) ([ecf8586](https://github.com/heywood8/money-tracker/commit/ecf85869209ba6c6a0fe7894585c9f9279eab3be))
+
 ## [0.314.0](https://github.com/heywood8/money-tracker/compare/penny-v0.313.0...penny-v0.314.0) (2026-11-17)
 
 
